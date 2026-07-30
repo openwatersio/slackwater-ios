@@ -12,10 +12,10 @@ struct TideDetailView: View {
     let record: TideStationRecord
     @AppStorage(unitsKey) private var units = "imperial"
 
-    @State private var live = Date.now
+    @State private var live = appNow()
     /// The committed instant everything reads (web's `now`): scrub release,
     /// row taps and day paging all move it.
-    @State private var selected = Date.now
+    @State private var selected = appNow()
     /// Finger-down preview, distinct from `selected` until release (web useScrub).
     @State private var preview: Date?
 
@@ -294,14 +294,27 @@ struct TideDetailView: View {
         .padding(.horizontal, 16)
     }
 
+    // The provenance/confidence marking (chs-online spec §2d, §7d): a fitted
+    // CHS station is our model of CHS's water, not CHS's published numbers —
+    // say so, with the clause-10 notice. A NOAA station keeps its line.
     private var footer: some View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
-            Text("\(record.chartDatum) datum · NOAA harmonic prediction")
-                .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+            if record.isChs {
+                Text("Chart datum · Harmonic model fitted on this device from CHS (IWLS) predictions — not CHS-published numbers")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+                Text("CHS data used under licence (clause 10) — not to be used for navigation")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("\(record.chartDatum) datum · NOAA harmonic prediction")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+            }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
         .padding(.top, 8)
     }
 
@@ -357,7 +370,7 @@ struct TideDetailView: View {
     }
 
     private func returnToNow() {
-        live = .now
+        live = appNow()
         selected = live
     }
 }

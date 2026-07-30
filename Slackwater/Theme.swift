@@ -91,6 +91,19 @@ func stationGradient(id: String) -> LinearGradient {
         startPoint: UnitPoint(x: 0.15, y: 0), endPoint: UnitPoint(x: 0.85, y: 1))
 }
 
+// MARK: - App clock
+
+/// Real time, or shifted by `-nowOffsetDays N` — the UI-test hook behind the
+/// M3 airplane-mode day-after check (relaunch offline "tomorrow").
+private let appNowOffset: TimeInterval = {
+    guard let i = CommandLine.arguments.firstIndex(of: "-nowOffsetDays"),
+          i + 1 < CommandLine.arguments.count,
+          let days = Double(CommandLine.arguments[i + 1]) else { return 0 }
+    return days * 86_400
+}()
+
+func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
+
 // MARK: - Units (mirrors slackwater-web src/units.ts)
 
 let unitsKey = "slackwater.units"  // "imperial" | "metric", same values as the web

@@ -41,7 +41,9 @@ marine apps). User experience first, capability of the platform second, technolo
 
 ## Status & license
 
-M1 (tides at web parity: station list + search, scrubbable tide detail, units) — see the
+M3 (tides + currents at web parity, and Canadian Salish tide ports that fit their own
+harmonic model on-device from IWLS on first connected launch — offline thereafter; identity
+is bundled from `station-corrections`, CHS data never is) — see the
 [docs index](docs/README.md) and the milestone plan in `slackwater/docs/superpowers/specs/`.
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
 are generated, not committed). This repo is **deliberately private and

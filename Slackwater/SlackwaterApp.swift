@@ -47,6 +47,8 @@ struct StationListView: View {
                                     CurrentCardView(record: station)
                                 }
                                 .buttonStyle(.plain)
+                            case .chs(let info):
+                                ChsCardView(info: info, imperial: imperial)
                             }
                         }
                     }
@@ -58,6 +60,9 @@ struct StationListView: View {
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
             .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
         }
+        // First connected launch: the Canadian Salish ports auto-fit in the
+        // background (M3 — no region UX). Partial failure retries next launch.
+        .task { ChsFitService.shared.fitPendingIfNeeded() }
     }
 
     private var header: some View {
@@ -155,7 +160,62 @@ struct StationCardView: View {
         .background(stationGradient(id: record.id))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
-        .task { if state == nil { state = record.cardState(at: .now) } }
+        .task { if state == nil { state = record.cardState(at: appNow()) } }
+    }
+}
+
+/// A Canadian (CHS) tide port. Fitted: the ordinary tide card, navigable.
+/// Not yet fitted: the same gradient shell with identity and an honest message
+/// (chs-online spec §7c — never an empty chart, never a spinner to nothing).
+struct ChsCardView: View {
+    let info: ChsStationInfo
+    let imperial: Bool
+    @ObservedObject private var service = ChsFitService.shared
+
+    var body: some View {
+        switch service.state(info.id) {
+        case .fitted(let record):
+            NavigationLink(value: record) {
+                StationCardView(record: record, imperial: imperial)
+            }
+            .buttonStyle(.plain)
+        case .fitting:
+            pendingCard("Fitting on this device from CHS predictions…")
+        case .pending:
+            pendingCard("Needs a moment of signal — Canadian stations fit once on this device, then work offline.")
+        }
+    }
+
+    private func pendingCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(info.name)
+                        .font(.fraunces(23, .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(info.region)
+                        .font(.geist(13))
+                        .foregroundStyle(SN.foam.opacity(0.78))
+                }
+                Spacer(minLength: 8)
+                MonoLabel(text: "CHS", size: 10, color: SN.foam.opacity(0.7))
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(Color.white.opacity(0.12), in: Capsule())
+            }
+            Text(message)
+                .font(.geist(12))
+                .foregroundStyle(SN.foam.opacity(0.85))
+                .padding(.top, 10)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .background(stationGradient(id: info.id))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
+        .opacity(0.82)  // visibly quieter than a station with numbers
     }
 }
 
@@ -217,7 +277,7 @@ struct CurrentCardView: View {
         .background(stationGradient(id: record.id))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
-        .task { if state == nil { state = record.cardState(at: .now) } }
+        .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 
     private func nextLine(_ next: CurrentEvent) -> String {

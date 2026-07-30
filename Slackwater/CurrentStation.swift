@@ -113,23 +113,27 @@ extension CurrentEvent {
 enum StationItem: Identifiable, Hashable {
     case tide(TideStationRecord)
     case current(CurrentStationRecord)
+    case chs(ChsStationInfo)   // Canadian tide port: identity bundled, model fitted on-device
 
     var id: String {
         switch self {
         case .tide(let s): s.id
         case .current(let s): "current:" + s.id  // Friday Harbor has both a tide and a current station
+        case .chs(let s): s.id
         }
     }
     var name: String {
         switch self {
         case .tide(let s): s.name
         case .current(let s): s.name
+        case .chs(let s): s.name
         }
     }
     func searchRank(_ query: String) -> Int? {
         switch self {
         case .tide(let s): s.searchRank(query)
         case .current(let s): s.searchRank(query)
+        case .chs(let s): s.searchRank(query)
         }
     }
 
@@ -137,6 +141,7 @@ enum StationItem: Identifiable, Hashable {
     static let all: [StationItem] = {
         var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
         merged += CurrentStationRecord.all.map { StationItem.current($0) }
+        merged += ChsStationInfo.all.map { StationItem.chs($0) }
         merged.sort { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
         guard let friday = merged.first(where: { $0.id == TideStationRecord.fridayHarborID }) else { return merged }
         return [friday] + merged.filter { $0.id != friday.id }

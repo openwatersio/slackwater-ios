@@ -11,8 +11,8 @@ private let day = 86_400.0
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
 
-    @State private var live = Date.now
-    @State private var selected = Date.now
+    @State private var live = appNow()
+    @State private var selected = appNow()
     @State private var preview: Date?
 
     @State private var dayPoints: [CurrentPoint] = []
@@ -425,7 +425,7 @@ struct CurrentDetailView: View {
     }
 
     private func returnToNow() {
-        live = .now
+        live = appNow()
         selected = live
     }
 }

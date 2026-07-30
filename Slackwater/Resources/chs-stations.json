@@ -1,0 +1,110 @@
+[
+ {
+  "id": "chs-owen-bay",
+  "name": "Owen Bay",
+  "region": "Sonora Island",
+  "aliases": [],
+  "latitude": 50.31,
+  "longitude": -125.223,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-campbell-river",
+  "name": "Campbell River",
+  "region": "Discovery Passage",
+  "aliases": [],
+  "latitude": 50.042,
+  "longitude": -125.247,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-point-atkinson",
+  "name": "Point Atkinson",
+  "region": "West Vancouver",
+  "aliases": [
+   "lighthouse park"
+  ],
+  "latitude": 49.337,
+  "longitude": -123.254,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-vancouver",
+  "name": "Vancouver",
+  "region": "Burrard Inlet",
+  "aliases": [
+   "vancouver harbour"
+  ],
+  "latitude": 49.286,
+  "longitude": -123.1,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-port-alberni",
+  "name": "Port Alberni",
+  "region": "Alberni Inlet",
+  "aliases": [
+   "alberni"
+  ],
+  "latitude": 49.226,
+  "longitude": -124.814,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-tofino",
+  "name": "Tofino",
+  "region": "Clayoquot Sound",
+  "aliases": [
+   "clayoquot"
+  ],
+  "latitude": 49.154,
+  "longitude": -125.913,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-fulford-harbour",
+  "name": "Fulford Harbour",
+  "region": "Salt Spring Island",
+  "aliases": [
+   "fulford"
+  ],
+  "latitude": 48.769,
+  "longitude": -123.451,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-port-renfrew",
+  "name": "Port Renfrew",
+  "region": "Port San Juan",
+  "aliases": [
+   "san juan"
+  ],
+  "latitude": 48.555,
+  "longitude": -124.421,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-victoria",
+  "name": "Victoria",
+  "region": "Inner Harbour",
+  "aliases": [
+   "victoria harbour",
+   "inner harbour"
+  ],
+  "latitude": 48.424,
+  "longitude": -123.371,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-sooke",
+  "name": "Sooke",
+  "region": "Strait of Juan de Fuca",
+  "aliases": [
+   "sooke basin",
+   "sooke harbour"
+  ],
+  "latitude": 48.37,
+  "longitude": -123.726,
+  "timezone": "America/Vancouver"
+ }
+]
