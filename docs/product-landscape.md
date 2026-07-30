@@ -9,7 +9,7 @@ library-move plans already discussed. Same rule as always: written to be argued 
 Four layers. Each works without the layer below it, and gets better with it.
 
 ```
-  Apps (phone/tablet)     Slackwater · Charts · Equipment app
+  Apps (phone/tablet)     Slackwater · Charts (incl. Ship Shape, the equipment locker)
         │  boat WiFi (elevated) / own APIs (standalone)
   Boat platform (Pi)      SignalK · equipment registry · data history
         │  optional
@@ -25,8 +25,15 @@ Exactly the split-by-job shape from `collaboration-plan.md`, now with owners and
 | App | Job (the 3-second test) | Price posture | Owner |
 |---|---|---|---|
 | **Slackwater** | "Tides in Nanaimo" — curve + next slack | **Low entry, no-brainer.** Polished and cheap on purpose — it's the trust ladder and the funnel | Bryan |
-| **Charts** (Brandon's, own name TBD) | "Get me through the Gulf Islands Thursday" — chart with my boat on it | **Premium.** Free offline charting as the base; planning, routing, and the go-window class of features paid | Brandon |
-| **Equipment app** (unnamed — name earned, not assigned) | "What's this breaker for" — search over *my boat* | TBD; free-leaning base, see levels below | Bryan |
+| **Charts** (Brandon's, own name TBD) | "Get me through the Gulf Islands Thursday" — chart with my boat on it. **Plus Ship Shape** — see below | **Premium.** Free offline charting as the base; planning, routing, and the go-window class of features paid | Brandon |
+
+**Ship Shape — the equipment locker, inside Charts, not a third app** *(Brandon's call, agreed
+2026-07-30)*. The "what's this breaker for" job lives as a section of the Charts app — one stop
+shop for your boat — rather than its own build. That trims the app sprawl the split-by-job model
+pays for: one fewer release train, store listing, and review queue while the family is small.
+The boat-side backend (registry, manuals, index) is unchanged and app-agnostic, so nothing in
+this breaks the vision of splitting the locker out as its own app later if it earns it — the
+sync surface just gets its first home in Charts.
 
 Every app is **standalone-first**: it reaches its own APIs (tide services, chart tiles, weather)
 with no boat present. But when it's on the boat network and finds a local SignalK, it **elevates**
@@ -51,9 +58,9 @@ no subscription:
    `signalk-equipment-registry`) knows what's installed: manufacturer, model, serial, path
    bindings. The magic moment: plug the Pi into the NMEA network and it **auto-discovers the
    equipment** — it saw the VHF announce itself on the bus, so it goes and fetches the PDF
-   manual itself. Indexed locally; the equipment app syncs that index and then works fully
-   offline (interrogate your boat in an anchorage with no bars — Slackwater's offline principle
-   applied to knowledge). For gear that never speaks on the bus, the agent layer closes the gap:
+   manual itself. Indexed locally; Ship Shape (the locker in Charts) syncs that index and then
+   works fully offline (interrogate your boat in an anchorage with no bars — Slackwater's
+   offline principle applied to knowledge). For gear that never speaks on the bus, the agent layer closes the gap:
    **photo-to-understanding** — snap the breaker panel or the nameplate, the agent identifies it
    and files it into the registry. This is the honest merge point: we've both built the manuals
    layer independently, so it's validated and it's nobody's moat — the gathering/indexing/
@@ -120,7 +127,7 @@ Each milestone is a shippable thing with its own audience; none blocks the next 
 |---|---|---|---|
 | **M1** | **Slackwater launches** | iOS + web, free core + paid planning tier. First app out, sets the design bar and the maker mark | Engine + library moves (in motion) |
 | **M2** | **Charts app** | Brandon's app: free offline charting, paid planning/routing | Brandon's timeline; tides/currents embedded via the shared libraries |
-| **M3** | **Equipment app + platform levels 1–2** | The Pi as a product (installable image or clear install), equipment locker fetching manuals, the companion app syncing it. No agent required | Registry (shipped), gathering/indexing packages |
+| **M3** | **Ship Shape + platform levels 1–2** | The Pi as a product (installable image or clear install), equipment locker fetching manuals, and the Ship Shape section in Charts syncing it. No agent required | Registry (shipped), gathering/indexing packages, a Charts build to live in |
 | **M4** | **Agent subscription** | The runtime on the Pi as a paid service — managed models, metered tokens | Runtime decision (OpenClaw spike), M3's platform, and the biller question below |
 | **M5** | **Mac local-compute app** | Local models managed, local↔cloud swap | M4 + history layer |
 | **M6** | **The box** | Hat Labs partnership: our stack + OS-layer auto-updates preinstalled on HALPI2-class hardware, sold with the managed subscription | M3–M4 proven on our own installs |
@@ -136,4 +143,5 @@ Each milestone is a shippable thing with its own audience; none blocks the next 
 3. **Runtime.** OpenClaw vs Poseidon — bounded spike per the evaluation doc; decide on
    measurement, not hype.
 4. **Android.** Standing question, unchanged; must not gate any iOS launch.
-5. **Equipment app name.** Still earned, not assigned.
+5. ~~**Equipment app name.**~~ Resolved 2026-07-30: **Ship Shape**, and it ships as the locker
+   inside Charts rather than a separate app (see above).
