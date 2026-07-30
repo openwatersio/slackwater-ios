@@ -14,7 +14,7 @@ struct SlackwaterApp: App {
 
 struct StationListView: View {
     // Launch on Friday Harbor (first station); Back reaches the list.
-    @State private var path = Array(TideStationRecord.all.prefix(1))
+    @State private var path = NavigationPath(TideStationRecord.all.prefix(1))
     @State private var query = ""
     @AppStorage(unitsKey) private var units = "imperial"
 
@@ -35,11 +35,19 @@ struct StationListView: View {
                         .padding(.top, 14)
                         .padding(.bottom, 4)
                     LazyVStack(spacing: 12) {
-                        ForEach(TideStationRecord.search(query)) { station in
-                            NavigationLink(value: station) {
-                                StationCardView(record: station, imperial: imperial)
+                        ForEach(StationItem.search(query)) { item in
+                            switch item {
+                            case .tide(let station):
+                                NavigationLink(value: station) {
+                                    StationCardView(record: station, imperial: imperial)
+                                }
+                                .buttonStyle(.plain)
+                            case .current(let station):
+                                NavigationLink(value: station) {
+                                    CurrentCardView(record: station)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -48,6 +56,7 @@ struct StationListView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
+            .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
         }
     }
 
@@ -147,5 +156,74 @@ struct StationCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: .now) } }
+    }
+}
+
+/// The current-station card: same 1a gradient shell, but the reading is signed
+/// velocity — speed + set arrow + Flooding/Ebbing, a Slack pill at slack, and
+/// the next slack/max as the detail line (web StationCard's current layout).
+struct CurrentCardView: View {
+    let record: CurrentStationRecord
+    @State private var state: CurrentCardState?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(record.name)
+                        .font(.fraunces(23, .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(record.region)
+                        .font(.geist(13))
+                        .foregroundStyle(SN.foam.opacity(0.78))
+                    if let next = state?.next {
+                        Text(nextLine(next))
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.92))
+                            .padding(.top, 10)
+                    }
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 5) {
+                    if let state {
+                        let phase = currentPhase(signed: state.signed)
+                        if phase == .slack {
+                            Text("SLACK")
+                                .font(.geistMono(11, .medium)).tracking(1)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(Color.white.opacity(0.18), in: Capsule())
+                        } else {
+                            (Text(formatSpeed(abs(state.signed)))
+                                .font(.fraunces(42))
+                             + Text(" kn")
+                                .font(.fraunces(17)))
+                                .foregroundStyle(.white)
+                            HStack(spacing: 4) {
+                                CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.geist(11))
+                                Text(phaseWord(phase)).font(.geist(11))
+                            }
+                            .foregroundStyle(SN.foam.opacity(0.9))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .background(stationGradient(id: record.id))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
+        .task { if state == nil { state = record.cardState(at: .now) } }
+    }
+
+    private func nextLine(_ next: CurrentEvent) -> String {
+        let when = cardTime(next.time, record.tz)
+        return next.kind == .slack
+            ? "Slack · \(when)"
+            : "\(next.turnLabel) \(formatSpeed(abs(next.speed))) kn · \(when)"
     }
 }

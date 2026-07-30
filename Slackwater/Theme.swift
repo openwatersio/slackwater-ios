@@ -140,3 +140,46 @@ func dayLine(_ date: Date, _ tz: TimeZone) -> String {
 func weekdayName(_ date: Date, _ tz: TimeZone) -> String {
     formatter("EEEE", tz).string(from: date)
 }
+
+// MARK: - Detail-view shared pieces (tide + current)
+
+/// The schedule pager's circular chevron button.
+struct PagerButton: View {
+    let symbol: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(SN.foam)
+                .frame(width: 34, height: 34)
+                .background(Color.white.opacity(0.06), in: Circle())
+        }
+    }
+}
+
+/// Released within `window` of an event time, the scrub line parks exactly on
+/// it (web snapToTurn — tides snap to turns, currents to slacks and peaks).
+func snapToNearest(_ t: Date, times: [Date], window: TimeInterval = 30 * 60) -> Date {
+    var best: Date?
+    var bestGap = window
+    for time in times {
+        let gap = abs(time.timeIntervalSince(t))
+        if gap <= bestGap { bestGap = gap; best = time }
+    }
+    return best ?? t
+}
+
+/// "42m" / "2h 14m" until `target`, floored at zero.
+func countdown(from: Date, to target: Date) -> String {
+    let minutes = max(Int(target.timeIntervalSince(from) / 60), 0)
+    return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+}
+
+/// The web's CompassArrow: ↑ rotated to a true bearing, "sets this way".
+struct CompassArrow: View {
+    let deg: Double
+    var body: some View {
+        Text("↑").rotationEffect(.degrees(deg))
+    }
+}
