@@ -31,8 +31,11 @@ Fit 2026-05-25 → 07-24 (60 d @ 15 min); validation 2026-08-21 → 08-28 (7 d, 
    never hit.)
 3. **No `fetch` in JSCore** — IWLS fetching lives in Swift/URLSession; hand JSON strings +
    epoch-ms across the bridge.
-4. **Add `SA`/`SSA` to the constituent list for tide heights** (one line at the `fit()` call) —
-   recovers the seasonal signal on >60-day windows (fit RMS 8.2 → 5.0 cm at 210 d).
+4. ~~Add `SA`/`SSA` to the constituent list for tide heights~~ — **corrected by M3
+   (2026-07-30): only at windows ≥183 d.** SA/SSA are Rayleigh-unseparable below ~183 days
+   and silently absorb Z0 — at the shipping 60-day window this *worsened* Sidney validation
+   RMSE 9.1 → 22.0 cm (measured). Shipped config is plain BASIS at 60 d; the SA/SSA gain
+   (fit RMS 8.2 → 5.0 cm) is real only at the 210-day probe. See `Slackwater/Resources/chs-glue.js`.
 5. **IWLS gotchas:** `wlp` is 1-min native (decimate before bridging), 7-day request cap, query
    by Mongo `id` not station `code`, `wlp-hilo` events carry no high/low qualifier (classify
    against neighbours).
