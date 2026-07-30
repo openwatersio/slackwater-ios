@@ -1,0 +1,18 @@
+{
+  "comparedPoints" : 673,
+  "engine" : "JavaScriptCore (macOS — same engine as iOS)",
+  "extremes" : {
+    "matched" : 20,
+    "maxTimingMin" : 73,
+    "meanHeightErrCm" : 5.1900000000000004,
+    "medianTimingMin" : 15,
+    "of" : 21
+  },
+  "fitMsInsideJS" : 1111,
+  "maxAbsCm" : 19.690000000000001,
+  "nConstituents" : 23,
+  "rmseCm" : 6.8099999999999996,
+  "rmsFitM" : 0.081827947343090734,
+  "unseparablePairs" : 1,
+  "wallMsFitPlusPredict" : 1144.0999999999999
+}

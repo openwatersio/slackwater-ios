@@ -1,6 +1,10 @@
 # Xcode
 build/
+.build/
 DerivedData/
 xcuserdata/
 *.xcuserstate
 .DS_Store
+
+# XcodeGen output (regenerate with `xcodegen generate`)
+Slackwater.xcodeproj/
