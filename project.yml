@@ -20,6 +20,7 @@ targets:
       properties:
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIAppFonts:
           - Fraunces-Regular.ttf
           - Fraunces-Medium.ttf
@@ -37,6 +38,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
       configs:
         # Release archives sign manually with the CI-keychain distribution identity
         # (headless: login keychain is locked to non-GUI sessions — see docs/testflight.md)
