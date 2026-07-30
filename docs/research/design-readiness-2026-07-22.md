@@ -22,7 +22,8 @@ project/artifact, so every agent session hits the same wall. This is why prior s
 
 **Fix: export the prototype code into this repo** (`prototype/` — now meaning
 `slackwater-ios`, where the app lives). Loose ends 1–3 below all require reconciling spec
-against prototype. (Alternative — recreate it as a design-system project — is more setup
+against prototype. **✅ Done 2026-07-30** — exported to [`prototype/`](../../prototype/)
+(also: the "not readable by any model" claim is stale — DesignSync now reads regular projects). (Alternative — recreate it as a design-system project — is more setup
 for a worse fit; a prototype isn't a component library.)
 
 ## Loose ends (each recorded once, in the right spec — consolidated here)

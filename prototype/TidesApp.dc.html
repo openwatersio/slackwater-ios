@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="_ds/sailing-naturali-f5d6de3f-be26-471e-af8f-c24703ea5cbb/styles.css">
+<style>
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+  a{color:#88b868;text-decoration:none;}
+  a:hover{color:#e4f0e4;}
+  .hidescroll::-webkit-scrollbar{display:none;}
+  .hidescroll{scrollbar-width:none;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes kbrise{from{transform:translateY(100%);}to{transform:translateY(0);}}
+</style>
+</helmet>
+<div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:44px;font-family:Geist,system-ui,sans-serif;">
+  <div style="position:relative;width:402px;height:874px;border-radius:52px;background:#05122a;box-shadow:0 50px 90px rgba(0,12,30,0.4),0 0 0 1px rgba(0,0,0,0.3),inset 0 0 0 8px #000;overflow:hidden;">
+    <!-- dynamic island -->
+    <div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;border-radius:24px;background:#000;z-index:80;"></div>
+    <!-- status bar -->
+    <div style="position:absolute;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;justify-content:space-between;padding:20px 32px 0;pointer-events:none;">
+      <span style="font-weight:600;font-size:16px;color:#fff;letter-spacing:-0.2px;">9:41</span>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill="#fff"/><rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill="#fff"/><rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill="#fff"/><rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill="#fff"/></svg>
+        <svg width="17" height="12" viewBox="0 0 17 12"><path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill="#fff"/><circle cx="8.5" cy="10.5" r="1.5" fill="#fff"/></svg>
+        <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="#fff" stroke-opacity="0.4" fill="none"/><rect x="2" y="2" width="18" height="9" rx="2" fill="#fff"/><path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill="#fff" fill-opacity="0.4"/></svg>
+      </div>
+    </div>
+
+    <!-- ===== LIST SCREEN ===== -->
+    <div class="hidescroll" style="position:absolute;inset:0;overflow-y:auto;background:{{ listBg }};padding:64px 0 130px;">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:6px 22px 16px;">
+        <div style="font-family:Fraunces,serif;font-size:36px;font-weight:600;letter-spacing:-0.5px;color:#fcfcfc;">Tides</div>
+        <div onClick="{{ openSettings }}" style="cursor:pointer;height:34px;padding:0 14px;border-radius:17px;display:flex;align-items:center;font-family:'Geist Mono',monospace;font-size:12px;font-weight:500;letter-spacing:1px;text-transform:uppercase;background:rgba(136,184,104,0.16);color:#88b868;">{{ unitLabel }}</div>
+      </div>
+
+      <!-- current location card -->
+      <div onClick="{{ currentCard.open }}" style="cursor:pointer;margin:0 16px 12px;border-radius:24px;padding:18px 20px;min-height:118px;position:relative;overflow:hidden;background:{{ currentCard.grad }};box-shadow:0 12px 28px rgba(0,20,50,0.3);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div style="min-width:0;">
+            <div style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.6px;color:rgba(228,240,228,0.85);text-transform:uppercase;">My Location</div>
+            <div style="font-family:Fraunces,serif;font-size:25px;font-weight:600;color:#fff;margin-top:3px;">{{ currentCard.name }}</div>
+            <div style="font-size:13px;color:rgba(228,240,228,0.78);margin-top:1px;">{{ currentCard.region }}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-family:Fraunces,serif;font-size:46px;font-weight:400;color:#fff;line-height:1;letter-spacing:-1px;">{{ currentCard.hMain }}<span style="font-size:19px;"> {{ currentCard.hUnit }}</span></div>
+            <div style="font-size:12px;color:rgba(228,240,228,0.9);margin-top:5px;">{{ currentCard.tideIcon }}{{ currentCard.trend }}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:12px;font-size:12px;color:rgba(228,240,228,0.92);align-items:center;flex-wrap:wrap;">
+          <span>{{ currentCard.hi }}</span><span>{{ currentCard.lo }}</span>
+          <span style="display:inline-flex;align-items:center;">{{ currentCard.curArrow }}{{ currentCard.cur }} · {{ currentCard.slack }}</span>
+        </div>
+      </div>
+
+      <!-- favorites -->
+      <sc-for list="{{ favorites }}" as="c" hint-placeholder-count="4">
+        <div onClick="{{ c.open }}" style="cursor:pointer;margin:0 16px 12px;border-radius:24px;padding:16px 20px;min-height:104px;position:relative;overflow:hidden;background:{{ c.grad }};box-shadow:0 10px 24px rgba(0,20,50,0.24);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="min-width:0;">
+              <div style="font-family:Fraunces,serif;font-size:23px;font-weight:600;color:#fff;">{{ c.name }}</div>
+              <div style="font-size:13px;color:rgba(228,240,228,0.78);margin-top:2px;">{{ c.region }}</div>
+              <div style="font-size:12px;color:rgba(228,240,228,0.92);margin-top:10px;display:flex;align-items:center;">{{ c.curArrow }}{{ c.cur }} · {{ c.slack }}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:Fraunces,serif;font-size:42px;font-weight:400;color:#fff;line-height:1;letter-spacing:-1px;">{{ c.hMain }}<span style="font-size:17px;"> {{ c.hUnit }}</span></div>
+              <div style="font-size:11px;color:rgba(228,240,228,0.9);margin-top:5px;">{{ c.tideIcon }}{{ c.trend }}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;margin-top:8px;font-size:11px;color:rgba(228,240,228,0.82);">
+            <span>{{ c.hi }}</span><span>{{ c.lo }}</span>
+          </div>
+        </div>
+      </sc-for>
+
+      <!-- recent -->
+      <sc-if value="{{ hasRecents }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ toggleRecent }}" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:16px 26px 8px;">
+          <span style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;">Recent</span>
+          <svg width="13" height="13" viewBox="0 0 13 13" style="transform:rotate({{ recentDeg }}deg);transition:transform .25s ease;"><path d="M3 5l3.5 3.5L10 5" stroke="#88b868" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <sc-if value="{{ recentOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="margin:0 16px;border-radius:20px;overflow:hidden;background:rgba(255,255,255,0.05);border:0.5px solid rgba(136,184,104,0.2);">
+            <sc-for list="{{ recents }}" as="r" hint-placeholder-count="2">
+              <div onClick="{{ r.open }}" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:0.5px solid rgba(255,255,255,0.08);">
+                <div style="width:38px;height:38px;border-radius:11px;flex-shrink:0;background:{{ r.grad }};"></div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:16px;font-weight:500;color:#fcfcfc;">{{ r.name }}</div>
+                  <div style="font-size:12px;color:rgba(228,240,228,0.55);">{{ r.region }}</div>
+                </div>
+                <div style="font-family:Fraunces,serif;font-size:17px;color:rgba(228,240,228,0.7);">{{ r.hMain }} {{ r.hUnit }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </sc-if>
+    </div>
+
+    <!-- ===== SEARCH SCREEN ===== -->
+    <sc-if value="{{ searching }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:40;background:{{ listBg }};display:flex;flex-direction:column;animation:fadeUp .22s ease;">
+        <div style="padding:64px 22px 6px;">
+          <div style="font-family:Fraunces,serif;font-size:30px;font-weight:600;color:#fcfcfc;">Search</div>
+        </div>
+        <div class="hidescroll" style="flex:1;overflow-y:auto;padding:8px 0 8px;">
+          <div style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;padding:6px 26px 8px;">{{ searchHeader }}</div>
+          <sc-for list="{{ searchResults }}" as="s" hint-placeholder-count="4">
+            <div onClick="{{ s.open }}" style="cursor:pointer;margin:0 16px 10px;border-radius:18px;padding:13px 18px;position:relative;overflow:hidden;background:{{ s.grad }};box-shadow:0 6px 16px rgba(0,20,50,0.22);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-family:Fraunces,serif;font-size:19px;font-weight:600;color:#fff;">{{ s.name }}</div>
+                <div style="font-size:12px;color:rgba(228,240,228,0.8);">{{ s.region }}</div>
+              </div>
+              <div style="font-family:Fraunces,serif;font-size:27px;font-weight:400;color:#fff;">{{ s.hMain }}<span style="font-size:13px;"> {{ s.hUnit }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- ===== FLOATING TOOLBAR ===== -->
+    <sc-if value="{{ toolbarPill }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:0;right:0;bottom:34px;z-index:50;display:flex;justify-content:center;pointer-events:none;">
+        <div style="pointer-events:auto;display:flex;align-items:center;gap:10px;">
+          <div onClick="{{ startSearch }}" style="cursor:pointer;width:56px;height:56px;border-radius:28px;display:flex;align-items:center;justify-content:center;background:rgba(24,72,112,0.55);backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);border:0.5px solid rgba(136,184,104,0.3);box-shadow:0 6px 20px rgba(0,12,30,0.4);">
+            <svg width="22" height="22" viewBox="0 0 22 22"><circle cx="9" cy="9" r="7" stroke="#e4f0e4" stroke-width="2.2" fill="none"/><path d="M14.5 14.5L20 20" stroke="#e4f0e4" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </div>
+          <div onClick="{{ openSettings }}" style="cursor:pointer;height:56px;padding:0 22px;border-radius:28px;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Geist Mono',monospace;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:#e4f0e4;background:rgba(24,72,112,0.55);backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);border:0.5px solid rgba(136,184,104,0.3);box-shadow:0 6px 20px rgba(0,12,30,0.4);"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4" fill="none" stroke="#e4f0e4" stroke-width="1.4"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4" stroke="#e4f0e4" stroke-width="1.4" stroke-linecap="round"/></svg>{{ unitLabel }}</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ searching }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;right:0;bottom:0;z-index:60;">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 14px 10px;">
+          <div style="flex:1;height:48px;border-radius:24px;display:flex;align-items:center;gap:9px;padding:0 16px;background:rgba(24,72,112,0.6);backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);border:0.5px solid rgba(136,184,104,0.3);box-shadow:0 6px 20px rgba(0,12,30,0.4);">
+            <svg width="18" height="18" viewBox="0 0 22 22"><circle cx="9" cy="9" r="7" stroke="rgba(228,240,228,0.7)" stroke-width="2.2" fill="none"/><path d="M14.5 14.5L20 20" stroke="rgba(228,240,228,0.7)" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <input value="{{ query }}" onChange="{{ onQuery }}" autoFocus="{{ true }}" placeholder="Harbor, bay, or channel" style="flex:1;border:none;outline:none;background:transparent;font-size:17px;color:#fcfcfc;font-family:Geist,system-ui;"/>
+          </div>
+          <div onClick="{{ cancelSearch }}" style="cursor:pointer;font-size:17px;color:#88b868;">Cancel</div>
+        </div>
+        <div style="animation:kbrise .28s cubic-bezier(.2,.7,.2,1);">{{ keyboard }}</div>
+      </div>
+    </sc-if>
+
+    <!-- ===== DETAIL PANEL ===== -->
+    <div style="position:absolute;inset:0;z-index:65;transform:translateX({{ detailX }});transition:transform .34s cubic-bezier(.32,.72,0,1);pointer-events:{{ detailPE }};">
+      <sc-if value="{{ hasStation }}" hint-placeholder-val="{{ false }}">
+        <div class="hidescroll" style="position:absolute;inset:0;overflow-y:auto;background:{{ st.pageBg }};">
+          <!-- hero -->
+          <div style="position:relative;background:#05122a;height:420px;overflow:hidden;">
+            {{ st.mapLayer }}
+            <div style="position:relative;z-index:3;padding:58px 16px 0;">
+              <div style="position:relative;display:flex;align-items:center;justify-content:space-between;height:44px;">
+                <div onClick="{{ closeDetail }}" style="cursor:pointer;width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;background:rgba(5,18,42,0.55);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);">
+                  <svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div style="position:absolute;left:52px;right:{{ st.titleRight }};text-align:center;pointer-events:none;display:flex;justify-content:center;">
+                  <div style="display:inline-block;max-width:100%;padding:7px 14px 8px;border-radius:16px;background:rgba(5,18,42,0.34);border:0.5px solid rgba(255,255,255,0.10);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+                    <div style="font-family:Fraunces,serif;font-size:19px;font-weight:600;color:#fff;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ st.name }}</div>
+                    <div style="font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(228,240,228,0.8);margin-top:2px;white-space:nowrap;">{{ st.region }}</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <sc-if value="{{ st.showNow }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ returnToNow }}" style="cursor:pointer;width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;background:rgba(5,18,42,0.55);border:0.5px solid rgba(255,255,255,0.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+                      <svg width="19" height="19" viewBox="0 0 20 20" fill="none"><path d="M3.7 10a6.4 6.4 0 1 0 1.85-4.5" stroke="#88b868" stroke-width="2.2" stroke-linecap="round"/><path d="M3.3 3.5v3.6h3.6" stroke="#88b868" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ st.canSave }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ saveActive }}" style="cursor:pointer;width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;background:rgba(136,184,104,0.9);box-shadow:0 4px 14px rgba(0,20,50,0.3);">
+                      <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14" stroke="#00183c" stroke-width="2.6" stroke-linecap="round"/></svg>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 0 42px;display:flex;flex-direction:column;gap:14px;">
+            <!-- TIDE + CURRENT (one continuous scrubbable timeline) -->
+            <div style="border-radius:0;padding:16px 16px 12px;background:{{ st.cardBg }};border:none;border-bottom:0.5px solid rgba(136,184,104,0.22);overflow:hidden;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+                <div>
+                  <div style="font-family:'Geist Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;">{{ st.scrubDay }}</div>
+                  <div style="font-family:Fraunces,serif;font-size:30px;font-weight:500;color:#fff;line-height:1.1;">{{ st.scrubTime }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding-top:2px;">
+                  {{ st.scrubMoon }}
+                  <span style="font-size:11px;color:rgba(228,240,228,0.6);text-align:right;max-width:88px;">{{ st.scrubMoonName }}</span>
+                </div>
+              </div>
+
+              <sc-if value="{{ st.hasTide }}" hint-placeholder-val="{{ true }}">
+              <!-- TIDE readout -->
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:14px;">
+                <div>
+                  <div style="display:flex;align-items:baseline;gap:6px;">
+                    <span style="font-family:Fraunces,serif;font-size:34px;font-weight:400;color:#fff;line-height:1;">{{ st.scrubTideH }}</span>
+                    <span style="font-size:14px;color:rgba(228,240,228,0.8);">{{ st.uH }}</span>
+                  </div>
+                  <div style="font-size:13px;color:rgba(228,240,228,0.85);margin-top:4px;">{{ st.tideIcon }}{{ st.tideState }}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:1.4px;color:rgba(228,240,228,0.5);text-transform:uppercase;">Next {{ st.nextTideType }}</div>
+                  <div style="font-family:Fraunces,serif;font-size:19px;color:#e4f0e4;margin-top:1px;">{{ st.nextTideH }} {{ st.uH }}</div>
+                  <div style="font-size:12px;color:#88b868;margin-top:1px;">in {{ st.nextTideDt }}</div>
+                </div>
+              </div>
+              </sc-if>
+
+              <div style="margin:12px 0 2px;">{{ st.chart }}</div>
+
+              <sc-if value="{{ st.hasCur }}" hint-placeholder-val="{{ true }}">
+              <!-- CURRENT readout -->
+              <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:4px;">
+                <div>
+                  <div style="display:flex;align-items:baseline;gap:6px;">
+                    <span style="font-family:Fraunces,serif;font-size:34px;font-weight:400;color:#fff;line-height:1;">{{ st.scrubCurMain }}</span>
+                    <span style="font-size:14px;color:rgba(228,240,228,0.8);">{{ st.scrubCurUnit }}</span>
+                  </div>
+                  <div style="font-size:13px;color:rgba(228,240,228,0.85);margin-top:4px;">{{ st.curStateLine }}{{ st.curArrow }}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:1.4px;color:rgba(228,240,228,0.5);text-transform:uppercase;">Next slack</div>
+                  <div style="font-family:Fraunces,serif;font-size:19px;color:#e4f0e4;margin-top:1px;">in {{ st.nextSlackDt }}</div>
+                  <div style="font-size:12px;color:#88b868;margin-top:1px;">{{ st.nextPeakLine }}</div>
+                </div>
+              </div>
+              </sc-if>
+
+              <div style="text-align:center;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:1.4px;color:rgba(228,240,228,0.4);text-transform:uppercase;margin-top:12px;">‹ swipe to scrub · snaps to slack &amp; your limit ›</div>
+              <sc-if value="{{ st.hasCur }}" hint-placeholder-val="{{ true }}">
+              <div style="text-align:center;font-size:12px;color:rgba(228,240,228,0.55);margin-top:8px;">Slack limit ±{{ slackVal }} {{ slackUnit }}</div>
+              </sc-if>
+            </div>
+
+            <div style="margin:0 16px;border-radius:24px;background:{{ st.cardBg }};border:0.5px solid rgba(136,184,104,0.16);overflow:hidden;">{{ st.table }}</div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- ===== SETTINGS SHEET ===== -->
+    <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeSettings }}" style="position:absolute;inset:0;z-index:74;background:rgba(0,8,20,0.55);"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;z-index:75;background:#04162e;border-radius:26px 26px 0 0;padding:20px 20px 34px;border-top:0.5px solid rgba(136,184,104,0.25);box-shadow:0 -14px 40px rgba(0,8,20,0.5);animation:kbrise .3s cubic-bezier(.2,.7,.2,1);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <div style="font-family:Fraunces,serif;font-size:24px;color:#fcfcfc;">Settings</div>
+          <div onClick="{{ closeSettings }}" style="cursor:pointer;font-size:16px;color:#88b868;">Done</div>
+        </div>
+
+        <div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;margin-bottom:9px;">Tide height</div>
+        <div style="display:flex;gap:8px;margin-bottom:20px;">
+          <div onClick="{{ setFt }}" style="cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:15px;background:{{ bgFt }};color:{{ tFt }};">Feet</div>
+          <div onClick="{{ setM }}" style="cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:15px;background:{{ bgM }};color:{{ tM }};">Meters</div>
+        </div>
+
+        <div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;margin-bottom:9px;">Current speed</div>
+        <div style="display:flex;gap:8px;margin-bottom:20px;">
+          <div onClick="{{ setKn }}" style="cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:15px;background:{{ bgKn }};color:{{ tKn }};">Knots</div>
+          <div onClick="{{ setKmh }}" style="cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:15px;background:{{ bgKmh }};color:{{ tKmh }};">km/h</div>
+          <div onClick="{{ setMs }}" style="cursor:pointer;flex:1;text-align:center;padding:11px 0;border-radius:12px;font-size:15px;background:{{ bgMs }};color:{{ tMs }};">m/s</div>
+        </div>
+
+        <div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.6px;color:#88b868;text-transform:uppercase;margin-bottom:6px;">Slack limit</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+          <div style="font-size:12px;color:rgba(228,240,228,0.65);max-width:150px;line-height:1.4;">Your safe transit speed. Wider limit, wider go-window.</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div onClick="{{ slackMinus }}" style="cursor:pointer;width:34px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#e4f0e4;background:rgba(255,255,255,0.08);">−</div>
+            <div style="font-family:Fraunces,serif;font-size:19px;color:#fff;min-width:82px;text-align:center;">{{ slackVal }} {{ slackUnit }}</div>
+            <div onClick="{{ slackPlus }}" style="cursor:pointer;width:34px;height:34px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#e4f0e4;background:rgba(255,255,255,0.08);">+</div>
+          </div>
+        </div>
+        <input type="range" min="0.25" max="8" step="0.25" value="{{ slackKn }}" onChange="{{ onSlack }}" style="width:100%;accent-color:#88b868;"/>
+        <div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9px;color:rgba(228,240,228,0.4);margin-top:4px;"><span>kayak</span><span>small craft</span><span>powerboat</span></div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;bottom:9px;left:0;right:0;z-index:90;display:flex;justify-content:center;pointer-events:none;">
+      <div style="width:139px;height:5px;border-radius:3px;background:rgba(255,255,255,0.5);"></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:490,&quot;height&quot;:962},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;a&quot;,&quot;b&quot;],&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;'a'|'b'&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const BAKED={"t0":"2026-07-20","stations":{"seattle":{"sun":[{"d":-2,"rise":-42.479,"set":-26.97},{"d":-1,"rise":-18.461,"set":-2.985},{"d":0,"rise":5.558,"set":20.998},{"d":1,"rise":29.576,"set":44.981},{"d":2,"rise":53.596,"set":68.964},{"d":3,"rise":77.615,"set":92.946},{"d":4,"rise":101.634,"set":116.927},{"d":5,"rise":125.654,"set":140.908},{"d":6,"rise":149.674,"set":164.889},{"d":7,"rise":173.695,"set":188.868}],"tideName":"SEATTLE (Madison St.), Elliott Bay","tideId":"9447130","tideKm":0.1,"sub":false,"curName":"Harbor Island East","curId":"PUG1506","curKm":1.6,"weak":true,"note":"Currents are weak and variable","floodDir":0,"ebbDir":0,"tideEv":[{"t":-45.1333,"type":"low","v":4.63},{"t":-39.9667,"type":"high","v":9.2},{"t":-33.5833,"type":"low","v":-0.0},{"t":-26.6,"type":"high","v":12.15},{"t":-20.2333,"type":"low","v":3.65},{"t":-14.8167,"type":"high","v":8.47},{"t":-8.8333,"type":"low","v":1.8},{"t":-2.0333,"type":"high","v":11.88},{"t":4.6667,"type":"low","v":2.71},{"t":10.5,"type":"high","v":7.93},{"t":15.9667,"type":"low","v":3.72},{"t":22.5333,"type":"high","v":11.46},{"t":29.5667,"type":"low","v":1.87},{"t":36.1333,"type":"high","v":7.81},{"t":40.9,"type":"low","v":5.55},{"t":47.15,"type":"high","v":10.94},{"t":54.4667,"type":"low","v":1.15},{"t":62.1167,"type":"high","v":8.36},{"t":66.2,"type":"low","v":7.05},{"t":71.8333,"type":"high","v":10.39},{"t":79.35,"type":"low","v":0.56},{"t":87.6833,"type":"high","v":9.32},{"t":92.0,"type":"low","v":7.9},{"t":96.6167,"type":"high","v":9.9},{"t":104.1833,"type":"low","v":0.08},{"t":112.6833,"type":"high","v":10.19},{"t":117.6,"type":"low","v":8.03},{"t":121.5,"type":"high","v":9.57},{"t":128.95,"type":"low","v":-0.33},{"t":137.4,"type":"high","v":10.76},{"t":142.6,"type":"low","v":7.86},{"t":146.3667,"type":"high","v":9.44},{"t":153.6667,"type":"low","v":-0.69},{"t":161.9833,"type":"high","v":11.05},{"t":167.2833,"type":"low","v":7.63},{"t":171.1833,"type":"high","v":9.46},{"t":178.3333,"type":"low","v":-0.99},{"t":186.4333,"type":"high","v":11.16},{"t":191.7833,"type":"low","v":7.38}],"curEv":[],"tS":{"t0":-48.0,"dt":1.0,"v":[8.24,6.32,5.01,4.64,5.16,6.27,7.62,8.74,9.2,8.77,7.49,5.55,3.3,1.28,0.12,0.23,1.62,3.89,6.58,9.16,11.1,12.06,11.97,10.94,9.18,7.07,5.15,3.93,3.67,4.26,5.41,6.78,7.92,8.46,8.2,7.22,5.71,3.99,2.52,1.82,2.19,3.56,5.59,7.88,9.98,11.41,11.88,11.36,10.01,8.05,5.88,4.01,2.92,2.76,3.4,4.58,5.98,7.19,7.85,7.84,7.26,6.25,5.07,4.09,3.72,4.17,5.35,7.0,8.82,10.4,11.33,11.37,10.52,8.95,6.9,4.75,2.99,2.01,1.95,2.64,3.87,5.33,6.64,7.49,7.81,7.65,7.13,6.41,5.78,5.55,5.91,6.77,7.98,9.31,10.42,10.93,10.65,9.6,7.92,5.85,3.76,2.11,1.25,1.27,2.03,3.35,4.92,6.39,7.47,8.11,8.35,8.22,7.8,7.32,7.06,7.18,7.67,8.46,9.39,10.15,10.38,9.9,8.74,7.01,4.95,2.92,1.36,0.61,0.74,1.62,3.08,4.82,6.47,7.78,8.7,9.22,9.3,8.99,8.48,8.06,7.9,8.06,8.54,9.22,9.78,9.85,9.27,8.04,6.27,4.19,2.19,0.71,0.09,0.37,1.43,3.1,5.04,6.87,8.36,9.44,10.06,10.16,9.77,9.11,8.48,8.1,8.06,8.42,9.02,9.5,9.48,8.82,7.5,5.64,3.5,1.5,0.12,-0.33,0.17,1.5,3.42,5.56,7.52,9.07,10.16,10.71,10.65,10.06,9.2,8.42,7.95,7.9,8.3,8.94,9.39,9.3,8.51,7.03,5.02,2.77,0.78,-0.45,-0.63,0.2,1.86,4.05,6.34,8.32,9.81,10.74,11.05,10.72,9.87,8.86,8.04,7.65,7.76,8.32,9.04,9.45,9.21,8.22,6.51,4.3,1.96,0.05,-0.93,-0.74,0.5,2.53,4.96,7.31,9.19,10.46,11.09,11.05,10.38,9.3,8.24,7.55]},"cS":null},"tacoma":{"sun":[{"d":-2,"rise":-42.443,"set":-26.977},{"d":-1,"rise":-18.425,"set":-2.992},{"d":0,"rise":5.593,"set":20.992},{"d":1,"rise":29.611,"set":44.975},{"d":2,"rise":53.63,"set":68.958},{"d":3,"rise":77.649,"set":92.94},{"d":4,"rise":101.668,"set":116.922},{"d":5,"rise":125.688,"set":140.903},{"d":6,"rise":149.708,"set":164.883},{"d":7,"rise":173.728,"set":188.864}],"tideName":"Tacoma Narrows Bridge","tideId":"9446486","tideKm":0.3,"sub":true,"curName":"The Narrows, 0.3 miles North of Bridge","curId":"PUG1527","curKm":0.8,"weak":false,"note":"","floodDir":198,"ebbDir":40,"tideEv":[{"t":-44.75,"type":"low","v":4.73},{"t":-39.5,"type":"high","v":10.21},{"t":-33.2,"type":"low","v":-0.0},{"t":-26.1333,"type":"high","v":13.49},{"t":-19.85,"type":"low","v":3.72},{"t":-14.35,"type":"high","v":9.4},{"t":-8.45,"type":"low","v":1.84},{"t":-1.5667,"type":"high","v":13.18},{"t":5.05,"type":"low","v":2.77},{"t":10.9667,"type":"high","v":8.8},{"t":16.35,"type":"low","v":3.79},{"t":23.0,"type":"high","v":12.72},{"t":29.95,"type":"low","v":1.91},{"t":36.6,"type":"high","v":8.67},{"t":41.2833,"type":"low","v":5.66},{"t":47.6167,"type":"high","v":12.14},{"t":54.85,"type":"low","v":1.18},{"t":62.5833,"type":"high","v":9.27},{"t":66.5833,"type":"low","v":7.2},{"t":72.3,"type":"high","v":11.53},{"t":79.7333,"type":"low","v":0.57},{"t":88.15,"type":"high","v":10.35},{"t":92.3833,"type":"low","v":8.06},{"t":97.0833,"type":"high","v":10.98},{"t":104.5667,"type":"low","v":0.08},{"t":113.15,"type":"high","v":11.31},{"t":117.9833,"type":"low","v":8.19},{"t":121.9667,"type":"high","v":10.62},{"t":129.3333,"type":"low","v":-0.34},{"t":137.8667,"type":"high","v":11.94},{"t":142.9833,"type":"low","v":8.02},{"t":146.8333,"type":"high","v":10.47},{"t":154.05,"type":"low","v":-0.7},{"t":162.45,"type":"high","v":12.27},{"t":167.6667,"type":"low","v":7.79},{"t":171.65,"type":"high","v":10.51},{"t":178.7167,"type":"low","v":-1.01},{"t":186.9,"type":"high","v":12.39}],"curEv":[{"t":-47.25,"type":"ebb","v":-3.87},{"t":-44.15,"type":"slack","v":0.01},{"t":-41.8167,"type":"flood","v":2.98},{"t":-39.1833,"type":"slack","v":0.0},{"t":-35.9,"type":"ebb","v":-4.56},{"t":-32.5167,"type":"slack","v":0.01},{"t":-29.4167,"type":"flood","v":5.25},{"t":-25.8,"type":"slack","v":0.0},{"t":-22.5667,"type":"ebb","v":-4.04},{"t":-19.2667,"type":"slack","v":0.0},{"t":-16.8667,"type":"flood","v":2.92},{"t":-14.1333,"type":"slack","v":0.0},{"t":-11.1,"type":"ebb","v":-3.66},{"t":-7.8,"type":"slack","v":0.01},{"t":-4.7167,"type":"flood","v":4.53},{"t":-1.2333,"type":"slack","v":-0.01},{"t":2.1333,"type":"ebb","v":-4.16},{"t":5.6333,"type":"slack","v":0.01},{"t":8.1667,"type":"flood","v":2.91},{"t":11.0667,"type":"slack","v":0.01},{"t":13.8167,"type":"ebb","v":-2.67},{"t":16.9667,"type":"slack","v":-0.01},{"t":19.9667,"type":"flood","v":3.66},{"t":23.3167,"type":"slack","v":0.0},{"t":26.8667,"type":"ebb","v":-4.21},{"t":30.5,"type":"slack","v":-0.02},{"t":33.2667,"type":"flood","v":3.01},{"t":36.4833,"type":"slack","v":0.0},{"t":38.9167,"type":"ebb","v":-1.78},{"t":41.9167,"type":"slack","v":0.0},{"t":44.7333,"type":"flood","v":2.73},{"t":47.9,"type":"slack","v":0.01},{"t":51.65,"type":"ebb","v":-4.18},{"t":55.3667,"type":"slack","v":-0.01},{"t":58.4833,"type":"flood","v":3.25},{"t":62.0333,"type":"slack","v":0.0},{"t":64.4333,"type":"ebb","v":-1.25},{"t":67.1333,"type":"slack","v":-0.01},{"t":69.65,"type":"flood","v":1.87},{"t":72.5833,"type":"slack","v":-0.01},{"t":76.5167,"type":"ebb","v":-4.11},{"t":80.2167,"type":"slack","v":0.0},{"t":83.6667,"type":"flood","v":3.61},{"t":87.4333,"type":"slack","v":0.01},{"t":90.3167,"type":"ebb","v":-1.3},{"t":92.5667,"type":"slack","v":0.01},{"t":94.95,"type":"flood","v":1.3},{"t":97.4,"type":"slack","v":0.01},{"t":101.4,"type":"ebb","v":-4.04},{"t":105.0667,"type":"slack","v":0.01},{"t":108.65,"type":"flood","v":3.99},{"t":112.4833,"type":"slack","v":0.0},{"t":115.5167,"type":"ebb","v":-1.67},{"t":117.9,"type":"slack","v":0.0},{"t":120.3667,"type":"flood","v":1.2},{"t":122.3667,"type":"slack","v":0.0},{"t":126.2833,"type":"ebb","v":-4.03},{"t":129.8833,"type":"slack","v":-0.01},{"t":133.4833,"type":"flood","v":4.29},{"t":137.2667,"type":"slack","v":-0.01},{"t":140.4167,"type":"ebb","v":-2.06},{"t":142.9,"type":"slack","v":0.0},{"t":145.3333,"type":"flood","v":1.42},{"t":147.3333,"type":"slack","v":-0.01},{"t":151.1167,"type":"ebb","v":-4.12},{"t":154.6667,"type":"slack","v":-0.01},{"t":158.1833,"type":"flood","v":4.49},{"t":161.9167,"type":"slack","v":-0.01},{"t":165.1333,"type":"ebb","v":-2.38},{"t":167.6333,"type":"slack","v":0.0},{"t":170.05,"type":"flood","v":1.74},{"t":172.1833,"type":"slack","v":0.0},{"t":175.9,"type":"ebb","v":-4.3},{"t":179.4,"type":"slack","v":0.02},{"t":182.8,"type":"flood","v":4.65},{"t":186.5,"type":"slack","v":0.01},{"t":189.7167,"type":"ebb","v":-2.61}],"tS":{"t0":-44.75,"dt":1.0,"v":[4.73,5.21,6.47,8.08,9.48,10.18,9.86,8.39,6.12,3.6,1.45,0.19,0.13,1.35,3.62,6.5,9.42,11.82,13.24,13.4,12.37,10.41,8.02,5.76,4.21,3.72,4.26,5.53,7.12,8.54,9.33,9.21,8.11,6.32,4.34,2.71,1.89,2.13,3.46,5.63,8.18,10.59,12.37,13.16,12.79,11.36,9.18,6.73,4.56,3.14,2.79,3.36,4.6,6.17,7.63,8.58,8.77,8.13,6.89,5.45,4.29,3.79,4.19,5.47,7.36,9.45,11.28,12.44,12.69,11.88,10.16,7.86,5.46,3.43,2.18,1.94,2.53,3.72,5.25,6.79,8.01,8.62,8.53,7.84,6.86,6.01,5.66,6.03,7.08,8.58,10.15,11.42,12.09,11.93,10.82,8.93,6.62,4.32,2.45,1.37,1.23,1.82,2.96,4.46,6.09,7.58,8.69,9.23,9.13,8.5,7.72,7.24,7.34,8.05,9.14,10.3,11.18,11.53,11.09,9.77,7.79,5.51,3.32,1.61,0.68,0.66,1.33,2.57,4.21,6.02,7.75,9.17,10.08,10.35,9.99,9.22,8.44,8.07,8.3,9.06,10.01,10.76,10.97,10.34,8.88,6.83,4.56,2.46,0.89,0.13,0.25,1.11,2.58,4.46,6.5,8.43,10.01,11.01,11.31,10.93,10.07,9.08,8.36,8.22,8.75,9.67,10.43,10.58,9.82,8.22,6.07,3.75,1.68,0.23,-0.34,0.01,1.13,2.87,5.01,7.26,9.3,10.88,11.78,11.89,11.27,10.19,9.03,8.22,8.05,8.62,9.58,10.33,10.38,9.44,7.65,5.35,2.96,0.93,-0.36,-0.68,-0.06,1.37,3.42,5.78,8.15,10.2,11.63,12.25,12.02,11.08,9.77,8.56,7.86,7.93,8.72,9.76,10.44,10.31,9.11,7.07,4.58,2.12,0.17,-0.89,-0.87,0.12,1.92,4.26,6.82,9.21,11.09,12.18]},"cS":{"t0":-48.0,"dt":1.0,"v":[-3.65,-3.84,-3.27,-1.81,0.35,2.21,2.96,2.67,1.5,-0.38,-2.42,-3.95,-4.56,-4.17,-2.99,-1.13,1.34,3.73,5.06,5.17,4.33,2.66,0.45,-1.67,-3.22,-3.97,-3.93,-3.17,-1.57,0.57,2.27,2.91,2.61,1.5,-0.25,-2.05,-3.29,-3.66,-3.17,-2.05,-0.39,1.74,3.64,4.49,4.3,3.31,1.6,-0.5,-2.39,-3.66,-4.15,-3.92,-3.01,-1.32,0.77,2.33,2.9,2.65,1.66,0.12,-1.41,-2.41,-2.66,-2.21,-1.31,0.04,1.78,3.2,3.66,3.27,2.24,0.6,-1.29,-2.92,-3.94,-4.2,-3.82,-2.82,-1.06,0.99,2.44,2.99,2.84,2.01,0.68,-0.65,-1.53,-1.78,-1.51,-0.92,0.1,1.48,2.51,2.7,2.26,1.31,-0.16,-1.83,-3.23,-4.04,-4.15,-3.68,-2.59,-0.77,1.23,2.59,3.18,3.16,2.48,1.28,0.04,-0.84,-1.22,-1.21,-0.92,-0.15,0.97,1.75,1.84,1.5,0.71,-0.61,-2.12,-3.36,-4.02,-4.04,-3.51,-2.33,-0.45,1.5,2.81,3.47,3.57,2.94,1.75,0.48,-0.5,-1.05,-1.28,-1.2,-0.56,0.44,1.13,1.3,1.13,0.45,-0.8,-2.24,-3.4,-3.99,-3.94,-3.34,-2.07,-0.13,1.8,3.11,3.83,3.93,3.23,1.94,0.58,-0.53,-1.22,-1.6,-1.59,-0.94,0.1,0.86,1.17,1.11,0.42,-0.88,-2.34,-3.48,-4.01,-3.88,-3.2,-1.8,0.24,2.19,3.5,4.19,4.16,3.27,1.83,0.34,-0.84,-1.6,-2.01,-1.94,-1.1,0.11,0.99,1.39,1.28,0.43,-1.03,-2.56,-3.68,-4.11,-3.89,-3.07,-1.46,0.75,2.71,3.94,4.48,4.19,3.04,1.43,-0.12,-1.3,-2.04,-2.38,-2.07,-0.92,0.49,1.43,1.74,1.42,0.29,-1.37,-2.96,-4.0,-4.29,-3.91,-2.85,-0.93,1.45,3.36,4.39,4.63,3.99,2.56,0.83,-0.72,-1.83,-2.46,-2.58,-1.91]}},"friday":{"sun":[{"d":-2,"rise":-42.495,"set":-26.863},{"d":-1,"rise":-18.476,"set":-2.879},{"d":0,"rise":5.543,"set":21.104},{"d":1,"rise":29.562,"set":45.086},{"d":2,"rise":53.582,"set":69.068},{"d":3,"rise":77.602,"set":93.049},{"d":4,"rise":101.622,"set":117.03},{"d":5,"rise":125.643,"set":141.01},{"d":6,"rise":149.664,"set":164.989},{"d":7,"rise":173.685,"set":188.968}],"tideName":"Friday Harbor, San Juan Island","tideId":"9449880","tideKm":1.2,"sub":false,"curName":"Point George, west of","curId":"PUG1745","curKm":2.8,"weak":false,"note":"","floodDir":321,"ebbDir":152,"tideEv":[{"t":-44.6333,"type":"low","v":4.42},{"t":-40.55,"type":"high","v":5.49},{"t":-33.8333,"type":"low","v":0.06},{"t":-26.1667,"type":"high","v":8.03},{"t":-19.6167,"type":"low","v":3.32},{"t":-15.05,"type":"high","v":4.76},{"t":-9.1833,"type":"low","v":1.52},{"t":-1.7833,"type":"high","v":7.89},{"t":5.2833,"type":"low","v":2.26},{"t":10.9167,"type":"high","v":4.41},{"t":15.4333,"type":"low","v":3.02},{"t":22.55,"type":"high","v":7.73},{"t":30.0833,"type":"low","v":1.32},{"t":37.3,"type":"high","v":4.75},{"t":40.0667,"type":"low","v":4.44},{"t":46.8333,"type":"high","v":7.57},{"t":54.85,"type":"low","v":0.58},{"t":71.1,"type":"high","v":7.43},{"t":79.5833,"type":"low","v":0.03},{"t":95.4167,"type":"high","v":7.3},{"t":104.3,"type":"low","v":-0.37},{"t":113.55,"type":"high","v":7.26},{"t":117.1,"type":"low","v":6.95},{"t":119.8333,"type":"high","v":7.19},{"t":129.0,"type":"low","v":-0.67},{"t":138.1167,"type":"high","v":7.62},{"t":142.3833,"type":"low","v":6.97},{"t":144.4333,"type":"high","v":7.09},{"t":153.65,"type":"low","v":-0.89},{"t":162.6333,"type":"high","v":7.77},{"t":167.1833,"type":"low","v":6.88},{"t":169.2667,"type":"high","v":7.0},{"t":178.2667,"type":"low","v":-1.08},{"t":187.1,"type":"high","v":7.78},{"t":191.7333,"type":"low","v":6.72}],"curEv":[{"t":-48.0,"type":"ebb","v":-1.23},{"t":-44.3833,"type":"slack","v":0.0},{"t":-41.75,"type":"flood","v":0.8},{"t":-39.3167,"type":"slack","v":0.0},{"t":-36.4,"type":"ebb","v":-1.16},{"t":-32.7,"type":"slack","v":0.0},{"t":-29.4667,"type":"flood","v":1.3},{"t":-26.4333,"type":"slack","v":0.01},{"t":-23.4833,"type":"ebb","v":-1.17},{"t":-19.6167,"type":"slack","v":0.0},{"t":-16.7167,"type":"flood","v":0.86},{"t":-14.2167,"type":"slack","v":0.0},{"t":-11.5833,"type":"ebb","v":-0.97},{"t":-7.7667,"type":"slack","v":0.0},{"t":-4.75,"type":"flood","v":1.01},{"t":-1.8667,"type":"slack","v":0.0},{"t":1.15,"type":"ebb","v":-1.1},{"t":5.15,"type":"slack","v":0.0},{"t":8.5,"type":"flood","v":0.99},{"t":10.9833,"type":"slack","v":0.0},{"t":14.3167,"type":"ebb","v":-0.78},{"t":17.2667,"type":"slack","v":0.0},{"t":20.2167,"type":"flood","v":0.73},{"t":22.65,"type":"slack","v":0.0},{"t":26.3333,"type":"ebb","v":-1.07},{"t":30.0,"type":"slack","v":0.0},{"t":33.5167,"type":"flood","v":1.17},{"t":36.3833,"type":"slack","v":0.0},{"t":39.8,"type":"ebb","v":-0.71},{"t":42.5167,"type":"slack","v":0.0},{"t":45.1167,"type":"flood","v":0.49},{"t":47.15,"type":"slack","v":0.0},{"t":51.1333,"type":"ebb","v":-1.12},{"t":54.95,"type":"slack","v":0.0},{"t":58.4833,"type":"flood","v":1.37},{"t":61.9333,"type":"slack","v":0.0},{"t":65.1,"type":"ebb","v":-0.68},{"t":67.9333,"type":"slack","v":0.0},{"t":69.8667,"type":"flood","v":0.3},{"t":71.65,"type":"slack","v":0.0},{"t":75.6667,"type":"ebb","v":-1.19},{"t":79.8833,"type":"slack","v":0.0},{"t":83.55,"type":"flood","v":1.56},{"t":87.2333,"type":"slack","v":0.0},{"t":90.45,"type":"ebb","v":-0.72},{"t":93.1833,"type":"slack","v":0.0},{"t":94.75,"type":"flood","v":0.17},{"t":96.2667,"type":"slack","v":0.0},{"t":100.2667,"type":"ebb","v":-1.26},{"t":104.75,"type":"slack","v":0.0},{"t":108.5333,"type":"flood","v":1.77},{"t":112.4167,"type":"slack","v":0.0},{"t":115.3833,"type":"ebb","v":-0.81},{"t":118.35,"type":"slack","v":0.0},{"t":119.9667,"type":"flood","v":0.13},{"t":121.0833,"type":"slack","v":0.0},{"t":126.0167,"type":"ebb","v":-1.34},{"t":129.5667,"type":"slack","v":0.0},{"t":133.3167,"type":"flood","v":1.94},{"t":137.4,"type":"slack","v":0.0},{"t":140.15,"type":"ebb","v":-0.87},{"t":143.2667,"type":"slack","v":0.0},{"t":144.8167,"type":"flood","v":0.18},{"t":145.9333,"type":"slack","v":0.0},{"t":150.9167,"type":"ebb","v":-1.45},{"t":154.3333,"type":"slack","v":0.0},{"t":157.9833,"type":"flood","v":2.02},{"t":162.1,"type":"slack","v":0.0},{"t":164.9,"type":"ebb","v":-0.93},{"t":167.8833,"type":"slack","v":0.0},{"t":169.4667,"type":"flood","v":0.27},{"t":170.8,"type":"slack","v":0.0},{"t":175.3167,"type":"ebb","v":-1.55},{"t":179.0333,"type":"slack","v":0.0},{"t":182.6333,"type":"flood","v":2.03},{"t":186.6167,"type":"slack","v":0.0},{"t":189.6333,"type":"ebb","v":-0.99}],"tS":{"t0":-48.0,"dt":1.0,"v":[6.38,5.4,4.73,4.44,4.48,4.77,5.17,5.45,5.43,4.99,4.11,2.89,1.59,0.54,0.07,0.29,1.12,2.42,4.02,5.63,6.96,7.8,8.02,7.6,6.66,5.48,4.4,3.67,3.35,3.38,3.73,4.22,4.62,4.76,4.56,4.02,3.22,2.35,1.7,1.52,1.89,2.72,3.9,5.28,6.54,7.46,7.87,7.71,6.97,5.81,4.49,3.35,2.6,2.27,2.36,2.79,3.39,3.93,4.29,4.4,4.24,3.84,3.37,3.06,3.08,3.49,4.23,5.22,6.28,7.15,7.65,7.68,7.18,6.19,4.87,3.49,2.33,1.6,1.33,1.51,2.06,2.79,3.51,4.12,4.55,4.74,4.7,4.54,4.44,4.55,4.9,5.48,6.21,6.93,7.43,7.57,7.27,6.52,5.36,3.95,2.54,1.42,0.76,0.59,0.89,1.57,2.46,3.39,4.25,4.96,5.43,5.66,5.68,5.66,5.75,5.98,6.35,6.81,7.23,7.42,7.28,6.74,5.82,4.56,3.1,1.72,0.67,0.11,0.07,0.52,1.37,2.44,3.55,4.62,5.53,6.2,6.54,6.61,6.58,6.58,6.65,6.82,7.08,7.28,7.25,6.9,6.21,5.18,3.85,2.37,1.03,0.08,-0.35,-0.24,0.38,1.41,2.64,3.91,5.12,6.16,6.88,7.22,7.24,7.12,7.0,6.95,7.0,7.13,7.19,7.01,6.54,5.76,4.63,3.23,1.74,0.45,-0.38,-0.67,-0.37,0.45,1.65,3.01,4.39,5.69,6.74,7.39,7.62,7.53,7.3,7.1,6.98,7.0,7.08,7.06,6.8,6.26,5.37,4.14,2.66,1.16,-0.06,-0.77,-0.85,-0.34,0.68,2.03,3.5,4.95,6.23,7.18,7.69,7.75,7.51,7.21,6.98,6.88,6.92,7.0,6.95,6.64,6.0,5.0,3.65,2.09,0.58,-0.55,-1.05,-0.9,-0.16,1.06,2.54,4.09,5.53,6.72,7.49,7.78,7.63,7.27,6.94,6.76]},"cS":{"t0":-48.0,"dt":1.0,"v":[-1.23,-1.13,-0.84,-0.35,0.21,0.62,0.79,0.73,0.38,-0.2,-0.78,-1.11,-1.14,-0.97,-0.66,-0.18,0.45,0.99,1.26,1.27,1.01,0.42,-0.31,-0.89,-1.14,-1.15,-1.03,-0.75,-0.23,0.34,0.71,0.85,0.8,0.46,-0.13,-0.69,-0.95,-0.95,-0.82,-0.59,-0.14,0.45,0.87,1.01,0.97,0.69,0.09,-0.57,-0.98,-1.09,-1.07,-0.97,-0.65,-0.09,0.45,0.78,0.96,0.95,0.59,-0.01,-0.5,-0.72,-0.77,-0.75,-0.56,-0.14,0.35,0.64,0.73,0.68,0.36,-0.22,-0.75,-1.01,-1.07,-1.06,-0.93,-0.56,0.0,0.51,0.89,1.13,1.13,0.75,0.19,-0.25,-0.5,-0.66,-0.71,-0.56,-0.2,0.17,0.41,0.49,0.41,0.07,-0.44,-0.86,-1.06,-1.11,-1.08,-0.91,-0.52,0.03,0.59,1.04,1.33,1.32,0.96,0.44,-0.03,-0.36,-0.58,-0.67,-0.59,-0.32,0.02,0.24,0.3,0.19,-0.14,-0.59,-0.97,-1.16,-1.18,-1.11,-0.94,-0.54,0.08,0.72,1.21,1.51,1.53,1.18,0.62,0.1,-0.26,-0.52,-0.69,-0.68,-0.4,-0.05,0.14,0.17,0.06,-0.26,-0.74,-1.12,-1.26,-1.25,-1.19,-1.02,-0.53,0.19,0.86,1.37,1.72,1.72,1.3,0.68,0.17,-0.21,-0.54,-0.78,-0.74,-0.41,-0.08,0.09,0.13,0.02,-0.38,-0.91,-1.25,-1.33,-1.34,-1.3,-1.04,-0.44,0.34,1.03,1.58,1.91,1.81,1.28,0.66,0.17,-0.25,-0.65,-0.87,-0.75,-0.39,-0.06,0.12,0.18,-0.02,-0.52,-1.05,-1.33,-1.42,-1.45,-1.35,-0.97,-0.27,0.54,1.25,1.8,2.02,1.77,1.18,0.57,0.05,-0.42,-0.8,-0.93,-0.73,-0.33,0.04,0.24,0.23,-0.09,-0.64,-1.14,-1.43,-1.54,-1.51,-1.3,-0.8,-0.02,0.83,1.53,1.95,2.0,1.63,1.0,0.35,-0.2,-0.64,-0.93,-0.96,-0.67]}},"townsend":{"sun":[{"d":-2,"rise":-42.484,"set":-26.909},{"d":-1,"rise":-18.466,"set":-2.925},{"d":0,"rise":5.553,"set":21.059},{"d":1,"rise":29.572,"set":45.041},{"d":2,"rise":53.591,"set":69.023},{"d":3,"rise":77.611,"set":93.005},{"d":4,"rise":101.631,"set":116.986},{"d":5,"rise":125.651,"set":140.967},{"d":6,"rise":149.672,"set":164.946},{"d":7,"rise":173.693,"set":188.926}],"tideName":"PORT TOWNSEND","tideId":"9444900","tideKm":0.4,"sub":false,"curName":"Port Townsend, 0.5 mile S of Pt. Hudson","curId":"PCT1501","curKm":0.6,"weak":true,"note":"unavailable","floodDir":0,"ebbDir":0,"tideEv":[{"t":-45.9667,"type":"low","v":4.53},{"t":-40.85,"type":"high","v":6.56},{"t":-34.5333,"type":"low","v":0.04},{"t":-27.0333,"type":"high","v":8.98},{"t":-20.9167,"type":"low","v":3.52},{"t":-15.6,"type":"high","v":5.81},{"t":-9.8,"type":"low","v":1.54},{"t":-2.5667,"type":"high","v":8.81},{"t":4.0667,"type":"low","v":2.5},{"t":10.0,"type":"high","v":5.29},{"t":14.9333,"type":"low","v":3.1},{"t":21.8667,"type":"high","v":8.58},{"t":28.9833,"type":"low","v":1.58},{"t":36.2333,"type":"high","v":5.39},{"t":39.7833,"type":"low","v":4.58},{"t":46.3,"type":"high","v":8.3},{"t":53.85,"type":"low","v":0.81},{"t":62.25,"type":"high","v":6.18},{"t":64.9,"type":"low","v":5.83},{"t":70.75,"type":"high","v":8.01},{"t":78.6667,"type":"low","v":0.22},{"t":87.5667,"type":"high","v":7.1},{"t":90.4667,"type":"low","v":6.68},{"t":95.2667,"type":"high","v":7.74},{"t":103.4333,"type":"low","v":-0.23},{"t":112.4,"type":"high","v":7.82},{"t":116.1167,"type":"low","v":7.03},{"t":119.9,"type":"high","v":7.54},{"t":128.15,"type":"low","v":-0.56},{"t":137.05,"type":"high","v":8.26},{"t":141.35,"type":"low","v":7.06},{"t":144.7,"type":"high","v":7.43},{"t":152.8333,"type":"low","v":-0.81},{"t":161.6167,"type":"high","v":8.47},{"t":166.0667,"type":"low","v":6.97},{"t":169.5833,"type":"high","v":7.42},{"t":177.4833,"type":"low","v":-1.0},{"t":186.1,"type":"high","v":8.53},{"t":190.5333,"type":"low","v":6.8}],"curEv":[],"tS":{"t0":-48.0,"dt":1.0,"v":[5.63,4.8,4.53,4.7,5.1,5.64,6.22,6.55,6.33,5.46,4.06,2.41,0.95,0.14,0.16,0.95,2.27,3.89,5.7,7.41,8.59,8.98,8.56,7.46,6.01,4.68,3.81,3.52,3.67,4.08,4.68,5.34,5.76,5.71,5.15,4.18,3.02,2.03,1.56,1.77,2.58,3.79,5.23,6.74,8.04,8.74,8.69,7.93,6.6,5.03,3.66,2.79,2.5,2.66,3.11,3.78,4.53,5.1,5.29,5.11,4.61,3.91,3.32,3.1,3.4,4.14,5.16,6.32,7.47,8.32,8.57,8.15,7.13,5.65,4.03,2.67,1.83,1.58,1.78,2.29,3.05,3.93,4.67,5.16,5.38,5.3,5.0,4.68,4.59,4.86,5.45,6.21,7.05,7.83,8.27,8.15,7.46,6.26,4.71,3.09,1.77,1.0,0.82,1.08,1.68,2.56,3.59,4.55,5.34,5.92,6.17,6.11,5.92,5.83,5.99,6.37,6.87,7.41,7.87,7.99,7.6,6.74,5.45,3.86,2.27,1.02,0.34,0.24,0.6,1.32,2.35,3.55,4.72,5.78,6.61,7.04,7.07,6.88,6.7,6.71,6.89,7.17,7.5,7.73,7.63,7.08,6.1,4.75,3.14,1.58,0.4,-0.17,-0.14,0.34,1.21,2.41,3.78,5.14,6.37,7.32,7.78,7.75,7.45,7.15,7.03,7.08,7.24,7.44,7.54,7.31,6.66,5.61,4.19,2.53,0.98,-0.12,-0.55,-0.36,0.29,1.34,2.71,4.24,5.72,7.02,7.93,8.26,8.06,7.62,7.24,7.07,7.09,7.21,7.38,7.42,7.11,6.38,5.22,3.68,1.95,0.41,-0.56,-0.8,-0.41,0.45,1.68,3.23,4.87,6.39,7.63,8.35,8.43,8.02,7.47,7.09,6.97,7.03,7.18,7.37,7.38,7.01,6.16,4.84,3.13,1.33,-0.14,-0.91,-0.91,-0.27,0.8,2.23,3.93,5.62,7.08,8.12,8.53,8.3,7.71,7.14,6.84,6.83]},"cS":null},"deception":{"sun":[{"d":-2,"rise":-42.512,"set":-26.897},{"d":-1,"rise":-18.493,"set":-2.913},{"d":0,"rise":5.526,"set":21.07},{"d":1,"rise":29.546,"set":45.053},{"d":2,"rise":53.565,"set":69.035},{"d":3,"rise":77.585,"set":93.016},{"d":4,"rise":101.606,"set":116.997},{"d":5,"rise":125.626,"set":140.977},{"d":6,"rise":149.647,"set":164.957},{"d":7,"rise":173.668,"set":188.936}],"tideName":"Deception Pass St. Park, Bowman Bay, Fidalgo I.","tideId":"9448614","tideKm":1.1,"sub":false,"curName":"Deception Pass (Narrows)","curId":"PUG1701","curKm":0.1,"weak":false,"note":"","floodDir":108,"ebbDir":277,"tideEv":[{"t":-45.85,"type":"low","v":4.54},{"t":-41.45,"type":"high","v":5.98},{"t":-34.6667,"type":"low","v":0.16},{"t":-27.2833,"type":"high","v":8.04},{"t":-20.7333,"type":"low","v":3.5},{"t":-16.15,"type":"high","v":5.14},{"t":-10.0167,"type":"low","v":1.61},{"t":-2.8833,"type":"high","v":7.96},{"t":4.2833,"type":"low","v":2.46},{"t":9.55,"type":"high","v":4.56},{"t":14.6,"type":"low","v":3.05},{"t":21.55,"type":"high","v":7.82},{"t":29.2,"type":"low","v":1.52},{"t":36.55,"type":"high","v":4.67},{"t":39.15,"type":"low","v":4.38},{"t":46.0,"type":"high","v":7.62},{"t":54.0333,"type":"low","v":0.73},{"t":70.4833,"type":"high","v":7.39},{"t":78.8,"type":"low","v":0.11},{"t":95.0,"type":"high","v":7.18},{"t":103.5333,"type":"low","v":-0.37},{"t":113.1167,"type":"high","v":7.02},{"t":117.1167,"type":"low","v":6.81},{"t":119.6,"type":"high","v":7.04},{"t":128.2333,"type":"low","v":-0.75},{"t":137.5667,"type":"high","v":7.38},{"t":142.2833,"type":"low","v":6.84},{"t":144.3167,"type":"high","v":6.98},{"t":152.8833,"type":"low","v":-1.05},{"t":162.0167,"type":"high","v":7.54},{"t":166.95,"type":"low","v":6.83},{"t":169.0667,"type":"high","v":6.99},{"t":177.5,"type":"low","v":-1.27},{"t":186.45,"type":"high","v":7.58},{"t":191.2167,"type":"low","v":6.79}],"curEv":[{"t":-46.3167,"type":"slack","v":0.02},{"t":-43.4667,"type":"flood","v":4.05},{"t":-40.7167,"type":"slack","v":0.0},{"t":-37.8,"type":"ebb","v":-5.46},{"t":-34.2833,"type":"slack","v":-0.01},{"t":-31.3167,"type":"flood","v":4.94},{"t":-28.25,"type":"slack","v":0.0},{"t":-25.2167,"type":"ebb","v":-6.0},{"t":-21.4833,"type":"slack","v":-0.02},{"t":-18.35,"type":"flood","v":3.68},{"t":-15.7333,"type":"slack","v":0.01},{"t":-12.5167,"type":"ebb","v":-4.87},{"t":-9.25,"type":"slack","v":0.01},{"t":-6.2833,"type":"flood","v":4.24},{"t":-3.4167,"type":"slack","v":-0.01},{"t":-0.3833,"type":"ebb","v":-5.31},{"t":3.4167,"type":"slack","v":-0.02},{"t":7.0167,"type":"flood","v":3.32},{"t":9.2833,"type":"slack","v":-0.02},{"t":13.05,"type":"ebb","v":-4.49},{"t":15.7667,"type":"slack","v":-0.01},{"t":18.9,"type":"flood","v":3.72},{"t":21.4333,"type":"slack","v":-0.01},{"t":24.85,"type":"ebb","v":-4.84},{"t":28.4167,"type":"slack","v":0.0},{"t":32.1833,"type":"flood","v":3.17},{"t":34.3833,"type":"slack","v":-0.01},{"t":38.2,"type":"ebb","v":-4.32},{"t":40.8,"type":"slack","v":0.02},{"t":43.9,"type":"flood","v":3.4},{"t":46.3,"type":"slack","v":-0.02},{"t":49.95,"type":"ebb","v":-4.76},{"t":53.45,"type":"slack","v":0.0},{"t":57.2667,"type":"flood","v":3.31},{"t":59.55,"type":"slack","v":0.01},{"t":63.2167,"type":"ebb","v":-4.29},{"t":65.7833,"type":"slack","v":0.01},{"t":68.7833,"type":"flood","v":3.22},{"t":71.1333,"type":"slack","v":-0.01},{"t":74.7333,"type":"ebb","v":-4.96},{"t":78.3333,"type":"slack","v":-0.01},{"t":82.25,"type":"flood","v":3.74},{"t":84.6,"type":"slack","v":0.02},{"t":88.15,"type":"ebb","v":-4.42},{"t":90.6833,"type":"slack","v":0.01},{"t":93.6333,"type":"flood","v":3.15},{"t":95.9,"type":"slack","v":-0.01},{"t":99.25,"type":"ebb","v":-5.32},{"t":103.0167,"type":"slack","v":0.01},{"t":107.0167,"type":"flood","v":4.28},{"t":109.4333,"type":"slack","v":0.0},{"t":112.9667,"type":"ebb","v":-4.71},{"t":115.5,"type":"slack","v":0.0},{"t":118.3667,"type":"flood","v":3.2},{"t":120.6,"type":"slack","v":-0.02},{"t":123.6833,"type":"ebb","v":-5.76},{"t":127.55,"type":"slack","v":-0.02},{"t":131.5833,"type":"flood","v":4.74},{"t":134.0833,"type":"slack","v":0.01},{"t":137.65,"type":"ebb","v":-5.08},{"t":140.2833,"type":"slack","v":0.01},{"t":142.9833,"type":"flood","v":3.33},{"t":145.2667,"type":"slack","v":0.0},{"t":148.2167,"type":"ebb","v":-6.17},{"t":152.0667,"type":"slack","v":0.02},{"t":155.9167,"type":"flood","v":5.11},{"t":158.65,"type":"slack","v":-0.01},{"t":162.2167,"type":"ebb","v":-5.47},{"t":165.0333,"type":"slack","v":0.01},{"t":167.5167,"type":"flood","v":3.52},{"t":169.95,"type":"slack","v":0.01},{"t":172.8333,"type":"ebb","v":-6.46},{"t":176.5833,"type":"slack","v":0.0},{"t":179.8,"type":"flood","v":5.56},{"t":183.1833,"type":"slack","v":-0.02},{"t":186.6667,"type":"ebb","v":-5.83},{"t":189.75,"type":"slack","v":0.01}],"tS":{"t0":-48.0,"dt":1.0,"v":[5.48,4.8,4.55,4.65,5.0,5.5,5.9,5.92,5.44,4.53,3.34,2.02,0.84,0.2,0.33,1.17,2.5,4.14,5.82,7.15,7.89,8.02,7.63,6.8,5.67,4.57,3.81,3.51,3.58,3.95,4.49,4.98,5.13,4.87,4.3,3.53,2.65,1.9,1.61,1.93,2.76,3.94,5.31,6.64,7.59,7.95,7.76,7.11,6.06,4.78,3.58,2.79,2.47,2.55,2.96,3.59,4.19,4.52,4.54,4.34,3.99,3.52,3.13,3.09,3.49,4.22,5.16,6.21,7.17,7.73,7.76,7.31,6.45,5.23,3.84,2.61,1.82,1.52,1.65,2.14,2.89,3.64,4.18,4.49,4.65,4.66,4.51,4.39,4.49,4.86,5.4,6.05,6.77,7.38,7.62,7.38,6.72,5.71,4.38,2.94,1.72,0.97,0.73,0.94,1.56,2.47,3.39,4.14,4.72,5.17,5.45,5.52,5.53,5.65,5.89,6.2,6.58,7.01,7.34,7.33,6.89,6.1,4.99,3.59,2.12,0.94,0.27,0.12,0.46,1.25,2.33,3.43,4.37,5.16,5.8,6.22,6.38,6.42,6.47,6.55,6.64,6.81,7.04,7.18,6.99,6.43,5.54,4.34,2.88,1.41,0.28,-0.29,-0.31,0.2,1.19,2.46,3.71,4.78,5.7,6.43,6.88,7.01,6.98,6.92,6.86,6.81,6.86,7.0,7.01,6.71,6.04,5.06,3.77,2.24,0.76,-0.29,-0.73,-0.57,0.16,1.37,2.81,4.16,5.3,6.25,6.97,7.33,7.36,7.22,7.07,6.93,6.84,6.87,6.97,6.91,6.5,5.73,4.64,3.23,1.62,0.15,-0.79,-1.05,-0.65,0.33,1.76,3.32,4.73,5.86,6.75,7.34,7.54,7.42,7.2,7.02,6.89,6.83,6.9,6.99,6.85,6.33,5.43,4.2,2.65,0.97,-0.42,-1.18,-1.18,-0.51,0.74,2.34,3.98,5.36,6.41,7.16,7.54,7.53,7.27,7.0,6.85,6.79]},"cS":{"t0":-48.0,"dt":1.0,"v":[-4.76,-2.1,0.94,3.1,3.96,3.98,3.14,0.87,-2.28,-4.63,-5.44,-5.23,-4.23,-2.11,0.86,3.46,4.75,4.91,4.3,2.4,-0.89,-4.07,-5.72,-5.98,-5.48,-4.04,-1.5,1.25,3.0,3.6,3.65,2.94,0.78,-2.13,-4.14,-4.82,-4.8,-4.08,-2.11,0.73,3.06,4.1,4.22,3.67,1.76,-1.38,-4.07,-5.19,-5.28,-4.85,-3.48,-1.09,1.28,2.6,3.09,3.32,2.76,0.73,-1.83,-3.48,-4.18,-4.48,-3.98,-2.06,0.61,2.64,3.52,3.72,3.18,1.23,-1.69,-3.89,-4.71,-4.83,-4.48,-3.14,-0.93,1.07,2.15,2.72,3.15,2.71,0.88,-1.34,-2.82,-3.73,-4.3,-3.87,-2.0,0.5,2.34,3.18,3.4,2.79,0.79,-1.93,-3.85,-4.59,-4.76,-4.38,-3.01,-0.91,0.91,1.95,2.67,3.26,2.92,1.2,-0.89,-2.44,-3.55,-4.26,-3.82,-1.93,0.51,2.27,3.04,3.2,2.47,0.35,-2.36,-4.19,-4.85,-4.94,-4.43,-2.9,-0.71,1.13,2.2,3.02,3.7,3.28,1.4,-0.83,-2.47,-3.68,-4.41,-3.83,-1.75,0.75,2.4,3.04,3.1,2.14,-0.31,-3.15,-4.85,-5.31,-5.2,-4.39,-2.48,-0.03,1.84,2.87,3.72,4.28,3.43,1.11,-1.27,-2.92,-4.14,-4.71,-3.77,-1.35,1.18,2.64,3.16,3.03,1.61,-1.29,-4.17,-5.57,-5.73,-5.29,-3.97,-1.54,1.12,2.91,3.85,4.55,4.61,3.02,0.25,-2.17,-3.73,-4.81,-4.98,-3.49,-0.78,1.69,2.99,3.33,2.81,0.8,-2.44,-5.14,-6.15,-5.93,-4.99,-3.04,-0.18,2.54,4.16,4.86,5.1,4.37,2.02,-1.06,-3.39,-4.75,-5.43,-5.01,-3.0,-0.08,2.3,3.39,3.41,2.37,-0.14,-3.5,-5.89,-6.45,-5.74,-4.25,-1.8,1.31,3.97,5.32,5.55,5.1,3.55,0.6,-2.62,-4.72,-5.65,-5.78,-4.77,-2.31,0.75,2.99]}},"anacortes":{"sun":[{"d":-2,"rise":-42.521,"set":-26.891},{"d":-1,"rise":-18.502,"set":-2.907},{"d":0,"rise":5.517,"set":21.076},{"d":1,"rise":29.536,"set":45.058},{"d":2,"rise":53.556,"set":69.04},{"d":3,"rise":77.576,"set":93.021},{"d":4,"rise":101.597,"set":117.002},{"d":5,"rise":125.617,"set":140.982},{"d":6,"rise":149.638,"set":164.961},{"d":7,"rise":173.659,"set":188.94}],"tideName":"Anacortes, Guemes Channel","tideId":"9448794","tideKm":0.5,"sub":true,"curName":"Guemes Channel, East Entrance","curId":"PUG1735","curKm":1.2,"weak":false,"note":"","floodDir":75,"ebbDir":268,"tideEv":[{"t":-45.4167,"type":"low","v":4.53},{"t":-40.4833,"type":"high","v":6.3},{"t":-33.9833,"type":"low","v":0.04},{"t":-26.6667,"type":"high","v":8.63},{"t":-20.3667,"type":"low","v":3.52},{"t":-15.2333,"type":"high","v":5.57},{"t":-9.25,"type":"low","v":1.54},{"t":-2.2,"type":"high","v":8.46},{"t":4.6167,"type":"low","v":2.5},{"t":10.3667,"type":"high","v":5.08},{"t":15.4833,"type":"low","v":3.1},{"t":22.2333,"type":"high","v":8.23},{"t":29.5333,"type":"low","v":1.58},{"t":36.6,"type":"high","v":5.17},{"t":40.3333,"type":"low","v":4.58},{"t":46.6667,"type":"high","v":7.96},{"t":54.4,"type":"low","v":0.81},{"t":62.6167,"type":"high","v":5.93},{"t":65.45,"type":"low","v":5.83},{"t":71.1167,"type":"high","v":7.68},{"t":79.2167,"type":"low","v":0.22},{"t":87.9333,"type":"high","v":6.82},{"t":91.0167,"type":"low","v":6.68},{"t":95.6333,"type":"high","v":7.43},{"t":103.9833,"type":"low","v":-0.23},{"t":112.7667,"type":"high","v":7.5},{"t":116.6667,"type":"low","v":7.03},{"t":120.2667,"type":"high","v":7.24},{"t":128.7,"type":"low","v":-0.56},{"t":137.4167,"type":"high","v":7.93},{"t":141.9,"type":"low","v":7.06},{"t":145.0667,"type":"high","v":7.14},{"t":153.3833,"type":"low","v":-0.81},{"t":161.9833,"type":"high","v":8.13},{"t":166.6167,"type":"low","v":6.97},{"t":169.95,"type":"high","v":7.12},{"t":178.0333,"type":"low","v":-1.0},{"t":186.4667,"type":"high","v":8.19},{"t":191.0833,"type":"low","v":6.8}],"curEv":[{"t":-47.6,"type":"ebb","v":-2.18},{"t":-43.4333,"type":"slack","v":0.0},{"t":-41.6333,"type":"flood","v":0.84},{"t":-39.8,"type":"slack","v":0.0},{"t":-35.8667,"type":"ebb","v":-2.64},{"t":-32.5167,"type":"slack","v":0.01},{"t":-29.4,"type":"flood","v":3.31},{"t":-26.2,"type":"slack","v":-0.01},{"t":-22.9,"type":"ebb","v":-2.33},{"t":-18.5333,"type":"slack","v":0.01},{"t":-16.5667,"type":"flood","v":0.93},{"t":-14.55,"type":"slack","v":0.01},{"t":-10.9667,"type":"ebb","v":-2.16},{"t":-7.8167,"type":"slack","v":0.0},{"t":-4.7,"type":"flood","v":2.72},{"t":-1.6833,"type":"slack","v":0.01},{"t":1.7833,"type":"ebb","v":-2.43},{"t":6.3333,"type":"slack","v":0.0},{"t":8.6167,"type":"flood","v":1.11},{"t":10.9,"type":"slack","v":0.0},{"t":14.0167,"type":"ebb","v":-1.63},{"t":16.95,"type":"slack","v":-0.01},{"t":19.9833,"type":"flood","v":2.0},{"t":22.7833,"type":"slack","v":0.0},{"t":26.45,"type":"ebb","v":-2.46},{"t":31.1667,"type":"slack","v":0.0},{"t":33.8333,"type":"flood","v":1.44},{"t":36.5,"type":"slack","v":0.0},{"t":39.1,"type":"ebb","v":-1.15},{"t":41.9667,"type":"slack","v":0.0},{"t":44.7167,"type":"flood","v":1.21},{"t":47.1333,"type":"slack","v":0.0},{"t":51.15,"type":"ebb","v":-2.42},{"t":55.9333,"type":"slack","v":0.0},{"t":58.9667,"type":"flood","v":1.88},{"t":62.1,"type":"slack","v":0.0},{"t":64.3667,"type":"ebb","v":-0.84},{"t":67.6333,"type":"slack","v":0.0},{"t":69.5167,"type":"flood","v":0.46},{"t":71.2333,"type":"slack","v":0.0},{"t":75.95,"type":"ebb","v":-2.35},{"t":80.65,"type":"slack","v":-0.01},{"t":83.9333,"type":"flood","v":2.34},{"t":87.4833,"type":"slack","v":0.0},{"t":89.8333,"type":"ebb","v":-0.79},{"t":94.5167,"type":"ebb","v":-0.13},{"t":100.8833,"type":"ebb","v":-2.28},{"t":105.35,"type":"slack","v":0.0},{"t":108.75,"type":"flood","v":2.73},{"t":112.5333,"type":"slack","v":0.0},{"t":115.7167,"type":"ebb","v":-0.94},{"t":119.7,"type":"ebb","v":-0.48},{"t":125.8667,"type":"ebb","v":-2.27},{"t":130.0333,"type":"slack","v":0.01},{"t":133.4833,"type":"flood","v":3.0},{"t":137.3167,"type":"slack","v":0.0},{"t":141.0167,"type":"ebb","v":-1.14},{"t":144.75,"type":"ebb","v":-0.58},{"t":150.7667,"type":"ebb","v":-2.32},{"t":154.7,"type":"slack","v":0.01},{"t":158.15,"type":"flood","v":3.16},{"t":161.9667,"type":"slack","v":0.0},{"t":165.2667,"type":"ebb","v":-1.24},{"t":169.55,"type":"ebb","v":-0.53},{"t":175.5833,"type":"ebb","v":-2.42},{"t":179.35,"type":"slack","v":0.01},{"t":182.7667,"type":"flood","v":3.25},{"t":186.5333,"type":"slack","v":0.0},{"t":189.5,"type":"ebb","v":-1.32}],"tS":{"t0":-45.4167,"dt":1.0,"v":[4.53,4.7,5.16,5.71,6.15,6.3,5.89,4.86,3.45,1.97,0.76,0.11,0.17,0.98,2.39,4.17,5.97,7.47,8.41,8.61,8.15,7.18,5.95,4.74,3.86,3.52,3.69,4.17,4.78,5.31,5.56,5.39,4.72,3.74,2.71,1.91,1.55,1.78,2.63,3.95,5.47,6.9,7.96,8.44,8.27,7.51,6.33,4.97,3.72,2.83,2.5,2.68,3.18,3.85,4.51,4.96,5.07,4.82,4.3,3.7,3.25,3.1,3.43,4.23,5.34,6.51,7.51,8.11,8.19,7.68,6.67,5.33,3.92,2.68,1.85,1.58,1.77,2.28,2.99,3.78,4.5,4.99,5.17,5.07,4.85,4.64,4.59,4.89,5.53,6.34,7.14,7.72,7.96,7.72,6.93,5.73,4.31,2.91,1.74,1.0,0.82,1.07,1.65,2.48,3.44,4.39,5.19,5.73,5.93,5.9,5.85,5.83,6.01,6.4,6.91,7.37,7.64,7.62,7.09,6.1,4.79,3.35,2.0,0.94,0.33,0.25,0.61,1.35,2.37,3.53,4.69,5.71,6.44,6.79,6.81,6.74,6.69,6.71,6.87,7.12,7.34,7.43,7.19,6.44,5.3,3.92,2.5,1.23,0.29,-0.19,-0.14,0.39,1.32,2.56,3.92,5.25,6.38,7.16,7.49,7.45,7.29,7.11,7.03,7.06,7.15,7.22,7.21,6.78,5.88,4.62,3.19,1.79,0.59,-0.23,-0.56,-0.35,0.38,1.53,2.96,4.48,5.9,7.04,7.74,7.93,7.79,7.52,7.23,7.07,7.07,7.1,7.14,7.06,6.51,5.48,4.12,2.63,1.21,0.07,-0.63,-0.8,-0.39,0.56,1.91,3.5,5.1,6.52,7.56,8.08,8.08,7.82,7.44,7.11,6.97,7.0,7.07,7.12,7.0,6.33,5.17,3.7,2.13,0.71,-0.37,-0.94,-0.9,-0.26,0.92,2.47,4.16,5.78,7.1,7.94,8.19,8.0,7.59,7.13,6.84]},"cS":{"t0":-48.0,"dt":1.0,"v":[-2.15,-2.12,-1.78,-1.23,-0.48,0.33,0.8,0.73,0.16,-0.76,-1.72,-2.38,-2.64,-2.46,-1.77,-0.64,0.76,2.18,3.14,3.24,2.5,1.19,-0.29,-1.45,-2.1,-2.32,-2.19,-1.77,-1.16,-0.38,0.41,0.88,0.85,0.36,-0.49,-1.36,-1.95,-2.16,-1.94,-1.24,-0.21,0.97,2.07,2.69,2.53,1.7,0.44,-0.87,-1.83,-2.31,-2.42,-2.18,-1.7,-1.08,-0.29,0.52,1.03,1.08,0.68,-0.08,-0.88,-1.43,-1.63,-1.41,-0.78,0.04,0.92,1.69,2.0,1.68,0.86,-0.26,-1.35,-2.09,-2.42,-2.41,-2.1,-1.61,-0.98,-0.15,0.71,1.28,1.43,1.11,0.41,-0.37,-0.92,-1.15,-0.99,-0.54,0.02,0.61,1.09,1.19,0.83,0.12,-0.81,-1.68,-2.23,-2.42,-2.32,-1.98,-1.5,-0.84,0.06,0.99,1.65,1.88,1.59,0.87,0.07,-0.52,-0.82,-0.78,-0.53,-0.22,0.13,0.42,0.42,0.11,-0.45,-1.19,-1.86,-2.24,-2.35,-2.22,-1.87,-1.37,-0.64,0.36,1.38,2.1,2.34,1.99,1.2,0.35,-0.31,-0.7,-0.78,-0.7,-0.57,-0.36,-0.16,-0.16,-0.38,-0.81,-1.4,-1.93,-2.21,-2.28,-2.14,-1.77,-1.21,-0.37,0.75,1.83,2.55,2.71,2.23,1.33,0.41,-0.31,-0.77,-0.93,-0.94,-0.89,-0.72,-0.52,-0.49,-0.64,-1.0,-1.5,-1.94,-2.19,-2.27,-2.1,-1.68,-1.02,-0.03,1.2,2.3,2.92,2.91,2.25,1.24,0.27,-0.49,-0.94,-1.1,-1.14,-1.08,-0.86,-0.64,-0.59,-0.73,-1.08,-1.58,-2.0,-2.25,-2.31,-2.09,-1.58,-0.77,0.39,1.7,2.71,3.15,2.91,2.06,0.95,-0.03,-0.75,-1.13,-1.24,-1.22,-1.07,-0.79,-0.56,-0.55,-0.74,-1.16,-1.7,-2.13,-2.37,-2.39,-2.07,-1.42,-0.43,0.88,2.19,3.04,3.23,2.72,1.69,0.53,-0.4,-1.02,-1.3,-1.3,-1.18]}},"victoria":{"sun":[{"d":-2,"rise":-42.464,"set":-26.847},{"d":-1,"rise":-18.445,"set":-2.863},{"d":0,"rise":5.574,"set":21.12},{"d":1,"rise":29.593,"set":45.102},{"d":2,"rise":53.613,"set":69.084},{"d":3,"rise":77.633,"set":93.066},{"d":4,"rise":101.653,"set":117.046},{"d":5,"rise":125.674,"set":141.026},{"d":6,"rise":149.694,"set":165.006},{"d":7,"rise":173.715,"set":188.985}],"tideName":"Kanaka Bay, San Juan Island","tideId":"9449856","tideKm":22.2,"sub":false,"curName":"Trial Island, 5.2 miles SSW of","curId":"PCT1391","curKm":11.8,"weak":false,"note":"","floodDir":45,"ebbDir":235,"tideEv":[{"t":-45.5333,"type":"low","v":4.46},{"t":-41.65,"type":"high","v":5.47},{"t":-34.6667,"type":"low","v":0.27},{"t":-27.0833,"type":"high","v":7.63},{"t":-20.5,"type":"low","v":3.42},{"t":-16.3333,"type":"high","v":4.64},{"t":-10.0667,"type":"low","v":1.6},{"t":-2.8167,"type":"high","v":7.5},{"t":4.4333,"type":"low","v":2.42},{"t":9.6333,"type":"high","v":4.07},{"t":14.4833,"type":"low","v":2.88},{"t":21.45,"type":"high","v":7.42},{"t":29.3167,"type":"low","v":1.53},{"t":36.6667,"type":"high","v":4.24},{"t":38.9833,"type":"low","v":4.03},{"t":45.75,"type":"high","v":7.36},{"t":54.15,"type":"low","v":0.78},{"t":70.1333,"type":"high","v":7.31},{"t":78.9333,"type":"low","v":0.16},{"t":94.6167,"type":"high","v":7.27},{"t":103.6667,"type":"low","v":-0.34},{"t":119.2167,"type":"high","v":7.22},{"t":128.35,"type":"low","v":-0.74},{"t":143.9333,"type":"high","v":7.17},{"t":152.9833,"type":"low","v":-1.05},{"t":161.9333,"type":"high","v":7.04},{"t":164.8,"type":"low","v":6.73},{"t":168.75,"type":"high","v":7.1},{"t":177.5833,"type":"low","v":-1.26},{"t":186.3667,"type":"high","v":7.23},{"t":189.9333,"type":"low","v":6.6}],"curEv":[{"t":-46.9,"type":"ebb","v":-1.37},{"t":-43.7167,"type":"slack","v":0.0},{"t":-41.7,"type":"flood","v":0.34},{"t":-39.6333,"type":"slack","v":0.0},{"t":-35.1,"type":"ebb","v":-1.78},{"t":-32.05,"type":"slack","v":0.0},{"t":-28.5333,"type":"flood","v":1.64},{"t":-25.2,"type":"slack","v":0.0},{"t":-22.1333,"type":"ebb","v":-1.47},{"t":-18.6833,"type":"slack","v":0.0},{"t":-16.6667,"type":"flood","v":0.33},{"t":-14.6333,"type":"slack","v":0.0},{"t":-10.3167,"type":"ebb","v":-1.51},{"t":-7.35,"type":"slack","v":0.0},{"t":-3.8833,"type":"flood","v":1.39},{"t":-0.7333,"type":"slack","v":0.0},{"t":2.6667,"type":"ebb","v":-1.59},{"t":6.4,"type":"slack","v":0.0},{"t":8.4667,"type":"flood","v":0.33},{"t":10.4833,"type":"slack","v":0.0},{"t":14.5333,"type":"ebb","v":-1.17},{"t":17.3667,"type":"slack","v":0.0},{"t":20.6833,"type":"flood","v":1.06},{"t":23.65,"type":"slack","v":0.0},{"t":27.4833,"type":"ebb","v":-1.71},{"t":31.4,"type":"slack","v":0.0},{"t":33.6333,"type":"flood","v":0.41},{"t":35.9,"type":"slack","v":0.0},{"t":39.5333,"type":"ebb","v":-0.82},{"t":42.1667,"type":"slack","v":0.0},{"t":45.15,"type":"flood","v":0.69},{"t":47.9,"type":"slack","v":0.0},{"t":52.3,"type":"ebb","v":-1.81},{"t":56.2667,"type":"slack","v":0.0},{"t":58.85,"type":"flood","v":0.59},{"t":61.9,"type":"slack","v":0.0},{"t":64.7167,"type":"ebb","v":-0.54},{"t":67.3,"type":"slack","v":0.0},{"t":69.5333,"type":"flood","v":0.29},{"t":71.9,"type":"slack","v":0.0},{"t":77.1167,"type":"ebb","v":-1.86},{"t":81.0167,"type":"slack","v":0.0},{"t":84.0333,"type":"flood","v":0.86},{"t":88.05,"type":"slack","v":0.0},{"t":90.0833,"type":"ebb","v":-0.4},{"t":94.4667,"type":"slack","v":0.0},{"t":101.9333,"type":"ebb","v":-1.85},{"t":105.7333,"type":"slack","v":0.0},{"t":109.1,"type":"flood","v":1.14},{"t":113.35,"type":"slack","v":0.0},{"t":115.95,"type":"ebb","v":-0.44},{"t":119.2167,"type":"ebb","v":-0.27},{"t":126.7667,"type":"ebb","v":-1.79},{"t":130.45,"type":"slack","v":0.0},{"t":134.0,"type":"flood","v":1.35},{"t":138.2,"type":"slack","v":0.0},{"t":141.3,"type":"ebb","v":-0.58},{"t":144.6167,"type":"ebb","v":-0.4},{"t":151.6,"type":"ebb","v":-1.71},{"t":155.1667,"type":"slack","v":0.0},{"t":158.75,"type":"flood","v":1.47},{"t":162.85,"type":"slack","v":0.0},{"t":165.8833,"type":"ebb","v":-0.72},{"t":170.2,"type":"ebb","v":-0.39},{"t":176.45,"type":"ebb","v":-1.66},{"t":179.8667,"type":"slack","v":0.0},{"t":183.4167,"type":"flood","v":1.51},{"t":187.4,"type":"slack","v":0.0},{"t":190.2,"type":"ebb","v":-0.84}],"tS":{"t0":-48.0,"dt":1.0,"v":[5.47,4.78,4.48,4.49,4.74,5.14,5.44,5.37,4.88,4.08,3.05,1.89,0.87,0.31,0.42,1.14,2.31,3.83,5.41,6.67,7.42,7.62,7.34,6.6,5.56,4.53,3.8,3.46,3.46,3.74,4.19,4.56,4.62,4.36,3.88,3.22,2.46,1.83,1.6,1.91,2.68,3.78,5.08,6.31,7.16,7.5,7.36,6.79,5.83,4.65,3.55,2.79,2.46,2.48,2.8,3.32,3.79,4.03,4.05,3.92,3.63,3.24,2.92,2.94,3.37,4.11,5.05,6.06,6.92,7.37,7.35,6.92,6.13,5.01,3.73,2.59,1.85,1.55,1.62,2.01,2.63,3.24,3.69,4.01,4.2,4.23,4.12,4.03,4.19,4.65,5.29,6.0,6.72,7.23,7.35,7.04,6.39,5.43,4.19,2.84,1.72,1.03,0.79,0.91,1.41,2.17,2.96,3.64,4.22,4.69,4.94,4.99,5.02,5.24,5.65,6.12,6.61,7.07,7.31,7.16,6.65,5.85,4.75,3.4,2.03,0.95,0.34,0.16,0.39,1.05,1.98,2.95,3.85,4.65,5.28,5.63,5.75,5.83,6.02,6.32,6.62,6.93,7.21,7.24,6.91,6.26,5.32,4.11,2.69,1.32,0.3,-0.24,-0.32,0.07,0.92,2.04,3.19,4.26,5.19,5.88,6.25,6.35,6.39,6.5,6.68,6.86,7.06,7.21,7.11,6.66,5.88,4.83,3.51,2.04,0.68,-0.28,-0.71,-0.64,-0.04,1.02,2.33,3.64,4.8,5.76,6.43,6.73,6.74,6.69,6.72,6.8,6.92,7.08,7.17,6.98,6.41,5.52,4.35,2.94,1.42,0.08,-0.78,-1.05,-0.77,0.07,1.36,2.84,4.22,5.4,6.32,6.88,7.04,6.92,6.77,6.73,6.78,6.88,7.04,7.09,6.81,6.13,5.13,3.86,2.36,0.81,-0.46,-1.16,-1.21,-0.67,0.43,1.93,3.51,4.9,6.01,6.82,7.2,7.16,6.89,6.66,6.6,6.66]},"cS":{"t0":-46.9,"dt":3.1833,"v":[-1.37,0.0,0.34,0.0,-1.78,0.0,1.64,0.0,-1.47,0.0,0.33,0.0,-1.51,0.0,1.39,0.0,-1.59,0.0,0.33,0.0,-1.17,0.0,1.06,0.0,-1.71,0.0,0.41,0.0,-0.82,0.0,0.69,0.0,-1.81,0.0,0.59,0.0,-0.54,0.0,0.29,0.0,-1.86,0.0,0.86,0.0,-0.4,0.0,-1.85,0.0,1.14,0.0,-0.44,-0.27,-1.79,0.0,1.35,0.0,-0.58,-0.4,-1.71,0.0,1.47,0.0,-0.72,-0.39,-1.66,0.0,1.51,0.0,-0.84]}},"bellingham":{"sun":[{"d":-2,"rise":-42.542,"set":-26.884},{"d":-1,"rise":-18.523,"set":-2.9},{"d":0,"rise":5.496,"set":21.083},{"d":1,"rise":29.516,"set":45.065},{"d":2,"rise":53.535,"set":69.047},{"d":3,"rise":77.556,"set":93.028},{"d":4,"rise":101.576,"set":117.008},{"d":5,"rise":125.597,"set":140.988},{"d":6,"rise":149.618,"set":164.968},{"d":7,"rise":173.639,"set":188.946}],"tideName":"Bellingham","tideId":"9449211","tideKm":2.0,"sub":true,"curName":"Eliza Island, 0.5 mile southeast of","curId":"PCT2116","curKm":9.8,"weak":true,"note":"unavailable","floodDir":0,"ebbDir":0,"tideEv":[{"t":-44.7833,"type":"low","v":4.26},{"t":-40.1333,"type":"high","v":6.5},{"t":-33.35,"type":"low","v":0.04},{"t":-26.3167,"type":"high","v":8.9},{"t":-19.7333,"type":"low","v":3.3},{"t":-14.8833,"type":"high","v":5.75},{"t":-8.6167,"type":"low","v":1.45},{"t":-1.85,"type":"high","v":8.72},{"t":5.25,"type":"low","v":2.35},{"t":10.7167,"type":"high","v":5.24},{"t":16.1167,"type":"low","v":2.91},{"t":22.5833,"type":"high","v":8.49},{"t":30.1667,"type":"low","v":1.49},{"t":36.95,"type":"high","v":5.34},{"t":40.9667,"type":"low","v":4.3},{"t":47.0167,"type":"high","v":8.21},{"t":55.0333,"type":"low","v":0.77},{"t":62.9667,"type":"high","v":6.12},{"t":66.0833,"type":"low","v":5.48},{"t":71.4667,"type":"high","v":7.92},{"t":79.85,"type":"low","v":0.2},{"t":88.2833,"type":"high","v":7.03},{"t":91.65,"type":"low","v":6.28},{"t":95.9833,"type":"high","v":7.67},{"t":104.6167,"type":"low","v":-0.21},{"t":113.1167,"type":"high","v":7.74},{"t":117.3,"type":"low","v":6.61},{"t":120.6167,"type":"high","v":7.47},{"t":129.3333,"type":"low","v":-0.52},{"t":137.7667,"type":"high","v":8.18},{"t":142.5333,"type":"low","v":6.64},{"t":145.4167,"type":"high","v":7.36},{"t":154.0167,"type":"low","v":-0.76},{"t":162.3333,"type":"high","v":8.38},{"t":167.25,"type":"low","v":6.55},{"t":170.3,"type":"high","v":7.34},{"t":178.6667,"type":"low","v":-0.94},{"t":186.8167,"type":"high","v":8.45},{"t":191.7167,"type":"low","v":6.39}],"curEv":[],"tS":{"t0":-44.7833,"dt":1.0,"v":[4.26,4.51,5.14,5.87,6.39,6.46,5.89,4.77,3.33,1.88,0.73,0.1,0.18,1.08,2.65,4.57,6.47,7.98,8.8,8.81,8.18,7.09,5.78,4.54,3.64,3.3,3.52,4.15,4.93,5.55,5.75,5.43,4.66,3.64,2.6,1.81,1.46,1.72,2.69,4.17,5.84,7.35,8.38,8.72,8.37,7.48,6.21,4.81,3.55,2.68,2.35,2.57,3.18,3.99,4.74,5.18,5.19,4.82,4.21,3.55,3.07,2.91,3.3,4.24,5.52,6.84,7.9,8.45,8.37,7.72,6.61,5.22,3.79,2.57,1.76,1.49,1.71,2.29,3.11,3.99,4.75,5.23,5.33,5.11,4.72,4.39,4.32,4.7,5.49,6.48,7.42,8.04,8.2,7.81,6.91,5.65,4.21,2.82,1.67,0.96,0.78,1.06,1.71,2.63,3.67,4.68,5.5,6.0,6.11,5.9,5.59,5.48,5.74,6.31,7.01,7.61,7.91,7.77,7.12,6.05,4.7,3.26,1.93,0.9,0.31,0.23,0.63,1.44,2.55,3.81,5.03,6.07,6.76,7.03,6.9,6.57,6.31,6.34,6.68,7.17,7.57,7.66,7.28,6.44,5.24,3.85,2.44,1.2,0.29,-0.17,-0.11,0.47,1.49,2.82,4.28,5.67,6.8,7.52,7.74,7.56,7.17,6.79,6.61,6.76,7.14,7.44,7.38,6.82,5.84,4.55,3.13,1.75,0.59,-0.2,-0.52,-0.29,0.51,1.76,3.29,4.9,6.36,7.47,8.09,8.15,7.85,7.38,6.91,6.66,6.74,7.09,7.35,7.19,6.51,5.42,4.04,2.56,1.18,0.09,-0.59,-0.75,-0.3,0.73,2.19,3.88,5.56,7.0,7.98,8.38,8.24,7.79,7.22,6.74,6.55,6.73,7.12,7.34,7.1,6.31,5.1,3.61,2.07,0.69,-0.34,-0.88,-0.83,-0.13,1.15,2.81,4.61,6.28,7.58,8.32,8.42,8.06,7.45,6.83,6.44]},"cS":null},"everett":{"sun":[{"d":-2,"rise":-42.512,"set":-26.952},{"d":-1,"rise":-18.493,"set":-2.968},{"d":0,"rise":5.525,"set":21.015},{"d":1,"rise":29.544,"set":44.998},{"d":2,"rise":53.564,"set":68.98},{"d":3,"rise":77.583,"set":92.962},{"d":4,"rise":101.603,"set":116.943},{"d":5,"rise":125.623,"set":140.924},{"d":6,"rise":149.644,"set":164.904},{"d":7,"rise":173.665,"set":188.883}],"tideName":"Everett","tideId":"9447659","tideKm":1.1,"sub":false,"curName":"Everett","curId":"PUG1613","curKm":1.8,"weak":true,"note":"Currents are weak and variable","floodDir":0,"ebbDir":0,"tideEv":[{"t":-45.1333,"type":"low","v":4.41},{"t":-39.9333,"type":"high","v":8.81},{"t":-33.5333,"type":"low","v":0.47},{"t":-26.5833,"type":"high","v":11.69},{"t":-20.2667,"type":"low","v":3.48},{"t":-14.7667,"type":"high","v":8.1},{"t":-8.8333,"type":"low","v":2.24},{"t":-2.0833,"type":"high","v":11.34},{"t":4.6167,"type":"low","v":2.66},{"t":10.5667,"type":"high","v":7.59},{"t":15.8833,"type":"low","v":3.98},{"t":22.4167,"type":"high","v":10.97},{"t":29.5333,"type":"low","v":1.94},{"t":36.25,"type":"high","v":7.51},{"t":40.6833,"type":"low","v":5.56},{"t":46.9333,"type":"high","v":10.61},{"t":54.4333,"type":"low","v":1.32},{"t":62.0167,"type":"high","v":7.97},{"t":65.6667,"type":"low","v":6.84},{"t":71.5167,"type":"high","v":10.28},{"t":79.3,"type":"low","v":0.78},{"t":87.4167,"type":"high","v":8.72},{"t":90.8333,"type":"low","v":7.72},{"t":96.2167,"type":"high","v":10.0},{"t":104.15,"type":"low","v":0.27},{"t":112.3833,"type":"high","v":9.45},{"t":116.1167,"type":"low","v":8.14},{"t":121.0167,"type":"high","v":9.8},{"t":128.95,"type":"low","v":-0.23},{"t":137.1,"type":"high","v":10.04},{"t":141.3333,"type":"low","v":8.16},{"t":145.8833,"type":"high","v":9.7},{"t":153.6833,"type":"low","v":-0.7},{"t":161.7,"type":"high","v":10.49},{"t":166.3167,"type":"low","v":7.91},{"t":170.7667,"type":"high","v":9.66},{"t":178.3833,"type":"low","v":-1.1},{"t":186.2167,"type":"high","v":10.82},{"t":191.0833,"type":"low","v":7.52}],"curEv":[],"tS":{"t0":-48.0,"dt":1.0,"v":[7.96,6.05,4.76,4.42,4.92,5.97,7.24,8.33,8.81,8.44,7.26,5.51,3.5,1.68,0.6,0.64,1.84,3.86,6.29,8.71,10.62,11.6,11.52,10.51,8.8,6.76,4.9,3.73,3.51,4.08,5.15,6.42,7.53,8.08,7.88,7.02,5.71,4.2,2.89,2.25,2.6,3.85,5.67,7.71,9.61,10.93,11.34,10.81,9.51,7.67,5.62,3.85,2.83,2.71,3.32,4.39,5.68,6.83,7.49,7.54,7.06,6.2,5.16,4.29,3.99,4.49,5.65,7.16,8.76,10.13,10.9,10.83,9.97,8.5,6.59,4.58,2.94,2.06,2.03,2.67,3.77,5.1,6.34,7.16,7.49,7.39,6.93,6.27,5.7,5.59,6.09,7.06,8.23,9.39,10.29,10.61,10.2,9.14,7.57,5.65,3.7,2.17,1.4,1.45,2.14,3.31,4.73,6.11,7.14,7.76,7.97,7.79,7.36,6.94,6.87,7.27,8.0,8.85,9.65,10.19,10.2,9.58,8.4,6.76,4.84,2.93,1.48,0.81,0.95,1.75,3.03,4.61,6.17,7.43,8.27,8.68,8.65,8.28,7.86,7.73,7.98,8.49,9.09,9.66,9.99,9.82,9.06,7.79,6.09,4.12,2.22,0.83,0.27,0.55,1.49,2.97,4.77,6.54,7.97,8.94,9.41,9.36,8.9,8.38,8.14,8.27,8.63,9.1,9.57,9.8,9.53,8.66,7.29,5.47,3.41,1.49,0.18,-0.23,0.23,1.41,3.16,5.22,7.16,8.68,9.66,10.04,9.81,9.17,8.52,8.18,8.23,8.55,9.02,9.5,9.69,9.32,8.34,6.81,4.83,2.64,0.72,-0.46,-0.65,0.08,1.58,3.65,5.93,7.97,9.47,10.32,10.46,9.96,9.1,8.31,7.94,8.01,8.39,8.96,9.49,9.64,9.15,7.99,6.25,4.07,1.8,-0.05,-1.02,-0.9,0.21,2.09,4.46,6.89,8.91,10.24,10.8,10.6,9.78,8.71,7.85,7.52]},"cS":null},"olympia":{"sun":[{"d":-2,"rise":-42.406,"set":-26.968},{"d":-1,"rise":-18.388,"set":-2.983},{"d":0,"rise":5.63,"set":21.001},{"d":1,"rise":29.648,"set":44.985},{"d":2,"rise":53.667,"set":68.968},{"d":3,"rise":77.685,"set":92.95},{"d":4,"rise":101.705,"set":116.932},{"d":5,"rise":125.724,"set":140.913},{"d":6,"rise":149.744,"set":164.894},{"d":7,"rise":173.763,"set":188.874}],"tideName":"Olympia, Budd Inlet","tideId":"9446969","tideKm":1.1,"sub":true,"curName":"Budd Inlet Entrance","curId":"PUG1540","curKm":10.1,"weak":false,"note":"","floodDir":184,"ebbDir":10,"tideEv":[{"t":-44.1833,"type":"low","v":5.0},{"t":-39.2167,"type":"high","v":11.87},{"t":-32.6333,"type":"low","v":-0.0},{"t":-25.85,"type":"high","v":15.68},{"t":-19.2833,"type":"low","v":3.94},{"t":-14.0667,"type":"high","v":10.92},{"t":-7.8833,"type":"low","v":1.95},{"t":-1.2833,"type":"high","v":15.32},{"t":5.6167,"type":"low","v":2.93},{"t":11.25,"type":"high","v":10.22},{"t":16.9167,"type":"low","v":4.01},{"t":23.2833,"type":"high","v":14.79},{"t":30.5167,"type":"low","v":2.02},{"t":36.8833,"type":"high","v":10.08},{"t":41.85,"type":"low","v":5.99},{"t":47.9,"type":"high","v":14.11},{"t":55.4167,"type":"low","v":1.25},{"t":62.8667,"type":"high","v":10.78},{"t":67.15,"type":"low","v":7.62},{"t":72.5833,"type":"high","v":13.4},{"t":80.3,"type":"low","v":0.61},{"t":88.4333,"type":"high","v":12.02},{"t":92.95,"type":"low","v":8.53},{"t":97.3667,"type":"high","v":12.77},{"t":105.1333,"type":"low","v":0.08},{"t":113.4333,"type":"high","v":13.14},{"t":118.55,"type":"low","v":8.67},{"t":122.25,"type":"high","v":12.34},{"t":129.9,"type":"low","v":-0.36},{"t":138.15,"type":"high","v":13.88},{"t":143.55,"type":"low","v":8.49},{"t":147.1167,"type":"high","v":12.17},{"t":154.6167,"type":"low","v":-0.74},{"t":162.7333,"type":"high","v":14.26},{"t":168.2333,"type":"low","v":8.24},{"t":171.9333,"type":"high","v":12.21},{"t":179.2833,"type":"low","v":-1.07},{"t":187.1833,"type":"high","v":14.4}],"curEv":[{"t":-46.4333,"type":"ebb","v":-0.33},{"t":-44.05,"type":"slack","v":0.0},{"t":-41.8333,"type":"flood","v":0.29},{"t":-38.7833,"type":"slack","v":0.0},{"t":-35.6333,"type":"ebb","v":-0.42},{"t":-32.3,"type":"slack","v":0.0},{"t":-27.8667,"type":"flood","v":0.6},{"t":-24.4167,"type":"slack","v":0.0},{"t":-21.7833,"type":"ebb","v":-0.35},{"t":-19.2,"type":"slack","v":0.0},{"t":-16.75,"type":"flood","v":0.3},{"t":-13.55,"type":"slack","v":0.0},{"t":-10.85,"type":"ebb","v":-0.29},{"t":-7.7667,"type":"slack","v":0.0},{"t":-3.6667,"type":"flood","v":0.47},{"t":-0.0667,"type":"slack","v":0.0},{"t":2.8667,"type":"ebb","v":-0.35},{"t":5.6833,"type":"slack","v":0.0},{"t":8.4333,"type":"flood","v":0.32},{"t":11.9,"type":"slack","v":0.0},{"t":14.05,"type":"ebb","v":-0.16},{"t":16.7,"type":"slack","v":0.0},{"t":19.9667,"type":"flood","v":0.38},{"t":24.2,"type":"slack","v":0.0},{"t":27.55,"type":"ebb","v":-0.35},{"t":30.5167,"type":"slack","v":0.0},{"t":33.9833,"type":"flood","v":0.34},{"t":37.9833,"type":"slack","v":0.0},{"t":41.0333,"type":"slack","v":0.0},{"t":44.3833,"type":"flood","v":0.31},{"t":48.3833,"type":"slack","v":0.0},{"t":52.2667,"type":"ebb","v":-0.34},{"t":55.35,"type":"slack","v":0.0},{"t":59.4167,"type":"flood","v":0.39},{"t":65.5333,"type":"slack","v":0.02},{"t":68.9833,"type":"flood","v":0.23},{"t":72.4333,"type":"slack","v":0.0},{"t":77.0167,"type":"ebb","v":-0.33},{"t":80.2,"type":"slack","v":0.0},{"t":84.6667,"type":"flood","v":0.46},{"t":90.95,"type":"slack","v":0.01},{"t":93.7167,"type":"flood","v":0.16},{"t":96.1833,"type":"slack","v":0.0},{"t":101.8,"type":"ebb","v":-0.33},{"t":105.1167,"type":"slack","v":0.0},{"t":109.8,"type":"flood","v":0.55},{"t":115.25,"type":"slack","v":0.0},{"t":116.8667,"type":"slack","v":0.0},{"t":118.5833,"type":"flood","v":0.1},{"t":120.3,"type":"slack","v":0.0},{"t":126.7,"type":"ebb","v":-0.35},{"t":130.05,"type":"slack","v":0.0},{"t":134.75,"type":"flood","v":0.64},{"t":139.6833,"type":"slack","v":0.0},{"t":142.2667,"type":"slack","v":0.0},{"t":145.0667,"type":"slack","v":0.0},{"t":151.6667,"type":"ebb","v":-0.38},{"t":154.95,"type":"slack","v":0.0},{"t":159.5333,"type":"flood","v":0.71},{"t":164.1667,"type":"slack","v":0.0},{"t":165.7167,"type":"ebb","v":-0.12},{"t":167.25,"type":"slack","v":0.0},{"t":170.5667,"type":"slack","v":0.0},{"t":176.5167,"type":"ebb","v":-0.41},{"t":179.7833,"type":"slack","v":0.0},{"t":184.25,"type":"flood","v":0.74},{"t":188.65,"type":"slack","v":0.0},{"t":190.35,"type":"ebb","v":-0.15}],"tS":{"t0":-44.1833,"dt":1.0,"v":[5.0,5.66,7.4,9.54,11.25,11.87,11.16,9.29,6.66,3.88,1.55,0.2,0.17,1.7,4.53,8.05,11.53,14.23,15.59,15.38,13.91,11.52,8.74,6.2,4.48,3.95,4.68,6.38,8.45,10.16,10.91,10.48,9.02,6.91,4.68,2.89,2.0,2.32,4.02,6.75,9.9,12.77,14.72,15.31,14.56,12.7,10.11,7.32,4.9,3.34,2.95,3.72,5.35,7.35,9.12,10.11,10.07,9.12,7.57,5.89,4.57,4.01,4.53,6.21,8.65,11.27,13.44,14.65,14.62,13.43,11.3,8.64,5.93,3.68,2.31,2.06,2.82,4.35,6.28,8.16,9.53,10.08,9.73,8.73,7.46,6.41,5.99,6.49,7.93,9.93,11.96,13.48,14.11,13.64,12.15,9.9,7.25,4.69,2.63,1.45,1.32,2.06,3.49,5.36,7.35,9.11,10.32,10.78,10.41,9.42,8.32,7.67,7.83,8.86,10.43,12.02,13.12,13.37,12.61,10.93,8.61,6.03,3.61,1.74,0.73,0.72,1.56,3.1,5.11,7.3,9.35,10.94,11.86,11.96,11.27,10.12,9.04,8.54,8.92,10.14,11.61,12.61,12.67,11.71,9.9,7.53,4.98,2.67,0.96,0.13,0.3,1.36,3.17,5.46,7.92,10.19,11.96,12.96,13.08,12.38,11.14,9.82,8.89,8.72,9.63,11.14,12.22,12.17,11.07,9.13,6.66,4.09,1.83,0.26,-0.36,0.07,1.45,3.6,6.2,8.87,11.25,12.98,13.82,13.68,12.71,11.24,9.75,8.73,8.54,9.52,11.09,12.11,11.89,10.6,8.46,5.85,3.21,1.01,-0.38,-0.72,0.05,1.82,4.31,7.17,9.97,12.29,13.79,14.26,13.7,12.37,10.68,9.17,8.32,8.48,9.78,11.38,12.2,11.74,10.17,7.77,4.98,2.29,0.19,-0.94,-0.9,0.32,2.53,5.39,8.44,11.22,13.29,14.32]},"cS":{"t0":-48.0,"dt":1.0,"v":[-0.18,-0.31,-0.32,-0.2,0.01,0.21,0.29,0.27,0.19,0.04,-0.16,-0.33,-0.41,-0.4,-0.3,-0.15,0.07,0.31,0.48,0.56,0.6,0.55,0.38,0.14,-0.09,-0.27,-0.34,-0.31,-0.18,0.04,0.23,0.3,0.29,0.22,0.08,-0.1,-0.23,-0.29,-0.26,-0.17,-0.04,0.15,0.34,0.45,0.47,0.46,0.38,0.2,-0.01,-0.2,-0.32,-0.35,-0.3,-0.15,0.07,0.25,0.31,0.31,0.26,0.14,-0.02,-0.12,-0.16,-0.13,-0.07,0.04,0.19,0.34,0.38,0.36,0.31,0.21,0.04,-0.14,-0.27,-0.34,-0.34,-0.28,-0.12,0.11,0.27,0.33,0.34,0.31,0.21,0.08,0.0,-0.04,-0.03,0.0,0.07,0.2,0.3,0.29,0.23,0.16,0.06,-0.09,-0.22,-0.3,-0.34,-0.33,-0.25,-0.08,0.14,0.29,0.35,0.38,0.38,0.3,0.19,0.11,0.05,0.02,0.02,0.08,0.18,0.23,0.18,0.11,0.04,-0.06,-0.18,-0.26,-0.31,-0.33,-0.31,-0.22,-0.04,0.16,0.3,0.38,0.44,0.46,0.39,0.3,0.19,0.1,0.04,0.01,0.05,0.13,0.15,0.09,0.01,-0.05,-0.13,-0.22,-0.28,-0.32,-0.33,-0.3,-0.21,-0.02,0.18,0.32,0.43,0.52,0.55,0.49,0.37,0.24,0.11,0.02,-0.03,0.01,0.08,0.09,0.02,-0.04,-0.09,-0.17,-0.25,-0.3,-0.34,-0.34,-0.31,-0.21,-0.01,0.2,0.36,0.49,0.61,0.64,0.56,0.41,0.24,0.08,-0.03,-0.07,-0.02,0.06,0.07,0.0,-0.05,-0.1,-0.19,-0.27,-0.33,-0.37,-0.37,-0.34,-0.21,0.01,0.24,0.41,0.57,0.69,0.7,0.58,0.4,0.2,0.02,-0.09,-0.11,-0.03,0.07,0.08,0.03,-0.02,-0.09,-0.21,-0.3,-0.37,-0.41,-0.41,-0.35,-0.19,0.06,0.3,0.48,0.64,0.74,0.7,0.55,0.34,0.12,-0.05,-0.15,-0.13]}},"pointroberts":{"sun":[{"d":-2,"rise":-42.522,"set":-26.829},{"d":-1,"rise":-18.503,"set":-2.846},{"d":0,"rise":5.517,"set":21.137},{"d":1,"rise":29.536,"set":45.119},{"d":2,"rise":53.557,"set":69.1},{"d":3,"rise":77.577,"set":93.081},{"d":4,"rise":101.598,"set":117.061},{"d":5,"rise":125.619,"set":141.041},{"d":6,"rise":149.64,"set":165.02},{"d":7,"rise":173.662,"set":188.999}],"tideName":"POINT ROBERTS, PUGET SOUND","tideId":"9449639","tideKm":1.1,"sub":false,"curName":"Strait of Georgia, 4.5 nm SW of Point Roberts","curId":"PUG1726","curKm":8.2,"weak":false,"note":"","floodDir":332,"ebbDir":129,"tideEv":[{"t":-44.2167,"type":"low","v":4.82},{"t":-39.6,"type":"high","v":7.18},{"t":-33.0833,"type":"low","v":0.39},{"t":-25.85,"type":"high","v":10.44},{"t":-19.3333,"type":"low","v":3.73},{"t":-14.2833,"type":"high","v":6.49},{"t":-8.4,"type":"low","v":2.07},{"t":-1.4,"type":"high","v":10.09},{"t":5.5167,"type":"low","v":2.71},{"t":11.2167,"type":"high","v":6.08},{"t":16.2667,"type":"low","v":3.72},{"t":23.05,"type":"high","v":9.72},{"t":30.3667,"type":"low","v":1.81},{"t":37.05,"type":"high","v":6.14},{"t":40.95,"type":"low","v":5.21},{"t":47.4667,"type":"high","v":9.38},{"t":55.2,"type":"low","v":1.04},{"t":63.1167,"type":"high","v":6.76},{"t":65.75,"type":"low","v":6.47},{"t":71.9,"type":"high","v":9.08},{"t":80.0333,"type":"low","v":0.4},{"t":88.6833,"type":"high","v":7.61},{"t":91.05,"type":"low","v":7.42},{"t":96.3667,"type":"high","v":8.83},{"t":104.8167,"type":"low","v":-0.15},{"t":113.6167,"type":"high","v":8.35},{"t":116.7333,"type":"low","v":7.93},{"t":120.9667,"type":"high","v":8.64},{"t":129.55,"type":"low","v":-0.61},{"t":138.2167,"type":"high","v":8.92},{"t":142.1667,"type":"low","v":8.03},{"t":145.7333,"type":"high","v":8.5},{"t":154.25,"type":"low","v":-0.99},{"t":162.7167,"type":"high","v":9.34},{"t":167.2333,"type":"low","v":7.9},{"t":170.6,"type":"high","v":8.4},{"t":178.9,"type":"low","v":-1.28},{"t":187.15,"type":"high","v":9.65}],"curEv":[{"t":-47.15,"type":"ebb","v":-0.96},{"t":-43.9167,"type":"slack","v":0.0},{"t":-41.3,"type":"flood","v":0.69},{"t":-38.7167,"type":"slack","v":0.0},{"t":-35.3833,"type":"ebb","v":-1.09},{"t":-32.2667,"type":"slack","v":0.0},{"t":-29.1167,"type":"flood","v":1.09},{"t":-25.7833,"type":"slack","v":0.0},{"t":-22.5167,"type":"ebb","v":-0.95},{"t":-19.3667,"type":"slack","v":0.0},{"t":-16.5167,"type":"flood","v":0.78},{"t":-13.85,"type":"slack","v":0.0},{"t":-10.5667,"type":"ebb","v":-1.01},{"t":-7.4833,"type":"slack","v":0.0},{"t":-4.3833,"type":"flood","v":0.93},{"t":-1.3167,"type":"slack","v":0.0},{"t":2.1,"type":"ebb","v":-0.9},{"t":5.2333,"type":"slack","v":0.0},{"t":8.25,"type":"flood","v":0.8},{"t":10.9833,"type":"slack","v":0.0},{"t":14.2333,"type":"ebb","v":-0.9},{"t":17.2667,"type":"slack","v":0.0},{"t":20.3,"type":"flood","v":0.78},{"t":23.1667,"type":"slack","v":0.0},{"t":26.7,"type":"ebb","v":-0.85},{"t":29.9167,"type":"slack","v":0.0},{"t":33.0,"type":"flood","v":0.77},{"t":35.8333,"type":"slack","v":0.0},{"t":38.9333,"type":"ebb","v":-0.77},{"t":41.9833,"type":"slack","v":0.0},{"t":44.95,"type":"flood","v":0.64},{"t":47.6833,"type":"slack","v":0.0},{"t":51.2667,"type":"ebb","v":-0.81},{"t":54.75,"type":"slack","v":0.0},{"t":57.8,"type":"flood","v":0.71},{"t":60.7667,"type":"slack","v":0.0},{"t":63.55,"type":"ebb","v":-0.61},{"t":66.6,"type":"slack","v":0.0},{"t":69.5167,"type":"flood","v":0.54},{"t":72.2167,"type":"slack","v":0.0},{"t":75.8333,"type":"ebb","v":-0.8},{"t":79.7,"type":"slack","v":0.0},{"t":82.7333,"type":"flood","v":0.63},{"t":85.7167,"type":"slack","v":0.0},{"t":88.1333,"type":"ebb","v":-0.43},{"t":91.0833,"type":"slack","v":0.0},{"t":94.05,"type":"flood","v":0.47},{"t":96.7833,"type":"slack","v":0.0},{"t":100.45,"type":"ebb","v":-0.81},{"t":104.6833,"type":"slack","v":0.0},{"t":107.7667,"type":"flood","v":0.57},{"t":110.6667,"type":"slack","v":0.0},{"t":112.7167,"type":"ebb","v":-0.26},{"t":115.3667,"type":"slack","v":0.0},{"t":118.6,"type":"flood","v":0.42},{"t":121.35,"type":"slack","v":0.0},{"t":125.15,"type":"ebb","v":-0.81},{"t":129.6833,"type":"slack","v":0.0},{"t":132.65,"type":"flood","v":0.54},{"t":135.7167,"type":"slack","v":0.0},{"t":137.4167,"type":"ebb","v":-0.13},{"t":139.4667,"type":"slack","v":0.0},{"t":143.2833,"type":"flood","v":0.38},{"t":145.9167,"type":"slack","v":0.0},{"t":149.95,"type":"ebb","v":-0.81},{"t":154.6333,"type":"slack","v":0.0},{"t":157.4,"type":"flood","v":0.51},{"t":161.1667,"type":"slack","v":0.0},{"t":163.4667,"type":"slack","v":0.0},{"t":168.0833,"type":"flood","v":0.35},{"t":170.5333,"type":"slack","v":0.0},{"t":174.75,"type":"ebb","v":-0.78},{"t":179.45,"type":"slack","v":0.0},{"t":182.15,"type":"flood","v":0.48},{"t":186.8,"type":"slack","v":0.0},{"t":187.95,"type":"slack","v":0.0}],"tS":{"t0":-48.0,"dt":1.0,"v":[8.69,7.18,5.84,5.01,4.83,5.21,5.92,6.66,7.13,7.06,6.33,5.02,3.43,1.89,0.77,0.39,0.93,2.32,4.29,6.45,8.43,9.84,10.43,10.12,9.07,7.58,5.98,4.65,3.87,3.77,4.21,4.98,5.78,6.36,6.47,6.02,5.1,3.96,2.9,2.2,2.13,2.82,4.16,5.87,7.6,9.06,9.93,10.02,9.32,8.02,6.4,4.78,3.48,2.8,2.78,3.29,4.11,5.0,5.73,6.07,5.94,5.43,4.75,4.1,3.74,3.88,4.61,5.78,7.13,8.39,9.34,9.72,9.39,8.39,6.92,5.24,3.63,2.43,1.85,1.93,2.51,3.4,4.42,5.34,5.94,6.14,6.01,5.7,5.36,5.21,5.45,6.1,7.01,7.97,8.81,9.32,9.29,8.64,7.44,5.87,4.17,2.62,1.52,1.05,1.23,1.9,2.93,4.12,5.25,6.1,6.6,6.76,6.69,6.53,6.48,6.69,7.17,7.8,8.43,8.91,9.08,8.77,7.9,6.56,4.93,3.23,1.75,0.75,0.4,0.69,1.51,2.71,4.11,5.45,6.53,7.23,7.55,7.6,7.5,7.42,7.51,7.8,8.2,8.57,8.81,8.76,8.26,7.24,5.79,4.11,2.42,0.99,0.08,-0.14,0.32,1.34,2.76,4.38,5.92,7.14,7.93,8.3,8.34,8.17,7.98,7.93,8.07,8.31,8.54,8.64,8.46,7.82,6.67,5.12,3.38,1.68,0.29,-0.5,-0.54,0.15,1.41,3.08,4.91,6.59,7.85,8.62,8.91,8.82,8.5,8.18,8.03,8.09,8.26,8.44,8.49,8.22,7.45,6.16,4.51,2.7,0.97,-0.35,-0.97,-0.76,0.2,1.75,3.67,5.66,7.38,8.58,9.22,9.33,9.02,8.52,8.09,7.9,7.96,8.15,8.35,8.37,8.0,7.09,5.66,3.88,1.98,0.27,-0.91,-1.28,-0.75,0.54,2.39,4.52,6.57,8.22,9.26,9.64,9.47,8.93,8.28,7.8]},"cS":{"t0":-48.0,"dt":1.0,"v":[-0.88,-0.96,-0.81,-0.47,-0.03,0.37,0.63,0.68,0.49,0.12,-0.33,-0.77,-1.04,-1.07,-0.85,-0.41,0.15,0.66,0.99,1.09,0.93,0.57,0.1,-0.37,-0.73,-0.92,-0.92,-0.7,-0.3,0.16,0.53,0.75,0.74,0.49,0.07,-0.39,-0.78,-0.98,-0.97,-0.73,-0.27,0.24,0.66,0.89,0.91,0.7,0.3,-0.14,-0.52,-0.79,-0.9,-0.82,-0.53,-0.1,0.32,0.63,0.79,0.73,0.42,-0.01,-0.43,-0.74,-0.9,-0.84,-0.56,-0.13,0.31,0.61,0.77,0.72,0.45,0.07,-0.31,-0.61,-0.81,-0.84,-0.69,-0.37,0.03,0.4,0.66,0.77,0.65,0.32,-0.06,-0.42,-0.68,-0.77,-0.65,-0.36,0.01,0.34,0.56,0.64,0.53,0.24,-0.11,-0.43,-0.68,-0.81,-0.77,-0.58,-0.27,0.09,0.41,0.64,0.7,0.55,0.26,-0.08,-0.38,-0.58,-0.59,-0.43,-0.18,0.12,0.37,0.52,0.52,0.36,0.07,-0.25,-0.54,-0.75,-0.8,-0.71,-0.52,-0.23,0.1,0.39,0.58,0.62,0.49,0.22,-0.08,-0.33,-0.43,-0.38,-0.23,-0.02,0.22,0.4,0.47,0.41,0.23,-0.07,-0.39,-0.66,-0.79,-0.79,-0.69,-0.5,-0.21,0.1,0.35,0.53,0.57,0.43,0.18,-0.08,-0.23,-0.26,-0.19,-0.06,0.12,0.3,0.4,0.41,0.33,0.11,-0.22,-0.53,-0.74,-0.81,-0.78,-0.67,-0.47,-0.2,0.09,0.33,0.5,0.53,0.37,0.14,-0.04,-0.12,-0.12,-0.05,0.07,0.21,0.33,0.38,0.36,0.24,-0.03,-0.36,-0.62,-0.76,-0.81,-0.76,-0.63,-0.43,-0.17,0.1,0.34,0.49,0.47,0.31,0.13,0.01,-0.04,-0.03,0.04,0.12,0.22,0.31,0.35,0.31,0.14,-0.15,-0.44,-0.64,-0.76,-0.78,-0.72,-0.59,-0.39,-0.13,0.15,0.37,0.48,0.43,0.28,0.14,0.05,-0.01,0.0,0.04,0.09,0.19]}},"edmonds":{"sun":[{"d":-2,"rise":-42.489,"set":-26.953},{"d":-1,"rise":-18.471,"set":-2.969},{"d":0,"rise":5.547,"set":21.014},{"d":1,"rise":29.566,"set":44.997},{"d":2,"rise":53.585,"set":68.98},{"d":3,"rise":77.605,"set":92.962},{"d":4,"rise":101.625,"set":116.943},{"d":5,"rise":125.645,"set":140.924},{"d":6,"rise":149.665,"set":164.904},{"d":7,"rise":173.686,"set":188.883}],"tideName":"Edmonds","tideId":"9447427","tideKm":0.3,"sub":true,"curName":"Edmonds, 2.5 miles West of","curId":"PUG1503","curKm":4.6,"weak":false,"note":"","floodDir":161,"ebbDir":358,"tideEv":[{"t":-45.2,"type":"low","v":4.59},{"t":-39.9667,"type":"high","v":8.83},{"t":-33.65,"type":"low","v":-0.0},{"t":-26.6,"type":"high","v":11.66},{"t":-20.3,"type":"low","v":3.61},{"t":-14.8167,"type":"high","v":8.13},{"t":-8.9,"type":"low","v":1.78},{"t":-2.0333,"type":"high","v":11.4},{"t":4.6,"type":"low","v":2.68},{"t":10.5,"type":"high","v":7.61},{"t":15.9,"type":"low","v":3.68},{"t":22.5333,"type":"high","v":11.01},{"t":29.5,"type":"low","v":1.85},{"t":36.1333,"type":"high","v":7.5},{"t":40.8333,"type":"low","v":5.5},{"t":47.15,"type":"high","v":10.5},{"t":54.4,"type":"low","v":1.14},{"t":62.1167,"type":"high","v":8.02},{"t":66.1333,"type":"low","v":6.98},{"t":71.8333,"type":"high","v":9.97},{"t":79.2833,"type":"low","v":0.56},{"t":87.6833,"type":"high","v":8.95},{"t":91.9333,"type":"low","v":7.82},{"t":96.6167,"type":"high","v":9.5},{"t":104.1167,"type":"low","v":0.08},{"t":112.6833,"type":"high","v":9.78},{"t":117.5333,"type":"low","v":7.95},{"t":121.5,"type":"high","v":9.18},{"t":128.8833,"type":"low","v":-0.33},{"t":137.4,"type":"high","v":10.33},{"t":142.5333,"type":"low","v":7.78},{"t":146.3667,"type":"high","v":9.06},{"t":153.6,"type":"low","v":-0.68},{"t":161.9833,"type":"high","v":10.61},{"t":167.2167,"type":"low","v":7.56},{"t":171.1833,"type":"high","v":9.09},{"t":178.2667,"type":"low","v":-0.98},{"t":186.4333,"type":"high","v":10.71},{"t":191.7167,"type":"low","v":7.31}],"curEv":[{"t":-47.8,"type":"ebb","v":-0.46},{"t":-43.2667,"type":"slack","v":0.0},{"t":-41.6333,"type":"slack","v":0.0},{"t":-36.25,"type":"ebb","v":-0.93},{"t":-32.3167,"type":"slack","v":0.0},{"t":-29.6833,"type":"flood","v":0.48},{"t":-26.7833,"type":"slack","v":0.0},{"t":-23.0333,"type":"ebb","v":-0.56},{"t":-17.4,"type":"slack","v":0.0},{"t":-11.3667,"type":"ebb","v":-0.72},{"t":-7.7833,"type":"slack","v":0.0},{"t":-5.2,"type":"flood","v":0.43},{"t":-2.5833,"type":"slack","v":0.0},{"t":1.6667,"type":"ebb","v":-0.66},{"t":7.6667,"type":"slack","v":-0.03},{"t":13.65,"type":"ebb","v":-0.51},{"t":16.8167,"type":"slack","v":0.0},{"t":19.3167,"type":"flood","v":0.35},{"t":21.6167,"type":"slack","v":0.0},{"t":26.3,"type":"ebb","v":-0.74},{"t":32.8333,"type":"slack","v":-0.03},{"t":38.7333,"type":"ebb","v":-0.33},{"t":41.6,"type":"slack","v":0.0},{"t":43.85,"type":"flood","v":0.23},{"t":45.7667,"type":"slack","v":0.0},{"t":50.9,"type":"ebb","v":-0.77},{"t":58.4833,"type":"slack","v":0.0},{"t":60.2667,"type":"slack","v":0.0},{"t":63.9333,"type":"ebb","v":-0.22},{"t":67.05,"type":"slack","v":0.0},{"t":69.7167,"type":"slack","v":0.0},{"t":75.4833,"type":"ebb","v":-0.75},{"t":82.45,"type":"slack","v":0.0},{"t":84.9167,"type":"flood","v":0.1},{"t":87.15,"type":"slack","v":0.0},{"t":89.3333,"type":"ebb","v":-0.19},{"t":93.3833,"type":"slack","v":-0.06},{"t":100.1,"type":"ebb","v":-0.72},{"t":106.9167,"type":"slack","v":0.0},{"t":109.85,"type":"flood","v":0.16},{"t":112.35,"type":"slack","v":0.0},{"t":116.0833,"type":"ebb","v":-0.23},{"t":118.8,"type":"ebb","v":-0.15},{"t":124.8833,"type":"ebb","v":-0.68},{"t":131.5,"type":"slack","v":0.0},{"t":134.9167,"type":"flood","v":0.18},{"t":137.2667,"type":"slack","v":0.0},{"t":141.0,"type":"ebb","v":-0.3},{"t":143.9167,"type":"ebb","v":-0.14},{"t":149.8167,"type":"ebb","v":-0.68},{"t":156.15,"type":"slack","v":0.0},{"t":159.9167,"type":"flood","v":0.19},{"t":162.1333,"type":"slack","v":0.0},{"t":165.55,"type":"ebb","v":-0.31},{"t":168.6833,"type":"slack","v":-0.1},{"t":174.8333,"type":"ebb","v":-0.72},{"t":180.8667,"type":"slack","v":0.0},{"t":184.8167,"type":"flood","v":0.18},{"t":186.9833,"type":"slack","v":0.0},{"t":189.8667,"type":"ebb","v":-0.28}],"tS":{"t0":-45.2,"dt":1.0,"v":[4.59,4.96,5.94,7.19,8.28,8.81,8.51,7.23,5.27,3.1,1.25,0.16,0.12,1.18,3.14,5.64,8.17,10.24,11.45,11.58,10.72,9.11,7.13,5.29,4.01,3.61,4.04,5.06,6.33,7.46,8.08,7.96,7.03,5.53,3.87,2.51,1.82,2.02,3.16,5.01,7.18,9.22,10.73,11.39,11.06,9.86,8.03,5.98,4.17,2.99,2.69,3.17,4.19,5.47,6.67,7.44,7.58,7.07,6.1,4.97,4.07,3.68,4.01,5.07,6.63,8.34,9.84,10.79,10.98,10.28,8.82,6.88,4.85,3.13,2.08,1.88,2.37,3.37,4.65,5.94,6.96,7.46,7.4,6.94,6.29,5.73,5.5,5.78,6.6,7.76,8.98,9.96,10.46,10.32,9.35,7.74,5.77,3.81,2.22,1.3,1.19,1.68,2.66,3.94,5.33,6.6,7.54,7.99,7.95,7.63,7.24,7.0,7.08,7.57,8.32,9.13,9.73,9.97,9.58,8.44,6.74,4.79,2.91,1.45,0.66,0.64,1.22,2.29,3.69,5.25,6.74,7.95,8.72,8.95,8.77,8.39,8.01,7.82,7.96,8.4,8.95,9.38,9.49,8.93,7.66,5.9,3.94,2.13,0.78,0.12,0.23,0.98,2.24,3.87,5.64,7.31,8.67,9.53,9.78,9.55,9.05,8.47,8.05,7.96,8.23,8.7,9.09,9.14,8.47,7.08,5.21,3.21,1.42,0.17,-0.33,-0.03,0.95,2.47,4.33,6.28,8.06,9.43,10.2,10.29,9.89,9.18,8.43,7.91,7.8,8.09,8.6,8.99,8.97,8.15,6.58,4.58,2.5,0.73,-0.39,-0.66,-0.12,1.13,2.92,4.98,7.05,8.82,10.06,10.6,10.43,9.79,8.9,8.08,7.61,7.64,8.09,8.68,9.06,8.9,7.85,6.06,3.89,1.74,0.05,-0.87,-0.86,0.01,1.58,3.64,5.87,7.96,9.59,10.54,10.67,10.18,9.29,8.3,7.56]},"cS":{"t0":-48.0,"dt":1.0,"v":[-0.46,-0.43,-0.33,-0.22,-0.09,0.02,0.03,-0.08,-0.29,-0.54,-0.75,-0.89,-0.93,-0.79,-0.51,-0.21,0.1,0.35,0.47,0.45,0.29,0.05,-0.17,-0.35,-0.5,-0.56,-0.5,-0.39,-0.27,-0.13,-0.02,-0.01,-0.1,-0.28,-0.47,-0.61,-0.7,-0.71,-0.57,-0.32,-0.06,0.19,0.38,0.43,0.33,0.11,-0.15,-0.36,-0.51,-0.63,-0.65,-0.56,-0.44,-0.3,-0.15,-0.05,-0.03,-0.1,-0.23,-0.34,-0.41,-0.48,-0.5,-0.37,-0.17,0.04,0.23,0.34,0.31,0.15,-0.1,-0.34,-0.51,-0.64,-0.73,-0.7,-0.57,-0.44,-0.29,-0.15,-0.05,-0.03,-0.07,-0.12,-0.17,-0.22,-0.3,-0.32,-0.23,-0.08,0.05,0.18,0.23,0.14,-0.05,-0.28,-0.48,-0.62,-0.72,-0.77,-0.69,-0.53,-0.4,-0.26,-0.13,-0.05,-0.01,0.01,0.0,-0.01,-0.07,-0.17,-0.22,-0.17,-0.08,0.0,0.07,0.07,-0.04,-0.2,-0.4,-0.57,-0.68,-0.74,-0.74,-0.62,-0.46,-0.33,-0.22,-0.11,-0.03,0.04,0.09,0.1,0.09,0.02,-0.11,-0.18,-0.18,-0.15,-0.11,-0.07,-0.08,-0.16,-0.29,-0.47,-0.61,-0.68,-0.72,-0.68,-0.54,-0.39,-0.29,-0.19,-0.09,0.01,0.1,0.15,0.16,0.14,0.05,-0.1,-0.2,-0.22,-0.23,-0.22,-0.17,-0.15,-0.2,-0.33,-0.5,-0.61,-0.66,-0.68,-0.62,-0.48,-0.35,-0.27,-0.17,-0.05,0.05,0.14,0.18,0.18,0.16,0.04,-0.12,-0.23,-0.28,-0.3,-0.26,-0.18,-0.14,-0.2,-0.34,-0.5,-0.61,-0.66,-0.68,-0.61,-0.48,-0.36,-0.27,-0.15,-0.02,0.08,0.15,0.18,0.19,0.15,0.02,-0.15,-0.25,-0.3,-0.3,-0.22,-0.12,-0.1,-0.19,-0.35,-0.52,-0.63,-0.69,-0.71,-0.65,-0.51,-0.39,-0.26,-0.11,0.01,0.09,0.15,0.17,0.18,0.14,0.0,-0.17,-0.25,-0.27,-0.23]}},"boundary":{"sun":[{"d":-2,"rise":-42.491,"set":-26.838},{"d":-1,"rise":-18.472,"set":-2.854},{"d":0,"rise":5.547,"set":21.129},{"d":1,"rise":29.567,"set":45.111},{"d":2,"rise":53.587,"set":69.093},{"d":3,"rise":77.607,"set":93.074},{"d":4,"rise":101.628,"set":117.054},{"d":5,"rise":125.648,"set":141.034},{"d":6,"rise":149.669,"set":165.014},{"d":7,"rise":173.691,"set":188.992}],"tideName":"Roche Harbor, San Juan Island","tideId":"9449834","tideKm":10.6,"sub":false,"curName":"Turn Point, Boundary Pass","curId":"PUG1717","curKm":0.6,"weak":false,"note":"","floodDir":3,"ebbDir":236,"tideEv":[],"curEv":[{"t":-47.9667,"type":"ebb","v":-1.51},{"t":-45.4833,"type":"slack","v":0.0},{"t":-42.6,"type":"flood","v":2.1},{"t":-39.25,"type":"slack","v":0.01},{"t":-36.0833,"type":"ebb","v":-2.91},{"t":-32.7333,"type":"slack","v":0.0},{"t":-29.2667,"type":"flood","v":2.85},{"t":-25.3833,"type":"slack","v":-0.01},{"t":-23.4833,"type":"ebb","v":-1.26},{"t":-21.0333,"type":"slack","v":0.0},{"t":-17.9667,"type":"flood","v":1.88},{"t":-14.4,"type":"slack","v":0.0},{"t":-11.3167,"type":"ebb","v":-2.39},{"t":-8.15,"type":"slack","v":0.0},{"t":-4.8667,"type":"flood","v":2.45},{"t":-0.9833,"type":"slack","v":-0.01},{"t":1.0167,"type":"ebb","v":-1.11},{"t":3.4167,"type":"slack","v":-0.01},{"t":6.85,"type":"flood","v":1.54},{"t":10.5833,"type":"slack","v":0.0},{"t":13.5,"type":"ebb","v":-1.75},{"t":16.35,"type":"slack","v":0.0},{"t":19.6167,"type":"flood","v":2.15},{"t":23.2333,"type":"slack","v":0.0},{"t":25.5167,"type":"ebb","v":-1.12},{"t":28.05,"type":"slack","v":0.0},{"t":32.1,"type":"flood","v":1.24},{"t":36.05,"type":"slack","v":0.0},{"t":38.3833,"type":"ebb","v":-1.04},{"t":40.7833,"type":"slack","v":0.0},{"t":44.15,"type":"flood","v":1.92},{"t":47.3667,"type":"slack","v":0.0},{"t":50.0167,"type":"ebb","v":-1.26},{"t":53.0667,"type":"slack","v":0.0},{"t":58.1167,"type":"flood","v":1.13},{"t":62.0833,"type":"slack","v":0.0},{"t":63.4167,"type":"ebb","v":-0.37},{"t":65.1,"type":"slack","v":0.0},{"t":68.7667,"type":"flood","v":1.71},{"t":71.6167,"type":"slack","v":-0.01},{"t":74.55,"type":"ebb","v":-1.47},{"t":78.9,"type":"slack","v":0.0},{"t":84.4333,"type":"flood","v":1.5},{"t":89.1333,"type":"slack","v":0.04},{"t":93.4667,"type":"flood","v":1.49},{"t":96.05,"type":"slack","v":0.0},{"t":99.1333,"type":"ebb","v":-1.61},{"t":104.2333,"type":"slack","v":0.0},{"t":109.5167,"type":"flood","v":1.96},{"t":114.3333,"type":"slack","v":0.0},{"t":118.3,"type":"flood","v":1.27},{"t":120.6833,"type":"slack","v":-0.01},{"t":123.9,"type":"ebb","v":-1.63},{"t":129.2333,"type":"slack","v":0.0},{"t":134.4333,"type":"flood","v":2.32},{"t":138.5,"type":"slack","v":0.0},{"t":139.6167,"type":"ebb","v":-0.24},{"t":140.7333,"type":"slack","v":0.0},{"t":143.2833,"type":"flood","v":1.12},{"t":145.4833,"type":"slack","v":0.0},{"t":149.1,"type":"ebb","v":-1.57},{"t":154.1333,"type":"slack","v":0.0},{"t":159.2667,"type":"flood","v":2.57},{"t":162.9,"type":"slack","v":-0.01},{"t":164.4167,"type":"ebb","v":-0.49},{"t":165.9833,"type":"slack","v":0.0},{"t":168.25,"type":"flood","v":1.11},{"t":170.4833,"type":"slack","v":0.0},{"t":174.3667,"type":"ebb","v":-1.59},{"t":178.9667,"type":"slack","v":0.0},{"t":183.95,"type":"flood","v":2.7},{"t":187.3833,"type":"slack","v":0.0},{"t":189.1167,"type":"ebb","v":-0.68},{"t":190.9167,"type":"slack","v":0.0}],"tS":null,"cS":{"t0":-48.0,"dt":1.0,"v":[-1.51,-1.21,-0.49,0.5,1.49,2.05,2.01,1.54,0.77,-0.28,-1.51,-2.54,-2.9,-2.48,-1.57,-0.36,1.0,2.14,2.74,2.84,2.54,1.81,0.73,-0.43,-1.16,-1.19,-0.7,0.03,0.88,1.61,1.88,1.7,1.26,0.55,-0.41,-1.46,-2.22,-2.35,-1.84,-0.95,0.18,1.33,2.15,2.45,2.31,1.79,0.97,0.01,-0.79,-1.11,-0.85,-0.27,0.37,0.99,1.43,1.54,1.39,1.03,0.44,-0.33,-1.12,-1.67,-1.67,-1.13,-0.32,0.61,1.5,2.05,2.11,1.73,1.02,0.19,-0.56,-1.04,-1.05,-0.6,-0.03,0.43,0.82,1.12,1.24,1.18,0.94,0.56,0.03,-0.57,-1.0,-0.94,-0.47,0.15,0.86,1.55,1.91,1.72,1.1,0.29,-0.46,-1.03,-1.26,-1.02,-0.47,-0.02,0.25,0.56,0.89,1.08,1.13,1.1,0.94,0.57,0.04,-0.34,-0.31,-0.03,0.36,0.94,1.53,1.69,1.28,0.51,-0.31,-0.99,-1.4,-1.42,-1.01,-0.49,-0.19,0.03,0.39,0.79,1.07,1.3,1.47,1.45,1.12,0.59,0.18,0.04,0.1,0.37,0.93,1.42,1.41,0.85,0.04,-0.76,-1.36,-1.61,-1.47,-1.03,-0.61,-0.37,-0.09,0.35,0.82,1.23,1.63,1.91,1.92,1.56,0.96,0.39,0.05,-0.01,0.27,0.83,1.24,1.13,0.54,-0.27,-1.03,-1.5,-1.63,-1.46,-1.08,-0.72,-0.45,-0.1,0.41,0.96,1.5,1.99,2.29,2.26,1.81,1.02,0.26,-0.17,-0.21,0.12,0.7,1.1,0.97,0.37,-0.41,-1.07,-1.44,-1.57,-1.46,-1.13,-0.77,-0.48,-0.07,0.54,1.19,1.78,2.28,2.55,2.43,1.77,0.77,-0.07,-0.45,-0.42,0.01,0.67,1.09,0.94,0.35,-0.36,-0.92,-1.32,-1.57,-1.52,-1.18,-0.83,-0.5,0.02,0.75,1.43,2.02,2.5,2.7,2.37,1.46,0.35,-0.42,-0.68,-0.52,0.06]}}}};
+
+class Component extends DCLogic {
+  now = 9.68;
+  TMIN = -48; TMAX = 132; PPH = 12; SYN = 29.53; AGE0 = 10.15;
+  SP = {kn:1,kmh:1.852,ms:0.5144}; SPLABEL = {kn:'kn',kmh:'km/h',ms:'m/s'};
+  state = {
+    unitH:'ft', unitSp:'kn', slackKn:0.5, settingsOpen:false, recentOpen:true, searching:false, query:'', scrubT:null,
+    detailOpen: false, activeId: null, fromSearch: false,
+    savedIds: ['tacoma','friday','townsend','deception','anacortes'],
+    recentIds: [],
+  };
+
+  DATA(){
+    if(this._d) return this._d;
+    const sun=['5:24 AM','9:02 PM',5.4,21.03];
+    const moon={name:'Waxing Gibbous',frac:0.78};
+    const mk=(o)=>{
+      const b=BAKED.stations[o.id]; const V=b.tS?b.tS.v:[0,1];
+      const mn=Math.min.apply(null,V), mx=Math.max.apply(null,V);
+      const cmx=b.cS?Math.max.apply(null,b.cS.v.map(Math.abs)):0;
+      return Object.assign({sun,moon,b,mean:(mn+mx)/2,amp:(mx-mn)/2,
+        cur:{dir:b.floodDir,mx:cmx||1}},o);
+    };
+    this._d={
+      seattle: mk({id:'seattle',ll:[47.6025,-122.34],z:12.4,name:'Seattle',region:'Elliott Bay',current:true,grad:['#88b0cc','#3a6d98','#184870']}),
+      tacoma: mk({id:'tacoma',ll:[47.269,-122.552],z:12.9,name:'Tacoma Narrows',region:'Puget Sound',grad:['#3a6d98','#184870','#083058']}),
+      friday: mk({id:'friday',ll:[48.535,-123.017],z:12.6,name:'Friday Harbor',region:'San Juan Islands',grad:['#9ac0b0','#4a8f78','#184860']}),
+      townsend: mk({id:'townsend',ll:[48.112,-122.755],z:12.2,name:'Port Townsend',region:'Admiralty Inlet',grad:['#78a8b8','#2f7088','#0d3a58']}),
+      deception: mk({id:'deception',ll:[48.4065,-122.6437],z:13.2,name:'Deception Pass',region:'Strong Currents',grad:['#184870','#0d3358','#00183c']}),
+      anacortes: mk({id:'anacortes',ll:[48.518,-122.613],z:12.9,name:'Anacortes',region:'Guemes Channel',grad:['#88b0cc','#4a7ba0','#20486a']}),
+      victoria: mk({id:'victoria',ll:[48.423,-123.37],z:12.7,name:'Victoria Harbour',region:'Vancouver Island, BC',grad:['#a8c4d4','#5888a8','#28587c']}),
+      bellingham: mk({id:'bellingham',ll:[48.73,-122.51],z:12.2,name:'Bellingham Bay',region:'Whatcom County',grad:['#7098b8','#2f6390','#153f66']}),
+      everett: mk({id:'everett',ll:[47.99,-122.225],z:12.5,name:'Everett',region:'Port Gardner',grad:['#88aecb','#3d6f9a','#1a4a70']}),
+      olympia: mk({id:'olympia',ll:[47.05,-122.9],z:12.7,name:'Olympia',region:'Budd Inlet',grad:['#8ab8a0','#3d8068','#154a44']}),
+      pointroberts: mk({id:'pointroberts',ll:[48.977,-123.068],z:12.3,name:'Point Roberts',region:'Boundary Bay',grad:['#96bcd2','#4e84a8','#265678']}),
+      boundary: mk({id:'boundary',ll:[48.6883,-123.2383],z:12.4,name:'Turn Point',region:'Boundary Pass',grad:['#7098b8','#2f6390','#153f66']}),
+      edmonds: mk({id:'edmonds',ll:[47.811,-122.383],z:12.6,name:'Edmonds',region:'Puget Sound',grad:['#7fa6c6','#356690','#184568']}),
+    };
+    return this._d;
+  }
+
+  _ser(S,t){ if(!S)return 0; const n=S.v.length, i=(t-S.t0)/S.dt;
+    if(i<=0)return S.v[0]; if(i>=n-1)return S.v[n-1];
+    const k=Math.floor(i), f=i-k;
+    const p0=S.v[Math.max(0,k-1)],p1=S.v[k],p2=S.v[k+1],p3=S.v[Math.min(n-1,k+2)];
+    return 0.5*((2*p1)+(-p0+p2)*f+(2*p0-5*p1+4*p2-p3)*f*f+(-p0+3*p1-3*p2+p3)*f*f*f); }
+  tideAt(s,t){ return this._ser(s.b.tS,t); }
+  slope(s,t){ return this.tideAt(s,t+0.05)-this.tideAt(s,t-0.05); }
+  velAt(s,t){ return s.b.cS?this._ser(s.b.cS,t):0; }
+  speedAt(s,t){ return Math.abs(this.velAt(s,t)); }
+  dirAt(s,t){ return this.velAt(s,t)>=0?s.b.floodDir:s.b.ebbDir; }
+  maxSlope(s){ return 1; }
+  cumAdv(s){ if(!s.b.cS)return null; if(!this._cum)this._cum={}; if(this._cum[s.id])return this._cum[s.id];
+    const S=s.b.cS, c=[0];
+    for(let i=1;i<S.v.length;i++) c.push(c[i-1]+(S.v[i]+S.v[i-1])/2*S.dt);
+    return (this._cum[s.id]={t0:S.t0,dt:S.dt,v:c}); }
+  events(s){ return (s.b.tideEv&&s.b.tideEv.length)?s.b.tideEv:this.slacks(s); }
+  stops(s){ if(!this._stops)this._stops={}; if(this._stops[s.id])return this._stops[s.id];
+    const out=[];
+    (s.b.tideEv||[]).forEach(e=>out.push({t:e.t,kind:e.type,v:e.v}));
+    (s.b.curEv||[]).forEach(e=>out.push({t:e.t,kind:e.type,v:e.v}));
+    (s.b.sun||[]).forEach(e=>{ out.push({t:e.rise,kind:'sunrise'}); out.push({t:e.set,kind:'sunset'}); });
+    out.sort((a,b)=>a.t-b.t);
+    return (this._stops[s.id]=out); }
+  slacks(s){ return (s.b.curEv||[]).filter(e=>e.type==='slack'); }
+  nextSlack(s,t){ return this.slacks(s).find(e=>e.t>t+0.02)||null; }
+  fmtTime(t){ let tt=((t%24)+24)%24; let h=Math.floor(tt); let m=Math.round((tt-h)*60); if(m===60){m=0;h=(h+1)%24;} const ap=h<12?'AM':'PM'; let h12=h%12; if(h12===0)h12=12; return h12+':'+(m<10?'0':'')+m+' '+ap; }
+  fmtHr(t){ let tt=((t%24)+24)%24; let h=Math.floor(tt); const ap=h<12?'A':'P'; let h12=h%12; if(h12===0)h12=12; return h12+ap; }
+  toU(ft){ return this.state.unitH==='ft'?ft:ft*0.3048; }
+  fmtH(ft){ return this.toU(ft).toFixed(1); }
+  uH(){ return this.state.unitH; }
+  fmtSp(kn){ return (kn*this.SP[this.state.unitSp]).toFixed(this.state.unitSp==='ms'?2:1); }
+  uSp(){ return this.SPLABEL[this.state.unitSp]; }
+  dirName(deg){ const d=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return d[Math.round(((deg%360)+360)%360/22.5)%16]; }
+  dayLabel(off){ if(off===0)return 'Today'; if(off===-1)return 'Yesterday'; const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; return days[((1+off)%7+7)%7]; }
+
+  detail(s){
+    const nowH=this.tideAt(s,this.now);
+    const rising=this.slope(s,this.now)>0;
+    const ev=this.events(s);
+    const nextHigh=ev.find(e=>e.type==='high'&&e.t>this.now);
+    const nextLow=ev.find(e=>e.type==='low'&&e.t>this.now);
+    const seven=[]; let gmin=Infinity,gmax=-Infinity;
+    for(let i=0;i<7;i++){ let mn=Infinity,mx=-Infinity; for(let t=i*24;t<i*24+24;t+=0.2){const v=this.tideAt(s,t);mn=Math.min(mn,v);mx=Math.max(mx,v);} seven.push({mn,mx}); gmin=Math.min(gmin,mn);gmax=Math.max(gmax,mx); }
+    const days=[0,1,2,3,4,5,6].map(i=>this.dayName(i)); const gr=(gmax-gmin)||1;
+    const sevenVm=seven.map((d,i)=>({day:days[i],loStr:this.fmtH(d.mn),hiStr:this.fmtH(d.mx),left:((d.mn-gmin)/gr*100).toFixed(1),width:Math.max(6,(d.mx-d.mn)/gr*100).toFixed(1)}));
+    let fmax=0,emax=0; for(let t=0;t<=24;t+=0.2){const v=this.velAt(s,t); if(v>fmax)fmax=v; if(-v>emax)emax=-v;}
+    return {nowH,rising,nextHigh,nextLow,seven:sevenVm,floodMax:fmax,ebbMax:emax};
+  }
+
+  card(s,fromSearch){
+    const d=this.detail(s), nh=d.nextHigh, nl=d.nextLow;
+    return { id:s.id,name:s.name,region:s.region,
+      grad:`linear-gradient(150deg, ${s.grad[0]}, ${s.grad[1]} 55%, ${s.grad[2]})`,
+      hMain:s.b.tS?this.fmtH(d.nowH):this.fmtSp(this.speedAt(s,this.now)),
+      hUnit:s.b.tS?this.uH():this.uSp(),
+      trend:s.b.tS?(d.rising?'Rising':'Falling'):(this.velAt(s,this.now)>0?'Flooding':'Ebbing'),
+      hi: s.b.tS?(nh?('H '+this.fmtH(nh.v)+' · '+this.fmtTime(nh.t)):''):'Current only',
+      lo: s.b.tS?(nl?('L '+this.fmtH(nl.v)+' · '+this.fmtTime(nl.t)):''):(s.b.curName||''),
+      cur: this.fmtSp(this.speedAt(s,this.now))+' '+this.uSp()+(this.slope(s,this.now)>0?' Flooding':' Ebbing'),
+      tideIcon:s.b.tS?this.tideIconEl(d.rising?'up':'down','#eaf2ff'):null,
+      curArrow:(Math.abs(this.velAt(s,this.now))<=this.state.slackKn)?null:this.compassArrowEl(this.dirAt(s,this.now),'#eaf2ff'),
+      slack:'slack in '+this.fmtDur(this.nextEventAfter(s,this.now).t-this.now),
+      open:()=>this.openStation(s.id,fromSearch) };
+  }
+
+  setTideRef=(el)=>{ this._tideEl=el; if(el)this._vw=el.clientWidth; };
+  centerNow(){ const el=this._tideEl; if(!el)return; this._magneting=true; el.scrollLeft=(this.now-this.TMIN)*this.PPH-el.clientWidth/2; this.setState({scrubT:this.now}); setTimeout(()=>{this._magneting=false;},550); }
+  magnet(el){ if(this._magneting)return; const s=this.DATA()[this.state.activeId]; if(!s)return; const cT=this.TMIN+(el.scrollLeft+el.clientWidth/2)/this.PPH; const snaps=[]; this.stops(s).forEach(ev=>snaps.push(ev.t));
+    this.events(s).forEach(ev=>{ const w=this.goWindow(s,ev.t); snaps.push(w[0],w[1]); }); let best=null,bd=1e9; snaps.forEach(t=>{ const dd=Math.abs(t-cT); if(dd<bd){bd=dd;best=t;} }); if(best!=null&&bd*this.PPH<46){ this._magneting=true; el.scrollTo({left:(best-this.TMIN)*this.PPH-el.clientWidth/2,behavior:'smooth'}); setTimeout(()=>{this._magneting=false;},420); } }
+  onTideScroll=(e)=>{ const el=e.currentTarget; this._vw=el.clientWidth; if(!this._sraf){ this._sraf=requestAnimationFrame(()=>{ this._sraf=0; const t=this.TMIN+(el.scrollLeft+el.clientWidth/2)/this.PPH; this.setState({scrubT:t}); }); } clearTimeout(this._snapTO); this._snapTO=setTimeout(()=>this.magnet(el),150); };
+  openStation(id,fromSearch){ this.setState({activeId:id,fromSearch:!!fromSearch,searching:false,scrubT:this.now}); if(fromSearch)this.addRecent(id); requestAnimationFrame(()=>requestAnimationFrame(()=>{ this.setState({detailOpen:true}); setTimeout(()=>this.centerNow(),150); })); }
+  returnToNow=()=>{ this.centerNow(); };
+  scrubTo=(t)=>{ const el=this._tideEl; if(!el){this.setState({scrubT:t});return;}
+    this._magneting=true; el.scrollLeft=(t-this.TMIN)*this.PPH-el.clientWidth/2;
+    this.setState({scrubT:t}); setTimeout(()=>{this._magneting=false;},550); };
+  closeDetail=()=>{ this.setState({detailOpen:false}); setTimeout(()=>this.setState({activeId:null}),340); };
+  addRecent(id){ this.setState(st=>{ if(st.savedIds.includes(id))return{}; return {recentIds:[id,...st.recentIds.filter(x=>x!==id)].slice(0,6),recentOpen:true}; }); }
+  saveActive=()=>{ const id=this.state.activeId; if(!id)return; this.setState(st=>({savedIds:st.savedIds.includes(id)?st.savedIds:[...st.savedIds,id],recentIds:st.recentIds.filter(x=>x!==id)})); };
+  toggleRecent=()=>this.setState(st=>({recentOpen:!st.recentOpen}));
+  startSearch=()=>this.setState({searching:true,query:''});
+  cancelSearch=()=>this.setState({searching:false,query:''});
+  onQuery=(e)=>this.setState({query:e.target.value});
+  openSettings=()=>this.setState({settingsOpen:true});
+  closeSettings=()=>this.setState({settingsOpen:false});
+  setUnitH=(v)=>this.setState({unitH:v});
+  setUnitSp=(v)=>this.setState({unitSp:v});
+  setSlack=(d)=>this.setState(st=>({slackKn:Math.max(0.25,Math.min(8,+(st.slackKn+d).toFixed(2)))}));
+  onSlack=(e)=>this.setState({slackKn:+e.target.value});
+  goWindow(s,et){ const L=this.state.slackKn; let a=et,b=et; for(let x=et;x>et-6.2;x-=0.05){ if(Math.abs(this.velAt(s,x))<=L)a=x; else break; } for(let x=et;x<et+6.2;x+=0.05){ if(Math.abs(this.velAt(s,x))<=L)b=x; else break; } return [a,b]; }
+
+  // ---------- moon ----------
+  moonAge(off){ return (((this.AGE0+off)%this.SYN)+this.SYN)%this.SYN; }
+  moonIllum(off){ return (1-Math.cos(2*Math.PI*this.moonAge(off)/this.SYN))/2; }
+  moonWaxing(off){ return this.moonAge(off) < this.SYN/2; }
+  moonName(off){ const a=this.moonAge(off), il=this.moonIllum(off), wax=this.moonWaxing(off);
+    if(a<1.7||a>this.SYN-1.7)return 'New Moon';
+    if(Math.abs(a-this.SYN/2)<1.7)return 'Full Moon';
+    if(Math.abs(a-this.SYN/4)<1.4)return 'First Quarter';
+    if(Math.abs(a-3*this.SYN/4)<1.4)return 'Last Quarter';
+    if(il<0.5)return wax?'Waxing Crescent':'Waning Crescent';
+    return wax?'Waxing Gibbous':'Waning Gibbous'; }
+  moonGlyphEl(off,sz){ const R=React.createElement; sz=sz||20; const c=sz/2,r=c-1; const il=this.moonIllum(off),wax=this.moonWaxing(off); const shift=(wax?-1:1)*(1-il)*1.9*r;
+    return R('svg',{viewBox:`0 0 ${sz} ${sz}`,width:sz,height:sz,style:{flexShrink:0}},[R('circle',{key:'b',cx:c,cy:c,r:r,fill:'#e4f0e4'}),R('circle',{key:'s',cx:c+shift,cy:c,r:r,fill:'rgba(0,18,44,0.92)'}),R('circle',{key:'o',cx:c,cy:c,r:r,fill:'none',stroke:'rgba(255,255,255,0.25)',strokeWidth:0.75})]); }
+  curPeaks(s){ if(!this._cpk)this._cpk={}; if(this._cpk[s.id])return this._cpk[s.id];
+    return (this._cpk[s.id]=(s.b.curEv||[]).filter(e=>e.type==='flood'||e.type==='ebb').map(e=>({t:e.t,v:e.v}))); }
+  dayName(off){ if(off===0)return 'Today'; if(off===-1)return 'Yesterday'; if(off===1)return 'Tomorrow';
+    const d=new Date(BAKED.t0+'T00:00:00'); d.setDate(d.getDate()+off);
+    return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]; }
+  compassArrowEl(deg,color){ const R=React.createElement; const col=color||'#88b868'; return R('svg',{width:13,height:13,viewBox:'0 0 13 13',style:{display:'inline-block',verticalAlign:'-2px',marginLeft:4}},R('g',{transform:`rotate(${deg} 6.5 6.5)`},[R('line',{key:'l',x1:6.5,y1:10.5,x2:6.5,y2:3,stroke:col,strokeWidth:1.6,strokeLinecap:'round'}),R('path',{key:'h',d:'M4.2 5 L6.5 2.4 L8.8 5',fill:'none',stroke:col,strokeWidth:1.6,strokeLinecap:'round',strokeLinejoin:'round'})])); }
+  tideIconEl(dir,color){ if(!dir)return null; const R=React.createElement; const up=dir==='up'; const col=color||(up?'#9cc87c':'#8ab6d2'); return R('svg',{width:11,height:11,viewBox:'0 0 11 11',style:{display:'inline-block',verticalAlign:'-1px',marginRight:4}},R('path',{d:up?'M5.5 1.5 L10 9 L1 9 Z':'M5.5 9.5 L10 2 L1 2 Z',fill:col})); }
+
+  // ---------- continuous timeline ----------
+  fmtDur(h){ let m=Math.max(0,Math.round(h*60)); const hh=Math.floor(m/60); m=m%60; return hh>0?`${hh}h ${m}m`:`${m}m`; }
+  fmtWhen(t,ref){ ref=(ref==null)?this.now:ref; const dt=t-ref; const at=' at '+this.fmtTime(t); if(dt<1)return '~'+Math.max(1,Math.round(dt*60))+'m'+at; return '~'+Math.floor(dt)+'h'+at; }
+  nextEventAfter(s,t){ return this.events(s).find(e=>e.t>t+0.02) || this.events(s)[this.events(s).length-1]; }
+  nextCurPeak(s,t,until){ let best=0,bt=t; for(let x=t+0.05;x<until;x+=0.1){ const v=this.velAt(s,x); if(Math.abs(v)>Math.abs(best)){best=v;bt=x;} } return {v:best,t:bt,type:best>=0?'Flood':'Ebb'}; }
+  geo(s){ const noCur=!s.b.cS, noTide=!s.b.tS;
+    const H=noCur?258:(noTide?286:362), dayY=20, sunY=34, moonY=34;
+    const yT0=48, yT1=noCur?226:170, sepY=noTide?44:192;
+    const yC0=noTide?68:216, yCbot=noCur?226:(noTide?270:342);
+    const zeroY=noCur?yT1:(yC0+yCbot)/2, curHalf=noCur?1:(yCbot-yC0)/2-3;
+    const span=s.amp*1.18, mid=s.mean, tmin=mid-span, tmax=mid+span; const mxv=s.cur.mx*1.05;
+    return { noCur, noTide, H,dayY,sunY,moonY,yT0,yT1,sepY,yC0,yCbot,zeroY,curHalf,mxv,
+      tideY:v=>yT0+(1-(v-tmin)/(tmax-tmin))*(yT1-yT0),
+      curY:v=>zeroY-(Math.max(-1,Math.min(1,v/mxv)))*curHalf,
+      X:t=>(t-this.TMIN)*this.PPH }; }
+
+  innerChart(s){
+    const key=s.id+'_'+this.state.unitH+'_'+this.state.unitSp+'_'+this.state.slackKn;
+    if(this._inner&&this._inner.key===key) return this._inner.el;
+    const R=React.createElement; const g=this.geo(s); const X=g.X;
+    const total=(this.TMAX-this.TMIN)*this.PPH, H=g.H;
+    const SUN={}; (s.b.sun||[]).forEach(e=>{SUN[e.d]=e;});
+    const sunOf=(off)=>SUN[off]||{rise:off*24+5.5,set:off*24+21};
+    const gid='tg_'+s.id, cT='cT_'+s.id, cB='cB_'+s.id;
+    const kids=[R('defs',{key:'df'},[
+      R('linearGradient',{key:'g',id:gid,x1:0,y1:0,x2:0,y2:1},[R('stop',{key:0,offset:'0%',stopColor:'#9cc0dc',stopOpacity:0.7}),R('stop',{key:1,offset:'100%',stopColor:'#0d3a5c',stopOpacity:0.12})]),
+      R('radialGradient',{key:'mg',id:'mglow'},[R('stop',{key:0,offset:'0%',stopColor:'#e6eeff',stopOpacity:0.95}),R('stop',{key:1,offset:'45%',stopColor:'#cfe0ff',stopOpacity:0.28}),R('stop',{key:2,offset:'100%',stopColor:'#cfe0ff',stopOpacity:0})]),
+      R('clipPath',{key:'ct',id:cT},R('rect',{x:0,y:g.yC0-10,width:total,height:g.zeroY-(g.yC0-10)})),
+      R('clipPath',{key:'cb',id:cB},R('rect',{x:0,y:g.zeroY,width:total,height:(g.yCbot+10)-g.zeroY})),
+    ])];
+    // per-day background: draw all night + day-tint rects FIRST so nothing clips the moon glow, then glow/moon/labels/sun on top (glow now spans both days across midnight)
+    const d0=Math.floor(this.TMIN/24), d1=Math.floor((this.TMAX-0.001)/24);
+    for(let off=d0;off<=d1;off++){ const ds=off*24, _s=sunOf(off), rise=_s.rise, set=_s.set;
+      kids.push(R('rect',{key:'nA'+off,x:X(ds),y:g.dayY+4,width:X(rise)-X(ds),height:g.yCbot-(g.dayY+4),fill:'#00101f',fillOpacity:0.52}));
+      kids.push(R('rect',{key:'nB'+off,x:X(set),y:g.dayY+4,width:X(ds+24)-X(set),height:g.yCbot-(g.dayY+4),fill:'#00101f',fillOpacity:0.52}));
+      kids.push(R('rect',{key:'dy'+off,x:X(rise),y:g.yT0,width:X(set)-X(rise),height:g.yCbot-g.yT0,fill:'#a8cae0',fillOpacity:0.07}));
+    }
+    for(let off=d0;off<=d1;off++){ const ds=off*24, _s2=sunOf(off), rise=_s2.rise, set=_s2.set; const il=this.moonIllum(off), wax=this.moonWaxing(off);
+      const glowR=28+il*84, glowOp=0.1+il*0.66, dr=8, shift=(wax?-1:1)*(1-il)*1.9*dr;
+      const mmx=X((set+sunOf(off+1).rise)/2);
+      kids.push(R('circle',{key:'gl'+off,cx:mmx,cy:g.moonY,r:glowR,fill:'url(#mglow)',opacity:glowOp}));
+      kids.push(R('circle',{key:'m0'+off,cx:mmx,cy:g.moonY,r:dr,fill:'#eef4ff'}));
+      kids.push(R('circle',{key:'m1'+off,cx:mmx+shift,cy:g.moonY,r:dr,fill:'rgba(0,14,34,0.94)'}));
+      kids.push(R('circle',{key:'m2'+off,cx:mmx,cy:g.moonY,r:dr,fill:'none',stroke:'rgba(255,255,255,0.3)',strokeWidth:0.6}));
+      kids.push(R('text',{key:'dl'+off,x:X(ds+12),y:g.dayY,textAnchor:'middle',fontSize:11,fontWeight:600,fill:'rgba(228,240,228,0.85)',fontFamily:'Fraunces, serif'},this.dayName(off)));
+      [[rise,'↑'],[set,'↓']].forEach(([tt,ar],i)=>{ kids.push(R('circle',{key:'su'+off+i,cx:X(tt),cy:g.sunY,r:3.5,fill:'#f0c860',style:{filter:'drop-shadow(0 0 4px rgba(240,200,96,0.8))'}})); kids.push(R('text',{key:'sx'+off+i,x:X(tt),y:g.dayY,textAnchor:'middle',fontSize:10,fontWeight:600,fill:'#f0d890',fontFamily:'Geist Mono, monospace'},ar+this.fmtTime(tt).replace(' ',''))); }); }
+    // separator between tide and current tracks
+    if(!g.noCur&&!g.noTide) kids.push(R('line',{key:'sep',x1:0,y1:g.sepY,x2:total,y2:g.sepY,stroke:'rgba(255,255,255,0.16)',strokeWidth:1}));
+    // tide curve
+    if(!g.noTide){
+    const tp=[]; for(let t=this.TMIN;t<=this.TMAX;t+=0.2)tp.push([t,this.tideAt(s,t)]);
+    let td=''; tp.forEach((p,i)=>{td+=(i?'L':'M')+X(p[0]).toFixed(1)+','+g.tideY(p[1]).toFixed(1);});
+    kids.push(R('path',{key:'ta',d:td+`L${X(this.TMAX).toFixed(1)},${g.yT1}L${X(this.TMIN).toFixed(1)},${g.yT1}Z`,fill:'url(#'+gid+')'}));
+    kids.push(R('path',{key:'tl',d:td,fill:'none',stroke:'#eef4ee',strokeWidth:2.2,strokeLinejoin:'round',strokeLinecap:'round'}));
+    this.events(s).filter(e=>e.t>=this.TMIN+0.3&&e.t<=this.TMAX-0.3).forEach((e,i)=>{ const xx=X(e.t),yy=g.tideY(e.v); kids.push(R('circle',{key:'te'+i,cx:xx,cy:yy,r:3,fill:'#fff'})); kids.push(R('text',{key:'tt'+i,x:xx,y:e.type==='high'?yy-7:yy+15,textAnchor:'middle',fontSize:10,fontWeight:600,fill:'#fff',fontFamily:'Fraunces, serif'},this.fmtH(e.v))); });
+    }
+    if(!g.noCur){
+    // current curve (signed: flood above, ebb below)
+    const cp=[]; for(let t=this.TMIN;t<=this.TMAX;t+=0.2)cp.push([t,this.velAt(s,t)]);
+    // clamped current line: inside your slack window (|v|<=L) it lies flat on the slack floor, dropping straight there at the edges
+    const clamp=this.state.slackKn>0.5; const L=this.state.slackKn; const cpts=[]; let pIn=null;
+    for(let t=this.TMIN;t<=this.TMAX+1e-9;t+=0.2){ const v=this.velAt(s,t), isIn=clamp&&Math.abs(v)<=L, x=X(t);
+      if(pIn!==null&&isIn!==pIn){ if(isIn){cpts.push([x,g.curY(v)],[x,g.zeroY]);}else{cpts.push([x,g.zeroY],[x,g.curY(v)]);} }
+      cpts.push([x, isIn?g.zeroY:g.curY(v)]); pIn=isIn; }
+    let cdp=''; cpts.forEach((p,i)=>{cdp+=(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1);});
+    const carea=cdp+`L${X(this.TMAX).toFixed(1)},${g.zeroY}L${X(this.TMIN).toFixed(1)},${g.zeroY}Z`;
+    kids.push(R('path',{key:'cfa',d:carea,fill:'rgba(136,184,104,0.32)',clipPath:'url(#'+cT+')'}));
+    kids.push(R('path',{key:'cfb',d:carea,fill:'rgba(96,150,190,0.32)',clipPath:'url(#'+cB+')'}));
+    // YOUR slack limit: faint +/-limit guide lines (only when the limit is raised above the default)
+    if(clamp){ kids.push(R('line',{key:'lgp',x1:0,y1:g.curY(L),x2:total,y2:g.curY(L),stroke:'rgba(136,184,104,0.3)',strokeWidth:1,strokeDasharray:'3 4'})); kids.push(R('line',{key:'lgn',x1:0,y1:g.curY(-L),x2:total,y2:g.curY(-L),stroke:'rgba(136,184,104,0.3)',strokeWidth:1,strokeDasharray:'3 4'})); }
+    kids.push(R('line',{key:'cz',x1:0,y1:g.zeroY,x2:total,y2:g.zeroY,stroke:'rgba(255,255,255,0.4)',strokeWidth:1}));
+    kids.push(R('path',{key:'cl',d:cdp,fill:'none',stroke:'#dfeee0',strokeWidth:2,strokeLinejoin:'round',strokeLinecap:'round'}));
+    // go-windows: flat "your slack window" line at zero [entry..exit] + endpoint dots where the curve meets your limit (only when the limit is raised above the default)
+    if(clamp)this.events(s).filter(e=>e.t>=this.TMIN&&e.t<=this.TMAX).forEach((e,i)=>{ const w=this.goWindow(s,e.t); const xa=X(w[0]),xb=X(w[1]);
+      kids.push(R('line',{key:'gw'+i,x1:xa,y1:g.zeroY,x2:xb,y2:g.zeroY,stroke:'#88b868',strokeWidth:4,strokeLinecap:'round'}));
+      [w[0],w[1]].forEach((tt,k)=>{ const xx=X(tt),vy=g.curY(this.velAt(s,tt)); kids.push(R('circle',{key:'gd'+i+'_'+k,cx:xx,cy:vy,r:3,fill:'#88b868',stroke:'#eef4ee',strokeWidth:1})); });
+    });
+    this.slacks(s).filter(e=>e.t>=this.TMIN+0.3&&e.t<=this.TMAX-0.3).forEach((e,i)=>{ const xx=X(e.t); kids.push(R('circle',{key:'sk'+i,cx:xx,cy:g.zeroY,r:2.6,fill:'rgba(255,255,255,0.85)'})); kids.push(R('text',{key:'skl'+i,x:xx,y:g.zeroY+12,textAnchor:'middle',fontSize:8,fill:'rgba(228,240,228,0.5)',fontFamily:'Geist Mono, monospace'},'slack')); });
+    for(let i=1;i<cp.length-1;i++){ const v=cp[i][1];
+      if(v>0&&v>=cp[i-1][1]&&v>cp[i+1][1]&&v>0.3*g.mxv){ const xx=X(cp[i][0]),yy=g.curY(v); kids.push(R('circle',{key:'pf'+i,cx:xx,cy:yy,r:3,fill:'#fff'})); kids.push(R('text',{key:'pft'+i,x:xx,y:yy-6,textAnchor:'middle',fontSize:10,fontWeight:600,fill:'#cfe6b8',fontFamily:'Fraunces, serif'},this.fmtSp(v))); }
+      if(v<0&&v<=cp[i-1][1]&&v<cp[i+1][1]&&v<-0.3*g.mxv){ const xx=X(cp[i][0]),yy=g.curY(v); kids.push(R('circle',{key:'pe'+i,cx:xx,cy:yy,r:3,fill:'#fff'})); kids.push(R('text',{key:'pet'+i,x:xx,y:yy+14,textAnchor:'middle',fontSize:10,fontWeight:600,fill:'#bcd8ec',fontFamily:'Fraunces, serif'},this.fmtSp(-v))); }
+    }
+    }
+    // real-now faint marker
+    kids.push(R('line',{key:'nowt',x1:X(this.now),y1:g.yT0,x2:X(this.now),y2:g.yCbot,stroke:'rgba(136,184,104,0.55)',strokeWidth:1,strokeDasharray:'2 3'}));
+    const snaps=this.stops(s).filter(e=>e.t>=this.TMIN&&e.t<=this.TMAX).map((e,i)=>R('div',{key:'sn'+i,style:{position:'absolute',left:X(e.t)-0.5,top:0,width:1,height:'100%',scrollSnapAlign:'center'}}));
+    const svg=R('svg',{key:'svg',width:total,height:H,viewBox:`0 0 ${total} ${H}`,style:{display:'block'}},kids);
+    const el=R('div',{className:'hidescroll',ref:this.setTideRef,onScroll:this.onTideScroll,style:{position:'relative',overflowX:'auto',overflowY:'hidden',scrollSnapType:'none',height:H,margin:'0 -16px'}},
+      R('div',{style:{position:'relative',width:total,height:H}},[svg,...snaps]));
+    this._inner={key,el};
+    return el;
+  }
+
+  MAPSTYLE='https://tiles.openwaters.io/seascape/style.json?unit=ft&safety=3';
+  mountMap=(el,s)=>{
+    if(!el||typeof maplibregl==='undefined')return;
+    if(this._mapEl!==el){
+      this._mapEl=el; this._map=null; this._mapSid=s.id;
+      try{ this._map=new maplibregl.Map({container:el,style:this.MAPSTYLE,center:[s.ll[1],s.ll[0]],zoom:s.z,interactive:false,attributionControl:false});
+        // Seascape's published style borrows tile.openstreetmap.org for land, which is
+        // blocked here and is off-limits for a shipped app anyway. Drop it and lay a flat
+        // land tone underneath; bathymetry still shades the water on top.
+        this._map.on('load',()=>{ try{
+          if(this._map.getLayer('osm-base')) this._map.removeLayer('osm-base');
+          const first=this._map.getStyle().layers[0];
+          if(!this._map.getLayer('land-bg'))
+            this._map.addLayer({id:'land-bg',type:'background',paint:{'background-color':'#f2efe9'}}, first&&first.id);
+        }catch(e){} });
+      }catch(e){}
+    }else if(this._map&&this._mapSid!==s.id){
+      this._mapSid=s.id;
+      try{ this._map.jumpTo({center:[s.ll[1],s.ll[0]],zoom:s.z}); }catch(e){}
+    }
+  };
+  // particle positions are a pure function of scrubT: advection potential is the
+  // tide height itself (its derivative is the current), so reverse-scrub and
+  // time-jumps stay correct without any frame-to-frame state.
+  particlesEl(s,scrubT){
+    const R=React.createElement, W=402, H=420;
+    if(!s.b.cS) return null;
+    const v=this.velAt(s,scrubT), sp=Math.min(1,Math.abs(v)/(s.cur.mx||1));
+    const fl=v>=0, C=this.cumAdv(s), A=C?this._ser(C,scrubT):0, adv=(fl?A:-A)*0.16;
+    const rad=(fl?s.b.floodDir:s.b.ebbDir)*Math.PI/180;
+    const ax=Math.sin(rad), ay=-Math.cos(rad), px=-ay, py=ax;
+    const N=34, L=560, col=v>0?'#9cc87c':'#8ab6d2', kids=[];
+    for(let i=0;i<N;i++){
+      const a=Math.sin(i*127.1)*43758.5453, r1=a-Math.floor(a);
+      const b=Math.sin(i*311.7)*24634.6345, r2=b-Math.floor(b);
+      let u=(i/N+r2*0.03+adv)%1; if(u<0)u+=1;
+      const d=(u-0.5)*L, off=(r1-0.5)*250;
+      const cx=W/2+ax*d+px*off, cy=H/2+ay*d+py*off;
+      const len=5+sp*28, op=(0.10+sp*0.75)*(1-Math.abs(u-0.5)*1.4);
+      if(op<=0.02)continue;
+      kids.push(R('line',{key:'p'+i,x1:cx-ax*len/2,y1:cy-ay*len/2,x2:cx+ax*len/2,y2:cy+ay*len/2,
+        stroke:col,strokeWidth:1.5+sp*1.3,strokeLinecap:'round',opacity:op}));
+    }
+    return R('svg',{key:'pt',width:W,height:H,viewBox:'0 0 '+W+' '+H,
+      style:{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',pointerEvents:'none'}},kids);
+  }
+  mapLayerEl(s,scrubT){
+    const R=React.createElement;
+    return R('div',{key:'ml',style:{position:'absolute',left:0,top:0,right:0,bottom:0,overflow:'hidden'}},[
+      R('div',{key:'mp',ref:(el)=>this.mountMap(el,s),style:{position:'absolute',left:0,top:0,right:0,bottom:0,
+        background:'#f2efe9'}}),
+      this.particlesEl(s,scrubT),
+      R('div',{key:'stn',style:{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',width:11,height:11,borderRadius:6,background:'#fff',boxShadow:'0 0 0 3px rgba(5,18,42,0.6),0 0 12px rgba(255,255,255,0.85)'}}),
+      R('div',{key:'attr',style:{position:'absolute',left:10,bottom:8,zIndex:4,fontSize:8,letterSpacing:'0.3px',
+        color:'rgba(228,240,228,0.45)',fontFamily:'Geist Mono, monospace',pointerEvents:'none'}},
+        '\u00a9 Open Water Software \u00b7 OpenStreetMap'),
+      R('div',{key:'scrim',style:{position:'absolute',left:0,top:0,right:0,bottom:0,pointerEvents:'none',background:'linear-gradient(180deg,rgba(5,18,42,0.80) 0%,rgba(5,18,42,0.20) 26%,rgba(5,18,42,0.10) 52%,rgba(5,18,42,0.75) 100%)'}}),
+    ]);
+  }
+
+  tableEl(s,scrubT){
+    const R=React.createElement, TOP=54;
+    const evs=this.stops(s).filter(e=>e.t>=0&&e.t<=TOP).map(e=>({t:e.t,kind:e.kind,v:e.v}));
+    if(!evs.length) return null;
+    let near=evs[0]; evs.forEach(e=>{ if(Math.abs(e.t-scrubT)<Math.abs(near.t-scrubT)) near=e; });
+    const days=[]; evs.forEach(e=>{ const d=Math.floor(e.t/24);
+      if(!days.length||days[days.length-1].d!==d) days.push({d,items:[]});
+      days[days.length-1].items.push(e); });
+    const PILL={
+      high:{label:'\u2191 High', fill:'rgba(136,184,104,0.18)', color:'#cfe6b8', border:'none'},
+      low: {label:'\u2193 Low',  fill:'rgba(230,168,80,0.16)',  color:'#e8c07a', border:'none'},
+      flood:{label:'Flood', fill:'transparent', color:'#9cc87c', border:'0.5px solid rgba(156,200,124,0.45)'},
+      sunrise:{label:'\u2600 Rise', fill:'transparent', color:'#f0d890', border:'0.5px solid rgba(240,200,96,0.4)'},
+      sunset: {label:'\u2600 Set',  fill:'transparent', color:'#c8a86a', border:'0.5px solid rgba(200,168,106,0.35)'},
+      slack:{label:'Slack', fill:'transparent', color:'rgba(228,240,228,0.75)', border:'0.5px solid rgba(255,255,255,0.25)'},
+      ebb:  {label:'Ebb',   fill:'transparent', color:'#8ab6d2', border:'0.5px solid rgba(138,182,210,0.45)'},
+    };
+    const hdr=(txt,align)=>R('div',{key:'h'+txt,style:{flex:1,textAlign:align,fontFamily:'Geist Mono, monospace',
+      fontSize:9,letterSpacing:'1.4px',textTransform:'uppercase',color:'rgba(228,240,228,0.42)'}},txt);
+    const head=R('div',{key:'head',style:{display:'flex',alignItems:'center',gap:8,padding:'2px 14px 10px'}},[
+      R('div',{key:'hd',style:{width:74,fontFamily:'Geist Mono, monospace',fontSize:9,letterSpacing:'1.4px',
+        textTransform:'uppercase',color:'rgba(228,240,228,0.42)'}},'Date'),
+      hdr('Time','right'), hdr('Level','right'),
+      R('div',{key:'ht',style:{width:78}}),
+    ]);
+    const rows=days.map((g,gi)=>R('div',{key:'g'+gi,style:{display:'flex',alignItems:'stretch',
+        borderTop:gi?'0.5px solid rgba(255,255,255,0.08)':'none'}},[
+      R('div',{key:'d',style:{width:74,flexShrink:0,padding:'12px 0 0 14px',fontSize:12,fontWeight:600,
+        color:'rgba(228,240,228,0.9)',lineHeight:1.2}},this.dayName(g.d)),
+      R('div',{key:'items',style:{flex:1,minWidth:0}},g.items.map((e,i)=>{
+        const on=e===near, sun=(e.kind==='sunrise'||e.kind==='sunset'), sl=(e.kind==='slack');
+        const cur=(e.kind==='flood'||e.kind==='ebb'||sl), P=PILL[e.kind];
+        if(!P) return null;
+        return R('div',{key:'e'+i,onClick:()=>this.scrubTo(e.t),
+          style:{display:'flex',alignItems:'center',gap:8,cursor:'pointer',padding:'9px 14px 9px 0',
+            borderTop:i?'0.5px solid rgba(255,255,255,0.055)':'none',
+            background:on?'rgba(136,184,104,0.13)':'transparent',
+            boxShadow:on?'inset 2px 0 0 #88b868':'none'}},[
+          R('div',{key:'t',style:{flex:1,textAlign:'right',fontSize:14,
+            color:on?'#fff':((cur||sun)?'rgba(228,240,228,0.62)':'rgba(228,240,228,0.85)')}},this.fmtTime(e.t)),
+          R('div',{key:'v',style:{flex:1,textAlign:'right',fontFamily:'Fraunces, serif',fontSize:15,
+            fontWeight:600,color:cur?'rgba(255,255,255,0.82)':'#fff'}},
+            (sl||sun)?'\u2014':(cur?(this.fmtSp(Math.abs(e.v))+' '+this.uSp()):(this.fmtH(e.v)+' '+this.uH()))),
+          R('div',{key:'p',style:{width:78,display:'flex',justifyContent:'flex-end'}},
+            R('div',{style:{fontSize:10,fontWeight:600,letterSpacing:'0.3px',padding:'3px 8px',borderRadius:9,
+              background:P.fill,color:P.color,border:P.border}},P.label)),
+        ]);
+      })),
+    ]));
+    return R('div',{style:{paddingTop:12,paddingBottom:4}},[head,...rows]);
+  }
+
+  chartEl(s,scrubT){
+    const R=React.createElement; const g=this.geo(s);
+    const inner=this.innerChart(s);
+    const tY=g.tideY(this.tideAt(s,scrubT)); const vNow=this.velAt(s,scrubT); const cY=(this.state.slackKn>0.5&&Math.abs(vNow)<=this.state.slackKn)?g.zeroY:g.curY(vNow);
+    const vw=this._vw||360, halfH=(vw/2)/this.PPH, lo=scrubT-halfH, hi=scrubT+halfH;
+    const vis=this.curPeaks(s).filter(p=>p.t>=lo&&p.t<=hi), fv=vis.filter(p=>p.v>0).map(p=>p.v), ev=vis.filter(p=>p.v<0).map(p=>p.v);
+    const mf=fv.length?Math.max(...fv):0, me=ev.length?Math.min(...ev):0;
+    const overlay=R('div',{key:'ov',style:{position:'absolute',left:0,top:0,right:0,height:g.H,pointerEvents:'none'}},[
+      R('div',{key:'line',style:{position:'absolute',left:'50%',top:8,transform:'translateX(-50%)',width:2,height:g.yCbot-8,background:'linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0.3))'}}),
+      R('div',{key:'tri',style:{position:'absolute',left:'50%',top:2,transform:'translateX(-50%)',width:0,height:0,borderLeft:'4px solid transparent',borderRight:'4px solid transparent',borderTop:'6px solid #fff'}}),
+      g.noTide?null:R('div',{key:'td',style:{position:'absolute',left:'50%',top:tY,transform:'translate(-50%,-50%)',width:13,height:13,borderRadius:7,background:'#88b868',boxShadow:'0 0 0 2px #fff,0 0 8px rgba(136,184,104,0.9)'}}),
+      g.noCur?null:R('div',{key:'cd',style:{position:'absolute',left:'50%',top:cY,transform:'translate(-50%,-50%)',width:10,height:10,borderRadius:5,background:'#fff',boxShadow:'0 0 6px rgba(255,255,255,0.9)'}}),
+      mf>0?R('div',{key:'flLine',style:{position:'absolute',left:-16,right:-16,top:g.curY(mf),height:0,borderTop:'1px solid rgba(156,200,124,0.5)'}}):null,
+      mf>0?R('div',{key:'fl',style:{position:'absolute',right:6,top:g.curY(mf)-15,fontSize:9,fontWeight:600,color:'#9cc87c',fontFamily:'Geist Mono, monospace',background:'rgba(0,16,32,0.55)',padding:'1px 4px',borderRadius:3}},'FLOOD'):null,
+      me<0?R('div',{key:'ebLine',style:{position:'absolute',left:-16,right:-16,top:g.curY(me),height:0,borderTop:'1px solid rgba(138,182,210,0.5)'}}):null,
+      me<0?R('div',{key:'eb',style:{position:'absolute',right:6,top:g.curY(me)+3,fontSize:9,fontWeight:600,color:'#8ab6d2',fontFamily:'Geist Mono, monospace',background:'rgba(0,16,32,0.55)',padding:'1px 4px',borderRadius:3}},'EBB'):null,
+      g.noTide?null:R('div',{key:'tl',style:{position:'absolute',left:0,top:g.yT0-3,fontSize:9,fontWeight:600,letterSpacing:'1.4px',color:'rgba(136,184,104,0.9)',fontFamily:'Geist Mono, monospace',background:'rgba(0,16,32,0.5)',padding:'0 4px'}},'TIDE'),
+      g.noCur?null:R('div',{key:'clab',style:{position:'absolute',left:0,top:g.sepY-14,fontSize:9,fontWeight:600,letterSpacing:'1.4px',color:'rgba(136,184,104,0.9)',fontFamily:'Geist Mono, monospace',background:'rgba(0,16,32,0.5)',padding:'0 4px'}},'CURRENT'),
+    ]);
+    return R('div',{style:{position:'relative'}},[inner,overlay]);
+  }
+
+  renderVals(){
+    const D=this.DATA();
+    const variant=this.props.variant==='b'?'b':'a';
+
+    const currentCard=this.card(D.seattle,false);
+    const favorites=this.state.savedIds.filter(id=>D[id]).map(id=>this.card(D[id],false));
+    const recents=this.state.recentIds.filter(id=>D[id]&&!this.state.savedIds.includes(id)).map(id=>this.card(D[id],true));
+
+    const q=this.state.query.trim().toLowerCase();
+    const pool=Object.values(D).filter(s=>!s.current);
+    const sr=q?pool.filter(s=>(s.name+' '+s.region).toLowerCase().includes(q)):['deception','victoria','tacoma','friday','townsend'].map(id=>D[id]);
+    const searchResults=sr.map(s=>this.card(s,true));
+
+    let st=null; const aid=this.state.activeId;
+    if(aid&&D[aid]){
+      const s=D[aid], d=this.detail(s), isFav=this.state.savedIds.includes(aid);
+      const ev=d.rising?d.nextHigh:d.nextLow;
+      const heroSub=ev?(d.rising?'Rising · High '+this.fmtH(ev.v)+' '+this.uH()+' at '+this.fmtTime(ev.t):'Falling · Low '+this.fmtH(ev.v)+' '+this.uH()+' at '+this.fmtTime(ev.t)):'';
+      const nRise=d.rising, nNext=nRise?d.nextHigh:d.nextLow, nVel=this.velAt(s,this.now), nSlk=this.nextEventAfter(s,this.now), nPk=this.nextCurPeak(s,this.now,nSlk.t), nSlackNow=Math.abs(nVel)<=this.state.slackKn;
+      const scrubT=this.state.scrubT==null?this.now:this.state.scrubT;
+      const dayOff=Math.floor(scrubT/24);
+      const stH=this.tideAt(s,scrubT), stSlope=this.slope(s,scrubT);
+      const nearEx=Math.abs(stSlope)<0.05;
+      const tideState=nearEx?(stH>s.mean?'High water':'Low water'):(stSlope>0?'Rising':'Falling');
+      const tideDir=nearEx?null:(stSlope>0?'up':'down');
+      const nTide=this.nextEventAfter(s,scrubT);
+      const velS=this.velAt(s,scrubT), mxc=Math.max(d.floodMax,d.ebbMax)||1;
+      const atZero=Math.abs(velS)<0.15;
+      const inLimit=this.state.slackKn>0.5&&Math.abs(velS)<=this.state.slackKn;
+      const flowing=velS>0?'Flooding':'Ebbing';
+      const cDirS=this.dirName(this.dirAt(s,scrubT));
+      const noCur=!s.b.cS;
+      const nsl=this.nextSlack(s,scrubT);
+      const peak=this.nextCurPeak(s,scrubT,nsl?nsl.t:scrubT+6);
+      st={
+        name:s.name, region:s.region,
+        grad: variant==='b'?'linear-gradient(180deg,#083058,#00183c)':`linear-gradient(180deg, ${s.grad[0]}, ${s.grad[1]} 55%, ${s.grad[2]})`,
+        pageBg: variant==='b'?'#00121f':'#00183c',
+        cardBg: variant==='b'?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.09)',
+        mapLayer:this.mapLayerEl(s,scrubT),
+        heroNum:this.fmtH(stH), heroUnit:this.uH(), heroSub,
+        nowTideIcon:this.tideIconEl(tideDir,'#eef4ff'), nowTideState:tideState,
+        nowNextTideType:nTide.type==='high'?'High':'Low', nowNextTideH:this.fmtH(nTide.v), nowNextTideDt:this.fmtWhen(nTide.t,scrubT),
+        nowCur:noCur?'\u2014':(atZero?'Slack':this.fmtSp(Math.abs(velS))), nowCurArrow:(noCur||atZero)?null:this.compassArrowEl(this.dirAt(s,scrubT),'#eef4ff'),
+        nowCurState:noCur?(s.b.note||'No current predictions'):(atZero?'Slack water':`${flowing} toward ${cDirS}`),
+        nowNextSlackDt:this.fmtWhen(nTide.t,scrubT), nowPeakType:peak.type, nowPeakVal:this.fmtSp(Math.abs(peak.v)),
+        canSave: this.state.fromSearch && !isFav,
+        showNow: Math.abs(scrubT-this.now)>0.05,
+        titleRight: ((this.state.fromSearch&&!isFav)?1:0)+((Math.abs(scrubT-this.now)>0.05)?1:0)>1?'104px':'52px',
+        scrubDay:this.dayName(dayOff), scrubTime:this.fmtTime(scrubT),
+        scrubMoon:this.moonGlyphEl(dayOff,22), scrubMoonName:this.moonName(dayOff),
+        uH:this.uH(), uSpLabel:this.uSp(),
+        scrubTideH:s.b.tS?this.fmtH(stH):'\u2014', tideState, tideIcon:this.tideIconEl(tideDir),
+        nextTideType: nTide.type==='high'?'High':'Low', nextTideH:this.fmtH(nTide.v), nextTideDt:this.fmtWhen(nTide.t,scrubT),
+        scrubCurMain: noCur?'\u2014':(atZero?'Slack':this.fmtSp(Math.abs(velS))), scrubCurUnit: noCur?'':(atZero?'':this.uSp()),
+        curStateLine: noCur?(s.b.note||'No current predictions'):(atZero?'Slack water · turning':(inLimit?`${flowing} · within your limit`:`${flowing} · toward ${cDirS}`)), curArrow: (noCur||atZero)?null:this.compassArrowEl(this.dirAt(s,scrubT)),
+        nextSlackDt: (noCur||!nsl)?'\u2014':this.fmtWhen(nsl.t,scrubT),
+        nextPeakLine: noCur?`${s.b.curName} \u00b7 ${s.b.curKm} km away`:`then ${peak.type} ${this.fmtSp(Math.abs(peak.v))} ${this.uSp()}`,
+        hasCur: !noCur, hasTide: !!s.b.tS,
+        chart:this.chartEl(s,scrubT),
+        table:this.tableEl(s,scrubT),
+      };
+    }
+
+    return {
+      listBg:'#00183c',
+      currentCard, favorites, recents,
+      hasRecents:recents.length>0, recentOpen:this.state.recentOpen, recentDeg:this.state.recentOpen?0:-90,
+      searching:this.state.searching, query:this.state.query,
+      searchResults, searchHeader:q?'Results':'Popular',
+      toolbarPill:!this.state.searching, unitLabel:this.state.unitH+' · '+this.SPLABEL[this.state.unitSp],
+      keyboard:this.keyboardEl(),
+      hasStation:!!st, st:st||{seven:[]},
+      detailX:this.state.detailOpen?'0':'100%', detailPE:this.state.detailOpen?'auto':'none',
+      settingsOpen:this.state.settingsOpen, openSettings:this.openSettings, closeSettings:this.closeSettings,
+      bgFt:this.state.unitH==='ft'?'#88b868':'rgba(255,255,255,0.06)', tFt:this.state.unitH==='ft'?'#00183c':'rgba(228,240,228,0.85)',
+      bgM:this.state.unitH==='m'?'#88b868':'rgba(255,255,255,0.06)', tM:this.state.unitH==='m'?'#00183c':'rgba(228,240,228,0.85)',
+      bgKn:this.state.unitSp==='kn'?'#88b868':'rgba(255,255,255,0.06)', tKn:this.state.unitSp==='kn'?'#00183c':'rgba(228,240,228,0.85)',
+      bgKmh:this.state.unitSp==='kmh'?'#88b868':'rgba(255,255,255,0.06)', tKmh:this.state.unitSp==='kmh'?'#00183c':'rgba(228,240,228,0.85)',
+      bgMs:this.state.unitSp==='ms'?'#88b868':'rgba(255,255,255,0.06)', tMs:this.state.unitSp==='ms'?'#00183c':'rgba(228,240,228,0.85)',
+      setFt:()=>this.setUnitH('ft'), setM:()=>this.setUnitH('m'), setKn:()=>this.setUnitSp('kn'), setKmh:()=>this.setUnitSp('kmh'), setMs:()=>this.setUnitSp('ms'),
+      slackKn:this.state.slackKn, slackVal:(this.state.slackKn*this.SP[this.state.unitSp]).toFixed(this.state.unitSp==='ms'?2:1), slackUnit:this.SPLABEL[this.state.unitSp],
+      slackMinus:()=>this.setSlack(-0.25), slackPlus:()=>this.setSlack(0.25), onSlack:this.onSlack,
+      toggleRecent:this.toggleRecent,
+      startSearch:this.startSearch, cancelSearch:this.cancelSearch, onQuery:this.onQuery,
+      closeDetail:this.closeDetail, saveActive:this.saveActive, returnToNow:this.returnToNow,
+    };
+  }
+
+  keyboardEl(){
+    const R=React.createElement;
+    const glyph='rgba(255,255,255,0.92)', keyBg='rgba(120,140,168,0.45)', bg='rgba(0,18,40,0.92)';
+    const rows=[['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['z','x','c','v','b','n','m']];
+    const key=(l,extra)=>R('div',{key:l,style:Object.assign({height:42,flex:1,borderRadius:6,background:keyBg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,color:glyph,fontFamily:'Geist, system-ui'},extra||{})},l);
+    return R('div',{style:{background:bg,backdropFilter:'blur(6px)',padding:'8px 4px 6px',display:'flex',flexDirection:'column',gap:9}},
+      rows.map((row,ri)=>R('div',{key:ri,style:{display:'flex',gap:6,padding:ri===1?'0 18px':'0 4px',justifyContent:'center'}},
+        (ri===2?[R('div',{key:'sh',style:{width:40,height:42,borderRadius:6,background:'rgba(90,110,140,0.5)',display:'flex',alignItems:'center',justifyContent:'center',color:glyph,fontSize:16}},'⇧')]:[])
+        .concat(row.map(l=>key(l)))
+        .concat(ri===2?[R('div',{key:'del',style:{width:40,height:42,borderRadius:6,background:'rgba(90,110,140,0.5)',display:'flex',alignItems:'center',justifyContent:'center',color:glyph,fontSize:16}},'⌫')]:[])
+      )).concat([
+        R('div',{key:'last',style:{display:'flex',gap:6,padding:'0 4px'}},[
+          R('div',{key:'123',style:{width:80,height:42,borderRadius:6,background:'rgba(90,110,140,0.5)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,color:glyph}},'123'),
+          R('div',{key:'sp',style:{flex:1,height:42,borderRadius:6,background:keyBg}}),
+          R('div',{key:'go',style:{width:88,height:42,borderRadius:6,background:'#006030',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,color:'#fff',fontWeight:500}},'Search'),
+        ]),
+        R('div',{key:'pad',style:{height:22}})
+      ])
+    );
+  }
+}
+</script>
+</body>
+</html>
+
