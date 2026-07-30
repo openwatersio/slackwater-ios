@@ -8,3 +8,4 @@ xcuserdata/
 
 # XcodeGen output (regenerate with `xcodegen generate`)
 Slackwater.xcodeproj/
+Slackwater/Info.plist

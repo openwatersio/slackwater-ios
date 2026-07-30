@@ -15,11 +15,39 @@ targets:
     dependencies:
       - package: TideEngine
         product: TideEngine
+    info:
+      path: Slackwater/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIAppFonts:
+          - Fraunces-Regular.ttf
+          - Fraunces-Medium.ttf
+          - Fraunces-SemiBold.ttf
+          - Geist-Regular.ttf
+          - Geist-Medium.ttf
+          - Geist-SemiBold.ttf
+          - GeistMono-Regular.ttf
+          - GeistMono-Medium.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        MARKETING_VERSION: 0.1.0
-        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.2.0
+        CURRENT_PROJECT_VERSION: 2
         CODE_SIGN_STYLE: Automatic
+  SlackwaterUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [SlackwaterUITests]
+    dependencies:
+      - target: Slackwater
+schemes:
+  Slackwater:
+    build:
+      targets:
+        Slackwater: all
+        SlackwaterUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [SlackwaterUITests]

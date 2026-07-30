@@ -41,7 +41,10 @@ marine apps). User experience first, capability of the platform second, technolo
 
 ## Status & license
 
-Pre-code — docs first (see the [docs index](docs/README.md)). This repo is **deliberately private and
+M1 (tides at web parity: station list + search, scrubbable tide detail, units) — see the
+[docs index](docs/README.md) and the milestone plan in `slackwater/docs/superpowers/specs/`.
+Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
+are generated, not committed). This repo is **deliberately private and
 deliberately unlicensed for now**: the engine and libraries are open and permissive, the web app
 is GPL, and the app's own license waits until we've worked out a structure that actually holds
 (copyleft + paid distribution + contributor terms don't sit cleanly together). Getting it right
