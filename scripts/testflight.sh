@@ -10,6 +10,11 @@ cd "$(dirname "$0")/.."
 KEY_ID=VM6W5HP585
 ISSUER=69a6de81-5896-47e3-e053-5b8c7c11a4d1
 KC=~/Library/Keychains/slackwater-ci.keychain-db
+# The identity is pinned by SHA-1 in project.yml (Release CODE_SIGN_IDENTITY)
+# and in signingCertificate below: the login keychain holds a second
+# same-named "Apple Distribution" identity, and the bare name resolves
+# ambiguously (cost the build-10 upload). NOT a CLI override — that would
+# leak onto SPM package targets, which must stay unsigned.
 
 security unlock-keychain -p "$(cat ~/.appstoreconnect/ci-keychain-pass)" $KC
 
@@ -26,7 +31,7 @@ cat > build/exportUpload.plist <<'EOF'
   <key>destination</key><string>upload</string>
   <key>signingStyle</key><string>manual</string>
   <key>teamID</key><string>R3H8DPTV9C</string>
-  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>signingCertificate</key><string>02FBDB9A5D2DB409A4331349069A8C8B09D73069</string>
   <key>provisioningProfiles</key>
   <dict><key>org.openwaters.slackwater</key><string>Slackwater App Store</string></dict>
 </dict>

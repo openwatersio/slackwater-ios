@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. Speed-unit formatting (web units.ts parity) and the
-// list dedupe rule (My Location > Favorites > Recents > Near Me), plus the
+// list dedupe rule (My Location > Favorites > Near Me > Recents), plus the
 // FavoritesStore round trip behind the detail star and list swipes.
 import XCTest
 @testable import Slackwater
@@ -36,31 +36,36 @@ final class UnitsAndGroupsTests: XCTestCase {
     }
 
     // MARK: - Dedupe rule: each station renders in at most one group
+    // (M4.5 precedence: My Location > Favorites > Near Me > Recents)
 
-    func testMyLocationHeroExcludedFromRecentsAndNearMe() {
+    func testHeroExcludedAndNearbyRecentShowsUnderNearMe() {
         let g = ListGroups(heroId: "a", favoriteIds: [], recentIds: ["a", "b"],
                            rankedIds: ["a", "b", "c", "d"], nearCount: 4)
-        XCTAssertEqual(g.recents, ["b"], "hero must not repeat in Recents")
         XCTAssertFalse(g.nearMe.contains("a"), "hero must not repeat in Near Me")
+        XCTAssertEqual(g.nearMe, ["b", "c", "d"])
+        XCTAssertEqual(g.recents, [],
+                       "a station both nearby and recent shows under Near Me only")
     }
 
-    func testFavoritesExcludedFromRecentsAndNearMe() {
-        let g = ListGroups(heroId: nil, favoriteIds: ["b"], recentIds: ["b", "c"],
+    func testFavoritesExcludedFromNearMeAndRecents() {
+        let g = ListGroups(heroId: nil, favoriteIds: ["b"], recentIds: ["b", "c", "z"],
                            rankedIds: ["a", "b", "c", "d", "e"], nearCount: 3)
         XCTAssertEqual(g.favorites, ["b"])
-        XCTAssertEqual(g.recents, ["c"], "a favorite must not repeat in Recents")
-        XCTAssertEqual(g.nearMe, ["a", "d", "e"], "Near Me backfills past excluded ids")
+        XCTAssertEqual(g.nearMe, ["a", "c", "d"], "Near Me backfills past excluded ids")
+        XCTAssertEqual(g.recents, ["z"], "Recents holds only stations not shown above")
     }
 
-    /// Exclusion is render-time only: drop the hero/favorite and the persisted
-    /// recent surfaces again.
+    /// Exclusion is render-time only: drop the hero/favorite (or fall past the
+    /// Near Me cut) and the persisted recent surfaces again.
     func testExclusionIsRenderTimeOnly() {
         let hidden = ListGroups(heroId: "a", favoriteIds: ["b"], recentIds: ["a", "b"],
                                 rankedIds: ["a", "b"], nearCount: 2)
         XCTAssertEqual(hidden.recents, [])
         let restored = ListGroups(heroId: nil, favoriteIds: [], recentIds: ["a", "b"],
-                                  rankedIds: ["a", "b"], nearCount: 2)
-        XCTAssertEqual(restored.recents, ["a", "b"])
+                                  rankedIds: ["a", "b", "c"], nearCount: 1)
+        XCTAssertEqual(restored.nearMe, ["a"])
+        XCTAssertEqual(restored.recents, ["b"],
+                       "a recent past the Near Me cut surfaces in Recents")
     }
 
     // MARK: - FavoritesStore round trip (ends clean — shared UserDefaults)

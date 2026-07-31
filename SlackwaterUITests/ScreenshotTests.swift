@@ -9,6 +9,34 @@ import XCTest
 final class ScreenshotTests: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
 
+    /// M4.5: search lives behind the bottom-left FAB. Opens it and types with
+    /// NO field tap — typeText throws unless the field already has keyboard
+    /// focus, so every use doubles as the keyboard-up-immediately assertion.
+    private func openSearch(_ app: XCUIApplication, _ text: String) {
+        app.buttons["Search"].firstMatch.tap()
+        let field = app.textFields.firstMatch
+        XCTAssert(field.waitForExistence(timeout: 5), "search input did not appear")
+        sleep(1)  // let the auto-focus land
+        field.typeText(text)
+    }
+
+    /// The X glass circle beside the bottom input (Bryan's Weather reference).
+    private func closeSearch(_ app: XCUIApplication) {
+        app.buttons["Close search"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+    }
+
+    /// Scroll the list until `el` is realized and hittable (Recents now lives
+    /// at the very bottom — often below the fold).
+    private func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
+        var tries = 0
+        while (!el.exists || !el.isHittable), tries < 6 {
+            app.swipeUp()
+            tries += 1
+        }
+        XCTAssert(el.exists, "could not scroll to element")
+    }
+
     /// Pan the timeline strip under its fixed centerline (drag left = later).
     /// Targets the strip element itself so the drag lands on it at any size —
     /// the old window-normalized offsets (dy 0.8) miss the strip on iPad.
@@ -42,23 +70,18 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         save(app, "m1-detail-scrubbed.png")
 
-        // Back to the station list; clear the "friday" query.
+        // Back to the station list (search closed itself on the pick).
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
         sleep(1)
         save(app, "m1-list.png")
 
-        // Search mid-query: name + region substring both match.
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("pass")
+        // Search mid-query: name + region substring both match (bottom input).
+        openSearch(app, "pass")
+        XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch.waitForExistence(timeout: 5))
         sleep(1)
         save(app, "m1-search.png")
-        let clear = app.buttons["xmark.circle.fill"].firstMatch
-        if clear.exists { clear.tap() } else { field.typeText(XCUIKeyboardKey.delete.rawValue) }
+        closeSearch(app)
 
         // Metres via Settings, then open Friday Harbor in metric.
         setUnits(app, "Meters")
@@ -81,12 +104,10 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
     }
 
-    /// Search "friday" → tap the tide card → detail; clears the query on the
-    /// way in so the list is clean when the caller navigates back.
+    /// Search "friday" via the FAB → tap the tide card → detail (the overlay
+    /// closes itself on the pick).
     private func openFridayHarbor(_ app: XCUIApplication) {
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("friday")
+        openSearch(app, "friday")
         let card = app.staticTexts["Friday Harbor"].firstMatch
         XCTAssert(card.waitForExistence(timeout: 5))
         card.tap()
@@ -105,9 +126,7 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m2-list-mixed.png")
 
         // Search finds the current station; its detail is the signed curve.
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("deception")
+        openSearch(app, "deception")
         let card = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(card.waitForExistence(timeout: 5))
         card.tap()
@@ -133,9 +152,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
         // Victoria is pending (or already mid-fit): identity + honest message, no numbers.
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("victoria")
+        openSearch(app, "victoria")
         let pending = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'signal' OR label CONTAINS 'Downloading'")).firstMatch
         XCTAssert(pending.waitForExistence(timeout: 10))
@@ -163,9 +180,7 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments = ["-networkKillSwitch", "-nowOffsetDays", "1", "-seedGate"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
-        let field2 = app.textFields.firstMatch
-        field2.tap()
-        field2.typeText("victoria")
+        openSearch(app, "victoria")
         let offlineFitted = app.staticTexts.matching(
             NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored model did not survive relaunch")
@@ -177,9 +192,10 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m3-offline.png")
     }
 
-    // M4: first-run gate — the search bypass lands on the fully usable list,
-    // and the choice sticks across relaunch. (The Use-My-Location path needs
-    // the system permission dialog; exercised manually via simctl privacy.)
+    // M4: first-run gate — the search bypass lands in the search experience
+    // (M4.5), and the choice sticks across relaunch without reopening search.
+    // (The Use-My-Location path needs the system permission dialog; exercised
+    // manually via simctl privacy.)
     func testM4Gate() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-resetGate"]
@@ -189,13 +205,19 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.buttons["Use My Location"].exists)
         save(app, "m4-ftue-gate.png")
         app.buttons["Or search for a harbor, bay, or channel."].tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["Friday Harbor"].waitForExistence(timeout: 5))
+        let field = app.textFields.firstMatch
+        XCTAssert(field.waitForExistence(timeout: 5), "gate bypass did not open search")
+        sleep(1)
+        field.typeText("friday")  // works only if the field auto-focused
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.waitForExistence(timeout: 5))
+        closeSearch(app)
 
         app.terminate()
         app.launchArguments = []
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.textFields.firstMatch.exists,
+                       "search must not reopen on relaunch — the handoff is one-shot")
     }
 
     // M4: pin map — opens from the floating button, land + pins render, and a
@@ -210,12 +232,15 @@ final class ScreenshotTests: XCTestCase {
 
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         app.buttons["Map"].tap()
-        XCTAssert(app.staticTexts["MAP"].waitForExistence(timeout: 5))
-        sleep(5)  // let tiles (and Seascape, when reachable) come in
-        save(app, "m41-map-zoom.png")
-
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 5))
+        // M4.5: no header, no X — the toggle FAB (now the list icon) is the
+        // way back, and the search FAB persists over the map.
+        XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
+        XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
+        XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
+        sleep(5)  // let tiles (and Seascape, when reachable) come in
+        save(app, "m41-map-zoom.png")
         let frame = map.frame
         let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
         func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
@@ -246,9 +271,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
         // First: the reference port's own detail — collect today's H/L numbers.
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("deception")
+        openSearch(app, "deception")
         let port = app.staticTexts["Deception Pass State Park"].firstMatch
         XCTAssert(port.waitForExistence(timeout: 5))
         port.tap()
@@ -260,6 +283,8 @@ final class ScreenshotTests: XCTestCase {
 
         // Then: the gate's detail — paired pane present, port numbers verbatim.
         app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        openSearch(app, "deception")
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
@@ -333,16 +358,23 @@ final class ScreenshotTests: XCTestCase {
         sleep(2)
         save(app, "m41-mylocation-tile.png")
 
-        // Visit a station; it must appear under Recents on return.
+        // Visit a station; it must appear under Recents — now the very BOTTOM
+        // group (M4.5 order: My Location → Favorites → Near Me → Recents).
         openFridayHarbor(app)
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
-        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5))
+        let near = app.staticTexts["NEAR ME"].firstMatch
+        XCTAssert(near.waitForExistence(timeout: 5))
+        let recentsLabel = app.staticTexts["RECENTS"].firstMatch
+        scrollTo(recentsLabel, in: app)
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
+        // Both labels realized (tall screens / short lists): direct order check.
+        if near.exists {
+            XCTAssert(near.frame.minY < recentsLabel.frame.minY,
+                      "Recents must render below Near Me")
+        }
         sleep(2)
+        save(app, "m45-groups-order.png")
         save(app, "m41-list-grouped.png")
     }
 
@@ -377,12 +409,7 @@ final class ScreenshotTests: XCTestCase {
         // The map header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("deception")
+        openSearch(app, "deception")
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
@@ -493,36 +520,32 @@ final class ScreenshotTests: XCTestCase {
         // (it was just visited — favorites win the dedupe).
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
         XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
         XCTAssertFalse(app.staticTexts["RECENTS"].exists,
                        "a favorited station must not also render under Recents")
 
         // Visit a second station so Recents renders too — all four groups.
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("deception")
+        openSearch(app, "deception")
         let port = app.staticTexts["Deception Pass State Park"].firstMatch
         XCTAssert(port.waitForExistence(timeout: 5))
         port.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
         XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["FAVORITES"].exists)
-        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["NEAR ME"].exists)
+        // M4.5: Recents is the last group — scroll down to it.
+        let recentsLabel = app.staticTexts["RECENTS"].firstMatch
+        scrollTo(recentsLabel, in: app)
         sleep(1)
         save(app, "m43-favorites-group.png")
 
         // Swipe open the Recents row: red destructive Remove (spec §9).
-        app.staticTexts["Deception Pass State Park"].firstMatch.swipeLeft()
+        let parkRow = app.staticTexts["Deception Pass State Park"].firstMatch
+        scrollTo(parkRow, in: app)
+        parkRow.swipeLeft()
         XCTAssert(app.buttons["Remove"].waitForExistence(timeout: 5),
                   "trailing swipe did not reveal the Recents remove action")
         save(app, "m43-swipe.png")
@@ -531,18 +554,26 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Deception Pass State Park"].exists,
                        "remove-from-recents left the row behind")
 
-        // Swipe-unfavorite Friday Harbor: it leaves Favorites and re-files
-        // under Recents (spec §9 — a move, not a deletion).
-        app.staticTexts["Friday Harbor"].firstMatch.swipeLeft()
+        // Swipe-unfavorite Friday Harbor (back near the top): it leaves
+        // Favorites and re-files under Recents (spec §9 — a move, not a
+        // deletion) — which now means the bottom of the list.
+        app.swipeDown()
+        app.swipeDown()
+        let fridayRow = app.staticTexts["Friday Harbor"].firstMatch
+        XCTAssert(fridayRow.waitForExistence(timeout: 5))
+        fridayRow.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5),
                   "trailing swipe did not reveal the favorites remove action")
         app.buttons["Unfavorite"].firstMatch.tap()
         sleep(1)
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "unfavorite left the Favorites group behind")
-        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5),
+        let recentsAgain = app.staticTexts["RECENTS"].firstMatch
+        scrollTo(recentsAgain, in: app)
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists,
                   "unfavorited station did not re-file to Recents")
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
+        app.swipeDown()
+        app.swipeDown()
 
         // Speed units: switch to km/h in Settings, the current detail follows.
         app.buttons["Settings"].tap()
@@ -553,9 +584,7 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m43-settings-speed.png")
         app.buttons["Done"].tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        let field2 = app.textFields.firstMatch
-        field2.tap()
-        field2.typeText("deception")
+        openSearch(app, "deception")
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
@@ -610,9 +639,7 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("victoria")
+        openSearch(app, "victoria")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Canadian tidal predictions download once'"))
             .firstMatch.waitForExistence(timeout: 10),
@@ -638,32 +665,87 @@ final class ScreenshotTests: XCTestCase {
         openFridayHarbor(app)
         // The sidebar must still be on screen while the detail shows —
         // a split, not a push.
-        XCTAssert(app.textFields.firstMatch.exists, "sidebar gone — not a split layout")
+        XCTAssert(app.staticTexts["Slackwater"].exists, "sidebar gone — not a split layout")
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
         // A second pick replaces the detail (no stacking) — web sidebar behavior.
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()  // clear "friday"
-        }
-        let field = app.textFields.firstMatch
-        field.tap()
-        field.typeText("deception")
+        openSearch(app, "deception")
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5),
                   "row tap did not replace the detail pane")
-        if app.buttons["xmark.circle.fill"].firstMatch.exists {
-            app.buttons["xmark.circle.fill"].firstMatch.tap()
-        }
         sleep(5)  // header map tiles
         save(app, "m44-ipad-landscape.png")
 
+        // M4.5 regular width: the FABs live in the sidebar column; the map
+        // FAB swaps the detail pane to the map (replacing the shown detail),
+        // flips to the list icon, and toggling back lands on the placeholder.
+        app.buttons["Map"].firstMatch.tap()
+        XCTAssert(app.otherElements["map-canvas"].waitForExistence(timeout: 5),
+                  "map did not take over the detail pane")
+        XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
+        XCTAssert(app.buttons["Search"].exists, "search FAB missing while the map shows")
+        sleep(4)  // map tiles
+        save(app, "m45-ipad.png")
+        app.buttons["List"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Pick a station"].waitForExistence(timeout: 5),
+                  "toggle back did not land on the placeholder")
+
         XCUIDevice.shared.orientation = .portrait
         sleep(2)
-        XCTAssert(app.otherElements["timeline-strip"].exists,
-                  "rotation lost the detail")
-        XCTAssert(app.textFields.firstMatch.exists, "portrait dropped the sidebar")
+        XCTAssert(app.staticTexts["Slackwater"].exists, "portrait dropped the sidebar")
         save(app, "m44-ipad-portrait.png")
+    }
+
+    // M4.5 design pass: the floating toolbar (prototype NearMe.dc.html
+    // showToggle) — search FAB bottom-left opens the bottom-input search with
+    // the keyboard up; the X beside the input exits in one tap; the map FAB
+    // toggles the surface in place and flips to the list icon (no header, no
+    // close chrome); both FABs persist over the map.
+    func testM45SearchFabAndMapToggle() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // No top search bar on the list; both FABs present.
+        XCTAssertFalse(app.textFields.firstMatch.exists, "top search bar must be gone")
+        XCTAssert(app.buttons["Search"].exists)
+        XCTAssert(app.buttons["Map"].exists)
+        sleep(1)
+        save(app, "m45-list-fabs.png")
+
+        // Search FAB → bottom input, keyboard up (openSearch types with no
+        // field tap), results fill the space above.
+        openSearch(app, "friday")
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssert(app.buttons["Close search"].exists, "X missing beside the input")
+        sleep(1)
+        save(app, "m45-search-open.png")
+
+        // X beside the input: one tap back to the list, keyboard gone.
+        closeSearch(app)
+        XCTAssertFalse(app.textFields.firstMatch.exists, "X did not close search")
+
+        // Map FAB: the surface swaps in place, the button becomes the list
+        // icon, and no chrome sits over the map.
+        app.buttons["Map"].tap()
+        XCTAssert(app.otherElements["map-canvas"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header")
+        XCTAssert(app.buttons["List"].exists, "toggle did not flip to the list icon")
+        sleep(4)  // tiles
+        save(app, "m45-map-toggled.png")
+
+        // The search FAB persists over the map and opens the same search.
+        openSearch(app, "friday")
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Close search"].firstMatch.tap()
+
+        // Toggle back: list returns, the button is the map icon again.
+        XCTAssert(app.buttons["List"].waitForExistence(timeout: 5))
+        app.buttons["List"].tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

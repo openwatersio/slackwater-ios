@@ -113,6 +113,7 @@ struct GateView: View {
                     .padding(.top, 30)
                     .padding(.horizontal, 22)
                     Button {
+                        gateSearchHandoff = true
                         seenGate = true
                     } label: {
                         Text("Or search for a harbor, bay, or channel.")
@@ -137,10 +138,16 @@ struct GateView: View {
 
 // MARK: - Station list
 
+/// Set by the gate's "or search" bypass, consumed by the list's first appear —
+/// the bypass lands straight in the search experience.
+var gateSearchHandoff = false
+
 struct StationListView: View {
     @State private var path = NavigationPath()
     @State private var query = ""
     @State private var showSettings = false
+    @State private var searching = false
+    @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
     @AppStorage(unitsKey) private var units = "imperial"
@@ -172,25 +179,36 @@ struct StationListView: View {
                 stackLayout
             }
         }
+        // Search is modal: hide the base surface from accessibility while the
+        // overlay is up (VoiceOver correctness, and hit-tests resolve to the
+        // overlay's cards, not identically-named cards underneath).
+        .accessibilityHidden(searching)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .fullScreenCover(isPresented: $showMap) {
-            MapScreen { item in
-                showMap = false
-                open(item)
+        // Search covers everything — list, map, and (regular) the detail pane.
+        .overlay { if searching { searchOverlay } }
+        .onAppear {
+            loc.refreshIfAuthorized()
+            if gateSearchHandoff {
+                gateSearchHandoff = false
+                openSearch()
             }
         }
-        .onAppear { loc.refreshIfAuthorized() }
         // First connected launch: the Canadian Salish ports auto-fit in the
         // background (M3 — no region UX). Partial failure retries next launch.
         .task { ChsFitService.shared.fitPendingIfNeeded() }
     }
 
-    /// iPhone (and iPad Slide Over): the M1–M4 stack, unchanged.
+    /// iPhone (and iPad Slide Over): the M1–M4 stack. The map swaps in-place
+    /// for the list (prototype toggleView); both FABs persist over either.
     private var stackLayout: some View {
         NavigationStack(path: $path) {
-            listPane
-                .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
-                .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+            ZStack {
+                if showMap { mapPane } else { listPane }
+                fabBar
+            }
+            .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
+            .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -198,15 +216,25 @@ struct StationListView: View {
     /// the list earns permanent space as a 320pt sidebar (20rem on web), and
     /// the detail is the content pane with its own stack so a row or map-pin
     /// tap replaces what's shown rather than covering the list.
+    /// M4.5: the FABs live in the sidebar column (the list is always on
+    /// screen, so the sidebar is where you act), and the toggle drives the
+    /// detail pane's content — map ⇄ placeholder/detail. Opening the map
+    /// clears the shown detail; a pin tap swaps back and opens it.
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: .constant(.doubleColumn)) {
-            listPane
-                .navigationSplitViewColumnWidth(320)
+            ZStack {
+                listPane
+                fabBar
+            }
+            .navigationSplitViewColumnWidth(320)
         } detail: {
             NavigationStack(path: $path) {
-                detailPlaceholder
-                    .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
-                    .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+                Group {
+                    if showMap { mapPane } else { detailPlaceholder }
+                }
+                .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
+                .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+                .toolbar(.hidden, for: .navigationBar)
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -233,9 +261,10 @@ struct StationListView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    /// The list surface both layouts share: canvas, grouped List, map button.
+    /// The list surface both layouts share: canvas + grouped List. Search
+    /// moved to the floating button (M4.5) — no top bar.
     private var listPane: some View {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                                startRadius: 0, endRadius: 500)
                     .ignoresSafeArea()
@@ -245,22 +274,8 @@ struct StationListView: View {
                 List {
                     Group {
                         header
-                        searchField
-                        if query.isEmpty {
-                            locatedSections
-                        } else {
-                            MonoLabel(text: "Results")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 26)
-                                .padding(.top, 14)
-                                .padding(.bottom, 4)
-                            ForEach(StationItem.search(query)) { item in
-                                itemCard(item)
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 12)
-                            }
-                        }
-                        Color.clear.frame(height: 32)
+                        locatedSections
+                        Color.clear.frame(height: 96)  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -269,9 +284,28 @@ struct StationListView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .environment(\.defaultMinListRowHeight, 1)
-                mapButton
             }
             .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// The in-place map surface (prototype READY·MAP): no header, no close —
+    /// the toggle FAB is the only way back.
+    private var mapPane: some View {
+        MapViewRepresentable { item in
+            if regular { showMap = false }  // the detail pane shows the pick
+            open(item)
+        }
+        .accessibilityIdentifier("map-canvas")
+        .ignoresSafeArea()
+        .overlay(alignment: .bottom) {
+            Text("Depths not reduced to chart datum — not for navigation.")
+                .font(.geist(11))
+                .foregroundStyle(SN.foam.opacity(0.85))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(SN.page.opacity(0.82), in: Capsule())
+                .padding(.bottom, 96)   // clear of the FABs
+        }
+        .background(SN.page.ignoresSafeArea())
     }
 
     /// Show a station picked anywhere (row tap in regular, map pin tap in
@@ -295,11 +329,11 @@ struct StationListView: View {
     }
 
     // The list (Bryan's regrouping of the prototype READY·LIST): My Location →
-    // Favorites → Recents → Near Me, nothing else — search is the discovery
+    // Favorites → Near Me → Recents, nothing else — search is the discovery
     // path for the rest of the catalog. Without a fix the ranking anchors on
     // the Victoria fallback (prototype FALLBACK), and the My Location slot
     // holds the amber denied card when location is off. Dedupe: ListGroups —
-    // each station renders once, My Location > Favorites > Recents > Near Me.
+    // each station renders once, My Location > Favorites > Near Me > Recents.
     @ViewBuilder private var locatedSections: some View {
         let anchor = fix ?? fallbackFix
         let ranked = StationItem.all.sorted {
@@ -339,7 +373,25 @@ struct StationListView: View {
             }
         }
 
-        // Recents: recently viewed, most recent first, minus hero/favorites.
+        sectionLabel("Near Me")
+        ForEach(items(groups.nearMe)) { item in
+            itemCard(item)
+                .overlay(alignment: .topTrailing) {
+                    DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)   // room for the straddling nm pill
+                .padding(.bottom, 4)
+                .swipeActions(edge: .leading) {
+                    Button { favorites.toggle(item.id) } label: {
+                        Label("Favorite", systemImage: "star.fill")
+                    }
+                    .tint(SN.sun)
+                }
+        }
+
+        // Recents at the very bottom (M4.5): recently viewed, most recent
+        // first, minus everything already shown above.
         let recentItems = items(groups.recents)
         if !recentItems.isEmpty {
             sectionLabel("Recents")
@@ -359,23 +411,6 @@ struct StationListView: View {
                         .tint(SN.sun)
                     }
             }
-        }
-
-        sectionLabel("Near Me")
-        ForEach(items(groups.nearMe)) { item in
-            itemCard(item)
-                .overlay(alignment: .topTrailing) {
-                    DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)   // room for the straddling nm pill
-                .padding(.bottom, 4)
-                .swipeActions(edge: .leading) {
-                    Button { favorites.toggle(item.id) } label: {
-                        Label("Favorite", systemImage: "star.fill")
-                    }
-                    .tint(SN.sun)
-                }
         }
     }
 
@@ -512,13 +547,30 @@ struct StationListView: View {
         .padding(.top, 6)
     }
 
-    /// List ⇄ map switch: bottom-right floating button (detail-view spec
-    /// backlog #6; prototype toolbar).
-    private var mapButton: some View {
-        Button {
-            showMap = true
-        } label: {
-            Image(systemName: "map")
+    // MARK: - Floating toolbar (prototype showToggle: search bottom-left,
+    // list ⇄ map toggle bottom-right, both persistent over list AND map)
+
+    private var fabBar: some View {
+        HStack {
+            fab("magnifyingglass", label: "Search") { openSearch() }
+            Spacer()
+            fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
+                showMap.toggle()
+                // Regular width: opening the map replaces the shown detail;
+                // toggling back lands on the placeholder (prototype toggleView
+                // is a full surface swap, not a stack push).
+                if regular && showMap { path = NavigationPath() }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    }
+
+    /// The prototype toolbar button: 56pt glass circle.
+    private func fab(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(SN.foam)
                 .frame(width: 56, height: 56)
@@ -527,33 +579,97 @@ struct StationListView: View {
                 .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
                 .shadow(color: Color(hex: 0x000C1E, opacity: 0.4), radius: 10, y: 6)
         }
-        .accessibilityLabel("Map")
-        .padding(.trailing, 16)
-        .padding(.bottom, 24)
+        .accessibilityLabel(label)
     }
 
-    private var searchField: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(SN.foam.opacity(0.7))
-            TextField("Harbor, bay, or channel", text: $query)
-                .font(.geist(17))
-                .foregroundStyle(SN.paper)
-                .autocorrectionDisabled()
-            if !query.isEmpty {
-                Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(SN.foam.opacity(0.5))
+    // MARK: - Search (M4.5: bottom input above the keyboard, results above —
+    // the Weather-app pattern from Bryan's reference; prototype openSearch)
+
+    private func openSearch() {
+        query = ""       // prototype openSearch resets the query
+        searching = true
+    }
+
+    private var searchOverlay: some View {
+        ZStack {
+            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
+                           startRadius: 0, endRadius: 500)
+                .ignoresSafeArea()
+            VStack(spacing: 0) {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(StationItem.search(query)) { item in
+                            resultCard(item)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
-                .buttonStyle(.plain)  // List rows: keep the tap on the ×
+                searchBar
             }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .background(Color.white.opacity(0.08), in: Capsule())
-        .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .onAppear { searchFocused = true }  // keyboard up immediately
+    }
+
+    /// A search result: the ordinary card, tapping opens the detail and
+    /// closes search (the overlay sits outside the nav stacks, so results
+    /// drive `open` directly rather than riding hidden links).
+    @ViewBuilder private func resultCard(_ item: StationItem) -> some View {
+        Group {
+            switch item {
+            case .tide(let s): StationCardView(record: s, imperial: imperial)
+            case .current(let s): CurrentCardView(record: s)
+            case .chs(let info): ChsCardView(info: info, imperial: imperial)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            searching = false
+            open(item)
+        }
+    }
+
+    /// The bottom bar: input pill + the X glass circle beside it (Bryan's
+    /// Weather-app reference — one tap exits search and drops the keyboard).
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(SN.foam.opacity(0.7))
+                TextField("Harbor, bay, or channel", text: $query)
+                    .font(.geist(17))
+                    .foregroundStyle(SN.paper)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .focused($searchFocused)
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(SN.foam.opacity(0.5))
+                    }
+                    .accessibilityLabel("Clear search text")
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 48)
+            .background(Color.white.opacity(0.08), in: Capsule())
+            .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
+
+            Button {
+                searching = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(SN.foam)
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
+                    .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
+            }
+            .accessibilityLabel("Close search")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }
 

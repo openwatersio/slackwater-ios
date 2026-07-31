@@ -50,7 +50,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 9
+        CURRENT_PROJECT_VERSION: 10
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -60,7 +60,9 @@ targets:
         # (headless: login keychain is locked to non-GUI sessions — see docs/testflight.md)
         Release:
           CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: "Apple Distribution"
+          # Pinned by SHA-1: two same-named "Apple Distribution" identities
+          # exist locally; the profile embeds only this one (docs/testflight.md)
+          CODE_SIGN_IDENTITY: "02FBDB9A5D2DB409A4331349069A8C8B09D73069"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater App Store"
   SlackwaterTests:
     type: bundle.unit-test

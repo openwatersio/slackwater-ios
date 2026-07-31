@@ -318,21 +318,24 @@ final class FavoritesStore: ObservableObject {
     }
 }
 
-/// The one dedupe rule (prototype TidesApp: recents exclude savedIds): each
-/// station renders in at most one group — My Location > Favorites > Recents >
-/// Near Me. Persisted stores are untouched; exclusion is render-time only, so
-/// a station reappears when it stops being the hero / a favorite.
+/// The one dedupe rule: each station renders in at most one group —
+/// My Location > Favorites > Near Me > Recents (Bryan's M4.5 order: Recents at
+/// the very bottom is the floor — a station both nearby and recent shows under
+/// Near Me; Recents holds only stations not already shown above). Persisted
+/// stores are untouched; exclusion is render-time only, so a station reappears
+/// when it stops being the hero / a favorite / nearby.
 struct ListGroups {
     let favorites: [String]
-    let recents: [String]
     let nearMe: [String]
+    let recents: [String]
 
     init(heroId: String?, favoriteIds: [String], recentIds: [String],
          rankedIds: [String], nearCount: Int) {
         favorites = favoriteIds.filter { $0 != heroId }
-        recents = recentIds.filter { $0 != heroId && !favoriteIds.contains($0) }
-        var shown = Set(favorites + recents)
+        var shown = Set(favorites)
         if let heroId { shown.insert(heroId) }
         nearMe = Array(rankedIds.filter { !shown.contains($0) }.prefix(nearCount))
+        shown.formUnion(nearMe)
+        recents = recentIds.filter { !shown.contains($0) }
     }
 }

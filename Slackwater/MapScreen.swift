@@ -13,46 +13,8 @@ import MapLibre
 let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.35, longitude: -123.05)
 let SALISH_ZOOM = 7.35
 
-struct MapScreen: View {
-    let onSelect: (StationItem) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                MonoLabel(text: "Map")
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(SN.foam)
-                        .frame(width: 34, height: 34)
-                        .background(Color.white.opacity(0.08), in: Circle())
-                }
-                .accessibilityLabel("Close map")
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(SN.page)
-
-            MapViewRepresentable(onSelect: onSelect)
-                .accessibilityIdentifier("map-canvas")
-                .ignoresSafeArea(edges: .bottom)
-                .overlay(alignment: .bottom) {
-                    Text("Depths not reduced to chart datum — not for navigation.")
-                        .font(.geist(11))
-                        .foregroundStyle(SN.foam.opacity(0.85))
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(SN.page.opacity(0.82), in: Capsule())
-                        .padding(.bottom, 26)
-                }
-        }
-        .background(SN.page.ignoresSafeArea())
-        .preferredColorScheme(.dark)
-    }
-}
+// The MapScreen full-screen-cover wrapper (header + X) is gone — M4.5 shows
+// the map in place behind the list ⇄ map toggle FAB (StationListView.mapPane).
 
 // MARK: - Style building (mirrors web mapStyle.ts)
 
