@@ -19,15 +19,32 @@ enum ChsState {
     case fitted(TideStationRecord)
 }
 
+/// Same three states for a validated current gate — the fitted payload is a
+/// CurrentStationRecord, so the gate rides the NOAA current view path.
+enum ChsCurrentState {
+    case pending
+    case fitting
+    case fitted(CurrentStationRecord)
+}
+
 @MainActor
 final class ChsFitService: ObservableObject {
     static let shared = ChsFitService()
 
     @Published private(set) var states: [String: ChsState] = [:]
+    @Published private(set) var currentStates: [String: ChsCurrentState] = [:]
 
     /// True once launched with `-networkKillSwitch` (UI tests' honest
     /// airplane-mode stand-in: every IWLS request throws before the socket).
     let networkDisabled = CommandLine.arguments.contains("-networkKillSwitch")
+
+    /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
+    /// ids — a REAL live fit, bounded to one gate's fetch time.
+    private static let fitOnly: Set<String>? = {
+        guard let at = CommandLine.arguments.firstIndex(of: "-chsFitOnly"),
+              CommandLine.arguments.indices.contains(at + 1) else { return nil }
+        return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
+    }()
 
     private var started = false
 
@@ -40,20 +57,34 @@ final class ChsFitService: ObservableObject {
                 states[info.id] = .pending
             }
         }
+        for gate in ChsCurrentGateInfo.all {
+            if let model = ChsModelStore.loadCurrent(gate.id) {
+                currentStates[gate.id] = .fitted(gate.record(with: model))
+            } else {
+                currentStates[gate.id] = .pending
+            }
+        }
     }
 
     func state(_ id: String) -> ChsState { states[id] ?? .pending }
+    func currentState(_ id: String) -> ChsCurrentState { currentStates[id] ?? .pending }
 
-    /// Fit every pending station, Victoria first (home water lands fastest).
-    /// Partial failure is fine: whatever fit is stored; the rest stay pending
-    /// and retry on the next connected launch.
+    /// Fit every pending station, Victoria first (home water lands fastest),
+    /// tide ports before current gates (ports unlock the most surfaces, and a
+    /// gate's paired tide track needs its port fitted). Partial failure is
+    /// fine: whatever fit is stored; the rest stay pending and retry on the
+    /// next connected launch.
     func fitPendingIfNeeded() {
         guard !started, !networkDisabled else { return }
         started = true
         let pending = ChsStationInfo.all
+            .filter { Self.fitOnly?.contains($0.id) ?? true }
             .filter { if case .fitted = state($0.id) { return false } else { return true } }
             .sorted { ($0.id == ChsStationInfo.victoriaID ? 0 : 1, $0.name) < ($1.id == ChsStationInfo.victoriaID ? 0 : 1, $1.name) }
-        guard !pending.isEmpty else { return }
+        let pendingGates = ChsCurrentGateInfo.all
+            .filter { Self.fitOnly?.contains($0.id) ?? true }
+            .filter { if case .fitted = currentState($0.id) { return false } else { return true } }
+        guard !pending.isEmpty || !pendingGates.isEmpty else { return }
 
         Task.detached(priority: .utility) {
             let fetcher = IwlsFetcher()
@@ -68,6 +99,16 @@ final class ChsFitService: ObservableObject {
                 } catch {
                     // ponytail: no retry ladder — next connected launch retries.
                     await MainActor.run { self.states[info.id] = .pending }
+                }
+            }
+            for gate in pendingGates {
+                await MainActor.run { self.currentStates[gate.id] = .fitting }
+                do {
+                    let model = try await Self.fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
+                    try ChsModelStore.saveCurrent(model)
+                    await MainActor.run { self.currentStates[gate.id] = .fitted(gate.record(with: model)) }
+                } catch {
+                    await MainActor.run { self.currentStates[gate.id] = .pending }
                 }
             }
         }
@@ -90,19 +131,70 @@ final class ChsFitService: ObservableObject {
             constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
     }
 
-    /// Position is the match key, never name (web chs/resolve.ts): nearest wlp
-    /// station within tolerance, else throw — a silent mis-bind would put the
-    /// wrong water under a trusted name.
-    static let resolveToleranceKm = 3.0
+    /// 210 d of wcsp1+wcdp1 ending yesterday, projected onto the CHS flood
+    /// axis, fitted with the same JSCore path as the tides. 210 days is the
+    /// window the M47 validation passed: Rayleigh separation of K1/P1 (which
+    /// drive PNW diurnal inequality) needs ≥183 d, and the 60-day tide window
+    /// measurably fails the slack bar (spikes/chs-currents-fit/README.md).
+    static let currentFitDays = 210.0
+
+    private static func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
+                                   fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
+        let station = try resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
+                                  series: "wcsp1", in: list)
+        let meta = try await fetcher.metadata(stationID: station.id)
+        guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
+            throw ChsError.noFloodAxis(gate.name)
+        }
+        let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
+        let start = end.addingTimeInterval(-currentFitDays * 86_400)
+        let speeds = try await fetcher.series("wcsp1", stationID: station.id, from: start, to: end)
+        let dirs = try await fetcher.series("wcdp1", stationID: station.id, from: start, to: end)
+        let samples = Self.project(speeds: speeds, dirs: dirs, floodDirection: flood)
+        let fit = try await fitter.fit(samples: samples)
+        print("CHS current fit \(gate.id): \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
+        return ChsCurrentModel(
+            stationID: gate.id, iwlsID: station.id, iwlsName: station.officialName,
+            fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
+            fitEndMs: end.timeIntervalSince1970 * 1000,
+            floodDirection: flood, ebbDirection: ebb,
+            offset: fit.offset, rms: fit.rms,
+            constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
+    }
+
+    /// Signed along-channel velocity: speed · cos(direction − floodDirection).
+    /// The chs-constituents pipeline's own projection — linear, so equivalent
+    /// to a full 2D fit projected onto the same axis. Samples without a
+    /// matching direction stamp are dropped.
+    nonisolated static func project(speeds: [ChsSample], dirs: [ChsSample],
+                                    floodDirection: Double) -> [ChsSample] {
+        let dirAt = Dictionary(dirs.map { ($0.t, $0.v) }, uniquingKeysWith: { a, _ in a })
+        let d2r = Double.pi / 180
+        return speeds.compactMap { s in
+            guard let dir = dirAt[s.t] else { return nil }
+            return ChsSample(t: s.t, v: s.v * cos((dir - floodDirection) * d2r))
+        }
+    }
+
+    /// Position is the match key, never name (web chs/resolve.ts): nearest
+    /// station serving the series within tolerance, else throw — a silent
+    /// mis-bind would put the wrong water under a trusted name.
+    nonisolated static let resolveToleranceKm = 3.0
 
     static func resolve(_ info: ChsStationInfo, in list: [IwlsStation]) throws -> IwlsStation {
-        let candidates = list.filter { $0.timeSeries.contains { $0.code == "wlp" } }
+        try resolve(name: info.name, latitude: info.latitude, longitude: info.longitude,
+                    series: "wlp", in: list)
+    }
+
+    nonisolated static func resolve(name: String, latitude: Double, longitude: Double,
+                                    series: String, in list: [IwlsStation]) throws -> IwlsStation {
+        let candidates = list.filter { st in st.timeSeries.contains { $0.code == series } }
         guard let best = candidates.min(by: {
-            distanceKm(info.latitude, info.longitude, $0.latitude, $0.longitude) <
-            distanceKm(info.latitude, info.longitude, $1.latitude, $1.longitude)
+            distanceKm(latitude, longitude, $0.latitude, $0.longitude) <
+            distanceKm(latitude, longitude, $1.latitude, $1.longitude)
         }) else { throw ChsError.noStations }
-        let km = distanceKm(info.latitude, info.longitude, best.latitude, best.longitude)
-        guard km <= resolveToleranceKm else { throw ChsError.noStationWithinTolerance(info.name, best.officialName, km) }
+        let km = distanceKm(latitude, longitude, best.latitude, best.longitude)
+        guard km <= resolveToleranceKm else { throw ChsError.noStationWithinTolerance(name, best.officialName, km) }
         return best
     }
 }
@@ -111,6 +203,7 @@ enum ChsError: Error {
     case networkDisabled
     case noStations
     case noStationWithinTolerance(String, String, Double)
+    case noFloodAxis(String)
     case badResponse(Int)
     case jsError(String)
 }
@@ -151,6 +244,35 @@ final class IwlsFetcher {
 
     func stationList() async throws -> [IwlsStation] {
         try JSONDecoder().decode([IwlsStation].self, from: try await get("/stations"))
+    }
+
+    struct Metadata: Decodable { let floodDirection: Double?; let ebbDirection: Double? }
+
+    /// Per-station metadata — the only place IWLS serves the flood/ebb axis
+    /// (the /stations list entries carry none).
+    func metadata(stationID: String) async throws -> Metadata {
+        try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
+    }
+
+    /// A natively 15-minute series (wcsp1/wcdp1) for [from, to), 7-day chunks.
+    /// No decimation — only chunk-edge de-dup.
+    func series(_ code: String, stationID: String, from: Date, to: Date) async throws -> [ChsSample] {
+        let iso = ISO8601DateFormatter()
+        var out: [ChsSample] = []
+        var t = from
+        while t < to {
+            let next = min(t.addingTimeInterval(7 * 86_400), to)
+            let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
+                "&from=\(iso.string(from: t))&to=\(iso.string(from: next))"
+            let chunk = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
+            for s in chunk {
+                guard let date = iso.date(from: s.eventDate) else { continue }
+                let ms = date.timeIntervalSince1970 * 1000
+                if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
+            }
+            t = next
+        }
+        return out
     }
 
     /// wlp for [from, to), 7-day chunks, decimated from 1-min to 15-min.

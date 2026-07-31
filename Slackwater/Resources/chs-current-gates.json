@@ -1,0 +1,110 @@
+[
+ {
+  "id": "chs-active-pass",
+  "name": "Active Pass",
+  "region": "Galiano & Mayne Islands",
+  "aliases": [],
+  "latitude": 48.8604,
+  "longitude": -123.3128,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-fulford-harbour"
+ },
+ {
+  "id": "chs-blackney-passage",
+  "name": "Blackney Passage",
+  "region": "Blackfish Sound",
+  "aliases": [],
+  "latitude": 50.555,
+  "longitude": -126.6842,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-dodd-narrows",
+  "name": "Dodd Narrows",
+  "region": "Nanaimo",
+  "aliases": [],
+  "latitude": 49.1344,
+  "longitude": -123.8171,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-first-narrows",
+  "name": "First Narrows",
+  "region": "Lions Gate Bridge",
+  "aliases": [
+   "lions gate"
+  ],
+  "latitude": 49.316,
+  "longitude": -123.1401,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-vancouver"
+ },
+ {
+  "id": "chs-gillard-passage",
+  "name": "Gillard Passage",
+  "region": "Yuculta Rapids",
+  "aliases": [
+   "yucultas"
+  ],
+  "latitude": 50.3933,
+  "longitude": -125.1567,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-hole-in-the-wall",
+  "name": "Hole in the Wall",
+  "region": "Okisollo Channel",
+  "aliases": [],
+  "latitude": 50.3001,
+  "longitude": -125.2083,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-owen-bay"
+ },
+ {
+  "id": "chs-johnstone-strait-central",
+  "name": "Johnstone Strait - Central",
+  "region": "Port Neville",
+  "aliases": [],
+  "latitude": 50.4717,
+  "longitude": -126.1367,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-porlier-pass",
+  "name": "Porlier Pass",
+  "region": "Galiano & Valdes Islands",
+  "aliases": [],
+  "latitude": 49.015,
+  "longitude": -123.585,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-fulford-harbour"
+ },
+ {
+  "id": "chs-race-passage",
+  "name": "Race Passage",
+  "region": "Race Rocks",
+  "aliases": [],
+  "latitude": 48.3067,
+  "longitude": -123.5367,
+  "timezone": "America/Vancouver"
+ },
+ {
+  "id": "chs-seymour-narrows",
+  "name": "Seymour Narrows",
+  "region": "Discovery Passage",
+  "aliases": [],
+  "latitude": 50.1333,
+  "longitude": -125.35,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-campbell-river"
+ },
+ {
+  "id": "chs-weynton-passage",
+  "name": "Weynton Passage",
+  "region": "Broughton Strait",
+  "aliases": [],
+  "latitude": 50.6033,
+  "longitude": -126.8117,
+  "timezone": "America/Vancouver"
+ }
+]

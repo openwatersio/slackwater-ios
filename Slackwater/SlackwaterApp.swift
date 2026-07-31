@@ -332,6 +332,11 @@ struct StationListView: View {
             if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
                 path = NavigationPath(); path.append(DerivedGateRecord(gate: gate, port: port))
             }
+        case .chsCurrent(let gate):
+            // A pending/fitting gate has nothing to show — leave the path be.
+            if case .fitted(let record) = ChsFitService.shared.currentState(gate.id) {
+                path = NavigationPath(); path.append(record)
+            }
         }
     }
 
@@ -478,6 +483,10 @@ struct StationListView: View {
             if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
                 NavigationLink(value: DerivedGateRecord(gate: gate, port: port)) { EmptyView() }.opacity(0)
             }
+        case .chsCurrent(let gate):
+            if case .fitted(let record) = ChsFitService.shared.currentState(gate.id) {
+                NavigationLink(value: record) { EmptyView() }.opacity(0)
+            }
         }
     }
 
@@ -491,6 +500,8 @@ struct StationListView: View {
             activatable(ChsCardView(info: info, imperial: imperial), item)
         case .chsGate(let gate):
             activatable(ChsGateCardView(gate: gate), item)
+        case .chsCurrent(let gate):
+            activatable(ChsCurrentGateCardView(gate: gate), item)
         }
     }
 
@@ -634,6 +645,7 @@ struct StationListView: View {
             case .current(let s): CurrentCardView(record: s)
             case .chs(let info): ChsCardView(info: info, imperial: imperial)
             case .chsGate(let gate): ChsGateCardView(gate: gate)
+            case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate)
             }
         }
         .contentShape(Rectangle())
@@ -788,6 +800,9 @@ struct RecentRowLabel: View {
         case .chsGate(let gate):
             guard case .fitted(let port) = ChsFitService.shared.state(gate.reference) else { return }
             gatePhase = DerivedGateRecord(gate: gate, port: port).cardState(at: appNow()).phase
+        case .chsCurrent(let gate):
+            guard case .fitted(let record) = ChsFitService.shared.currentState(gate.id) else { return }
+            signed = record.cardState(at: appNow()).signed
         }
     }
 }
@@ -968,6 +983,28 @@ struct ChsGateCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
+    }
+}
+
+/// A validated CHS current gate. Fitted: the ordinary current card — real
+/// velocities, navigable. Not yet fitted: the pending shell in the established
+/// register, naming currents (chs-online spec §7c — never an empty chart).
+struct ChsCurrentGateCardView: View {
+    let gate: ChsCurrentGateInfo
+    @ObservedObject private var service = ChsFitService.shared
+
+    var body: some View {
+        // Navigation comes from the enclosing row's hidden link (itemCard).
+        switch service.currentState(gate.id) {
+        case .fitted(let record):
+            CurrentCardView(record: record)
+        case .fitting:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Downloading Canadian current predictions…")
+        case .pending:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Needs a moment of signal — Canadian current predictions download once, then work offline.")
+        }
     }
 }
 

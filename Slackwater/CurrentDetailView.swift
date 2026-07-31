@@ -224,8 +224,15 @@ struct CurrentDetailView: View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
-            Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
-                .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+            if record.isChs {
+                // Same register as the CHS tide footer (TideDetailView).
+                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+            }
             if let port = pairedTide {
                 // Honesty line for the pairing (spec §2): the tide curve is the
                 // reference port's water, not this gate's.

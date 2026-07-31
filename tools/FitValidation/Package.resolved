@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sailingnaturali/slackwater-engine",
       "state" : {
-        "revision" : "471e36d344fe544850ce19f5d724f8951789fe60",
-        "version" : "0.2.0"
+        "revision" : "58b2c54d023d7e40c440650bd171129df1e839b4",
+        "version" : "0.3.0"
       }
     }
   ],

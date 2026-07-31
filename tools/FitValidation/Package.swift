@@ -9,7 +9,7 @@ let package = Package(
     name: "FitValidation",
     platforms: [.macOS(.v14)],
     dependencies: [
-        .package(url: "https://github.com/sailingnaturali/slackwater-engine", from: "0.2.0"),
+        .package(url: "https://github.com/sailingnaturali/slackwater-engine", from: "0.3.0"),
     ],
     targets: [
         .executableTarget(

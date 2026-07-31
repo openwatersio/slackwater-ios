@@ -748,6 +748,62 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
+    // M47: a validated CHS current gate (Dodd Narrows) — pending copy in the
+    // currents register, a REAL live 210-day wcsp1/wcdp1 fit (scoped to the
+    // one gate via -chsFitOnly so the wait is one gate's fetch, ~2.5 min),
+    // the full current-detail treatment with CHS provenance, then the
+    // airplane-mode day-after relaunch on the stored model.
+    func testM47DoddNarrowsPendingFitDetailOffline() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate", "-chsFitOnly", "chs-dodd-narrows"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // "dodd" matches ONLY the CHS gate — a broader query like "narrows"
+        // also pulls NOAA current cards whose Flooding/Ebbing/SLACK labels
+        // false-positive the fitted wait below.
+        openSearch(app, "dodd")
+        XCTAssert(app.staticTexts["Dodd Narrows"].firstMatch.waitForExistence(timeout: 5),
+                  "search did not find Dodd Narrows")
+        // Pending: identity + the honest currents message, no numbers.
+        let pending = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'current predictions'")).firstMatch
+        XCTAssert(pending.waitForExistence(timeout: 10), "currents pending copy missing")
+
+        // The live fit lands and the card becomes a real current card:
+        // a velocity phase word or the SLACK pill — numbers, not copy.
+        // Scoped to the search overlay's ScrollView: the (accessibility-hidden
+        // but still queryable) list behind it carries the same labels.
+        let overlay = app.scrollViews.firstMatch
+        let fitted = overlay.staticTexts.matching(
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+        XCTAssert(fitted.waitForExistence(timeout: 480), "Dodd Narrows never fitted — IWLS unreachable?")
+        sleep(1)
+        save(app, "m47-gates-list.png")
+
+        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        // Full current-detail anatomy: the slack countdown and the CHS
+        // provenance footer (device-computed, not CHS-published).
+        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 5))
+        sleep(2)
+        save(app, "m47-dodd-detail.png")
+
+        // Airplane-mode day-after: the stored model predicts offline.
+        app.terminate()
+        app.launchArguments = ["-networkKillSwitch", "-nowOffsetDays", "1", "-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openSearch(app, "dodd")
+        let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+        XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
+        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        save(app, "m47-dodd-offline.png")
+    }
+
     // M4.6: the derived gate (Malibu Rapids) — pending while its reference
     // port (Point Atkinson) is unfitted, held there by the network kill switch.
     func testM46MalibuPendingBeforeFit() throws {
