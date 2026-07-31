@@ -41,9 +41,11 @@ marine apps). User experience first, capability of the platform second, technolo
 
 ## Status & license
 
-M3 (tides + currents at web parity, and Canadian Salish tide ports that fit their own
-harmonic model on-device from IWLS on first connected launch — offline thereafter; identity
-is bundled from `station-corrections`, CHS data never is) — see the
+M4 (M3's tides + currents + CHS fit-on-device, plus: first-run location gate and a
+distance-ranked Near Me list, the offline pin map — bundled OSM land PMTiles under
+Seascape when online, the web's exact land artifact — the paired current→tide detail on
+gates with a `station-corrections` reference port, settings, a real app icon, and drafted
+App Store metadata in `docs/appstore-metadata.md`) — see the
 [docs index](docs/README.md) and the milestone plan in `slackwater/docs/superpowers/specs/`.
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
 are generated, not committed). This repo is **deliberately private and

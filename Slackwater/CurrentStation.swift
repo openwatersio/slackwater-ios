@@ -21,7 +21,16 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable {
     let ebbDirection: Double
     /// Z0 net mean flow along the major axis, knots, signed.
     let meanFlow: Double
+    /// Bundled tide station id whose water pairs with this gate (current-detail
+    /// spec §2/§9 — a data-layer field written by tools/enrich-currents.mjs
+    /// against station-corrections v2.5.0; absent = current-only fallback).
+    let tideReference: String?
     let constituents: [Con]
+
+    /// The paired reference tide port, resolved to its bundled record.
+    var pairedTide: TideStationRecord? {
+        tideReference.flatMap { id in TideStationRecord.all.first { $0.id == id } }
+    }
 
     var engineStation: CurrentStation {
         CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
@@ -135,6 +144,32 @@ enum StationItem: Identifiable, Hashable {
         case .current(let s): s.searchRank(query)
         case .chs(let s): s.searchRank(query)
         }
+    }
+    var latitude: Double {
+        switch self {
+        case .tide(let s): s.latitude
+        case .current(let s): s.latitude
+        case .chs(let s): s.latitude
+        }
+    }
+    var longitude: Double {
+        switch self {
+        case .tide(let s): s.longitude
+        case .current(let s): s.longitude
+        case .chs(let s): s.longitude
+        }
+    }
+    /// Map pin class per the design tokens: tide / current / chs.
+    var pinKind: String {
+        switch self {
+        case .tide: "tide"
+        case .current: "current"
+        case .chs: "chs"
+        }
+    }
+    /// Distance from a fix, in km.
+    func km(fromLat lat: Double, lon: Double) -> Double {
+        distanceKm(lat1: lat, lon1: lon, lat2: latitude, lon2: longitude)
     }
 
     /// All bundled stations, Friday Harbor (tide) first, rest alphabetical.

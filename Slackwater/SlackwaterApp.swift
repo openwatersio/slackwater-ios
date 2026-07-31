@@ -1,77 +1,341 @@
-// Slackwater — GPL v3. M1: station list with search + 1a gradient cards.
+// Slackwater — GPL v3. M4: first-run location gate (prototype NearMe.dc.html),
+// located list (My Location tile + Near Me by distance), settings, pin map.
+// M1's list + 1a gradient cards underneath, unchanged.
 import SwiftUI
 import TideEngine
 
 @main
 struct SlackwaterApp: App {
+    init() {
+        // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
+        // gate; -seedGate skips it (arguments-domain values would mask the
+        // in-app write, so tests set persisted state explicitly instead).
+        if CommandLine.arguments.contains("-resetGate") {
+            UserDefaults.standard.removeObject(forKey: seenGateKey)
+        }
+        if CommandLine.arguments.contains("-seedGate") {
+            UserDefaults.standard.set(true, forKey: seenGateKey)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
-            StationListView()
+            RootView()
                 .preferredColorScheme(.dark)
         }
     }
 }
 
+/// Gate until a choice is made (prototype phase machine); list ever after.
+struct RootView: View {
+    @AppStorage(seenGateKey) private var seenGate = false
+
+    var body: some View {
+        if seenGate {
+            StationListView()
+        } else {
+            GateView()
+        }
+    }
+}
+
+// MARK: - First-run gate (prototype NearMe.dc.html: gate + locating states)
+
+struct GateView: View {
+    @AppStorage(seenGateKey) private var seenGate = false
+    @ObservedObject private var loc = LocationService.shared
+    @State private var asked = false
+
+    var body: some View {
+        ZStack {
+            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
+                           startRadius: 0, endRadius: 500)
+                .ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(alignment: .bottom) {
+                    Text("Slackwater")
+                        .font(.fraunces(36, .semibold))
+                        .foregroundStyle(SN.paper)
+                    Spacer()
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 6)
+
+                Spacer()
+
+                if loc.locating {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(SN.leaf)
+                    Text("Finding stations near you…")
+                        .font(.geist(16))
+                        .foregroundStyle(SN.foam.opacity(0.7))
+                        .padding(.top, 22)
+                } else {
+                    // Pin glyph on the gradient tile, per the prototype.
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .fill(LinearGradient(
+                                colors: [Color(hex: 0x3A6D98), Color(hex: 0x184870), Color(hex: 0x083058)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .frame(width: 96, height: 96)
+                            .shadow(color: Color(hex: 0x001432, opacity: 0.4), radius: 20, y: 16)
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 40, weight: .light))
+                            .foregroundStyle(SN.foam)
+                    }
+                    Text("See tides near you")
+                        .font(.fraunces(27, .semibold))
+                        .foregroundStyle(SN.paper)
+                        .padding(.top, 26)
+                    Text("Turn on location and we'll find the nearest tide & current stations — no searching required.")
+                        .font(.geist(15))
+                        .lineSpacing(3)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(SN.foam.opacity(0.65))
+                        .frame(maxWidth: 300)
+                        .padding(.top, 10)
+                    Button {
+                        asked = true
+                        loc.request()
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: "location.fill")
+                            Text("Use My Location")
+                        }
+                        .font(.geist(17, .semibold))
+                        .foregroundStyle(SN.navyDeep)
+                        .frame(maxWidth: 320)
+                        .frame(height: 54)
+                        .background(SN.leaf, in: Capsule())
+                        .shadow(color: SN.leaf.opacity(0.3), radius: 13, y: 10)
+                    }
+                    .padding(.top, 30)
+                    .padding(.horizontal, 22)
+                    Button {
+                        seenGate = true
+                    } label: {
+                        Text("Or search for a harbor, bay, or channel.")
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.4))
+                    }
+                    .padding(.top, 16)
+                }
+
+                Spacer()
+                Spacer()
+            }
+        }
+        // The gate resolves when the ask resolves — a fix, or a denial. Either
+        // way the choice is made and the list takes over (denied shows the
+        // amber card there).
+        .onChange(of: loc.locating) { _, locating in
+            if asked && !locating { seenGate = true }
+        }
+    }
+}
+
+// MARK: - Station list
+
 struct StationListView: View {
-    // Launch on Friday Harbor (first station); Back reaches the list.
-    @State private var path = NavigationPath(TideStationRecord.all.prefix(1))
+    @State private var path = NavigationPath()
     @State private var query = ""
+    @State private var showSettings = false
+    // -openMap: launch straight into the map (manual offline verification hook).
+    @State private var showMap = CommandLine.arguments.contains("-openMap")
     @AppStorage(unitsKey) private var units = "imperial"
+    @ObservedObject private var loc = LocationService.shared
 
     private var imperial: Bool { units == "imperial" }
+    /// The fix the list ranks by — only while authorized.
+    private var fix: (lat: Double, lon: Double)? {
+        guard loc.authorized, let l = loc.location else { return nil }
+        return (l.coordinate.latitude, l.coordinate.longitude)
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                                startRadius: 0, endRadius: 500)
                     .ignoresSafeArea()
                 ScrollView {
                     header
                     searchField
-                    MonoLabel(text: query.isEmpty ? "Salish Sea" : "Results")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 26)
-                        .padding(.top, 14)
-                        .padding(.bottom, 4)
-                    LazyVStack(spacing: 12) {
-                        ForEach(StationItem.search(query)) { item in
-                            switch item {
-                            case .tide(let station):
-                                NavigationLink(value: station) {
-                                    StationCardView(record: station, imperial: imperial)
-                                }
-                                .buttonStyle(.plain)
-                            case .current(let station):
-                                NavigationLink(value: station) {
-                                    CurrentCardView(record: station)
-                                }
-                                .buttonStyle(.plain)
-                            case .chs(let info):
-                                ChsCardView(info: info, imperial: imperial)
+                    if query.isEmpty {
+                        locatedSections
+                    } else {
+                        MonoLabel(text: "Results")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 26)
+                            .padding(.top, 14)
+                            .padding(.bottom, 4)
+                        LazyVStack(spacing: 12) {
+                            ForEach(StationItem.search(query)) { item in
+                                itemCard(item)
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 44)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 44)
                 }
+                mapButton
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
             .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
         }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .fullScreenCover(isPresented: $showMap) {
+            MapScreen { item in
+                showMap = false
+                open(item)
+            }
+        }
+        .onAppear { loc.refreshIfAuthorized() }
         // First connected launch: the Canadian Salish ports auto-fit in the
         // background (M3 — no region UX). Partial failure retries next launch.
         .task { ChsFitService.shared.fitPendingIfNeeded() }
     }
 
+    /// Push a station picked outside the list (map pin tap).
+    private func open(_ item: StationItem) {
+        switch item {
+        case .tide(let s): path.append(s)
+        case .current(let s): path.append(s)
+        case .chs(let info):
+            if case .fitted(let record) = ChsFitService.shared.state(info.id) {
+                path.append(record)
+            }
+        }
+    }
+
+    // The located list (prototype READY·LIST): My Location hero tile, Near Me
+    // by distance with nm badges, then everything ranked by distance. Without
+    // a fix the M1 ordering stands (Friday Harbor first, alphabetical).
+    @ViewBuilder private var locatedSections: some View {
+        if let fix {
+            let ranked = StationItem.all.sorted {
+                $0.km(fromLat: fix.lat, lon: fix.lon) < $1.km(fromLat: fix.lat, lon: fix.lon)
+            }
+            if let nearest = ranked.first {
+                MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+            }
+            MonoLabel(text: "Near Me")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 26)
+                .padding(.top, 14)
+                .padding(.bottom, 4)
+            LazyVStack(spacing: 12) {
+                ForEach(ranked.dropFirst().prefix(4)) { item in
+                    itemCard(item)
+                        .overlay(alignment: .topTrailing) {
+                            distanceBadge(item.km(fromLat: fix.lat, lon: fix.lon))
+                        }
+                }
+            }
+            .padding(.horizontal, 16)
+            listSection(Array(ranked.dropFirst(5)), label: "Salish Sea")
+        } else {
+            if loc.denied { unavailableCard.padding(.horizontal, 16).padding(.top, 14) }
+            listSection(StationItem.all, label: "Salish Sea")
+        }
+    }
+
+    @ViewBuilder private func listSection(_ items: [StationItem], label: String) -> some View {
+        MonoLabel(text: label)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 26)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+        LazyVStack(spacing: 12) {
+            ForEach(items) { item in itemCard(item) }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 44)
+    }
+
+    @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
+        switch item {
+        case .tide(let station):
+            NavigationLink(value: station) {
+                StationCardView(record: station, imperial: imperial)
+            }
+            .buttonStyle(.plain)
+        case .current(let station):
+            NavigationLink(value: station) {
+                CurrentCardView(record: station)
+            }
+            .buttonStyle(.plain)
+        case .chs(let info):
+            ChsCardView(info: info, imperial: imperial)
+        }
+    }
+
+    /// Straddles the card's top-right corner, clear of the reading numeral.
+    private func distanceBadge(_ km: Double) -> some View {
+        Text(formatNm(km))
+            .font(.geistMono(11, .medium))
+            .foregroundStyle(SN.navyDeep)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(SN.foam.opacity(0.92), in: Capsule())
+            .shadow(color: Color(hex: 0x001432, opacity: 0.3), radius: 4, y: 2)
+            .offset(x: -14, y: -8)
+    }
+
+    /// Location denied — amber card, deep link to the app's iOS Settings.
+    private var unavailableCard: some View {
+        Button {
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 13) {
+                    Image(systemName: "location.slash")
+                        .font(.system(size: 21))
+                        .foregroundStyle(Color(hex: 0xE0B45A))
+                        .frame(width: 46, height: 46)
+                        .background(Color(hex: 0xE0B45A, opacity: 0.16),
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Location unavailable")
+                            .font(.fraunces(20, .semibold))
+                            .foregroundStyle(SN.paper)
+                        Text("Turn on location for Slackwater to see stations near you.")
+                            .font(.geist(13))
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                    }
+                }
+                HStack(spacing: 4) {
+                    Spacer()
+                    Text("Go to Settings")
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                }
+                .font(.geist(15, .semibold))
+                .foregroundStyle(Color(hex: 0xE0B45A))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(hex: 0xE0B45A, opacity: 0.1),
+                        in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color(hex: 0xE0B45A, opacity: 0.35), lineWidth: 0.5))
+        }
+        .buttonStyle(.plain)
+    }
+
     private var header: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .bottom, spacing: 10) {
             Text("Slackwater")
                 .font(.fraunces(36, .semibold))
                 .foregroundStyle(SN.paper)
             Spacer()
             // The prototype's units pill doubles as the setting: tap to toggle.
+            // Its backing store is shared with Settings (same @AppStorage key).
             Button {
                 units = imperial ? "metric" : "imperial"
             } label: {
@@ -83,9 +347,39 @@ struct StationListView: View {
                     .padding(.horizontal, 14)
                     .background(SN.leaf.opacity(0.16), in: Capsule())
             }
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(SN.foam.opacity(0.8))
+                    .frame(width: 34, height: 34)
+                    .background(Color.white.opacity(0.08), in: Circle())
+            }
+            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 22)
         .padding(.top, 6)
+    }
+
+    /// List ⇄ map switch: bottom-right floating button (detail-view spec
+    /// backlog #6; prototype toolbar).
+    private var mapButton: some View {
+        Button {
+            showMap = true
+        } label: {
+            Image(systemName: "map")
+                .font(.system(size: 21, weight: .medium))
+                .foregroundStyle(SN.foam)
+                .frame(width: 56, height: 56)
+                .background(.ultraThinMaterial, in: Circle())
+                .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
+                .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
+                .shadow(color: Color(hex: 0x000C1E, opacity: 0.4), radius: 10, y: 6)
+        }
+        .accessibilityLabel("Map")
+        .padding(.trailing, 16)
+        .padding(.bottom, 24)
     }
 
     private var searchField: some View {
@@ -109,6 +403,40 @@ struct StationListView: View {
         .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
         .padding(.horizontal, 16)
         .padding(.top, 16)
+    }
+}
+
+/// The prototype's My Location hero: MY LOCATION eyebrow with the location
+/// arrow, the nearest station's ordinary card, then coordinates + the §5f
+/// match grading in mono (web heroMatchFor: "N away · quality").
+struct MyLocationTile<Card: View>: View {
+    let item: StationItem
+    let fix: (lat: Double, lon: Double)
+    let imperial: Bool
+    @ViewBuilder let card: (StationItem) -> Card
+
+    var body: some View {
+        let km = item.km(fromLat: fix.lat, lon: fix.lon)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 10))
+                    .rotationEffect(.degrees(45))
+                MonoLabel(text: "My Location", size: 11, color: SN.foam.opacity(0.9))
+            }
+            .foregroundStyle(SN.foam.opacity(0.9))
+            .padding(.horizontal, 6)
+            card(item)
+            Text("\(formatCoord(lat: fix.lat, lon: fix.lon)) · \(formatNm(km)) to station · \(gradeMatch(km: km, lat: fix.lat, lon: fix.lon).rawValue)")
+                .font(.geistMono(11))
+                .foregroundStyle(SN.foam.opacity(0.55))
+                .padding(.horizontal, 6)
+        }
+        .padding(8)
+        .background(Color.white.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
+            .strokeBorder(SN.leaf.opacity(0.22), lineWidth: 0.5))
     }
 }
 

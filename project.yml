@@ -7,6 +7,9 @@ packages:
   TideEngine:
     url: https://github.com/sailingnaturali/slackwater-engine
     from: 0.2.0
+  MapLibre:
+    url: https://github.com/maplibre/maplibre-gl-native-distribution
+    from: 6.9.0
 targets:
   Slackwater:
     type: application
@@ -15,11 +18,16 @@ targets:
     dependencies:
       - package: TideEngine
         product: TideEngine
+      - package: MapLibre
+        product: MapLibre
     info:
       path: Slackwater/Info.plist
       properties:
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        NSLocationWhenInUseUsageDescription: >-
+          Your location is used on this device to find the nearest tide and
+          current stations. It never leaves the device.
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIAppFonts:
           - Fraunces-Regular.ttf
@@ -34,7 +42,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 4
+        CURRENT_PROJECT_VERSION: 5
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

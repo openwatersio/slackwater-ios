@@ -1,0 +1,6 @@
+{
+  "name": "slackwater-ios-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@sailingnaturali/station-corrections": "2.5.0" }
+}

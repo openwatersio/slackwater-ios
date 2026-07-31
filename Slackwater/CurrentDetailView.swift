@@ -10,6 +10,7 @@ private let day = 86_400.0
 
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
+    @AppStorage(unitsKey) private var units = "imperial"
 
     @State private var live = appNow()
     @State private var selected = appNow()
@@ -19,6 +20,14 @@ struct CurrentDetailView: View {
     @State private var dayEvents: [CurrentEvent] = []
     @State private var wideEvents: [CurrentEvent] = []
     @State private var committedSigned = 0.0
+
+    // The paired reference tide port (spec §2: current-led, tide-paired; §9's
+    // association is the data-layer tideReference). Same engine path as the
+    // port's own TideDetailView — station.heights / station.extremes.
+    private var pairedTide: TideStationRecord? { record.pairedTide }
+    @State private var tideDayPoints: [TidePoint] = []
+    @State private var tideDayExtremes: [TideExtreme] = []
+    @State private var tideWideExtremes: [TideExtreme] = []
 
     private var tz: TimeZone { record.tz }
     private var calendar: Calendar {
@@ -47,6 +56,12 @@ struct CurrentDetailView: View {
         ScrollView {
             VStack(spacing: 14) {
                 scrubCard
+                if let port = pairedTide {
+                    PairedTidePane(port: port, dayPoints: tideDayPoints,
+                                   extremes: tideWideExtremes, effective: effective,
+                                   imperial: units == "imperial",
+                                   preview: $preview, selected: $selected)
+                }
                 scheduleCard
                 footer
             }
@@ -254,7 +269,9 @@ struct CurrentDetailView: View {
                             }
                             .onEnded { g in
                                 let raw = time(at: g.location, proxy: proxy, geo: geo) ?? effective
-                                selected = snapToNearest(min(max(raw, t0), t1), times: dayEvents.map(\.time))
+                                // Paired-port turns join slacks and peaks as snap targets.
+                                selected = snapToNearest(min(max(raw, t0), t1),
+                                                         times: dayEvents.map(\.time) + tideDayExtremes.map(\.time))
                                 preview = nil
                             })
             }
@@ -295,26 +312,38 @@ struct CurrentDetailView: View {
             }
             .padding(16)
 
-            ForEach(dayEvents, id: \.time) { e in
+            // The gate's slacks/maxes and the paired port's highs/lows, one
+            // chronological table (spec §4.3 events table; web EventList).
+            ForEach(scheduleRows, id: \.time) { row in
                 Divider().overlay(Color.white.opacity(0.08))
-                Button { selected = e.time } label: {
+                Button { selected = row.time } label: {
                     HStack {
-                        eventPill(e)
-                        Text(clockTime(e.time, tz))
+                        switch row {
+                        case .current(let e): eventPill(e)
+                        case .tide(let e): tidePill(e)
+                        }
+                        Text(clockTime(row.time, tz))
                             .font(.geistMono(15)).foregroundStyle(SN.foam)
                             .padding(.leading, 6)
                         Spacer()
-                        if e.kind == .slack {
-                            Text("—").font(.geist(15)).foregroundStyle(SN.foam.opacity(0.5))
-                        } else {
-                            (Text(formatSpeed(abs(e.speed))).font(.geist(15, .medium))
-                             + Text(" kn").font(.geist(12)))
-                                .foregroundStyle(SN.foam)
+                        switch row {
+                        case .current(let e):
+                            if e.kind == .slack {
+                                Text("—").font(.geist(15)).foregroundStyle(SN.foam.opacity(0.5))
+                            } else {
+                                (Text(formatSpeed(abs(e.speed))).font(.geist(15, .medium))
+                                 + Text(" kn").font(.geist(12)))
+                                    .foregroundStyle(SN.foam)
+                            }
+                        case .tide(let e):
+                            (Text(formatHeight(e.height, imperial: units == "imperial")).font(.geist(15, .medium))
+                             + Text(" \(heightUnit(imperial: units == "imperial"))").font(.geist(12)))
+                                .foregroundStyle(SN.foam.opacity(0.75))
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 11)
-                    .opacity(e.time < effective ? 0.45 : 1)
+                    .opacity(row.time < effective ? 0.45 : 1)
                 }
                 .buttonStyle(.plain)
             }
@@ -370,9 +399,44 @@ struct CurrentDetailView: View {
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
             Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · knots")
                 .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+            if let port = pairedTide {
+                // Honesty line for the pairing (spec §2): the tide curve is the
+                // reference port's water, not this gate's.
+                Text("Tide shown is \(port.name) — the nearby reference port, not this station")
+                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
         .padding(.top, 8)
+    }
+
+    /// One chronological schedule: gate events plus paired tide highs/lows.
+    private enum ScheduleRow {
+        case current(CurrentEvent)
+        case tide(TideExtreme)
+        var time: Date {
+            switch self {
+            case .current(let e): e.time
+            case .tide(let e): e.time
+            }
+        }
+    }
+
+    private var scheduleRows: [ScheduleRow] {
+        (dayEvents.map(ScheduleRow.current) + tideDayExtremes.map(ScheduleRow.tide))
+            .sorted { $0.time < $1.time }
+    }
+
+    private func tidePill(_ e: TideExtreme) -> some View {
+        Text(e.kind == .high ? "↑ HIGH" : "↓ LOW")
+            .font(.geistMono(10, .medium)).tracking(0.5)
+            .foregroundStyle(SN.foam.opacity(0.9))
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Color.white.opacity(0.10), in: Capsule())
+            .overlay(Capsule().strokeBorder(
+                (e.kind == .high ? SN.rising : SN.falling).opacity(0.5), lineWidth: 1))
     }
 
     // MARK: - Data
@@ -398,6 +462,15 @@ struct CurrentDetailView: View {
                                     to: end.addingTimeInterval(day))
         dayEvents = wideEvents.filter { $0.time >= start && $0.time < end }
         committedSigned = exactSigned(at: selected)
+        // Paired tide: identical calls to TideDetailView.recompute, so the
+        // pane's numbers ARE the port's own detail numbers.
+        if let port = pairedTide {
+            let tideStation = port.engineStation
+            tideDayPoints = tideStation.heights(from: start, to: end, step: 600).filter { $0.time < end }
+            tideWideExtremes = tideStation.extremes(from: start.addingTimeInterval(-day),
+                                                    to: end.addingTimeInterval(day))
+            tideDayExtremes = tideWideExtremes.filter { $0.time >= start && $0.time < end }
+        }
     }
 
     private func exactSigned(at t: Date) -> Double {
