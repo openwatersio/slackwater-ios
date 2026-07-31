@@ -132,21 +132,24 @@ final class ScreenshotTests: XCTestCase {
         field.tap()
         field.typeText("victoria")
         let pending = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'signal' OR label CONTAINS 'Fitting'")).firstMatch
+            NSPredicate(format: "label CONTAINS 'signal' OR label CONTAINS 'Downloading'")).firstMatch
         XCTAssert(pending.waitForExistence(timeout: 10))
         sleep(1)
         save(app, "m3-pending.png")
 
         // Live IWLS fetch (10 polite requests) + JSCore fit. The card becomes
-        // a navigable tide card when the model lands.
-        let fitted = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Victoria'")).firstMatch
+        // a navigable tide card when the model lands — it stops being copy and
+        // shows numbers. (Cards are no longer buttons: since the M4.3 List
+        // conversion, rows navigate via a hidden link.)
+        let fitted = app.staticTexts.matching(
+            NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
         XCTAssert(fitted.waitForExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
         sleep(1)
-        fitted.tap()
+        app.staticTexts["Victoria"].firstMatch.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        // The provenance marking (fitted-model vs authoritative-harmonic).
+        // The provenance marking (device-computed vs authoritative-harmonic).
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'fitted on this device'")).firstMatch.waitForExistence(timeout: 5))
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 5))
         sleep(2)
         save(app, "m3-fitted-detail.png")
 
@@ -158,9 +161,10 @@ final class ScreenshotTests: XCTestCase {
         let field2 = app.textFields.firstMatch
         field2.tap()
         field2.typeText("victoria")
-        let offlineCard = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Victoria'")).firstMatch
-        XCTAssert(offlineCard.waitForExistence(timeout: 10), "stored model did not survive relaunch")
-        offlineCard.tap()
+        let offlineFitted = app.staticTexts.matching(
+            NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
+        XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored model did not survive relaunch")
+        app.staticTexts["Victoria"].firstMatch.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 5)
                   || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 5))
@@ -452,6 +456,164 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'TODAY'")).firstMatch.waitForExistence(timeout: 5),
                   "return-to-now did not restore the live readout")
+    }
+
+    // M4.3 design pass: favorites — the detail-header star files a station
+    // under a Favorites group (My Location → Favorites → Recents → Near Me),
+    // favorites/hero never repeat in Recents, swipe actions manage the groups
+    // (current-detail spec §9), and the speed-unit setting rewrites a current
+    // detail's readout.
+    func testM43FavoritesSwipesAndSpeedUnits() throws {
+        let app = XCUIApplication()
+        // Deterministic Victoria fix; clean favorites/recents.
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // Star Friday Harbor from its detail (upper-right, back's mirror).
+        openFridayHarbor(app)
+        let star = app.buttons["detail-favorite"].firstMatch
+        XCTAssert(star.waitForExistence(timeout: 5), "favorite star missing from detail header")
+        star.tap()
+        XCTAssert(app.buttons["Remove favorite"].waitForExistence(timeout: 5),
+                  "star did not flip to favorited in the header")
+        sleep(1)
+        save(app, "m43-detail-star.png")
+
+        // Back: a Favorites group holds it, and it does NOT repeat in Recents
+        // (it was just visited — favorites win the dedupe).
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()
+        }
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["RECENTS"].exists,
+                       "a favorited station must not also render under Recents")
+
+        // Visit a second station so Recents renders too — all four groups.
+        let field = app.textFields.firstMatch
+        field.tap()
+        field.typeText("deception")
+        let port = app.staticTexts["Deception Pass State Park"].firstMatch
+        XCTAssert(port.waitForExistence(timeout: 5))
+        port.tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()
+        }
+        XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["FAVORITES"].exists)
+        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        sleep(1)
+        save(app, "m43-favorites-group.png")
+
+        // Swipe open the Recents row: red destructive Remove (spec §9).
+        app.staticTexts["Deception Pass State Park"].firstMatch.swipeLeft()
+        XCTAssert(app.buttons["Remove"].waitForExistence(timeout: 5),
+                  "trailing swipe did not reveal the Recents remove action")
+        save(app, "m43-swipe.png")
+        app.buttons["Remove"].firstMatch.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["Deception Pass State Park"].exists,
+                       "remove-from-recents left the row behind")
+
+        // Swipe-unfavorite Friday Harbor: it leaves Favorites and re-files
+        // under Recents (spec §9 — a move, not a deletion).
+        app.staticTexts["Friday Harbor"].firstMatch.swipeLeft()
+        XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5),
+                  "trailing swipe did not reveal the favorites remove action")
+        app.buttons["Unfavorite"].firstMatch.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "unfavorite left the Favorites group behind")
+        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5),
+                  "unfavorited station did not re-file to Recents")
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
+
+        // Speed units: switch to km/h in Settings, the current detail follows.
+        app.buttons["Settings"].tap()
+        let kmh = app.buttons["km/h"]
+        XCTAssert(kmh.waitForExistence(timeout: 5), "speed-unit switch missing from Settings")
+        kmh.tap()
+        sleep(1)
+        save(app, "m43-settings-speed.png")
+        app.buttons["Done"].tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        let field2 = app.textFields.firstMatch
+        field2.tap()
+        field2.typeText("deception")
+        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
+        XCTAssert(gate.waitForExistence(timeout: 5))
+        gate.tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'km/h'")).firstMatch.waitForExistence(timeout: 5),
+                  "current detail readout did not follow the km/h setting")
+        // Leave the store on knots for the other tests.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        app.buttons["Settings"].tap()
+        let kn = app.buttons["Knots"]
+        XCTAssert(kn.waitForExistence(timeout: 5))
+        kn.tap()
+        app.buttons["Done"].tap()
+    }
+
+    // M4.3: the build-7 riding-dot bug — initial centering must happen at the
+    // first layout, not the first magnet settle. Honest check: the very FIRST
+    // scrub must move the centerline readout with the gesture (in build 7,
+    // scrubTime stayed frozen until the settle recomputed everything, so the
+    // dot floated off the curve). Screenshot lands mid-deceleration, before
+    // any settle.
+    func testM43FirstScrubDotRidesCurve() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openFridayHarbor(app)
+
+        // First frame after appearance — no scrub, no settle yet.
+        save(app, "m43-first-view.png")
+        let readout = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$")).firstMatch
+        XCTAssert(readout.waitForExistence(timeout: 5))
+        let before = readout.label
+
+        // The FIRST drag on a fresh detail: the readout must move during the
+        // gesture itself, not only after the magnet settles.
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
+            .press(forDuration: 0.3, thenDragTo:
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8)))
+        save(app, "m43-first-scrub-fixed.png")  // mid-deceleration, pre-settle
+        let after = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$")).firstMatch.label
+        XCTAssertNotEqual(before, after,
+                          "first scrub left the readout frozen — initial centering raced layout again")
+    }
+
+    // M4.3: the CHS pending card speaks plain language — held pending by the
+    // network kill switch (no fit can start, honest offline stand-in).
+    func testM43ChsPendingCopy() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        let field = app.textFields.firstMatch
+        field.tap()
+        field.typeText("victoria")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions download once'"))
+            .firstMatch.waitForExistence(timeout: 10),
+                  "pending card is missing the plain-language copy")
+        sleep(1)
+        save(app, "m43-chs-copy.png")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

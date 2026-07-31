@@ -16,10 +16,13 @@ struct MapHeader: View {
     let region: String
     let latitude: Double
     let longitude: Double
+    /// StationItem id this detail shows — the favorite star toggles it.
+    let favoriteId: String
     /// Shown while scrubbed away from now (prototype st.showNow).
     let showReturn: Bool
     let onReturn: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var favorites = FavoritesStore.shared
 
     var body: some View {
         ZStack {
@@ -72,19 +75,32 @@ struct MapHeader: View {
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
                     Spacer()
-                    if showReturn {
-                        Button(action: onReturn) {
-                            Image(systemName: "arrow.counterclockwise")
+                    HStack(spacing: 10) {
+                        if showReturn {
+                            Button(action: onReturn) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(SN.leaf)
+                                    .frame(width: 44, height: 44)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
+                                    .overlay(Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+                            }
+                            .accessibilityLabel("Return to now")
+                        }
+                        // Favorite star — the back button's mirror (design pass
+                        // item 4a): same 44pt circle chrome, top-right.
+                        let fav = favorites.contains(favoriteId)
+                        Button { favorites.toggle(favoriteId) } label: {
+                            Image(systemName: fav ? "star.fill" : "star")
                                 .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(SN.leaf)
+                                .foregroundStyle(fav ? SN.sun : .white)
                                 .frame(width: 44, height: 44)
                                 .background(.ultraThinMaterial, in: Circle())
                                 .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
-                                .overlay(Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
                         }
-                        .accessibilityLabel("Return to now")
-                    } else {
-                        Color.clear.frame(width: 44, height: 44)
+                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                        .accessibilityIdentifier("detail-favorite")
                     }
                 }
                 .padding(.horizontal, 16)

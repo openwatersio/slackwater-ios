@@ -124,6 +124,22 @@ func formatHeight(_ metres: Double, imperial: Bool) -> String {
 
 func heightUnit(imperial: Bool) -> String { imperial ? "ft" : "m" }
 
+// Current speed (web units.ts SpeedUnit): "kn" | "kmh" | "ms", same key/values.
+let speedUnitKey = "slackwater.speedUnit"
+
+func toKmh(_ knots: Double) -> Double { knots * 1.852 }
+func toMs(_ knots: Double) -> Double { knots * 0.514444 }
+
+/// Web formatSpeed: convert, strip a near-zero sign, one decimal.
+func formatSpeed(_ knots: Double, unit: String) -> String {
+    let v = unit == "kmh" ? toKmh(knots) : unit == "ms" ? toMs(knots) : knots
+    return String(format: "%.1f", abs(v) < 0.05 ? abs(v) : v)
+}
+
+func speedUnitLabel(_ unit: String) -> String {
+    unit == "kmh" ? "km/h" : unit == "ms" ? "m/s" : "kn"
+}
+
 // MARK: - Station-local time formatting
 
 private var formatterCache: [String: DateFormatter] = [:]
@@ -255,7 +271,68 @@ final class RecentsStore: ObservableObject {
         UserDefaults.standard.set(next, forKey: Self.key)
     }
 
+    /// Swipe "Remove" on a Recents row (current-detail spec §9: true deletion).
+    func remove(_ id: String) {
+        ids.removeAll { $0 == id }
+        UserDefaults.standard.set(ids, forKey: Self.key)
+    }
+
     var items: [StationItem] {
         ids.compactMap { id in StationItem.all.first { $0.id == id } }
+    }
+}
+
+// MARK: - Favorites (current-detail spec §9; prototype TidesApp savedIds)
+
+/// Starred stations, insertion order, persisted. Toggled by the detail-header
+/// star and the list swipe actions.
+final class FavoritesStore: ObservableObject {
+    static let shared = FavoritesStore()
+    private static let key = "slackwater.favorites"
+
+    @Published private(set) var ids: [String]
+
+    private init() {
+        // UI-test hook, like -resetRecents: a clean no-favorites run.
+        if CommandLine.arguments.contains("-resetFavorites") {
+            UserDefaults.standard.removeObject(forKey: Self.key)
+        }
+        ids = UserDefaults.standard.stringArray(forKey: Self.key) ?? []
+    }
+
+    func contains(_ id: String) -> Bool { ids.contains(id) }
+
+    func toggle(_ id: String) {
+        if let i = ids.firstIndex(of: id) {
+            ids.remove(at: i)
+            // Spec §9: unfavoriting re-files to Recents, never data loss.
+            RecentsStore.shared.record(id)
+        } else {
+            ids.append(id)
+        }
+        UserDefaults.standard.set(ids, forKey: Self.key)
+    }
+
+    var items: [StationItem] {
+        ids.compactMap { id in StationItem.all.first { $0.id == id } }
+    }
+}
+
+/// The one dedupe rule (prototype TidesApp: recents exclude savedIds): each
+/// station renders in at most one group — My Location > Favorites > Recents >
+/// Near Me. Persisted stores are untouched; exclusion is render-time only, so
+/// a station reappears when it stops being the hero / a favorite.
+struct ListGroups {
+    let favorites: [String]
+    let recents: [String]
+    let nearMe: [String]
+
+    init(heroId: String?, favoriteIds: [String], recentIds: [String],
+         rankedIds: [String], nearCount: Int) {
+        favorites = favoriteIds.filter { $0 != heroId }
+        recents = recentIds.filter { $0 != heroId && !favoriteIds.contains($0) }
+        var shown = Set(favorites + recents)
+        if let heroId { shown.insert(heroId) }
+        nearMe = Array(rankedIds.filter { !shown.contains($0) }.prefix(nearCount))
     }
 }

@@ -146,6 +146,11 @@ struct StationListView: View {
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
+    @ObservedObject private var favorites = FavoritesStore.shared
+    // The rows' hidden nav links depend on fit state (navLink's .chs case),
+    // so the list must re-render when a fit lands — the card itself observes,
+    // but the link lives out here.
+    @ObservedObject private var chs = ChsFitService.shared
 
     private var imperial: Bool { units == "imperial" }
     /// The fix the list ranks by — only while authorized.
@@ -160,26 +165,36 @@ struct StationListView: View {
                 RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                                startRadius: 0, endRadius: 500)
                     .ignoresSafeArea()
-                ScrollView {
-                    header
-                    searchField
-                    if query.isEmpty {
-                        locatedSections
-                    } else {
-                        MonoLabel(text: "Results")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 26)
-                            .padding(.top, 14)
-                            .padding(.bottom, 4)
-                        LazyVStack(spacing: 12) {
+                // A List (not ScrollView) so the group rows carry native
+                // .swipeActions (current-detail spec §9) — restyled to the
+                // same canvas: clear rows, no separators, no insets.
+                List {
+                    Group {
+                        header
+                        searchField
+                        if query.isEmpty {
+                            locatedSections
+                        } else {
+                            MonoLabel(text: "Results")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 26)
+                                .padding(.top, 14)
+                                .padding(.bottom, 4)
                             ForEach(StationItem.search(query)) { item in
                                 itemCard(item)
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 12)
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 44)
+                        Color.clear.frame(height: 32)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets())
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 1)
                 mapButton
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -212,18 +227,24 @@ struct StationListView: View {
     }
 
     // The list (Bryan's regrouping of the prototype READY·LIST): My Location →
-    // Recents → Near Me, nothing else — search is the discovery path for the
-    // rest of the catalog. Without a fix the ranking anchors on the Victoria
-    // fallback (prototype FALLBACK), and the My Location slot holds the amber
-    // denied card when location is off.
+    // Favorites → Recents → Near Me, nothing else — search is the discovery
+    // path for the rest of the catalog. Without a fix the ranking anchors on
+    // the Victoria fallback (prototype FALLBACK), and the My Location slot
+    // holds the amber denied card when location is off. Dedupe: ListGroups —
+    // each station renders once, My Location > Favorites > Recents > Near Me.
     @ViewBuilder private var locatedSections: some View {
         let anchor = fix ?? fallbackFix
         let ranked = StationItem.all.sorted {
             $0.km(fromLat: anchor.lat, lon: anchor.lon) < $1.km(fromLat: anchor.lat, lon: anchor.lon)
         }
+        let heroItem = fix == nil ? nil : ranked.first
+        let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
+                                recentIds: recents.ids, rankedIds: ranked.map(\.id),
+                                // With a hero the nearest is already on screen — 4 more; without, 5.
+                                nearCount: fix == nil ? 5 : 4)
 
         // My Location slot: the hero tile, or the amber card in its place.
-        if let fix, let nearest = ranked.first {
+        if let fix, let nearest = heroItem {
             MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
@@ -231,64 +252,106 @@ struct StationListView: View {
             unavailableCard.padding(.horizontal, 16).padding(.top, 14)
         }
 
-        // Recents: persisted recently-viewed stations, most recent first.
-        let recentItems = recents.items
-        if !recentItems.isEmpty {
-            MonoLabel(text: "Recents")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 26)
-                .padding(.top, 14)
-                .padding(.bottom, 4)
-            VStack(spacing: 0) {
-                ForEach(recentItems) { item in
-                    recentRow(item)
-                    if item.id != recentItems.last?.id {
-                        Divider().overlay(Color.white.opacity(0.08))
+        // Favorites: starred stations, insertion order (spec §9 swipe-to-manage).
+        let favItems = items(groups.favorites)
+        if !favItems.isEmpty {
+            sectionLabel("Favorites")
+            ForEach(favItems) { item in
+                itemCard(item)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                    // Spec §9: remove re-files to Recents — neutral tint, no
+                    // destructive full-swipe.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button { favorites.toggle(item.id) } label: {
+                            Label("Unfavorite", systemImage: "star.slash")
+                        }
+                        .tint(SN.steel)
                     }
-                }
             }
-            .background(Color.white.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(SN.leaf.opacity(0.2), lineWidth: 0.5))
-            .padding(.horizontal, 16)
         }
 
-        MonoLabel(text: "Near Me")
+        // Recents: recently viewed, most recent first, minus hero/favorites.
+        let recentItems = items(groups.recents)
+        if !recentItems.isEmpty {
+            sectionLabel("Recents")
+            ForEach(recentItems) { item in
+                recentRow(item, isFirst: item.id == recentItems.first?.id,
+                          isLast: item.id == recentItems.last?.id)
+                    .swipeActions(edge: .trailing) {
+                        // Spec §9: true deletion — red destructive full-swipe.
+                        Button(role: .destructive) { recents.remove(item.id) } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button { favorites.toggle(item.id) } label: {
+                            Label("Favorite", systemImage: "star.fill")
+                        }
+                        .tint(SN.sun)
+                    }
+            }
+        }
+
+        sectionLabel("Near Me")
+        ForEach(items(groups.nearMe)) { item in
+            itemCard(item)
+                .overlay(alignment: .topTrailing) {
+                    DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)   // room for the straddling nm pill
+                .padding(.bottom, 4)
+                .swipeActions(edge: .leading) {
+                    Button { favorites.toggle(item.id) } label: {
+                        Label("Favorite", systemImage: "star.fill")
+                    }
+                    .tint(SN.sun)
+                }
+        }
+    }
+
+    private func items(_ ids: [String]) -> [StationItem] {
+        ids.compactMap { id in StationItem.all.first { $0.id == id } }
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        MonoLabel(text: text)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 26)
             .padding(.top, 14)
             .padding(.bottom, 4)
-        // With a hero the nearest is already on screen — 4 more; without, 5.
-        let nearMe = fix == nil ? Array(ranked.prefix(5)) : Array(ranked.dropFirst().prefix(4))
-        LazyVStack(spacing: 12) {
-            ForEach(nearMe) { item in
-                itemCard(item)
-                    .overlay(alignment: .topTrailing) {
-                        DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                    }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 44)
     }
 
     /// A compact recently-viewed row (prototype recent rows: gradient chip,
-    /// name over region), navigating like the full cards.
-    @ViewBuilder private func recentRow(_ item: StationItem) -> some View {
+    /// name over region), navigating like the full cards. First/last rows
+    /// round the group's outer corners — the grouped-card look, but one List
+    /// row per station so each carries its own swipe actions.
+    @ViewBuilder private func recentRow(_ item: StationItem, isFirst: Bool, isLast: Bool) -> some View {
+        RecentRowLabel(item: item, imperial: imperial)
+            .background(navLink(item))
+            .overlay(alignment: .bottom) {
+                if !isLast { Divider().overlay(Color.white.opacity(0.08)) }
+            }
+            .background(Color.white.opacity(0.05))
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: isFirst ? 20 : 0, bottomLeadingRadius: isLast ? 20 : 0,
+                bottomTrailingRadius: isLast ? 20 : 0, topTrailingRadius: isFirst ? 20 : 0,
+                style: .continuous))
+            .padding(.horizontal, 16)
+    }
+
+    /// The row's tap target: a hidden NavigationLink behind the card, so List
+    /// rows navigate without growing the disclosure chevron.
+    @ViewBuilder private func navLink(_ item: StationItem) -> some View {
         switch item {
         case .tide(let station):
-            NavigationLink(value: station) { RecentRowLabel(item: item, imperial: imperial) }
-                .buttonStyle(.plain)
+            NavigationLink(value: station) { EmptyView() }.opacity(0)
         case .current(let station):
-            NavigationLink(value: station) { RecentRowLabel(item: item, imperial: imperial) }
-                .buttonStyle(.plain)
+            NavigationLink(value: station) { EmptyView() }.opacity(0)
         case .chs(let info):
             if case .fitted(let record) = ChsFitService.shared.state(info.id) {
-                NavigationLink(value: record) { RecentRowLabel(item: item, imperial: imperial) }
-                    .buttonStyle(.plain)
-            } else {
-                RecentRowLabel(item: item, imperial: imperial)
+                NavigationLink(value: record) { EmptyView() }.opacity(0)
             }
         }
     }
@@ -296,17 +359,14 @@ struct StationListView: View {
     @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
         switch item {
         case .tide(let station):
-            NavigationLink(value: station) {
-                StationCardView(record: station, imperial: imperial)
-            }
-            .buttonStyle(.plain)
+            StationCardView(record: station, imperial: imperial)
+                .background(navLink(item))
         case .current(let station):
-            NavigationLink(value: station) {
-                CurrentCardView(record: station)
-            }
-            .buttonStyle(.plain)
+            CurrentCardView(record: station)
+                .background(navLink(item))
         case .chs(let info):
             ChsCardView(info: info, imperial: imperial)
+                .background(navLink(item))
         }
     }
 
@@ -369,6 +429,7 @@ struct StationListView: View {
                     .frame(width: 34, height: 34)
                     .background(Color.white.opacity(0.08), in: Circle())
             }
+            .buttonStyle(.plain)  // List rows: keep the tap on the gear itself
             .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 22)
@@ -408,6 +469,7 @@ struct StationListView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(SN.foam.opacity(0.5))
                 }
+                .buttonStyle(.plain)  // List rows: keep the tap on the ×
             }
         }
         .padding(.horizontal, 16)
@@ -461,7 +523,10 @@ struct MyLocationTile<Card: View>: View {
 struct RecentRowLabel: View {
     let item: StationItem
     let imperial: Bool
-    @State private var reading = ""
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    // Cache the engine value, format in body — unit switches re-render live.
+    @State private var height: Double?
+    @State private var signed: Double?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -486,7 +551,7 @@ struct RecentRowLabel: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .task { if reading.isEmpty { reading = currentReading() } }
+        .task { if height == nil && signed == nil { load() } }
     }
 
     private var rawId: String {
@@ -494,19 +559,24 @@ struct RecentRowLabel: View {
         return item.id
     }
 
-    private func currentReading() -> String {
+    private var reading: String {
+        if let signed {
+            return currentPhase(signed: signed) == .slack
+                ? "slack" : "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
+        }
+        guard let height else { return "" }
+        return "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+    }
+
+    private func load() {
         switch item {
         case .tide(let s):
-            let state = s.cardState(at: appNow())
-            return "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+            height = s.cardState(at: appNow()).height
         case .current(let s):
-            let state = s.cardState(at: appNow())
-            return currentPhase(signed: state.signed) == .slack
-                ? "slack" : "\(formatSpeed(abs(state.signed))) kn"
+            signed = s.cardState(at: appNow()).signed
         case .chs(let info):
-            guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return "" }
-            let state = record.cardState(at: appNow())
-            return "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+            guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
+            height = record.cardState(at: appNow()).height
         }
     }
 }
@@ -572,16 +642,14 @@ struct ChsCardView: View {
     @ObservedObject private var service = ChsFitService.shared
 
     var body: some View {
+        // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.state(info.id) {
         case .fitted(let record):
-            NavigationLink(value: record) {
-                StationCardView(record: record, imperial: imperial)
-            }
-            .buttonStyle(.plain)
+            StationCardView(record: record, imperial: imperial)
         case .fitting:
-            pendingCard("Fitting on this device from CHS predictions…")
+            pendingCard("Downloading Canadian tidal predictions…")
         case .pending:
-            pendingCard("Needs a moment of signal — Canadian stations fit once on this device, then work offline.")
+            pendingCard("Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
         }
     }
 
@@ -623,6 +691,7 @@ struct ChsCardView: View {
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
     let record: CurrentStationRecord
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
 
     var body: some View {
@@ -655,9 +724,9 @@ struct CurrentCardView: View {
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .background(Color.white.opacity(0.18), in: Capsule())
                         } else {
-                            (Text(formatSpeed(abs(state.signed)))
+                            (Text(formatSpeed(abs(state.signed), unit: speedUnit))
                                 .font(.fraunces(42))
-                             + Text(" kn")
+                             + Text(" \(speedUnitLabel(speedUnit))")
                                 .font(.fraunces(17)))
                                 .foregroundStyle(.white)
                             HStack(spacing: 4) {
@@ -683,6 +752,6 @@ struct CurrentCardView: View {
         let when = cardTime(next.time, record.tz)
         return next.kind == .slack
             ? "Slack · \(when)"
-            : "\(next.turnLabel) \(formatSpeed(abs(next.speed))) kn · \(when)"
+            : "\(next.turnLabel) \(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
     }
 }

@@ -83,12 +83,8 @@ func compass16(_ deg: Double) -> String {
     return points16[Int((d / 22.5).rounded()) % 16]
 }
 
-/// Velocity is always knots — the ft/m setting is heights only, like the web's
-/// separate speedUnit preference (which defaults to kn; only kn ships here).
-func formatSpeed(_ knots: Double) -> String {
-    let v = abs(knots) < 0.05 ? abs(knots) : knots
-    return String(format: "%.1f", v)
-}
+// Speed formatting lives in Theme.swift (formatSpeed(_:unit:)) — the engine
+// always speaks knots; the display unit is the slackwater.speedUnit setting.
 
 /// What a current list card shows: signed velocity now + the next slack/max.
 struct CurrentCardState {

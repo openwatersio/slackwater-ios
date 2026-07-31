@@ -12,6 +12,7 @@ import TideEngine
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
     @AppStorage(unitsKey) private var units = "imperial"
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
@@ -43,6 +44,7 @@ struct CurrentDetailView: View {
             VStack(spacing: 14) {
                 MapHeader(name: record.name, region: "\(record.region) · current",
                           latitude: record.latitude, longitude: record.longitude,
+                          favoriteId: "current:" + record.id,
                           showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
                           onReturn: returnToNow)
                 if let timeline {
@@ -122,7 +124,8 @@ struct CurrentDetailView: View {
             }
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial, now: live, scrubTime: $scrubTime)
+                               imperial: imperial, speedUnit: speedUnit,
+                               now: live, scrubTime: $scrubTime)
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 
@@ -131,11 +134,11 @@ struct CurrentDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
                         Text("Slack").font(.fraunces(34)).foregroundStyle(.white)
-                        Text("under \(formatSpeed(slackKn)) kn")
+                        Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
-                        (Text(formatSpeed(abs(scrubSigned))).font(.fraunces(34))
-                         + Text(" kn").font(.geist(14)))
+                        (Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.fraunces(34))
+                         + Text(" \(speedUnitLabel(speedUnit))").font(.geist(14)))
                             .foregroundStyle(.white)
                         HStack(spacing: 4) {
                             Text(phaseWord(phase)).font(.geist(13))
@@ -152,7 +155,7 @@ struct CurrentDetailView: View {
                         Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
                             .font(.geist(12)).foregroundStyle(SN.leaf)
                         if let then = following {
-                            Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed))) kn")
+                            Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
                         }
                     }
@@ -197,11 +200,11 @@ struct CurrentDetailView: View {
                     ScheduleEntry(time: e.time, pill: .slack)
                 case .maxFlood:
                     ScheduleEntry(time: e.time, pill: .flood,
-                                  value: "\(formatSpeed(abs(e.speed))) kn",
+                                  value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                                   arrowDeg: record.floodDirection)
                 case .maxEbb:
                     ScheduleEntry(time: e.time, pill: .ebb,
-                                  value: "\(formatSpeed(abs(e.speed))) kn",
+                                  value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                                   arrowDeg: record.ebbDirection)
                 }
             }
@@ -221,7 +224,7 @@ struct CurrentDetailView: View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
-            Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · knots")
+            Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
                 .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
             if let port = pairedTide {
                 // Honesty line for the pairing (spec §2): the tide curve is the

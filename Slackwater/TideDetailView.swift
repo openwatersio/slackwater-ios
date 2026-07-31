@@ -35,6 +35,7 @@ struct TideDetailView: View {
             VStack(spacing: 14) {
                 MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
+                          favoriteId: record.id,
                           showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
                           onReturn: returnToNow)
                 if let timeline {
@@ -154,18 +155,16 @@ struct TideDetailView: View {
         return out.sorted { $0.time < $1.time }
     }
 
-    // The provenance/confidence marking (chs-online spec §2d, §7d): a fitted
-    // CHS station is our model of CHS's water, not CHS's published numbers —
-    // say so, with the clause-10 notice. A NOAA station keeps its line.
+    // The provenance/confidence marking (chs-online spec §2d, §7d — simplified
+    // to plain language, design pass M4.3): lead with where the data came
+    // from, keep the honesty clause that the numbers are device-computed. The
+    // full clause-10 licence statement carries its weight in Settings.
     private var footer: some View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
             if record.isChs {
-                Text("Chart datum · Harmonic model fitted on this device from CHS (IWLS) predictions — not CHS-published numbers")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
-                    .multilineTextAlignment(.center)
-                Text("CHS data used under licence (clause 10) — not to be used for navigation")
+                Text("Chart datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else {

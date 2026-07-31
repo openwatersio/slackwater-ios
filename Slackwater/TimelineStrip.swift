@@ -182,6 +182,7 @@ struct TimelineCanvas: View {
     let data: TimelineData
     let geo: TimelineGeo
     let imperial: Bool
+    let speedUnit: String
     let now: Date
 
     var body: some View {
@@ -353,7 +354,7 @@ struct TimelineCanvas: View {
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
-                ctx.draw(Text(formatSpeed(abs(e.speed)))
+                ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
                             .font(.fraunces(10, .semibold))
                             .foregroundStyle(Color(hex: e.kind == .maxFlood ? 0xCFE6B8 : 0xBCD8EC)),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
@@ -383,13 +384,28 @@ struct TimelineScrubber: UIViewRepresentable {
     let data: TimelineData
     let geo: TimelineGeo
     let imperial: Bool
+    let speedUnit: String
     let now: Date
     @Binding var scrubTime: Date
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
+    /// The scroll view's bounds are zero in makeUIView and updateUIView is
+    /// not re-invoked by layout, so "center now under the centerline" can't
+    /// live there: it would wait for the next state change (the first magnet
+    /// settle), leaving the first view uncentered and the first scrub's
+    /// readout frozen (build-7 riding-dot bug). Centering runs at layout
+    /// time instead — the first moment the real width exists.
+    final class ScrubScrollView: UIScrollView {
+        var onLayout: (() -> Void)?
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            onLayout?()
+        }
+    }
+
     func makeUIView(context: Context) -> UIScrollView {
-        let sv = UIScrollView()
+        let sv = ScrubScrollView()
         sv.showsHorizontalScrollIndicator = false
         sv.alwaysBounceVertical = false
         sv.contentInsetAdjustmentBehavior = .never
@@ -400,6 +416,10 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
+        sv.onLayout = { [weak sv, coordinator = context.coordinator] in
+            guard let sv else { return }
+            coordinator.centerIfNeeded(sv)
+        }
         return sv
     }
 
@@ -409,8 +429,7 @@ struct TimelineScrubber: UIViewRepresentable {
         co.host?.rootView = canvas
         guard sv.bounds.width > 0 else { return }
         if !co.didInitialCenter {
-            co.didInitialCenter = true
-            sv.contentOffset = CGPoint(x: data.x(scrubTime) - sv.bounds.width / 2, y: 0)
+            co.centerIfNeeded(sv)
             return
         }
         // External scrub (event tap, return-to-now): jump the strip so the
@@ -424,7 +443,7 @@ struct TimelineScrubber: UIViewRepresentable {
     }
 
     private var canvas: TimelineCanvas {
-        TimelineCanvas(data: data, geo: geo, imperial: imperial, now: now)
+        TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit, now: now)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
@@ -435,6 +454,16 @@ struct TimelineScrubber: UIViewRepresentable {
         private var magnetTarget: Date?
 
         init(_ parent: TimelineScrubber) { self.parent = parent }
+
+        /// One-shot initial centering, at the first layout with a real width
+        /// (also reachable from updateUIView, whichever lands first). After
+        /// this, scrollViewDidScroll drives scrubTime — including the very
+        /// first drag.
+        func centerIfNeeded(_ sv: UIScrollView) {
+            guard !didInitialCenter, sv.bounds.width > 0 else { return }
+            didInitialCenter = true
+            sv.contentOffset = CGPoint(x: parent.data.x(parent.scrubTime) - sv.bounds.width / 2, y: 0)
+        }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
             guard sv.bounds.width > 0, didInitialCenter else { return }
@@ -476,12 +505,13 @@ struct TimelineScrubStrip: View {
     let data: TimelineData
     let geo: TimelineGeo
     let imperial: Bool
+    var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
     @Binding var scrubTime: Date
 
     var body: some View {
-        TimelineScrubber(data: data, geo: geo, imperial: imperial, now: now,
-                         scrubTime: $scrubTime)
+        TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
+                         now: now, scrubTime: $scrubTime)
             .frame(height: geo.height)
             .overlay { overlay }
             .accessibilityElement(children: .contain)

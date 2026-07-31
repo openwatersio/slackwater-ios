@@ -6,6 +6,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(unitsKey) private var units = "imperial"
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @Environment(\.dismiss) private var dismiss
 
     private var version: String {
@@ -27,9 +28,12 @@ struct SettingsView: View {
                     }
 
                     section("Current speed") {
-                        Text("Knots")
-                            .font(.geist(15))
-                            .foregroundStyle(SN.foam.opacity(0.7))
+                        Picker("Current speed units", selection: $speedUnit) {
+                            Text("Knots").tag("kn")
+                            Text("km/h").tag("kmh")
+                            Text("m/s").tag("ms")
+                        }
+                        .pickerStyle(.segmented)
                     }
 
                     section("About these predictions") {
