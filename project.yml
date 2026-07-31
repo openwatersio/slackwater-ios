@@ -28,7 +28,15 @@ targets:
         NSLocationWhenInUseUsageDescription: >-
           Your location is used on this device to find the nearest tide and
           current stations. It never leaves the device.
+        # iPhone: portrait-only, as ever. iPad: all four + no UIRequiresFullScreen
+        # so Split View / Slide Over work (App Store validation 90474 requires
+        # exactly this set when multitasking is supported).
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
         UIAppFonts:
           - Fraunces-Regular.ttf
           - Fraunces-Medium.ttf
@@ -42,11 +50,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 8
+        CURRENT_PROJECT_VERSION: 9
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
       configs:
         # Release archives sign manually with the CI-keychain distribution identity
         # (headless: login keychain is locked to non-GUI sessions — see docs/testflight.md)

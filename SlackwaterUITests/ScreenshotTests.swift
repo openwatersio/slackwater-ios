@@ -3,10 +3,22 @@
 // M4 launch flow: the app opens on the first-run gate, then the list — tests
 // seed or reset that state explicitly (-seedGate / -resetGate) because a
 // UserDefaults value passed as a launch argument would mask in-app writes.
+import UIKit
 import XCTest
 
 final class ScreenshotTests: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
+
+    /// Pan the timeline strip under its fixed centerline (drag left = later).
+    /// Targets the strip element itself so the drag lands on it at any size —
+    /// the old window-normalized offsets (dy 0.8) miss the strip on iPad.
+    private func scrubStrip(_ app: XCUIApplication) {
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 5), "timeline strip missing")
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo:
+                strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+    }
 
     func testM1Walkthrough() throws {
         let app = XCUIApplication()
@@ -26,10 +38,7 @@ final class ScreenshotTests: XCTestCase {
 
         // Scrub: pan the strip under the fixed centerline (drag left = later),
         // release — the readout keeps the scrubbed time.
-        let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8))
-        from.press(forDuration: 0.3, thenDragTo: to)
+        scrubStrip(app)
         sleep(1)
         save(app, "m1-detail-scrubbed.png")
 
@@ -107,12 +116,8 @@ final class ScreenshotTests: XCTestCase {
         sleep(2)
         save(app, "m2-current-detail.png")
 
-        // Scrub: pan the combined tide+current strip (it sits lower on the
-        // gate detail — port tide readout above it), release.
-        let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.88))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.88))
-        from.press(forDuration: 0.3, thenDragTo: to)
+        // Scrub: pan the combined tide+current strip, release.
+        scrubStrip(app)
         sleep(1)
         save(app, "m2-current-scrubbed.png")
     }
@@ -365,10 +370,7 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m41-detail-mapheader.png")
 
         // Scrub, then capture the moon-bearing scrub card.
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
-            .press(forDuration: 0.3, thenDragTo:
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8)))
+        scrubStrip(app)
         sleep(1)
         save(app, "m41-scrubber-moon.png")
 
@@ -426,10 +428,7 @@ final class ScreenshotTests: XCTestCase {
                   "multi-day schedule missing its Tomorrow day header")
 
         // Pan the strip: the centerline readout moves off "now".
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.8))
-            .press(forDuration: 0.3, thenDragTo:
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.8)))
+        scrubStrip(app)
         sleep(1)
         XCTAssert(app.buttons["Return to now"].waitForExistence(timeout: 5),
                   "return-to-now affordance missing after scrubbing away")
@@ -440,9 +439,18 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         save(app, "m42-multiday-list.png")
 
-        // Tap one of Tomorrow's rows: the scrub crosses midnight to it.
+        // Tap one of Tomorrow's rows: the scrub crosses midnight to it. A row
+        // hugging the bottom edge "taps" without firing (the touch lands in
+        // the home-indicator band — seen on iPad landscape), so scroll until
+        // it sits clear of the edge first.
         let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
         XCTAssert(tomorrowRow.waitForExistence(timeout: 5), "no Tomorrow rows in the schedule")
+        var tries = 0
+        while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
+            app.swipeUp()
+            sleep(1)
+            tries += 1
+        }
         tomorrowRow.tap()
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'TOMORROW'")).firstMatch.waitForExistence(timeout: 5),
@@ -587,10 +595,7 @@ final class ScreenshotTests: XCTestCase {
 
         // The FIRST drag on a fresh detail: the readout must move during the
         // gesture itself, not only after the magnet settles.
-        let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
-            .press(forDuration: 0.3, thenDragTo:
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8)))
+        scrubStrip(app)
         save(app, "m43-first-scrub-fixed.png")  // mid-deceleration, pre-settle
         let after = app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$")).firstMatch.label
@@ -614,6 +619,51 @@ final class ScreenshotTests: XCTestCase {
                   "pending card is missing the plain-language copy")
         sleep(1)
         save(app, "m43-chs-copy.png")
+    }
+
+    // M4.4: iPad split layout — regular width gets the web's ≥62rem shape
+    // (styles.css): persistent sidebar (search + groups) beside the detail
+    // pane, in both orientations. Skipped on iPhone, which keeps the stack.
+    func testM44IPadSplit() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad-only layout test")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Pick a station"].waitForExistence(timeout: 5),
+                  "detail placeholder missing beside the sidebar")
+        openFridayHarbor(app)
+        // The sidebar must still be on screen while the detail shows —
+        // a split, not a push.
+        XCTAssert(app.textFields.firstMatch.exists, "sidebar gone — not a split layout")
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
+        // A second pick replaces the detail (no stacking) — web sidebar behavior.
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()  // clear "friday"
+        }
+        let field = app.textFields.firstMatch
+        field.tap()
+        field.typeText("deception")
+        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
+        XCTAssert(gate.waitForExistence(timeout: 5))
+        gate.tap()
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5),
+                  "row tap did not replace the detail pane")
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()
+        }
+        sleep(5)  // header map tiles
+        save(app, "m44-ipad-landscape.png")
+
+        XCUIDevice.shared.orientation = .portrait
+        sleep(2)
+        XCTAssert(app.otherElements["timeline-strip"].exists,
+                  "rotation lost the detail")
+        XCTAssert(app.textFields.firstMatch.exists, "portrait dropped the sidebar")
+        save(app, "m44-ipad-portrait.png")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

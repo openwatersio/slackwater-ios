@@ -151,7 +151,12 @@ struct StationListView: View {
     // so the list must re-render when a fit lands — the card itself observes,
     // but the link lives out here.
     @ObservedObject private var chs = ChsFitService.shared
+    // Size class, not device, picks the layout (web styles.css breakpoints):
+    // regular = the ≥62rem persistent-sidebar grid; compact = the phone stack.
+    // iPad Slide Over / narrow Split View is compact and gets the phone layout.
+    @Environment(\.horizontalSizeClass) private var hSize
 
+    private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
     /// The fix the list ranks by — only while authorized.
     private var fix: (lat: Double, lon: Double)? {
@@ -160,7 +165,76 @@ struct StationListView: View {
     }
 
     var body: some View {
+        Group {
+            if regular {
+                splitLayout
+            } else {
+                stackLayout
+            }
+        }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .fullScreenCover(isPresented: $showMap) {
+            MapScreen { item in
+                showMap = false
+                open(item)
+            }
+        }
+        .onAppear { loc.refreshIfAuthorized() }
+        // First connected launch: the Canadian Salish ports auto-fit in the
+        // background (M3 — no region UX). Partial failure retries next launch.
+        .task { ChsFitService.shared.fitPendingIfNeeded() }
+    }
+
+    /// iPhone (and iPad Slide Over): the M1–M4 stack, unchanged.
+    private var stackLayout: some View {
         NavigationStack(path: $path) {
+            listPane
+                .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
+                .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+        }
+    }
+
+    /// Regular width — the web's tablet-and-up layout (styles.css ≥62rem):
+    /// the list earns permanent space as a 320pt sidebar (20rem on web), and
+    /// the detail is the content pane with its own stack so a row or map-pin
+    /// tap replaces what's shown rather than covering the list.
+    private var splitLayout: some View {
+        NavigationSplitView(columnVisibility: .constant(.doubleColumn)) {
+            listPane
+                .navigationSplitViewColumnWidth(320)
+        } detail: {
+            NavigationStack(path: $path) {
+                detailPlaceholder
+                    .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
+                    .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    /// The content pane before any pick — same canvas, an invitation, not blank.
+    private var detailPlaceholder: some View {
+        ZStack {
+            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
+                           startRadius: 0, endRadius: 500)
+                .ignoresSafeArea()
+            VStack(spacing: 14) {
+                Image(systemName: "water.waves")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(SN.foam.opacity(0.5))
+                Text("Pick a station")
+                    .font(.fraunces(24, .semibold))
+                    .foregroundStyle(SN.paper.opacity(0.9))
+                Text("Tides and currents open here.")
+                    .font(.geist(14))
+                    .foregroundStyle(SN.foam.opacity(0.55))
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// The list surface both layouts share: canvas, grouped List, map button.
+    private var listPane: some View {
             ZStack(alignment: .bottomTrailing) {
                 RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                                startRadius: 0, endRadius: 500)
@@ -198,30 +272,24 @@ struct StationListView: View {
                 mapButton
             }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
-            .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
-        }
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .fullScreenCover(isPresented: $showMap) {
-            MapScreen { item in
-                showMap = false
-                open(item)
-            }
-        }
-        .onAppear { loc.refreshIfAuthorized() }
-        // First connected launch: the Canadian Salish ports auto-fit in the
-        // background (M3 — no region UX). Partial failure retries next launch.
-        .task { ChsFitService.shared.fitPendingIfNeeded() }
     }
 
-    /// Push a station picked outside the list (map pin tap).
+    /// Show a station picked anywhere (row tap in regular, map pin tap in
+    /// both). Resets the path first: in the split layout this replaces the
+    /// shown detail; in the stack the path is empty here anyway.
     private func open(_ item: StationItem) {
+        // Regular width: the sidebar (and its focused search field) stays on
+        // screen when a detail opens, so the keyboard would sit over the new
+        // detail — drop it. On iPhone the push dismisses it anyway.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
         switch item {
-        case .tide(let s): path.append(s)
-        case .current(let s): path.append(s)
+        case .tide(let s): path = NavigationPath(); path.append(s)
+        case .current(let s): path = NavigationPath(); path.append(s)
         case .chs(let info):
+            // A pending/fitting port has nothing to show — leave the path be.
             if case .fitted(let record) = ChsFitService.shared.state(info.id) {
-                path.append(record)
+                path = NavigationPath(); path.append(record)
             }
         }
     }
@@ -328,8 +396,7 @@ struct StationListView: View {
     /// round the group's outer corners — the grouped-card look, but one List
     /// row per station so each carries its own swipe actions.
     @ViewBuilder private func recentRow(_ item: StationItem, isFirst: Bool, isLast: Bool) -> some View {
-        RecentRowLabel(item: item, imperial: imperial)
-            .background(navLink(item))
+        activatable(RecentRowLabel(item: item, imperial: imperial), item)
             .overlay(alignment: .bottom) {
                 if !isLast { Divider().overlay(Color.white.opacity(0.08)) }
             }
@@ -339,6 +406,18 @@ struct StationListView: View {
                 bottomTrailingRadius: isLast ? 20 : 0, topTrailingRadius: isFirst ? 20 : 0,
                 style: .continuous))
             .padding(.horizontal, 16)
+    }
+
+    /// Row activation, per layout: compact rides the List's hidden
+    /// NavigationLink (unchanged phone behavior); regular taps drive the
+    /// detail column's path directly — a sidebar link would push inside the
+    /// sidebar, not the content pane.
+    @ViewBuilder private func activatable<V: View>(_ view: V, _ item: StationItem) -> some View {
+        if regular {
+            view.contentShape(Rectangle()).onTapGesture { open(item) }
+        } else {
+            view.background(navLink(item))
+        }
     }
 
     /// The row's tap target: a hidden NavigationLink behind the card, so List
@@ -359,14 +438,11 @@ struct StationListView: View {
     @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
         switch item {
         case .tide(let station):
-            StationCardView(record: station, imperial: imperial)
-                .background(navLink(item))
+            activatable(StationCardView(record: station, imperial: imperial), item)
         case .current(let station):
-            CurrentCardView(record: station)
-                .background(navLink(item))
+            activatable(CurrentCardView(record: station), item)
         case .chs(let info):
-            ChsCardView(info: info, imperial: imperial)
-                .background(navLink(item))
+            activatable(ChsCardView(info: info, imperial: imperial), item)
         }
     }
 

@@ -662,26 +662,31 @@ struct MultiDaySchedule: View {
                     VStack(spacing: 0) {
                         ForEach(group.items) { e in
                             let on = e.id == nearestID
-                            Button { onTap(e.time) } label: {
-                                HStack(spacing: 8) {
-                                    Text(clockTime(e.time, tz))
-                                        .font(.geistMono(14))
-                                        .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
-                                    Spacer()
-                                    Text(e.value ?? "—")
-                                        .font(.fraunces(15, .semibold))
-                                        .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
-                                    pillView(e)
-                                        .frame(width: 84, alignment: .trailing)
-                                }
-                                .padding(.vertical, 9)
-                                .padding(.trailing, 14)
-                                .background(on ? SN.leaf.opacity(0.13) : .clear)
-                                .overlay(alignment: .leading) {
-                                    if on { Rectangle().fill(SN.leaf).frame(width: 2) }
-                                }
+                            // A tap gesture, not a Button: Button press tracking
+                            // goes dead in the iPad split layout's detail column
+                            // (regular width, below the strip) while gesture
+                            // recognizers keep working — same tap for the user.
+                            HStack(spacing: 8) {
+                                Text(clockTime(e.time, tz))
+                                    .font(.geistMono(14))
+                                    .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
+                                Spacer()
+                                Text(e.value ?? "—")
+                                    .font(.fraunces(15, .semibold))
+                                    .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
+                                pillView(e)
+                                    .frame(width: 84, alignment: .trailing)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.vertical, 9)
+                            .padding(.trailing, 14)
+                            .background(on ? SN.leaf.opacity(0.13) : .clear)
+                            .overlay(alignment: .leading) {
+                                if on { Rectangle().fill(SN.leaf).frame(width: 2) }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture { onTap(e.time) }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isButton)
                             .accessibilityIdentifier("schedule-row-d\(group.offset)")
                             if e.id != group.items.last?.id {
                                 Divider().overlay(Color.white.opacity(0.055))
