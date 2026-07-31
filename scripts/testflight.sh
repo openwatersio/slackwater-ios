@@ -19,8 +19,13 @@ KC=~/Library/Keychains/slackwater-ci.keychain-db
 security unlock-keychain -p "$(cat ~/.appstoreconnect/ci-keychain-pass)" $KC
 
 xcodegen generate
+# -clonedSourcePackagesDirPath: repo-local SPM cache so CLI builds never share
+# ~/Library/Caches/org.swift.swiftpm with the Xcode GUI — two resolvers racing
+# on the MapLibre binary artifact corrupts the shared cache ("already exists
+# in file system", 2026-07-31). Agent-run builds should pass the same flag.
 xcodebuild archive -project Slackwater.xcodeproj -scheme Slackwater \
-  -destination 'generic/platform=iOS' -archivePath build/Slackwater.xcarchive
+  -destination 'generic/platform=iOS' -archivePath build/Slackwater.xcarchive \
+  -clonedSourcePackagesDirPath build/SourcePackages
 
 cat > build/exportUpload.plist <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>

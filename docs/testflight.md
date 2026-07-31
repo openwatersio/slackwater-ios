@@ -31,3 +31,14 @@ used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → impo
   Connect UI — records can't be created via the public API.
 - Export-only variant (signed .ipa, no upload): `build/exportOptions.plist` with
   `destination: export` — what the first proof run used.
+
+## CLI vs Xcode GUI — SPM cache isolation (2026-07-31)
+
+CLI builds (testflight.sh and any agent-run `xcodebuild`) must pass
+`-clonedSourcePackagesDirPath build/SourcePackages` — a repo-local, gitignored SPM
+cache. Without it, a CLI resolve racing the Xcode GUI resolver corrupts the shared
+`~/.../org.swift.swiftpm` artifact cache on the MapLibre binary zip ("already exists
+in file system" → Resolving Package Graph Failed in Xcode). If the GUI shows that
+error: quit Xcode, delete the artifact dir under
+`~/Library/Caches/org.swift.swiftpm/artifacts/`, File → Packages → Reset Package
+Caches, rebuild.
