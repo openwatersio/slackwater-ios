@@ -26,6 +26,10 @@ enum SN {
     static let falling = Color(hex: 0x7FB4D8)      // web --falling
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
+    static let night = Color(hex: 0x00101F)        // prototype night band
+    static let sun = Color(hex: 0xF0C860)          // prototype sun dot
+    static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
+    static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }
 
 extension Font {
@@ -194,5 +198,91 @@ struct CompassArrow: View {
     let deg: Double
     var body: some View {
         Text("↑").rotationEffect(.degrees(deg))
+    }
+}
+
+/// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
+/// an offset circle clipped to the disc — fullness and waxing side track the
+/// illumination as you scrub across days.
+struct MoonGlyph: View {
+    let fraction: Double
+    let waxing: Bool
+    var size: CGFloat = 20
+
+    var body: some View {
+        let r = size / 2 - 1
+        // Dark limb slides off as illumination grows: covering at new (shift 0),
+        // clear at full (shift 2r), lit side right while waxing. (The prototype
+        // export's (1-fraction)·1.9r is inverted — it blacks out a full moon.)
+        let shift = (waxing ? -1.0 : 1.0) * fraction * 2 * r
+        ZStack {
+            Circle().fill(SN.foam)
+            Circle().fill(Color(hex: 0x00122C, opacity: 0.92)).offset(x: shift)
+        }
+        .frame(width: 2 * r, height: 2 * r)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The schedule table's sunrise/sunset pill (prototype PILL.sunrise/.sunset:
+/// outlined, amber family, "☀ Rise" / "☀ Set").
+struct SunPill: View {
+    let kind: SunMoon.SunEventKind
+    var body: some View {
+        let color = kind == .sunrise ? SN.sunrise : SN.sunset
+        Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
+            .font(.geistMono(10, .medium)).tracking(0.5)
+            .foregroundStyle(color)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))
+    }
+}
+
+/// The Near Me cards' nautical-miles pill; straddles a card's top-right
+/// corner (also overlaid on the My Location tile — same component).
+struct DistancePill: View {
+    let km: Double
+    var body: some View {
+        Text(formatNm(km))
+            .font(.geistMono(11, .medium))
+            .foregroundStyle(SN.navyDeep)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(SN.foam.opacity(0.92), in: Capsule())
+            .shadow(color: Color(hex: 0x001432, opacity: 0.3), radius: 4, y: 2)
+            .offset(x: -14, y: -8)
+    }
+}
+
+// MARK: - Recently viewed stations (prototype "Recent" list, Bryan's Recents)
+
+/// Most-recent-first, capped at 6 (prototype addRecent slice(0,6)), persisted
+/// in UserDefaults. Recorded by the detail views on appear.
+final class RecentsStore: ObservableObject {
+    static let shared = RecentsStore()
+    private static let key = "slackwater.recents"
+
+    @Published private(set) var ids: [String]
+
+    private init() {
+        // UI-test hook, like -resetGate: a clean no-recents first run.
+        if CommandLine.arguments.contains("-resetRecents") {
+            UserDefaults.standard.removeObject(forKey: Self.key)
+        }
+        ids = UserDefaults.standard.stringArray(forKey: Self.key) ?? []
+    }
+
+    func record(_ id: String) {
+        var next = ids.filter { $0 != id }
+        next.insert(id, at: 0)
+        next = Array(next.prefix(6))
+        ids = next
+        UserDefaults.standard.set(next, forKey: Self.key)
+    }
+
+    var items: [StationItem] {
+        ids.compactMap { id in StationItem.all.first { $0.id == id } }
     }
 }

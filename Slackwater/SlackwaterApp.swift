@@ -145,6 +145,7 @@ struct StationListView: View {
     @State private var showMap = CommandLine.arguments.contains("-openMap")
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
+    @ObservedObject private var recents = RecentsStore.shared
 
     private var imperial: Bool { units == "imperial" }
     /// The fix the list ranks by — only while authorized.
@@ -210,51 +211,86 @@ struct StationListView: View {
         }
     }
 
-    // The located list (prototype READY·LIST): My Location hero tile, Near Me
-    // by distance with nm badges, then everything ranked by distance. Without
-    // a fix the M1 ordering stands (Friday Harbor first, alphabetical).
+    // The list (Bryan's regrouping of the prototype READY·LIST): My Location →
+    // Recents → Near Me, nothing else — search is the discovery path for the
+    // rest of the catalog. Without a fix the ranking anchors on the Victoria
+    // fallback (prototype FALLBACK), and the My Location slot holds the amber
+    // denied card when location is off.
     @ViewBuilder private var locatedSections: some View {
-        if let fix {
-            let ranked = StationItem.all.sorted {
-                $0.km(fromLat: fix.lat, lon: fix.lon) < $1.km(fromLat: fix.lat, lon: fix.lon)
-            }
-            if let nearest = ranked.first {
-                MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-            }
-            MonoLabel(text: "Near Me")
+        let anchor = fix ?? fallbackFix
+        let ranked = StationItem.all.sorted {
+            $0.km(fromLat: anchor.lat, lon: anchor.lon) < $1.km(fromLat: anchor.lat, lon: anchor.lon)
+        }
+
+        // My Location slot: the hero tile, or the amber card in its place.
+        if let fix, let nearest = ranked.first {
+            MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+        } else if loc.denied {
+            unavailableCard.padding(.horizontal, 16).padding(.top, 14)
+        }
+
+        // Recents: persisted recently-viewed stations, most recent first.
+        let recentItems = recents.items
+        if !recentItems.isEmpty {
+            MonoLabel(text: "Recents")
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 26)
                 .padding(.top, 14)
                 .padding(.bottom, 4)
-            LazyVStack(spacing: 12) {
-                ForEach(ranked.dropFirst().prefix(4)) { item in
-                    itemCard(item)
-                        .overlay(alignment: .topTrailing) {
-                            distanceBadge(item.km(fromLat: fix.lat, lon: fix.lon))
-                        }
+            VStack(spacing: 0) {
+                ForEach(recentItems) { item in
+                    recentRow(item)
+                    if item.id != recentItems.last?.id {
+                        Divider().overlay(Color.white.opacity(0.08))
+                    }
                 }
             }
+            .background(Color.white.opacity(0.05),
+                        in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(SN.leaf.opacity(0.2), lineWidth: 0.5))
             .padding(.horizontal, 16)
-            listSection(Array(ranked.dropFirst(5)), label: "Salish Sea")
-        } else {
-            if loc.denied { unavailableCard.padding(.horizontal, 16).padding(.top, 14) }
-            listSection(StationItem.all, label: "Salish Sea")
         }
-    }
 
-    @ViewBuilder private func listSection(_ items: [StationItem], label: String) -> some View {
-        MonoLabel(text: label)
+        MonoLabel(text: "Near Me")
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 26)
             .padding(.top, 14)
             .padding(.bottom, 4)
+        // With a hero the nearest is already on screen — 4 more; without, 5.
+        let nearMe = fix == nil ? Array(ranked.prefix(5)) : Array(ranked.dropFirst().prefix(4))
         LazyVStack(spacing: 12) {
-            ForEach(items) { item in itemCard(item) }
+            ForEach(nearMe) { item in
+                itemCard(item)
+                    .overlay(alignment: .topTrailing) {
+                        DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
+                    }
+            }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 44)
+    }
+
+    /// A compact recently-viewed row (prototype recent rows: gradient chip,
+    /// name over region), navigating like the full cards.
+    @ViewBuilder private func recentRow(_ item: StationItem) -> some View {
+        switch item {
+        case .tide(let station):
+            NavigationLink(value: station) { RecentRowLabel(item: item, imperial: imperial) }
+                .buttonStyle(.plain)
+        case .current(let station):
+            NavigationLink(value: station) { RecentRowLabel(item: item, imperial: imperial) }
+                .buttonStyle(.plain)
+        case .chs(let info):
+            if case .fitted(let record) = ChsFitService.shared.state(info.id) {
+                NavigationLink(value: record) { RecentRowLabel(item: item, imperial: imperial) }
+                    .buttonStyle(.plain)
+            } else {
+                RecentRowLabel(item: item, imperial: imperial)
+            }
+        }
     }
 
     @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
@@ -272,17 +308,6 @@ struct StationListView: View {
         case .chs(let info):
             ChsCardView(info: info, imperial: imperial)
         }
-    }
-
-    /// Straddles the card's top-right corner, clear of the reading numeral.
-    private func distanceBadge(_ km: Double) -> some View {
-        Text(formatNm(km))
-            .font(.geistMono(11, .medium))
-            .foregroundStyle(SN.navyDeep)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(SN.foam.opacity(0.92), in: Capsule())
-            .shadow(color: Color(hex: 0x001432, opacity: 0.3), radius: 4, y: 2)
-            .offset(x: -14, y: -8)
     }
 
     /// Location denied — amber card, deep link to the app's iOS Settings.
@@ -334,19 +359,7 @@ struct StationListView: View {
                 .font(.fraunces(36, .semibold))
                 .foregroundStyle(SN.paper)
             Spacer()
-            // The prototype's units pill doubles as the setting: tap to toggle.
-            // Its backing store is shared with Settings (same @AppStorage key).
-            Button {
-                units = imperial ? "metric" : "imperial"
-            } label: {
-                Text(imperial ? "FT" : "M")
-                    .font(.geistMono(12, .medium))
-                    .tracking(1)
-                    .foregroundStyle(SN.leaf)
-                    .frame(height: 34)
-                    .padding(.horizontal, 14)
-                    .background(SN.leaf.opacity(0.16), in: Capsule())
-            }
+            // Units live in Settings only — no list-header pill.
             Button {
                 showSettings = true
             } label: {
@@ -407,8 +420,9 @@ struct StationListView: View {
 }
 
 /// The prototype's My Location hero: MY LOCATION eyebrow with the location
-/// arrow, the nearest station's ordinary card, then coordinates + the §5f
-/// match grading in mono (web heroMatchFor: "N away · quality").
+/// arrow, the nearest station's ordinary card wearing the same nm pill the
+/// Near Me cards wear, then the fix coordinates in mono (NearMe.dc.html
+/// fmtCoord — 3 decimal places).
 struct MyLocationTile<Card: View>: View {
     let item: StationItem
     let fix: (lat: Double, lon: Double)
@@ -416,7 +430,6 @@ struct MyLocationTile<Card: View>: View {
     @ViewBuilder let card: (StationItem) -> Card
 
     var body: some View {
-        let km = item.km(fromLat: fix.lat, lon: fix.lon)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
@@ -427,7 +440,10 @@ struct MyLocationTile<Card: View>: View {
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
-            Text("\(formatCoord(lat: fix.lat, lon: fix.lon)) · \(formatNm(km)) to station · \(gradeMatch(km: km, lat: fix.lat, lon: fix.lon).rawValue)")
+                .overlay(alignment: .topTrailing) {
+                    DistancePill(km: item.km(fromLat: fix.lat, lon: fix.lon))
+                }
+            Text(formatCoord(lat: fix.lat, lon: fix.lon))
                 .font(.geistMono(11))
                 .foregroundStyle(SN.foam.opacity(0.55))
                 .padding(.horizontal, 6)
@@ -437,6 +453,61 @@ struct MyLocationTile<Card: View>: View {
                     in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
             .strokeBorder(SN.leaf.opacity(0.22), lineWidth: 0.5))
+    }
+}
+
+/// The compact recent-station row body (prototype: 38pt gradient chip, name
+/// over region, current reading trailing in Fraunces).
+struct RecentRowLabel: View {
+    let item: StationItem
+    let imperial: Bool
+    @State private var reading = ""
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(stationGradient(id: rawId))
+                .frame(width: 38, height: 38)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.name)
+                    .font(.geist(16, .medium))
+                    .foregroundStyle(SN.paper)
+                    .lineLimit(1)
+                Text(item.region)
+                    .font(.geist(12))
+                    .foregroundStyle(SN.foam.opacity(0.55))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(reading)
+                .font(.fraunces(17))
+                .foregroundStyle(SN.foam.opacity(0.7))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .task { if reading.isEmpty { reading = currentReading() } }
+    }
+
+    private var rawId: String {
+        if case .current(let s) = item { return s.id }
+        return item.id
+    }
+
+    private func currentReading() -> String {
+        switch item {
+        case .tide(let s):
+            let state = s.cardState(at: appNow())
+            return "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        case .current(let s):
+            let state = s.cardState(at: appNow())
+            return currentPhase(signed: state.signed) == .slack
+                ? "slack" : "\(formatSpeed(abs(state.signed))) kn"
+        case .chs(let info):
+            guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return "" }
+            let state = record.cardState(at: appNow())
+            return "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        }
     }
 }
 

@@ -7,7 +7,11 @@
 import SwiftUI
 import MapLibre
 
-private let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.6, longitude: -123.4)
+// Discovery-map camera: frames the bundled-station core (Puget Sound through
+// the Gulf Islands / Strait of Georgia) so it opens reading as the Salish Sea.
+// The UI pin-tap test derives screen points from these same constants.
+let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.35, longitude: -123.05)
+let SALISH_ZOOM = 7.35
 
 struct MapScreen: View {
     let onSelect: (StationItem) -> Void
@@ -160,6 +164,67 @@ func composeStyle(_ seascape: [String: Any], landUrl: String) -> [String: Any] {
     return style
 }
 
+// MARK: - Shared style loading + camera assertion
+
+/// Loads the fallback style immediately and Seascape when its fetch lands
+/// (web MapScreen, Open Waters offline.md: no error banner — the map renders
+/// what it can reach), and re-asserts the camera after each style load. The
+/// camera must be asserted post-layout: a zoomLevel set on a zero-frame view
+/// converts through a degenerate altitude and the map opened continent-wide.
+final class MapStyler: NSObject, MLNMapViewDelegate {
+    private weak var map: MLNMapView?
+    private let cacheName: String
+    private let center: CLLocationCoordinate2D
+    private let zoom: Double
+    private let killSwitch = CommandLine.arguments.contains("-networkKillSwitch")
+
+    init(map: MLNMapView, cacheName: String, center: CLLocationCoordinate2D, zoom: Double) {
+        self.map = map
+        self.cacheName = cacheName
+        self.center = center
+        self.zoom = zoom
+        super.init()
+        map.delegate = self
+        setStyle(localFallbackStyle(landUrl: landUrl), name: "\(cacheName)-fallback")
+        fetchSeascape()
+    }
+
+    private var landUrl: String {
+        guard let url = Bundle.main.url(forResource: "land", withExtension: "pmtiles") else { return "" }
+        return "pmtiles://\(url.absoluteString)"  // pmtiles://file:///…/land.pmtiles
+    }
+
+    /// MLN loads styles by URL — write the composed JSON next to the caches.
+    private func setStyle(_ style: [String: Any], name: String) {
+        guard let data = try? JSONSerialization.data(withJSONObject: style),
+              let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        else { return }
+        let url = dir.appendingPathComponent("map-style-\(name).json")
+        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
+        DispatchQueue.main.async { self.map?.styleURL = url }
+    }
+
+    private func fetchSeascape() {
+        guard !killSwitch else { return }
+        let imperial = UserDefaults.standard.string(forKey: unitsKey) != "metric"
+        guard let url = URL(string: "https://tiles.openwaters.io/seascape/style.json?unit=\(imperial ? "ft" : "m")")
+        else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
+            guard let self, let data,
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return }  // offline or upstream down: the fallback style is already up
+            self.setStyle(composeStyle(json, landUrl: self.landUrl), name: "\(self.cacheName)-seascape")
+        }.resume()
+    }
+
+    // ponytail: re-asserts on every style load, so a Seascape arriving late
+    // recenters a user who already panned; track interaction if it annoys.
+    func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
+        mapView.setCenter(center, zoomLevel: zoom, animated: false)
+    }
+}
+
 // MARK: - The map view
 
 struct MapViewRepresentable: UIViewRepresentable {
@@ -169,7 +234,6 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero)
-        map.setCenter(SALISH_CENTER, zoomLevel: 7, animated: false)
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         map.showsUserLocation = LocationService.shared.authorized
@@ -182,49 +246,16 @@ struct MapViewRepresentable: UIViewRepresentable {
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
         private weak var map: MLNMapView?
-        private let killSwitch = CommandLine.arguments.contains("-networkKillSwitch")
+        private var styler: MapStyler?
 
         init(onSelect: @escaping (StationItem) -> Void) { self.onSelect = onSelect }
 
-        private var landUrl: String {
-            guard let url = Bundle.main.url(forResource: "land", withExtension: "pmtiles") else { return "" }
-            return "pmtiles://\(url.absoluteString)"  // pmtiles://file:///…/land.pmtiles
-        }
-
         func install(on map: MLNMapView) {
             self.map = map
-            // Fallback first: land + pins render immediately (and are all an
-            // offline user gets); Seascape replaces the style when its fetch
-            // lands. No error banner when it doesn't — the map renders what it
-            // can reach (web MapScreen, Open Waters offline.md).
-            setStyle(localFallbackStyle(landUrl: landUrl), name: "fallback")
-            fetchSeascape()
+            styler = MapStyler(map: map, cacheName: "discovery",
+                               center: SALISH_CENTER, zoom: SALISH_ZOOM)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
-        }
-
-        /// MLN loads styles by URL — write the composed JSON next to the caches.
-        private func setStyle(_ style: [String: Any], name: String) {
-            guard let data = try? JSONSerialization.data(withJSONObject: style),
-                  let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            else { return }
-            let url = dir.appendingPathComponent("map-style-\(name).json")
-            guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-            DispatchQueue.main.async { self.map?.styleURL = url }
-        }
-
-        private func fetchSeascape() {
-            guard !killSwitch else { return }
-            let imperial = UserDefaults.standard.string(forKey: unitsKey) != "metric"
-            guard let url = URL(string: "https://tiles.openwaters.io/seascape/style.json?unit=\(imperial ? "ft" : "m")")
-            else { return }
-            URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
-                guard let self, let data,
-                      (response as? HTTPURLResponse)?.statusCode == 200,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-                else { return }  // offline or upstream down: the fallback style is already up
-                self.setStyle(composeStyle(json, landUrl: self.landUrl), name: "seascape")
-            }.resume()
         }
 
         /// Tap → nearest station dot within a finger-sized box → detail.

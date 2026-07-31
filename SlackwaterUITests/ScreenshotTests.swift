@@ -16,19 +16,25 @@ final class ScreenshotTests: XCTestCase {
         // M4: launches on the list — when located it ranks by distance, so
         // reach Friday Harbor through search (deterministic either way).
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // Units are settings-only now (no list pill): reset to feet first —
+        // the setting persists across runs.
+        setUnits(app, "Feet")
+
         openFridayHarbor(app)
         sleep(2)
 
-        // Scrub: drag across the chart plot, release — crosshair persists.
+        // Scrub: drag across the chart plot (below the map header), release —
+        // crosshair persists.
         let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.45))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.45))
+        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
+        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72))
         from.press(forDuration: 0.3, thenDragTo: to)
         sleep(1)
         save(app, "m1-detail-scrubbed.png")
 
         // Back to the station list; clear the "friday" query.
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         if app.buttons["xmark.circle.fill"].firstMatch.exists {
             app.buttons["xmark.circle.fill"].firstMatch.tap()
@@ -45,17 +51,25 @@ final class ScreenshotTests: XCTestCase {
         let clear = app.buttons["xmark.circle.fill"].firstMatch
         if clear.exists { clear.tap() } else { field.typeText(XCUIKeyboardKey.delete.rawValue) }
 
-        // Units pill → metres, then open Friday Harbor in metric.
-        // The setting persists across runs — reset to imperial first if needed.
-        if app.buttons["M"].exists {
-            app.buttons["M"].tap()
-            XCTAssert(app.buttons["FT"].waitForExistence(timeout: 5))
-        }
-        app.buttons["FT"].tap()
-        XCTAssert(app.buttons["M"].waitForExistence(timeout: 5))
+        // Metres via Settings, then open Friday Harbor in metric.
+        setUnits(app, "Meters")
         openFridayHarbor(app)
         sleep(2)
         save(app, "m1-detail-metric.png")
+        // Leave the store imperial for the other tests.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        setUnits(app, "Feet")
+    }
+
+    /// Units moved to Settings only (design pass item 1): toggle there.
+    private func setUnits(_ app: XCUIApplication, _ label: String) {
+        app.buttons["Settings"].tap()
+        let segment = app.buttons[label]
+        XCTAssert(segment.waitForExistence(timeout: 5))
+        segment.tap()
+        app.buttons["Done"].tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
     }
 
     /// Search "friday" → tap the tide card → detail; clears the query on the
@@ -93,10 +107,11 @@ final class ScreenshotTests: XCTestCase {
         sleep(2)
         save(app, "m2-current-detail.png")
 
-        // Scrub: drag across the plot, release — crosshair persists.
+        // Scrub: drag across the plot (below the map header), release —
+        // crosshair persists.
         let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.35))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.35))
+        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
+        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72))
         from.press(forDuration: 0.3, thenDragTo: to)
         sleep(1)
         save(app, "m2-current-scrubbed.png")
@@ -177,7 +192,8 @@ final class ScreenshotTests: XCTestCase {
     // M4: pin map — opens from the floating button, land + pins render, and a
     // tap on the Deception Pass (Narrows) pin opens its detail. The pin's
     // screen point is pure web-mercator math from the fixed camera
-    // (center 48.6,-123.4 · zoom 7 · 512pt world tiles).
+    // (center 48.35,-123.05 · zoom 7.35 · 512pt world tiles — MapScreen's
+    // SALISH constants; the styler re-asserts them after style load).
     func testM4MapPinToDetail() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
@@ -187,19 +203,19 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Map"].tap()
         XCTAssert(app.staticTexts["MAP"].waitForExistence(timeout: 5))
         sleep(5)  // let tiles (and Seascape, when reachable) come in
-        save(app, "m4-map.png")
+        save(app, "m41-map-zoom.png")
 
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 5))
         let frame = map.frame
-        let world = 512.0 * pow(2.0, 7)  // zoom 7
+        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
         func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
             let x = (lon + 180) / 360 * world
             let phi = lat * .pi / 180
             let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
             return (x, y)
         }
-        let c = mercator(48.6, -123.4)                            // camera center
+        let c = mercator(48.35, -123.05)                          // SALISH_CENTER
         let p = mercator(48.40618896484375, -122.64311981201172)  // Deception Pass (Narrows)
         let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
         let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
@@ -234,7 +250,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(!portTimes.isEmpty && !portHeights.isEmpty, "no schedule rows read from the port detail")
 
         // Then: the gate's detail — paired pane present, port numbers verbatim.
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["detail-back"].firstMatch.tap()
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
@@ -248,8 +264,17 @@ final class ScreenshotTests: XCTestCase {
 
         let gateTimes = clockLabels(app)
         let gateHeights = heightLabels(app)
+        // Sun rows joined the schedule (design pass item 7a) and are computed
+        // from each station's own position, so a port sun time may differ from
+        // the gate's by seconds — allow a 1-minute neighbour for those labels.
+        func minutes(_ s: String) -> Int {
+            let parts = s.split(separator: ":")
+            return Int(parts[0])! * 60 + Int(parts[1])!
+        }
         for t in portTimes {
-            XCTAssert(gateTimes.contains(t), "port extreme at \(t) missing from paired view (has \(gateTimes))")
+            let ok = gateTimes.contains(t)
+                || gateTimes.contains { abs(minutes($0) - minutes(t)) <= 1 }
+            XCTAssert(ok, "port event at \(t) missing from paired view (has \(gateTimes))")
         }
         for h in portHeights {
             XCTAssert(gateHeights.contains(h), "port height \(h) missing from paired view (has \(gateHeights))")
@@ -270,6 +295,111 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m4-settings.png")
         app.buttons["Done"].tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+    }
+
+    // M4.1 design pass: the regrouped list — My Location hero (nm pill, 3-dp
+    // coords, no match-grade sentence), Recents after a visit, Near Me, and
+    // nothing else (no catalog section, no units pill).
+    func testM41GroupedListAndRecents() throws {
+        let app = XCUIApplication()
+        // Deterministic Victoria fix via the -fixLat/-fixLon hook.
+        app.launchArguments = ["-seedGate", "-resetRecents",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        // The full-catalog section and the units pill are gone.
+        XCTAssertFalse(app.staticTexts["SALISH SEA"].exists)
+        XCTAssertFalse(app.buttons["FT"].exists)
+        XCTAssertFalse(app.buttons["M"].exists)
+        // Tile copy: coordinates only — no "to station"/match-grade sentence.
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '°N'")).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'to station'")).firstMatch.exists)
+        // No recents yet on a clean run.
+        XCTAssertFalse(app.staticTexts["RECENTS"].exists)
+        sleep(2)
+        save(app, "m41-mylocation-tile.png")
+
+        // Visit a station; it must appear under Recents on return.
+        openFridayHarbor(app)
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()
+        }
+        XCTAssert(app.staticTexts["RECENTS"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
+        sleep(2)
+        save(app, "m41-list-grouped.png")
+    }
+
+    // M4.1: the detail header is the station map with the title overlaid, the
+    // schedule carries sunrise/sunset rows, and the scrubber wears the moon
+    // with its phase name.
+    func testM41DetailMapHeaderSunMoon() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openFridayHarbor(app)
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
+                  "map header missing from tide detail")
+        XCTAssert(app.staticTexts["☀ RISE"].firstMatch.waitForExistence(timeout: 5),
+                  "sunrise row missing from the day schedule")
+        XCTAssert(app.staticTexts["☀ SET"].firstMatch.exists,
+                  "sunset row missing from the day schedule")
+        let phaseNames = "New Moon|Waxing Crescent|First Quarter|Waxing Gibbous|Full Moon|Waning Gibbous|Last Quarter|Waning Crescent"
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
+                  "moon phase name missing from the scrub readout")
+        sleep(6)  // let the header map tiles come in
+        save(app, "m41-detail-mapheader.png")
+
+        // Scrub, then capture the moon-bearing scrub card.
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
+            .press(forDuration: 0.3, thenDragTo:
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72)))
+        sleep(1)
+        save(app, "m41-scrubber-moon.png")
+
+        // The map header carries the current-station detail too.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        if app.buttons["xmark.circle.fill"].firstMatch.exists {
+            app.buttons["xmark.circle.fill"].firstMatch.tap()
+        }
+        let field = app.textFields.firstMatch
+        field.tap()
+        field.typeText("deception")
+        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
+        XCTAssert(gate.waitForExistence(timeout: 5))
+        gate.tap()
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
+                  "map header missing from current detail")
+        XCTAssert(app.staticTexts["☀ RISE"].firstMatch.waitForExistence(timeout: 5),
+                  "sunrise row missing from the current-station schedule")
+    }
+
+    // M4.1: location denied — the amber card sits in the My Location slot
+    // (NearMe.dc.html "unavailable"), above Near Me ranked from the fallback.
+    func testM41DeniedSlot() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-resetRecents", "-locDenied"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Location unavailable"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Go to Settings"].exists)
+        XCTAssertFalse(app.staticTexts["MY LOCATION"].exists)
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        sleep(2)
+        save(app, "m41-denied-slot.png")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

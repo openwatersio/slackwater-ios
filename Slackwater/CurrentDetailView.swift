@@ -19,6 +19,7 @@ struct CurrentDetailView: View {
     @State private var dayPoints: [CurrentPoint] = []
     @State private var dayEvents: [CurrentEvent] = []
     @State private var wideEvents: [CurrentEvent] = []
+    @State private var sunEvents: [SunMoon.SunEvent] = []
     @State private var committedSigned = 0.0
 
     // The paired reference tide port (spec §2: current-led, tide-paired; §9's
@@ -55,6 +56,11 @@ struct CurrentDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
+                // The map is the header (map-hero spec, header portion only).
+                MapHeader(name: record.name, region: "\(record.region) · current",
+                          latitude: record.latitude, longitude: record.longitude,
+                          showReturn: abs(selected.timeIntervalSince(live)) > 60,
+                          onReturn: returnToNow)
                 scrubCard
                 if let port = pairedTide {
                     PairedTidePane(port: port, dayPoints: tideDayPoints,
@@ -67,28 +73,14 @@ struct CurrentDetailView: View {
             }
             .padding(.bottom, 42)
         }
+        .ignoresSafeArea(edges: .top)
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(SN.page, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(record.name).font(.fraunces(19, .semibold)).foregroundStyle(.white)
-                    MonoLabel(text: "\(record.region) · current", size: 9,
-                              color: SN.foam.opacity(0.8), tracking: 1.5)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if abs(selected.timeIntervalSince(live)) > 60 {
-                    Button { returnToNow() } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .foregroundStyle(SN.leaf)
-                    }
-                }
-            }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            recompute()
+            RecentsStore.shared.record("current:" + record.id)
         }
-        .onAppear { recompute() }
         .onChange(of: dayKey(selected)) { recompute() }
         .onChange(of: selected) { committedSigned = exactSigned(at: selected) }
     }
@@ -114,6 +106,17 @@ struct CurrentDetailView: View {
                         .contentTransition(.numericText())
                 }
                 Spacer()
+                // Integrated moon (prototype scrubMoon + scrubMoonName).
+                let moon = SunMoon.moonIllumination(date: effective)
+                HStack(spacing: 8) {
+                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
+                    Text(SunMoon.phaseName(phase: moon.phase))
+                        .font(.geist(11))
+                        .foregroundStyle(SN.foam.opacity(0.6))
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 88, alignment: .trailing)
+                }
+                .padding(.top, 2)
             }
 
             HStack(alignment: .bottom) {
@@ -177,7 +180,40 @@ struct CurrentDetailView: View {
         let t1 = dayPoints.last?.time ?? selected
         let effectiveClamped = min(max(effective, t0), t1)
 
+        let sunrise = sunEvents.first { $0.kind == .sunrise }?.time
+        let sunset = sunEvents.first { $0.kind == .sunset }?.time
+        let sunY = maxV + 0.16 * range
+        let moon = SunMoon.moonIllumination(date: selected)
+
         return Chart {
+            // Night bands + sun/moon integrated into the scrubber (prototype
+            // innerChart), same treatment as the tide chart.
+            if let sunrise {
+                RectangleMark(xStart: .value("Night", t0), xEnd: .value("Sunrise", sunrise))
+                    .foregroundStyle(SN.night.opacity(0.52))
+            }
+            if let sunset {
+                RectangleMark(xStart: .value("Sunset", sunset), xEnd: .value("Night", t1))
+                    .foregroundStyle(SN.night.opacity(0.52))
+                PointMark(x: .value("Moon", sunset.addingTimeInterval(t1.timeIntervalSince(sunset) / 2)),
+                          y: .value("Sky", sunY))
+                    .symbolSize(0)
+                    .annotation(position: .overlay) {
+                        MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 16)
+                            .shadow(color: Color(hex: 0xCFE0FF, opacity: 0.1 + moon.fraction * 0.6),
+                                    radius: 5 + moon.fraction * 9)
+                    }
+            }
+            ForEach(sunEvents, id: \.time) { e in
+                PointMark(x: .value("Time", e.time), y: .value("Sky", sunY))
+                    .symbolSize(38)
+                    .foregroundStyle(SN.sun)
+                    .annotation(position: .top, spacing: 3) {
+                        Text("\(e.kind == .sunrise ? "↑" : "↓")\(cardTime(e.time, tz).replacingOccurrences(of: " ", with: ""))")
+                            .font(.geistMono(9, .medium))
+                            .foregroundStyle(SN.sunrise)
+                    }
+            }
             // Flood lobe above zero, ebb lobe below — two clamped fills against
             // the zero baseline (web's one ribbon polygon, in Charts terms).
             ForEach(dayPoints, id: \.time) { p in
@@ -321,6 +357,7 @@ struct CurrentDetailView: View {
                         switch row {
                         case .current(let e): eventPill(e)
                         case .tide(let e): tidePill(e)
+                        case .sun(let e): SunPill(kind: e.kind)
                         }
                         Text(clockTime(row.time, tz))
                             .font(.geistMono(15)).foregroundStyle(SN.foam)
@@ -339,6 +376,8 @@ struct CurrentDetailView: View {
                             (Text(formatHeight(e.height, imperial: units == "imperial")).font(.geist(15, .medium))
                              + Text(" \(heightUnit(imperial: units == "imperial"))").font(.geist(12)))
                                 .foregroundStyle(SN.foam.opacity(0.75))
+                        case .sun:
+                            Text("—").font(.geist(15)).foregroundStyle(SN.foam.opacity(0.5))
                         }
                     }
                     .padding(.horizontal, 16)
@@ -412,20 +451,24 @@ struct CurrentDetailView: View {
         .padding(.top, 8)
     }
 
-    /// One chronological schedule: gate events plus paired tide highs/lows.
+    /// One chronological schedule: gate events, paired tide highs/lows, and
+    /// sunrise/sunset (web dayEvents; prototype table).
     private enum ScheduleRow {
         case current(CurrentEvent)
         case tide(TideExtreme)
+        case sun(SunMoon.SunEvent)
         var time: Date {
             switch self {
             case .current(let e): e.time
             case .tide(let e): e.time
+            case .sun(let e): e.time
             }
         }
     }
 
     private var scheduleRows: [ScheduleRow] {
-        (dayEvents.map(ScheduleRow.current) + tideDayExtremes.map(ScheduleRow.tide))
+        (dayEvents.map(ScheduleRow.current) + tideDayExtremes.map(ScheduleRow.tide)
+         + sunEvents.map(ScheduleRow.sun))
             .sorted { $0.time < $1.time }
     }
 
@@ -461,6 +504,8 @@ struct CurrentDetailView: View {
         wideEvents = station.events(from: start.addingTimeInterval(-day),
                                     to: end.addingTimeInterval(day))
         dayEvents = wideEvents.filter { $0.time >= start && $0.time < end }
+        sunEvents = SunMoon.sunEvents(lat: record.latitude, lon: record.longitude,
+                                      tz: tz, day: selected)
         committedSigned = exactSigned(at: selected)
         // Paired tide: identical calls to TideDetailView.recompute, so the
         // pane's numbers ARE the port's own detail numbers.

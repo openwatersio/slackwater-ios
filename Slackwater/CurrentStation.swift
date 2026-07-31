@@ -138,6 +138,13 @@ enum StationItem: Identifiable, Hashable {
         case .chs(let s): s.name
         }
     }
+    var region: String {
+        switch self {
+        case .tide(let s): s.region
+        case .current(let s): s.region
+        case .chs(let s): s.region
+        }
+    }
     func searchRank(_ query: String) -> Int? {
         switch self {
         case .tide(let s): s.searchRank(query)

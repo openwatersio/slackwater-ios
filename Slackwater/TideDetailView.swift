@@ -22,6 +22,7 @@ struct TideDetailView: View {
     @State private var dayPoints: [TidePoint] = []
     @State private var dayExtremes: [TideExtreme] = []
     @State private var wideExtremes: [TideExtreme] = []
+    @State private var sunEvents: [SunMoon.SunEvent] = []
     @State private var committedHeight = 0.0
 
     private var imperial: Bool { units == "imperial" }
@@ -46,33 +47,25 @@ struct TideDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
+                // The map is the header (map-hero spec, header portion only).
+                MapHeader(name: record.name, region: record.region,
+                          latitude: record.latitude, longitude: record.longitude,
+                          showReturn: abs(selected.timeIntervalSince(live)) > 60,
+                          onReturn: returnToNow)
                 scrubCard
                 scheduleCard
                 footer
             }
             .padding(.bottom, 42)
         }
+        .ignoresSafeArea(edges: .top)
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)  // chart axis strides in station-local hours
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(SN.page, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(record.name).font(.fraunces(19, .semibold)).foregroundStyle(.white)
-                    MonoLabel(text: record.region, size: 9, color: SN.foam.opacity(0.8), tracking: 1.5)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if abs(selected.timeIntervalSince(live)) > 60 {
-                    Button { returnToNow() } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .foregroundStyle(SN.leaf)
-                    }
-                }
-            }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            recompute()
+            RecentsStore.shared.record(record.id)
         }
-        .onAppear { recompute() }
         .onChange(of: dayKey(selected)) { recompute() }
         .onChange(of: selected) { committedHeight = exactHeight(at: selected) }
     }
@@ -90,6 +83,18 @@ struct TideDetailView: View {
                         .contentTransition(.numericText())
                 }
                 Spacer()
+                // Integrated moon (prototype scrubMoon + scrubMoonName): its
+                // fullness tracks the scrubbed day.
+                let moon = SunMoon.moonIllumination(date: effective)
+                HStack(spacing: 8) {
+                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
+                    Text(SunMoon.phaseName(phase: moon.phase))
+                        .font(.geist(11))
+                        .foregroundStyle(SN.foam.opacity(0.6))
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 88, alignment: .trailing)
+                }
+                .padding(.top, 2)
             }
 
             HStack(alignment: .bottom) {
@@ -145,7 +150,41 @@ struct TideDetailView: View {
         let t1 = dayPoints.last?.time ?? selected
         let effectiveClamped = min(max(effective, t0), t1)
 
+        let sunrise = sunEvents.first { $0.kind == .sunrise }?.time
+        let sunset = sunEvents.first { $0.kind == .sunset }?.time
+        let sunY = maxH + 0.16 * range
+        let moon = SunMoon.moonIllumination(date: selected)
+
         return Chart {
+            // Night bands + sun/moon integrated into the scrubber (prototype
+            // innerChart: night rects, sun rise/set dots, per-night moon).
+            if let sunrise {
+                RectangleMark(xStart: .value("Night", t0), xEnd: .value("Sunrise", sunrise))
+                    .foregroundStyle(SN.night.opacity(0.52))
+            }
+            if let sunset {
+                RectangleMark(xStart: .value("Sunset", sunset), xEnd: .value("Night", t1))
+                    .foregroundStyle(SN.night.opacity(0.52))
+                // The night's moon, fullness per SunMoon (prototype moonGlyphEl).
+                PointMark(x: .value("Moon", sunset.addingTimeInterval(t1.timeIntervalSince(sunset) / 2)),
+                          y: .value("Sky", sunY))
+                    .symbolSize(0)
+                    .annotation(position: .overlay) {
+                        MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 16)
+                            .shadow(color: Color(hex: 0xCFE0FF, opacity: 0.1 + moon.fraction * 0.6),
+                                    radius: 5 + moon.fraction * 9)
+                    }
+            }
+            ForEach(sunEvents, id: \.time) { e in
+                PointMark(x: .value("Time", e.time), y: .value("Sky", sunY))
+                    .symbolSize(38)
+                    .foregroundStyle(SN.sun)
+                    .annotation(position: .top, spacing: 3) {
+                        Text("\(e.kind == .sunrise ? "↑" : "↓")\(cardTime(e.time, tz).replacingOccurrences(of: " ", with: ""))")
+                            .font(.geistMono(9, .medium))
+                            .foregroundStyle(SN.sunrise)
+                    }
+            }
             ForEach(dayPoints, id: \.time) { p in
                 AreaMark(x: .value("Time", p.time), y: .value("Height", display(p.height)))
                     .interpolationMethod(.catmullRom)
@@ -257,26 +296,38 @@ struct TideDetailView: View {
             }
             .padding(16)
 
-            ForEach(dayExtremes, id: \.time) { e in
+            // Tide turns and sunrise/sunset, one chronological table (web
+            // dayEvents; prototype table's ☀ Rise / ☀ Set pills).
+            ForEach(dayRows, id: \.time) { row in
                 Divider().overlay(Color.white.opacity(0.08))
-                Button { selected = e.time } label: {
+                Button { selected = row.time } label: {
                     HStack {
-                        Text(e.kind == .high ? "↑ HIGH" : "↓ LOW")
-                            .font(.geistMono(10, .medium)).tracking(0.5)
-                            .foregroundStyle(SN.navyDeep)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(e.kind == .high ? SN.rising : SN.falling, in: Capsule())
-                        Text(clockTime(e.time, tz))
+                        switch row {
+                        case .tide(let e):
+                            Text(e.kind == .high ? "↑ HIGH" : "↓ LOW")
+                                .font(.geistMono(10, .medium)).tracking(0.5)
+                                .foregroundStyle(SN.navyDeep)
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(e.kind == .high ? SN.rising : SN.falling, in: Capsule())
+                        case .sun(let e):
+                            SunPill(kind: e.kind)
+                        }
+                        Text(clockTime(row.time, tz))
                             .font(.geistMono(15)).foregroundStyle(SN.foam)
                             .padding(.leading, 6)
                         Spacer()
-                        (Text(formatHeight(e.height, imperial: imperial)).font(.geist(15, .medium))
-                         + Text(" \(unit)").font(.geist(12)))
-                            .foregroundStyle(SN.foam)
+                        switch row {
+                        case .tide(let e):
+                            (Text(formatHeight(e.height, imperial: imperial)).font(.geist(15, .medium))
+                             + Text(" \(unit)").font(.geist(12)))
+                                .foregroundStyle(SN.foam)
+                        case .sun:
+                            Text("—").font(.geist(15)).foregroundStyle(SN.foam.opacity(0.5))
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 11)
-                    .opacity(e.time < effective ? 0.45 : 1)  // past rows dim, like the web
+                    .opacity(row.time < effective ? 0.45 : 1)  // past rows dim, like the web
                 }
                 .buttonStyle(.plain)
             }
@@ -320,6 +371,23 @@ struct TideDetailView: View {
 
     // MARK: - Data
 
+    /// Tide turns + sun events for the selected day, in the order they happen.
+    private enum DayRow {
+        case tide(TideExtreme)
+        case sun(SunMoon.SunEvent)
+        var time: Date {
+            switch self {
+            case .tide(let e): e.time
+            case .sun(let e): e.time
+            }
+        }
+    }
+
+    private var dayRows: [DayRow] {
+        (dayExtremes.map(DayRow.tide) + sunEvents.map(DayRow.sun))
+            .sorted { $0.time < $1.time }
+    }
+
     private var relativeDayLabel: String {
         switch dayOffset {
         case 0: "Today"
@@ -342,6 +410,8 @@ struct TideDetailView: View {
         wideExtremes = station.extremes(from: start.addingTimeInterval(-day),
                                         to: end.addingTimeInterval(day))
         dayExtremes = wideExtremes.filter { $0.time >= start && $0.time < end }
+        sunEvents = SunMoon.sunEvents(lat: record.latitude, lon: record.longitude,
+                                      tz: tz, day: selected)
         committedHeight = exactHeight(at: selected)
     }
 
