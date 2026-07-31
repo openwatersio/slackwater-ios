@@ -208,6 +208,7 @@ struct StationListView: View {
             }
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
             .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+            .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -234,6 +235,7 @@ struct StationListView: View {
                 }
                 .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
                 .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
+                .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
                 .toolbar(.hidden, for: .navigationBar)
             }
         }
@@ -324,6 +326,11 @@ struct StationListView: View {
             // A pending/fitting port has nothing to show — leave the path be.
             if case .fitted(let record) = ChsFitService.shared.state(info.id) {
                 path = NavigationPath(); path.append(record)
+            }
+        case .chsGate(let gate):
+            // A gate is openable exactly when its reference port is fitted.
+            if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
+                path = NavigationPath(); path.append(DerivedGateRecord(gate: gate, port: port))
             }
         }
     }
@@ -467,6 +474,10 @@ struct StationListView: View {
             if case .fitted(let record) = ChsFitService.shared.state(info.id) {
                 NavigationLink(value: record) { EmptyView() }.opacity(0)
             }
+        case .chsGate(let gate):
+            if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
+                NavigationLink(value: DerivedGateRecord(gate: gate, port: port)) { EmptyView() }.opacity(0)
+            }
         }
     }
 
@@ -478,6 +489,8 @@ struct StationListView: View {
             activatable(CurrentCardView(record: station), item)
         case .chs(let info):
             activatable(ChsCardView(info: info, imperial: imperial), item)
+        case .chsGate(let gate):
+            activatable(ChsGateCardView(gate: gate), item)
         }
     }
 
@@ -620,6 +633,7 @@ struct StationListView: View {
             case .tide(let s): StationCardView(record: s, imperial: imperial)
             case .current(let s): CurrentCardView(record: s)
             case .chs(let info): ChsCardView(info: info, imperial: imperial)
+            case .chsGate(let gate): ChsGateCardView(gate: gate)
             }
         }
         .contentShape(Rectangle())
@@ -719,6 +733,7 @@ struct RecentRowLabel: View {
     // Cache the engine value, format in body — unit switches re-render live.
     @State private var height: Double?
     @State private var signed: Double?
+    @State private var gatePhase: DerivedPhase?  // derived gate: phase word, never a speed
 
     var body: some View {
         HStack(spacing: 12) {
@@ -752,6 +767,7 @@ struct RecentRowLabel: View {
     }
 
     private var reading: String {
+        if let gatePhase { return phaseWord(gatePhase).lowercased() }
         if let signed {
             return currentPhase(signed: signed) == .slack
                 ? "slack" : "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
@@ -769,6 +785,9 @@ struct RecentRowLabel: View {
         case .chs(let info):
             guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
             height = record.cardState(at: appNow()).height
+        case .chsGate(let gate):
+            guard case .fitted(let port) = ChsFitService.shared.state(gate.reference) else { return }
+            gatePhase = DerivedGateRecord(gate: gate, port: port).cardState(at: appNow()).phase
         }
     }
 }
@@ -839,22 +858,34 @@ struct ChsCardView: View {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial)
         case .fitting:
-            pendingCard("Downloading Canadian tidal predictions…")
+            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+                           message: "Downloading Canadian tidal predictions…")
         case .pending:
-            pendingCard("Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
+            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+                           message: "Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
         }
     }
+}
 
-    private func pendingCard(_ message: String) -> some View {
+/// The not-yet-fitted CHS shell: identity + an honest message, no numbers
+/// (chs-online spec §7c). Shared by the tide ports and the derived gates —
+/// a gate is pending exactly while its reference port is.
+struct ChsPendingCard: View {
+    let name: String
+    let region: String
+    let id: String
+    let message: String
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(info.name)
+                    Text(name)
                         .font(.fraunces(23, .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    Text(info.region)
+                    Text(region)
                         .font(.geist(13))
                         .foregroundStyle(SN.foam.opacity(0.78))
                 }
@@ -871,10 +902,72 @@ struct ChsCardView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: info.id))
+        .background(stationGradient(id: id))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .opacity(0.82)  // visibly quieter than a station with numbers
+    }
+}
+
+/// A derived current gate's card (web StationCard's derived layout): identity,
+/// "Slack · time" as the next line, and a compact phase pill — a derived gate
+/// has no speed, so the reading is never a number (chs/current.ts). Pending
+/// while the reference port is unfitted, in the same register as the ports.
+struct ChsGateCardView: View {
+    let gate: ChsGateInfo
+    @ObservedObject private var service = ChsFitService.shared
+    @State private var state: DerivedGateCardState?
+
+    var body: some View {
+        switch service.state(gate.reference) {
+        case .fitted(let port):
+            fittedCard(DerivedGateRecord(gate: gate, port: port))
+        case .fitting:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Downloading Canadian tidal predictions…")
+        case .pending:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
+        }
+    }
+
+    private func fittedCard(_ record: DerivedGateRecord) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(gate.name)
+                        .font(.fraunces(23, .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(gate.region)
+                        .font(.geist(13))
+                        .foregroundStyle(SN.foam.opacity(0.78))
+                    if let next = state?.nextSlack {
+                        Text("Slack · \(cardTime(next.time, gate.tz))")
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.92))
+                            .padding(.top, 10)
+                    }
+                }
+                Spacer(minLength: 8)
+                if let state {
+                    // The web's phase-pill words: flood / ebb / slack.
+                    Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
+                        .font(.geistMono(11, .medium)).tracking(1)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(Color.white.opacity(0.18), in: Capsule())
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .background(stationGradient(id: gate.id))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
+        .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 }
 

@@ -748,6 +748,115 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
+    // M4.6: the derived gate (Malibu Rapids) — pending while its reference
+    // port (Point Atkinson) is unfitted, held there by the network kill switch.
+    func testM46MalibuPendingBeforeFit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openSearch(app, "malibu")
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+                  "search did not find Malibu Rapids")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions download once'"))
+            .firstMatch.waitForExistence(timeout: 10),
+                  "derived gate must show the CHS pending register before its reference is fitted")
+    }
+
+    // M4.6: after the reference port fits (live IWLS, like M3), the gate card
+    // shows the phase pill + next slack, and the detail renders the dual-track
+    // strip, slack rows with no speeds, and the derived provenance copy.
+    func testM46MalibuDerivedGate() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // The gate opens exactly when Point Atkinson's fit lands (M3 fits all
+        // pending Salish ports on launch; a previously fitted store is
+        // instant). A pending card swallows the tap without navigating, so
+        // retry tap → check until the detail appears. (Label predicates can't
+        // gate this: accessibilityHidden(searching) does not exclude the base
+        // list from XCUITest queries, so a NOAA card's "Slack · …" leaks
+        // through — cost this test its first green.)
+        openSearch(app, "malibu")
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+                  "search did not find Malibu Rapids")
+        var opened = false
+        for _ in 0..<20 {  // ~5 min ceiling — covers a from-scratch fit chain
+            app.staticTexts["Malibu Rapids"].firstMatch.tap()  // closes search either way
+            if app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 8) {
+                opened = true
+                break
+            }
+            XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+            sleep(8)  // let the fit chain advance before retrying
+            openSearch(app, "malibu")
+            XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5))
+        }
+        XCTAssert(opened, "gate never opened — Point Atkinson fit missing (IWLS unreachable?)")
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 5),
+                  "reference-port tide readout missing from the gate detail")
+        XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
+                  "slack rows missing from the schedule")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'speeds are not predicted'")).firstMatch.exists,
+                  "the shape-only note is missing")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
+            .waitForExistence(timeout: 5),
+                  "derived provenance footer missing")
+        // No knots anywhere: a derived gate never shows a speed. iPhone only —
+        // the iPad split keeps the sidebar (and its NOAA "kn" cards) on screen
+        // beside the detail, so the whole-hierarchy sweep would catch those.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertFalse(app.staticTexts.matching(
+                NSPredicate(format: "label MATCHES %@", "^\\d+\\.\\d+ kn$")).firstMatch.exists,
+                           "a derived gate must never render a speed")
+        }
+        sleep(5)  // header map tiles
+        save(app, "m46-malibu-detail.png")
+
+        // Print today's rendered schedule times for the verification table.
+        let labels = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^\\d{2}:\\d{2}$")).allElementsBoundByIndex
+        print("M46-SCHEDULE-TIMES: \(labels.compactMap { $0.exists ? $0.label : nil })")
+
+        // The live card (PA fitted now): "Slack · time" line + the phase pill.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        openSearch(app, "malibu")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Slack ·'")).firstMatch.waitForExistence(timeout: 5),
+                  "live gate card missing its next-slack line")
+        sleep(1)
+        save(app, "m46-malibu-card.png")
+        closeSearch(app)
+
+        // Map: the gate pins at the channel position. Pan north from the
+        // Salish camera toward Jervis Inlet so the pin is on screen.
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(4)  // tiles
+        // Malibu (50.16, -123.85) sits north-west of the camera — drag the
+        // map content south-east to bring the pin into the frame's middle
+        // (one full drag + one short one; two full drags left it at the edge).
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
+            .press(forDuration: 0.1, thenDragTo:
+                map.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.8)))
+        sleep(1)
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.35))
+            .press(forDuration: 0.1, thenDragTo:
+                map.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.62)))
+        sleep(1)
+        sleep(2)
+        save(app, "m46-malibu-map.png")
+    }
+
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The
     /// tide detail's set must be a subset of the paired view's merged set.
     private func clockLabels(_ app: XCUIApplication) -> Set<String> {

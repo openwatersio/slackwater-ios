@@ -1,0 +1,18 @@
+[
+ {
+  "id": "chs-malibu-rapids",
+  "name": "Malibu Rapids",
+  "region": "Princess Louisa Inlet",
+  "aliases": [
+   "princess louisa",
+   "malibu islet"
+  ],
+  "latitude": 50.1626,
+  "longitude": -123.8515,
+  "timezone": "America/Vancouver",
+  "reference": "chs-point-atkinson",
+  "referenceName": "Point Atkinson",
+  "hwLagMinutes": 25,
+  "lwLagMinutes": 35
+ }
+]

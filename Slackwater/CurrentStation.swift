@@ -119,12 +119,14 @@ enum StationItem: Identifiable, Hashable {
     case tide(TideStationRecord)
     case current(CurrentStationRecord)
     case chs(ChsStationInfo)   // Canadian tide port: identity bundled, model fitted on-device
+    case chsGate(ChsGateInfo)  // derived current gate: slack from a reference port's fitted tide
 
     var id: String {
         switch self {
         case .tide(let s): s.id
         case .current(let s): "current:" + s.id  // Friday Harbor has both a tide and a current station
         case .chs(let s): s.id
+        case .chsGate(let s): s.id
         }
     }
     var name: String {
@@ -132,6 +134,7 @@ enum StationItem: Identifiable, Hashable {
         case .tide(let s): s.name
         case .current(let s): s.name
         case .chs(let s): s.name
+        case .chsGate(let s): s.name
         }
     }
     var region: String {
@@ -139,6 +142,7 @@ enum StationItem: Identifiable, Hashable {
         case .tide(let s): s.region
         case .current(let s): s.region
         case .chs(let s): s.region
+        case .chsGate(let s): s.region
         }
     }
     func searchRank(_ query: String) -> Int? {
@@ -146,6 +150,7 @@ enum StationItem: Identifiable, Hashable {
         case .tide(let s): s.searchRank(query)
         case .current(let s): s.searchRank(query)
         case .chs(let s): s.searchRank(query)
+        case .chsGate(let s): s.searchRank(query)
         }
     }
     var latitude: Double {
@@ -153,6 +158,7 @@ enum StationItem: Identifiable, Hashable {
         case .tide(let s): s.latitude
         case .current(let s): s.latitude
         case .chs(let s): s.latitude
+        case .chsGate(let s): s.latitude
         }
     }
     var longitude: Double {
@@ -160,13 +166,15 @@ enum StationItem: Identifiable, Hashable {
         case .tide(let s): s.longitude
         case .current(let s): s.longitude
         case .chs(let s): s.longitude
+        case .chsGate(let s): s.longitude
         }
     }
-    /// Map pin class per the design tokens: tide / current / chs.
+    /// Map pin class per the design tokens: tide / current / chs. A derived
+    /// gate is a current gate (web chsStations.ts: series "current").
     var pinKind: String {
         switch self {
         case .tide: "tide"
-        case .current: "current"
+        case .current, .chsGate: "current"
         case .chs: "chs"
         }
     }
@@ -180,6 +188,7 @@ enum StationItem: Identifiable, Hashable {
         var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
         merged += CurrentStationRecord.all.map { StationItem.current($0) }
         merged += ChsStationInfo.all.map { StationItem.chs($0) }
+        merged += ChsGateInfo.all.map { StationItem.chsGate($0) }
         merged.sort { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
         guard let friday = merged.first(where: { $0.id == TideStationRecord.fridayHarborID }) else { return merged }
         return [friday] + merged.filter { $0.id != friday.id }

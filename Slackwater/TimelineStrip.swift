@@ -75,12 +75,20 @@ struct TimelineData {
         return prev.1
     }
 
+    /// A derived gate's strip: the reference port's tide above, the schematic
+    /// current below. The current track is a magnitude-less half-sine shape
+    /// (±1, NOT a speed — web chs/current.ts schematicSignedAt) with slack
+    /// events only: no peaks, so no speed labels and no FLOOD/EBB lines.
+    static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
+        build(tide: gate.port, current: nil, now: now, gate: gate)
+    }
+
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
-                      now: Date) -> TimelineData {
+                      now: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
         // The primary station names the timezone and the sky position.
-        let tz = current?.tz ?? tide?.tz ?? .current
-        let lat = current?.latitude ?? tide?.latitude ?? 48.5
-        let lon = current?.longitude ?? tide?.longitude ?? -123.0
+        let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
+        let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
+        let lon = gate?.gate.longitude ?? current?.longitude ?? tide?.longitude ?? -123.0
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)
@@ -112,6 +120,17 @@ struct TimelineData {
             currentPoints = s.speeds(from: start, to: end, step: 600)
             currentEvents = s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad))
+        }
+        if let gate {
+            let g = gate.engineGate
+            let slacks = g.slacks(from: start.addingTimeInterval(-pad),
+                                  to: end.addingTimeInterval(pad))
+            currentEvents = slacks.map { CurrentEvent(time: $0.time, speed: 0, kind: .slack) }
+            var t = start
+            while t <= end {
+                currentPoints.append(CurrentPoint(time: t, speed: g.schematicSigned(at: t, slacks: slacks)))
+                t = t.addingTimeInterval(600)
+            }
         }
 
         let sunTimes = days.filter { $0.offset <= 5 }
