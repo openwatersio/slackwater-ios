@@ -24,11 +24,11 @@ final class ScreenshotTests: XCTestCase {
         openFridayHarbor(app)
         sleep(2)
 
-        // Scrub: drag across the chart plot (below the map header), release —
-        // crosshair persists.
+        // Scrub: pan the strip under the fixed centerline (drag left = later),
+        // release — the readout keeps the scrubbed time.
         let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72))
+        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
+        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8))
         from.press(forDuration: 0.3, thenDragTo: to)
         sleep(1)
         save(app, "m1-detail-scrubbed.png")
@@ -107,11 +107,11 @@ final class ScreenshotTests: XCTestCase {
         sleep(2)
         save(app, "m2-current-detail.png")
 
-        // Scrub: drag across the plot (below the map header), release —
-        // crosshair persists.
+        // Scrub: pan the combined tide+current strip (it sits lower on the
+        // gate detail — port tide readout above it), release.
         let window = app.windows.firstMatch
-        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
-        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72))
+        let from = window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.88))
+        let to = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.88))
         from.press(forDuration: 0.3, thenDragTo: to)
         sleep(1)
         save(app, "m2-current-scrubbed.png")
@@ -362,9 +362,9 @@ final class ScreenshotTests: XCTestCase {
 
         // Scrub, then capture the moon-bearing scrub card.
         let window = app.windows.firstMatch
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.72))
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
             .press(forDuration: 0.3, thenDragTo:
-                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.72)))
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.8)))
         sleep(1)
         save(app, "m41-scrubber-moon.png")
 
@@ -400,6 +400,58 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["NEAR ME"].exists)
         sleep(2)
         save(app, "m41-denied-slot.png")
+    }
+
+    // M4.2: the continuous scrub — a fixed centerline with the multi-day strip
+    // panning underneath. Scrubbing across midnight lands on the next day's
+    // events; the schedule shows several days under day headers; a row tap
+    // scrubs cross-day; return-to-now comes home.
+    func testM42ContinuousScrubAcrossMidnight() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openFridayHarbor(app)
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "pan-under-centerline strip missing from tide detail")
+
+        // The multi-day schedule carries day headers beyond today.
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Tomorrow"].waitForExistence(timeout: 5),
+                  "multi-day schedule missing its Tomorrow day header")
+
+        // Pan the strip: the centerline readout moves off "now".
+        let window = app.windows.firstMatch
+        window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.8))
+            .press(forDuration: 0.3, thenDragTo:
+                window.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.8)))
+        sleep(1)
+        XCTAssert(app.buttons["Return to now"].waitForExistence(timeout: 5),
+                  "return-to-now affordance missing after scrubbing away")
+        save(app, "m42-scrub-center.png")
+
+        // Multi-day list, day-grouped.
+        app.swipeUp()
+        sleep(1)
+        save(app, "m42-multiday-list.png")
+
+        // Tap one of Tomorrow's rows: the scrub crosses midnight to it.
+        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
+        XCTAssert(tomorrowRow.waitForExistence(timeout: 5), "no Tomorrow rows in the schedule")
+        tomorrowRow.tap()
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'TOMORROW'")).firstMatch.waitForExistence(timeout: 5),
+                  "readout did not follow the cross-midnight scrub")
+        app.swipeDown()
+        sleep(1)
+        save(app, "m42-scrub-midnight.png")
+
+        // Return to now: the readout comes back to Today.
+        app.buttons["Return to now"].firstMatch.tap()
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'TODAY'")).firstMatch.waitForExistence(timeout: 5),
+                  "return-to-now did not restore the live readout")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

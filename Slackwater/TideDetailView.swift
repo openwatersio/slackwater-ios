@@ -1,91 +1,77 @@
-// Slackwater — GPL v3. Tide detail, variant 1b Modular: uniform dark canvas,
-// data-forward, the day curve as the hero with a scrubbable crosshair.
-// Behavior mirrors slackwater-web: drag previews, release snaps to a turn
-// within 30 minutes and commits; the schedule pages by day; rows scrub.
+// Slackwater — GPL v3. Tide detail on the iOS scrub model (prototype
+// TidesApp.dc.html, not the web's): a FIXED reading line at the center of the
+// strip, the continuous multi-day curve panning underneath it. No day pager —
+// free panning plus the map header's return-to-now. The schedule below is a
+// rolling multi-day list (today → +54h) with day headers; rows scrub, cross-day.
 import SwiftUI
-import Charts
 import TideEngine
-
-private let day = 86_400.0
 
 struct TideDetailView: View {
     let record: TideStationRecord
     @AppStorage(unitsKey) private var units = "imperial"
 
     @State private var live = appNow()
-    /// The committed instant everything reads (web's `now`): scrub release,
-    /// row taps and day paging all move it.
-    @State private var selected = appNow()
-    /// Finger-down preview, distinct from `selected` until release (web useScrub).
-    @State private var preview: Date?
-
-    @State private var dayPoints: [TidePoint] = []
-    @State private var dayExtremes: [TideExtreme] = []
-    @State private var wideExtremes: [TideExtreme] = []
-    @State private var sunEvents: [SunMoon.SunEvent] = []
-    @State private var committedHeight = 0.0
+    /// The single scrub time — whatever sits under the centerline.
+    @State private var scrubTime = appNow()
+    @State private var timeline: TimelineData?
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
-    private var calendar: Calendar {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-        return cal
+    private var unit: String { heightUnit(imperial: imperial) }
+    private var scrubHeight: Double { exactHeight(at: scrubTime) }
+    private var nextExtreme: TideExtreme? {
+        timeline?.tideExtremes.first { $0.time > scrubTime }
     }
-    private var effective: Date { preview ?? selected }
-    private var effectiveHeight: Double {
-        preview.map { interpolated(at: $0) } ?? committedHeight
-    }
-    private var nextExtreme: TideExtreme? { wideExtremes.first { $0.time > effective } }
     private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
     private var dayOffset: Int {
-        calendar.dateComponents([.day], from: calendar.startOfDay(for: live),
-                                to: calendar.startOfDay(for: selected)).day ?? 0
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal.dateComponents([.day], from: cal.startOfDay(for: live),
+                                  to: cal.startOfDay(for: scrubTime)).day ?? 0
     }
-    private var unit: String { heightUnit(imperial: imperial) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                // The map is the header (map-hero spec, header portion only).
                 MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
-                          showReturn: abs(selected.timeIntervalSince(live)) > 60,
+                          showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
                           onReturn: returnToNow)
-                scrubCard
-                scheduleCard
+                if let timeline {
+                    scrubCard(timeline)
+                    scheduleCard(timeline)
+                }
                 footer
             }
             .padding(.bottom, 42)
         }
         .ignoresSafeArea(edges: .top)
         .background(SN.page.ignoresSafeArea())
-        .environment(\.timeZone, tz)  // chart axis strides in station-local hours
+        .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            recompute()
+            if timeline == nil {
+                timeline = TimelineData.build(tide: record, current: nil, now: live)
+            }
             RecentsStore.shared.record(record.id)
         }
-        .onChange(of: dayKey(selected)) { recompute() }
-        .onChange(of: selected) { committedHeight = exactHeight(at: selected) }
     }
 
-    // MARK: - Scrub card (readout + chart)
+    // MARK: - Scrub card (readout + pan-under-centerline strip)
 
-    private var scrubCard: some View {
+    private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel) · \(dayLine(effective, tz))", size: 11)
-                    Text(cardTime(effective, tz))
+                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))", size: 11)
+                    Text(cardTime(scrubTime, tz))
                         .font(.fraunces(30, .medium))
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
                 Spacer()
-                // Integrated moon (prototype scrubMoon + scrubMoonName): its
-                // fullness tracks the scrubbed day.
-                let moon = SunMoon.moonIllumination(date: effective)
+                // Moon for the scrubbed day (prototype scrubMoon + scrubMoonName).
+                let moon = SunMoon.moonIllumination(date: scrubTime)
                 HStack(spacing: 8) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
                     Text(SunMoon.phaseName(phase: moon.phase))
@@ -99,7 +85,7 @@ struct TideDetailView: View {
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
-                    (Text(formatHeight(effectiveHeight, imperial: imperial)).font(.fraunces(34))
+                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.fraunces(34))
                      + Text(" \(unit)").font(.geist(14)))
                         .foregroundStyle(.white)
                     HStack(spacing: 4) {
@@ -115,18 +101,19 @@ struct TideDetailView: View {
                                   size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
                             .font(.fraunces(19)).foregroundStyle(SN.foam)
-                        Text("in \(countdown(from: effective, to: next.time)) · \(cardTime(next.time, tz))")
+                        Text("in \(countdown(from: scrubTime, to: next.time)) · \(cardTime(next.time, tz))")
                             .font(.geist(12)).foregroundStyle(SN.leaf)
                     }
                 }
             }
             .padding(.top, 14)
 
-            chart
-                .frame(height: 240)
+            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                               imperial: imperial, now: live, scrubTime: $scrubTime)
+                .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
                 .padding(.top, 12)
 
-            MonoLabel(text: "‹ drag to scrub · snaps to high & low ›",
+            MonoLabel(text: "‹ swipe to scrub · snaps to high & low ›",
                       size: 9, color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
@@ -140,209 +127,31 @@ struct TideDetailView: View {
         }
     }
 
-    private var chart: some View {
-        let display: (Double) -> Double = { self.imperial ? toFeet($0) : $0 }
-        let levels = dayPoints.map { display($0.height) }
-        let minH = levels.min() ?? 0
-        let maxH = levels.max() ?? 1
-        let range = max(maxH - minH, 0.001)
-        let t0 = dayPoints.first?.time ?? selected
-        let t1 = dayPoints.last?.time ?? selected
-        let effectiveClamped = min(max(effective, t0), t1)
+    // MARK: - Rolling multi-day schedule (turns + sun, day-grouped)
 
-        let sunrise = sunEvents.first { $0.kind == .sunrise }?.time
-        let sunset = sunEvents.first { $0.kind == .sunset }?.time
-        let sunY = maxH + 0.16 * range
-        let moon = SunMoon.moonIllumination(date: selected)
-
-        return Chart {
-            // Night bands + sun/moon integrated into the scrubber (prototype
-            // innerChart: night rects, sun rise/set dots, per-night moon).
-            if let sunrise {
-                RectangleMark(xStart: .value("Night", t0), xEnd: .value("Sunrise", sunrise))
-                    .foregroundStyle(SN.night.opacity(0.52))
-            }
-            if let sunset {
-                RectangleMark(xStart: .value("Sunset", sunset), xEnd: .value("Night", t1))
-                    .foregroundStyle(SN.night.opacity(0.52))
-                // The night's moon, fullness per SunMoon (prototype moonGlyphEl).
-                PointMark(x: .value("Moon", sunset.addingTimeInterval(t1.timeIntervalSince(sunset) / 2)),
-                          y: .value("Sky", sunY))
-                    .symbolSize(0)
-                    .annotation(position: .overlay) {
-                        MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 16)
-                            .shadow(color: Color(hex: 0xCFE0FF, opacity: 0.1 + moon.fraction * 0.6),
-                                    radius: 5 + moon.fraction * 9)
-                    }
-            }
-            ForEach(sunEvents, id: \.time) { e in
-                PointMark(x: .value("Time", e.time), y: .value("Sky", sunY))
-                    .symbolSize(38)
-                    .foregroundStyle(SN.sun)
-                    .annotation(position: .top, spacing: 3) {
-                        Text("\(e.kind == .sunrise ? "↑" : "↓")\(cardTime(e.time, tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.geistMono(9, .medium))
-                            .foregroundStyle(SN.sunrise)
-                    }
-            }
-            ForEach(dayPoints, id: \.time) { p in
-                AreaMark(x: .value("Time", p.time), y: .value("Height", display(p.height)))
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(LinearGradient(
-                        colors: [SN.steel.opacity(0.38), SN.sky.opacity(0.04)],
-                        startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Time", p.time), y: .value("Height", display(p.height)))
-                    .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                    .foregroundStyle(SN.sky)
-            }
-            ForEach(dayExtremes, id: \.time) { e in
-                PointMark(x: .value("Time", e.time), y: .value("Height", display(e.height)))
-                    .symbolSize(48)
-                    .foregroundStyle(e.kind == .high ? SN.rising : SN.falling)
-                    .annotation(position: e.kind == .high ? .top : .bottom, spacing: 6) {
-                        Text(clockTime(e.time, tz))
-                            .font(.geistMono(10)).foregroundStyle(SN.foam.opacity(0.55))
-                    }
-            }
-            RuleMark(x: .value("Time", effectiveClamped))
-                .lineStyle(StrokeStyle(lineWidth: 1))
-                .foregroundStyle(SN.foam.opacity(0.45))
-                .annotation(position: .top, spacing: 2) {
-                    Text("\(formatHeight(effectiveHeight, imperial: imperial)) \(unit) · \(clockTime(effectiveClamped, tz))")
-                        .font(.geistMono(11, .medium))
-                        .foregroundStyle(SN.foam)
-                }
-            PointMark(x: .value("Time", effectiveClamped),
-                      y: .value("Height", display(effectiveHeight)))
-                .symbolSize(90)
-                .foregroundStyle(.white)
-        }
-        .chartXScale(domain: t0...t1)
-        .chartYScale(domain: (minH - 0.12 * range)...(maxH + 0.22 * range))
-        .chartXAxis {
-            AxisMarks(values: .stride(by: .hour, count: 4)) { value in
-                AxisTick(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(SN.foam.opacity(0.2))
-                AxisValueLabel {
-                    if let d = value.as(Date.self) {
-                        // 24h hour labels, like the web chart's "08"/"16".
-                        Text(String(clockTime(d, tz).prefix(2)))
-                            .font(.geistMono(10)).foregroundStyle(SN.foam.opacity(0.4))
-                    }
-                }
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: [minH, (minH + maxH) / 2, maxH]) { value in
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(SN.foam.opacity(0.12))
-                AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text(String(format: "%.1f", v))
-                            .font(.geistMono(10)).foregroundStyle(SN.foam.opacity(0.4))
-                    }
-                }
-            }
-        }
-        .chartOverlay { proxy in
-            GeometryReader { geo in
-                Rectangle().fill(.clear).contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { g in
-                                if let t = time(at: g.location, proxy: proxy, geo: geo) {
-                                    preview = min(max(t, t0), t1)
-                                }
-                            }
-                            .onEnded { g in
-                                let raw = time(at: g.location, proxy: proxy, geo: geo) ?? effective
-                                selected = snapToNearest(min(max(raw, t0), t1), times: dayExtremes.map(\.time))
-                                preview = nil
-                            })
-            }
-        }
+    private func scheduleCard(_ tl: TimelineData) -> some View {
+        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today,
+                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
+            .background(SN.cardFill)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+            .padding(.horizontal, 16)
     }
 
-    private func time(at location: CGPoint, proxy: ChartProxy, geo: GeometryProxy) -> Date? {
-        guard let plotFrame = proxy.plotFrame else { return nil }
-        let origin = geo[plotFrame].origin
-        return proxy.value(atX: location.x - origin.x)
-    }
-
-    // MARK: - Schedule (day pager + extremes table)
-
-    private var scheduleCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(relativeDayLabel)
-                        .font(.fraunces(22, .semibold)).foregroundStyle(SN.paper)
-                    Text(dayLine(selected, tz))
-                        .font(.geist(12)).foregroundStyle(SN.steel)
-                }
-                Spacer()
-                HStack(spacing: 8) {
-                    PagerButton(symbol: "chevron.left") { pageDay(-1) }
-                    Button { returnToNow() } label: {
-                        Text("Today")
-                            .font(.geist(13, .medium))
-                            .foregroundStyle(dayOffset == 0 ? SN.foam.opacity(0.35) : SN.foam)
-                            .frame(height: 34)
-                            .padding(.horizontal, 12)
-                            .background(Color.white.opacity(0.06), in: Capsule())
-                    }
-                    .disabled(dayOffset == 0)
-                    PagerButton(symbol: "chevron.right") { pageDay(1) }
-                }
-            }
-            .padding(16)
-
-            // Tide turns and sunrise/sunset, one chronological table (web
-            // dayEvents; prototype table's ☀ Rise / ☀ Set pills).
-            ForEach(dayRows, id: \.time) { row in
-                Divider().overlay(Color.white.opacity(0.08))
-                Button { selected = row.time } label: {
-                    HStack {
-                        switch row {
-                        case .tide(let e):
-                            Text(e.kind == .high ? "↑ HIGH" : "↓ LOW")
-                                .font(.geistMono(10, .medium)).tracking(0.5)
-                                .foregroundStyle(SN.navyDeep)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(e.kind == .high ? SN.rising : SN.falling, in: Capsule())
-                        case .sun(let e):
-                            SunPill(kind: e.kind)
-                        }
-                        Text(clockTime(row.time, tz))
-                            .font(.geistMono(15)).foregroundStyle(SN.foam)
-                            .padding(.leading, 6)
-                        Spacer()
-                        switch row {
-                        case .tide(let e):
-                            (Text(formatHeight(e.height, imperial: imperial)).font(.geist(15, .medium))
-                             + Text(" \(unit)").font(.geist(12)))
-                                .foregroundStyle(SN.foam)
-                        case .sun:
-                            Text("—").font(.geist(15)).foregroundStyle(SN.foam.opacity(0.5))
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 11)
-                    .opacity(row.time < effective ? 0.45 : 1)  // past rows dim, like the web
-                }
-                .buttonStyle(.plain)
-            }
-            if dayExtremes.isEmpty {
-                Divider().overlay(Color.white.opacity(0.08))
-                Text("Nothing on this day.")
-                    .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.5))
-                    .padding(16)
+    private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
+        let t0 = tl.today
+        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
+        var out: [ScheduleEntry] = tl.tideExtremes
+            .filter { $0.time >= t0 && $0.time <= t1 }
+            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
+                                 value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
+        for day in tl.days {
+            for (t, pill) in [(day.sunrise, SchedulePill.sunrise), (day.sunset, .sunset)] {
+                if let t, t >= t0, t <= t1 { out.append(ScheduleEntry(time: t, pill: pill)) }
             }
         }
-        .background(SN.cardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-        .padding(.horizontal, 16)
+        return out.sorted { $0.time < $1.time }
     }
 
     // The provenance/confidence marking (chs-online spec §2d, §7d): a fitted
@@ -371,76 +180,14 @@ struct TideDetailView: View {
 
     // MARK: - Data
 
-    /// Tide turns + sun events for the selected day, in the order they happen.
-    private enum DayRow {
-        case tide(TideExtreme)
-        case sun(SunMoon.SunEvent)
-        var time: Date {
-            switch self {
-            case .tide(let e): e.time
-            case .sun(let e): e.time
-            }
-        }
-    }
-
-    private var dayRows: [DayRow] {
-        (dayExtremes.map(DayRow.tide) + sunEvents.map(DayRow.sun))
-            .sorted { $0.time < $1.time }
-    }
-
-    private var relativeDayLabel: String {
-        switch dayOffset {
-        case 0: "Today"
-        case 1: "Tomorrow"
-        case -1: "Yesterday"
-        default: weekdayName(selected, tz)
-        }
-    }
-
-    private func dayKey(_ date: Date) -> Date { calendar.startOfDay(for: date) }
-
-    private func recompute() {
-        let start = calendar.startOfDay(for: selected)
-        let end = calendar.date(byAdding: .day, value: 1, to: start)!
-        let station = record.engineStation
-        // Chart domain is the station-local day (web filters its ±30h timeline
-        // to the same day); drop the midnight-of-tomorrow sample.
-        dayPoints = station.heights(from: start, to: end, step: 600).filter { $0.time < end }
-        // Widen then filter, so a turn near local midnight isn't clipped (web predictRange).
-        wideExtremes = station.extremes(from: start.addingTimeInterval(-day),
-                                        to: end.addingTimeInterval(day))
-        dayExtremes = wideExtremes.filter { $0.time >= start && $0.time < end }
-        sunEvents = SunMoon.sunEvents(lat: record.latitude, lon: record.longitude,
-                                      tz: tz, day: selected)
-        committedHeight = exactHeight(at: selected)
-    }
-
+    /// Engine-exact height — the same call the old model's committed readout
+    /// made, so the now-readout is unchanged by the scrub rework.
     private func exactHeight(at t: Date) -> Double {
         record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
     }
 
-    /// Height at `t`, linearly interpolated between bracketing 10-min samples —
-    /// what the web's crosshair reads while dragging (TideChart levelAt).
-    private func interpolated(at t: Date) -> Double {
-        guard let first = dayPoints.first else { return 0 }
-        var prev = first
-        for p in dayPoints {
-            if t <= p.time {
-                let span = p.time.timeIntervalSince(prev.time)
-                let frac = span > 0 ? t.timeIntervalSince(prev.time) / span : 0
-                return prev.height + (p.height - prev.height) * frac
-            }
-            prev = p
-        }
-        return prev.height
-    }
-
-    private func pageDay(_ delta: Int) {
-        selected = selected.addingTimeInterval(Double(delta) * day)
-    }
-
     private func returnToNow() {
         live = appNow()
-        selected = live
+        scrubTime = live
     }
 }
