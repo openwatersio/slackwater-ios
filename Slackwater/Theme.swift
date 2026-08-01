@@ -28,6 +28,9 @@ enum SN {
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
     static let sun = Color(hex: 0xF0C860)          // prototype sun dot
+    /// Attention, never alarm: the location-denied card, and the unfitted
+    /// station's ⚠️ download warning.
+    static let amber = Color(hex: 0xE0B45A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }

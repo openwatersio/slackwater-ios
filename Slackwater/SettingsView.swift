@@ -7,6 +7,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage(unitsKey) private var units = "imperial"
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @ObservedObject private var chs = ChsFitService.shared
     @Environment(\.dismiss) private var dismiss
 
     private var version: String {
@@ -34,6 +35,25 @@ struct SettingsView: View {
                             Text("m/s").tag("ms")
                         }
                         .pickerStyle(.segmented)
+                    }
+
+                    // The downloads manager also lives one tap from the list,
+                    // behind the status indicator beside this screen's gear.
+                    section("Offline downloads") {
+                        NavigationLink {
+                            OfflineManagerList()
+                                .navigationTitle("Downloads")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.page, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text("\(chs.queue.ready) of \(chs.queue.total) Canadian stations on this device")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
                     }
 
                     section("About these predictions") {

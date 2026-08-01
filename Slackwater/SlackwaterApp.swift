@@ -146,6 +146,7 @@ struct StationListView: View {
     @State private var path = NavigationPath()
     @State private var query = ""
     @State private var showSettings = false
+    @State private var showDownloads = false
     @State private var searching = false
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
@@ -184,6 +185,7 @@ struct StationListView: View {
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
         // Search covers everything — list, map, and (regular) the detail pane.
         .overlay { if searching { searchOverlay } }
         .onAppear {
@@ -193,9 +195,19 @@ struct StationListView: View {
                 openSearch()
             }
         }
-        // First connected launch: the Canadian Salish ports auto-fit in the
-        // background (M3 — no region UX). Partial failure retries next launch.
-        .task { ChsFitService.shared.fitPendingIfNeeded() }
+        // First connected launch: every Canadian station downloads in the
+        // background, nearest-first (M48 — no region UX; "all of Canada" is
+        // the default, and a future which-regions option is a filter on this
+        // one queue). Partial failure retries from the manager or next launch.
+        .task {
+            if let fix { ChsFitService.shared.prioritize(lat: fix.lat, lon: fix.lon) }
+            ChsFitService.shared.startIfNeeded()
+        }
+        // A fix landing (or moving) re-orders what is still queued.
+        .onChange(of: loc.location) { _, new in
+            guard let l = new else { return }
+            ChsFitService.shared.prioritize(lat: l.coordinate.latitude, lon: l.coordinate.longitude)
+        }
     }
 
     /// iPhone (and iPad Slide Over): the M1–M4 stack. The map swaps in-place
@@ -209,6 +221,7 @@ struct StationListView: View {
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
             .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
             .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
+            .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0) }
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -236,6 +249,7 @@ struct StationListView: View {
                 .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
                 .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
                 .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
+                .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0) }
                 .toolbar(.hidden, for: .navigationBar)
             }
         }
@@ -319,24 +333,16 @@ struct StationListView: View {
         // detail — drop it. On iPhone the push dismisses it anyway.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                         to: nil, from: nil, for: nil)
+        path = NavigationPath()
         switch item {
-        case .tide(let s): path = NavigationPath(); path.append(s)
-        case .current(let s): path = NavigationPath(); path.append(s)
-        case .chs(let info):
-            // A pending/fitting port has nothing to show — leave the path be.
-            if case .fitted(let record) = ChsFitService.shared.state(info.id) {
-                path = NavigationPath(); path.append(record)
-            }
-        case .chsGate(let gate):
-            // A gate is openable exactly when its reference port is fitted.
-            if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
-                path = NavigationPath(); path.append(DerivedGateRecord(gate: gate, port: port))
-            }
-        case .chsCurrent(let gate):
-            // A pending/fitting gate has nothing to show — leave the path be.
-            if case .fitted(let record) = ChsFitService.shared.currentState(gate.id) {
-                path = NavigationPath(); path.append(record)
-            }
+        case .tide(let s): path.append(s)
+        case .current(let s): path.append(s)
+        // Every CHS station routes the same way, fitted or not: ChsDetailView
+        // shows the real detail when the model is there and the ⚠️ download
+        // explanation when it isn't. A tap is never a dead tap (M48).
+        case .chs(let info): path.append(ChsRoute.port(info))
+        case .chsGate(let gate): path.append(ChsRoute.derivedGate(gate))
+        case .chsCurrent(let gate): path.append(ChsRoute.currentGate(gate))
         }
     }
 
@@ -475,18 +481,14 @@ struct StationListView: View {
             NavigationLink(value: station) { EmptyView() }.opacity(0)
         case .current(let station):
             NavigationLink(value: station) { EmptyView() }.opacity(0)
+        // Unconditional, unlike M3–M47: an unfitted station still navigates,
+        // to the page that explains why it has no numbers yet (M48).
         case .chs(let info):
-            if case .fitted(let record) = ChsFitService.shared.state(info.id) {
-                NavigationLink(value: record) { EmptyView() }.opacity(0)
-            }
+            NavigationLink(value: ChsRoute.port(info)) { EmptyView() }.opacity(0)
         case .chsGate(let gate):
-            if case .fitted(let port) = ChsFitService.shared.state(gate.reference) {
-                NavigationLink(value: DerivedGateRecord(gate: gate, port: port)) { EmptyView() }.opacity(0)
-            }
+            NavigationLink(value: ChsRoute.derivedGate(gate)) { EmptyView() }.opacity(0)
         case .chsCurrent(let gate):
-            if case .fitted(let record) = ChsFitService.shared.currentState(gate.id) {
-                NavigationLink(value: record) { EmptyView() }.opacity(0)
-            }
+            NavigationLink(value: ChsRoute.currentGate(gate)) { EmptyView() }.opacity(0)
         }
     }
 
@@ -549,11 +551,14 @@ struct StationListView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .bottom, spacing: 10) {
+        HStack(alignment: .bottom, spacing: 8) {
             Text("Slackwater")
                 .font(.fraunces(36, .semibold))
                 .foregroundStyle(SN.paper)
             Spacer()
+            // Offline / online / downloading, beside the gear — and the way in
+            // to the downloads manager (M48, web OfflineStatus).
+            OfflineStatusButton { showDownloads = true }
             // Units live in Settings only — no list-header pill.
             Button {
                 showSettings = true
@@ -866,6 +871,7 @@ struct ChsCardView: View {
     let info: ChsStationInfo
     let imperial: Bool
     @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
@@ -877,9 +883,22 @@ struct ChsCardView: View {
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
             ChsPendingCard(name: info.name, region: info.region, id: info.id,
-                           message: "Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
+                           message: chsPendingMessage("tidal"))
+        case .failed:
+            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+                           message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
+}
+
+/// A queued station's line. Both halves of "pending" are honest, and they are
+/// different situations: connected, it is simply in line behind the nearer
+/// stations; with no signal, nothing is moving at all. The established
+/// moment-of-signal copy is kept verbatim for the second.
+@MainActor func chsPendingMessage(_ series: String) -> String {
+    Connectivity.shared.online
+        ? "Queued — Canadian \(series) predictions download once, then work offline."
+        : "Needs a moment of signal — Canadian \(series) predictions download once, then work offline."
 }
 
 /// The not-yet-fitted CHS shell: identity + an honest message, no numbers
@@ -905,9 +924,6 @@ struct ChsPendingCard: View {
                         .foregroundStyle(SN.foam.opacity(0.78))
                 }
                 Spacer(minLength: 8)
-                MonoLabel(text: "CHS", size: 10, color: SN.foam.opacity(0.7))
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(Color.white.opacity(0.12), in: Capsule())
             }
             Text(message)
                 .font(.geist(12))
@@ -931,6 +947,7 @@ struct ChsPendingCard: View {
 struct ChsGateCardView: View {
     let gate: ChsGateInfo
     @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
     @State private var state: DerivedGateCardState?
 
     var body: some View {
@@ -942,7 +959,10 @@ struct ChsGateCardView: View {
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
-                           message: "Needs a moment of signal — Canadian tidal predictions download once, then work offline.")
+                           message: chsPendingMessage("tidal"))
+        case .failed:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
 
@@ -992,6 +1012,7 @@ struct ChsGateCardView: View {
 struct ChsCurrentGateCardView: View {
     let gate: ChsCurrentGateInfo
     @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
@@ -1003,7 +1024,10 @@ struct ChsCurrentGateCardView: View {
                            message: "Downloading Canadian current predictions…")
         case .pending:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
-                           message: "Needs a moment of signal — Canadian current predictions download once, then work offline.")
+                           message: chsPendingMessage("current"))
+        case .failed:
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+                           message: "Canadian current predictions didn't finish downloading — open it to retry.")
         }
     }
 }

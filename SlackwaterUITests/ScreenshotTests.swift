@@ -829,29 +829,20 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
-        // The gate opens exactly when Point Atkinson's fit lands (M3 fits all
-        // pending Salish ports on launch; a previously fitted store is
-        // instant). A pending card swallows the tap without navigating, so
-        // retry tap → check until the detail appears. (Label predicates can't
-        // gate this: accessibilityHidden(searching) does not exclude the base
-        // list from XCUITest queries, so a NOAA card's "Slack · …" leaks
-        // through — cost this test its first green.)
+        // M48: ONE tap. The gate always opens — showing the ⚠️ download
+        // warning if its reference port (Point Atkinson) isn't fitted yet —
+        // and opening it moves that port to the front of the queue, so the
+        // page fills in live with no second tap and no back-and-forth.
         openSearch(app, "malibu")
         XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
                   "search did not find Malibu Rapids")
-        var opened = false
-        for _ in 0..<20 {  // ~5 min ceiling — covers a from-scratch fit chain
-            app.staticTexts["Malibu Rapids"].firstMatch.tap()  // closes search either way
-            if app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 8) {
-                opened = true
-                break
-            }
-            XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-            sleep(8)  // let the fit chain advance before retrying
-            openSearch(app, "malibu")
-            XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5))
-        }
-        XCTAssert(opened, "gate never opened — Point Atkinson fit missing (IWLS unreachable?)")
+        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+                  "tapping the gate did not open a detail")
+        // ~5 min ceiling: the in-flight station finishes, then the promoted
+        // Point Atkinson runs.
+        XCTAssert(app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 300),
+                  "the open detail never filled in — Point Atkinson fit missing (IWLS unreachable?)")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 5),
@@ -911,6 +902,132 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         sleep(2)
         save(app, "m46-malibu-map.png")
+    }
+
+    // M48: the offline-downloads system — the indicator beside the gear, the
+    // manager it opens, the proximity-ordered queue, and the fix for the dead
+    // tap: an unfitted station opens its detail with the ⚠️ explanation and
+    // jumps to the front of the queue. Runs against LIVE IWLS from a clean
+    // store (like M3/M47) — nothing here waits for a fit to land, only for the
+    // queue and its UI, so it costs seconds, not the fit chain.
+    func testM48DownloadsManagerAndQueueJump() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]  // Victoria
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // The indicator sits beside the gear, on the same line.
+        let indicator = app.buttons["offline-status"].firstMatch
+        XCTAssert(indicator.waitForExistence(timeout: 5), "no download indicator beside the gear")
+        let gear = app.buttons["Settings"].firstMatch
+        XCTAssert(gear.exists)
+        XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1, "indicator must sit beside the gear")
+        XCTAssertEqual(indicator.frame.midY, gear.frame.midY, accuracy: 2,
+                       "indicator must share the gear's row")
+        sleep(3)  // let the first download start, so the state is 'downloading'
+        save(app, "m48-indicator.png")
+
+        // Tapping it opens the manager directly (not Settings).
+        indicator.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+                  "the indicator did not open the downloads manager")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Downloading Canadian tidal and current predictions'"))
+            .firstMatch.waitForExistence(timeout: 5),
+                  "manager is missing the plain-register progress line")
+
+        // Proximity order from the Victoria fix: Victoria, then Race Passage,
+        // then Sooke — nearest-first, exactly as the queue sorts them.
+        let rows = app.descendants(matching: .any)
+        let victoria = rows["download-row-chs-victoria"].firstMatch
+        let race = rows["download-row-chs-race-passage"].firstMatch
+        let sooke = rows["download-row-chs-sooke"].firstMatch
+        XCTAssert(victoria.waitForExistence(timeout: 5), "no per-station rows in the manager")
+        XCTAssert(victoria.frame.minY < race.frame.minY, "queue is not proximity-ordered")
+        XCTAssert(race.frame.minY < sooke.frame.minY, "queue is not proximity-ordered")
+        sleep(1)
+        save(app, "m48-downloads-manager.png")
+        app.buttons["Done"].tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+
+        // The dead tap, fixed: the farthest station in the catalogue is last in
+        // the queue and has nothing to show — tapping it still opens a detail,
+        // and that detail explains itself.
+        openSearch(app, "weynton")
+        let far = app.staticTexts["Weynton Passage"].firstMatch
+        XCTAssert(far.waitForExistence(timeout: 5))
+        far.tap()
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 5),
+                  "tapping an unfitted station from search did not open the warning detail")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Canadian current predictions'")).firstMatch.exists,
+                  "warning is missing the plain-register download line")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists,
+                  "warning must say what to expect once it lands")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'first in line'")).firstMatch.exists,
+                  "viewing must move the station to the front of the queue")
+        sleep(2)  // header map tiles
+        save(app, "m48-unfitted-detail.png")
+
+        // And the promotion is visible in the manager: the station you opened
+        // is at the top, badged, ahead of the nearer ones.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        let promoted = app.descendants(matching: .any)["download-row-chs-weynton-passage"].firstMatch
+        XCTAssert(promoted.waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists,  // MonoLabel uppercases
+                  "the promoted station is not marked in the manager")
+        let stillQueued = app.descendants(matching: .any)["download-row-chs-sooke"].firstMatch
+        XCTAssert(promoted.frame.minY < stillQueued.frame.minY,
+                  "the viewed station did not jump ahead of the proximity order")
+        sleep(1)
+        save(app, "m48-queue-jump.png")
+        app.buttons["Done"].tap()
+    }
+
+    // M48: the map needed no map-specific work — a pin tap goes through the
+    // same open() as a row, so an unfitted station lands on the same warning
+    // detail. Held unfitted by the kill switch, so this is deterministic.
+    func testM48MapPinToUnfittedDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // tiles
+
+        // Same web-mercator math as testM4MapPinToDetail, on Race Passage.
+        let frame = map.frame
+        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
+            let x = (lon + 180) / 360 * world
+            let phi = lat * .pi / 180
+            let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
+            return (x, y)
+        }
+        let c = mercator(48.35, -123.05)        // SALISH_CENTER
+        let p = mercator(48.3067, -123.5367)    // Race Passage
+        let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
+        let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
+        map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
+
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 8),
+                  "a map pin on an unfitted station must still open its detail")
+        XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
+        // Offline: the established honest register, and no bogus ETA.
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'need a moment of signal'")).firstMatch.exists,
+                  "offline warning must keep the moment-of-signal copy")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Nothing downloads without a connection'"))
+            .firstMatch.exists)
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

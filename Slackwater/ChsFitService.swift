@@ -14,16 +14,18 @@ import JavaScriptCore
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.
 enum ChsState {
-    case pending      // no model, not currently fitting (no network yet / failed)
+    case pending      // queued: no model yet, waiting its turn
     case fitting
+    case failed       // this run tried and could not finish it
     case fitted(TideStationRecord)
 }
 
-/// Same three states for a validated current gate — the fitted payload is a
+/// Same four states for a validated current gate — the fitted payload is a
 /// CurrentStationRecord, so the gate rides the NOAA current view path.
 enum ChsCurrentState {
     case pending
     case fitting
+    case failed
     case fitted(CurrentStationRecord)
 }
 
@@ -31,8 +33,14 @@ enum ChsCurrentState {
 final class ChsFitService: ObservableObject {
     static let shared = ChsFitService()
 
-    @Published private(set) var states: [String: ChsState] = [:]
-    @Published private(set) var currentStates: [String: ChsCurrentState] = [:]
+    /// The download queue — ordering, status and progress for every CHS
+    /// station (ChsQueue, the port of the web's offlineSync store). The fitted
+    /// records live beside it; the queue owns status, so there is exactly one
+    /// place a station's state can disagree with itself: none.
+    @Published private(set) var queue = ChsQueue()
+
+    private var tideRecords: [String: TideStationRecord] = [:]
+    private var currentRecords: [String: CurrentStationRecord] = [:]
 
     /// True once launched with `-networkKillSwitch` (UI tests' honest
     /// airplane-mode stand-in: every IWLS request throws before the socket).
@@ -47,76 +55,147 @@ final class ChsFitService: ObservableObject {
     }()
 
     private var started = false
+    private var running = false
 
     private init() {
         ChsModelStore.resetIfRequested()
-        for info in ChsStationInfo.all {
+        // Every Canadian station, always — "which regions" is not a question
+        // the app asks. If it ever should (Bryan: "later we might make this an
+        // option, for non-Canadians"), it is one more `where` clause on these
+        // two loops, exactly where the -chsFitOnly test hook already filters.
+        var jobs: [ChsJob] = []
+        for info in ChsStationInfo.all where Self.fitOnly?.contains(info.id) ?? true {
+            var job = ChsJob(id: info.id, name: info.name, region: info.region, isCurrent: false,
+                             latitude: info.latitude, longitude: info.longitude)
             if let model = ChsModelStore.load(info.id) {
-                states[info.id] = .fitted(info.record(with: model))
-            } else {
-                states[info.id] = .pending
+                tideRecords[info.id] = info.record(with: model)
+                job.status = .ready
             }
+            jobs.append(job)
         }
-        for gate in ChsCurrentGateInfo.all {
+        for gate in ChsCurrentGateInfo.all where Self.fitOnly?.contains(gate.id) ?? true {
+            var job = ChsJob(id: gate.id, name: gate.name, region: gate.region, isCurrent: true,
+                             latitude: gate.latitude, longitude: gate.longitude)
             if let model = ChsModelStore.loadCurrent(gate.id) {
-                currentStates[gate.id] = .fitted(gate.record(with: model))
-            } else {
-                currentStates[gate.id] = .pending
+                currentRecords[gate.id] = gate.record(with: model)
+                job.status = .ready
             }
+            jobs.append(job)
+        }
+        queue = ChsQueue(jobs)
+        // Never an arbitrary order, even before a fix lands: the prototype's
+        // Victoria fallback anchors the first sort, and a real fix re-sorts.
+        queue.prioritize(lat: fallbackFix.lat, lon: fallbackFix.lon)
+    }
+
+    func state(_ id: String) -> ChsState {
+        if let record = tideRecords[id] { return .fitted(record) }
+        switch queue.status(id) ?? .pending {
+        case .downloading: return .fitting
+        case .failed: return .failed
+        case .pending, .ready: return .pending
         }
     }
 
-    func state(_ id: String) -> ChsState { states[id] ?? .pending }
-    func currentState(_ id: String) -> ChsCurrentState { currentStates[id] ?? .pending }
+    func currentState(_ id: String) -> ChsCurrentState {
+        if let record = currentRecords[id] { return .fitted(record) }
+        switch queue.status(id) ?? .pending {
+        case .downloading: return .fitting
+        case .failed: return .failed
+        case .pending, .ready: return .pending
+        }
+    }
 
-    /// Fit every pending station, Victoria first (home water lands fastest),
-    /// tide ports before current gates (ports unlock the most surfaces, and a
-    /// gate's paired tide track needs its port fitted). Partial failure is
-    /// fine: whatever fit is stored; the rest stay pending and retry on the
-    /// next connected launch.
-    func fitPendingIfNeeded() {
-        guard !started, !networkDisabled else { return }
+    /// Start the download run: nearest-first, one station at a time. Partial
+    /// failure is fine — whatever fit is stored; the rest are retryable from
+    /// the manager and retry on the next connected launch.
+    func startIfNeeded() {
+        guard !started else { return }
         started = true
-        let pending = ChsStationInfo.all
-            .filter { Self.fitOnly?.contains($0.id) ?? true }
-            .filter { if case .fitted = state($0.id) { return false } else { return true } }
-            .sorted { ($0.id == ChsStationInfo.victoriaID ? 0 : 1, $0.name) < ($1.id == ChsStationInfo.victoriaID ? 0 : 1, $1.name) }
-        let pendingGates = ChsCurrentGateInfo.all
-            .filter { Self.fitOnly?.contains($0.id) ?? true }
-            .filter { if case .fitted = currentState($0.id) { return false } else { return true } }
-        guard !pending.isEmpty || !pendingGates.isEmpty else { return }
+        pump()
+    }
 
-        Task.detached(priority: .utility) {
-            let fetcher = IwlsFetcher()
-            let fitter = ChsFitter()
-            guard let list = try? await fetcher.stationList() else { return }  // offline: stay pending
-            for info in pending {
-                await MainActor.run { self.states[info.id] = .fitting }
-                do {
-                    let model = try await Self.fit(info, list: list, fetcher: fetcher, fitter: fitter)
-                    try ChsModelStore.save(model)
-                    await MainActor.run { self.states[info.id] = .fitted(info.record(with: model)) }
-                } catch {
-                    // ponytail: no retry ladder — next connected launch retries.
-                    await MainActor.run { self.states[info.id] = .pending }
+    /// A fix landed (or moved): re-order what is still queued closest-first.
+    func prioritize(lat: Double, lon: Double) {
+        queue.prioritize(lat: lat, lon: lon)
+    }
+
+    /// The station the user just opened jumps the queue — ahead of proximity
+    /// order — and retries if it had failed. Kicks the loop in case it had run
+    /// dry (every job done or failed).
+    func promote(_ id: String) {
+        queue.promote(id)
+        pump()
+    }
+
+    /// The manager's retry-all: re-queue the failures and run again.
+    func retryFailed() {
+        queue.retryFailed()
+        pump()
+    }
+
+    private func pump() {
+        guard !running, !networkDisabled, queue.nextPending != nil else { return }
+        running = true
+        Task.detached(priority: .utility) { [self] in await run() }
+    }
+
+    /// Claim the head of the queue. Sync find-then-mark on the main actor, so
+    /// the loop can never hand the same job out twice (web offlineSync.worker).
+    private func claimNext() -> ChsJob? {
+        guard let job = queue.nextPending else { return nil }
+        queue.set(job.id, .downloading)
+        return job
+    }
+
+    private nonisolated func run() async {
+        let fetcher = IwlsFetcher()
+        let fitter = ChsFitter()
+        guard let list = try? await fetcher.stationList() else {
+            // No station list, no fit is possible this run. Fail the queued
+            // jobs rather than leaving them on "Waiting" forever — the manager
+            // can then say so, and offer the retry.
+            await MainActor.run {
+                for job in self.queue.jobs where job.status == .pending {
+                    self.queue.set(job.id, .failed)
                 }
+                self.running = false
             }
-            for gate in pendingGates {
-                await MainActor.run { self.currentStates[gate.id] = .fitting }
-                do {
+            return
+        }
+        while let job = await MainActor.run(body: { self.claimNext() }) {
+            do {
+                if job.isCurrent {
+                    guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
+                    else { throw ChsError.noStations }
                     let model = try await Self.fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.saveCurrent(model)
-                    await MainActor.run { self.currentStates[gate.id] = .fitted(gate.record(with: model)) }
-                } catch {
-                    await MainActor.run { self.currentStates[gate.id] = .pending }
+                    await MainActor.run {
+                        self.currentRecords[gate.id] = gate.record(with: model)
+                        self.queue.set(job.id, .ready)
+                    }
+                } else {
+                    guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
+                    else { throw ChsError.noStations }
+                    let model = try await Self.fit(info, list: list, fetcher: fetcher, fitter: fitter)
+                    try ChsModelStore.save(model)
+                    await MainActor.run {
+                        self.tideRecords[info.id] = info.record(with: model)
+                        self.queue.set(job.id, .ready)
+                    }
                 }
+            } catch {
+                // ponytail: no retry ladder — the manager's retry and the next
+                // connected launch are the retries.
+                await MainActor.run { self.queue.set(job.id, .failed) }
             }
         }
+        await MainActor.run { self.running = false }
     }
 
     /// 60 d @ 15 min ending yesterday — the window the M0 spike validated.
-    private static func fit(_ info: ChsStationInfo, list: [IwlsStation],
-                            fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {
+    private nonisolated static func fit(_ info: ChsStationInfo, list: [IwlsStation],
+                                        fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {
         let station = try resolve(info, in: list)
         let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
         let start = end.addingTimeInterval(-60 * 86_400)
@@ -138,8 +217,8 @@ final class ChsFitService: ObservableObject {
     /// measurably fails the slack bar (spikes/chs-currents-fit/README.md).
     static let currentFitDays = 210.0
 
-    private static func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
-                                   fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
+    private nonisolated static func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
+                                               fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
         let station = try resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
                                   series: "wcsp1", in: list)
         let meta = try await fetcher.metadata(stationID: station.id)
@@ -181,7 +260,7 @@ final class ChsFitService: ObservableObject {
     /// mis-bind would put the wrong water under a trusted name.
     nonisolated static let resolveToleranceKm = 3.0
 
-    static func resolve(_ info: ChsStationInfo, in list: [IwlsStation]) throws -> IwlsStation {
+    nonisolated static func resolve(_ info: ChsStationInfo, in list: [IwlsStation]) throws -> IwlsStation {
         try resolve(name: info.name, latitude: info.latitude, longitude: info.longitude,
                     series: "wlp", in: list)
     }
