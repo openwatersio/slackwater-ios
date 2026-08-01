@@ -26,12 +26,23 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
     }
 
+    /// The list's own scroll container. `app.swipeUp()` gestures at the centre
+    /// of the whole app, which in the iPad split lands in the DETAIL pane and
+    /// scrolls nothing — the sidebar list has to be swiped directly.
+    private func listContainer(_ app: XCUIApplication) -> XCUIElement {
+        for query in [app.tables, app.collectionViews, app.scrollViews] {
+            let el = query.firstMatch
+            if el.exists { return el }
+        }
+        return app
+    }
+
     /// Scroll the list until `el` is realized and hittable (Recents now lives
     /// at the very bottom — often below the fold).
     private func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var tries = 0
-        while (!el.exists || !el.isHittable), tries < 6 {
-            app.swipeUp()
+        while (!el.exists || !el.isHittable), tries < 8 {
+            listContainer(app).swipeUp()
             tries += 1
         }
         XCTAssert(el.exists, "could not scroll to element")
@@ -1028,6 +1039,163 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Nothing downloads without a connection'"))
             .firstMatch.exists)
+    }
+
+    // MARK: - M50: station identity presentation
+
+    /// The subtitle bug Bryan found on the iPad: "7.6 mi. Sse" — a compass
+    /// point title-cased by station-corrections' cleanName, and statute miles
+    /// on a card whose distance pill speaks nm.
+    func testM50RegionSubtitleIsNauticalAndShouts() throws {
+        // Upright: the split-layout test leaves the device in landscape, and
+        // these screenshots are the ones a human reads.
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "discovery island")
+        XCTAssert(app.staticTexts["6.6 nm SSE"].firstMatch.waitForExistence(timeout: 5),
+                  "the fixed subtitle is missing — expected nautical miles and SSE")
+        XCTAssertFalse(app.staticTexts["7.6 mi. Sse"].exists,
+                       "the broken subtitle is still rendering")
+        XCTAssert(app.staticTexts["3.0 nm NE"].firstMatch.exists,
+                  "the sibling station's already-correct subtitle changed")
+        sleep(1)
+        save(app, "m50-subtitle-fixed.png")
+        closeSearch(app)
+    }
+
+    /// Two "Discovery Island" cards used to sit in Near Me looking identical.
+    /// Now: one entry, and the matching stations behind the chooser.
+    func testM50MatchingStationChooser() throws {
+        // Upright: the split-layout test leaves the device in landscape, and
+        // these screenshots are the ones a human reads.
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]  // Victoria
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["NEAR ME"].waitForExistence(timeout: 10))
+
+        // One entry, not two: the nearer Discovery Island renders, the farther
+        // one is behind the chooser.
+        let cards = app.staticTexts.matching(NSPredicate(format: "label == %@", "Discovery Island"))
+        XCTAssertEqual(cards.count, 1, "same-named stations must render as one entry")
+        XCTAssert(app.staticTexts["3.0 nm NE"].firstMatch.exists, "the nearest one is the entry")
+        XCTAssertFalse(app.staticTexts["6.6 nm SSE"].exists,
+                       "the farther namesake must not render as its own card")
+
+        let chooserButton = app.buttons["matching-stations"].firstMatch
+        XCTAssert(chooserButton.waitForExistence(timeout: 5),
+                  "no matching-station affordance on a collided name")
+        XCTAssert(app.staticTexts["2 matching stations"].firstMatch.exists)
+        chooserButton.tap()
+
+        // The chooser: both stations, each with what it measures and how far.
+        XCTAssert(app.otherElements["station-chooser"].waitForExistence(timeout: 5)
+                  || app.staticTexts["3.0 nm NE"].firstMatch.waitForExistence(timeout: 5),
+                  "the chooser sheet did not open")
+        XCTAssert(app.staticTexts["6.6 nm SSE"].firstMatch.waitForExistence(timeout: 5),
+                  "the chooser must offer the station the list collapsed")
+        XCTAssert(app.staticTexts["CURRENT · NOAA"].firstMatch.exists,  // MonoLabel uppercases
+                  "a chooser row must say what it measures and whose data it is")
+        sleep(1)
+        save(app, "m50-station-chooser.png")
+
+        // Picking the collapsed one opens it — it is not lost, just quiet.
+        app.staticTexts["6.6 nm SSE"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Discovery Island"].firstMatch.waitForExistence(timeout: 8))
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8),
+                  "the chooser pick did not open a station detail")
+    }
+
+    /// "Deception Pas…" — the compact Recents row starved the name column so
+    /// two different stations truncated to the same string.
+    func testM50RecentsNamesFit() throws {
+        // Upright: the split-layout test leaves the device in landscape, and
+        // these screenshots are the ones a human reads.
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        for name in ["Deception Pass (Narrows)", "Deception Pass State Park"] {
+            openSearch(app, "deception")
+            let card = app.staticTexts[name].firstMatch
+            XCTAssert(card.waitForExistence(timeout: 5), "\(name) missing from search")
+            card.tap()
+            XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
+            app.buttons["detail-back"].firstMatch.tap()
+            XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        }
+
+        let recents = app.staticTexts["RECENTS"].firstMatch
+        scrollTo(recents, in: app)
+        let long = app.staticTexts["Deception Pass State Park"].firstMatch
+        scrollTo(long, in: app)
+        XCTAssert(long.exists, "the visited station is not in Recents")
+        // The name owns the row's width now. Truncated, its frame collapsed to
+        // the ~150pt column left over beside the reading (iPad sidebar).
+        XCTAssert(long.frame.width > 165,
+                  "the Recents name column is still starved: \(long.frame.width)pt")
+        // And the reading sits below the name, not beside it.
+        let readings = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
+            .allElementsBoundByIndex
+            // Only this row's — the Near Me cards above carry readings too.
+            .filter { $0.exists && $0.frame.minY >= long.frame.minY && $0.frame.maxY <= long.frame.maxY + 34 }
+        XCTAssertFalse(readings.isEmpty, "the Recents row lost its reading")
+        for reading in readings {
+            XCTAssert(reading.frame.minY >= long.frame.maxY - 1,
+                      "the reading still shares the name's line")
+        }
+        sleep(1)
+        save(app, "m50-recents-untruncated.png")
+    }
+
+    /// Build 13, iPad: opening a second station of the SAME kind kept the
+    /// first one's chart and map — same destination type at the same depth is
+    /// the same SwiftUI identity, so @State survived. Discovery Island has no
+    /// paired reference port and Deception Pass (Narrows) does, so the paired
+    /// station's tide rows are the tell: they come from the @State timeline,
+    /// and a stale one has none.
+    func testM50DetailSwapsBetweenSameKindStations() throws {
+        // Split layout only: on iPhone the detail covers the search FAB, so a
+        // second station is always reached through a pop first.
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad-only split-layout swap")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "discovery island")
+        app.staticTexts["3.0 nm NE"].firstMatch.tap()
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists,
+                       "an unpaired current station must show no tide rows")
+
+        // Second station, same kind — in the split layout this replaces the
+        // detail pane without a pop.
+        openSearch(app, "deception pass (n")
+        app.staticTexts["Deception Pass (Narrows)"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch
+            .waitForExistence(timeout: 8))
+        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 8),
+                  "the detail kept the previous station's timeline — no tide rows for a paired gate")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'the nearby reference port'")).firstMatch.exists,
+                  "the paired-tide honesty line is missing")
+        sleep(4)  // header map tiles for the new station
+        save(app, "m50-detail-swap.png")
+        XCUIDevice.shared.orientation = .portrait
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

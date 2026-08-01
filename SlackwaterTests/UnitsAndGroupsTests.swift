@@ -68,6 +68,82 @@ final class UnitsAndGroupsTests: XCTestCase {
                        "a recent past the Near Me cut surfaces in Recents")
     }
 
+    // MARK: - Station regions: one distance unit, compass points intact (M50)
+
+    /// The bundled region lines are NOAA's own qualifiers, normalized by
+    /// tools/enrich-currents.mjs. Two things must hold on every one of them.
+    func testBundledRegionsAreNauticalAndShoutTheirCompassPoints() {
+        let titleCased = try! NSRegularExpression(
+            pattern: "\\b(Nne|Ene|Ese|Sse|Ssw|Wsw|Wnw|Nnw|Ne|Se|Sw|Nw)\\b")
+        let statute = try! NSRegularExpression(pattern: "\\bmi\\.|\\bmiles?\\b",
+                                               options: .caseInsensitive)
+        let regions = StationItem.all.map(\.region)
+        XCTAssertFalse(regions.isEmpty, "no bundled stations — did the resources ship?")
+        for region in regions {
+            let r = NSRange(region.startIndex..., in: region)
+            XCTAssertNil(titleCased.firstMatch(in: region, range: r),
+                         "compass abbreviation title-cased in \"\(region)\" (SSE, not Sse)")
+            XCTAssertNil(statute.firstMatch(in: region, range: r),
+                         "statute miles in \"\(region)\" — the distance pill speaks nm")
+        }
+    }
+
+    /// The specific card Bryan found: "7.6 mi. Sse" is now "6.6 nm SSE".
+    func testDiscoveryIslandSubtitleRendersFixed() {
+        let regions = StationItem.all.filter { $0.name == "Discovery Island" }.map(\.region)
+        XCTAssertEqual(Set(regions), ["3.0 nm NE", "6.6 nm SSE"])
+    }
+
+    // MARK: - One entry per place (M50 matching-station grouping)
+
+    func testSameNamedStationsCollapseToTheNearest() {
+        let ranked = StationItem.all.sorted {
+            $0.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon) <
+            $1.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon)
+        }
+        let places = StationGroups(ranked: ranked)
+        let discovery = ranked.filter { $0.name == "Discovery Island" }
+        XCTAssertEqual(discovery.count, 2, "the collision this exists for")
+        let shown = places.collapse(discovery.map(\.id))
+        XCTAssertEqual(shown, [discovery[0].id], "one entry per name, the nearest")
+        XCTAssertEqual(places.shown(discovery[1].id), discovery[0].id)
+        XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id),
+                       "the chooser still offers both, nearest first")
+    }
+
+    /// A unique name is untouched — and gets no chooser (one option is noise).
+    func testUniqueNameIsItsOwnEntry() {
+        let ranked = StationItem.all
+        let places = StationGroups(ranked: ranked)
+        let friday = ranked.first { $0.id == TideStationRecord.fridayHarborID }!
+        XCTAssertEqual(places.shown(friday.id), friday.id)
+        XCTAssertEqual(places.matches(friday).count, 1)
+    }
+
+    /// Collapse keeps input order and drops the duplicates behind it — the
+    /// Recents case (visit both Point Wilsons, see one row).
+    func testCollapseKeepsOrderAndDedupes() {
+        let ranked = StationItem.all.sorted {
+            $0.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon) <
+            $1.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon)
+        }
+        let places = StationGroups(ranked: ranked)
+        let wilsons = ranked.filter { $0.name == "Point Wilson" }
+        XCTAssertEqual(wilsons.count, 3)
+        let friday = TideStationRecord.fridayHarborID
+        XCTAssertEqual(places.collapse([wilsons[2].id, friday, wilsons[0].id]),
+                       [wilsons[0].id, friday])
+    }
+
+    /// Series and provider are what a chooser row says when the names match.
+    func testKindLabelsDistinguishSeriesAndProvider() {
+        let byId = Dictionary(StationItem.all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        XCTAssertEqual(byId[TideStationRecord.fridayHarborID]?.kindLabel, "Tide · NOAA")
+        XCTAssertEqual(byId["current:noaa/PUG1744"]?.kindLabel, "Current · NOAA")
+        XCTAssertEqual(byId["chs-victoria"]?.kindLabel, "Tide · CHS")
+        XCTAssertEqual(byId["chs-active-pass"]?.kindLabel, "Current · CHS")
+    }
+
     // MARK: - FavoritesStore round trip (ends clean — shared UserDefaults)
 
     @MainActor

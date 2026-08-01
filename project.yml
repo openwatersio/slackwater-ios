@@ -50,7 +50,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 13
+        CURRENT_PROJECT_VERSION: 14
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

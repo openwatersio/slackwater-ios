@@ -164,6 +164,9 @@ struct StationListView: View {
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
     @Environment(\.horizontalSizeClass) private var hSize
 
+    /// The place whose matching stations the chooser is offering, if open.
+    @State private var chooser: StationMatches?
+
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
     /// The fix the list ranks by — only while authorized.
@@ -171,6 +174,8 @@ struct StationListView: View {
         guard loc.authorized, let l = loc.location else { return nil }
         return (l.coordinate.latitude, l.coordinate.longitude)
     }
+    /// What distances are measured from: the fix, or the Victoria fallback.
+    private var anchor: (lat: Double, lon: Double) { fix ?? fallbackFix }
 
     var body: some View {
         Group {
@@ -186,6 +191,9 @@ struct StationListView: View {
         .accessibilityHidden(searching)
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showDownloads) { OfflineManagerView() }
+        .sheet(item: $chooser) { place in
+            StationChooserSheet(place: place, anchor: anchor) { open($0) }
+        }
         // Search covers everything — list, map, and (regular) the detail pane.
         .overlay { if searching { searchOverlay } }
         .onAppear {
@@ -218,10 +226,10 @@ struct StationListView: View {
                 if showMap { mapPane } else { listPane }
                 fabBar
             }
-            .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
-            .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
-            .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
-            .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0) }
+            .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0).id($0.id) }
+            .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0).id($0.id) }
+            .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
+            .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -246,10 +254,19 @@ struct StationListView: View {
                 Group {
                     if showMap { mapPane } else { detailPlaceholder }
                 }
-                .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0) }
-                .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0) }
-                .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0) }
-                .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0) }
+                // .id(station) — a second station of the SAME kind lands at the
+                // same depth with the same destination type, which is the same
+                // SwiftUI identity: @State survives, so the detail kept the
+                // previous station's built `timeline` (guarded `if timeline ==
+                // nil`) and its map camera (set once in `makeUIView`, and
+                // `updateUIView` is a no-op). The header title updated, the
+                // chart and map did not — build 13 on iPad, most visible in
+                // the split layout where a sidebar tap swaps the pane without
+                // a pop. A different station is a different view; say so.
+                .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0).id($0.id) }
+                .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0).id($0.id) }
+                .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
+                .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
             }
         }
@@ -353,19 +370,26 @@ struct StationListView: View {
     // holds the amber denied card when location is off. Dedupe: ListGroups —
     // each station renders once, My Location > Favorites > Near Me > Recents.
     @ViewBuilder private var locatedSections: some View {
-        let anchor = fix ?? fallbackFix
+        let anchor = anchor
         let ranked = StationItem.all.sorted {
             $0.km(fromLat: anchor.lat, lon: anchor.lon) < $1.km(fromLat: anchor.lat, lon: anchor.lon)
         }
+        // Same-named stations collapse to their nearest (M50): one entry per
+        // place in Near Me and Recents, the rest behind the chooser.
+        let places = StationGroups(ranked: ranked)
         let heroItem = fix == nil ? nil : ranked.first
         let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
-                                recentIds: recents.ids, rankedIds: ranked.map(\.id),
+                                recentIds: places.collapse(recents.ids),
+                                rankedIds: places.collapse(ranked.map(\.id)),
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 
         // My Location slot: the hero tile, or the amber card in its place.
         if let fix, let nearest = heroItem {
-            MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+            VStack(spacing: 0) {
+                MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+                matchingButton(nearest, places)
+            }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
         } else if loc.denied {
@@ -393,10 +417,13 @@ struct StationListView: View {
 
         sectionLabel("Near Me")
         ForEach(items(groups.nearMe)) { item in
-            itemCard(item)
-                .overlay(alignment: .topTrailing) {
-                    DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                }
+            VStack(spacing: 0) {
+                itemCard(item)
+                    .overlay(alignment: .topTrailing) {
+                        DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
+                    }
+                matchingButton(item, places)
+            }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)   // room for the straddling nm pill
                 .padding(.bottom, 4)
@@ -414,7 +441,7 @@ struct StationListView: View {
         if !recentItems.isEmpty {
             sectionLabel("Recents")
             ForEach(recentItems) { item in
-                recentRow(item, isFirst: item.id == recentItems.first?.id,
+                recentRow(item, places: places, isFirst: item.id == recentItems.first?.id,
                           isLast: item.id == recentItems.last?.id)
                     .swipeActions(edge: .trailing) {
                         // Spec §9: true deletion — red destructive full-swipe.
@@ -448,8 +475,14 @@ struct StationListView: View {
     /// name over region), navigating like the full cards. First/last rows
     /// round the group's outer corners — the grouped-card look, but one List
     /// row per station so each carries its own swipe actions.
-    @ViewBuilder private func recentRow(_ item: StationItem, isFirst: Bool, isLast: Bool) -> some View {
-        activatable(RecentRowLabel(item: item, imperial: imperial), item)
+    @ViewBuilder private func recentRow(_ item: StationItem, places: StationGroups,
+                                        isFirst: Bool, isLast: Bool) -> some View {
+        VStack(spacing: 0) {
+            activatable(RecentRowLabel(item: item, imperial: imperial), item)
+            // Nothing at all unless the name is shared — the common row is
+            // exactly what it was.
+            matchingButton(item, places).padding(.bottom, 10)
+        }
             .overlay(alignment: .bottom) {
                 if !isLast { Divider().overlay(Color.white.opacity(0.08)) }
             }
@@ -459,6 +492,33 @@ struct StationListView: View {
                 bottomTrailingRadius: isLast ? 20 : 0, topTrailingRadius: isFirst ? 20 : 0,
                 style: .continuous))
             .padding(.horizontal, 16)
+    }
+
+    /// The matching-station chooser's entry point: a quiet link-styled line
+    /// under an entry whose name several stations share (the web chooser's
+    /// toggle — "not right?"). Renders nothing when the name is unique, since
+    /// an affordance offering one option is noise (web StationChooser).
+    @ViewBuilder private func matchingButton(_ item: StationItem, _ places: StationGroups) -> some View {
+        let matches = places.matches(item)
+        if matches.count > 1 {
+            Button {
+                chooser = StationMatches(place: item.name, matches: matches)
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("\(matches.count) matching stations")
+                }
+                .font(.geist(12, .medium))
+                .foregroundStyle(SN.leaf)
+                .padding(.horizontal, 18)
+                .padding(.top, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("matching-stations")
+        }
     }
 
     /// Row activation, per layout: compact rides the List's hidden
@@ -746,6 +806,108 @@ struct MyLocationTile<Card: View>: View {
     }
 }
 
+/// One place and every station that answers for it (M50 chooser payload).
+struct StationMatches: Identifiable, Hashable {
+    let place: String
+    /// Nearest first; always includes the entry that opened the chooser.
+    let matches: [StationItem]
+    var id: String { place }
+}
+
+/// The matching-station chooser (web `StationChooser.tsx`, list-side): where
+/// several stations share a name, the list shows the nearest and this says so
+/// rather than silently hiding the rest. Each row carries the two things that
+/// aren't the name — what it measures (tide or current, NOAA or CHS) and how
+/// far it is — so the pick is informed rather than a guess between identical
+/// labels.
+struct StationChooserSheet: View {
+    let place: StationMatches
+    let anchor: (lat: Double, lon: Double)
+    let onPick: (StationItem) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
+                           startRadius: 0, endRadius: 400)
+                .ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(place.place)
+                            .font(.fraunces(26, .semibold))
+                            .foregroundStyle(SN.paper)
+                        Text("\(place.matches.count) stations answer for this place — pick the one you mean.")
+                            .font(.geist(13))
+                            .foregroundStyle(SN.foam.opacity(0.62))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SN.foam.opacity(0.8))
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.08), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 24)
+                .padding(.bottom, 16)
+
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(place.matches) { row($0) }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("station-chooser")
+    }
+
+    private func row(_ item: StationItem) -> some View {
+        Button {
+            onPick(item)
+            dismiss()
+        } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(stationGradient(id: item.id))
+                    .frame(width: 38, height: 38)
+                VStack(alignment: .leading, spacing: 3) {
+                    // The name is the same on every row — the qualifier is the
+                    // whole point, so it leads.
+                    Text(item.region.isEmpty ? item.name : item.region)
+                        .font(.geist(15, .medium))
+                        .foregroundStyle(SN.paper)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    MonoLabel(text: item.kindLabel, size: 10,
+                              color: SN.foam.opacity(0.55), tracking: 1.1)
+                }
+                Spacer(minLength: 8)
+                Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
+                    .font(.geistMono(12, .medium))
+                    .foregroundStyle(SN.foam.opacity(0.85))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.05),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(SN.leaf.opacity(0.16), lineWidth: 0.5))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 /// The compact recent-station row body (prototype: 38pt gradient chip, name
 /// over region, current reading trailing in Fraunces).
 struct RecentRowLabel: View {
@@ -762,20 +924,31 @@ struct RecentRowLabel: View {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(stationGradient(id: rawId))
                 .frame(width: 38, height: 38)
-            VStack(alignment: .leading, spacing: 1) {
+            // The name owns the full row width (M50). It used to share the
+            // line with the reading, which in the 320pt iPad sidebar left it
+            // ~150pt — "Deception Pass State Park" came out "Deception Pas…",
+            // and two different stations truncated to the same string. The
+            // reading drops to the secondary line, where the region (the least
+            // load-bearing text here) is what gives way instead.
+            VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
                     .font(.geist(16, .medium))
                     .foregroundStyle(SN.paper)
                     .lineLimit(1)
-                Text(item.region)
-                    .font(.geist(12))
-                    .foregroundStyle(SN.foam.opacity(0.55))
-                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                HStack(spacing: 8) {
+                    Text(item.region)
+                        .font(.geist(12))
+                        .foregroundStyle(SN.foam.opacity(0.55))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(reading)
+                        .font(.fraunces(15))
+                        .foregroundStyle(SN.foam.opacity(0.7))
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                }
             }
-            Spacer(minLength: 8)
-            Text(reading)
-                .font(.fraunces(17))
-                .foregroundStyle(SN.foam.opacity(0.7))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

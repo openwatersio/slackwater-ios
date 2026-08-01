@@ -1,6 +1,27 @@
 /**
- * Enrich the bundled currents.json with the station-corrections v2.5.0
- * gate→tide pairing (`tideReference`), in place.
+ * Enrich the bundled currents.json in place: the station-corrections v2.5.0
+ * gate→tide pairing (`tideReference`), and the region line's presentation.
+ *
+ * ## Regions (M50)
+ *
+ * A NOAA current station's `region` is the comma qualifier off its own name
+ * ("Discovery Island, 7.6 mi. SSE of"), split out by station-corrections'
+ * resolver. Two things arrive broken and are fixed here, at the data layer,
+ * once — not on every render:
+ *
+ * 1. **Compass abbreviations get title-cased.** station-corrections'
+ *    `cleanName` re-cases ALL-CAPS words and its KEEP set holds only the
+ *    two-letter points (NE/NW/SE/SW), so the eight three-letter ones come out
+ *    "Sse", "Nne", "Ene", "Wnw"… The real root cause is upstream in
+ *    `station-corrections/src/clean.js`; slackwater-web resolves at runtime
+ *    through the same function and has the identical bug (web follow-up).
+ * 2. **Statute miles in a marine app.** NOAA writes some qualifiers in miles
+ *    and some in nautical miles, so a card could say "7.6 mi." above a
+ *    computed "6.6 nm" pill — one card, two distance units. Everything
+ *    becomes nautical miles.
+ *
+ * Both passes are idempotent (a converted string carries "nm", not "mi."), so
+ * this stays safe to re-run after any regeneration.
  *
  * Two rungs, in order:
  * 1. The registry's curated pairing, surfaced by resolve() (the v2.5.0 type
@@ -39,8 +60,22 @@ function km(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-let curated = 0, derived = 0;
+/** The 12 abbreviated compass points that can survive a title-casing pass. */
+const COMPASS = /\b(NNE|ENE|ESE|SSE|SSW|WSW|WNW|NNW|NE|SE|SW|NW)\b/gi;
+/** 1 statute mile = 1.609344 km; 1 nautical mile = 1.852 km. */
+const MI_TO_NM = 1.609344 / 1.852;
+
+export function normalizeRegion(region) {
+  return region
+    .replace(/(\d+(?:\.\d+)?)\s*(?:mi\.|miles?\b)/gi,
+             (_, n) => `${(Number(n) * MI_TO_NM).toFixed(1)} nm`)
+    .replace(COMPASS, (p) => p.toUpperCase());
+}
+
+let curated = 0, derived = 0, recased = 0;
 for (const gate of currents) {
+  const region = normalizeRegion(gate.region ?? "");
+  if (region !== gate.region) { gate.region = region; recased += 1; }
   delete gate.tideReference; // regenerate, never accrete
   const r = resolve({ id: gate.id, name: gate.name, latitude: gate.latitude, longitude: gate.longitude });
   if (r.tideReference) {
@@ -59,4 +94,4 @@ for (const gate of currents) {
 }
 
 writeFileSync(join(res, "currents.json"), JSON.stringify(currents));
-console.log(`${currents.length} gates: ${curated} curated + ${derived} proximity-paired (<= ${PAIR_KM} km)`);
+console.log(`${currents.length} gates: ${curated} curated + ${derived} proximity-paired (<= ${PAIR_KM} km), ${recased} regions normalized`);

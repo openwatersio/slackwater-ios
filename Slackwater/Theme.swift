@@ -342,3 +342,49 @@ struct ListGroups {
         recents = recentIds.filter { !shown.contains($0) }
     }
 }
+
+// MARK: - One entry per place (M50)
+
+/// Same-named stations are one place answered by several stations. NOAA alone
+/// ships 19 collided names in the bundle — three "Point Wilson", four "The
+/// Narrows", two "Discovery Island" — and in a distance-ranked list they
+/// render as identical cards stacked on each other, distinguishable only by
+/// the distance pill.
+///
+/// So a name renders once, as its nearest station, and the rest stay one tap
+/// away behind the matching-station chooser: the list-side application of the
+/// web's multi-match chooser (slackwater-web `src/StationChooser.tsx`,
+/// web-client-design § "the multi-match chooser" — "where more than one
+/// station plausibly serves a place, say so rather than silently picking").
+///
+/// Favorites are deliberately *not* collapsed: a starred station is an
+/// explicit pick, and quietly swapping it for a nearer namesake would override
+/// a choice the user made on purpose.
+struct StationGroups {
+    /// Name -> every station carrying it, nearest first.
+    private let byName: [String: [StationItem]]
+    /// Any station id -> the id that actually renders for its name.
+    private let canonical: [String: String]
+
+    /// `ranked` is the catalog sorted nearest-first, so the first station of a
+    /// name is the nearest one — the one shown.
+    init(ranked: [StationItem]) {
+        var byName: [String: [StationItem]] = [:]
+        for item in ranked { byName[item.name, default: []].append(item) }
+        self.byName = byName
+        canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
+                               uniquingKeysWith: { first, _ in first })
+    }
+
+    /// What renders in place of `id` — itself, unless a nearer station shares its name.
+    func shown(_ id: String) -> String { canonical[id] ?? id }
+
+    /// Collapse ids to what renders: one per name, input order kept.
+    func collapse(_ ids: [String]) -> [String] {
+        var seen = Set<String>()
+        return ids.map(shown).filter { seen.insert($0).inserted }
+    }
+
+    /// Every station sharing this one's name, nearest first — the chooser's rows.
+    func matches(_ item: StationItem) -> [StationItem] { byName[item.name] ?? [item] }
+}

@@ -182,6 +182,17 @@ enum StationItem: Identifiable, Hashable {
         case .chsCurrent(let s): s.longitude
         }
     }
+    /// "Current · NOAA" — what this station measures and whose data it is.
+    /// The matching-station chooser's disambiguator: when two entries share a
+    /// name, series and provider are the difference that isn't distance.
+    var kindLabel: String {
+        switch self {
+        case .tide: "Tide · NOAA"
+        case .current: "Current · NOAA"
+        case .chs: "Tide · CHS"
+        case .chsGate, .chsCurrent: "Current · CHS"
+        }
+    }
     /// Map pin class per the design tokens: tide / current / chs. A derived
     /// gate is a current gate (web chsStations.ts: series "current").
     var pinKind: String {

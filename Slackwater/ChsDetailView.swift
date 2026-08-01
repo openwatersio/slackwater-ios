@@ -19,6 +19,18 @@ enum ChsRoute: Hashable {
     /// when its reference PORT is fitted, so that is the job it waits on.
     case derivedGate(ChsGateInfo)
 
+    /// This route's own station — the navigation destination's identity, so
+    /// opening a second CHS station replaces the view rather than reusing it
+    /// (see `navigationDestination` in SlackwaterApp). Not `jobID`: two derived
+    /// gates can share a reference port and would collide there.
+    var stationID: String {
+        switch self {
+        case .port(let info): info.id
+        case .currentGate(let gate): gate.id
+        case .derivedGate(let gate): gate.id
+        }
+    }
+
     /// The queue job this route waits on.
     var jobID: String {
         switch self {
