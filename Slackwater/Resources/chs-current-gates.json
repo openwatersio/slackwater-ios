@@ -7,7 +7,8 @@
   "latitude": 48.8604,
   "longitude": -123.3128,
   "timezone": "America/Vancouver",
-  "tideReference": "chs-fulford-harbour"
+  "tideReference": "chs-fulford-harbour",
+  "fitDays": 60
  },
  {
   "id": "chs-blackney-passage",
@@ -16,7 +17,9 @@
   "aliases": [],
   "latitude": 50.555,
   "longitude": -126.6842,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 35
  },
  {
   "id": "chs-dodd-narrows",
@@ -25,7 +28,9 @@
   "aliases": [],
   "latitude": 49.1344,
   "longitude": -123.8171,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 35
  },
  {
   "id": "chs-first-narrows",
@@ -37,7 +42,8 @@
   "latitude": 49.316,
   "longitude": -123.1401,
   "timezone": "America/Vancouver",
-  "tideReference": "chs-vancouver"
+  "tideReference": "chs-vancouver",
+  "fitDays": 60
  },
  {
   "id": "chs-gillard-passage",
@@ -48,7 +54,9 @@
   ],
   "latitude": 50.3933,
   "longitude": -125.1567,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 20
  },
  {
   "id": "chs-hole-in-the-wall",
@@ -58,7 +66,9 @@
   "latitude": 50.3001,
   "longitude": -125.2083,
   "timezone": "America/Vancouver",
-  "tideReference": "chs-owen-bay"
+  "tideReference": "chs-owen-bay",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 20
  },
  {
   "id": "chs-johnstone-strait-central",
@@ -67,7 +77,8 @@
   "aliases": [],
   "latitude": 50.4717,
   "longitude": -126.1367,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 60
  },
  {
   "id": "chs-porlier-pass",
@@ -77,7 +88,9 @@
   "latitude": 49.015,
   "longitude": -123.585,
   "timezone": "America/Vancouver",
-  "tideReference": "chs-fulford-harbour"
+  "tideReference": "chs-fulford-harbour",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 35
  },
  {
   "id": "chs-race-passage",
@@ -86,7 +99,9 @@
   "aliases": [],
   "latitude": 48.3067,
   "longitude": -123.5367,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 30
  },
  {
   "id": "chs-seymour-narrows",
@@ -96,7 +111,8 @@
   "latitude": 50.1333,
   "longitude": -125.35,
   "timezone": "America/Vancouver",
-  "tideReference": "chs-campbell-river"
+  "tideReference": "chs-campbell-river",
+  "fitDays": 60
  },
  {
   "id": "chs-weynton-passage",
@@ -105,6 +121,8 @@
   "aliases": [],
   "latitude": 50.6033,
   "longitude": -126.8117,
-  "timezone": "America/Vancouver"
+  "timezone": "America/Vancouver",
+  "fitDays": 210,
+  "provisionalSlackMinutes": 35
  }
 ]

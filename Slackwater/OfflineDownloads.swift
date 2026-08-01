@@ -208,22 +208,25 @@ struct OfflineManagerList: View {
 
     // MARK: Rows
 
-    /// Web OfflineManager STATUS_TEXT, verbatim.
-    private func statusText(_ status: ChsJobStatus) -> String {
-        switch status {
-        case .pending: "Waiting"
-        case .downloading: "Downloading…"
-        case .ready: "Offline ✓"
-        case .failed: "Failed"
+    /// Web OfflineManager STATUS_TEXT, verbatim — except for the gate that is
+    /// usable but not finished, which the web has no equivalent of.
+    private func statusText(_ job: ChsJob) -> String {
+        if service.isProvisional(job.id) { return "Refining…" }
+        switch job.status {
+        case .pending: return "Waiting"
+        case .downloading: return "Downloading…"
+        case .ready: return "Offline ✓"
+        case .failed: return "Failed"
         }
     }
 
-    private func statusTint(_ status: ChsJobStatus) -> Color {
-        switch status {
-        case .pending: SN.foam.opacity(0.5)
-        case .downloading: SN.leaf
-        case .ready: SN.leaf
-        case .failed: SN.amber
+    private func statusTint(_ job: ChsJob) -> Color {
+        if service.isProvisional(job.id) { return SN.amber }
+        switch job.status {
+        case .pending: return SN.foam.opacity(0.5)
+        case .downloading: return SN.leaf
+        case .ready: return SN.leaf
+        case .failed: return SN.amber
         }
     }
 
@@ -232,7 +235,8 @@ struct OfflineManagerList: View {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(stationGradient(id: job.id))
                 .frame(width: 38, height: 38)
-                .opacity(job.status == .ready ? 1 : 0.45)
+                // Provisional sits between the two: usable, not finished.
+                .opacity(job.status == .ready ? 1 : service.isProvisional(job.id) ? 0.75 : 0.45)
             VStack(alignment: .leading, spacing: 3) {
                 Text(job.name)
                     .font(.geist(16, .medium))
@@ -245,6 +249,14 @@ struct OfflineManagerList: View {
                         MonoLabel(text: "You opened", size: 9, color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(SN.amber.opacity(0.16), in: Capsule())
+                    }
+                    // Usable now, not finished — and it says by how much.
+                    if service.isProvisional(job.id),
+                       let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
+                        MonoLabel(text: "Fast answer \(gate.provisionalTolerance)",
+                                  size: 9, color: SN.amber, tracking: 1.2)
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(SN.amber.opacity(0.18), in: Capsule())
                     }
                     Text("\(job.isCurrent ? "Current" : "Tide") · \(job.region)")
                         .font(.geist(12))
@@ -263,9 +275,9 @@ struct OfflineManagerList: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Text(statusText(job.status))
+                Text(statusText(job))
                     .font(.geist(13))
-                    .foregroundStyle(statusTint(job.status))
+                    .foregroundStyle(statusTint(job))
             }
         }
         .padding(.horizontal, 14)

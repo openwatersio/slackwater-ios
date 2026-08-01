@@ -28,20 +28,26 @@ struct ChsJob: Identifiable, Hashable {
     let id: String
     let name: String
     let region: String
-    /// A current gate fits a 210-day window (≈7× a tide port's requests). The
-    /// manager and the detail warning both say which, because it is the whole
-    /// explanation for the wait.
+    /// A current gate reads two series (speed + direction) and a metadata call;
+    /// a tide port reads one. The manager and the detail warning both say
+    /// which, because it is the whole explanation for the wait.
     let isCurrent: Bool
     let latitude: Double
     let longitude: Double
+    /// This station's OWN fit window — 60 d for every tide port and for the
+    /// four gates validated at 60 d, 210 d for the rest (M51).
+    let fitDays: Double
     var status: ChsJobStatus = .pending
 
     /// Rough wall-clock cost of this job, seconds: IwlsFetcher paces one
-    /// request every 2.5 s, and the window divides into 7-day chunks — 9 for a
-    /// 60-day tide port, 30 × 2 series + 1 metadata for a 210-day current gate.
-    /// ponytail: a constant, not a measurement; it only ever feeds "about N
+    /// request every 2.5 s, the window divides into 7-day chunks (+1 for grid
+    /// alignment), and a gate reads two series plus one metadata call.
+    /// ponytail: an estimate, not a measurement; it only ever feeds "about N
     /// min", so a live moving average would be precision nobody reads.
-    var estimatedSeconds: Double { isCurrent ? 61 * 2.5 : 9 * 2.5 }
+    var estimatedSeconds: Double {
+        let chunks = (fitDays / 7).rounded(.up) + 1
+        return (chunks * (isCurrent ? 2 : 1) + (isCurrent ? 1 : 0)) * 2.5
+    }
 }
 
 struct ChsQueue {
@@ -65,6 +71,25 @@ struct ChsQueue {
     func job(_ id: String) -> ChsJob? { jobs.first { $0.id == id } }
     /// Did the user jump this one up the queue? Drives the manager's badge.
     func isPromoted(_ id: String) -> Bool { promoted.contains(id) }
+
+    /// Should the job currently downloading step aside? Only for a station the
+    /// user actually opened, waiting at the head of the queue. The fit loop
+    /// asks this at every chunk boundary, so "I opened this" costs one chunk
+    /// (~2.5 s) instead of the rest of a 210-day gate (~2.5 min).
+    ///
+    /// Between two stations the user opened, the one opened MOST RECENTLY wins
+    /// — `promoted` is newest-first, so this is a strict order and the pair can
+    /// never hand the download back and forth (the newest can only be yielded
+    /// TO, never yielded FROM).
+    func shouldYield(running id: String) -> Bool {
+        guard let next = nextPending, next.id != id, isPromoted(next.id) else { return false }
+        return promotionRank(next.id) < promotionRank(id)
+    }
+
+    /// 0 = the station opened most recently; Int.max = never opened.
+    private func promotionRank(_ id: String) -> Int {
+        promoted.firstIndex(of: id) ?? .max
+    }
 
     /// 1-based position among the stations still to come; nil once it is ready.
     func position(_ id: String) -> Int? {

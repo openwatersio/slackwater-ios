@@ -89,9 +89,16 @@ final class ScreenshotTests: XCTestCase {
 
         // Search mid-query: name + region substring both match (bottom input).
         openSearch(app, "pass")
-        XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Active Pass"].firstMatch.waitForExistence(timeout: 5))
         sleep(1)
         save(app, "m1-search.png")
+        // The NOAA station is further down the results, and how far depends on
+        // what is downloaded (M51: a gate showing its fast answer wears an
+        // extra badge line). Scroll the results rather than assume the fold.
+        let deception = app.staticTexts["Deception Pass (Narrows)"].firstMatch
+        var tries = 0
+        while !deception.exists, tries < 6 { app.scrollViews.firstMatch.swipeUp(); tries += 1 }
+        XCTAssert(deception.exists, "search did not find Deception Pass (Narrows)")
         closeSearch(app)
 
         // Metres via Settings, then open Friday Harbor in metric.
@@ -794,10 +801,13 @@ final class ScreenshotTests: XCTestCase {
 
         app.staticTexts["Dodd Narrows"].firstMatch.tap()
         // Full current-detail anatomy: the slack countdown and the CHS
-        // provenance footer (device-computed, not CHS-published).
+        // provenance footer (device-computed, not CHS-published). M51: Dodd is
+        // a 210-day gate, so the card above landed on its 60-day fast answer —
+        // the final footer is the tell that the full model has since replaced
+        // it (the fast answer's own footer says "60 of 210 days downloaded").
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 5))
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 300))
         sleep(2)
         save(app, "m47-dodd-detail.png")
 
@@ -1196,6 +1206,193 @@ final class ScreenshotTests: XCTestCase {
         sleep(4)  // header map tiles for the new station
         save(app, "m50-detail-swap.png")
         XCUIDevice.shared.orientation = .portrait
+    }
+
+    // MARK: - M51: the fast answer
+
+    /// Time-to-first-usable, printed into the test log. These four numbers —
+    /// nearest tide port, 60-day gate, 210-day gate provisional, same gate
+    /// final — are what M51 exists to move, so they get measured, not guessed.
+    private func report(_ what: String, _ from: Date) {
+        print("M51 TTFU · \(what): \(String(format: "%.1f", -from.timeIntervalSinceNow)) s")
+    }
+
+    /// (a) the nearest tide port — unchanged by M51 at its validated 60 d, and
+    /// the baseline the gate numbers are read against.
+    func testM51NearestTidePortTimeToFirstUsable() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate", "-chsFitOnly", "chs-victoria",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        let t0 = Date()
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openSearch(app, "victoria")
+        // The pending copy is the CHS card's alone — when it goes, the fit
+        // landed and the card is showing real water.
+        let pending = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions'")).firstMatch
+        XCTAssert(pending.waitForExistence(timeout: 15), "no CHS Victoria card in the results")
+        var waited = 0
+        while pending.exists, waited < 240 { sleep(2); waited += 2 }
+        XCTAssertFalse(pending.exists, "Victoria never fitted — IWLS unreachable?")
+        report("nearest tide port (60 d)", t0)
+        XCTAssert(app.scrollViews.firstMatch.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^\\d+\\.\\d+ (ft|m)$")).firstMatch.exists,
+                  "a fitted port must show a height, not just lose its pending copy")
+    }
+
+    /// (b) a gate validated at 60 d: one short fetch, straight to FINAL. The
+    /// negative is the point — this station must never wear the amber fast
+    /// answer, because its first fit already meets the full bar.
+    func testM51ValidatedGateReachesFinalWithNoProvisionalStage() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate", "-chsFitOnly", "chs-active-pass",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        let t0 = Date()
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openSearch(app, "active pass")
+        let overlay = app.scrollViews.firstMatch
+        let fitted = overlay.staticTexts.matching(
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+        XCTAssert(fitted.waitForExistence(timeout: 240), "Active Pass never fitted — IWLS unreachable?")
+        report("nearest 60-day gate → FINAL", t0)
+
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'FAST ANSWER'")).firstMatch.exists,
+                       "a gate validated at 60 d must go straight to final — no provisional marking")
+        app.staticTexts["Active Pass"].firstMatch.tap()
+        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'can be off by up to'")).firstMatch.exists,
+                       "no fast-answer warning belongs on a final model")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.exists,
+                  "final models keep the ordinary CHS provenance footer")
+    }
+
+    /// (c) + (d): a 210-day gate shows its fast answer at ~60 d, says by how
+    /// much it can be wrong AT THIS PASS, then refines in place under an open
+    /// page — the amber marking clearing is the transition to final.
+    func testM51ProvisionalGateShowsFastAnswerThenRefines() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate", "-chsFitOnly", "chs-dodd-narrows",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        let t0 = Date()
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openSearch(app, "dodd")
+
+        // The fast answer, in the list: amber numbers and this pass's own
+        // tolerance — never a generic hedge, never mistakable for final.
+        let badge = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'FAST ANSWER · SLACK ±35 MIN'")).firstMatch
+        XCTAssert(badge.waitForExistence(timeout: 240),
+                  "Dodd Narrows never published its 60-day fast answer")
+        report("nearest 210-day gate → PROVISIONAL", t0)
+        sleep(1)
+        save(app, "m51-provisional-list.png")
+
+        // …and in the detail: the ⚠️ family, with the real number in it.
+        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        let warning = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'")).firstMatch
+        XCTAssert(warning.waitForExistence(timeout: 10),
+                  "the provisional detail is missing its warning, naming THIS pass's measured error")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'Stay connected'")).firstMatch.exists,
+                  "the warning must say what to do about it, and roughly how long")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '60 of 210 days downloaded'")).firstMatch.exists,
+                  "the footer must say how much of the model is actually here")
+        sleep(2)  // header map tiles
+        save(app, "m51-provisional-detail.png")
+
+        // The refinement lands under the open page: same station, final model.
+        var waited = 0
+        while warning.exists, waited < 300 { sleep(5); waited += 5 }
+        XCTAssertFalse(warning.exists, "the fast answer never refined to the full model")
+        report("nearest 210-day gate → FINAL", t0)
+        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.exists, "the refined page is still a live detail")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.exists,
+                  "the refined page carries the ordinary final footer")
+        sleep(1)
+        save(app, "m51-refined.png")
+    }
+
+    /// The manager, mid-run: one gate usable-but-refining beside the ordinary
+    /// waiting/downloading rows — provisional and final are different words.
+    func testM51ManagerShowsProvisionalApartFromFinal() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate",
+                               "-chsFitOnly", "chs-dodd-narrows,chs-victoria,chs-active-pass",
+                               "-fixLat", "49.1344", "-fixLon", "-123.8171"]  // at Dodd
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        XCTAssert(dodd.waitForExistence(timeout: 10))
+        var waited = 0
+        while !dodd.label.contains("Refining"), waited < 300 { sleep(5); waited += 5 }
+        XCTAssert(dodd.label.contains("Refining"),
+                  "the manager never showed the usable-but-unfinished state")
+        XCTAssert(dodd.label.contains("FAST ANSWER ±35 MIN"),
+                  "the manager must say how good the fast answer is, not just that there is one")
+        sleep(1)
+        save(app, "m51-manager.png")
+        app.buttons["Done"].tap()
+    }
+
+    /// Opening a station while a long gate is mid-download used to cost up to
+    /// ~2.5 min: promotion only took effect at the next STATION boundary. Now
+    /// the running job steps aside at the next CHUNK — and comes back to what
+    /// it already fetched.
+    func testM51PromotionInterruptsAnInFlightDownload() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate",
+                               "-chsFitOnly", "chs-dodd-narrows,chs-tofino",
+                               "-fixLat", "49.1344", "-fixLon", "-123.8171"]  // Dodd is nearest
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // Dodd (210 d, ~2.5 min of chunks) is in flight.
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
+        XCTAssert(dodd.waitForExistence(timeout: 10))
+        XCTAssert(dodd.label.contains("Downloading"), "the nearest gate should be the one in flight")
+        app.buttons["Done"].tap()
+
+        // Open the far tide port — the promotion the queue has to honour NOW.
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        openSearch(app, "tofino")
+        app.staticTexts["Tofino"].firstMatch.tap()
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        let t0 = Date()
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+
+        // Within one chunk (2.5 s of pacing, plus the round trip), the gate has
+        // stepped aside and the station you opened is downloading.
+        let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
+        var waited = 0
+        while !tofino.label.contains("Downloading"), waited < 30 { sleep(1); waited += 1 }
+        XCTAssert(tofino.label.contains("Downloading"),
+                  "opening a station did not interrupt the gate in flight (waited \(waited) s)")
+        XCTAssert(app.descendants(matching: .any)["download-row-chs-dodd-narrows"]
+            .firstMatch.label.contains("Waiting"), "the yielded gate must go back to waiting, not fail")
+        print("M51 interrupt: promoted station started \(String(format: "%.1f", -t0.timeIntervalSinceNow)) s after the open")
+
+        // And it resumes: once the promoted port is done the gate carries on
+        // from its cached chunks (never re-fetching them — ChsProvisionalTests).
+        waited = 0
+        while !dodd.label.contains("Downloading"), waited < 120 { sleep(2); waited += 2 }
+        XCTAssert(dodd.label.contains("Downloading"), "the yielded gate never resumed")
+        app.buttons["Done"].tap()
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

@@ -59,19 +59,41 @@ console.log(`${gates.length} derived gate(s): ${gates.map((g) => g.name).join(",
 // published wcp1-events, held out +28..+35 d: slack median ≤15 / worst ≤30
 // min, extrema median ≤20 min, peak-speed median ≤0.5 kn, no reversed axis).
 // A failed gate is ABSENT, not broken-looking. Numbers recorded 2026-07-31.
-const SHIPPED = new Set([
-  // slack med/max · extrema med/max (min) · peak-speed med (kn)
-  "chs-active-pass",              // 2.4/4.0 · 1.1/2.4 · 0.06
-  "chs-blackney-passage",         // 5.0/24.7 · 8.7/25.2 · 0.07
-  "chs-dodd-narrows",             // 2.1/18.6 · 13.1/26.0 · 0.16
-  "chs-first-narrows",            // 2.8/5.8 · 1.9/3.0 · 0.09
-  "chs-gillard-passage",          // 3.7/9.1 · 12.4/22.8 · 0.42
-  "chs-hole-in-the-wall",         // 3.6/9.6 · 13.7/26.9 · 0.42
-  "chs-johnstone-strait-central", // 1.3/5.4 · 4.5/12.8 · 0.05
-  "chs-porlier-pass",             // 2.2/18.8 · 10.6/38.1 · 0.16
-  "chs-race-passage",             // 4.2/11.6 · 9.9/50.4 · 0.44
-  "chs-seymour-narrows",          // 0.2/1.0 · 0.3/0.5 · 0.00
-  "chs-weynton-passage",          // 3.0/19.2 · 5.6/25.5 · 0.12
+//
+// M51 — the WINDOW IS PER GATE, not a blanket 210 d. The same validation run
+// scored both windows from one fetch, and four gates already meet the full bar
+// at the 60-day tide window: those fetch 60 d (~45 s) and go straight to FINAL,
+// no provisional stage. The rest need 210 d, so they fit at 60 d first (a
+// prefix of the same fetch — no wasted request), show that PROVISIONAL, and
+// refine in place.
+//
+//   fitDays                 the window whose fit is FINAL for this gate
+//   provisionalSlackMinutes the honest worst-case slack error of the 60-day
+//                           fast answer, rounded UP to 5 min — the number the
+//                           app puts in front of the user, per gate, never a
+//                           generic hedge. Absent ⇒ no provisional stage.
+//
+// USEFULNESS FLOOR — 45 min of 60-day WORST slack error. Past that the warning
+// ("could be three quarters of an hour out") is itself the instruction not to
+// use the answer, so showing it is theatre: the gate stays pending until its
+// full model lands. Worst, not median, because worst is the number the copy
+// quotes. 45 sits in the real gap in the data (worst shipped 34.1 → next 45.7).
+const PROVISIONAL_FLOOR_MIN = 45;
+// id → { fitDays, slack60Max } — slack60Max is the measured 60-day worst.
+const SHIPPED = new Map([
+  //                                 210 d: slack med/max · extrema med/max (min) · speed med (kn)
+  //                                  60 d: slack med/max
+  ["chs-active-pass", { fitDays: 60 }],              // 2.4/4.0 · 1.1/2.4 · 0.06 | 60 d 1.8/3.2 PASSES
+  ["chs-first-narrows", { fitDays: 60 }],            // 2.8/5.8 · 1.9/3.0 · 0.09 | 60 d 2.6/4.8 PASSES
+  ["chs-johnstone-strait-central", { fitDays: 60 }], // 1.3/5.4 · 4.5/12.8 · 0.05 | 60 d 3.8/11.4 PASSES
+  ["chs-seymour-narrows", { fitDays: 60 }],          // 0.2/1.0 · 0.3/0.5 · 0.00 | 60 d 0.2/1.0 PASSES
+  ["chs-blackney-passage", { fitDays: 210, slack60Max: 31.8 }], // 5.0/24.7 · 8.7/25.2 · 0.07 | 60 d 7.2/31.8
+  ["chs-dodd-narrows", { fitDays: 210, slack60Max: 32.9 }],     // 2.1/18.6 · 13.1/26.0 · 0.16 | 60 d 15.1/32.9
+  ["chs-gillard-passage", { fitDays: 210, slack60Max: 17.7 }],  // 3.7/9.1 · 12.4/22.8 · 0.42 | 60 d 12.4/17.7
+  ["chs-hole-in-the-wall", { fitDays: 210, slack60Max: 19.7 }], // 3.6/9.6 · 13.7/26.9 · 0.42 | 60 d 10.5/19.7
+  ["chs-porlier-pass", { fitDays: 210, slack60Max: 32.1 }],     // 2.2/18.8 · 10.6/38.1 · 0.16 | 60 d 12.3/32.1
+  ["chs-race-passage", { fitDays: 210, slack60Max: 28.5 }],     // 4.2/11.6 · 9.9/50.4 · 0.44 | 60 d 7.8/28.5
+  ["chs-weynton-passage", { fitDays: 210, slack60Max: 34.1 }],  // 3.0/19.2 · 5.6/25.5 · 0.12 | 60 d 2.9/34.1
 ]);
 // EXCLUDED — failed the bar (210 d window; slack med/max · extrema med/max ·
 // peak-speed med). Kept out entirely per §6a: wrong water under a trusted
@@ -84,23 +106,42 @@ const SHIPPED = new Set([
 //   chs-sechelt-rapids    15.5/39.5 · 11.7/55.7 · 0.94 kn — slack + speed (Skookumchuck)
 //   chs-second-narrows    5.9/13.5 · 20.6/48.1 · 0.26 kn — extrema med (near miss)
 //   chs-tillicum-bridge   19.0/93.0 · 19.1/96.5 · 0.15 kn — slack (Gorge Waterway)
+// Their 60-day worsts, for the record — all four are also below the M51
+// usefulness floor, so they would not get a provisional stage either:
+//   second-narrows 45.7 · sechelt-rapids 60.4 · tillicum-bridge 79.4 ·
+//   juan-de-fuca-east 146.6
 
 const gateEntries = Object.entries(registry).filter(
   ([, e]) => e.provider === "chs" && !e.kind && !e.derived,
 );
 const currentGates = gateEntries
   .filter(([id]) => SHIPPED.has(id))
-  .map(([id, e]) => ({
-    id,
-    name: e.name,
-    region: e.context,
-    aliases: e.aliases ?? [],
-    latitude: e.position[0],
-    longitude: e.position[1],
-    timezone: "America/Vancouver",
-    // Registry pairing (dual-track detail) — only if that port is bundled.
-    tideReference: ports.some((p) => p.id === e.tideReference) ? e.tideReference : undefined,
-  }));
+  .map(([id, e]) => {
+    const { fitDays, slack60Max } = SHIPPED.get(id);
+    // The floor, enforced here so a future gate cannot silently ship a fast
+    // answer nobody could act on: over it, the entry carries no provisional
+    // number and the app holds the gate pending until the full model lands.
+    const useful = slack60Max !== undefined && slack60Max <= PROVISIONAL_FLOOR_MIN;
+    return {
+      id,
+      name: e.name,
+      region: e.context,
+      aliases: e.aliases ?? [],
+      latitude: e.position[0],
+      longitude: e.position[1],
+      timezone: "America/Vancouver",
+      // Registry pairing (dual-track detail) — only if that port is bundled.
+      tideReference: ports.some((p) => p.id === e.tideReference) ? e.tideReference : undefined,
+      fitDays,
+      provisionalSlackMinutes: useful ? Math.ceil(slack60Max / 5) * 5 : undefined,
+    };
+  });
 
 writeFileSync(join(res, "chs-current-gates.json"), JSON.stringify(currentGates, null, 1) + "\n");
-console.log(`${currentGates.length}/${gateEntries.length} validated current gate(s): ${currentGates.map((g) => g.name).join(", ")}`);
+console.log(`${currentGates.length}/${gateEntries.length} validated current gate(s):`);
+for (const g of currentGates) {
+  console.log(`  ${g.name.padEnd(26)} ${g.fitDays} d` +
+    (g.fitDays === 60 ? "  (final on first fit)"
+     : g.provisionalSlackMinutes ? `  provisional ±${g.provisionalSlackMinutes} min`
+     : `  NO provisional — over the ${PROVISIONAL_FLOOR_MIN} min floor`));
+}

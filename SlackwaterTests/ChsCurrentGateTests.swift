@@ -49,11 +49,12 @@ final class ChsCurrentGateTests: XCTestCase {
     func testFittedModelRecordPredictsSlackAndSignedMaxima() throws {
         let gate = ChsCurrentGateInfo(
             id: "chs-test-gate", name: "Test Gate", region: "Test", aliases: [],
-            latitude: 49, longitude: -123, timezone: "America/Vancouver", tideReference: nil)
+            latitude: 49, longitude: -123, timezone: "America/Vancouver", tideReference: nil,
+            fitDays: 210, provisionalSlackMinutes: 35)
         // A pure M2 current, 2 kn peak: slack every ~6.21 h, alternating maxima.
         let model = ChsCurrentModel(
             stationID: gate.id, iwlsID: "x", iwlsName: "x", fittedAt: .now,
-            fitStartMs: 0, fitEndMs: 0, floodDirection: 45, ebbDirection: 225,
+            fitStartMs: 0, fitEndMs: 0, fitDays: 210, floodDirection: 45, ebbDirection: 225,
             offset: 0, rms: 0.01,
             constituents: [.init(name: "M2", amplitude: 2, phase: 0)])
         let record = gate.record(with: model)
@@ -85,7 +86,7 @@ final class ChsCurrentGateTests: XCTestCase {
     func testCurrentModelStoreRoundTrip() throws {
         let model = ChsCurrentModel(
             stationID: "chs-test-store", iwlsID: "abc", iwlsName: "Test", fittedAt: .now,
-            fitStartMs: 1, fitEndMs: 2, floodDirection: 355, ebbDirection: 155,
+            fitStartMs: 1, fitEndMs: 2, fitDays: 210, floodDirection: 355, ebbDirection: 155,
             offset: 0.1, rms: 0.37,
             constituents: [.init(name: "M2", amplitude: 1.5, phase: 123)])
         try ChsModelStore.saveCurrent(model)

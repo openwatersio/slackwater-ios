@@ -13,10 +13,20 @@ struct CurrentDetailView: View {
     let record: CurrentStationRecord
     @AppStorage(unitsKey) private var units = "imperial"
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @ObservedObject private var service = ChsFitService.shared
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
     @State private var timeline: TimelineData?
+    @State private var showDownloads = false
+
+    /// The gate identity behind a provisional fast answer — nil for a final
+    /// model, which is what every readout below keys on.
+    private var provisionalGate: ChsCurrentGateInfo? {
+        service.isProvisional(record.id) ? record.chsGate : nil
+    }
+    /// Every number on this page is the fast answer's: amber, not white.
+    private var readingColor: Color { provisionalGate == nil ? .white : SN.amber }
 
     private var pairedTide: TideStationRecord? { record.pairedTide }
     private var imperial: Bool { units == "imperial" }
@@ -47,6 +57,12 @@ struct CurrentDetailView: View {
                           favoriteId: "current:" + record.id,
                           showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
                           onReturn: returnToNow)
+                if let gate = provisionalGate {
+                    ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
+                                 expectation: gate.provisionalExpectation,
+                                 action: "See all downloads",
+                                 identifier: "chs-provisional-warning") { showDownloads = true }
+                }
                 if let timeline {
                     scrubCard(timeline)
                     scheduleCard(timeline)
@@ -59,11 +75,17 @@ struct CurrentDetailView: View {
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
         .onAppear {
             if timeline == nil {
                 timeline = TimelineData.build(tide: pairedTide, current: record, now: live)
             }
             RecentsStore.shared.record("current:" + record.id)
+        }
+        // The refinement lands under an open page: same station, new model. The
+        // curve, the schedule and the amber marking all have to follow it.
+        .onChange(of: record) { _, refined in
+            timeline = TimelineData.build(tide: pairedTide, current: refined, now: live)
         }
     }
 
@@ -133,27 +155,39 @@ struct CurrentDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
-                        Text("Slack").font(.fraunces(34)).foregroundStyle(.white)
+                        Text("Slack").font(.fraunces(34)).foregroundStyle(readingColor)
                         Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
-                        (Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.fraunces(34))
+                        // The tilde is the whole point of the provisional
+                        // treatment: the number itself stops claiming to be
+                        // exact, before any badge or card is read.
+                        (Text(provisionalGate == nil ? "" : "~").font(.fraunces(34))
+                         + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.fraunces(34))
                          + Text(" \(speedUnitLabel(speedUnit))").font(.geist(14)))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(readingColor)
                         HStack(spacing: 4) {
                             Text(phaseWord(phase)).font(.geist(13))
                             CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.geist(13))
                             Text(compass16(record.setDegrees(signed: scrubSigned))).font(.geist(13))
                         }
-                        .foregroundStyle(phaseColor)
+                        .foregroundStyle(provisionalGate == nil ? phaseColor : SN.amber.opacity(0.85))
+                    }
+                    if let gate = provisionalGate {
+                        MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
+                                  size: 9, color: SN.amber, tracking: 1.2)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(SN.amber.opacity(0.16), in: Capsule())
+                            .padding(.top, 2)
+                            .accessibilityIdentifier("provisional-reading-badge")
                     }
                 }
                 Spacer()
                 if let slack = nextSlack {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.geist(12)).foregroundStyle(SN.leaf)
+                        Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.leaf : SN.amber)
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
@@ -224,7 +258,11 @@ struct CurrentDetailView: View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
-            if record.isChs {
+            if let gate = provisionalGate {
+                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded — still refining")
+                    .font(.geist(11)).foregroundStyle(SN.amber.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            } else if record.isChs {
                 // Same register as the CHS tide footer (TideDetailView).
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))

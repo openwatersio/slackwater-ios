@@ -1196,7 +1196,8 @@ struct ChsCurrentGateCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.currentState(gate.id) {
         case .fitted(let record):
-            CurrentCardView(record: record)
+            CurrentCardView(record: record,
+                            provisional: service.isProvisional(gate.id) ? gate : nil)
         case .fitting:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
                            message: "Downloading Canadian current predictions…")
@@ -1215,8 +1216,16 @@ struct ChsCurrentGateCardView: View {
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
     let record: CurrentStationRecord
+    /// Set while this gate is showing its 60-day fast answer: the card's own
+    /// numbers go amber and tilde'd, and the gate's real tolerance rides under
+    /// them. Never a subtle badge — a provisional card must not be mistakable
+    /// for a final one at a glance down the list.
+    var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
+
+    private var reading: Color { provisional == nil ? .white : SN.amber }
+    private var tilde: String { provisional == nil ? "" : "~" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1233,8 +1242,15 @@ struct CurrentCardView: View {
                     if let next = state?.next {
                         Text(nextLine(next))
                             .font(.geist(12))
-                            .foregroundStyle(SN.foam.opacity(0.92))
+                            .foregroundStyle(provisional == nil ? SN.foam.opacity(0.92) : SN.amber)
                             .padding(.top, 10)
+                    }
+                    if let gate = provisional {
+                        MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
+                                  size: 9, color: SN.amber, tracking: 1.2)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(SN.amber.opacity(0.18), in: Capsule())
+                            .padding(.top, 6)
                     }
                 }
                 Spacer(minLength: 8)
@@ -1244,20 +1260,20 @@ struct CurrentCardView: View {
                         if phase == .slack {
                             Text("SLACK")
                                 .font(.geistMono(11, .medium)).tracking(1)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(reading)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(Color.white.opacity(0.18), in: Capsule())
+                                .background((provisional == nil ? Color.white : SN.amber).opacity(0.18), in: Capsule())
                         } else {
-                            (Text(formatSpeed(abs(state.signed), unit: speedUnit))
+                            (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
                                 .font(.fraunces(42))
                              + Text(" \(speedUnitLabel(speedUnit))")
                                 .font(.fraunces(17)))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(reading)
                             HStack(spacing: 4) {
                                 CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.geist(11))
                                 Text(phaseWord(phase)).font(.geist(11))
                             }
-                            .foregroundStyle(SN.foam.opacity(0.9))
+                            .foregroundStyle(provisional == nil ? SN.foam.opacity(0.9) : SN.amber.opacity(0.85))
                         }
                     }
                 }
@@ -1268,14 +1284,18 @@ struct CurrentCardView: View {
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .background(stationGradient(id: record.id))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.amber.opacity(provisional == nil ? 0 : 0.5), lineWidth: 1))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
+        // The refinement replaces the record under an open list: recompute.
+        .onChange(of: record) { _, refined in state = refined.cardState(at: appNow()) }
     }
 
     private func nextLine(_ next: CurrentEvent) -> String {
         let when = cardTime(next.time, record.tz)
         return next.kind == .slack
-            ? "Slack · \(when)"
-            : "\(next.turnLabel) \(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
+            ? "\(tilde)Slack · \(when)"
+            : "\(next.turnLabel) \(tilde)\(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
     }
 }

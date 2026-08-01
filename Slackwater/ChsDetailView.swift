@@ -71,11 +71,11 @@ struct ChsDetailView: View {
                 }
             }
         }
-        // Viewing is the strongest possible signal of what to download next.
-        // ponytail: takes effect at the next job boundary — a 210-day current
-        // gate already in flight finishes first (≈2.5 min ceiling). Cancelling
-        // mid-station would mean throwing away paid-for requests; revisit only
-        // if that wait is what people complain about.
+        // Viewing is the strongest possible signal of what to download next,
+        // and M51 made it act like one: the running job steps aside at its next
+        // CHUNK boundary (~2.5 s), not its next station boundary (up to ~2.5
+        // min for a 210-day gate). Nothing paid for is thrown away — chunks are
+        // cached, so the yielded job resumes exactly where it stopped.
         .onAppear { service.promote(route.jobID) }
     }
 
@@ -125,53 +125,9 @@ struct ChsWaitingView: View {
     }
 
     private var warningCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 13) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 21))
-                    .foregroundStyle(SN.amber)
-                    .frame(width: 46, height: 46)
-                    .background(SN.amber.opacity(0.16),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .accessibilityLabel("Warning")
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("No predictions yet")
-                        .font(.fraunces(20, .semibold))
-                        .foregroundStyle(SN.paper)
-                    Text(headline)
-                        .font(.geist(13))
-                        .foregroundStyle(SN.foam.opacity(0.72))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            Text(expectation)
-                .font(.geist(13))
-                .lineSpacing(3)
-                .foregroundStyle(SN.foam.opacity(0.62))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("chs-waiting-expectation")
-
-            Button { showDownloads = true } label: {
-                HStack(spacing: 4) {
-                    Text(job?.status == .failed ? "Retry in Downloads" : "See all downloads")
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                }
-                .font(.geist(15, .semibold))
-                .foregroundStyle(SN.amber)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SN.amber.opacity(0.1),
-                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
-        .padding(.horizontal, 16)
-        .accessibilityIdentifier("chs-waiting-warning")
+        ChsAmberCard(title: "No predictions yet", headline: headline, expectation: expectation,
+                     action: job?.status == .failed ? "Retry in Downloads" : "See all downloads",
+                     identifier: "chs-waiting-warning") { showDownloads = true }
     }
 
     /// The one-line "what is happening". The established plain register is
@@ -209,6 +165,69 @@ struct ChsWaitingView: View {
                   size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
+    }
+}
+
+/// The ⚠️ card: the app's one shape for "these numbers aren't what you think".
+/// Shared by the not-yet-downloaded station and the provisional fast answer, on
+/// purpose — a user who has learned to read the amber block once has learned to
+/// read it everywhere.
+struct ChsAmberCard: View {
+    let title: String
+    let headline: String
+    let expectation: String
+    let action: String
+    let identifier: String
+    let onAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 13) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 21))
+                    .foregroundStyle(SN.amber)
+                    .frame(width: 46, height: 46)
+                    .background(SN.amber.opacity(0.16),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .accessibilityLabel("Warning")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.fraunces(20, .semibold))
+                        .foregroundStyle(SN.paper)
+                    Text(headline)
+                        .font(.geist(13))
+                        .foregroundStyle(SN.foam.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Text(expectation)
+                .font(.geist(13))
+                .lineSpacing(3)
+                .foregroundStyle(SN.foam.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("chs-waiting-expectation")
+
+            Button(action: onAction) {
+                HStack(spacing: 4) {
+                    Text(action)
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                }
+                .font(.geist(15, .semibold))
+                .foregroundStyle(SN.amber)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SN.amber.opacity(0.1),
+                    in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
+        .padding(.horizontal, 16)
+        .accessibilityIdentifier(identifier)
     }
 }
 

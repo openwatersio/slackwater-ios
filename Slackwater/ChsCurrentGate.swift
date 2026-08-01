@@ -25,8 +25,29 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
     /// Registry pairing: a bundled CHS tide port whose water renders as the
     /// second track above the gate's current strip. Absent = current-only.
     let tideReference: String?
+    /// The window whose fit is FINAL for THIS gate — 60 or 210 d, from the M51
+    /// per-gate validation, not a blanket number.
+    let fitDays: Double
+    /// The honest worst-case slack error, minutes, of the 60-day fast answer.
+    /// Absent means no fast answer is offered: either the gate is final at 60 d
+    /// anyway, or its 60-day error is over the usefulness floor.
+    let provisionalSlackMinutes: Int?
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
+
+    /// The trailing 60 days — every gate's first fit, and a prefix of the
+    /// 210-day fetch, so a provisional answer costs no extra request.
+    static let provisionalDays = 60.0
+
+    /// Does this gate get a fast answer before its full model? Only when the
+    /// full window is longer than the provisional one AND the measured 60-day
+    /// error cleared the floor (both encoded in the bundle by gen-chs-gates).
+    var offersProvisional: Bool { fitDays > Self.provisionalDays && provisionalSlackMinutes != nil }
+
+    /// Rough wall-clock for the refinement leg — the chunks between 60 d and
+    /// the full window, two series each, at the fetcher's 2.5 s pacing. Feeds
+    /// "stay connected about N more minutes"; coarse by design.
+    var refineSeconds: Double { ((fitDays - Self.provisionalDays) / 7).rounded(.up) * 2 * 2.5 }
 
     static let all: [ChsCurrentGateInfo] = {
         guard let url = Bundle.main.url(forResource: "chs-current-gates", withExtension: "json"),
@@ -57,6 +78,10 @@ struct ChsCurrentModel: Codable {
     let fittedAt: Date
     let fitStartMs: Double
     let fitEndMs: Double
+    /// Days of data behind this fit. Less than the gate's `fitDays` means this
+    /// is the PROVISIONAL fast answer, not the final model. Optional so a model
+    /// stored by build ≤14 (always the full window) still decodes.
+    let fitDays: Double?
     let floodDirection: Double
     let ebbDirection: Double
     /// Z0: net mean flow along the flood axis, knots, signed.
@@ -84,7 +109,27 @@ extension ChsModelStore {
     }
 }
 
+// MARK: - The fast answer, in words
+
+/// The copy for a provisional gate lives here, in one place, because it has to
+/// say the same thing on the card, in the detail and in the manager — and
+/// because the number in it is THIS gate's measured 60-day slack error, never a
+/// generic hedge. Register: what it is, how wrong it can be, what to do.
 extension ChsCurrentGateInfo {
+    /// "±35 min" — the badge-sized version.
+    var provisionalTolerance: String { "±\(provisionalSlackMinutes ?? 0) min" }
+
+    var provisionalHeadline: String {
+        "Fitted from the last \(Int(Self.provisionalDays)) days — slack at \(name) can be off by up to ~\(provisionalSlackMinutes ?? 0) min."
+    }
+
+    var provisionalExpectation: String {
+        "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
+    }
+
+    /// Is this stored model the fast answer rather than the full model?
+    func isProvisional(_ model: ChsCurrentModel) -> Bool { (model.fitDays ?? fitDays) < fitDays }
+
     /// A fitted CHS gate renders through the exact same record/engine/view path
     /// as a bundled NOAA current station — provenance shows only in the footer.
     func record(with model: ChsCurrentModel) -> CurrentStationRecord {
@@ -102,4 +147,7 @@ extension ChsCurrentGateInfo {
 extension CurrentStationRecord {
     /// Fitted-on-device CHS gate, vs a bundled NOAA harmonic station.
     var isChs: Bool { id.hasPrefix("chs-") }
+    /// The bundled gate identity behind a fitted CHS record — where the
+    /// per-gate window and the fast answer's tolerance live.
+    var chsGate: ChsCurrentGateInfo? { ChsCurrentGateInfo.all.first { $0.id == id } }
 }

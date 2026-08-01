@@ -40,7 +40,12 @@ final class ChsFitService: ObservableObject {
     @Published private(set) var queue = ChsQueue()
 
     private var tideRecords: [String: TideStationRecord] = [:]
-    private var currentRecords: [String: CurrentStationRecord] = [:]
+    /// Published: a gate's record is REPLACED in place when the provisional fit
+    /// refines to the final one, and any open detail has to follow it.
+    @Published private(set) var currentRecords: [String: CurrentStationRecord] = [:]
+    /// Gates whose current record is the 60-day fast answer, not the full
+    /// model. Published for the same reason.
+    @Published private(set) var provisional: Set<String> = []
 
     /// True once launched with `-networkKillSwitch` (UI tests' honest
     /// airplane-mode stand-in: every IWLS request throws before the socket).
@@ -66,7 +71,8 @@ final class ChsFitService: ObservableObject {
         var jobs: [ChsJob] = []
         for info in ChsStationInfo.all where Self.fitOnly?.contains(info.id) ?? true {
             var job = ChsJob(id: info.id, name: info.name, region: info.region, isCurrent: false,
-                             latitude: info.latitude, longitude: info.longitude)
+                             latitude: info.latitude, longitude: info.longitude,
+                             fitDays: Self.tideFitDays)
             if let model = ChsModelStore.load(info.id) {
                 tideRecords[info.id] = info.record(with: model)
                 job.status = .ready
@@ -75,10 +81,14 @@ final class ChsFitService: ObservableObject {
         }
         for gate in ChsCurrentGateInfo.all where Self.fitOnly?.contains(gate.id) ?? true {
             var job = ChsJob(id: gate.id, name: gate.name, region: gate.region, isCurrent: true,
-                             latitude: gate.latitude, longitude: gate.longitude)
+                             latitude: gate.latitude, longitude: gate.longitude,
+                             fitDays: gate.fitDays)
             if let model = ChsModelStore.loadCurrent(gate.id) {
                 currentRecords[gate.id] = gate.record(with: model)
-                job.status = .ready
+                // A provisional model is usable but NOT done: the job stays
+                // queued so the next connected run refines it, and its cached
+                // chunks mean that costs only the chunks it never fetched.
+                if gate.isProvisional(model) { provisional.insert(gate.id) } else { job.status = .ready }
             }
             jobs.append(job)
         }
@@ -105,6 +115,10 @@ final class ChsFitService: ObservableObject {
         case .pending, .ready: return .pending
         }
     }
+
+    /// Is this gate's showing record the 60-day fast answer? Every provisional
+    /// treatment in the UI hangs off this one question.
+    func isProvisional(_ id: String) -> Bool { provisional.contains(id) }
 
     /// Start the download run: nearest-first, one station at a time. Partial
     /// failure is fine — whatever fit is stored; the rest are retryable from
@@ -148,6 +162,13 @@ final class ChsFitService: ObservableObject {
         return job
     }
 
+    /// The fast answer landed: publish it, keep the job queued (it is not done).
+    private func publishProvisional(_ gate: ChsCurrentGateInfo, _ model: ChsCurrentModel) {
+        try? ChsModelStore.saveCurrent(model)
+        currentRecords[gate.id] = gate.record(with: model)
+        provisional.insert(gate.id)
+    }
+
     private nonisolated func run() async {
         let fetcher = IwlsFetcher()
         let fitter = ChsFitter()
@@ -168,22 +189,29 @@ final class ChsFitService: ObservableObject {
                 if job.isCurrent {
                     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.noStations }
-                    let model = try await Self.fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
+                    let model = try await fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.saveCurrent(model)
                     await MainActor.run {
                         self.currentRecords[gate.id] = gate.record(with: model)
+                        self.provisional.remove(gate.id)
                         self.queue.set(job.id, .ready)
                     }
+                    ChsChunkStore.purge(model.iwlsID)
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.noStations }
-                    let model = try await Self.fit(info, list: list, fetcher: fetcher, fitter: fitter)
+                    let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.save(model)
                     await MainActor.run {
                         self.tideRecords[info.id] = info.record(with: model)
                         self.queue.set(job.id, .ready)
                     }
+                    ChsChunkStore.purge(model.iwlsID)
                 }
+            } catch ChsError.yielded {
+                // Stepped aside for a station the user opened. Everything
+                // fetched is on disk, so resuming costs only what is missing.
+                await MainActor.run { self.queue.set(job.id, .pending) }
             } catch {
                 // ponytail: no retry ladder — the manager's retry and the next
                 // connected launch are the retries.
@@ -193,13 +221,22 @@ final class ChsFitService: ObservableObject {
         await MainActor.run { self.running = false }
     }
 
-    /// 60 d @ 15 min ending yesterday — the window the M0 spike validated.
-    private nonisolated static func fit(_ info: ChsStationInfo, list: [IwlsStation],
-                                        fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {
-        let station = try resolve(info, in: list)
+    /// 60 d @ 15 min ending yesterday — the window the M0 spike validated, and
+    /// unchanged by M51: the per-gate window work is currents-only.
+    static let tideFitDays = 60.0
+
+    private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
+                                 fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {
+        let station = try Self.resolve(info, in: list)
         let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
-        let start = end.addingTimeInterval(-60 * 86_400)
-        let samples = try await fetcher.wlp(stationID: station.id, from: start, to: end)
+        let plan = Self.chunkPlan(days: Self.tideFitDays, end: end)
+        var samples: [ChsSample] = []
+        for chunk in plan {
+            samples += try await fetcher.wlp(stationID: station.id, chunk: chunk)
+            if await MainActor.run(body: { self.queue.shouldYield(running: info.id) }) { throw ChsError.yielded }
+        }
+        samples.sort { $0.t < $1.t }
+        let start = plan.last?.start ?? end
         let fit = try await fitter.fit(samples: samples)
         print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms (interpreted, no JIT), rms \(String(format: "%.1f", fit.rms * 100)) cm")
         return ChsFittedModel(
@@ -210,35 +247,86 @@ final class ChsFitService: ObservableObject {
             constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
     }
 
-    /// 210 d of wcsp1+wcdp1 ending yesterday, projected onto the CHS flood
-    /// axis, fitted with the same JSCore path as the tides. 210 days is the
-    /// window the M47 validation passed: Rayleigh separation of K1/P1 (which
-    /// drive PNW diurnal inequality) needs ≥183 d, and the 60-day tide window
-    /// measurably fails the slack bar (spikes/chs-currents-fit/README.md).
-    static let currentFitDays = 210.0
-
-    private nonisolated static func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
-                                               fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
-        let station = try resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
-                                  series: "wcsp1", in: list)
+    /// wcsp1+wcdp1 over the gate's OWN validated window, projected onto the CHS
+    /// flood axis, fitted with the same JSCore path as the tides. Most gates
+    /// need 210 d — Rayleigh separation of K1/P1, which drive PNW diurnal
+    /// inequality, needs ≥183 d — but four meet the full bar at 60 d and are
+    /// final on their first fit (spikes/chs-currents-fit/README.md).
+    ///
+    /// Chunks are fetched NEWEST FIRST, so the trailing 60 days land first and
+    /// a 210-day gate can publish its fast answer at ~45 s and keep going. The
+    /// 60-day chunks are the same chunks the 210-day fetch needs: no request is
+    /// made twice, and nothing is thrown away.
+    private nonisolated func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
+                                        fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
+        let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
+                                       series: "wcsp1", in: list)
         let meta = try await fetcher.metadata(stationID: station.id)
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
             throw ChsError.noFloodAxis(gate.name)
         }
         let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
-        let start = end.addingTimeInterval(-currentFitDays * 86_400)
-        let speeds = try await fetcher.series("wcsp1", stationID: station.id, from: start, to: end)
-        let dirs = try await fetcher.series("wcdp1", stationID: station.id, from: start, to: end)
-        let samples = Self.project(speeds: speeds, dirs: dirs, floodDirection: flood)
+        let plan = Self.chunkPlan(days: gate.fitDays, end: end)
+        let provisionalCut = end.addingTimeInterval(-ChsCurrentGateInfo.provisionalDays * 86_400)
+        var speeds: [ChsSample] = [], dirs: [ChsSample] = []
+        var fastAnswerDone = !gate.offersProvisional
+
+        for chunk in plan {
+            speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
+            if await MainActor.run(body: { self.queue.shouldYield(running: gate.id) }) { throw ChsError.yielded }
+            dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
+            if await MainActor.run(body: { self.queue.shouldYield(running: gate.id) }) { throw ChsError.yielded }
+            // The trailing 60 days are in: publish the fast answer and carry on.
+            guard !fastAnswerDone, chunk.start <= provisionalCut else { continue }
+            fastAnswerDone = true
+            let model = try await Self.model(gate: gate, station: station, flood: flood, ebb: ebb,
+                                             start: chunk.start, end: end,
+                                             fitDays: ChsCurrentGateInfo.provisionalDays,
+                                             speeds: speeds, dirs: dirs, fitter: fitter)
+            await MainActor.run { self.publishProvisional(gate, model) }
+        }
+        return try await Self.model(gate: gate, station: station, flood: flood, ebb: ebb,
+                                    start: plan.last?.start ?? end, end: end, fitDays: gate.fitDays,
+                                    speeds: speeds, dirs: dirs, fitter: fitter)
+    }
+
+    /// Project + fit + wrap. Refitting the widened sample set is 19–106 ms —
+    /// cheap enough that the provisional stage costs nothing but the fit.
+    private nonisolated static func model(gate: ChsCurrentGateInfo, station: IwlsStation,
+                                          flood: Double, ebb: Double, start: Date, end: Date,
+                                          fitDays: Double, speeds: [ChsSample], dirs: [ChsSample],
+                                          fitter: ChsFitter) async throws -> ChsCurrentModel {
+        let samples = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
         let fit = try await fitter.fit(samples: samples)
-        print("CHS current fit \(gate.id): \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
+        print("CHS current fit \(gate.id) @ \(Int(fitDays)) d: \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
         return ChsCurrentModel(
             stationID: gate.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
-            fitEndMs: end.timeIntervalSince1970 * 1000,
+            fitEndMs: end.timeIntervalSince1970 * 1000, fitDays: fitDays,
             floodDirection: flood, ebbDirection: ebb,
             offset: fit.offset, rms: fit.rms,
             constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
+    }
+
+    /// 7-day chunks covering at least `days` back from `end`, NEWEST FIRST.
+    ///
+    /// Boundaries sit on an absolute 7-day epoch grid, not on `end` — so a
+    /// chunk's identity (and its cache file) is the same tomorrow as today, and
+    /// the 60-day plan is exactly the newest chunks of the 210-day plan. The
+    /// price is up to 7 days more data than asked for, which a harmonic fit can
+    /// only like. Only the newest chunk is short (grid boundary → `end`), and
+    /// it is the one chunk that is never cached.
+    nonisolated static func chunkPlan(days: Double, end: Date) -> [ChsChunk] {
+        let week = 7 * 86_400.0
+        let endS = end.timeIntervalSince1970
+        var out: [ChsChunk] = []
+        var t = (((endS - days * 86_400) / week).rounded(.down)) * week
+        while t < endS {
+            out.append(ChsChunk(start: Date(timeIntervalSince1970: t),
+                                end: Date(timeIntervalSince1970: min(t + week, endS))))
+            t += week
+        }
+        return out.reversed()
     }
 
     /// Signed along-channel velocity: speed · cos(direction − floodDirection).
@@ -280,6 +368,9 @@ final class ChsFitService: ObservableObject {
 
 enum ChsError: Error {
     case networkDisabled
+    /// Stepped aside at a chunk boundary for a station the user opened. Not a
+    /// failure: the job goes back to `.pending` with its chunks on disk.
+    case yielded
     case noStations
     case noStationWithinTolerance(String, String, Double)
     case noFloodAxis(String)
@@ -301,14 +392,53 @@ struct IwlsStation: Decodable {
 struct IwlsSample: Decodable { let eventDate: String; let value: Double }
 
 /// A decimated sample as bridged to JS: epoch-ms + metres.
-struct ChsSample: Encodable { let t: Double; let v: Double }
+struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
+
+/// One request's worth of series: a 7-day slot on the absolute epoch grid.
+struct ChsChunk: Equatable { let start: Date; let end: Date }
+
+/// Fetched chunks, on disk, keyed by what identifies them and nothing else —
+/// so a job that stepped aside mid-download resumes where it stopped instead of
+/// paying for the same bytes twice. Purged per station once its final fit lands
+/// (the harmonic model is the artifact; the samples were only scaffolding).
+enum ChsChunkStore {
+    static let dir: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("ChsChunks", isDirectory: true)
+    }()
+
+    static func url(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> URL {
+        dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970)).json")
+    }
+
+    static func load(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> [ChsSample]? {
+        guard let data = try? Data(contentsOf: url(stationID, code, chunk)) else { return nil }
+        return try? JSONDecoder().decode([ChsSample].self, from: data)
+    }
+
+    static func save(_ samples: [ChsSample], _ stationID: String, _ code: String, _ chunk: ChsChunk) {
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(samples).write(to: url(stationID, code, chunk), options: .atomic)
+    }
+
+    static func purge(_ stationID: String) {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        for f in files where f.hasPrefix(stationID + "-") {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(f))
+        }
+    }
+}
 
 /// Polite serial IWLS client: one request at a time, 2.5 s apart (~24/min,
 /// safely under the documented 3/s and 30/min caps), 7-day chunks.
 final class IwlsFetcher {
     static let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
-    private let killSwitch = CommandLine.arguments.contains("-networkKillSwitch")
+    private let killSwitch: Bool
     private var lastRequest = Date.distantPast
+
+    init(killSwitch: Bool = CommandLine.arguments.contains("-networkKillSwitch")) {
+        self.killSwitch = killSwitch
+    }
 
     private func get(_ path: String) async throws -> Data {
         guard !killSwitch else { throw ChsError.networkDisabled }
@@ -333,48 +463,41 @@ final class IwlsFetcher {
         try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
     }
 
-    /// A natively 15-minute series (wcsp1/wcdp1) for [from, to), 7-day chunks.
-    /// No decimation — only chunk-edge de-dup.
-    func series(_ code: String, stationID: String, from: Date, to: Date) async throws -> [ChsSample] {
-        let iso = ISO8601DateFormatter()
-        var out: [ChsSample] = []
-        var t = from
-        while t < to {
-            let next = min(t.addingTimeInterval(7 * 86_400), to)
-            let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
-                "&from=\(iso.string(from: t))&to=\(iso.string(from: next))"
-            let chunk = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
-            for s in chunk {
-                guard let date = iso.date(from: s.eventDate) else { continue }
-                let ms = date.timeIntervalSince1970 * 1000
-                if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
-            }
-            t = next
-        }
-        return out
+    /// A natively 15-minute series (wcsp1/wcdp1) for one chunk. Cached on disk,
+    /// so this costs a request exactly once — including across a job that
+    /// stepped aside and came back, and across days (the grid is absolute).
+    func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
+        try await cached(code, stationID: stationID, chunk: chunk) { $0 }
     }
 
-    /// wlp for [from, to), 7-day chunks, decimated from 1-min to 15-min.
-    func wlp(stationID: String, from: Date, to: Date) async throws -> [ChsSample] {
-        let iso = ISO8601DateFormatter()
-        var out: [ChsSample] = []
-        var t = from
-        while t < to {
-            let next = min(t.addingTimeInterval(7 * 86_400), to)
-            let path = "/stations/\(stationID)/data?time-series-code=wlp" +
-                "&from=\(iso.string(from: t))&to=\(iso.string(from: next))"
-            let chunk = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
-            for s in chunk {
-                guard let date = iso.date(from: s.eventDate) else { continue }
-                let ms = date.timeIntervalSince1970 * 1000
-                // 1-min native → keep the 15-min grid; chunk edges can repeat a point.
-                if ms.truncatingRemainder(dividingBy: 900_000) == 0, out.last?.t != ms {
-                    out.append(ChsSample(t: ms, v: s.value))
-                }
-            }
-            t = next
+    /// wlp for one chunk, decimated from its 1-min native rate to the 15-min
+    /// grid the fit wants (M0 spike carry-forward).
+    func wlp(stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
+        try await cached("wlp", stationID: stationID, chunk: chunk) {
+            $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
         }
-        return out
+    }
+
+    private func cached(_ code: String, stationID: String, chunk: ChsChunk,
+                        _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
+        if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
+        let iso = ISO8601DateFormatter()
+        let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
+            "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"
+        let raw = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
+        var out: [ChsSample] = []
+        for s in raw {
+            guard let date = iso.date(from: s.eventDate) else { continue }
+            let ms = date.timeIntervalSince1970 * 1000
+            if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
+        }
+        let samples = transform(out)
+        // Only whole grid chunks are cached: the newest one runs to "now" and
+        // would be a different chunk tomorrow.
+        if chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
+            ChsChunkStore.save(samples, stationID, code, chunk)
+        }
+        return samples
     }
 }
 

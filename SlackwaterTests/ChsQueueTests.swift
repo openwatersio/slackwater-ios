@@ -6,8 +6,10 @@ import XCTest
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
-    private func job(_ id: String, _ lat: Double, _ lon: Double, current: Bool = false) -> ChsJob {
-        ChsJob(id: id, name: id, region: "test", isCurrent: current, latitude: lat, longitude: lon)
+    private func job(_ id: String, _ lat: Double, _ lon: Double,
+                     current: Bool = false, days: Double = 60) -> ChsJob {
+        ChsJob(id: id, name: id, region: "test", isCurrent: current,
+               latitude: lat, longitude: lon, fitDays: days)
     }
 
     /// Victoria-ish origin, and three stations at increasing distance.
@@ -99,15 +101,66 @@ final class ChsQueueTests: XCTestCase {
     /// The FTUE number: with proximity ordering the nearest station's wait is
     /// its own fetch, not the whole queue's.
     func testWaitSecondsCountsOnlyWhatIsAheadPlusItself() {
-        var q = ChsQueue([job("near", 48.43, -123.37), job("gate", 48.5, -123.5, current: true)])
+        var q = ChsQueue([job("near", 48.43, -123.37),
+                          job("gate", 48.5, -123.5, current: true, days: 210)])
         q.prioritize(lat: 48.4235, lon: -123.3705)
-        // A tide port is 9 paced requests; the gate behind it adds 61 more.
-        XCTAssertEqual(q.waitSeconds("near"), 9 * 2.5, accuracy: 0.01)
-        XCTAssertEqual(q.waitSeconds("gate"), 9 * 2.5 + 61 * 2.5, accuracy: 0.01)
+        // A 60-day tide port is 10 paced requests; the 210-day gate behind it
+        // adds 31 chunks × 2 series + 1 metadata.
+        XCTAssertEqual(q.waitSeconds("near"), 10 * 2.5, accuracy: 0.01)
+        XCTAssertEqual(q.waitSeconds("gate"), 10 * 2.5 + 63 * 2.5, accuracy: 0.01)
         q.set("near", .ready)
-        XCTAssertEqual(q.waitSeconds("gate"), 61 * 2.5, accuracy: 0.01,
+        XCTAssertEqual(q.waitSeconds("gate"), 63 * 2.5, accuracy: 0.01,
                        "a finished station no longer holds anyone up")
         XCTAssertEqual(q.waitSeconds("near"), 0)
+    }
+
+    /// M51: the window is the job's own, so a 60-day gate is roughly a third of
+    /// a 210-day one — the whole reason four gates skip the provisional stage.
+    func testA60DayGateCostsAThirdOfA210DayGate() {
+        let fast = job("fast", 48.9, -123.3, current: true, days: 60)
+        let full = job("full", 49.1, -123.8, current: true, days: 210)
+        XCTAssertEqual(fast.estimatedSeconds, 21 * 2.5, accuracy: 0.01)   // 10 chunks × 2 + metadata
+        XCTAssertEqual(full.estimatedSeconds, 63 * 2.5, accuracy: 0.01)   // 31 chunks × 2 + metadata
+    }
+
+    // MARK: - M51: stepping aside at a chunk boundary
+
+    /// The whole point: a 210-day gate in flight does not make you wait 2.5 min
+    /// for the station you just opened.
+    func testTheRunningJobStepsAsideForAStationYouOpened() {
+        var q = queue()
+        q.prioritize(lat: 48.4235, lon: -123.3705)
+        q.set("near", .downloading)
+        XCTAssertFalse(q.shouldYield(running: "near"), "nobody is waiting on us")
+        q.promote("far")
+        XCTAssert(q.shouldYield(running: "near"), "the station the user opened is at the head, waiting")
+    }
+
+    /// Proximity alone never interrupts: only an explicit open does.
+    func testAMerelyCloserStationDoesNotInterrupt() {
+        var q = queue()
+        q.set("far", .downloading)
+        q.prioritize(lat: 48.4235, lon: -123.3705)
+        XCTAssertFalse(q.shouldYield(running: "far"),
+                       "a re-sort re-orders the queue; it does not throw away a download in flight")
+    }
+
+    /// Between two stations the user opened, the newest open wins — and the
+    /// pair can never hand the download back and forth, because that order is
+    /// strict in one direction.
+    func testTheMostRecentlyOpenedStationWinsAndCannotPingPong() {
+        var q = queue()
+        q.promote("far")            // opened first
+        q.set("far", .downloading)
+        q.promote("mid")            // opened second, while `far` is in flight
+        XCTAssertEqual(q.nextPending?.id, "mid", "the newest open leads the queue")
+        XCTAssert(q.shouldYield(running: "far"), "an earlier open still steps aside for a later one")
+
+        // …and once `mid` has the download, `far` waiting behind it changes nothing.
+        q.set("far", .pending)
+        q.set("mid", .downloading)
+        XCTAssertEqual(q.nextPending?.id, "far")
+        XCTAssertFalse(q.shouldYield(running: "mid"), "no thrash: the newest open is never yielded from")
     }
 
     func testDurationPhraseIsCoarse() {
