@@ -48,7 +48,27 @@ gates with a `station-corrections` reference port, settings, a real app icon, an
 App Store metadata in `docs/appstore-metadata.md`) — see the
 [docs index](docs/README.md) and the milestone plan in `slackwater/docs/superpowers/specs/`.
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
-are generated, not committed). This repo is **deliberately private and
+are generated, not committed).
+
+## Testing (agents: read this)
+
+Two checked-in test plans, run on both reference simulators by `scripts/test.sh`:
+
+```sh
+./scripts/test.sh          # FAST (default) — ~9 min/sim. Use this while iterating.
+./scripts/test.sh --full   # FULL — ~21 min/sim, and variable. Before every upload.
+```
+
+Fast is everything that runs on stored or mocked state. Full adds the nine UI tests that
+fetch live from CHS IWLS and fit harmonics on-device — that is the entire difference, it
+runs at the IWLS client's 2.5 s-per-request pacing, and it is the only coverage of the
+network path. **Iterate on fast; go full before `scripts/testflight.sh`.** Every
+`xcodebuild` invocation, by hand or by script, needs
+`-clonedSourcePackagesDirPath build/SourcePackages`. Details in `docs/testflight.md`.
+
+## License
+
+This repo is **deliberately private and
 deliberately unlicensed for now**: the engine and libraries are open and permissive, the web app
 is GPL, and the app's own license waits until we've worked out a structure that actually holds
 (copyleft + paid distribution + contributor terms don't sit cleanly together). Getting it right

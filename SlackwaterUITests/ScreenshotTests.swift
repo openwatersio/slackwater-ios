@@ -28,8 +28,12 @@ final class ScreenshotTests: XCTestCase {
 
     /// The list's own scroll container. `app.swipeUp()` gestures at the centre
     /// of the whole app, which in the iPad split lands in the DETAIL pane and
-    /// scrolls nothing — the sidebar list has to be swiped directly.
+    /// scrolls nothing — the sidebar list has to be swiped directly. Since M52
+    /// the pane opens on a station, so "the first scroll view" is the detail's
+    /// as often as the list's: go by identifier, and only then guess.
     private func listContainer(_ app: XCUIApplication) -> XCUIElement {
+        let named = app.descendants(matching: .any)["station-list"].firstMatch
+        if named.exists { return named }
         for query in [app.tables, app.collectionViews, app.scrollViews] {
             let el = query.firstMatch
             if el.exists { return el }
@@ -181,7 +185,11 @@ final class ScreenshotTests: XCTestCase {
         // a navigable tide card when the model lands — it stops being copy and
         // shows numbers. (Cards are no longer buttons: since the M4.3 List
         // conversion, rows navigate via a hidden link.)
-        let fitted = app.staticTexts.matching(
+        // Scoped to the search overlay's ScrollView, like M47: the list behind
+        // it is accessibility-hidden but still QUERYABLE, so an unscoped match
+        // can pick up some other station's Rising/Falling and let the test walk
+        // into a Victoria that is still downloading.
+        let fitted = app.scrollViews.firstMatch.staticTexts.matching(
             NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
         XCTAssert(fitted.waitForExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
         sleep(1)
@@ -199,7 +207,7 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         openSearch(app, "victoria")
-        let offlineFitted = app.staticTexts.matching(
+        let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
             NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored model did not survive relaunch")
         app.staticTexts["Victoria"].firstMatch.tap()
@@ -575,8 +583,8 @@ final class ScreenshotTests: XCTestCase {
         // Swipe-unfavorite Friday Harbor (back near the top): it leaves
         // Favorites and re-files under Recents (spec §9 — a move, not a
         // deletion) — which now means the bottom of the list.
-        app.swipeDown()
-        app.swipeDown()
+        listContainer(app).swipeDown()
+        listContainer(app).swipeDown()
         let fridayRow = app.staticTexts["Friday Harbor"].firstMatch
         XCTAssert(fridayRow.waitForExistence(timeout: 5))
         fridayRow.swipeLeft()
@@ -588,10 +596,14 @@ final class ScreenshotTests: XCTestCase {
                        "unfavorite left the Favorites group behind")
         let recentsAgain = app.staticTexts["RECENTS"].firstMatch
         scrollTo(recentsAgain, in: app)
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists,
-                  "unfavorited station did not re-file to Recents")
-        app.swipeDown()
-        app.swipeDown()
+        // Scroll to the ROW, not just the group label: how many rows Recents
+        // has depends on what this simulator has downloaded, so the label can
+        // land on the last visible line with the row below the fold.
+        let refiled = app.staticTexts["Friday Harbor"].firstMatch
+        scrollTo(refiled, in: app)
+        XCTAssert(refiled.exists, "unfavorited station did not re-file to Recents")
+        listContainer(app).swipeDown()
+        listContainer(app).swipeDown()
 
         // Speed units: switch to km/h in Settings, the current detail follows.
         app.buttons["Settings"].tap()
@@ -678,8 +690,10 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments = ["-seedGate"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
-        XCTAssert(app.staticTexts["Pick a station"].waitForExistence(timeout: 5),
-                  "detail placeholder missing beside the sidebar")
+        // M52: the pane opens on the first row, not the placeholder — the
+        // placeholder is now only reachable by clearing the pane (map toggle).
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 10),
+                  "regular width did not auto-select a station into the detail pane")
         openFridayHarbor(app)
         // The sidebar must still be on screen while the detail shows —
         // a split, not a push.
@@ -1258,8 +1272,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(fitted.waitForExistence(timeout: 240), "Active Pass never fitted — IWLS unreachable?")
         report("nearest 60-day gate → FINAL", t0)
 
-        XCTAssertFalse(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'FAST ANSWER'")).firstMatch.exists,
+        XCTAssertFalse(app.descendants(matching: .any)["provisional-badge"].firstMatch.exists,
                        "a gate validated at 60 d must go straight to final — no provisional marking")
         app.staticTexts["Active Pass"].firstMatch.tap()
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
@@ -1283,15 +1296,23 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         openSearch(app, "dodd")
 
-        // The fast answer, in the list: amber numbers and this pass's own
-        // tolerance — never a generic hedge, never mistakable for final.
-        let badge = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'FAST ANSWER · SLACK ±35 MIN'")).firstMatch
+        // The fast answer, in the list: the ⚠️ badge and a tilde'd reading, and
+        // that is ALL — the amber prose that used to ride the card measured
+        // 1.03:1 against the palest station gradient (M52). The number it can
+        // be off by lives on the detail, where the amber card can afford it.
+        let badge = app.descendants(matching: .any)["provisional-badge"].firstMatch
         XCTAssert(badge.waitForExistence(timeout: 240),
                   "Dodd Narrows never published its 60-day fast answer")
         report("nearest 210-day gate → PROVISIONAL", t0)
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'FAST ANSWER'")).firstMatch.exists,
+                       "the low-contrast amber badge must be gone from the list card")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH '~'")).firstMatch.exists,
+                  "the tilde stays: the reading itself must still say it is not exact")
         sleep(1)
         save(app, "m51-provisional-list.png")
+        save(app, "m52-provisional-card-icon.png")
 
         // …and in the detail: the ⚠️ family, with the real number in it.
         app.staticTexts["Dodd Narrows"].firstMatch.tap()
@@ -1393,6 +1414,160 @@ final class ScreenshotTests: XCTestCase {
         while !dodd.label.contains("Downloading"), waited < 120 { sleep(2); waited += 2 }
         XCTAssert(dodd.label.contains("Downloading"), "the yielded gate never resumed")
         app.buttons["Done"].tap()
+    }
+
+    // MARK: - M52: device-testing fixes (build 15 → 16)
+
+    /// Drag from the very left edge — the interactive pop, not a content swipe.
+    private func edgeSwipeBack(_ app: XCUIApplication) {
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.5))
+        let across = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        edge.press(forDuration: 0.02, thenDragTo: across,
+                   withVelocity: .default, thenHoldForDuration: 0)
+    }
+
+    /// The reading the strip's centerline is parked on ("1:42 PM").
+    private func scrubClock(_ app: XCUIApplication) -> String? {
+        app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$"))
+            .firstMatch.label
+    }
+
+    /// (2) The nav bar is hidden app-wide for the map-hero chrome, and UIKit
+    /// disables `interactivePopGestureRecognizer` whenever it is — so on iPhone
+    /// there was no way back but the button. Both halves are asserted, because
+    /// the risk in re-arming the gesture is that it eats the strip's scrub: a
+    /// drag from the EDGE pops, a drag INSIDE the strip scrubs and stays put.
+    /// Kill-switched, so the CHS page is deterministically the waiting page.
+    func testM52EdgeSwipeBackOnEveryDetailType() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            throw XCTSkip("iPhone-only: regular width is a split, with nothing to pop")
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // (a) tide detail — and first, the gesture that must NOT pop.
+        openFridayHarbor(app)
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
+        let before = scrubClock(app)
+        scrubStrip(app)
+        sleep(1)
+        XCTAssert(app.otherElements["timeline-strip"].exists,
+                  "a drag inside the strip popped the detail — the edge gesture is too greedy")
+        XCTAssertNotEqual(scrubClock(app), before,
+                          "a drag inside the strip no longer scrubs")
+
+        edgeSwipeBack(app)
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
+                  "edge swipe did not pop the tide detail")
+
+        // (b) current detail.
+        openSearch(app, "deception")
+        let current = app.staticTexts["Deception Pass (Narrows)"].firstMatch
+        XCTAssert(current.waitForExistence(timeout: 5))
+        current.tap()
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10))
+        edgeSwipeBack(app)
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
+                  "edge swipe did not pop the current detail")
+
+        // (c) the CHS waiting page — no chart at all, held there by the kill switch.
+        openSearch(app, "victoria")
+        app.staticTexts["Victoria"].firstMatch.tap()
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        edgeSwipeBack(app)
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
+                  "edge swipe did not pop the CHS waiting page")
+
+        // (d) a derived gate — Malibu Rapids, likewise pending offline.
+        openSearch(app, "malibu")
+        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        edgeSwipeBack(app)
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
+                  "edge swipe did not pop the derived-gate detail")
+
+        // And the root must not pop itself into a wedged navigation controller.
+        edgeSwipeBack(app)
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
+                  "an edge swipe on the list must be a no-op")
+    }
+
+    /// (3) Return-to-now used to live in the header's top-right row and shoved
+    /// the favourite star sideways the moment you scrubbed. It has its own slot
+    /// now — bottom-right of the hero, below the star, above the scrub card —
+    /// so appearing and disappearing moves nothing.
+    func testM52ReturnToNowHasItsOwnFixedSlot() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        openFridayHarbor(app)
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
+
+        let star = app.buttons["detail-favorite"].firstMatch
+        let back = app.buttons["detail-back"].firstMatch
+        XCTAssert(star.waitForExistence(timeout: 5))
+        let starBefore = star.frame, backBefore = back.frame
+        let now = app.buttons["detail-return-now"].firstMatch
+        XCTAssertFalse(now.exists, "return-to-now must not show before a scrub")
+
+        scrubStrip(app)
+        sleep(1)
+        XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
+        XCTAssertEqual(star.frame.minX, starBefore.minX, accuracy: 0.5,
+                       "return-to-now still shifts the star")
+        XCTAssertEqual(star.frame.minY, starBefore.minY, accuracy: 0.5)
+        XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
+                       "return-to-now must not move the back button either")
+
+        // Its own slot: below the star, above the strip, hard right.
+        let header = app.otherElements["detail-map-header"].firstMatch
+        XCTAssert(now.frame.minY > star.frame.maxY, "return-to-now is not below the star")
+        XCTAssert(now.frame.maxY <= header.frame.maxY + 1, "return-to-now escaped the hero")
+        XCTAssertEqual(now.frame.maxX, star.frame.maxX, accuracy: 1,
+                       "return-to-now must share the star's right margin")
+        save(app, "m52-return-now-fixed.png")
+
+        // And it still does its job — back to now, and gone again.
+        now.tap()
+        sleep(1)
+        XCTAssertFalse(app.buttons["detail-return-now"].firstMatch.exists,
+                       "return-to-now did not clear after returning to now")
+        XCTAssertEqual(star.frame.minX, starBefore.minX, accuracy: 0.5,
+                       "the star moved when return-to-now went away")
+    }
+
+    /// (4) iPad: a fresh launch opens the first row in the detail pane instead
+    /// of the "Pick a station" invitation. Only when nothing is selected — a
+    /// pick already made is never overridden.
+    func testM52IPadAutoSelectsTheFirstStation() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("regular-width behaviour")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 10),
+                  "the detail pane did not open a station on launch")
+        XCTAssertFalse(app.staticTexts["Pick a station"].exists,
+                       "the placeholder is still what a fresh iPad launch shows")
+        // The sidebar is intact — this is a selection, not a push.
+        XCTAssert(app.staticTexts["Slackwater"].exists)
+        sleep(5)  // header map tiles
+        save(app, "m52-ipad-autoselect.png")
+
+        // Don't fight the user: a deliberate pick stands, and coming back to
+        // the list does not re-run the auto-select.
+        openSearch(app, "friday")
+        app.staticTexts["Friday Harbor"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists,
+                  "the auto-selection overrode a deliberate pick")
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The

@@ -233,6 +233,31 @@ struct SunPill: View {
     }
 }
 
+/// The provisional ("fast answer") marking on a LIST card: the ⚠️ family and
+/// nothing else — the detail view carries the explanation.
+///
+/// M52 accessibility fix. The old treatment wrote amber (#E0B45A) prose and an
+/// amber badge straight onto the station gradient, and amber sits at almost
+/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 is
+/// **1.06:1**, and 1.03:1 on #9AC0B0 — literally unreadable, which is what
+/// Bryan saw on device. So the glyph gets the app's own over-an-unpredictable-
+/// background chrome (MapHeader's dark disc + ring): amber on an SN.canvas disc
+/// is 9.63:1, the disc reads 10.22:1 against the palest stop, and the ring
+/// reads 9.07:1 against the darkest — every trio has one boundary at ≥3.14:1,
+/// clearing WCAG 1.4.11 for non-text. Numbers in docs/testflight.md.
+struct ProvisionalBadge: View {
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(SN.amber)
+            .frame(width: 22, height: 22)
+            .background(SN.canvas, in: Circle())
+            .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
+            .accessibilityLabel("Fast answer — still refining")
+            .accessibilityIdentifier("provisional-badge")
+    }
+}
+
 /// The Near Me cards' nautical-miles pill; straddles a card's top-right
 /// corner (also overlaid on the My Location tile — same component).
 struct DistancePill: View {
@@ -258,6 +283,12 @@ final class RecentsStore: ObservableObject {
 
     @Published private(set) var ids: [String]
 
+    /// Set by the regular-width auto-selection (M52) for exactly the detail it
+    /// opens. The pane opening itself is not the user viewing a station, and
+    /// counting it would evict a real entry from the 6-slot history on every
+    /// single launch.
+    var skipNextRecord = false
+
     private init() {
         // UI-test hook, like -resetGate: a clean no-recents first run.
         if CommandLine.arguments.contains("-resetRecents") {
@@ -267,6 +298,7 @@ final class RecentsStore: ObservableObject {
     }
 
     func record(_ id: String) {
+        if skipNextRecord { skipNextRecord = false; return }
         var next = ids.filter { $0 != id }
         next.insert(id, at: 0)
         next = Array(next.prefix(6))

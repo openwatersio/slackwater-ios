@@ -39,7 +39,7 @@ struct DerivedGateDetailView: View {
                 MapHeader(name: gate.name, region: "\(gate.region) · current",
                           latitude: gate.latitude, longitude: gate.longitude,
                           favoriteId: gate.id,
-                          showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
+                          showReturn: scrubbedAway(scrubTime, from: live),
                           onReturn: returnToNow)
                 if let timeline {
                     scrubCard(timeline)

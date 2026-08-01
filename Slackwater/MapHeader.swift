@@ -4,6 +4,7 @@
 // legibility risk), with the prototype's back / title-pill / return-to-now
 // chrome (TidesApp.dc.html detail hero).
 import SwiftUI
+import UIKit
 import MapLibre
 
 /// Prototype hero height (420 of a 874pt frame).
@@ -75,33 +76,22 @@ struct MapHeader: View {
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
                     Spacer()
-                    HStack(spacing: 10) {
-                        if showReturn {
-                            Button(action: onReturn) {
-                                Image(systemName: "arrow.counterclockwise")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundStyle(SN.leaf)
-                                    .frame(width: 44, height: 44)
-                                    .background(.ultraThinMaterial, in: Circle())
-                                    .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
-                                    .overlay(Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
-                            }
-                            .accessibilityLabel("Return to now")
-                        }
-                        // Favorite star — the back button's mirror (design pass
-                        // item 4a): same 44pt circle chrome, top-right.
-                        let fav = favorites.contains(favoriteId)
-                        Button { favorites.toggle(favoriteId) } label: {
-                            Image(systemName: fav ? "star.fill" : "star")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(fav ? SN.sun : .white)
-                                .frame(width: 44, height: 44)
-                                .background(.ultraThinMaterial, in: Circle())
-                                .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
-                        }
-                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
-                        .accessibilityIdentifier("detail-favorite")
+                    // Favorite star — the back button's mirror (design pass
+                    // item 4a): same 44pt circle chrome, top-right. It is the
+                    // ONLY thing in this slot: return-to-now used to share the
+                    // row and shoved the star sideways every time you scrubbed
+                    // (M52), so it moved to its own fixed slot below.
+                    let fav = favorites.contains(favoriteId)
+                    Button { favorites.toggle(favoriteId) } label: {
+                        Image(systemName: fav ? "star.fill" : "star")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(fav ? SN.sun : .white)
+                            .frame(width: 44, height: 44)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
                     }
+                    .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                    .accessibilityIdentifier("detail-favorite")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 62)  // clears the status bar; header ignores the top safe area
@@ -109,11 +99,76 @@ struct MapHeader: View {
             }
         }
         .frame(height: mapHeaderHeight)
+        // Return-to-now: bottom-right of the hero — below the star, above the
+        // scrub card — as an OVERLAY, so it occupies the same points whether it
+        // is there or not and nothing reflows when a scrub starts or ends.
+        .overlay(alignment: .bottomTrailing) {
+            if showReturn {
+                Button(action: onReturn) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SN.leaf)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+                }
+                .accessibilityLabel("Return to now")
+                .accessibilityIdentifier("detail-return-now")
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+        }
         .clipped()
         .background(Color(hex: 0x05122A))
+        // Every detail type is built on this header, so arming the edge-swipe
+        // here arms it for all four (tide, current, derived gate, CHS waiting).
+        .background(InteractivePopEnabler())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("detail-map-header")
     }
+}
+
+/// Restores the edge-swipe-back that the custom chrome costs us.
+///
+/// Root cause (M52): the app hides the nav bar everywhere —
+/// `.toolbar(.hidden, for: .navigationBar)` on the stack and on every detail —
+/// because the map hero carries its own back button. UIKit's
+/// `setNavigationBarHidden:` disables `interactivePopGestureRecognizer` as a
+/// side effect, so on iPhone the only way out of a detail was the button.
+/// Re-enabling the recognizer needs a delegate (its own is nil'd with the bar),
+/// and the delegate must refuse to begin on the root — otherwise a swipe on the
+/// list wedges the navigation controller.
+///
+/// It stays an edge gesture, so it never competes with the timeline strip's
+/// horizontal scrub: the strip's UIScrollView owns every pan that doesn't start
+/// within the screen-edge margin.
+struct InteractivePopEnabler: UIViewControllerRepresentable {
+    final class PopDelegate: NSObject, UIGestureRecognizerDelegate {
+        weak var nav: UINavigationController?
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            (nav?.viewControllers.count ?? 0) > 1
+        }
+    }
+
+    final class Host: UIViewController {
+        private let popDelegate = PopDelegate()
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.isUserInteractionEnabled = false  // pure plumbing, never a hit target
+        }
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard let nav = navigationController,
+                  let pop = nav.interactivePopGestureRecognizer else { return }
+            popDelegate.nav = nav
+            pop.delegate = popDelegate
+            pop.isEnabled = true
+        }
+    }
+
+    func makeUIViewController(context: Context) -> Host { Host() }
+    func updateUIViewController(_ vc: Host, context: Context) {}
 }
 
 /// The header's map: centered on the station, station zoom, non-interactive.

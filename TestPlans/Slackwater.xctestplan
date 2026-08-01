@@ -1,0 +1,46 @@
+{
+  "configurations" : [
+    {
+      "id" : "5C873FD4-30C8-4484-90B5-DD481C38BA73",
+      "name" : "Fast",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Slackwater.xcodeproj",
+      "identifier" : "CD48C26F8F8167BA5FD3B248",
+      "name" : "Slackwater"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Slackwater.xcodeproj",
+        "identifier" : "9B13DFC429A84947A1256324",
+        "name" : "SlackwaterTests"
+      }
+    },
+    {
+      "skippedTests" : [
+        "ScreenshotTests\/testM3ChsPendingFitOffline()",
+        "ScreenshotTests\/testM46MalibuDerivedGate()",
+        "ScreenshotTests\/testM47DoddNarrowsPendingFitDetailOffline()",
+        "ScreenshotTests\/testM48DownloadsManagerAndQueueJump()",
+        "ScreenshotTests\/testM51ManagerShowsProvisionalApartFromFinal()",
+        "ScreenshotTests\/testM51NearestTidePortTimeToFirstUsable()",
+        "ScreenshotTests\/testM51PromotionInterruptsAnInFlightDownload()",
+        "ScreenshotTests\/testM51ProvisionalGateShowsFastAnswerThenRefines()",
+        "ScreenshotTests\/testM51ValidatedGateReachesFinalWithNoProvisionalStage()"
+      ],
+      "target" : {
+        "containerPath" : "container:Slackwater.xcodeproj",
+        "identifier" : "474F7563FE2CB219785DD847",
+        "name" : "SlackwaterUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

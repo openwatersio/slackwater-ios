@@ -19,6 +19,21 @@ enum Timeline {
     static let forwardHours = 132.0       // TMAX
     static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+
+    /// One point of strip = 5 minutes, and UIScrollView snaps `contentOffset`
+    /// to the pixel grid — so the centered-on-now strip round-trips through
+    /// `scrubTime` up to ~2.5 min off before anyone has touched it. That was
+    /// over the old 60 s "scrubbed away from now" threshold, which is why
+    /// return-to-now could be there on arrival at some pane widths (iPad, M52).
+    /// A whole point is the smallest honest answer: below it, the centerline
+    /// has not visibly moved.
+    static let scrubbedSeconds = 3600.0 / Double(pph)
+}
+
+/// Is the strip parked somewhere other than now? The one definition, shared by
+/// all three scrubable details.
+func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
+    abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
 }
 
 // MARK: - Data: everything the strip draws, computed once per station

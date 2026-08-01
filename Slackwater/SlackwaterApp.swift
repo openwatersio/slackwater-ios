@@ -166,6 +166,8 @@ struct StationListView: View {
 
     /// The place whose matching stations the chooser is offering, if open.
     @State private var chooser: StationMatches?
+    /// Regular width opens the first row once, on the first appearance only.
+    @State private var didAutoSelect = false
 
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
@@ -269,8 +271,31 @@ struct StationListView: View {
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
             }
+            // A regular-width launch opens on the first row rather than the
+            // "Pick a station" placeholder (M52): the My Location station when
+            // there is a fix, else the first row the list renders. Once only,
+            // and only into an empty pane — coming back from a detail leaves
+            // the placeholder alone, and an existing pick is never overridden.
+            .onAppear {
+                guard !didAutoSelect else { return }
+                didAutoSelect = true
+                guard path.isEmpty, !showMap, let first = firstListItem else { return }
+                RecentsStore.shared.skipNextRecord = true
+                open(first)
+            }
         }
         .navigationSplitViewStyle(.balanced)
+    }
+
+    /// The first row the list actually renders: the My Location hero when a fix
+    /// has landed, else the leading Favorite (Favorites is the top group without
+    /// a hero), else the nearest station — Near Me's first card.
+    private var firstListItem: StationItem? {
+        let a = anchor
+        if fix == nil, let favorite = items(favorites.ids).first { return favorite }
+        return StationItem.all.min {
+            $0.km(fromLat: a.lat, lon: a.lon) < $1.km(fromLat: a.lat, lon: a.lon)
+        }
     }
 
     /// The content pane before any pick — same canvas, an invitation, not blank.
@@ -317,6 +342,10 @@ struct StationListView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .environment(\.defaultMinListRowHeight, 1)
+                // Named so UI tests scroll THIS container: at regular width the
+                // detail pane is a scroll view too, and since it now opens on a
+                // station (M52) "the first scroll view" is ambiguous.
+                .accessibilityIdentifier("station-list")
             }
             .toolbar(.hidden, for: .navigationBar)
     }
@@ -1216,15 +1245,18 @@ struct ChsCurrentGateCardView: View {
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
     let record: CurrentStationRecord
-    /// Set while this gate is showing its 60-day fast answer: the card's own
-    /// numbers go amber and tilde'd, and the gate's real tolerance rides under
-    /// them. Never a subtle badge — a provisional card must not be mistakable
-    /// for a final one at a glance down the list.
+    /// Set while this gate is showing its 60-day fast answer. On the LIST card
+    /// that is a ⚠️ badge and a `~` on the readings — nothing else (M52). The
+    /// amber prose this replaced was 1.03:1 against the palest station gradient
+    /// (see ProvisionalBadge); the full explanation, in the amber card that can
+    /// afford the contrast, lives on the detail view and is unchanged.
     var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
 
-    private var reading: Color { provisional == nil ? .white : SN.amber }
+    /// The tilde stays: at normal card contrast "~5.8" reads cleanly, and it is
+    /// the one part of the old treatment that marked the NUMBER rather than
+    /// shouting around it.
     private var tilde: String { provisional == nil ? "" : "~" }
 
     var body: some View {
@@ -1236,21 +1268,17 @@ struct CurrentCardView: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    Text(record.region)
-                        .font(.geist(13))
-                        .foregroundStyle(SN.foam.opacity(0.78))
+                    HStack(spacing: 7) {
+                        if provisional != nil { ProvisionalBadge() }
+                        Text(record.region)
+                            .font(.geist(13))
+                            .foregroundStyle(SN.foam.opacity(0.78))
+                    }
                     if let next = state?.next {
                         Text(nextLine(next))
                             .font(.geist(12))
-                            .foregroundStyle(provisional == nil ? SN.foam.opacity(0.92) : SN.amber)
+                            .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
-                    }
-                    if let gate = provisional {
-                        MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
-                                  size: 9, color: SN.amber, tracking: 1.2)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(SN.amber.opacity(0.18), in: Capsule())
-                            .padding(.top, 6)
                     }
                 }
                 Spacer(minLength: 8)
@@ -1260,20 +1288,20 @@ struct CurrentCardView: View {
                         if phase == .slack {
                             Text("SLACK")
                                 .font(.geistMono(11, .medium)).tracking(1)
-                                .foregroundStyle(reading)
+                                .foregroundStyle(.white)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background((provisional == nil ? Color.white : SN.amber).opacity(0.18), in: Capsule())
+                                .background(Color.white.opacity(0.18), in: Capsule())
                         } else {
                             (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
                                 .font(.fraunces(42))
                              + Text(" \(speedUnitLabel(speedUnit))")
                                 .font(.fraunces(17)))
-                                .foregroundStyle(reading)
+                                .foregroundStyle(.white)
                             HStack(spacing: 4) {
                                 CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.geist(11))
                                 Text(phaseWord(phase)).font(.geist(11))
                             }
-                            .foregroundStyle(provisional == nil ? SN.foam.opacity(0.9) : SN.amber.opacity(0.85))
+                            .foregroundStyle(SN.foam.opacity(0.9))
                         }
                     }
                 }
@@ -1284,8 +1312,6 @@ struct CurrentCardView: View {
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .background(stationGradient(id: record.id))
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(SN.amber.opacity(provisional == nil ? 0 : 0.5), lineWidth: 1))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
         // The refinement replaces the record under an open list: recompute.

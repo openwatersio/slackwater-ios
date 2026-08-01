@@ -50,7 +50,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 15
+        CURRENT_PROJECT_VERSION: 16
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -94,3 +94,11 @@ schemes:
     test:
       config: Debug
       targets: [SlackwaterTests, SlackwaterUITests]
+      # Two plans, both checked in (TestPlans/). Fast is the default: every unit
+      # test and every UI test that runs on stored/mocked state. Full adds the
+      # eight UI tests that fetch live IWLS and fit on-device — minutes each.
+      # Drive them with scripts/test.sh (`--full` for the second).
+      testPlans:
+        - path: TestPlans/Slackwater.xctestplan
+          defaultPlan: true
+        - path: TestPlans/Slackwater-Full.xctestplan

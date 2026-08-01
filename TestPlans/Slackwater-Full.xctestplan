@@ -1,0 +1,35 @@
+{
+  "configurations" : [
+    {
+      "id" : "2A9822A3-AEED-42D8-881D-B04214C6AFF3",
+      "name" : "Full",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Slackwater.xcodeproj",
+      "identifier" : "CD48C26F8F8167BA5FD3B248",
+      "name" : "Slackwater"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Slackwater.xcodeproj",
+        "identifier" : "9B13DFC429A84947A1256324",
+        "name" : "SlackwaterTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:Slackwater.xcodeproj",
+        "identifier" : "474F7563FE2CB219785DD847",
+        "name" : "SlackwaterUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

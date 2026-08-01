@@ -32,6 +32,73 @@ used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → impo
 - Export-only variant (signed .ipa, no upload): `build/exportOptions.plist` with
   `destination: export` — what the first proof run used.
 
+## Test plans — fast by default, full before an upload (2026-08-01)
+
+Two XCTestPlans, both checked in under `TestPlans/` and wired into the scheme by
+`project.yml`. Drive them with `scripts/test.sh`, which runs **both reference simulators**
+(iPhone 17, iPad Pro 11-inch (M5)) and prints a per-sim wall clock:
+
+```sh
+./scripts/test.sh                                  # fast plan  — the default
+./scripts/test.sh --full                           # full plan
+SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save screenshots
+```
+
+| Plan | File | Contents | Wall clock (per sim) |
+|---|---|---|---|
+| **Fast** (default) | `TestPlans/Slackwater.xctestplan` | all 55 unit tests + the 24 UI tests that run on stored/mocked state | **9 min** (iPhone 534 s, iPad 626 s) |
+| **Full** | `TestPlans/Slackwater-Full.xctestplan` | everything: + the 9 live-IWLS / on-device-fit UI tests | **21 min** (iPhone 1293 s) |
+
+The nine the fast plan skips — every one of them fetches live from IWLS
+(`api-iwls.dfo-mpo.gc.ca`) at the fetcher's 2.5 s pacing and then fits harmonics in
+JavaScriptCore, so each costs minutes, not seconds:
+
+```
+ScreenshotTests/testM3ChsPendingFitOffline
+ScreenshotTests/testM46MalibuDerivedGate
+ScreenshotTests/testM47DoddNarrowsPendingFitDetailOffline
+ScreenshotTests/testM48DownloadsManagerAndQueueJump
+ScreenshotTests/testM51ManagerShowsProvisionalApartFromFinal
+ScreenshotTests/testM51NearestTidePortTimeToFirstUsable
+ScreenshotTests/testM51PromotionInterruptsAnInFlightDownload
+ScreenshotTests/testM51ProvisionalGateShowsFastAnswerThenRefines
+ScreenshotTests/testM51ValidatedGateReachesFinalWithNoProvisionalStage
+```
+
+`testM46MalibuDerivedGate` is the expensive one and the reason the old "12 min" figure was
+never reproducible: it launches with no `-chsFitOnly`, so how long Point Atkinson takes to
+reach the front of the whole-catalogue queue depends entirely on what that simulator already
+had cached. Measured **900 s** on a freshly-reset iPhone sim and 80 s on an iPad sim in the
+same run — one test swinging by a quarter of an hour. Full-plan runtime therefore varies with
+IWLS and with simulator state; 21 min is a good run, not a ceiling.
+
+**Agents: run fast while iterating, run `--full` before `scripts/testflight.sh`.** The full
+plan is also the only thing that exercises the network path at all, so a green fast plan
+says nothing about IWLS resolution, chunk caching, or the provisional→final refinement.
+
+Screenshots: `ScreenshotTests` reads `M1_SHOT_DIR` **inside the UI-test runner process**, so
+the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix and sets the
+rest on the runner. A bare `M1_SHOT_DIR` in the invoking shell never arrives and the tests
+silently fall back to `/tmp`.
+
+## Card contrast — the sn- gradients are not a safe text background (2026-08-01)
+
+Measured for the M52 provisional-marking fix; the numbers are worth keeping because they
+apply to anything anyone is tempted to write onto a station card. Amber `#E0B45A` sits at
+almost exactly the luminance of the palette's pale gradient stops:
+
+| Foreground on a station gradient | Best stop | Worst stop |
+|---|---|---|
+| Amber `#E0B45A` | 9.07:1 (`#00183C`) | **1.03:1** (`#9AC0B0`) — invisible |
+| White | 17.56:1 (`#00183C`) | 1.82:1 (`#A8C4D4`) |
+
+So a marking that must read on *every* trio can't be bare coloured text — it needs its own
+opaque chrome. `ProvisionalBadge` is amber on an `SN.canvas` disc (9.63:1 glyph-on-disc) with
+a full-strength amber ring: the disc reads 10.22:1 against the palest stop, the ring 9.07:1
+against the darkest, and the better of the two boundaries is ≥3.14:1 on every stop in the
+palette — clear of WCAG 1.4.11's 3:1 for non-text. The prose it replaced lives on the detail
+view's amber card, which has a controlled background and can afford it.
+
 ## CLI vs Xcode GUI — SPM cache isolation (2026-07-31)
 
 CLI builds (testflight.sh and any agent-run `xcodebuild`) must pass

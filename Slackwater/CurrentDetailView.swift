@@ -55,7 +55,7 @@ struct CurrentDetailView: View {
                 MapHeader(name: record.name, region: "\(record.region) · current",
                           latitude: record.latitude, longitude: record.longitude,
                           favoriteId: "current:" + record.id,
-                          showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
+                          showReturn: scrubbedAway(scrubTime, from: live),
                           onReturn: returnToNow)
                 if let gate = provisionalGate {
                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,

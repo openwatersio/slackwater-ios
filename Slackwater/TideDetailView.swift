@@ -36,7 +36,7 @@ struct TideDetailView: View {
                 MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
                           favoriteId: record.id,
-                          showReturn: abs(scrubTime.timeIntervalSince(live)) > 60,
+                          showReturn: scrubbedAway(scrubTime, from: live),
                           onReturn: returnToNow)
                 if let timeline {
                     scrubCard(timeline)
