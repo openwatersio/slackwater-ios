@@ -555,7 +555,12 @@ struct StationListView: View {
             Text("Slackwater")
                 .font(.fraunces(36, .semibold))
                 .foregroundStyle(SN.paper)
-            Spacer()
+                // The wordmark never wraps: in the 320pt iPad sidebar it shares
+                // the row with two 34pt buttons and would break as "Slackwat/er".
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .layoutPriority(1)
+            Spacer(minLength: 8)
             // Offline / online / downloading, beside the gear — and the way in
             // to the downloads manager (M48, web OfflineStatus).
             OfflineStatusButton { showDownloads = true }
