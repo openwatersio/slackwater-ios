@@ -59,7 +59,10 @@ identity, then the CHS gates), and the basemap by `tools/build-land.sh`. Two lan
 ship and the split is deliberate — `land.pmtiles` is the Salish Sea at z0-14 (home water,
 where a station hero has to look right) and `land-usca.pmtiles` is the US and Canada at z0-9
 (everywhere else: coarse past z9, never blank). The App Store copy in
-`docs/appstore-metadata.md` still says Salish Sea and needs a rewrite.
+`docs/appstore-metadata.md` was rewritten for national coverage on 2026-08-01 — still a
+draft, nothing submitted; screenshots and a support URL are the remaining blockers
+(issues [#4](https://github.com/openwatersio/slackwater-ios/issues/4),
+[#5](https://github.com/openwatersio/slackwater-ios/issues/5)).
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
 are generated, not committed).
 
@@ -86,17 +89,15 @@ network path. **Iterate on fast; go full before `scripts/testflight.sh`.** Every
 `xcodebuild` invocation, by hand or by script, needs
 `-clonedSourcePackagesDirPath build/SourcePackages`. Details in `docs/testflight.md`.
 
-## Known issues (agents: pick these up when you're next in the area)
+## Known issues
 
-- **`skipNextRecord` can leak** (M5.3). The iPad auto-select sets it so opening the pane
-  doesn't count as viewing a station, but an unfitted CHS station's waiting view records
-  nothing — so the flag survives into the *next* station the user genuinely opens, and
-  that one silently misses Recents. Fix belongs in `RecentsStore` / the auto-select
-  handshake (make the skip consume-on-next-record-attempt, or scope it to the
-  auto-selected id), not in another caller. `NationalScaleTests` clears it explicitly and
-  says why.
-- **`docs/appstore-metadata.md` is Bryan's to edit** — outbound copy, never rewritten by
-  an agent without his say-so.
+Tracked in [the issue list](https://github.com/openwatersio/slackwater-ios/issues), not
+here — a second copy in the README only rots. Agents: check open issues before starting,
+and file what you deliberately leave behind rather than burying it in a report.
+
+One rule that isn't an issue because it never closes: **`docs/appstore-metadata.md` is
+Bryan's to edit.** It's outbound copy; an agent may draft into it when asked, never on its
+own initiative.
 
 ## License
 
