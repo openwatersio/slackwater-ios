@@ -41,11 +41,25 @@ final class ScreenshotTests: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized and hittable (Recents now lives
-    /// at the very bottom — often below the fold).
+    /// Scroll the list until `el` is realized, hittable, and clear of the
+    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
+    /// ~80pt exclusion already used inline for the schedule row below, "home
+    /// indicator band" case). Bare `isHittable` alone is not enough for
+    /// elements near the list's bottom — XCUITest counts an element hittable
+    /// the moment any part of it is on-screen and unobscured by an ancestor's
+    /// clipping, which can be true while it still sits directly under the
+    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
+    /// silently lands on the FAB instead and nothing happens (confirmed by
+    /// diagnostic frame dumps: at the old bare-isHittable stopping point the
+    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
+    /// one more swipe carried it clear by ~68pt and it stayed there — the
+    /// list was genuinely bottomed out, not still scrolling).
     private func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var tries = 0
-        while (!el.exists || !el.isHittable), tries < 8 {
+        while tries < 10 {
+            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
+                break
+            }
             listContainer(app).swipeUp()
             tries += 1
         }
