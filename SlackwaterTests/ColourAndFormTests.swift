@@ -88,4 +88,25 @@ final class ColourAndFormTests: XCTestCase {
         }
         XCTAssertTrue(offenders.isEmpty, "hardcoded direction colour in TimelineStrip.swift: \(offenders)")
     }
+
+    func testGlyphColourTracksStateAndNeverKind() {
+        // Same state, different kinds: same colour.
+        assertSameColour(StationGlyph.colour(for: .slack), StationGlyph.colour(for: .slack),
+                         "tone determines colour")
+        // Different states: different colours.
+        assertDifferentColour(StationGlyph.colour(for: .flood), StationGlyph.colour(for: .ebb),
+                              "flood and ebb must not share a colour")
+        assertSameColour(StationGlyph.colour(for: .rising), StationGlyph.colour(for: .flood),
+                         "rising and flood are one end of the axis")
+        assertSameColour(StationGlyph.colour(for: .slack), SN.go, "slack is the go colour")
+    }
+
+    func testGlyphShapeTracksKind() {
+        // The two kinds must not produce identical paths — that would collapse
+        // the form axis and leave kind unexpressed.
+        let box = CGRect(x: 0, y: 0, width: 24, height: 24)
+        XCTAssertNotEqual(StationGlyph.path(for: .tide, in: box).description,
+                          StationGlyph.path(for: .current, in: box).description,
+                          "tide and current must draw different shapes")
+    }
 }

@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. Design tokens from the prototype design system
 // (prototype/_ds/_ds_bundle.css): sn- palette, Fraunces/Geist/Geist Mono type
-// roles, per-station gradient trios, and the web app's unit formatting.
+// roles, and the web app's unit formatting. The per-station gradient trios
+// this once carried are gone (M53 layout A) — cards take a flat SN.cardFill.
 import SwiftUI
 
 extension Color {
@@ -102,33 +103,6 @@ struct MonoLabel: View {
             .tracking(tracking)
             .foregroundStyle(color)
     }
-}
-
-// MARK: - Per-station sky gradients (variant 1a list cards)
-
-/// The prototype's hand-tuned gradient trios (prototype/NearMe.dc.html DATA()).
-/// Assignment is a stable hash of the station id — deterministic, no semantics.
-private let gradientTrios: [(UInt32, UInt32, UInt32)] = [
-    (0x88B0CC, 0x3A6D98, 0x184870), (0x3A6D98, 0x184870, 0x083058),
-    (0x9AC0B0, 0x4A8F78, 0x184860), (0x78A8B8, 0x2F7088, 0x0D3A58),
-    (0x184870, 0x0D3358, 0x00183C), (0x88B0CC, 0x4A7BA0, 0x20486A),
-    (0xA8C4D4, 0x5888A8, 0x28587C), (0x7098B8, 0x2F6390, 0x153F66),
-    (0x88AECB, 0x3D6F9A, 0x1A4A70), (0x8AB8A0, 0x3D8068, 0x154A44),
-    (0x96BCD2, 0x4E84A8, 0x265678), (0x7FA6C6, 0x356690, 0x184568),
-]
-
-func stationGradient(id: String) -> LinearGradient {
-    // Friday Harbor keeps the prototype's teal trio; the rest hash into the family.
-    let index = id == TideStationRecord.fridayHarborID
-        ? 2
-        : Int(id.utf8.reduce(UInt64(5381)) { ($0 &* 33) &+ UInt64($1) } % UInt64(gradientTrios.count))
-    let (a, b, c) = gradientTrios[index]
-    // CSS linear-gradient(150deg, a, b 55%, c)
-    return LinearGradient(
-        stops: [.init(color: Color(hex: a), location: 0),
-                .init(color: Color(hex: b), location: 0.55),
-                .init(color: Color(hex: c), location: 1)],
-        startPoint: UnitPoint(x: 0.15, y: 0), endPoint: UnitPoint(x: 0.85, y: 1))
 }
 
 // MARK: - App clock
@@ -270,22 +244,22 @@ struct SunPill: View {
 /// nothing else — the detail view carries the explanation.
 ///
 /// M52 accessibility fix. The old treatment wrote amber (#E0B45A) prose and an
-/// amber badge straight onto the station gradient, and amber sits at almost
-/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 is
+/// amber badge straight onto the per-station gradient, and amber sat at almost
+/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 was
 /// **1.06:1**, and 1.03:1 on #9AC0B0 — literally unreadable, which is what
-/// Bryan saw on device. So the glyph gets the app's own over-an-unpredictable-
-/// background chrome (MapHeader's dark disc + ring): amber on an SN.canvas disc
-/// is 6.25:1, the disc reads 10.22:1 against the palest stop, and the ring
-/// reads 5.89:1 against the darkest.
+/// Bryan saw on device. So the glyph got the app's own over-an-unpredictable-
+/// background chrome (MapHeader's dark disc + ring).
 ///
-/// KNOWN GAP (2026-08-02, M53 amber move to #EF6F4A): the old #E0B45A cleared
-/// ≥3.14:1 on every trio in the palette; the new amber does not — the worst
-/// boundary (max of disc-vs-stop, ring-vs-stop) is **2.54:1** on `#28587C`
-/// (also 2.62:1 on `#265678`, 2.94:1 on `#2F6390`), under WCAG 1.4.11's 3:1 for
-/// non-text on those three station cards. Flagged, not fixed here — the amber
-/// value was fixed by the direction-token change above (0xEF6F4A, chosen to
-/// clear `ebb`), and re-balancing the badge chrome for it is its own task.
-/// Numbers in docs/testflight.md — also stale, needs the same update.
+/// RESOLVED (2026-08-02, M53 layout A): `stationGradient` is gone, so the
+/// question is no longer "does this clear every one of 12 gradient trios" —
+/// the card background is flat `SN.cardFill` (≈5% white) over the list's
+/// `SN.canvas`/`SN.canvasGlow` radial ground. Composited worst case (nearest
+/// the brighter `canvasGlow` top-of-list) is `#162C4A`; new amber `#EF6F4A`
+/// against it is **4.71:1**, rising to 5.59:1 lower in the list — clear of
+/// WCAG 1.4.11's 3:1 for non-text either way. The glyph-on-disc contrast
+/// (amber icon on the `SN.canvas` disc, 6.25:1) is unaffected by the
+/// background change and was never the tight number. Numbers in
+/// docs/testflight.md updated to match.
 struct ProvisionalBadge: View {
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
@@ -296,21 +270,6 @@ struct ProvisionalBadge: View {
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")
-    }
-}
-
-/// The Near Me cards' nautical-miles pill; straddles a card's top-right
-/// corner (also overlaid on the My Location tile — same component).
-struct DistancePill: View {
-    let km: Double
-    var body: some View {
-        Text(formatNm(km))
-            .font(.geistMono(11, .medium))
-            .foregroundStyle(SN.navyDeep)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(SN.foam.opacity(0.92), in: Capsule())
-            .shadow(color: Color(hex: 0x001432, opacity: 0.3), radius: 4, y: 2)
-            .offset(x: -14, y: -8)
     }
 }
 
