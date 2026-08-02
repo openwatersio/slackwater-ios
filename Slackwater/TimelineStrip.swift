@@ -607,21 +607,29 @@ struct TimelineScrubStrip: View {
         let mf = vis.filter { $0.kind == .maxFlood }.map(\.speed).max() ?? 0
         let me = vis.filter { $0.kind == .maxEbb }.map(\.speed).min() ?? 0
         if mf > 0 {
-            Rectangle().fill(SN.floodLabel.opacity(0.5)).frame(width: w, height: 1)
-                .position(x: w / 2, y: geo.curY(mf))
-            Text("FLOOD").font(.geistMono(9, .medium)).foregroundStyle(SN.floodLabel)
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .background(Color(hex: 0x001020, opacity: 0.55))
-                .position(x: w - 30, y: geo.curY(mf) - 10)
+            legendMarker("FLOOD", color: SN.floodLabel, width: w,
+                         lineY: geo.curY(mf), textY: geo.curY(mf) - 10, textXInset: 30)
         }
         if me < 0 {
-            Rectangle().fill(SN.ebbLabel.opacity(0.5)).frame(width: w, height: 1)
-                .position(x: w / 2, y: geo.curY(me))
-            Text("EBB").font(.geistMono(9, .medium)).foregroundStyle(SN.ebbLabel)
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .background(Color(hex: 0x001020, opacity: 0.55))
-                .position(x: w - 24, y: geo.curY(me) + 10)
+            legendMarker("EBB", color: SN.ebbLabel, width: w,
+                         lineY: geo.curY(me), textY: geo.curY(me) + 10, textXInset: 24)
         }
+    }
+
+    /// One reference line + label, so the rectangle and the text never
+    /// diverge on colour — a hardcoded regression here lands on the same
+    /// line as the "FLOOD"/"EBB" literal instead of a separate, unguarded
+    /// one (that used to be two colour call sites per direction; this is
+    /// the one place either can go wrong).
+    @ViewBuilder
+    private func legendMarker(_ label: String, color: Color, width w: CGFloat,
+                              lineY: CGFloat, textY: CGFloat, textXInset: CGFloat) -> some View {
+        Rectangle().fill(color.opacity(0.5)).frame(width: w, height: 1)
+            .position(x: w / 2, y: lineY)
+        Text(label).font(.geistMono(9, .medium)).foregroundStyle(color)
+            .padding(.horizontal, 4).padding(.vertical, 1)
+            .background(Color(hex: 0x001020, opacity: 0.55))
+            .position(x: w - textXInset, y: textY)
     }
 }
 

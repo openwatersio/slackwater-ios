@@ -60,7 +60,10 @@ final class ColourAndFormTests: XCTestCase {
     /// sharing a line with one of these markers is exactly how either
     /// regression would return. A source-text guard, not a rendered-colour
     /// one, because the bug was a literal slipping back in, not a wrong
-    /// value from a token.
+    /// value from a token. This is line-based source matching, not a parse —
+    /// a reformat that rewraps these lines can disable a trigger or, just as
+    /// easily, false-positive on neutral chrome that happens to land on the
+    /// same line. Treat it as a tripwire, not a guarantee.
     func testChartDoesNotHardcodeDirectionColour() {
         let path = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
