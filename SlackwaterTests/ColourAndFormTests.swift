@@ -53,12 +53,14 @@ final class ColourAndFormTests: XCTestCase {
         assertSameColour(CurrentDetailView.phaseColor(.ebb), SN.ebb, "ebb")
     }
 
-    /// The chart's max-speed dot labels and FLOOD/EBB legend once spoke the
-    /// retired pastel pair (pale green for flood, pale blue for ebb) even
-    /// after the tokens were retargeted — a raw hex literal sharing a line
-    /// with one of these markers is exactly how that regression would
-    /// return. A source-text guard, not a rendered-colour one, because the
-    /// bug was a literal slipping back in, not a wrong value from a token.
+    /// The chart's max-speed dot labels, FLOOD/EBB legend, and the current
+    /// track's area fill all once spoke the retired direction colours even
+    /// after the tokens were retargeted — the fill even used `SN.leaf`, the
+    /// slack-only green, for the flood half. A raw hex literal (or `SN.leaf`)
+    /// sharing a line with one of these markers is exactly how either
+    /// regression would return. A source-text guard, not a rendered-colour
+    /// one, because the bug was a literal slipping back in, not a wrong
+    /// value from a token.
     func testChartDoesNotHardcodeDirectionColour() {
         let path = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -66,9 +68,11 @@ final class ColourAndFormTests: XCTestCase {
         let source = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
         XCTAssertFalse(source.isEmpty, "could not read TimelineStrip.swift at \(path.path)")
         let offenders = source.components(separatedBy: .newlines).filter { line in
-            line.contains("Color(hex:") &&
-            (line.contains("maxFlood") || line.contains("maxEbb") ||
-             line.contains("\"FLOOD\"") || line.contains("\"EBB\""))
+            let isDirectionSite = line.contains("maxFlood") || line.contains("maxEbb") ||
+                line.contains("\"FLOOD\"") || line.contains("\"EBB\"") ||
+                line.contains("l.fill(area,")  // the flood/ebb area-fill lines
+            let isHardcoded = line.contains("Color(hex:") || line.contains("SN.leaf")
+            return isDirectionSite && isHardcoded
         }
         XCTAssertTrue(offenders.isEmpty, "hardcoded direction colour in TimelineStrip.swift: \(offenders)")
     }
