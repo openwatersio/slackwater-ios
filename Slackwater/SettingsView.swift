@@ -61,11 +61,12 @@ struct SettingsView: View {
                         Text("Not for navigation.")
                             .font(.geist(13, .semibold))
                             .foregroundStyle(SN.foam.opacity(0.9))
-                        Text("Canadian (CHS) stations are harmonic models fitted on this device from CHS (IWLS) predictions fetched under DFO's terms — not CHS-published numbers. CHS data is used under licence (clause 10) and is not to be used for navigation.")
+                        Text("Canadian (CHS) stations are harmonic models fitted on this device from CHS (IWLS) predictions fetched under DFO's terms — not CHS-published numbers. CHS data is used under licence (clause 10) and is not to be used for navigation. A few Canadian waters CHS does not gauge are covered by bundled TICON-4 constants instead.")
                     }
 
                     section("Data & attribution") {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
+                        Text("Additional stations: TICON-4 harmonic constants, SEANOE — used under CC BY 4.0 (seanoe.org/data/00980/109129).")
                         Text("Map land layer: © OpenStreetMap contributors (ODbL).")
                         Text("Map bathymetry: Seascape © Open Water Software, LLC (CC BY 4.0), when online.")
                         Text("Station names & pairings: @sailingnaturali/station-corrections (MIT).")

@@ -46,7 +46,7 @@
  * preposition strip ("0.9 nm east of" -> "0.9 nm east"), which 199 of these
  * 842 need against the Salish bundle's 0.
  *
- * Run: cd tools && npm install && node gen-noaa-tides.mjs && node gen-noaa-currents.mjs
+ * Run: cd tools && npm install && node gen-tides.mjs && node gen-noaa-currents.mjs
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -60,7 +60,7 @@ const bundle = JSON.parse(readFileSync(join(here, "..", "data", "noaa-currents.j
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
 const resolve = createBundledResolver();
 
-/** "0.9 nm east of" -> "0.9 nm east" (see gen-noaa-tides.mjs). */
+/** "0.9 nm east of" -> "0.9 nm east" (see gen-tides.mjs). */
 const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
 
 /** Distance wins outright under this (slackwater-web tides.ts matchQuality). */
