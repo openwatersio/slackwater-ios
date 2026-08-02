@@ -109,4 +109,25 @@ final class ColourAndFormTests: XCTestCase {
                           StationGlyph.path(for: .current, in: box).description,
                           "tide and current must draw different shapes")
     }
+
+    func testMapNeverColoursByStationKind() throws {
+        // The defect this whole change exists to remove: the map matched
+        // circle-color against ["get", "kind"], so a green dot meant "current
+        // station" here and "flooding" everywhere else.
+        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
+        XCTAssertFalse(source.contains("#8fd0a0"), "retired kind-green must be gone")
+        XCTAssertFalse(source.contains("#7fb3d5"), "retired kind-blue must be gone")
+        XCTAssertFalse(source.contains("#c0d8e4"), "retired chs-kind tone must be gone")
+        XCTAssertNil(source.range(of: #"circle-color[^\n]*\["get", "kind"\]"#, options: .regularExpression),
+                     "colour must never be matched against kind")
+    }
+
+    /// `#filePath` of this test file resolves to the repo, so the source under
+    /// test can be read relative to it.
+    private func mapScreenPath() -> String {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // SlackwaterTests/
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("Slackwater/MapScreen.swift").path
+    }
 }

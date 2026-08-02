@@ -30,7 +30,14 @@ let discoveryZoom: Double = {
 
 private let LAND_TONE = "#f5ecd7"   // paper-chart cream
 private let WATER_TONE = "#0b1a2b"  // navy water
-private let PIN_TIDE = "#7fb3d5", PIN_CURRENT = "#8fd0a0", PIN_CHS = "#c0d8e4"
+// A pin's COLOUR is the water's state, never the station's kind — kind is the
+// pin's SHAPE: a circle for a current station, a square for a tide one. One
+// shape per feature class, the oldest convention on any chart, and a silhouette
+// difference reads where an interior one does not.
+//
+// `chs` is a Canadian tide port. That is provenance, not kind — it draws the
+// same square a NOAA tide station does.
+private let PIN_NEUTRAL = "#7d9cb8"
 
 /// Every bundled station as a GeoJSON pin. Identity only — no readings.
 private func pinFeatures() -> [String: Any] {
@@ -93,27 +100,41 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
             // as bigger than a 5-station one without swallowing the coast.
             "circle-radius": ["interpolate", ["linear"], ["get", "point_count"],
                               2, 11, 25, 16, 150, 22, 600, 30] as [Any],
-            "circle-color": PIN_TIDE,
+            "circle-color": PIN_NEUTRAL,
             "circle-opacity": 0.82,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
         ],
     ]
-    let dots: [String: Any] = [
-        "id": "station-dots", "type": "circle", "source": "stations",
-        "filter": notACluster,
+    let currentPins: [String: Any] = [
+        "id": "station-pins-current", "type": "circle", "source": "stations",
+        "filter": ["all", notACluster, ["==", ["get", "kind"], "current"]] as [Any],
         "paint": [
             "circle-radius": 5,
-            "circle-color": ["match", ["get", "kind"],
-                             "current", PIN_CURRENT, "chs", PIN_CHS, PIN_TIDE] as [Any],
+            "circle-color": PIN_NEUTRAL,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
         ],
     ]
-    // Labels need glyphs — the local fallback declares none, so it's dots only
+    // tide and chs are both tide stations — provenance is not kind.
+    let tidePins: [String: Any] = [
+        "id": "station-pins-tide", "type": "symbol", "source": "stations",
+        "filter": ["all", notACluster, ["!=", ["get", "kind"], "current"]] as [Any],
+        "layout": [
+            "icon-image": "pin-square",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+        ],
+        "paint": [
+            "icon-color": PIN_NEUTRAL,
+            "icon-halo-color": WATER_TONE,
+            "icon-halo-width": 1.5,
+        ],
+    ]
+    // Labels need glyphs — the local fallback declares none, so it's pins only
     // (same decisive signal as the web). A cluster with no number on it is a
     // blob, so the cluster layer is glyphless-safe by the same rule.
-    guard hasGlyphs else { return [clusters, dots] }
+    guard hasGlyphs else { return [clusters, currentPins, tidePins] }
     let counts: [String: Any] = [
         "id": "station-cluster-count", "type": "symbol", "source": "stations",
         "filter": ["has", "point_count"] as [Any],
@@ -138,7 +159,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
         ],
         "paint": ["text-color": "#e8e4d8", "text-halo-color": WATER_TONE, "text-halo-width": 1],
     ]
-    return [clusters, counts, dots, labels]
+    return [clusters, counts, currentPins, tidePins, labels]
 }
 
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
@@ -252,10 +273,30 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         }.resume()
     }
 
+    /// A filled square, drawn to equal AREA with the 5pt circle pins: for
+    /// radius r the side is r·√π. A same-width square always reads heavier.
+    /// Registered as a template image so `icon-color` can tint it — that is
+    /// MapLibre Native's SDF path, and without it the pin ignores state.
+    private func squarePinImage(radius: CGFloat = 5, scale: CGFloat = 3) -> UIImage {
+        let side = radius * CGFloat(Double.pi.squareRoot())
+        let size = CGSize(width: side * 2, height: side * 2)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+        }
+        return image.withRenderingMode(.alwaysTemplate)
+    }
+
     // ponytail: re-asserts on every style load, so a Seascape arriving late
     // recenters a user who already panned; track interaction if it annoys.
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
         mapView.setCenter(center, zoomLevel: zoom, animated: false)
+        // Fires on every style load (local fallback, then Seascape) — the
+        // tide-pin icon must be re-registered each time or the swap loses it.
+        style.setImage(squarePinImage(), forName: "pin-square")
     }
 }
 
@@ -303,19 +344,19 @@ struct MapViewRepresentable: UIViewRepresentable {
             guard let map else { return }
             let point = gesture.location(in: map)
             let box = CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44)
-            func nearest(_ layer: String) -> MLNFeature? {
-                map.visibleFeatures(in: box, styleLayerIdentifiers: [layer]).min { a, b in
+            func nearest(_ layers: Set<String>) -> MLNFeature? {
+                map.visibleFeatures(in: box, styleLayerIdentifiers: layers).min { a, b in
                     let pa = map.convert(a.coordinate, toPointTo: map)
                     let pb = map.convert(b.coordinate, toPointTo: map)
                     return hypot(pa.x - point.x, pa.y - point.y) < hypot(pb.x - point.x, pb.y - point.y)
                 }
             }
-            if let id = nearest("station-dots")?.attribute(forKey: "id") as? String,
+            if let id = nearest(["station-pins-current", "station-pins-tide"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
                 return
             }
-            guard let cluster = nearest("station-clusters") else { return }
+            guard let cluster = nearest(["station-clusters"]) else { return }
             // +2 levels lands past CLUSTER_MAX_ZOOM from any clustered zoom, so
             // one tap on a cluster always breaks it into something tappable.
             map.setCenter(cluster.coordinate, zoomLevel: min(map.zoomLevel + 2, 12), animated: true)

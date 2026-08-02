@@ -156,8 +156,10 @@ final class NationalScaleTests: XCTestCase {
                           "the discovery camera must open on tappable stations, not clusters")
         let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
         XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-clusters" })
-        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-dots" }?["filter"],
-                        "the dot layer must exclude clusters, or every cluster draws twice")
+        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-current" }?["filter"],
+                        "the current-pin layer must exclude clusters, or every cluster draws twice")
+        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-tide" }?["filter"],
+                        "the tide-pin layer must exclude clusters, or every cluster draws twice")
         // Both land tilesets, or somewhere in the covered area is blank water.
         XCTAssertNotNil(sources["land-usca"], "the continental land floor is missing")
         XCTAssertNotNil(sources["land"], "the Salish detail layer is missing")
