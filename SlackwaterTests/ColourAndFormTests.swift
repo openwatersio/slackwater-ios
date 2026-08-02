@@ -71,11 +71,20 @@ final class ColourAndFormTests: XCTestCase {
         let source = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
         XCTAssertFalse(source.isEmpty, "could not read TimelineStrip.swift at \(path.path)")
         let offenders = source.components(separatedBy: .newlines).filter { line in
-            let isDirectionSite = line.contains("maxFlood") || line.contains("maxEbb") ||
-                line.contains("\"FLOOD\"") || line.contains("\"EBB\"") ||
-                line.contains("l.fill(area,")  // the flood/ebb area-fill lines
-            let isHardcoded = line.contains("Color(hex:") || line.contains("SN.leaf")
-            return isDirectionSite && isHardcoded
+            // A raw hex on a line that also names a direction marker.
+            // "Rectangle().fill(" is paired with hex only, not SN.leaf — that
+            // pairing legitimately appears elsewhere (the schedule row's
+            // highlight bar), and would false-positive if included here.
+            let hexOffender = line.contains("Color(hex:") &&
+                (line.contains("maxFlood") || line.contains("maxEbb") ||
+                 line.contains("\"FLOOD\"") || line.contains("\"EBB\"") ||
+                 line.contains("l.fill(area,") ||       // the flood/ebb area fill
+                 line.contains("Rectangle().fill("))    // the legend reference-line fill
+            // SN.leaf (the slack-only green) standing in for a direction
+            // colour — only checked against the area fill, the one place
+            // this specific regression actually happened.
+            let leafOffender = line.contains("SN.leaf") && line.contains("l.fill(area,")
+            return hexOffender || leafOffender
         }
         XCTAssertTrue(offenders.isEmpty, "hardcoded direction colour in TimelineStrip.swift: \(offenders)")
     }
