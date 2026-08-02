@@ -255,9 +255,17 @@ struct SunPill: View {
 /// **1.06:1**, and 1.03:1 on #9AC0B0 — literally unreadable, which is what
 /// Bryan saw on device. So the glyph gets the app's own over-an-unpredictable-
 /// background chrome (MapHeader's dark disc + ring): amber on an SN.canvas disc
-/// is 9.63:1, the disc reads 10.22:1 against the palest stop, and the ring
-/// reads 9.07:1 against the darkest — every trio has one boundary at ≥3.14:1,
-/// clearing WCAG 1.4.11 for non-text. Numbers in docs/testflight.md.
+/// is 6.25:1, the disc reads 10.22:1 against the palest stop, and the ring
+/// reads 5.89:1 against the darkest.
+///
+/// KNOWN GAP (2026-08-02, M53 amber move to #EF6F4A): the old #E0B45A cleared
+/// ≥3.14:1 on every trio in the palette; the new amber does not — the worst
+/// boundary (max of disc-vs-stop, ring-vs-stop) is **2.54:1** on `#28587C`
+/// (also 2.62:1 on `#265678`, 2.94:1 on `#2F6390`), under WCAG 1.4.11's 3:1 for
+/// non-text on those three station cards. Flagged, not fixed here — the amber
+/// value was fixed by the direction-token change above (0xEF6F4A, chosen to
+/// clear `ebb`), and re-balancing the badge chrome for it is its own task.
+/// Numbers in docs/testflight.md — also stale, needs the same update.
 struct ProvisionalBadge: View {
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
