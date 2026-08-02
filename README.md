@@ -63,6 +63,13 @@ where a station hero has to look right) and `land-usca.pmtiles` is the US and Ca
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
 are generated, not committed).
 
+## Branching (agents: read this)
+
+**No direct pushes to `main`** — branch, then pull request. Nothing on GitHub enforces
+this (a private repo in a free org gets neither branch protection nor rulesets), so it
+holds by agreement. An agent may open a PR and push to its branch, but never merges its
+own. Full policy, including why the macOS CI lane is self-hosted, in `CONTRIBUTING.md`.
+
 ## Testing (agents: read this)
 
 Two checked-in test plans, run on both reference simulators by `scripts/test.sh`:
