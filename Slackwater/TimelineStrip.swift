@@ -355,15 +355,18 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
         area.closeSubpath()
         // Flood fill above the zero line, ebb fill below (prototype clip paths).
+        // These were SN.leaf (the slack-only green) and a hardcoded blue —
+        // leftover from before the rebrand, still speaking the retired
+        // direction pair in the chart's most prominent area.
         ctx.drawLayer { l in
             l.clip(to: Path(CGRect(x: 0, y: geo.curTop - 10, width: data.totalWidth,
                                    height: geo.zeroY - (geo.curTop - 10))))
-            l.fill(area, with: .color(SN.leaf.opacity(0.32)))
+            l.fill(area, with: .color(SN.flood.opacity(0.32)))
         }
         ctx.drawLayer { l in
             l.clip(to: Path(CGRect(x: 0, y: geo.zeroY, width: data.totalWidth,
                                    height: geo.curBottom + 10 - geo.zeroY)))
-            l.fill(area, with: .color(Color(hex: 0x6096BE, opacity: 0.32)))
+            l.fill(area, with: .color(SN.ebb.opacity(0.32)))
         }
         var zero = Path()
         zero.move(to: CGPoint(x: 0, y: geo.zeroY))
@@ -392,7 +395,7 @@ struct TimelineCanvas: View {
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
                             .font(.fraunces(10, .semibold))
-                            .foregroundStyle(Color(hex: e.kind == .maxFlood ? 0xCFE6B8 : 0xBCD8EC)),
+                            .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
                          anchor: .center)
             }
@@ -604,17 +607,17 @@ struct TimelineScrubStrip: View {
         let mf = vis.filter { $0.kind == .maxFlood }.map(\.speed).max() ?? 0
         let me = vis.filter { $0.kind == .maxEbb }.map(\.speed).min() ?? 0
         if mf > 0 {
-            Rectangle().fill(Color(hex: 0x9CC87C, opacity: 0.5)).frame(width: w, height: 1)
+            Rectangle().fill(SN.floodLabel.opacity(0.5)).frame(width: w, height: 1)
                 .position(x: w / 2, y: geo.curY(mf))
-            Text("FLOOD").font(.geistMono(9, .medium)).foregroundStyle(Color(hex: 0x9CC87C))
+            Text("FLOOD").font(.geistMono(9, .medium)).foregroundStyle(SN.floodLabel)
                 .padding(.horizontal, 4).padding(.vertical, 1)
                 .background(Color(hex: 0x001020, opacity: 0.55))
                 .position(x: w - 30, y: geo.curY(mf) - 10)
         }
         if me < 0 {
-            Rectangle().fill(Color(hex: 0x8AB6D2, opacity: 0.5)).frame(width: w, height: 1)
+            Rectangle().fill(SN.ebbLabel.opacity(0.5)).frame(width: w, height: 1)
                 .position(x: w / 2, y: geo.curY(me))
-            Text("EBB").font(.geistMono(9, .medium)).foregroundStyle(Color(hex: 0x8AB6D2))
+            Text("EBB").font(.geistMono(9, .medium)).foregroundStyle(SN.ebbLabel)
                 .padding(.horizontal, 4).padding(.vertical, 1)
                 .background(Color(hex: 0x001020, opacity: 0.55))
                 .position(x: w - 24, y: geo.curY(me) + 10)

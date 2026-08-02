@@ -10,6 +10,17 @@ extension Color {
                   blue: Double(hex & 0xFF) / 255,
                   opacity: opacity)
     }
+
+    /// A pale tint of `hex`, blended toward white — for small text on a
+    /// near-black chart, where plain `.opacity()` just reads as dim rather
+    /// than pale. Takes the hex, not a Color, so callers stay one edit away
+    /// from the base token instead of a second hand-picked literal.
+    static func hex(_ hex: UInt32, lightenedBy t: Double) -> Color {
+        let r = Double((hex >> 16) & 0xFF), g = Double((hex >> 8) & 0xFF), b = Double(hex & 0xFF)
+        return Color(red: (r + (255 - r) * t) / 255,
+                     green: (g + (255 - g) * t) / 255,
+                     blue: (b + (255 - b) * t) / 255)
+    }
 }
 
 enum SN {
@@ -30,11 +41,20 @@ enum SN {
     // colourblind-safe diverging pair and it frees green, which matters: for an
     // app called Slackwater the moment you wait for is slack, and green names
     // it. Never colour anything by station kind.
-    static let flood = Color(hex: 0x4A9FD8)
-    static let ebb = Color(hex: 0xE8A33D)
+    private static let floodHex: UInt32 = 0x4A9FD8
+    private static let ebbHex: UInt32 = 0xE8A33D
+    static let flood = Color(hex: floodHex)
+    static let ebb = Color(hex: ebbHex)
     static let go = Color(hex: 0x88B868)
     static let rising = flood
     static let falling = ebb
+    /// Pale flood/ebb, for the chart's max-speed dot labels and FLOOD/EBB
+    /// reference-line legends — 9pt text on a near-black background, where
+    /// the saturated token is too heavy. Derived from the same hex as
+    /// `flood`/`ebb` so retargeting either token keeps its label in lockstep
+    /// instead of drifting the way the pre-rebrand pastel literals did.
+    static let floodLabel = Color.hex(floodHex, lightenedBy: 0.6)
+    static let ebbLabel = Color.hex(ebbHex, lightenedBy: 0.6)
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band

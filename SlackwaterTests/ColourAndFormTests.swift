@@ -52,4 +52,24 @@ final class ColourAndFormTests: XCTestCase {
         assertSameColour(CurrentDetailView.phaseColor(.flood), SN.flood, "flood")
         assertSameColour(CurrentDetailView.phaseColor(.ebb), SN.ebb, "ebb")
     }
+
+    /// The chart's max-speed dot labels and FLOOD/EBB legend once spoke the
+    /// retired pastel pair (pale green for flood, pale blue for ebb) even
+    /// after the tokens were retargeted — a raw hex literal sharing a line
+    /// with one of these markers is exactly how that regression would
+    /// return. A source-text guard, not a rendered-colour one, because the
+    /// bug was a literal slipping back in, not a wrong value from a token.
+    func testChartDoesNotHardcodeDirectionColour() {
+        let path = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Slackwater/TimelineStrip.swift")
+        let source = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
+        XCTAssertFalse(source.isEmpty, "could not read TimelineStrip.swift at \(path.path)")
+        let offenders = source.components(separatedBy: .newlines).filter { line in
+            line.contains("Color(hex:") &&
+            (line.contains("maxFlood") || line.contains("maxEbb") ||
+             line.contains("\"FLOOD\"") || line.contains("\"EBB\""))
+        }
+        XCTAssertTrue(offenders.isEmpty, "hardcoded direction colour in TimelineStrip.swift: \(offenders)")
+    }
 }
