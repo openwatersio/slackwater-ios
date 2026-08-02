@@ -91,11 +91,13 @@ struct CurrentDetailView: View {
 
     // MARK: - Scrub card: tide-at-port readout, strip, current readout
 
-    private var phaseColor: Color {
+    static func phaseColor(_ phase: CurrentPhase) -> Color {
         switch phase {
         case .flood: SN.rising
         case .ebb: SN.falling
-        case .slack: SN.foam.opacity(0.9)
+        // Slack is the app's "go" colour, not a neutral. It is the moment the
+        // app is named for, and it must read the same on every surface.
+        case .slack: SN.go
         }
     }
 
@@ -155,7 +157,8 @@ struct CurrentDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
-                        Text("Slack").font(.fraunces(34)).foregroundStyle(readingColor)
+                        Text("Slack").font(.fraunces(34))
+                            .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                         Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
@@ -171,7 +174,7 @@ struct CurrentDetailView: View {
                             CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.geist(13))
                             Text(compass16(record.setDegrees(signed: scrubSigned))).font(.geist(13))
                         }
-                        .foregroundStyle(provisionalGate == nil ? phaseColor : SN.amber.opacity(0.85))
+                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
                     }
                     if let gate = provisionalGate {
                         MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",

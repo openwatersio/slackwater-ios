@@ -69,11 +69,11 @@ struct DerivedGateDetailView: View {
 
     // MARK: - Scrub card: tide-at-port readout, strip, phase readout
 
-    private var phaseColor: Color {
+    static func phaseColor(_ phase: DerivedPhase) -> Color {
         switch phase {
         case .flood: SN.rising
         case .ebb: SN.falling
-        case .slack: SN.foam.opacity(0.9)
+        case .slack: SN.go
         }
     }
 
@@ -133,7 +133,7 @@ struct DerivedGateDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(phaseWord(phase))
                         .font(.fraunces(34))
-                        .foregroundStyle(phase == .slack ? .white : phaseColor)
+                        .foregroundStyle(Self.phaseColor(phase))
                     Text("speeds not predicted for this pass")
                         .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                 }

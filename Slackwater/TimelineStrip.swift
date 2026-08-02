@@ -381,8 +381,10 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 2.6, y: geo.zeroY - 2.6,
                                                 width: 5.2, height: 5.2)),
                          with: .color(.white.opacity(0.85)))
+                // Slack is the app's "go" colour, not a neutral. It is the moment the
+                // app is named for, and it must read the same on every surface.
                 ctx.draw(Text("slack").font(.geistMono(8))
-                            .foregroundStyle(SN.foam.opacity(0.5)),
+                            .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
             case .maxFlood, .maxEbb:
                 let y = geo.curY(e.speed)
@@ -760,9 +762,9 @@ struct MultiDaySchedule: View {
         case .slack:
             Text("● SLACK")
                 .font(.geistMono(10, .medium)).tracking(0.5)
-                .foregroundStyle(SN.foam)
+                .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color.white.opacity(0.12), in: Capsule())
+                .background(SN.go, in: Capsule())
         case .sunrise:
             SunPill(kind: .sunrise)
         case .sunset:

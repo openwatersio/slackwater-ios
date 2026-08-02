@@ -39,4 +39,17 @@ final class ColourAndFormTests: XCTestCase {
         // where a sunset pill and a max-ebb pill became indistinguishable.
         assertDifferentColour(SN.amber, SN.ebb, "the warning tone must not read as ebb")
     }
+
+    func testSlackIsGreenWhereverItAppears() {
+        // A gate at slack must not show a green glyph beside a grey "slack"
+        // pill in the same card — which is exactly what happened on web when
+        // only one surface adopted the go colour.
+        assertSameColour(CurrentDetailView.phaseColor(.slack), SN.go, "detail view slack")
+        assertSameColour(DerivedGateDetailView.phaseColor(.slack), SN.go, "derived gate slack")
+    }
+
+    func testPhaseColoursUseTheDivergingAxis() {
+        assertSameColour(CurrentDetailView.phaseColor(.flood), SN.flood, "flood")
+        assertSameColour(CurrentDetailView.phaseColor(.ebb), SN.ebb, "ebb")
+    }
 }
