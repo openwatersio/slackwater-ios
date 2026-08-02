@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. M4: first-run location gate (prototype NearMe.dc.html),
 // located list (My Location tile + Near Me by distance), settings, pin map.
 // M1's list + 1a gradient cards underneath, unchanged.
+import CoreLocation
 import SwiftUI
 import TideEngine
 
@@ -293,9 +294,7 @@ struct StationListView: View {
     private var firstListItem: StationItem? {
         let a = anchor
         if fix == nil, let favorite = items(favorites.ids).first { return favorite }
-        return StationItem.all.min {
-            $0.km(fromLat: a.lat, lon: a.lon) < $1.km(fromLat: a.lat, lon: a.lon)
-        }
+        return RankedStations.near(lat: a.lat, lon: a.lon).ranked.first
     }
 
     /// The content pane before any pick — same canvas, an invitation, not blank.
@@ -353,7 +352,9 @@ struct StationListView: View {
     /// The in-place map surface (prototype READY·MAP): no header, no close —
     /// the toggle FAB is the only way back.
     private var mapPane: some View {
-        MapViewRepresentable { item in
+        MapViewRepresentable(center: fix.map {
+            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
+        } ?? SALISH_CENTER) { item in
             if regular { showMap = false }  // the detail pane shows the pick
             open(item)
         }
@@ -400,12 +401,10 @@ struct StationListView: View {
     // each station renders once, My Location > Favorites > Near Me > Recents.
     @ViewBuilder private var locatedSections: some View {
         let anchor = anchor
-        let ranked = StationItem.all.sorted {
-            $0.km(fromLat: anchor.lat, lon: anchor.lon) < $1.km(fromLat: anchor.lat, lon: anchor.lon)
-        }
+        // Ranked once per fix, not once per render (M53 — RankedStations).
         // Same-named stations collapse to their nearest (M50): one entry per
         // place in Near Me and Recents, the rest behind the chooser.
-        let places = StationGroups(ranked: ranked)
+        let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         let heroItem = fix == nil ? nil : ranked.first
         let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
                                 recentIds: places.collapse(recents.ids),
@@ -489,7 +488,7 @@ struct StationListView: View {
     }
 
     private func items(_ ids: [String]) -> [StationItem] {
-        ids.compactMap { id in StationItem.all.first { $0.id == id } }
+        ids.compactMap { StationItem.byId[$0] }
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -720,8 +719,22 @@ struct StationListView: View {
                 .ignoresSafeArea()
             VStack(spacing: 0) {
                 ScrollView {
+                    let results = StationItem.search(query, near: anchor)
                     LazyVStack(spacing: 12) {
-                        ForEach(StationItem.search(query)) { item in
+                        // Nationally a two-letter query matches a thousand
+                        // stations. Showing the nearest 60 is the useful
+                        // answer; saying so is the honest one — and it says so
+                        // ABOVE the results, where it is read, not 60 cards
+                        // down where nobody scrolls (M53).
+                        if results.count == StationItem.searchLimit {
+                            MonoLabel(text: "Nearest \(StationItem.searchLimit) — keep typing to narrow",
+                                      size: 10, color: SN.foam.opacity(0.5), tracking: 1.2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 6)
+                                .padding(.bottom, 2)
+                                .accessibilityIdentifier("search-truncated")
+                        }
+                        ForEach(results) { item in
                             resultCard(item)
                         }
                     }
@@ -1090,7 +1103,7 @@ struct ChsCardView: View {
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
             ChsPendingCard(name: info.name, region: info.region, id: info.id,
-                           message: chsPendingMessage("tidal"))
+                           message: chsPendingMessage("tidal", id: info.id))
         case .failed:
             ChsPendingCard(name: info.name, region: info.region, id: info.id,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
@@ -1098,12 +1111,17 @@ struct ChsCardView: View {
     }
 }
 
-/// A queued station's line. Both halves of "pending" are honest, and they are
-/// different situations: connected, it is simply in line behind the nearer
-/// stations; with no signal, nothing is moving at all. The established
-/// moment-of-signal copy is kept verbatim for the second.
-@MainActor func chsPendingMessage(_ series: String) -> String {
-    Connectivity.shared.online
+/// A station with no model yet. Three honest situations, not one:
+///   - not in the download set at all (M53 — most of Canada): opening it is
+///     what downloads it, so say that rather than implying a queue it isn't in.
+///   - queued and connected: it is in line behind the nearer stations.
+///   - no signal: nothing is moving at all. The established moment-of-signal
+///     copy is kept verbatim.
+@MainActor func chsPendingMessage(_ series: String, id: String) -> String {
+    if !ChsFitService.shared.isQueued(id) {
+        return "Open to download — Canadian \(series) predictions download once, then work offline."
+    }
+    return Connectivity.shared.online
         ? "Queued — Canadian \(series) predictions download once, then work offline."
         : "Needs a moment of signal — Canadian \(series) predictions download once, then work offline."
 }
@@ -1144,6 +1162,11 @@ struct ChsPendingCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .opacity(0.82)  // visibly quieter than a station with numbers
+        // Named per station (M53). "Some card on screen says 'Canadian tidal
+        // predictions'" was a unique locator at 21 Canadian stations and is
+        // meaningless at 1,097 — every undownloaded station says it, so a test
+        // waiting for THIS station's copy to go never sees it go.
+        .accessibilityIdentifier("chs-pending-\(id)")
     }
 }
 
@@ -1166,7 +1189,7 @@ struct ChsGateCardView: View {
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
-                           message: chsPendingMessage("tidal"))
+                           message: chsPendingMessage("tidal", id: gate.reference))
         case .failed:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
@@ -1232,7 +1255,7 @@ struct ChsCurrentGateCardView: View {
                            message: "Downloading Canadian current predictions…")
         case .pending:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
-                           message: chsPendingMessage("current"))
+                           message: chsPendingMessage("current", id: gate.id))
         case .failed:
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
                            message: "Canadian current predictions didn't finish downloading — open it to retry.")

@@ -47,7 +47,7 @@ struct SettingsView: View {
                                 .toolbarBackground(SN.page, for: .navigationBar)
                         } label: {
                             HStack {
-                                Text("\(chs.queue.ready) of \(chs.queue.total) Canadian stations on this device")
+                                Text("\(chs.queue.ready) of \(chs.queue.total) nearby Canadian stations on this device")
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .semibold))

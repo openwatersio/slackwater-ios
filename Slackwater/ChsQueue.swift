@@ -104,6 +104,17 @@ struct ChsQueue {
         return waiting[...at].reduce(0) { $0 + $1.estimatedSeconds }
     }
 
+    /// Put a station into the download set. The set is NOT the catalog (M53):
+    /// it is the nearest few plus whatever has been opened plus whatever is
+    /// already on disk, so at national scale the manager has a finite list and
+    /// a first run has a finite cost. Adding an id already here is a no-op —
+    /// re-adding must never reset a job that is downloading or done.
+    mutating func add(_ job: ChsJob) {
+        guard !jobs.contains(where: { $0.id == job.id }) else { return }
+        jobs.append(job)
+        reorder()
+    }
+
     mutating func set(_ id: String, _ status: ChsJobStatus) {
         guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
         jobs[i].status = status

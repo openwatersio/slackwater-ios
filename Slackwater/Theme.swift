@@ -420,3 +420,33 @@ struct StationGroups {
     /// Every station sharing this one's name, nearest first — the chooser's rows.
     func matches(_ item: StationItem) -> [StationItem] { byName[item.name] ?? [item] }
 }
+
+// MARK: - The distance-ranked catalog, memoised (M53)
+
+/// The list ranks the whole catalog by distance and builds `StationGroups`
+/// over it — and it does that inside `body`, which SwiftUI re-evaluates on
+/// every fit that lands, every favourite toggle, every unit switch. At 41
+/// bundled stations nobody could measure it. At 3,125 it is a 3,125-element
+/// sort plus two dictionary builds, tens of times a second.
+///
+/// So it is computed once per FIX, not once per render. The key is the fix
+/// rounded to ~100 m — finer than the list can show, coarser than GPS jitter,
+/// so a boat at anchor pays for this exactly once.
+@MainActor
+enum RankedStations {
+    private static var key = ""
+    private static var ranked: [StationItem] = []
+    private static var groups = StationGroups(ranked: [])
+
+    static func near(lat: Double, lon: Double) -> (ranked: [StationItem], groups: StationGroups) {
+        let k = "\(Int((lat * 1000).rounded())),\(Int((lon * 1000).rounded()))"
+        if k != key {
+            key = k
+            ranked = StationItem.all.sorted {
+                $0.km(fromLat: lat, lon: lon) < $1.km(fromLat: lat, lon: lon)
+            }
+            groups = StationGroups(ranked: ranked)
+        }
+        return (ranked, groups)
+    }
+}

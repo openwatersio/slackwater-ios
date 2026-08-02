@@ -93,16 +93,18 @@ final class ScreenshotTests: XCTestCase {
 
         // Search mid-query: name + region substring both match (bottom input).
         openSearch(app, "pass")
-        XCTAssert(app.staticTexts["Active Pass"].firstMatch.waitForExistence(timeout: 5))
         sleep(1)
         save(app, "m1-search.png")
-        // The NOAA station is further down the results, and how far depends on
-        // what is downloaded (M51: a gate showing its fast answer wears an
-        // extra badge line). Scroll the results rather than assume the fold.
-        let deception = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        var tries = 0
-        while !deception.exists, tries < 6 { app.scrollViews.firstMatch.swipeUp(); tries += 1 }
-        XCTAssert(deception.exists, "search did not find Deception Pass (Narrows)")
+        // M53: "pass" matches 139 stations nationally and results are ranked by
+        // DISTANCE, not name — Active Pass used to be first alphabetically and
+        // is now eighth (Race Passage, then five San Juan passes, are nearer to
+        // the Victoria fix). Scroll for both rather than assume the fold.
+        for name in ["Active Pass", "Deception Pass (Narrows)"] {
+            let card = app.staticTexts[name].firstMatch
+            var tries = 0
+            while !card.exists, tries < 8 { app.scrollViews.firstMatch.swipeUp(); tries += 1 }
+            XCTAssert(card.exists, "search did not find \(name)")
+        }
         closeSearch(app)
 
         // Metres via Settings, then open Friday Harbor in metric.
@@ -168,15 +170,18 @@ final class ScreenshotTests: XCTestCase {
     // in order, because the offline half depends on the fit half's stored model.
     func testM3ChsPendingFitOffline() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-chsResetModels", "-seedGate"]  // clean first-run
+        // M53: scoped to Victoria. Unscoped, every launch also starts the
+        // nine-station auto-fit set against live IWLS — minutes of paced
+        // requests this test does not need, competing with the one fit it does.
+        app.launchArguments = ["-chsResetModels", "-seedGate",
+                               "-chsFitOnly", "chs-victoria"]  // clean first-run
         app.launch()
 
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
         // Victoria is pending (or already mid-fit): identity + honest message, no numbers.
         openSearch(app, "victoria")
-        let pending = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'signal' OR label CONTAINS 'Downloading'")).firstMatch
+        let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.waitForExistence(timeout: 10))
         sleep(1)
         save(app, "m3-pending.png")
@@ -797,9 +802,9 @@ final class ScreenshotTests: XCTestCase {
         openSearch(app, "dodd")
         XCTAssert(app.staticTexts["Dodd Narrows"].firstMatch.waitForExistence(timeout: 5),
                   "search did not find Dodd Narrows")
-        // Pending: identity + the honest currents message, no numbers.
-        let pending = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'current predictions'")).firstMatch
+        // Pending: identity + the honest currents message, no numbers. By id
+        // since M53 — the copy alone matches every undownloaded station.
+        let pending = app.descendants(matching: .any)["chs-pending-chs-dodd-narrows"].firstMatch
         XCTAssert(pending.waitForExistence(timeout: 10), "currents pending copy missing")
 
         // The live fit lands and the card becomes a real current card:
@@ -860,7 +865,11 @@ final class ScreenshotTests: XCTestCase {
     // strip, slack rows with no speeds, and the derived provenance copy.
     func testM46MalibuDerivedGate() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-seedGate"]
+        // M53: Point Atkinson is 100 km from the Victoria fallback, so it is
+        // NOT in the auto-fit set — opening the gate is what downloads it,
+        // which is the behaviour under test. Scoped so that is the only fit
+        // in flight (see testM3 for why unscoped live tests fight each other).
+        app.launchArguments = ["-seedGate", "-chsFitOnly", "chs-point-atkinson"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
@@ -972,15 +981,19 @@ final class ScreenshotTests: XCTestCase {
             .firstMatch.waitForExistence(timeout: 5),
                   "manager is missing the plain-register progress line")
 
-        // Proximity order from the Victoria fix: Victoria, then Race Passage,
-        // then Sooke — nearest-first, exactly as the queue sorts them.
+        // Proximity order from the Victoria fix: Victoria, then Race Passage
+        // (18 km), then Porlier Pass (68 km) — nearest-first, exactly as the
+        // queue sorts them. M53: the list is the DOWNLOAD SET, so Sooke (30 km
+        // and outside the six nearest ports) is deliberately not in it.
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
-        let sooke = rows["download-row-chs-sooke"].firstMatch
+        let porlier = rows["download-row-chs-porlier-pass"].firstMatch
         XCTAssert(victoria.waitForExistence(timeout: 5), "no per-station rows in the manager")
         XCTAssert(victoria.frame.minY < race.frame.minY, "queue is not proximity-ordered")
-        XCTAssert(race.frame.minY < sooke.frame.minY, "queue is not proximity-ordered")
+        XCTAssert(race.frame.minY < porlier.frame.minY, "queue is not proximity-ordered")
+        XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists,
+                       "the manager is listing the catalog again, not the download set")
         sleep(1)
         save(app, "m48-downloads-manager.png")
         app.buttons["Done"].tap()
@@ -1017,7 +1030,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(promoted.waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists,  // MonoLabel uppercases
                   "the promoted station is not marked in the manager")
-        let stillQueued = app.descendants(matching: .any)["download-row-chs-sooke"].firstMatch
+        let stillQueued = app.descendants(matching: .any)["download-row-chs-porlier-pass"].firstMatch
         XCTAssert(promoted.frame.minY < stillQueued.frame.minY,
                   "the viewed station did not jump ahead of the proximity order")
         sleep(1)
@@ -1030,7 +1043,13 @@ final class ScreenshotTests: XCTestCase {
     // detail. Held unfitted by the kill switch, so this is deterministic.
     func testM48MapPinToUnfittedDetail() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        // M53: the camera is put ON Race Passage rather than aimed at it from
+        // the wide Salish view. At 195 bundled stations a finger-sized box over
+        // that pin held one dot; at 3,125 it holds several, and "the nearest
+        // dot to the tap" stopped being the one the test meant. The fix is the
+        // fix — the discovery map now opens on it — plus a station-scale zoom.
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch",
+                               "-fixLat", "48.3067", "-fixLon", "-123.5367", "-mapZoom", "11"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         app.buttons["Map"].tap()
@@ -1038,24 +1057,12 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(map.waitForExistence(timeout: 5))
         sleep(5)  // tiles
 
-        // Same web-mercator math as testM4MapPinToDetail, on Race Passage.
-        let frame = map.frame
-        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
-        func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
-            let x = (lon + 180) / 360 * world
-            let phi = lat * .pi / 180
-            let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
-            return (x, y)
-        }
-        let c = mercator(48.35, -123.05)        // SALISH_CENTER
-        let p = mercator(48.3067, -123.5367)    // Race Passage
-        let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
-        let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
-        map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
-
+        // Dead centre: the camera is on the station, so the pin is the middle.
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 8),
                   "a map pin on an unfitted station must still open its detail")
         XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
+
         // Offline: the established honest register, and no bogus ETA.
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'need a moment of signal'")).firstMatch.exists,
@@ -1098,15 +1105,24 @@ final class ScreenshotTests: XCTestCase {
         // these screenshots are the ones a human reads.
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
+        // M53: the fix moved from Victoria to Discovery Island itself. At 195
+        // bundled stations the two namesakes were both inside Victoria's Near
+        // Me; at 3,125 the six nearest a Victoria fix are all harbour gauges
+        // inside 5 km, which is what Near Me is FOR and not what this test is
+        // about. Standing at the station is the deterministic way to put a
+        // collided name in the list.
         app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
-                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]  // Victoria
+                               "-fixLat", "48.452", "-fixLon", "-123.155"]  // Discovery Island
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         XCTAssert(app.staticTexts["NEAR ME"].waitForExistence(timeout: 10))
 
         // One entry, not two: the nearer Discovery Island renders, the farther
         // one is behind the chooser.
-        let cards = app.staticTexts.matching(NSPredicate(format: "label == %@", "Discovery Island"))
+        // Scoped to the LIST: at regular width the detail pane auto-opens on the
+        // first row (M52), so an unscoped count also picks up its header title.
+        let cards = listContainer(app).staticTexts
+            .matching(NSPredicate(format: "label == %@", "Discovery Island"))
         XCTAssertEqual(cards.count, 1, "same-named stations must render as one entry")
         XCTAssert(app.staticTexts["3.0 nm NE"].firstMatch.exists, "the nearest one is the entry")
         XCTAssertFalse(app.staticTexts["6.6 nm SSE"].exists,
@@ -1241,10 +1257,9 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         openSearch(app, "victoria")
-        // The pending copy is the CHS card's alone — when it goes, the fit
-        // landed and the card is showing real water.
-        let pending = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions'")).firstMatch
+        // M53: by station id, not by copy. Every undownloaded Canadian station
+        // says "Canadian tidal predictions", and "victoria" matches several.
+        let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.waitForExistence(timeout: 15), "no CHS Victoria card in the results")
         var waited = 0
         while pending.exists, waited < 240 { sleep(2); waited += 2 }
@@ -1588,5 +1603,175 @@ final class ScreenshotTests: XCTestCase {
     private func save(_ app: XCUIApplication, _ name: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
         try? png.write(to: URL(fileURLWithPath: shotDir + "/" + name))
+    }
+
+    // MARK: - M53: the US and Canada
+
+    /// The whole point of M53: a station 4,000 km from the Salish Sea is
+    /// searchable, opens, and draws a real curve from bundled NOAA harmonics —
+    /// no download, no signal needed, same screen as Friday Harbor.
+    func testM53UsEastCoastStationRendersACurve() throws {
+        let app = XCUIApplication()
+        // Airplane mode: whatever renders here is bundled, not fetched.
+        app.launchArguments = ["-seedGate", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "boston")
+        let boston = app.staticTexts["Boston"].firstMatch
+        XCTAssert(boston.waitForExistence(timeout: 5), "Boston is not in the bundle")
+        boston.tap()
+
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10),
+                  "an east-coast station did not open a real detail")
+        XCTAssert(app.staticTexts["MA"].firstMatch.exists,
+                  "the region line fell back to the Salish gazetteer")
+        // A curve, not an empty chart: heights and clock times both render, and
+        // Boston's range is metres — the numbers are the station's own.
+        XCTAssertFalse(heightLabels(app).isEmpty, "no height readings on the Boston detail")
+        XCTAssertGreaterThanOrEqual(clockLabels(app).count, 3, "no schedule on the Boston detail")
+        sleep(3)  // header map tiles — the continental land floor, offline
+        save(app, "m53-us-station.png")
+
+        // And the west coast, through the same path.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        openSearch(app, "san francisco")
+        let sf = app.staticTexts["San Francisco (Golden Gate)"].firstMatch
+        XCTAssert(sf.waitForExistence(timeout: 5), "San Francisco is not in the bundle")
+        sf.tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
+    }
+
+    /// Search at 3,125 stations: bounded, nearest-first, and honest about what
+    /// it is not showing.
+    func testM53SearchAtNationalScale() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        // "port" matches several hundred stations nationally.
+        openSearch(app, "port")
+        XCTAssert(app.descendants(matching: .any)["search-truncated"].firstMatch
+                    .waitForExistence(timeout: 5),
+                  "a query matching hundreds of stations must say it truncated")
+        // Nearest-first: from the Victoria fallback the top of the list is
+        // local water, not an alphabetical trip to Alaska.
+        XCTAssert(app.staticTexts["Portage Inlet"].firstMatch.exists ||
+                  app.staticTexts["Port Townsend"].firstMatch.exists,
+                  "results are not ranked by distance from the fix")
+        sleep(1)
+        save(app, "m53-search-scale.png")
+
+        // Narrowing removes the truncation notice — the list is complete again.
+        app.textFields.firstMatch.typeText(" townsend")
+        sleep(1)
+        XCTAssertFalse(app.descendants(matching: .any)["search-truncated"].firstMatch.exists,
+                       "a narrow query must not claim to be truncated")
+        closeSearch(app)
+    }
+
+    /// The map at continental scale. 3,125 pins is a grey smear without
+    /// clustering; this walks the camera out to the whole country, times the
+    /// gestures, and checks the map is still a map afterwards.
+    func testM53MapAtContinentalZoom() throws {
+        let app = XCUIApplication()
+        // z3.2 over the Salish camera longitude: the west coast from Mexico to
+        // Alaska, offline, with everything the bundle knows on it. The camera
+        // is stated rather than pinched into place — five synthesised pinches
+        // land somewhere no assertion can name.
+        app.launchArguments = ["-seedGate", "-networkKillSwitch", "-openMap", "-mapZoom", "3.2"]
+        app.launch()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 15))
+        sleep(6)  // the coarse land tiles, then the clusters
+        save(app, "m53-map-continental.png")
+
+        // Then the interaction cost, timed: zooming the clustered source at the
+        // scale where an unclustered one is 3,125 separate dots.
+        let start = Date.now
+        for _ in 0..<5 { map.pinch(withScale: 1.6, velocity: 2) }
+        let gestures = Date.now.timeIntervalSince(start)
+        print(String(format: "M53 map · 5 pinches at z3.2 over %d pins: %.2f s", 3125, gestures))
+        XCTAssertLessThan(gestures, 20, "zooming a 3,125-pin map should not take 20 seconds")
+
+        // Still responsive and still a map afterwards.
+        XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")
+        XCTAssert(app.buttons["Search"].exists)
+        app.buttons["List"].tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+    }
+
+    /// A Canadian station outside the auto-fit set: visible, searchable, and
+    /// honest — it is not queued, and it says opening it is what downloads it.
+    /// Held offline so the state is deterministic.
+    func testM53CanadianStationOnDemand() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "halifax")
+        let halifax = app.staticTexts["Halifax"].firstMatch
+        XCTAssert(halifax.waitForExistence(timeout: 5),
+                  "a Canadian station 4,400 km away must still be findable offline")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Open to download'")).firstMatch.exists,
+                  "an unqueued station must not claim to be queued")
+        _ = halifax
+        // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
+        app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch.tap()
+
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 8),
+                  "opening an undownloaded Canadian station must explain itself")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists)
+        sleep(3)  // header map tiles: the Atlantic coast, from the bundled floor
+        save(app, "m53-canada-ondemand.png")
+
+        // Opening it put it in the download set, at the front.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        let row = app.descendants(matching: .any)["download-row-chs-halifax"].firstMatch
+        XCTAssert(row.waitForExistence(timeout: 5),
+                  "opening a station outside the auto-fit set did not add it to the queue")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'searchable everywhere'")).firstMatch.exists,
+                  "the manager must say the rest of Canada is on demand, not missing")
+        app.buttons["Done"].tap()
+    }
+
+    /// FULL PLAN — live IWLS. The other half of on-demand: a Canadian station
+    /// nobody auto-downloaded fits on the device when you open it, and the page
+    /// fills in underneath you.
+    func testM53OnDemandCanadianStationFitsWhenOpened() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "halifax")
+        // Deliberately UNSCOPED: the point is that Halifax is not in the
+        // auto-fit set, so the set is downloading in the background throughout.
+        let pending = app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch
+        XCTAssert(pending.waitForExistence(timeout: 15),
+                  "it should start with nothing — nothing auto-downloads Nova Scotia")
+        // Tap the CARD, not the name: at regular width the sidebar behind the
+        // search overlay is accessibility-hidden but still queryable, so
+        // `staticTexts["Halifax"].firstMatch` can resolve to the hidden one.
+        pending.tap()
+        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 20))
+
+        // Promotion yields the running auto-fit job at its next chunk (~2.5 s),
+        // then one 60-day tide fit: ~30 s of paced requests.
+        let start = Date.now
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 180),
+                  "an opened Canadian station never fitted")
+        print(String(format: "M53 on-demand fit of Halifax: %.0f s", Date.now.timeIntervalSince(start)))
+        XCTAssertFalse(heightLabels(app).isEmpty, "fitted, but no numbers")
+        save(app, "m53-canada-fitted.png")
     }
 }

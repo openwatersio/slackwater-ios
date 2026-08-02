@@ -149,6 +149,11 @@ final class UnitsAndGroupsTests: XCTestCase {
     @MainActor
     func testFavoriteToggleRoundTrip() {
         let store = FavoritesStore.shared
+        // The regular-width auto-selection arms `skipNextRecord` and the detail
+        // it opens consumes it — unless that detail is a CHS station with no
+        // model yet, which records nothing. The flag then leaks into whatever
+        // records next, which on an iPad host is this test (M53).
+        RecentsStore.shared.skipNextRecord = false
         let id = "test-station-\(UUID().uuidString)"
         XCTAssertFalse(store.contains(id))
         store.toggle(id)

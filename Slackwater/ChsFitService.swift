@@ -62,40 +62,109 @@ final class ChsFitService: ObservableObject {
     private var started = false
     private var running = false
 
+    /// What downloads WITHOUT being asked for.
+    ///
+    /// Until M53 the answer was "every Canadian station" — true and affordable
+    /// at 21 Salish stations, and neither at 1,097 nationally: bulk-downloading
+    /// Canada is about 4.4 hours of politely paced IWLS requests, which is not
+    /// a thing to do to somebody's first run or their cellular plan.
+    ///
+    /// The replacement is NOT "the nearest ten", which is the obvious answer
+    /// and is wrong. Canadian tide gauges cluster: the ten nearest a Victoria
+    /// fix are ten gauges inside 6 km of each other — Selkirk Water, three
+    /// separate Gorge gauges, Portage Inlet — and not one current gate. It
+    /// would have downloaded the harbour six times and none of the passes,
+    /// which are the reason the app exists.
+    ///
+    /// So the two series are budgeted separately, and the numbers are measured
+    /// against the fetcher's 2.5 s pacing:
+    ///   - 6 tide ports, ~25 s each => ~2.5 min, anywhere in the country.
+    ///   - 3 current gates, 52 s (60-day) to 158 s (210-day) => ~4-6 min in
+    ///     the Salish, and a 210-day gate publishes its usable fast answer
+    ///     partway through rather than at the end.
+    /// ~8.5 min of background download in the worst case, 2.5 min away from
+    /// the gates. The nearest tide port is still usable at ~30 s — the number
+    /// that matters most, and it does not move.
+    ///
+    /// The radius is what keeps a Halifax first run honest: the nearest CHS
+    /// current gate is 4,430 km away, and downloading Salish passes for a Nova
+    /// Scotian is pure waste. 150 km is about a long day's passage at 6 knots.
+    ///
+    /// Everything else stays visible, searchable and one tap from downloading:
+    /// opening a station adds it to this set and jumps it to the front.
+    /// ponytail: constants, not settings. Make them settings when somebody
+    /// asks — a region picker is the thing nobody has asked for.
+    static let autoFitPorts = 6
+    static let autoFitGates = 3
+    static let autoFitGateRadiusKm = 150.0
+
+    /// Every CHS station the app could fit, ports and validated gates.
+    private static let candidates: [ChsJob] = {
+        var jobs = ChsStationInfo.all.map {
+            ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: false,
+                   latitude: $0.latitude, longitude: $0.longitude, fitDays: tideFitDays)
+        }
+        jobs += ChsCurrentGateInfo.all.map {
+            ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: true,
+                   latitude: $0.latitude, longitude: $0.longitude, fitDays: $0.fitDays)
+        }
+        return jobs.filter { fitOnly?.contains($0.id) ?? true }
+    }()
+
+    /// The stations a fix downloads on its own: the nearest ports, and the
+    /// nearest gates that are actually near.
+    static func autoFitSet(lat: Double, lon: Double) -> [ChsJob] {
+        func nearest(_ jobs: [ChsJob], _ count: Int) -> [ChsJob] {
+            jobs.sorted {
+                let a = distanceKm($0.latitude, $0.longitude, lat, lon)
+                let b = distanceKm($1.latitude, $1.longitude, lat, lon)
+                return a == b ? $0.id < $1.id : a < b
+            }.prefix(count).map { $0 }
+        }
+        let ports = candidates.filter { !$0.isCurrent }
+        let gates = candidates.filter {
+            $0.isCurrent && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitGateRadiusKm
+        }
+        return nearest(ports, autoFitPorts) + nearest(gates, autoFitGates)
+    }
+
     private init() {
         ChsModelStore.resetIfRequested()
-        // Every Canadian station, always — "which regions" is not a question
-        // the app asks. If it ever should (Bryan: "later we might make this an
-        // option, for non-Canadians"), it is one more `where` clause on these
-        // two loops, exactly where the -chsFitOnly test hook already filters.
+        // One directory read, not 1,097 stat calls: which stations already
+        // have a model on disk decides both what renders fitted and what stays
+        // in the download set after the auto-fit rule stops choosing it.
+        let files = Set((try? FileManager.default.contentsOfDirectory(atPath: ChsModelStore.dir.path)) ?? [])
         var jobs: [ChsJob] = []
-        for info in ChsStationInfo.all where Self.fitOnly?.contains(info.id) ?? true {
-            var job = ChsJob(id: info.id, name: info.name, region: info.region, isCurrent: false,
-                             latitude: info.latitude, longitude: info.longitude,
-                             fitDays: Self.tideFitDays)
-            if let model = ChsModelStore.load(info.id) {
-                tideRecords[info.id] = info.record(with: model)
+        for var job in Self.candidates {
+            let stored = files.contains(job.isCurrent ? "\(job.id)-current.json" : "\(job.id).json")
+            if stored, !job.isCurrent, let model = ChsModelStore.load(job.id),
+               let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
+                tideRecords[job.id] = info.record(with: model)
                 job.status = .ready
-            }
-            jobs.append(job)
-        }
-        for gate in ChsCurrentGateInfo.all where Self.fitOnly?.contains(gate.id) ?? true {
-            var job = ChsJob(id: gate.id, name: gate.name, region: gate.region, isCurrent: true,
-                             latitude: gate.latitude, longitude: gate.longitude,
-                             fitDays: gate.fitDays)
-            if let model = ChsModelStore.loadCurrent(gate.id) {
-                currentRecords[gate.id] = gate.record(with: model)
+            } else if stored, job.isCurrent, let model = ChsModelStore.loadCurrent(job.id),
+                      let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
+                currentRecords[job.id] = gate.record(with: model)
                 // A provisional model is usable but NOT done: the job stays
                 // queued so the next connected run refines it, and its cached
                 // chunks mean that costs only the chunks it never fetched.
-                if gate.isProvisional(model) { provisional.insert(gate.id) } else { job.status = .ready }
+                if gate.isProvisional(model) { provisional.insert(job.id) } else { job.status = .ready }
+            } else if !stored {
+                continue  // not downloaded, and the auto-fit set decides below
             }
             jobs.append(job)
         }
         queue = ChsQueue(jobs)
         // Never an arbitrary order, even before a fix lands: the prototype's
         // Victoria fallback anchors the first sort, and a real fix re-sorts.
-        queue.prioritize(lat: fallbackFix.lat, lon: fallbackFix.lon)
+        adopt(lat: fallbackFix.lat, lon: fallbackFix.lon)
+    }
+
+    /// Take the nearest stations into the download set and re-sort. Jobs only
+    /// ACCRETE: a fix moving from Victoria to Halifax adds Halifax's nearest
+    /// ports, and never drops what Victoria already paid for.
+    private func adopt(lat: Double, lon: Double) {
+        for job in Self.autoFitSet(lat: lat, lon: lon) { queue.add(job) }
+        queue.prioritize(lat: lat, lon: lon)
     }
 
     func state(_ id: String) -> ChsState {
@@ -120,6 +189,15 @@ final class ChsFitService: ObservableObject {
     /// treatment in the UI hangs off this one question.
     func isProvisional(_ id: String) -> Bool { provisional.contains(id) }
 
+    /// Is this station in the download set at all? Outside it, "pending" means
+    /// "open it and it downloads", not "wait your turn" (M53) — a different
+    /// sentence, and the only honest one for the other 1,000-odd stations.
+    func isQueued(_ id: String) -> Bool { queue.job(id) != nil }
+
+    /// How many Canadian stations exist but are not downloading — the number
+    /// the manager needs to say what "all done" actually means.
+    var notQueued: Int { Self.candidates.count - queue.total }
+
     /// Start the download run: nearest-first, one station at a time. Partial
     /// failure is fine — whatever fit is stored; the rest are retryable from
     /// the manager and retry on the next connected launch.
@@ -129,15 +207,22 @@ final class ChsFitService: ObservableObject {
         pump()
     }
 
-    /// A fix landed (or moved): re-order what is still queued closest-first.
+    /// A fix landed (or moved): take the nearest stations there into the
+    /// download set, and re-order what is still queued closest-first.
     func prioritize(lat: Double, lon: Double) {
-        queue.prioritize(lat: lat, lon: lon)
+        adopt(lat: lat, lon: lon)
+        pump()
     }
 
     /// The station the user just opened jumps the queue — ahead of proximity
-    /// order — and retries if it had failed. Kicks the loop in case it had run
-    /// dry (every job done or failed).
+    /// order — and retries if it had failed. Since M53 it also JOINS the queue
+    /// if it wasn't in it: outside the auto-fit set, opening a station is how
+    /// it gets downloaded, and a tap must never be a dead tap.
+    /// Kicks the loop in case it had run dry (every job done or failed).
     func promote(_ id: String) {
+        if queue.job(id) == nil, let job = Self.candidates.first(where: { $0.id == id }) {
+            queue.add(job)
+        }
         queue.promote(id)
         pump()
     }
@@ -223,7 +308,7 @@ final class ChsFitService: ObservableObject {
 
     /// 60 d @ 15 min ending yesterday — the window the M0 spike validated, and
     /// unchanged by M51: the per-gate window work is currents-only.
-    static let tideFitDays = 60.0
+    nonisolated static let tideFitDays = 60.0
 
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
                                  fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {

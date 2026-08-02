@@ -219,14 +219,43 @@ enum StationItem: Identifiable, Hashable {
         return [friday] + merged.filter { $0.id != friday.id }
     }()
 
-    static func search(_ query: String) -> [StationItem] {
+    /// Id → item, built once. Every row, every map-pin tap and every id→item
+    /// lookup used to be `all.first(where:)`; at 41 stations that was free and
+    /// at 3,125 it is a linear scan per row per render (M53).
+    static let byId: [String: StationItem] =
+        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+    /// How many results the search screen shows.
+    ///
+    /// This is the search change national scale actually forced. "port"
+    /// matches 214 stations and "b" over a thousand; the old screen handed
+    /// every one of them to a `ForEach`, so SwiftUI diffed a thousand rows per
+    /// keystroke to show the six you can see. Sixty is more than anyone
+    /// scrolls, and the screen says when it has truncated (M53).
+    static let searchLimit = 60
+
+    /// Matches, best first. Rank is the web's (name > region > alias) and
+    /// DISTANCE breaks the tie — the other thing national scale forces, since
+    /// alphabetical order across 3,125 stations answers "port" in Boston with
+    /// Alaska. Ties on distance break on id, so the order is total.
+    ///
+    /// ponytail: a plain scan, no index. Lowercasing three strings per station
+    /// measured the same as a prebuilt lowercased index at 3,125 stations
+    /// (~6 ms per keystroke, debug simulator), and the index was 35 lines of
+    /// cache that moved no number.
+    static func search(_ query: String, near anchor: (lat: Double, lon: Double) = fallbackFix) -> [StationItem] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
-        if q.isEmpty { return all }
-        var ranked: [(item: StationItem, rank: Int)] = []
+        var ranked: [(item: StationItem, rank: Int, km: Double)] = []
+        ranked.reserveCapacity(128)
         for s in all {
-            if let rank = s.searchRank(q) { ranked.append((s, rank)) }
+            guard let rank = q.isEmpty ? 0 : s.searchRank(q) else { continue }
+            ranked.append((s, rank, s.km(fromLat: anchor.lat, lon: anchor.lon)))
         }
-        ranked.sort { $0.rank == $1.rank ? $0.item.name < $1.item.name : $0.rank < $1.rank }
-        return ranked.map(\.item)
+        ranked.sort {
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            if $0.km != $1.km { return $0.km < $1.km }
+            return $0.item.id < $1.item.id
+        }
+        return ranked.prefix(searchLimit).map(\.item)
     }
 }

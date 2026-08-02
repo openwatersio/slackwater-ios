@@ -152,7 +152,12 @@ struct OfflineManagerList: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            // Lazy, and the list is bounded by construction (M53): the queue
+            // is the DOWNLOAD SET — the nearest few, whatever you opened, and
+            // whatever is already on disk — not the 1,097-station catalog.
+            // Rendering all of Canada here was the old shape and would have
+            // been an unbounded list of rows nobody scrolls.
+            LazyVStack(alignment: .leading, spacing: 14) {
                 summary
                 ForEach(queue.jobs) { row($0) }
             }
@@ -191,14 +196,24 @@ struct OfflineManagerList: View {
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
     }
 
+    /// What the manager is honest about at national scale (M53): this list is
+    /// the download SET, not the catalog. "Done" means the nearest stations
+    /// are on the device — and the sentence has to say, every time, that the
+    /// rest of Canada is one tap away rather than missing.
     private var summaryLine: String {
         if queue.complete {
-            return "Every Canadian station is on this device. Slackwater works with no signal."
+            return "The Canadian stations nearest you are on this device. Slackwater works with no signal.\(onDemandLine)"
         }
         if !net.online {
-            return "Waiting for signal. Downloading Canadian tidal and current predictions resumes as soon as you're connected — each station downloads once, then works offline for good."
+            return "Waiting for signal. Downloading Canadian tidal and current predictions resumes as soon as you're connected — each station downloads once, then works offline for good.\(onDemandLine)"
         }
-        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. Usually \(durationPhrase(remainingSeconds)) for the rest."
+        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. Usually \(durationPhrase(remainingSeconds)) for the rest.\(onDemandLine)"
+    }
+
+    private var onDemandLine: String {
+        let rest = service.notQueued
+        guard rest > 0 else { return "" }
+        return " \(rest) more Canadian stations are searchable everywhere — open one and it downloads."
     }
 
     private var remainingSeconds: Double {

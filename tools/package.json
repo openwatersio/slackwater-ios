@@ -2,5 +2,14 @@
   "name": "slackwater-ios-tools",
   "private": true,
   "type": "module",
-  "dependencies": { "@sailingnaturali/station-corrections": "^2.6.0" }
+  "dependencies": {
+    "@sailingnaturali/station-corrections": "^2.6.0"
+  },
+  "devDependencies": {
+    "@neaps/tide-database": "^0.8.20260722",
+    "tz-lookup": "^6.1.25"
+  },
+  "scripts": {
+    "build:data": "node gen-noaa-tides.mjs && node gen-noaa-currents.mjs && node gen-chs-stations.mjs && node gen-chs-gates.mjs"
+  }
 }

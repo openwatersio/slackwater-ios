@@ -33,7 +33,8 @@
         "ScreenshotTests\/testM51NearestTidePortTimeToFirstUsable()",
         "ScreenshotTests\/testM51PromotionInterruptsAnInFlightDownload()",
         "ScreenshotTests\/testM51ProvisionalGateShowsFastAnswerThenRefines()",
-        "ScreenshotTests\/testM51ValidatedGateReachesFinalWithNoProvisionalStage()"
+        "ScreenshotTests\/testM51ValidatedGateReachesFinalWithNoProvisionalStage()",
+        "ScreenshotTests\/testM53OnDemandCanadianStationFitsWhenOpened()"
       ],
       "target" : {
         "containerPath" : "container:Slackwater.xcodeproj",
