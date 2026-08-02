@@ -140,6 +140,29 @@ requires here.
 `MapScreen.swift:96,107-108` currently match `circle-color` against `["get", "kind"]`. That match is
 removed. Pins become SDF symbol icons: `icon-image` keyed on kind, `icon-color` on state, with a halo.
 
+**The map's marks are a circle and a square, not the card's glyphs.** *Amended 2026-08-02, after the
+web version was used.* The wave and dome were tried on the map there and rejected: thin curved
+strokes over bathymetry contours make a dense chart denser, and the map stops being calm enough to
+scan. Use the oldest cartographic convention instead — one shape per feature class:
+
+| Kind | Map mark |
+|---|---|
+| current station | **filled circle** |
+| tide station | **filled square** |
+
+Square versus circle is a *silhouette* difference, visible at any size and in peripheral vision,
+where the interior difference of a ring versus a disc is not. Solid shapes also carry the state
+colour far better than strokes, which matters because colour is the map's primary signal. Draw the
+square to equal **area** rather than equal width — a same-width square always reads heavier.
+
+So the two surfaces deliberately differ: the card keeps the expressive wave and dome of §4, because a
+list row is roomy and calm; the map takes the plain marker, because a chart at zoom 12 is neither.
+
+**The popup carries the words.** Since the map's only signal is colour, the preview popup names the
+station kind and spells the state out — "Flooding", "Ebbing", "Slack", or an honest wording where
+state is not known. That is what makes the palette self-teaching and lets the map do without a
+legend. On web the first tap previews and the second opens; iOS should match.
+
 `StationItem.pinKind` (`CurrentStation.swift:198-204`) stays — it is the kind discriminator feeding
 the icon expression, exactly as web's `kind` feature property does.
 
