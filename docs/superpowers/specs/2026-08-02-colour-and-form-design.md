@@ -181,6 +181,14 @@ if dropped:
 A station whose state is not knowable draws neutral. That is an honest "unknown", not a guess — on a
 boat a wrong slack is worse than an admitted grey.
 
+**Scope limit on state, deliberate.** Only stations that resolve *synchronously on device* get a
+colour in this piece: bundled NOAA tide and current stations, and derived gates, all through the
+`cardState(at:)` helpers that already exist. **CHS stations draw neutral**, because their readings sit
+behind an async cache and wiring that in is a subsystem rather than a step — it would roughly double
+this piece for the half of the map that is already the hardest. The rule is unaffected: neutral means
+unknown, which for an unsynced CHS station is exactly true. The async CHS cache read is a follow-on,
+and it is the one that makes the Canadian side of the map light up.
+
 ## 6. Testing
 
 This repo has **no** test asserting anything about colour or kind — nothing analogous to web's
