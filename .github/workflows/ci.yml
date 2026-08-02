@@ -1,0 +1,63 @@
+name: CI
+
+# ADVISORY, not blocking. openwatersio is a free org and this repo is private,
+# so GitHub offers neither branch protection nor rulesets here — nothing can
+# reject a push to main server-side. CI reports; the policy it backs is in
+# CONTRIBUTING.md and holds by agreement. If the org ever moves to Team, turn
+# these two jobs into required checks and the policy stops being voluntary.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  data:
+    name: Data generators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/package-lock.json
+
+      - run: npm ci
+        working-directory: tools
+
+      # gen-chs-stations.mjs is the only generator that needs the network (the
+      # DFO IWLS API), so it stays out of CI and its artefact is trusted as
+      # committed. The other two read local files only, which means CI can
+      # regenerate them and prove the committed bundles still match — a
+      # generator edited without a rerun fails here instead of shipping stale
+      # data to the App Store.
+      - name: Regenerate the offline bundles
+        working-directory: tools
+        run: node gen-tides.mjs && node gen-noaa-currents.mjs
+
+      - name: Committed bundles match their generators
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json
+
+      - name: Bundle invariants
+        working-directory: tools
+        run: node --test
+
+  app:
+    name: App tests
+    # Self-hosted on the Mac Studio. GitHub-hosted macOS bills at 10x on a
+    # private repo, and the fast plan across both simulators is ~25 min of wall
+    # clock — about 250 billable minutes, which would exhaust the monthly
+    # allowance in roughly eight runs. The Studio is already the always-on
+    # scheduled-job host and keeps a warm SPM cache. See CONTRIBUTING.md.
+    runs-on: [self-hosted, macOS]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Runs xcodegen, then the FAST test plan on both reference simulators.
+      # The full plan hits live IWLS and stays a pre-upload step run by hand.
+      - run: ./scripts/test.sh
