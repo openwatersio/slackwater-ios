@@ -89,7 +89,7 @@ struct GateView: View {
                         .font(.fraunces(27, .semibold))
                         .foregroundStyle(SN.paper)
                         .padding(.top, 26)
-                    Text("Turn on location and we'll find the nearest tide & current stations — no searching required.")
+                    Text("Turn on location to find the \nnearest tide & current stations.")
                         .font(.geist(15))
                         .lineSpacing(3)
                         .multilineTextAlignment(.center)
