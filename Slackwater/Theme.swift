@@ -22,15 +22,28 @@ enum SN {
     static let sky = Color(hex: 0xC0D8E4)
     static let foam = Color(hex: 0xE4F0E4)
     static let paper = Color(hex: 0xFCFCFC)
-    static let rising = leaf                       // web --rising
-    static let falling = Color(hex: 0x7FB4D8)      // web --falling
+    // Direction is one signed diverging axis; green means only slack.
+    //
+    // This replaced a green/blue direction pair that collided with the map's
+    // green/blue *kind* pins — a green dot meant "current station" on one
+    // screen and "flooding" on the next. Amber/blue is the standard
+    // colourblind-safe diverging pair and it frees green, which matters: for an
+    // app called Slackwater the moment you wait for is slack, and green names
+    // it. Never colour anything by station kind.
+    static let flood = Color(hex: 0x4A9FD8)
+    static let ebb = Color(hex: 0xE8A33D)
+    static let go = Color(hex: 0x88B868)
+    static let rising = flood
+    static let falling = ebb
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
     static let sun = Color(hex: 0xF0C860)          // prototype sun dot
     /// Attention, never alarm: the location-denied card, and the unfitted
-    /// station's ⚠️ download warning.
-    static let amber = Color(hex: 0xE0B45A)
+    /// station's ⚠️ download warning. Deliberately red-leaning rather than
+    /// golden — the old 0xE0B45A sat close enough to `ebb` to be misread as a
+    /// tide state. Same value the web app uses for the same job.
+    static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }
