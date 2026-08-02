@@ -1,7 +1,13 @@
 # App Store metadata — DRAFT for Bryan's review
 
-*M4, 2026-07-30. Nothing here has been submitted; App Store Connect still has
-placeholder values. Names/keywords from the ASO block in [gtm.md](gtm.md).*
+*M4, 2026-07-30. **Rewritten 2026-08-01 for national coverage** (M5.3: 3,125 bundled
+stations across the US and Canada — the previous draft described a Salish-Sea app).
+Nothing here has been submitted; App Store Connect still has placeholder values.
+Original keyword strategy from the ASO block in [gtm.md](gtm.md), now superseded below.*
+
+**What changed in the rewrite:** keywords (regional → national + one regional anchor),
+promotional text, and the description's coverage claims. Name, subtitle, category,
+privacy answers and review notes were already national and stand unchanged.
 
 ## Name & subtitle
 
@@ -10,15 +16,38 @@ placeholder values. Names/keywords from the ASO block in [gtm.md](gtm.md).*
 | **Name** | `Slackwater — Tides & Currents` | 30 (29 used) |
 | **Subtitle** | `Offline currents, US & Canada` | 30 (29 used) |
 
-Subtitle alternates (gtm.md): `Salish Sea slack & tide timing`, `Tides, currents & slack alerts`.
+Both still fit national coverage — "US & Canada" was always in the subtitle. The gtm.md
+alternate `Salish Sea slack & tide timing` is now **retired**: it describes 11 of 3,125
+stations.
 
 ## Keywords (≤100 chars, name/subtitle words omitted)
 
 ```
-salish sea,gulf islands,juan de fuca,ebb,flood,kayak,paddle,sail,fishing,puget sound,knot,boating
+chart,table,slack,ebb,flood,marine,kayak,paddle,fishing,sailing,noaa,chs,harbor,harbour,salish sea
 ```
 
-(97 characters.)
+(98 characters.)
+
+**Why this set, since it's a real strategy change.** The old list spent 40 of its 100
+characters on three Salish place names — correct when the app covered one region, wrong
+now that most of the coverage would be undiscoverable.
+
+- **`chart` / `table`, not "tide chart" / "tide table".** Apple indexes the app name, so
+  "tides" and "currents" are already covered; the algorithm combines fields, so the bare
+  nouns pair with them for free. Repeating them would waste 10 characters.
+- **Activity terms carry nationally** — kayak, paddle, fishing, sailing, marine are how
+  non-boaters find a tide app in any state.
+- **`noaa` / `chs`** — people search the data source by name, and it's a credibility
+  signal in the listing.
+- **`harbor` *and* `harbour`** — Apple doesn't stem across spellings, and half the
+  coverage is Canadian.
+- **One regional anchor kept: `salish sea`.** It's cheap to rank for (almost nobody
+  targets it), it's where the app is genuinely strongest (the only validated Canadian
+  currents), and it's the home audience. Dropping it to chase "tide chart" nationally
+  would trade a term we can win for one Garmin owns.
+
+Deliberately dropped: `gulf islands`, `juan de fuca`, `puget sound`, `knot`, `boating`
+(low-value; `boating` is also implied by the category).
 
 ## Category
 
@@ -31,10 +60,10 @@ discovery surface without making the primary shelf contradict the disclaimer.
 
 ## Promotional text (170 chars max, editable without review)
 
-> Slack and max-current timing for the Salish Sea — computed on your phone, so
-> it still answers in an anchorage with no bars. US and Canadian stations, free.
+> Slack and max-current timing for 3,000+ US and Canadian stations — computed on your
+> phone, so it still answers in an anchorage with no bars. Free, no account.
 
-(159 characters.)
+(158 characters.)
 
 ## Description
 
@@ -49,9 +78,9 @@ Full draft:
 >
 > Everyone does tide heights. Currents are the actual planning problem: when
 > does the pass go slack, how hard is it running at max, and can you be through
-> before it turns. Slackwater computes real harmonic current predictions on
-> your phone — no server, no signal needed — for the Salish Sea's passes,
-> narrows and channels, on both sides of the border.
+> before it turns. Slackwater computes real harmonic predictions on your phone —
+> no server, no signal needed — for more than 3,000 stations across the US and
+> Canada.
 >
 > WORKS WITH NO SIGNAL
 > The harmonics run on the device. Open it once with a connection and it keeps
@@ -63,8 +92,12 @@ Full draft:
 > same screen.
 >
 > US AND CANADIAN STATIONS
-> NOAA harmonic stations bundled; Canadian (CHS) stations fit a harmonic model
-> on your device from CHS predictions on first launch, then work offline.
+> More than 2,000 NOAA tide and current stations are built in — nothing to
+> download. Canadian (CHS) tide stations fit a harmonic model on your device
+> from CHS predictions, then work offline for good; the ones nearest you fit
+> automatically, and any other fits the moment you open it. Canadian current
+> passes cover the Salish Sea, each one checked against published predictions
+> before it ships.
 >
 > A MAP THAT WORKS OFFLINE
 > Every station on a pin map with coastline that renders with zero bars. Depth

@@ -79,6 +79,18 @@ network path. **Iterate on fast; go full before `scripts/testflight.sh`.** Every
 `xcodebuild` invocation, by hand or by script, needs
 `-clonedSourcePackagesDirPath build/SourcePackages`. Details in `docs/testflight.md`.
 
+## Known issues (agents: pick these up when you're next in the area)
+
+- **`skipNextRecord` can leak** (M5.3). The iPad auto-select sets it so opening the pane
+  doesn't count as viewing a station, but an unfitted CHS station's waiting view records
+  nothing — so the flag survives into the *next* station the user genuinely opens, and
+  that one silently misses Recents. Fix belongs in `RecentsStore` / the auto-select
+  handshake (make the skip consume-on-next-record-attempt, or scope it to the
+  auto-selected id), not in another caller. `NationalScaleTests` clears it explicitly and
+  says why.
+- **`docs/appstore-metadata.md` is Bryan's to edit** — outbound copy, never rewritten by
+  an agent without his say-so.
+
 ## License
 
 This repo is **deliberately private and
