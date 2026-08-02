@@ -16,7 +16,6 @@ func rgb(_ hex: UInt32, _ a: CGFloat = 1) -> CGColor {
 }
 let navy = rgb(0x05122A), navyGlow = rgb(0x0A2140), navyDeep = rgb(0x00183C)
 let leaf = rgb(0x88B868), sky = rgb(0xC0D8E4), steel = rgb(0x5888A8)
-let rising = rgb(0x88B868), falling = rgb(0x7FB4D8)
 
 func makeContext() -> CGContext {
     let ctx = CGContext(data: nil, width: Int(S), height: Int(S), bitsPerComponent: 8,
@@ -115,10 +114,15 @@ func candidateA() {
     ctx.setStrokeColor(rgb(0xE4F0E4, 0.2))
     ctx.setLineWidth(7)
     ctx.beginPath()
-    ctx.addLines(between: [CGPoint(x: S * 0.06, y: zero), CGPoint(x: S * 0.94, y: zero)])
+    // Full width: the curve bleeds off both edges, so an inset line reads as
+    // unfinished rather than as a deliberate margin.
+    ctx.addLines(between: [CGPoint(x: 0, y: zero), CGPoint(x: S, y: zero)])
     ctx.strokePath()
-    fillLobe(ctx, pts, zero: zero, above: true, top: rgb(0x88B868, 0.6), bottom: rgb(0x88B868, 0.05))
-    fillLobe(ctx, pts, zero: zero, above: false, top: rgb(0x7FB4D8, 0.05), bottom: rgb(0x7FB4D8, 0.6))
+    // Flood above the zero line, ebb below — the app's diverging direction
+    // axis. Green is absent here on purpose: it means slack, and slack is the
+    // dot at the crossing, not a lobe.
+    fillLobe(ctx, pts, zero: zero, above: true, top: rgb(0x4A9FD8, 0.6), bottom: rgb(0x4A9FD8, 0.05))
+    fillLobe(ctx, pts, zero: zero, above: false, top: rgb(0xE8A33D, 0.05), bottom: rgb(0xE8A33D, 0.6))
     strokeCurve(ctx, pts, width: 36, color: sky)
     slackDot(ctx, at: crossing(pts, zero: zero), r: 66, halo: 135)
     save(ctx, "icon-candidate-a.png")
