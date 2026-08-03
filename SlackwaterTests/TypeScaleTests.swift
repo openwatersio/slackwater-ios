@@ -285,3 +285,20 @@ extension TypeScaleTests {
         XCTAssertFalse(reduced.contains(.detail), "detail sheds going into reduced")
     }
 }
+
+extension TypeScaleTests {
+    /// Anything sized in points beside scaling text has to scale too, or it
+    /// becomes a 24pt mark next to 40pt type. @ScaledMetric is the sanctioned
+    /// exception to "no literal sizes" — it scales a non-text dimension.
+    func testGlyphAndFabClearanceScale() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Slackwater")
+        let card = try String(contentsOf: root.appendingPathComponent("StationCard.swift"), encoding: .utf8)
+        XCTAssertTrue(card.contains("@ScaledMetric"),
+                      "the glyph must scale with the text it sits beside")
+        let app = try String(contentsOf: root.appendingPathComponent("SlackwaterApp.swift"), encoding: .utf8)
+        XCTAssertFalse(app.contains("Color.clear.frame(height: 96)"),
+                       "the FAB clearance must scale, or the last card hides under the buttons")
+    }
+}

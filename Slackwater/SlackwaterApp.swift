@@ -169,6 +169,9 @@ struct StationListView: View {
     @State private var chooser: StationMatches?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
+    /// The FABs don't grow, but the row heights do — without this the last
+    /// card ends up under them at large sizes. List-level, not card-level.
+    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = 96
 
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
@@ -332,7 +335,7 @@ struct StationListView: View {
                     Group {
                         header
                         locatedSections
-                        Color.clear.frame(height: 96)  // scroll clear of the FABs
+                        Color.clear.frame(height: fabClearance)  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -539,7 +542,7 @@ struct StationListView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                     Text("\(matches.count) matching stations")
                 }
                 .font(.caption.weight(.medium))
@@ -614,7 +617,7 @@ struct StationListView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 13) {
                     Image(systemName: "location.slash")
-                        .font(.system(size: 21))
+                        .font(.title3)
                         .foregroundStyle(SN.amber)
                         .frame(width: 46, height: 46)
                         .background(SN.amber.opacity(0.16),
@@ -631,7 +634,7 @@ struct StationListView: View {
                 HStack(spacing: 4) {
                     Spacer()
                     Text("Go to Settings")
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)
@@ -834,7 +837,7 @@ struct MyLocationTile<Card: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .rotationEffect(.degrees(45))
                 MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
             }
@@ -971,6 +974,7 @@ struct RecentRowLabel: View {
     @State private var tide: CardState?
     @State private var current: CurrentCardState?
     @State private var gate: DerivedGateCardState?  // derived gate: phase word, never a speed
+    @ScaledMetric(relativeTo: .callout) private var tileGlyphSize: CGFloat = 26
 
     private var glyphKind: StationGlyph.GlyphKind {
         switch item {
@@ -990,7 +994,7 @@ struct RecentRowLabel: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            StationGlyph(kind: glyphKind, tone: glyphTone, size: 26)
+            StationGlyph(kind: glyphKind, tone: glyphTone, size: tileGlyphSize)
                 .frame(width: 38, height: 38)
             // The name owns the full row width (M50). It used to share the
             // line with the reading, which in the 320pt iPad sidebar left it

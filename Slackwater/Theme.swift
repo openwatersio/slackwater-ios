@@ -250,7 +250,7 @@ struct SunPill: View {
 struct ProvisionalBadge: View {
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
-            .font(.system(size: 11, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(SN.amber)
             .frame(width: 22, height: 22)
             .background(SN.canvas, in: Circle())

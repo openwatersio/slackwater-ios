@@ -46,6 +46,13 @@ struct MapHeader: View {
             .allowsHitTesting(false)
 
             VStack {
+                // Back / star / return: fixed 44pt circles, deliberately not
+                // scaled with Dynamic Type (unlike Task 5's inline-with-text
+                // symbols). These are chrome in fixed-size hit targets, not
+                // text companions — growing them is what breaks the same
+                // 320pt iPad sidebar row the wordmark's comment already warns
+                // about (SlackwaterApp.swift). Leave fixed; don't "finish the
+                // job" here.
                 HStack(alignment: .top) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.left")

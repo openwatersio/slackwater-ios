@@ -184,7 +184,7 @@ struct ChsAmberCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 21))
+                    .font(.title3)
                     .foregroundStyle(SN.amber)
                     .frame(width: 46, height: 46)
                     .background(SN.amber.opacity(0.16),
@@ -211,7 +211,7 @@ struct ChsAmberCard: View {
             Button(action: onAction) {
                 HStack(spacing: 4) {
                     Text(action)
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)

@@ -50,7 +50,7 @@ struct SettingsView: View {
                                 Text("\(chs.queue.ready) of \(chs.queue.total) nearby Canadian stations on this device")
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.footnote.weight(.semibold))
                             }
                             .foregroundStyle(SN.leaf)
                         }

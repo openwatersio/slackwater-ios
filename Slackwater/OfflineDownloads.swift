@@ -80,7 +80,7 @@ struct OfflineStatusButton: View {
                         .frame(width: 28, height: 28)
                 }
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.footnote.weight(.medium))
                     .foregroundStyle(tint)
             }
             .frame(width: 34, height: 34)

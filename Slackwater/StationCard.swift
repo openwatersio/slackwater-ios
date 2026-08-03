@@ -69,6 +69,10 @@ struct StationCard<Trailing: View, Badge: View>: View {
     @ViewBuilder var badge: () -> Badge
     @ViewBuilder var trailing: () -> Trailing
 
+    /// Grows with the text it sits beside. Frozen, a 24pt mark next to 40pt
+    /// type reads as a bullet rather than a station kind.
+    @ScaledMetric(relativeTo: .title2) private var glyphSize: CGFloat = 24
+
     /// `message` has no `CardField` of its own and is not shed by tier: it is
     /// prose that stands in for the whole reading on a pending card (glyph +
     /// name + an honest "why there's nothing yet" sentence, `trailing` empty)
@@ -80,7 +84,7 @@ struct StationCard<Trailing: View, Badge: View>: View {
         let fields = tier.fields
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: glyphKind, tone: glyphTone)
+                StationGlyph(kind: glyphKind, tone: glyphTone, size: glyphSize)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
                         .font(.title2.weight(.semibold))
