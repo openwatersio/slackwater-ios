@@ -84,9 +84,15 @@ struct MonoLabel: View {
     let text: String
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
+    /// Opt-out, `nil` everywhere but the two `TimelineStrip` track labels
+    /// ("TIDE" / "CURRENT"), which are `.position()`-pinned into `TimelineGeo`'s
+    /// literal-point geometry — see that type's doc comment. Scaling them
+    /// walks them off the chart rather than reflowing anything.
+    var fixedSize: CGFloat? = nil
     var body: some View {
         Text(text.uppercased())
-            .font(.caption2.monospaced().weight(.medium))
+            .font(fixedSize.map { .system(size: $0, weight: .medium).monospaced() }
+                    ?? .caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
     }

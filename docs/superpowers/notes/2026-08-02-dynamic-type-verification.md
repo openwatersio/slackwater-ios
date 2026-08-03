@@ -212,6 +212,47 @@ The `Use My Location` button itself was already correct — Task 5's
 and the label wraps to two full lines inside it, `Use My Location` intact, at
 every size on both devices.
 
+### 4. The chart's own labels scaling inside fixed-point geometry — FIXED
+
+**Found by the whole-branch review, not by this harness, and it is this
+branch's defect — not pre-existing.** Nine label sites in `TimelineStrip.swift`
+(six `ctx.draw(Text(…))` inside the `Canvas`, three `.position()`-pinned
+overlay labels) were fixed custom fonts — `.fraunces(11/10)`, `.geistMono(10/9/8)`
+— which do not respond to Dynamic Type at all. Task 1 mapped all nine to
+`.caption2`, which does.
+
+They are drawn into `TimelineGeo`, which is entirely literal points: `height`
+362/258/286 by case, `dayY = 20`, `sunY = 34`, `tideTop = 48`, extreme labels at
+`y ± 11` off their own dot, `slack` at `zeroY + 12`, track labels pinned at
+`x: 30` and `x: 42`. At AX5 `.caption2` is ~26pt, so the day label centred at
+`y = 20` overprints the sun dot at `y = 34` and reaches `tideTop`, and "Current"
+centred at `x: 42` runs off the left edge. Scaling text in fixed-point geometry
+does not degrade by wrapping; it overprints the chart.
+
+Fix: all nine reverted to `.font(.system(size: N))` at their pre-branch sizes
+(11 day, 10 sun, 10 tide extreme, 8 `slack`, 10 max flood/ebb, 9 × 3 track and
+legend labels), with the reasoning recorded on `TimelineGeo`. This is not a
+retreat from Dynamic Type — it is the rule this branch already applies three
+times, to `MapHeader`'s 44pt buttons, `OfflineStatusButton`'s 34pt circle and
+the FABs: chrome in a fixed-size slot does not scale. Making these labels scale
+means making the chart geometry scale with them, which is layout design.
+
+**Why Task 6's harness could not have caught this, and what that means for the
+matrix above.** The harness measured frame dumps of `staticText` / `button` /
+`image` / `textField` elements. **Text drawn with `GraphicsContext.draw` never
+enters the accessibility tree** — a `Canvas` is one opaque element, and the six
+labels inside it have no `staticText` of their own to dump. They cannot appear
+in a frame dump at any size, so no cell of the 86-capture matrix could have
+shown the collision however carefully it was read; the PNGs contain it, the
+measurements structurally cannot. The three `.position()`-pinned labels *are*
+real views and were dumpable, but the harness never opened a paired
+tide+current detail view at AX5, which is where they collide.
+
+The general form, worth carrying forward: **a frame-dump harness verifies the
+accessibility tree, not the pixels.** Anything drawn — `Canvas`, `Shape` text,
+`drawLayer` — is invisible to it and needs either a snapshot comparison or an
+eye on the PNG.
+
 ## What held
 
 - **FAB clearance, including at the small end.** The direction nobody checks,
@@ -265,12 +306,23 @@ every size on both devices.
   beside it. That is new layout design, and the spec explicitly closes the door
   on a further tier ("nothing above this ever asks for a layout narrower than
   name + region + trailing"). Out of Task 6's remit; worth its own decision.
-- **The detail view's chart and schedule labels colliding at AX5.** Pre-existing,
-  not `StationCard`, already known. Confirmed present. The mechanism is visible
-  in the frame dumps: `TimelineStrip.swift`'s schedule row pins a day label to
-  `.frame(width: 74)` and its pill to `.frame(width: 84)` around text that now
-  scales — the same fixed-container-around-scaling-content shape this branch
-  fixed six times elsewhere, in a file this branch's remit did not cover.
+- **`MultiDaySchedule`'s fixed slots at AX5.** `TimelineStrip.swift`'s schedule
+  row pins a day label to `.frame(width: 74)` and its pill to
+  `.frame(width: 84)` around text that now scales — the same
+  fixed-container-around-scaling-content shape this branch fixed six times
+  elsewhere.
+
+  **This entry originally called it "pre-existing". That attribution was wrong
+  and is corrected here.** The *frames* predate the branch, but nothing inside
+  them scaled before it: the day label was a fixed custom font and the pill's
+  text likewise, so a 74pt slot around them was never a mismatch. Task 1 mapped
+  them to `.caption`/`.caption2`, and the mismatch is therefore this branch's,
+  not inherited debt.
+
+  Left as-is deliberately, which is a different claim from "not ours": these
+  degrade by **wrapping** inside their slots, not by overprinting a chart, so
+  nothing is lost or made unreadable. Widening the slots is a schedule-layout
+  decision rather than a font fix. **This branch's follow-up, on the books.**
 - **`ScreenshotTests/testM4PairedTide`** — time-dependent flake, issue #16.
 
 ## Not covered — say so rather than imply it was

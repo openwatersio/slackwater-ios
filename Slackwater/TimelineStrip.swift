@@ -163,6 +163,26 @@ struct TimelineData {
 
 // MARK: - Vertical geometry (prototype geo())
 
+/// Every number in here is a literal point, and that is why the chart's own
+/// labels are the one place in this branch that keeps a fixed `.system(size:)`.
+///
+/// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
+/// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
+/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`, and the
+/// track labels are pinned at `x: 30` / `x: 42`. Nothing here reflows: `height`
+/// is 362/258/286 by case, and `tideY`/`curY` map data onto those constants.
+///
+/// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
+/// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
+/// and reaches `tideTop`, while "Current" centred at `x: 42` runs off the left
+/// edge. Scaling text inside fixed-point geometry does not degrade by wrapping;
+/// it degrades by overprinting the chart.
+///
+/// Same rule this branch already applies to `MapHeader`'s 44pt buttons,
+/// `OfflineStatusButton`'s 34pt circle and the FABs: chrome in a fixed-size
+/// slot does not scale. Making these labels scale means making this geometry
+/// scale with them — a real chart-layout change, not a font swap. Until then
+/// the labels stay fixed; don't "finish the job" here.
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
@@ -287,9 +307,10 @@ struct TimelineCanvas: View {
                 }
                 ctx.stroke(Path(ellipseIn: disc), with: .color(.white.opacity(0.3)), lineWidth: 0.6)
             }
-            // Day label at local noon.
+            // Day label at local noon. Fixed size, not `.caption2` — see the
+            // TimelineGeo doc comment: `dayY` is 20 and the sun dot is at 34.
             ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
-                        .font(.caption2.weight(.semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
                      anchor: .center)
@@ -300,7 +321,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
                 ctx.draw(Text("\(arrow)\(cardTime(t, data.tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.caption2.monospaced().weight(.medium).monospacedDigit())
+                            .font(.system(size: 10, weight: .medium).monospaced())
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
@@ -339,7 +360,8 @@ struct TimelineCanvas: View {
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                      with: .color(.white))
             ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.caption2.weight(.semibold).monospacedDigit()).foregroundStyle(.white),
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
         }
     }
@@ -386,7 +408,7 @@ struct TimelineCanvas: View {
                          with: .color(.white.opacity(0.85)))
                 // Slack is the app's "go" colour, not a neutral. It is the moment the
                 // app is named for, and it must read the same on every surface.
-                ctx.draw(Text("slack").font(.caption2.monospaced())
+                ctx.draw(Text("slack").font(.system(size: 8).monospaced())
                             .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
             case .maxFlood, .maxEbb:
@@ -394,7 +416,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.caption2.weight(.semibold).monospacedDigit())
+                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
                          anchor: .center)
@@ -584,7 +606,8 @@ struct TimelineScrubStrip: View {
                         .frame(width: 13, height: 13)
                         .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
-                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4,
+                              fixedSize: 9)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 30, y: geo.tideTop - 3)
@@ -594,7 +617,8 @@ struct TimelineScrubStrip: View {
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4,
+                              fixedSize: 9)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 42, y: (geo.hasTide ? geo.sepY : geo.curTop) - 8)
@@ -634,7 +658,10 @@ struct TimelineScrubStrip: View {
                               lineY: CGFloat, textY: CGFloat, textXInset: CGFloat) -> some View {
         Rectangle().fill(color.opacity(0.5)).frame(width: w, height: 1)
             .position(x: w / 2, y: lineY)
-        Text(label).font(.caption2.monospaced().weight(.medium)).foregroundStyle(color)
+        // Fixed size for the same reason as the track labels above — this one is
+        // `.position()`ed onto `geo.curY(...)`, a literal-point coordinate.
+        Text(label).font(.system(size: 9, weight: .medium).monospaced())
+            .foregroundStyle(color)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(Color(hex: 0x001020, opacity: 0.55))
             .position(x: w - textXInset, y: textY)
