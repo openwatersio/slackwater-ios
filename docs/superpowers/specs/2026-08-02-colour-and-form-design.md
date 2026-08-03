@@ -182,7 +182,11 @@ A station whose state is not knowable draws neutral. That is an honest "unknown"
 boat a wrong slack is worse than an admitted grey.
 
 **Scope limit on state, deliberate.** Only stations that resolve *synchronously on device* get a
-colour in this piece: bundled NOAA tide and current stations, and derived gates, all through the
+colour in this piece: bundled NOAA tide and current stations — **not** derived gates, correcting
+this spec's own earlier claim. A derived gate has no `cardState(at:)`; resolving one needs
+`ChsFitService.shared.state(gate.reference)` to be `.fitted`, and the single bundled gate's
+reference is itself a CHS port. So gates are async like the CHS stations they depend on, and draw
+neutral with them. The synchronous set is what resolves through the
 `cardState(at:)` helpers that already exist. **CHS stations draw neutral**, because their readings sit
 behind an async cache and wiring that in is a subsystem rather than a step — it would roughly double
 this piece for the half of the map that is already the hardest. The rule is unaffected: neutral means
