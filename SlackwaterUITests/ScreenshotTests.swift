@@ -41,11 +41,25 @@ final class ScreenshotTests: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized and hittable (Recents now lives
-    /// at the very bottom — often below the fold).
+    /// Scroll the list until `el` is realized, hittable, and clear of the
+    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
+    /// ~80pt exclusion already used inline for the schedule row below, "home
+    /// indicator band" case). Bare `isHittable` alone is not enough for
+    /// elements near the list's bottom — XCUITest counts an element hittable
+    /// the moment any part of it is on-screen and unobscured by an ancestor's
+    /// clipping, which can be true while it still sits directly under the
+    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
+    /// silently lands on the FAB instead and nothing happens (confirmed by
+    /// diagnostic frame dumps: at the old bare-isHittable stopping point the
+    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
+    /// one more swipe carried it clear by ~68pt and it stayed there — the
+    /// list was genuinely bottomed out, not still scrolling).
     private func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var tries = 0
-        while (!el.exists || !el.isHittable), tries < 8 {
+        while tries < 10 {
+            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
+                break
+            }
             listContainer(app).swipeUp()
             tries += 1
         }
@@ -289,6 +303,43 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
                   "map pin tap did not open a station detail")
         XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    // Colour-and-form Task 4: the dot layer split into station-pins-current
+    // (circle) and station-pins-tide (square). testM4MapPinToDetail above
+    // only ever taps a `current`-kind pin (Deception Pass is a current
+    // station) — this is the one test that proves the square/tide layer is
+    // still wired to the same tap handler. Losing this coverage is exactly
+    // the failure the split risked: the web port silently dropped tap
+    // handling for one kind when its dot layer was split, and no test caught
+    // it there either.
+    func testM4TideSquarePinToDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // let tiles (and Seascape, when reachable) come in
+        let frame = map.frame
+        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
+            let x = (lon + 180) / 360 * world
+            let phi = lat * .pi / 180
+            let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
+            return (x, y)
+        }
+        let c = mercator(48.35, -123.05)                 // SALISH_CENTER
+        let p = mercator(48.48500061035156, -123.08300018310547)  // Kanaka Bay, NOAA tide
+        let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
+        let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
+        map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
+
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+                  "map pin tap did not open a station detail")
+        XCTAssert(app.staticTexts["Kanaka Bay"].firstMatch.waitForExistence(timeout: 5))
     }
 
     // M4: the paired current→tide detail on Deception Pass — the pane exists,

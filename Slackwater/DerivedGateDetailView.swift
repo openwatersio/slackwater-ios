@@ -69,11 +69,11 @@ struct DerivedGateDetailView: View {
 
     // MARK: - Scrub card: tide-at-port readout, strip, phase readout
 
-    private var phaseColor: Color {
+    static func phaseColor(_ phase: DerivedPhase) -> Color {
         switch phase {
         case .flood: SN.rising
         case .ebb: SN.falling
-        case .slack: SN.foam.opacity(0.9)
+        case .slack: SN.go
         }
     }
 
@@ -133,7 +133,7 @@ struct DerivedGateDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(phaseWord(phase))
                         .font(.fraunces(34))
-                        .foregroundStyle(phase == .slack ? .white : phaseColor)
+                        .foregroundStyle(Self.phaseColor(phase))
                     Text("speeds not predicted for this pass")
                         .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                 }
@@ -142,7 +142,8 @@ struct DerivedGateDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.geist(12)).foregroundStyle(SN.leaf)
+                            // SN.go, not SN.leaf: this line says when slack is.
+                            .font(.geist(12)).foregroundStyle(SN.go)
                         Text("at \(slack.highWater ? "high" : "low") water")
                             .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
                     }

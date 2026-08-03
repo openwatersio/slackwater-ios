@@ -248,7 +248,7 @@ struct OfflineManagerList: View {
     private func row(_ job: ChsJob) -> some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(stationGradient(id: job.id))
+                .fill(SN.cardFill)
                 .frame(width: 38, height: 38)
                 // Provisional sits between the two: usable, not finished.
                 .opacity(job.status == .ready ? 1 : service.isProvisional(job.id) ? 0.75 : 0.45)

@@ -12,3 +12,6 @@ Slackwater/Info.plist
 
 # tools/ npm deps (npm install in tools/ to regenerate)
 tools/node_modules/
+
+# Agent scratch (SDD ledgers, briefs, review packages)
+.superpowers/

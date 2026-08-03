@@ -30,7 +30,158 @@ let discoveryZoom: Double = {
 
 private let LAND_TONE = "#f5ecd7"   // paper-chart cream
 private let WATER_TONE = "#0b1a2b"  // navy water
-private let PIN_TIDE = "#7fb3d5", PIN_CURRENT = "#8fd0a0", PIN_CHS = "#c0d8e4"
+// A pin's COLOUR is the water's state, never the station's kind — kind is the
+// pin's SHAPE: a circle for a current station, a square for a tide one. One
+// shape per feature class, the oldest convention on any chart, and a silhouette
+// difference reads where an interior one does not.
+//
+// `chs` is a Canadian tide port. That is provenance, not kind — it draws the
+// same square a NOAA tide station does.
+/// MapLibre style dicts hold strings and cannot read a Swift `Color`, so the
+/// palette crosses over as "#rrggbb" — but derived from the same `SN` hex the
+/// token is built from, never hand-copied. A hand-maintained copy is silent
+/// drift: retarget `SN.flood` and the map would keep the old blue, leaving two
+/// blues that both mean flood and no test anywhere that fails.
+func mapHex(_ hex: UInt32) -> String { String(format: "#%06x", hex) }
+
+/// The unknown-state pin. `SN.steel`, the same token the card glyph draws for
+/// `.unknown` — one meaning, one value. It replaced a lighter map-only grey
+/// (#7d9cb8) which, besides being a second value for the same idea, sat at
+/// 2.44:1 against the map's cream land polygons — under WCAG's 3:1 for a
+/// non-text mark. Steel clears both grounds: 4.65:1 on the navy water, 3.21:1
+/// on the land.
+let PIN_NEUTRAL = mapHex(SN.steelHex)
+// The circle radius and the square's equal-area radius share this constant so
+// the two literals cannot drift apart again.
+private let PIN_RADIUS: Double = 5
+
+// A pin's colour by state — literally the same expression on both pin layers
+// (Task 5), so kind (which layer a pin lands in) cannot influence colour.
+let PIN_STATE_COLOUR: [Any] = [
+    "match", ["get", "state"],
+    "rising", mapHex(SN.floodHex), "flood", mapHex(SN.floodHex),
+    "falling", mapHex(SN.ebbHex), "ebb", mapHex(SN.ebbHex),
+    "slack", mapHex(SN.goHex),
+    PIN_NEUTRAL,   // unknown
+]
+
+private func phaseName(_ phase: CurrentPhase) -> String {
+    switch phase {
+    case .flood: "flood"
+    case .ebb: "ebb"
+    case .slack: "slack"
+    }
+}
+
+/// Fix round 1 shrank the pin's direction search from `cardState(at:)`'s
+/// 30h window to a short one — fast, but only 838/5,700 (station, moment)
+/// checks in `testShortWindowDirectionMatchesThirtyHourBaseline` actually
+/// resolved a tone; the rest silently drew neutral. That traded correctness
+/// for coverage nobody asked to give up (fix round 2). This is the exact
+/// search a *fallback* uses instead, once round 2's cheap check below has
+/// already flagged that this one station needs it — so it runs for a small
+/// minority of stations, not all 1,425, and can afford a window wide enough
+/// to always find the next turn (13h clears a diurnal station's ~12.4h
+/// half-period; semidiurnal turns roughly every 6.2h).
+let PIN_TIDE_FALLBACK_WINDOW: TimeInterval = 13 * 3600
+
+/// Exact direction via the same search `cardState(at:)` uses, just over a
+/// shorter (but still turn-guaranteeing) window. nil only if even that comes
+/// up empty — draw neutral rather than default "rising" the way the card
+/// does; a wrong colour is worse than an admitted grey.
+func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterval) -> Bool? {
+    let next = record.engineStation.extremes(from: now, to: now.addingTimeInterval(window))
+        .first { $0.time > now }
+    return next.map { $0.kind == .high }
+}
+
+/// How far apart the cheap two-sample check looks, and how big a height
+/// change counts as a trustworthy signal rather than turn-adjacent noise.
+///
+/// `cardState(at:)`'s doc comment warns against differencing two height
+/// samples: near a turn the curve is flat, so a naive diff can point the
+/// wrong way. That is real — measured directly, a raw (unnormalised) diff
+/// disagreed with the 30h baseline in 62/5,700 checks — but the failure
+/// announces itself: every wrong sign showed up on a small |Δh|. So rather
+/// than discard the cheap path, only distrust it near that floor and fall
+/// back to the exact search for that one station.
+///
+/// The threshold weights each constituent's amplitude by its known
+/// astronomical SPEED (degrees/hour — Doodson/NOAA constants, fixed and not
+/// something that can drift the way a display colour hex can), not just
+/// amplitude. Amplitude alone under-flags fast (semidiurnal) stations and
+/// over-flags slow (diurnal) ones at the same amplitude, because a diurnal
+/// wave's peak slope is roughly half a semidiurnal one's — proportional to
+/// A·ω, not A. Weighting by speed cut the fallback population from 15% to
+/// 7% of checks at zero mismatches (see the sweep this shipped with in
+/// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment: an
+/// amplitude-only proxy needed 0.008 for zero wrong-signed trusted samples;
+/// speed-weighted needed only 0.0004, for less than half the fallback rate).
+let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
+let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
+private let constituentSpeed: [String: Double] = [   // degrees/hour
+    "M2": 28.9841, "S2": 30.0, "N2": 28.4397, "K2": 30.0821,
+    "K1": 15.0411, "O1": 13.9430, "P1": 14.9589, "Q1": 13.3987,
+]
+
+/// Direction for one tide station: cheap almost everywhere, exact always.
+/// One `heights()` call (same fixed setup cost as any other engine call,
+/// amortised over its two samples) gives a height difference; if that's
+/// comfortably above the noise floor its sign IS the direction — the curve
+/// is steep there, unambiguous. Only near a turn, where the difference is
+/// small relative to the station's own speed-weighted range, does this fall
+/// back to `tidePinRising`'s exact search, and only for that station.
+///
+/// The pair is a 30-minute window *around* `now`, not forward from it: the
+/// engine's `makeTimeline` floors the start and ceils the end to the `step`
+/// grid, so asking for `now … now+30min` at a 30-minute step returns the grid
+/// points bracketing `now` — at 12:29 that is 12:00 and 12:30, almost entirely
+/// behind the clock. That is fine and is what the sweep measured: the slope of
+/// a 30-minute window straddling `now` is the direction at `now` everywhere
+/// the threshold trusts it, and the near-turn cases where it would not be are
+/// exactly the ones handed to the exact search.
+func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
+    let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
+    let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
+    guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it
+    let pts = record.engineStation.heights(from: now, to: now.addingTimeInterval(PIN_TIDE_DIFF_DT),
+                                           step: PIN_TIDE_DIFF_DT)
+    guard pts.count >= 2 else { return fallback() }
+    let delta = pts[1].height - pts[0].height
+    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD else { return fallback() }
+    return delta > 0
+}
+
+/// A station's state as a tone name, for the pin's colour.
+///
+/// Synchronous only. Bundled NOAA stations predict on device from their own
+/// harmonics. Every CHS-provenance item — a CHS tide port, a derived gate
+/// (its slack derives from a CHS reference port's fitted tide), or a
+/// validated CHS current gate — resolves through `ChsFitService`'s async fit
+/// cache, so all three report "unknown" and draw neutral: an honest
+/// admission, not a guess. On a boat a wrong slack is worse than an admitted
+/// grey. Wiring the async CHS cache in is a follow-on, deliberately not done
+/// here.
+///
+/// Neither bundled case calls `cardState(at:)`: it computes a 30h "next"
+/// event neither branch displays, and for a current station that's TWO
+/// 30h searches (slack roots + max roots) for a value the pin discards.
+/// `pinFeatures()` runs this for all ~3,125 bundled stations on every style
+/// build (`testPinLayerBuildsInsideAFrame` budgets the whole thing at 0.3s),
+/// so the shortcuts here are load-bearing, not stylistic.
+private func pinTone(_ item: StationItem, at now: Date) -> String {
+    switch item {
+    case .tide(let record):
+        guard let rising = tidePinRisingHybrid(record, at: now) else { return "unknown" }
+        return rising ? "rising" : "falling"
+    case .current(let station):
+        let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
+            .first?.speed ?? 0
+        return phaseName(currentPhase(signed: signed))
+    case .chs, .chsGate, .chsCurrent:
+        return "unknown"   // async CHS fit cache — see the doc comment above
+    }
+}
 
 /// Every bundled station as a GeoJSON pin. Identity only — no readings.
 private func pinFeatures() -> [String: Any] {
@@ -40,7 +191,8 @@ private func pinFeatures() -> [String: Any] {
             [
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
-                "properties": ["id": s.id, "name": s.name, "kind": s.pinKind],
+                "properties": ["id": s.id, "name": s.name, "kind": s.pinKind,
+                               "state": pinTone(s, at: appNow())],
             ] as [String: Any]
         },
     ]
@@ -93,27 +245,41 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
             // as bigger than a 5-station one without swallowing the coast.
             "circle-radius": ["interpolate", ["linear"], ["get", "point_count"],
                               2, 11, 25, 16, 150, 22, 600, 30] as [Any],
-            "circle-color": PIN_TIDE,
+            "circle-color": PIN_NEUTRAL,
             "circle-opacity": 0.82,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
         ],
     ]
-    let dots: [String: Any] = [
-        "id": "station-dots", "type": "circle", "source": "stations",
-        "filter": notACluster,
+    let currentPins: [String: Any] = [
+        "id": "station-pins-current", "type": "circle", "source": "stations",
+        "filter": ["all", notACluster, ["==", ["get", "kind"], "current"]] as [Any],
         "paint": [
-            "circle-radius": 5,
-            "circle-color": ["match", ["get", "kind"],
-                             "current", PIN_CURRENT, "chs", PIN_CHS, PIN_TIDE] as [Any],
+            "circle-radius": PIN_RADIUS,
+            "circle-color": PIN_STATE_COLOUR,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
         ],
     ]
-    // Labels need glyphs — the local fallback declares none, so it's dots only
+    // tide and chs are both tide stations — provenance is not kind.
+    let tidePins: [String: Any] = [
+        "id": "station-pins-tide", "type": "symbol", "source": "stations",
+        "filter": ["all", notACluster, ["!=", ["get", "kind"], "current"]] as [Any],
+        "layout": [
+            "icon-image": "pin-square",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+        ],
+        "paint": [
+            "icon-color": PIN_STATE_COLOUR,
+            "icon-halo-color": WATER_TONE,
+            "icon-halo-width": 1.5,
+        ],
+    ]
+    // Labels need glyphs — the local fallback declares none, so it's pins only
     // (same decisive signal as the web). A cluster with no number on it is a
     // blob, so the cluster layer is glyphless-safe by the same rule.
-    guard hasGlyphs else { return [clusters, dots] }
+    guard hasGlyphs else { return [clusters, currentPins, tidePins] }
     let counts: [String: Any] = [
         "id": "station-cluster-count", "type": "symbol", "source": "stations",
         "filter": ["has", "point_count"] as [Any],
@@ -138,7 +304,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
         ],
         "paint": ["text-color": "#e8e4d8", "text-halo-color": WATER_TONE, "text-halo-width": 1],
     ]
-    return [clusters, counts, dots, labels]
+    return [clusters, counts, currentPins, tidePins, labels]
 }
 
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
@@ -252,10 +418,30 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         }.resume()
     }
 
+    /// A filled square, drawn to equal AREA with the 5pt circle pins: for
+    /// radius r the side is r·√π. A same-width square always reads heavier.
+    /// Registered as a template image so `icon-color` can tint it — that is
+    /// MapLibre Native's SDF path, and without it the pin ignores state.
+    private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS), scale: CGFloat = 3) -> UIImage {
+        let side = radius * CGFloat(Double.pi.squareRoot())
+        let size = CGSize(width: side, height: side)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+        }
+        return image.withRenderingMode(.alwaysTemplate)
+    }
+
     // ponytail: re-asserts on every style load, so a Seascape arriving late
     // recenters a user who already panned; track interaction if it annoys.
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
         mapView.setCenter(center, zoomLevel: zoom, animated: false)
+        // Fires on every style load (local fallback, then Seascape) — the
+        // tide-pin icon must be re-registered each time or the swap loses it.
+        style.setImage(squarePinImage(), forName: "pin-square")
     }
 }
 
@@ -303,19 +489,19 @@ struct MapViewRepresentable: UIViewRepresentable {
             guard let map else { return }
             let point = gesture.location(in: map)
             let box = CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44)
-            func nearest(_ layer: String) -> MLNFeature? {
-                map.visibleFeatures(in: box, styleLayerIdentifiers: [layer]).min { a, b in
+            func nearest(_ layers: Set<String>) -> MLNFeature? {
+                map.visibleFeatures(in: box, styleLayerIdentifiers: layers).min { a, b in
                     let pa = map.convert(a.coordinate, toPointTo: map)
                     let pb = map.convert(b.coordinate, toPointTo: map)
                     return hypot(pa.x - point.x, pa.y - point.y) < hypot(pb.x - point.x, pb.y - point.y)
                 }
             }
-            if let id = nearest("station-dots")?.attribute(forKey: "id") as? String,
+            if let id = nearest(["station-pins-current", "station-pins-tide"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
                 return
             }
-            guard let cluster = nearest("station-clusters") else { return }
+            guard let cluster = nearest(["station-clusters"]) else { return }
             // +2 levels lands past CLUSTER_MAX_ZOOM from any clustered zoom, so
             // one tap on a cluster always breaks it into something tappable.
             map.setCenter(cluster.coordinate, zoomLevel: min(map.zoomLevel + 2, 12), animated: true)

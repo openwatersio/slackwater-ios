@@ -91,11 +91,13 @@ struct CurrentDetailView: View {
 
     // MARK: - Scrub card: tide-at-port readout, strip, current readout
 
-    private var phaseColor: Color {
+    static func phaseColor(_ phase: CurrentPhase) -> Color {
         switch phase {
         case .flood: SN.rising
         case .ebb: SN.falling
-        case .slack: SN.foam.opacity(0.9)
+        // Slack is the app's "go" colour, not a neutral. It is the moment the
+        // app is named for, and it must read the same on every surface.
+        case .slack: SN.go
         }
     }
 
@@ -155,7 +157,8 @@ struct CurrentDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
-                        Text("Slack").font(.fraunces(34)).foregroundStyle(readingColor)
+                        Text("Slack").font(.fraunces(34))
+                            .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                         Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
@@ -171,7 +174,7 @@ struct CurrentDetailView: View {
                             CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.geist(13))
                             Text(compass16(record.setDegrees(signed: scrubSigned))).font(.geist(13))
                         }
-                        .foregroundStyle(provisionalGate == nil ? phaseColor : SN.amber.opacity(0.85))
+                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
                     }
                     if let gate = provisionalGate {
                         MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
@@ -187,7 +190,10 @@ struct CurrentDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.leaf : SN.amber)
+                            // SN.go, not SN.leaf: this line says when slack is.
+                            // Same value today, but the token has to name the
+                            // meaning or retargeting one of them breaks it.
+                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))

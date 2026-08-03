@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. M4: first-run location gate (prototype NearMe.dc.html),
 // located list (My Location tile + Near Me by distance), settings, pin map.
-// M1's list + 1a gradient cards underneath, unchanged.
+// M1's list underneath; M53 gave the cards layout A — kind glyph, flat fill.
 import CoreLocation
 import SwiftUI
 import TideEngine
@@ -415,7 +415,9 @@ struct StationListView: View {
         // My Location slot: the hero tile, or the amber card in its place.
         if let fix, let nearest = heroItem {
             VStack(spacing: 0) {
-                MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+                MyLocationTile(item: nearest, fix: fix, imperial: imperial) {
+                    itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
+                }
                 matchingButton(nearest, places)
             }
                 .padding(.horizontal, 16)
@@ -446,14 +448,17 @@ struct StationListView: View {
         sectionLabel("Near Me")
         ForEach(items(groups.nearMe)) { item in
             VStack(spacing: 0) {
-                itemCard(item)
-                    .overlay(alignment: .topTrailing) {
-                        DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                    }
+                itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
                 matchingButton(item, places)
             }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)   // room for the straddling nm pill
+                // 8 + 4 = the 12pt gap Favorites gets from its single
+                // `.padding(.bottom, 12)`. Split across the two edges because a
+                // Near Me row is a card *plus* its matching-stations link, and
+                // the link needs the slack under it, not over it. (The original
+                // reason — clearance for a straddling nm pill — went with the
+                // pill; this is the reason the number has now.)
+                .padding(.top, 8)
                 .padding(.bottom, 4)
                 .swipeActions(edge: .leading) {
                     Button { favorites.toggle(item.id) } label: {
@@ -499,8 +504,8 @@ struct StationListView: View {
             .padding(.bottom, 4)
     }
 
-    /// A compact recently-viewed row (prototype recent rows: gradient chip,
-    /// name over region), navigating like the full cards. First/last rows
+    /// A compact recently-viewed row (prototype recent rows: kind glyph, name
+    /// over region), navigating like the full cards. First/last rows
     /// round the group's outer corners — the grouped-card look, but one List
     /// row per station so each carries its own swipe actions.
     @ViewBuilder private func recentRow(_ item: StationItem, places: StationGroups,
@@ -580,22 +585,26 @@ struct StationListView: View {
         }
     }
 
-    @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
+    @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
         switch item {
         case .tide(let station):
-            activatable(StationCardView(record: station, imperial: imperial), item)
+            activatable(StationCardView(record: station, imperial: imperial, km: km), item)
         case .current(let station):
-            activatable(CurrentCardView(record: station), item)
+            activatable(CurrentCardView(record: station, km: km), item)
         case .chs(let info):
-            activatable(ChsCardView(info: info, imperial: imperial), item)
+            activatable(ChsCardView(info: info, imperial: imperial, km: km), item)
         case .chsGate(let gate):
-            activatable(ChsGateCardView(gate: gate), item)
+            activatable(ChsGateCardView(gate: gate, km: km), item)
         case .chsCurrent(let gate):
-            activatable(ChsCurrentGateCardView(gate: gate), item)
+            activatable(ChsCurrentGateCardView(gate: gate, km: km), item)
         }
     }
 
-    /// Location denied — amber card, deep link to the app's iOS Settings.
+    /// Location denied — `SN.amber` card, deep link to the app's iOS Settings.
+    /// The token, not a literal: this card renders in the My Location slot
+    /// directly above Near Me cards whose glyphs draw ebb, and the retired
+    /// golden amber it used to hardcode is the value amber moved away from
+    /// precisely because it read as ebb at that adjacency.
     private var unavailableCard: some View {
         Button {
             if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -606,9 +615,9 @@ struct StationListView: View {
                 HStack(spacing: 13) {
                     Image(systemName: "location.slash")
                         .font(.system(size: 21))
-                        .foregroundStyle(Color(hex: 0xE0B45A))
+                        .foregroundStyle(SN.amber)
                         .frame(width: 46, height: 46)
-                        .background(Color(hex: 0xE0B45A, opacity: 0.16),
+                        .background(SN.amber.opacity(0.16),
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Location unavailable")
@@ -625,15 +634,15 @@ struct StationListView: View {
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
                 }
                 .font(.geist(15, .semibold))
-                .foregroundStyle(Color(hex: 0xE0B45A))
+                .foregroundStyle(SN.amber)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(hex: 0xE0B45A, opacity: 0.1),
+            .background(SN.amber.opacity(0.1),
                         in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color(hex: 0xE0B45A, opacity: 0.35), lineWidth: 0.5))
+                .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -812,9 +821,9 @@ struct StationListView: View {
 }
 
 /// The prototype's My Location hero: MY LOCATION eyebrow with the location
-/// arrow, the nearest station's ordinary card wearing the same nm pill the
-/// Near Me cards wear, then the fix coordinates in mono (NearMe.dc.html
-/// fmtCoord — 3 decimal places).
+/// arrow, the nearest station's ordinary card (distance rendered in its own
+/// identity column, layout A — same as every other card), then the fix
+/// coordinates in mono (NearMe.dc.html fmtCoord — 3 decimal places).
 struct MyLocationTile<Card: View>: View {
     let item: StationItem
     let fix: (lat: Double, lon: Double)
@@ -832,9 +841,6 @@ struct MyLocationTile<Card: View>: View {
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
-                .overlay(alignment: .topTrailing) {
-                    DistancePill(km: item.km(fromLat: fix.lat, lon: fix.lon))
-                }
             Text(formatCoord(lat: fix.lat, lon: fix.lon))
                 .font(.geistMono(11))
                 .foregroundStyle(SN.foam.opacity(0.55))
@@ -919,7 +925,7 @@ struct StationChooserSheet: View {
         } label: {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(stationGradient(id: item.id))
+                    .fill(SN.cardFill)
                     .frame(width: 38, height: 38)
                 VStack(alignment: .leading, spacing: 3) {
                     // The name is the same on every row — the qualifier is the
@@ -950,21 +956,41 @@ struct StationChooserSheet: View {
     }
 }
 
-/// The compact recent-station row body (prototype: 38pt gradient chip, name
-/// over region, current reading trailing in Fraunces).
+/// The compact recent-station row body: kind glyph, name over region, current
+/// reading trailing in Fraunces. The prototype's 38pt gradient chip is gone
+/// with the gradients (M53 layout A) — it had become a flat empty box sitting
+/// inches below cards that draw a real glyph, so it takes the same
+/// `StationGlyph` the cards do: wave or dome for kind, tone for state.
 struct RecentRowLabel: View {
     let item: StationItem
     let imperial: Bool
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
-    // Cache the engine value, format in body — unit switches re-render live.
-    @State private var height: Double?
-    @State private var signed: Double?
-    @State private var gatePhase: DerivedPhase?  // derived gate: phase word, never a speed
+    // Cache the engine state, format in body — unit switches re-render live.
+    // The whole card state, not just the number, because the glyph's tone
+    // needs the direction/phase the reading alone doesn't carry.
+    @State private var tide: CardState?
+    @State private var current: CurrentCardState?
+    @State private var gate: DerivedGateCardState?  // derived gate: phase word, never a speed
+
+    private var glyphKind: StationGlyph.GlyphKind {
+        switch item {
+        case .tide, .chs: .tide
+        case .current, .chsGate, .chsCurrent: .current
+        }
+    }
+
+    /// Reuses the cards' own bindings so a row and its card can never disagree.
+    private var glyphTone: StationGlyph.Tone {
+        switch item {
+        case .tide, .chs: StationCardView.glyphTone(tide)
+        case .current, .chsCurrent: CurrentCardView.glyphTone(current)
+        case .chsGate: ChsGateCardView.glyphTone(gate?.phase)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(stationGradient(id: rawId))
+            StationGlyph(kind: glyphKind, tone: glyphTone, size: 26)
                 .frame(width: 38, height: 38)
             // The name owns the full row width (M50). It used to share the
             // line with the reading, which in the 320pt iPad sidebar left it
@@ -995,7 +1021,7 @@ struct RecentRowLabel: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .task { if height == nil && signed == nil { load() } }
+        .task { if tide == nil && current == nil && gate == nil { load() } }
     }
 
     private var rawId: String {
@@ -1004,43 +1030,56 @@ struct RecentRowLabel: View {
     }
 
     private var reading: String {
-        if let gatePhase { return phaseWord(gatePhase).lowercased() }
-        if let signed {
-            return currentPhase(signed: signed) == .slack
-                ? "slack" : "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
+        if let gate { return phaseWord(gate.phase).lowercased() }
+        if let current {
+            return currentPhase(signed: current.signed) == .slack
+                ? "slack" : "\(formatSpeed(abs(current.signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
         }
-        guard let height else { return "" }
-        return "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        guard let tide else { return "" }
+        return "\(formatHeight(tide.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
     }
 
     private func load() {
         switch item {
         case .tide(let s):
-            height = s.cardState(at: appNow()).height
+            tide = s.cardState(at: appNow())
         case .current(let s):
-            signed = s.cardState(at: appNow()).signed
+            current = s.cardState(at: appNow())
         case .chs(let info):
             guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
-            height = record.cardState(at: appNow()).height
-        case .chsGate(let gate):
-            guard case .fitted(let port) = ChsFitService.shared.state(gate.reference) else { return }
-            gatePhase = DerivedGateRecord(gate: gate, port: port).cardState(at: appNow()).phase
-        case .chsCurrent(let gate):
-            guard case .fitted(let record) = ChsFitService.shared.currentState(gate.id) else { return }
-            signed = record.cardState(at: appNow()).signed
+            tide = record.cardState(at: appNow())
+        case .chsGate(let info):
+            guard case .fitted(let port) = ChsFitService.shared.state(info.reference) else { return }
+            gate = DerivedGateRecord(gate: info, port: port).cardState(at: appNow())
+        case .chsCurrent(let info):
+            guard case .fitted(let record) = ChsFitService.shared.currentState(info.id) else { return }
+            current = record.cardState(at: appNow())
         }
     }
 }
 
-/// Variant 1a card: per-station sky gradient, Fraunces name, big height numeral.
+/// Layout A: kind glyph left, identity (name/region/distance), state right.
+/// Fraunces name, big height numeral.
 struct StationCardView: View {
     let record: TideStationRecord
     let imperial: Bool
+    var km: Double? = nil
     @State private var state: CardState?
+
+    /// State → tone. `static`, like the detail views' `phaseColor`, so the
+    /// binding can be asserted without building a view: an inverted binding
+    /// here renders a perfectly valid flood blue on a falling tide and no
+    /// token or colour test can see it (`ColourAndFormTests`
+    /// `testCardGlyphToneBindings`).
+    static func glyphTone(_ state: CardState?) -> StationGlyph.Tone {
+        guard let state else { return .unknown }
+        return state.rising ? .rising : .falling
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
+                StationGlyph(kind: .tide, tone: Self.glyphTone(state))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(record.name)
                         .font(.fraunces(23, .semibold))
@@ -1050,6 +1089,11 @@ struct StationCardView: View {
                     Text(record.region)
                         .font(.geist(13))
                         .foregroundStyle(SN.foam.opacity(0.78))
+                    if let km {
+                        Text(formatNm(km))
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.7))
+                    }
                     if let next = state?.next {
                         Text("\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))")
                             .font(.geist(12))
@@ -1077,7 +1121,7 @@ struct StationCardView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: record.id))
+        .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
@@ -1085,11 +1129,12 @@ struct StationCardView: View {
 }
 
 /// A Canadian (CHS) tide port. Fitted: the ordinary tide card, navigable.
-/// Not yet fitted: the same gradient shell with identity and an honest message
+/// Not yet fitted: the same card shell with identity and an honest message
 /// (chs-online spec §7c — never an empty chart, never a spinner to nothing).
 struct ChsCardView: View {
     let info: ChsStationInfo
     let imperial: Bool
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -1097,15 +1142,15 @@ struct ChsCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.state(info.id) {
         case .fitted(let record):
-            StationCardView(record: record, imperial: imperial)
+            StationCardView(record: record, imperial: imperial, km: km)
         case .fitting:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: chsPendingMessage("tidal", id: info.id))
         case .failed:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
@@ -1133,11 +1178,18 @@ struct ChsPendingCard: View {
     let name: String
     let region: String
     let id: String
+    /// No reading has ever loaded here — there's nothing yet to fit, so the
+    /// glyph's tone is `.unknown`, never a guess. Kind still comes from the
+    /// caller: a pending tide port and a pending derived current gate look
+    /// the same wave/dome distinction as their fitted counterparts.
+    let kind: StationGlyph.GlyphKind
+    var km: Double? = nil
     let message: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
+                StationGlyph(kind: kind, tone: .unknown)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
                         .font(.fraunces(23, .semibold))
@@ -1147,6 +1199,11 @@ struct ChsPendingCard: View {
                     Text(region)
                         .font(.geist(13))
                         .foregroundStyle(SN.foam.opacity(0.78))
+                    if let km {
+                        Text(formatNm(km))
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.7))
+                    }
                 }
                 Spacer(minLength: 8)
             }
@@ -1158,7 +1215,7 @@ struct ChsPendingCard: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: id))
+        .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .opacity(0.82)  // visibly quieter than a station with numbers
@@ -1176,29 +1233,41 @@ struct ChsPendingCard: View {
 /// while the reference port is unfitted, in the same register as the ports.
 struct ChsGateCardView: View {
     let gate: ChsGateInfo
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     @State private var state: DerivedGateCardState?
+
+    /// Phase → tone. `static` for the same reason as `StationCardView`'s.
+    static func glyphTone(_ phase: DerivedPhase?) -> StationGlyph.Tone {
+        switch phase {
+        case .flood: .flood
+        case .ebb: .ebb
+        case .slack: .slack
+        case nil: .unknown
+        }
+    }
 
     var body: some View {
         switch service.state(gate.reference) {
         case .fitted(let port):
             fittedCard(DerivedGateRecord(gate: gate, port: port))
         case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: chsPendingMessage("tidal", id: gate.reference))
         case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
+                StationGlyph(kind: .current, tone: Self.glyphTone(state?.phase))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(gate.name)
                         .font(.fraunces(23, .semibold))
@@ -1208,6 +1277,11 @@ struct ChsGateCardView: View {
                     Text(gate.region)
                         .font(.geist(13))
                         .foregroundStyle(SN.foam.opacity(0.78))
+                    if let km {
+                        Text(formatNm(km))
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.7))
+                    }
                     if let next = state?.nextSlack {
                         Text("Slack · \(cardTime(next.time, gate.tz))")
                             .font(.geist(12))
@@ -1217,19 +1291,23 @@ struct ChsGateCardView: View {
                 }
                 Spacer(minLength: 8)
                 if let state {
-                    // The web's phase-pill words: flood / ebb / slack.
+                    // The web's phase-pill words: flood / ebb / slack. Slack
+                    // takes SN.go, not the neutral chip flood/ebb still use —
+                    // otherwise the glyph beside it reads green while this
+                    // pill reads grey, the exact collision Task 2 fixed on
+                    // the detail views (testSlackIsGreenWhereverItAppears).
                     Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
                         .font(.geistMono(11, .medium)).tracking(1)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
                         .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Color.white.opacity(0.18), in: Capsule())
+                        .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
                 }
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: gate.id))
+        .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
@@ -1241,6 +1319,7 @@ struct ChsGateCardView: View {
 /// register, naming currents (chs-online spec §7c — never an empty chart).
 struct ChsCurrentGateCardView: View {
     let gate: ChsCurrentGateInfo
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -1248,31 +1327,34 @@ struct ChsCurrentGateCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.currentState(gate.id) {
         case .fitted(let record):
-            CurrentCardView(record: record,
+            CurrentCardView(record: record, km: km,
                             provisional: service.isProvisional(gate.id) ? gate : nil)
         case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Downloading Canadian current predictions…")
         case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: chsPendingMessage("current", id: gate.id))
         case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Canadian current predictions didn't finish downloading — open it to retry.")
         }
     }
 }
 
-/// The current-station card: same 1a gradient shell, but the reading is signed
+/// The current-station card: same layout-A shell, but the reading is signed
 /// velocity — speed + set arrow + Flooding/Ebbing, a Slack pill at slack, and
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
     let record: CurrentStationRecord
+    var km: Double? = nil
     /// Set while this gate is showing its 60-day fast answer. On the LIST card
     /// that is a ⚠️ badge and a `~` on the readings — nothing else (M52). The
-    /// amber prose this replaced was 1.03:1 against the palest station gradient
-    /// (see ProvisionalBadge); the full explanation, in the amber card that can
-    /// afford the contrast, lives on the detail view and is unchanged.
+    /// amber prose this replaced was unreadable on the per-station gradients of
+    /// the day; those are gone and the numbers were redone against the flat
+    /// card (see `ProvisionalBadge`, which carries the current contrast story).
+    /// The full explanation, in the amber card that can afford the contrast,
+    /// lives on the detail view and is unchanged.
     var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
@@ -1282,9 +1364,21 @@ struct CurrentCardView: View {
     /// shouting around it.
     private var tilde: String { provisional == nil ? "" : "~" }
 
+    /// Signed velocity → tone. `static` for the same reason as
+    /// `StationCardView`'s.
+    static func glyphTone(_ state: CurrentCardState?) -> StationGlyph.Tone {
+        guard let state else { return .unknown }
+        switch currentPhase(signed: state.signed) {
+        case .flood: return .flood
+        case .ebb: return .ebb
+        case .slack: return .slack
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
+                StationGlyph(kind: .current, tone: Self.glyphTone(state))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(record.name)
                         .font(.fraunces(23, .semibold))
@@ -1296,6 +1390,11 @@ struct CurrentCardView: View {
                         Text(record.region)
                             .font(.geist(13))
                             .foregroundStyle(SN.foam.opacity(0.78))
+                    }
+                    if let km {
+                        Text(formatNm(km))
+                            .font(.geist(12))
+                            .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.next {
                         Text(nextLine(next))
@@ -1309,11 +1408,13 @@ struct CurrentCardView: View {
                     if let state {
                         let phase = currentPhase(signed: state.signed)
                         if phase == .slack {
+                            // SN.go, not a neutral chip — see the matching
+                            // comment on ChsGateCardView's phase pill.
                             Text("SLACK")
                                 .font(.geistMono(11, .medium)).tracking(1)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(SN.navyDeep)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(Color.white.opacity(0.18), in: Capsule())
+                                .background(SN.go, in: Capsule())
                         } else {
                             (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
                                 .font(.fraunces(42))
@@ -1333,7 +1434,7 @@ struct CurrentCardView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: record.id))
+        .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
