@@ -380,6 +380,11 @@ final class ScreenshotTests: XCTestCase {
 
         let gateTimes = clockLabels(app)
         let gateHeights = heightLabels(app)
+        // Symmetry with the port-side guard above: if the row scope ever stops
+        // matching, say so directly instead of reporting every port value as
+        // "missing from paired view (has [])".
+        XCTAssert(!gateTimes.isEmpty && !gateHeights.isEmpty,
+                  "no schedule rows read from the gate detail")
         // Sun rows joined the schedule (design pass item 7a) and are computed
         // from each station's own position, so a port sun time may differ from
         // the gate's by seconds — allow a 1-minute neighbour for those labels.
@@ -963,9 +968,9 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m46-malibu-detail.png")
 
         // Print today's rendered schedule times for the verification table.
-        let labels = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{2}:\\d{2}$")).allElementsBoundByIndex
-        print("M46-SCHEDULE-TIMES: \(labels.compactMap { $0.exists ? $0.label : nil })")
+        // Scoped to the rows for the same reason clockLabels is: unscoped, this
+        // table would quietly include iPad sidebar card readings.
+        print("M46-SCHEDULE-TIMES: \(clockLabels(app).sorted())")
 
         // The live card (PA fitted now): "Slack · time" line + the phase pill.
         app.buttons["detail-back"].firstMatch.tap()
@@ -1638,17 +1643,58 @@ final class ScreenshotTests: XCTestCase {
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The
     /// tide detail's set must be a subset of the paired view's merged set.
-    private func clockLabels(_ app: XCUIApplication) -> Set<String> {
-        let all = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{2}:\\d{2}$")).allElementsBoundByIndex
-        return Set(all.compactMap { $0.exists ? $0.label : nil })
+    /// The schedule rows' accessibility labels — NOT the whole screen.
+    ///
+    /// Scoping matters on iPad and only on iPad. The split-view sidebar renders
+    /// live station cards, and since layout A put the reading on the card's
+    /// right they emit `X.X ft` strings that match the same regexes the schedule
+    /// rows do. A caller that scrapes twice and diffs then blames the paired
+    /// pane for a sidebar label: between two scrapes the Recents list reorders
+    /// (the station just visited moves in), so a reading present in the first
+    /// read is simply gone from the second. That produced two consecutive CI
+    /// failures on "missing" values of 4.6 ft and 4.8 ft — both sidebar
+    /// readings, never in the pane at all — while the other values drifted
+    /// between runs (6.7→6.6, 5.1→5.2) the way a live reading does and a tide
+    /// row does not. It passes on iPhone, which has no sidebar, and passes in
+    /// isolation on iPad, where the sidebar state differs.
+    ///
+    /// Each row is ONE element, not a container: `TimelineStrip` applies
+    /// `.accessibilityElement(children: .combine)`, so a row's children are
+    /// merged into its own label and `row.staticTexts` finds nothing. Hence we
+    /// read each row's label and pull the values out of it, rather than
+    /// querying descendants — querying would return an empty set and every
+    /// caller's comparison loop would pass vacuously.
+    private func scheduleRowLabels(_ app: XCUIApplication) -> [String] {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'schedule-row-d'"))
+            .allElementsBoundByIndex
+            .compactMap { $0.exists ? $0.label : nil }
     }
 
-    /// All "N.N ft/m" height labels on screen.
+    /// Every substring of the schedule rows matching `pattern`. Unanchored by
+    /// design: the row label is a combined string like "05:48 2.2 ft ↑ HIGH",
+    /// so the anchored `^…$` these helpers used when each value was its own
+    /// element would now match nothing.
+    private func scheduleValues(_ app: XCUIApplication, _ pattern: String) -> Set<String> {
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return [] }
+        var found: Set<String> = []
+        for label in scheduleRowLabels(app) {
+            let ns = label as NSString
+            for m in re.matches(in: label, range: NSRange(location: 0, length: ns.length)) {
+                found.insert(ns.substring(with: m.range))
+            }
+        }
+        return found
+    }
+
+    /// All "HH:MM" clock labels in the schedule rows.
+    private func clockLabels(_ app: XCUIApplication) -> Set<String> {
+        scheduleValues(app, "\\b\\d{2}:\\d{2}\\b")
+    }
+
+    /// All "N.N ft/m" height labels in the schedule rows.
     private func heightLabels(_ app: XCUIApplication) -> Set<String> {
-        let all = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d+\\.\\d+ (ft|m)$")).allElementsBoundByIndex
-        return Set(all.compactMap { $0.exists ? $0.label : nil })
+        scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b")
     }
 
     private func save(_ app: XCUIApplication, _ name: String) {
