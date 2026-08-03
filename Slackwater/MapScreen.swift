@@ -62,42 +62,74 @@ private func phaseName(_ phase: CurrentPhase) -> String {
     }
 }
 
-/// How far forward the map's direction check looks to find the next tidal
-/// turn. `cardState(at:)` uses 30h because it must GUARANTEE a "next" exists
-/// for the list card; the pin doesn't need that guarantee, and when the
-/// window comes up empty it draws neutral rather than defaulting to
-/// "rising" the way the card does.
-///
-/// This number is a budget, not a tidal-science constant: `extremes()`'s
-/// fixed per-station setup cost (building a harmonic parameter provider) —
-/// not the search itself — is most of what `testPinLayerBuildsInsideAFrame`
-/// measures across ~1,425 bundled tide stations, so shrinking the window
-/// buys back only the search portion. 1h was measured, not assumed: 13h
-/// (a diurnal station's ~12.4h half-period, so it would almost always find
-/// the next turn) cost 427ms; 1h costs ~265ms, with margin under the 300ms
-/// budget. The tradeoff this accepts is coverage, not correctness — at 1h,
-/// `testShortWindowDirectionMatchesThirtyHourBaseline` resolves a concrete
-/// direction for roughly 15% of (station, time) pairs checked and draws
-/// neutral for the rest, but at ZERO disagreements with the 30h baseline
-/// across the whole bundled set at four times of day. A coarser
-/// two-height-sample difference was measured as an alternative (same fixed
-/// cost, no window at all, so 100% coverage) and rejected: 62/5700
-/// disagreements with the baseline near real turns — an actual wrong
-/// colour, not just fewer coloured pins. Widening this window is a
-/// legitimate follow-on (async-fill after first paint, or a viewport-bounded
-/// subset) but is a bigger change than this budget fix; not done here.
-let PIN_TIDE_WINDOW: TimeInterval = 1 * 3600
+/// Fix round 1 shrank the pin's direction search from `cardState(at:)`'s
+/// 30h window to a short one — fast, but only 838/5,700 (station, moment)
+/// checks in `testShortWindowDirectionMatchesThirtyHourBaseline` actually
+/// resolved a tone; the rest silently drew neutral. That traded correctness
+/// for coverage nobody asked to give up (fix round 2). This is the exact
+/// search a *fallback* uses instead, once round 2's cheap check below has
+/// already flagged that this one station needs it — so it runs for a small
+/// minority of stations, not all 1,425, and can afford a window wide enough
+/// to always find the next turn (13h clears a diurnal station's ~12.4h
+/// half-period; semidiurnal turns roughly every 6.2h).
+let PIN_TIDE_FALLBACK_WINDOW: TimeInterval = 13 * 3600
 
-/// Direction from a short forward window, for the pin only — nil when no
-/// turn falls inside it, so the caller can draw neutral instead of guessing.
-/// Do not naively difference two height samples near a turn instead of this:
-/// the curve is flat there and sampling picks up numerical noise
-/// (`cardState(at:)`'s doc comment). This still finds the true next extreme
-/// via the same bracket-and-bisect search, just over a shorter horizon.
+/// Exact direction via the same search `cardState(at:)` uses, just over a
+/// shorter (but still turn-guaranteeing) window. nil only if even that comes
+/// up empty — draw neutral rather than default "rising" the way the card
+/// does; a wrong colour is worse than an admitted grey.
 func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterval) -> Bool? {
     let next = record.engineStation.extremes(from: now, to: now.addingTimeInterval(window))
         .first { $0.time > now }
     return next.map { $0.kind == .high }
+}
+
+/// How far apart the cheap two-sample check looks, and how big a height
+/// change counts as a trustworthy signal rather than turn-adjacent noise.
+///
+/// `cardState(at:)`'s doc comment warns against differencing two height
+/// samples: near a turn the curve is flat, so a naive diff can point the
+/// wrong way. That is real — measured directly, a raw (unnormalised) diff
+/// disagreed with the 30h baseline in 62/5,700 checks — but the failure
+/// announces itself: every wrong sign showed up on a small |Δh|. So rather
+/// than discard the cheap path, only distrust it near that floor and fall
+/// back to the exact search for that one station.
+///
+/// The threshold weights each constituent's amplitude by its known
+/// astronomical SPEED (degrees/hour — Doodson/NOAA constants, fixed and not
+/// something that can drift the way a display colour hex can), not just
+/// amplitude. Amplitude alone under-flags fast (semidiurnal) stations and
+/// over-flags slow (diurnal) ones at the same amplitude, because a diurnal
+/// wave's peak slope is roughly half a semidiurnal one's — proportional to
+/// A·ω, not A. Weighting by speed cut the fallback population from 15% to
+/// 7% of checks at zero mismatches (see the sweep this shipped with in
+/// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment: an
+/// amplitude-only proxy needed 0.008 for zero wrong-signed trusted samples;
+/// speed-weighted needed only 0.0004, for less than half the fallback rate).
+let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
+let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
+private let constituentSpeed: [String: Double] = [   // degrees/hour
+    "M2": 28.9841, "S2": 30.0, "N2": 28.4397, "K2": 30.0821,
+    "K1": 15.0411, "O1": 13.9430, "P1": 14.9589, "Q1": 13.3987,
+]
+
+/// Direction for one tide station: cheap almost everywhere, exact always.
+/// One `heights()` call (same fixed setup cost as any other engine call,
+/// amortised over its two samples) gives a height difference; if that's
+/// comfortably above the noise floor its sign IS the direction — the curve
+/// is steep there, unambiguous. Only near a turn, where the difference is
+/// small relative to the station's own speed-weighted range, does this fall
+/// back to `tidePinRising`'s exact search, and only for that station.
+func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
+    let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
+    let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
+    guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it
+    let pts = record.engineStation.heights(from: now, to: now.addingTimeInterval(PIN_TIDE_DIFF_DT),
+                                           step: PIN_TIDE_DIFF_DT)
+    guard pts.count >= 2 else { return fallback() }
+    let delta = pts[1].height - pts[0].height
+    guard abs(delta) / rangeProxy >= PIN_TIDE_DIFF_THRESHOLD else { return fallback() }
+    return delta > 0
 }
 
 /// A station's state as a tone name, for the pin's colour.
@@ -120,7 +152,7 @@ func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterv
 private func pinTone(_ item: StationItem, at now: Date) -> String {
     switch item {
     case .tide(let record):
-        guard let rising = tidePinRising(record, at: now, window: PIN_TIDE_WINDOW) else { return "unknown" }
+        guard let rising = tidePinRisingHybrid(record, at: now) else { return "unknown" }
         return rising ? "rising" : "falling"
     case .current(let station):
         let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)

@@ -144,18 +144,26 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(build, 0.30)
     }
 
-    /// Task 5 fix round 1: the pin's direction check shrank from the list
-    /// card's 30h "next" guarantee to `PIN_TIDE_WINDOW`, to fit the budget
-    /// above. Shrinking a forward search can only ever MISS the next turn
-    /// (window ends before it — `tidePinRising` returns nil, the pin draws
-    /// neutral) or find the SAME next extreme the 30h search finds first —
-    /// never a different one, because both searches walk forward from `now`
-    /// in the same order and stop at the first root. This test checks that
-    /// claim against the real bundled set instead of trusting the argument:
-    /// every tide station, at four times spread across a day (so a station
-    /// sitting right at a turn at hour 0 isn't the only case exercised),
-    /// short-window direction compared to the 30h baseline.
-    func testShortWindowDirectionMatchesThirtyHourBaseline() {
+    /// Task 5 fix round 1 shrank the pin's direction search to a 1h window
+    /// and drew neutral whenever nothing turned up inside it — correct, but
+    /// only 838/5,700 (station, moment) checks actually resolved a tone
+    /// (~15% coverage): "declining to answer" isn't the same as "cheap and
+    /// correct". Round 2 is the hybrid in `tidePinRisingHybrid`: a cheap
+    /// two-sample check, its noise threshold weighted by each constituent's
+    /// astronomical speed (not just amplitude — a diurnal station's peak
+    /// slope is roughly half a semidiurnal one's at equal amplitude, so an
+    /// amplitude-only proxy over-flagged diurnal stations as "near a turn"),
+    /// that resolves almost every station directly and falls back to the
+    /// exact search only for the ones actually near a turn. This asserts
+    /// BOTH numbers the round-1 test was missing — coverage (should read
+    /// ~100%, not a fraction) and correctness (mismatches against the 30h
+    /// baseline, which must be zero) — at four times spread across a day,
+    /// across the whole bundled tide set. Threshold sweep this shipped with
+    /// (speed-weighted relative delta): 0.0003 → 2 wrong-signed trusted
+    /// samples out of 5,700; 0.00033 → 0; shipped at 0.0004 for margin above
+    /// that empirical floor (7.4% fall back to the exact search, versus 15%
+    /// for the amplitude-only version of this same idea).
+    func testHybridDirectionHasFullCoverageAndMatchesBaseline() {
         let dayStart = Date(timeIntervalSince1970: 1_785_000_000)
         let checkTimes = [0.0, 6.0, 12.0, 18.0].map { dayStart.addingTimeInterval($0 * 3600) }
         var resolved = 0
@@ -163,18 +171,20 @@ final class NationalScaleTests: XCTestCase {
         for record in TideStationRecord.all {
             for now in checkTimes {
                 let baseline = record.cardState(at: now).rising
-                guard let short = tidePinRising(record, at: now, window: PIN_TIDE_WINDOW) else { continue }
+                guard let hybrid = tidePinRisingHybrid(record, at: now) else { continue }
                 resolved += 1
-                if short != baseline {
-                    mismatches.append("\(record.id) at \(now): short=\(short) baseline=\(baseline)")
+                if hybrid != baseline {
+                    mismatches.append("\(record.id) at \(now): hybrid=\(hybrid) baseline=\(baseline)")
                 }
             }
         }
         let checked = TideStationRecord.all.count * checkTimes.count
-        print("Short-window (\(Int(PIN_TIDE_WINDOW / 3600))h) direction: "
-              + "\(resolved)/\(checked) resolved a tone, \(mismatches.count) disagreed with the 30h baseline")
+        let coveragePct = Double(resolved) / Double(checked) * 100
+        print(String(format: "Hybrid direction: %d/%d resolved a tone (%.1f%% coverage), "
+                     + "%d disagreed with the 30h baseline", resolved, checked, coveragePct, mismatches.count))
+        XCTAssertGreaterThan(coveragePct, 99.0, "the hybrid must not quietly fall back to mostly-neutral again")
         XCTAssertTrue(mismatches.isEmpty,
-                      "short window direction disagreed with the 30h baseline: \(mismatches.prefix(10))")
+                      "hybrid direction disagreed with the 30h baseline: \(mismatches.prefix(10))")
     }
 
     /// Clustering is what makes 3,125 pins a map rather than a smear — and the
