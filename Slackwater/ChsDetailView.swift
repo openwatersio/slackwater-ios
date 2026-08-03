@@ -162,7 +162,7 @@ struct ChsWaitingView: View {
 
     private var footer: some View {
         MonoLabel(text: "Predictions — not for navigation",
-                  size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
+                  color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
     }
@@ -192,17 +192,17 @@ struct ChsAmberCard: View {
                     .accessibilityLabel("Warning")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.fraunces(20, .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(SN.paper)
                     Text(headline)
-                        .font(.geist(13))
+                        .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             Text(expectation)
-                .font(.geist(13))
+                .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
@@ -213,7 +213,7 @@ struct ChsAmberCard: View {
                     Text(action)
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
                 }
-                .font(.geist(15, .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }

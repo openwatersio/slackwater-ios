@@ -77,37 +77,16 @@ enum SN {
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }
 
-extension Font {
-    static func fraunces(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Fraunces-SemiBold", size: size)
-        case .medium: .custom("Fraunces-Medium", size: size)
-        default: .custom("Fraunces-Regular", size: size)
-        }
-    }
-    static func geist(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Geist-SemiBold", size: size)
-        case .medium: .custom("Geist-Medium", size: size)
-        default: .custom("Geist-Regular", size: size)
-        }
-    }
-    static func geistMono(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        weight == .medium || weight == .semibold
-            ? .custom("GeistMono-Medium", size: size)
-            : .custom("GeistMono-Regular", size: size)
-    }
-}
-
-/// The Geist Mono uppercase section-label role from the prototype.
+/// The uppercase mono section-label role. Sizes 9/10/11 used to be passed per
+/// call site; under Dynamic Type they all collapse to `.caption2` and scale
+/// with the reader's setting instead.
 struct MonoLabel: View {
     let text: String
-    var size: CGFloat = 11
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
     var body: some View {
         Text(text.uppercased())
-            .font(.geistMono(size, .medium))
+            .font(.caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
     }
@@ -241,7 +220,7 @@ struct SunPill: View {
     var body: some View {
         let color = kind == .sunrise ? SN.sunrise : SN.sunset
         Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
-            .font(.geistMono(10, .medium)).tracking(0.5)
+            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(color)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))

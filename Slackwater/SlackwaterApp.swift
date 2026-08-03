@@ -55,7 +55,7 @@ struct GateView: View {
             VStack(spacing: 0) {
                 HStack(alignment: .bottom) {
                     Text("Slackwater")
-                        .font(.fraunces(36, .semibold))
+                        .font(.largeTitle.weight(.semibold))
                         .foregroundStyle(SN.paper)
                     Spacer()
                 }
@@ -69,7 +69,7 @@ struct GateView: View {
                         .controlSize(.large)
                         .tint(SN.leaf)
                     Text("Finding stations near you…")
-                        .font(.geist(16))
+                        .font(.callout)
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .padding(.top, 22)
                 } else {
@@ -86,11 +86,11 @@ struct GateView: View {
                             .foregroundStyle(SN.foam)
                     }
                     Text("See tides near you")
-                        .font(.fraunces(27, .semibold))
+                        .font(.title.weight(.semibold))
                         .foregroundStyle(SN.paper)
                         .padding(.top, 26)
                     Text("Turn on location and we'll find the nearest tide & current stations — no searching required.")
-                        .font(.geist(15))
+                        .font(.subheadline)
                         .lineSpacing(3)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(SN.foam.opacity(0.65))
@@ -104,7 +104,7 @@ struct GateView: View {
                             Image(systemName: "location.fill")
                             Text("Use My Location")
                         }
-                        .font(.geist(17, .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(SN.navyDeep)
                         .frame(maxWidth: 320)
                         .frame(height: 54)
@@ -118,7 +118,7 @@ struct GateView: View {
                         seenGate = true
                     } label: {
                         Text("Or search for a harbor, bay, or channel.")
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.4))
                     }
                     .padding(.top, 16)
@@ -308,10 +308,10 @@ struct StationListView: View {
                     .font(.system(size: 40, weight: .light))
                     .foregroundStyle(SN.foam.opacity(0.5))
                 Text("Pick a station")
-                    .font(.fraunces(24, .semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(SN.paper.opacity(0.9))
                 Text("Tides and currents open here.")
-                    .font(.geist(14))
+                    .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.55))
             }
         }
@@ -362,7 +362,7 @@ struct StationListView: View {
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
             Text("Depths not reduced to chart datum — not for navigation.")
-                .font(.geist(11))
+                .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(SN.page.opacity(0.82), in: Capsule())
@@ -542,7 +542,7 @@ struct StationListView: View {
                         .font(.system(size: 10, weight: .semibold))
                     Text("\(matches.count) matching stations")
                 }
-                .font(.geist(12, .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(SN.leaf)
                 .padding(.horizontal, 18)
                 .padding(.top, 7)
@@ -621,10 +621,10 @@ struct StationListView: View {
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Location unavailable")
-                            .font(.fraunces(20, .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundStyle(SN.paper)
                         Text("Turn on location for Slackwater to see stations near you.")
-                            .font(.geist(13))
+                            .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     }
                 }
@@ -633,7 +633,7 @@ struct StationListView: View {
                     Text("Go to Settings")
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
                 }
-                .font(.geist(15, .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)
             }
             .padding(.horizontal, 20)
@@ -650,7 +650,7 @@ struct StationListView: View {
     private var header: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Text("Slackwater")
-                .font(.fraunces(36, .semibold))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(SN.paper)
                 // The wordmark never wraps: in the 320pt iPad sidebar it shares
                 // the row with two 34pt buttons and would break as "Slackwat/er".
@@ -737,7 +737,7 @@ struct StationListView: View {
                         // down where nobody scrolls (M53).
                         if results.count == StationItem.searchLimit {
                             MonoLabel(text: "Nearest \(StationItem.searchLimit) — keep typing to narrow",
-                                      size: 10, color: SN.foam.opacity(0.5), tracking: 1.2)
+                                      color: SN.foam.opacity(0.5), tracking: 1.2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 6)
                                 .padding(.bottom, 2)
@@ -784,7 +784,7 @@ struct StationListView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(SN.foam.opacity(0.7))
                 TextField("Harbor, bay, or channel", text: $query)
-                    .font(.geist(17))
+                    .font(.body)
                     .foregroundStyle(SN.paper)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -836,13 +836,13 @@ struct MyLocationTile<Card: View>: View {
                 Image(systemName: "location.north.fill")
                     .font(.system(size: 10))
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: "My Location", size: 11, color: SN.foam.opacity(0.9))
+                MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
             }
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
             Text(formatCoord(lat: fix.lat, lon: fix.lon))
-                .font(.geistMono(11))
+                .font(.caption2.monospaced())
                 .foregroundStyle(SN.foam.opacity(0.55))
                 .padding(.horizontal, 6)
         }
@@ -883,10 +883,10 @@ struct StationChooserSheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(place.place)
-                            .font(.fraunces(26, .semibold))
+                            .font(.title.weight(.semibold))
                             .foregroundStyle(SN.paper)
                         Text("\(place.matches.count) stations answer for this place — pick the one you mean.")
-                            .font(.geist(13))
+                            .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -931,16 +931,16 @@ struct StationChooserSheet: View {
                     // The name is the same on every row — the qualifier is the
                     // whole point, so it leads.
                     Text(item.region.isEmpty ? item.name : item.region)
-                        .font(.geist(15, .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(SN.paper)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    MonoLabel(text: item.kindLabel, size: 10,
+                    MonoLabel(text: item.kindLabel,
                               color: SN.foam.opacity(0.55), tracking: 1.1)
                 }
                 Spacer(minLength: 8)
                 Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
-                    .font(.geistMono(12, .medium))
+                    .font(.caption.monospaced().weight(.medium))
                     .foregroundStyle(SN.foam.opacity(0.85))
             }
             .padding(.horizontal, 16)
@@ -1000,18 +1000,18 @@ struct RecentRowLabel: View {
             // load-bearing text here) is what gives way instead.
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
-                    .font(.geist(16, .medium))
+                    .font(.callout.weight(.medium))
                     .foregroundStyle(SN.paper)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 HStack(spacing: 8) {
                     Text(item.region)
-                        .font(.geist(12))
+                        .font(.caption)
                         .foregroundStyle(SN.foam.opacity(0.55))
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Text(reading)
-                        .font(.fraunces(15))
+                        .font(.subheadline)
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -1082,21 +1082,21 @@ struct StationCardView: View {
                 StationGlyph(kind: .tide, tone: Self.glyphTone(state))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(record.name)
-                        .font(.fraunces(23, .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(record.region)
-                        .font(.geist(13))
+                        .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.next {
                         Text("\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))")
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1105,13 +1105,13 @@ struct StationCardView: View {
                 VStack(alignment: .trailing, spacing: 5) {
                     if let state {
                         (Text(formatHeight(state.height, imperial: imperial))
-                            .font(.fraunces(42))
+                            .font(.largeTitle)
                          + Text(" \(heightUnit(imperial: imperial))")
-                            .font(.fraunces(17)))
+                            .font(.body))
                             .foregroundStyle(.white)
                         HStack(spacing: 4) {
-                            Text(state.rising ? "▲" : "▼").font(.geist(9))
-                            Text(state.rising ? "Rising" : "Falling").font(.geist(11))
+                            Text(state.rising ? "▲" : "▼").font(.caption2)
+                            Text(state.rising ? "Rising" : "Falling").font(.caption2)
                         }
                         .foregroundStyle(SN.foam.opacity(0.9))
                     }
@@ -1192,23 +1192,23 @@ struct ChsPendingCard: View {
                 StationGlyph(kind: kind, tone: .unknown)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
-                        .font(.fraunces(23, .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(region)
-                        .font(.geist(13))
+                        .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
                 Spacer(minLength: 8)
             }
             Text(message)
-                .font(.geist(12))
+                .font(.caption)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.top, 10)
         }
@@ -1270,21 +1270,21 @@ struct ChsGateCardView: View {
                 StationGlyph(kind: .current, tone: Self.glyphTone(state?.phase))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(gate.name)
-                        .font(.fraunces(23, .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(gate.region)
-                        .font(.geist(13))
+                        .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.nextSlack {
                         Text("Slack · \(cardTime(next.time, gate.tz))")
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1297,7 +1297,7 @@ struct ChsGateCardView: View {
                     // pill reads grey, the exact collision Task 2 fixed on
                     // the detail views (testSlackIsGreenWhereverItAppears).
                     Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
-                        .font(.geistMono(11, .medium)).tracking(1)
+                        .font(.caption2.monospaced().weight(.medium)).tracking(1)
                         .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
@@ -1381,24 +1381,24 @@ struct CurrentCardView: View {
                 StationGlyph(kind: .current, tone: Self.glyphTone(state))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(record.name)
-                        .font(.fraunces(23, .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     HStack(spacing: 7) {
                         if provisional != nil { ProvisionalBadge() }
                         Text(record.region)
-                            .font(.geist(13))
+                            .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.78))
                     }
                     if let km {
                         Text(formatNm(km))
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.next {
                         Text(nextLine(next))
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1411,19 +1411,19 @@ struct CurrentCardView: View {
                             // SN.go, not a neutral chip — see the matching
                             // comment on ChsGateCardView's phase pill.
                             Text("SLACK")
-                                .font(.geistMono(11, .medium)).tracking(1)
+                                .font(.caption2.monospaced().weight(.medium)).tracking(1)
                                 .foregroundStyle(SN.navyDeep)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
                                 .background(SN.go, in: Capsule())
                         } else {
                             (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
-                                .font(.fraunces(42))
+                                .font(.largeTitle)
                              + Text(" \(speedUnitLabel(speedUnit))")
-                                .font(.fraunces(17)))
+                                .font(.body))
                                 .foregroundStyle(.white)
                             HStack(spacing: 4) {
-                                CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.geist(11))
-                                Text(phaseWord(phase)).font(.geist(11))
+                                CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
+                                Text(phaseWord(phase)).font(.caption2)
                             }
                             .foregroundStyle(SN.foam.opacity(0.9))
                         }

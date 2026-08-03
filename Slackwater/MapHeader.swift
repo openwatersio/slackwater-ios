@@ -61,11 +61,11 @@ struct MapHeader: View {
                     // Title pill (prototype: Fraunces 19 name over mono region).
                     VStack(spacing: 2) {
                         Text(name)
-                            .font(.fraunces(19, .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                        MonoLabel(text: region, size: 9, color: SN.foam.opacity(0.8), tracking: 1.5)
+                        MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)

@@ -19,7 +19,7 @@ Spec: `docs/superpowers/specs/2026-08-02-sf-and-dynamic-type-design.md`
 - **No `Font.custom` and no `Font.system(size:)` with a literal.** Every font is a semantic style (`.body`, `.caption`, …), optionally with `.weight()`, `.monospaced()`, `.monospacedDigit()`. The one sanctioned exception is `@ScaledMetric` in Task 5, which scales a *non-text* dimension.
 - **`minimumScaleFactor` comes off six sites and stays on one.** `SlackwaterApp.swift:658` (the wordmark) keeps its `0.6`. Read the comment above it before touching it.
 - **Colour is untouched.** This branch changes type and layout only. Do not alter any `SN.*` token, any hex literal, or any glyph tone binding — those are `ColourAndFormTests`' territory and it will fail loudly.
-- **Copy is untouched.** No user-visible string changes.
+- **Copy is untouched, with exactly one exception.** No user-visible string changes anywhere *except* `SettingsView.swift`'s font attribution — see Task 1 Step 7b. Retiring the fonts makes that sentence false, and a false licence statement is not something to preserve for consistency's sake.
 - **Line numbers in this plan are from before Task 1 and drift as you go.** Every task that cites one also gives you a `grep` that finds it. Trust the grep, never the number.
 
 ---
@@ -234,6 +234,32 @@ git rm -r Slackwater/Resources/Fonts/
 ```
 
 Then delete lines 40–48 of `project.yml` (the `UIAppFonts:` key and its eight entries). Keep the surrounding Info.plist keys intact.
+
+The directory also holds `OFL-Fraunces.txt` and `OFL-Geist.txt`. Those go with the fonts — a licence file for a font you no longer ship is dead weight.
+
+- [ ] **Step 7b: Remove the now-false font attribution**
+
+Deleting the fonts makes a shipping sentence untrue. In `SettingsView.swift`:
+
+```bash
+grep -n "SIL Open Font License" Slackwater/SettingsView.swift
+```
+
+Delete that entire `Text(...)` line:
+
+```swift
+Text("Fonts: Fraunces, Geist and Geist Mono, used under the SIL Open Font License 1.1.")
+```
+
+Delete the line only — leave the surrounding attribution section and every other statement in it alone. No replacement text: the app now uses the system font, and Apple's system font carries no attribution requirement. This is the **only** user-visible copy change permitted in this plan.
+
+Then confirm nothing else in the app still claims to use them:
+
+```bash
+grep -rn "Fraunces\|Geist" Slackwater/ --include="*.swift"
+```
+
+Comments describing the *prototype's* original design (e.g. `MapHeader.swift:61`, `Theme.swift:2`, `SlackwaterApp.swift:960`) are history, not claims — leave them. Only user-facing strings matter here.
 
 - [ ] **Step 8: Regenerate and run the suite**
 

@@ -37,15 +37,6 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIAppFonts:
-          - Fraunces-Regular.ttf
-          - Fraunces-Medium.ttf
-          - Fraunces-SemiBold.ttf
-          - Geist-Regular.ttf
-          - Geist-Medium.ttf
-          - Geist-SemiBold.ttf
-          - GeistMono-Regular.ttf
-          - GeistMono-Medium.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater

@@ -289,7 +289,7 @@ struct TimelineCanvas: View {
             }
             // Day label at local noon.
             ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
-                        .font(.fraunces(11, .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
                      anchor: .center)
@@ -300,7 +300,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
                 ctx.draw(Text("\(arrow)\(cardTime(t, data.tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.geistMono(10, .medium))
+                            .font(.caption2.monospaced().weight(.medium))
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
@@ -339,7 +339,7 @@ struct TimelineCanvas: View {
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                      with: .color(.white))
             ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.fraunces(10, .semibold)).foregroundStyle(.white),
+                        .font(.caption2.weight(.semibold)).foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
         }
     }
@@ -386,7 +386,7 @@ struct TimelineCanvas: View {
                          with: .color(.white.opacity(0.85)))
                 // Slack is the app's "go" colour, not a neutral. It is the moment the
                 // app is named for, and it must read the same on every surface.
-                ctx.draw(Text("slack").font(.geistMono(8))
+                ctx.draw(Text("slack").font(.caption2.monospaced())
                             .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
             case .maxFlood, .maxEbb:
@@ -394,7 +394,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.fraunces(10, .semibold))
+                            .font(.caption2.weight(.semibold))
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
                          anchor: .center)
@@ -584,7 +584,7 @@ struct TimelineScrubStrip: View {
                         .frame(width: 13, height: 13)
                         .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
-                    MonoLabel(text: "Tide", size: 9, color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 30, y: geo.tideTop - 3)
@@ -594,7 +594,7 @@ struct TimelineScrubStrip: View {
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    MonoLabel(text: "Current", size: 9, color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 42, y: (geo.hasTide ? geo.sepY : geo.curTop) - 8)
@@ -634,7 +634,7 @@ struct TimelineScrubStrip: View {
                               lineY: CGFloat, textY: CGFloat, textXInset: CGFloat) -> some View {
         Rectangle().fill(color.opacity(0.5)).frame(width: w, height: 1)
             .position(x: w / 2, y: lineY)
-        Text(label).font(.geistMono(9, .medium)).foregroundStyle(color)
+        Text(label).font(.caption2.monospaced().weight(.medium)).foregroundStyle(color)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(Color(hex: 0x001020, opacity: 0.55))
             .position(x: w - textXInset, y: textY)
@@ -709,7 +709,7 @@ struct MultiDaySchedule: View {
                 }
                 HStack(alignment: .top, spacing: 0) {
                     Text(relativeDayLabel(group.offset, group.start, tz))
-                        .font(.geist(12, .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(SN.foam.opacity(0.9))
                         .frame(width: 74, alignment: .leading)
                         .padding(.leading, 14)
@@ -723,11 +723,11 @@ struct MultiDaySchedule: View {
                             // recognizers keep working — same tap for the user.
                             HStack(spacing: 8) {
                                 Text(clockTime(e.time, tz))
-                                    .font(.geistMono(14))
+                                    .font(.footnote.monospaced())
                                     .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
                                 Spacer()
                                 Text(e.value ?? "—")
-                                    .font(.fraunces(15, .semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                 pillView(e)
                                     .frame(width: 84, alignment: .trailing)
@@ -759,13 +759,13 @@ struct MultiDaySchedule: View {
         switch e.pill {
         case .high:
             Text("↑ HIGH")
-                .font(.geistMono(10, .medium)).tracking(0.5)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.rising, in: Capsule())
         case .low:
             Text("↓ LOW")
-                .font(.geistMono(10, .medium)).tracking(0.5)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.falling, in: Capsule())
@@ -774,13 +774,13 @@ struct MultiDaySchedule: View {
                 if let deg = e.arrowDeg { CompassArrow(deg: deg) }
                 Text(e.pill == .flood ? "FLOOD" : "EBB")
             }
-            .font(.geistMono(10, .medium)).tracking(0.5)
+            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(SN.navyDeep)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(e.pill == .flood ? SN.rising : SN.falling, in: Capsule())
         case .slack:
             Text("● SLACK")
-                .font(.geistMono(10, .medium)).tracking(0.5)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
