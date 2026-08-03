@@ -106,8 +106,19 @@ struct GateView: View {
                         }
                         .font(.body.weight(.semibold))
                         .foregroundStyle(SN.navyDeep)
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: 320)
-                        .frame(height: 54)
+                        // Content sizes the capsule; `minHeight` keeps the 54pt
+                        // look at default sizes without capping growth. A fixed
+                        // `.frame(height: 54)` here silently truncated the label
+                        // at accessibility sizes ("Use My…"), because a `Text`
+                        // given too little height degrades by DROPPING CONTENT,
+                        // not by overflowing — the opposite of an `Image`, which
+                        // ignores the proposal and draws past its frame. Text
+                        // fails silently; images fail visibly. Never pin a
+                        // height around text you need read.
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 54)
                         .background(SN.leaf, in: Capsule())
                         .shadow(color: SN.leaf.opacity(0.3), radius: 13, y: 10)
                     }
@@ -175,14 +186,17 @@ struct StationListView: View {
     private static let fabSize: CGFloat = 56
     private static let fabBarBottomPadding: CGFloat = 24
     private static let fabFootprint: CGFloat = fabSize + fabBarBottomPadding
+    /// Footprint plus the 16pt of breathing room the design intends — the
+    /// bare footprint is flush contact (last card touching the FABs), which
+    /// is not the floor we want. Both the base and the clamp use this.
+    private static let fabClearanceBase: CGFloat = fabFootprint + 16
     /// The FABs don't grow, but the row heights do — without this the last
     /// card ends up under them at large sizes. List-level, not card-level.
     /// `@ScaledMetric` scales in BOTH directions from the default category, so
     /// below default text size this shrinks too — but the FABs' own footprint
-    /// never does. Base keeps the original 16pt of breathing room above the
-    /// bare footprint; clamped at the call site so the clearance can grow
-    /// past that but never fall under the fixed footprint itself.
-    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabFootprint + 16
+    /// never does. Clamped at the call site so the clearance can grow past
+    /// the base but never fall below it.
+    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabClearanceBase
     /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
     /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
     @ScaledMetric(relativeTo: .title3) private var deniedIconTileSize: CGFloat = 46
@@ -349,8 +363,8 @@ struct StationListView: View {
                     Group {
                         header
                         locatedSections
-                        // max: never shrinks below the fixed FAB footprint at small text sizes.
-                        Color.clear.frame(height: max(fabClearance, Self.fabFootprint))  // scroll clear of the FABs
+                        // max: never shrinks below the intended footprint + margin at small text sizes.
+                        Color.clear.frame(height: max(fabClearance, Self.fabClearanceBase))  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
