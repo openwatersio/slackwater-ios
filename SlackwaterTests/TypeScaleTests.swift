@@ -195,6 +195,30 @@ extension TypeScaleTests {
                       "chrome must live in StationCard.swift, found \(sites[0])")
     }
 
+    /// The wordmark's minimumScaleFactor is load-bearing: it shares the 320pt
+    /// iPad sidebar row with two 34pt buttons and would break as "Slackwat/er".
+    /// Every other name wraps instead of shrinking. This fails in both
+    /// directions — a blanket removal, or a fresh one creeping back in.
+    func testOnlyTheWordmarkShrinks() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Slackwater")
+        let files = try XCTUnwrap(
+            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        var sites: [String] = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let source = try String(contentsOf: url, encoding: .utf8)
+            for (n, line) in source.components(separatedBy: .newlines).enumerated()
+            where line.contains("minimumScaleFactor") {
+                sites.append("\(url.lastPathComponent):\(n + 1)")
+            }
+        }
+        XCTAssertEqual(sites.count, 1,
+                       "exactly one minimumScaleFactor should remain (the wordmark), found: \(sites)")
+        XCTAssertTrue(sites[0].hasPrefix("SlackwaterApp.swift:"),
+                      "the survivor must be the wordmark, found \(sites[0])")
+    }
+
     /// The nearest enclosing `func`/computed `var` above line `n`: a line
     /// that (after any access modifiers) contains `func <name>` or
     /// `var <name>` and ends with an unmatched opening brace. Indentation-
@@ -213,5 +237,37 @@ extension TypeScaleTests {
             i -= 1
         }
         return nil
+    }
+}
+
+extension TypeScaleTests {
+    /// ViewThatFits gives no supported way to ask which candidate it chose, so
+    /// the split is: unit-test what each tier CONTAINS, screenshot which one
+    /// gets PICKED. Do not try to unit-test the picker — that road ends in a
+    /// weakened test, which is how this project's colour guard went wrong four
+    /// times before it was restructured.
+    func testTiersShedInTheSpecifiedOrder() {
+        XCTAssertEqual(CardTier.full.fields,
+                       [.glyph, .name, .region, .distance, .detail, .trailing])
+        XCTAssertEqual(CardTier.reduced.fields,
+                       [.glyph, .name, .region, .trailing])
+        XCTAssertEqual(CardTier.essential.fields,
+                       [.glyph, .name, .trailing])
+    }
+
+    /// The two properties the shed order has to keep, stated as tests so a
+    /// future reorder has to argue with them.
+    func testEveryTierKeepsNameAndTrailing() {
+        for tier in CardTier.allCases {
+            XCTAssertTrue(tier.fields.contains(.name), "\(tier) dropped the name")
+            XCTAssertTrue(tier.fields.contains(.trailing), "\(tier) dropped the reading")
+        }
+    }
+
+    func testRegionOutlivesDistanceAndDetail() {
+        let reduced = CardTier.reduced.fields
+        XCTAssertTrue(reduced.contains(.region), "region must survive into reduced")
+        XCTAssertFalse(reduced.contains(.distance), "distance sheds before region")
+        XCTAssertFalse(reduced.contains(.detail), "detail sheds before region")
     }
 }

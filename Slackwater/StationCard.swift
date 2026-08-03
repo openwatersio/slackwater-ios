@@ -1,5 +1,32 @@
 import SwiftUI
 
+enum CardField: Equatable { case glyph, name, region, distance, detail, trailing }
+
+/// Shed order: distance, then detail, then nothing more — region and the
+/// reading are load-bearing at every size. Asserted in TypeScaleTests.
+///
+/// Distance goes first because the list's own grouping already answers "which
+/// of these is near me". The detail line goes second because "when" is the
+/// detail view's whole job, one tap away. Region survives longest because it
+/// is the only thing separating "Victoria" from "Victoria Harbour" from
+/// "Victoria Inner Harbour" — a truncated ambiguous name is worse than a
+/// missing one.
+///
+/// Top-level, not nested in `StationCard`: nesting inside a generic would
+/// force every assertion to spell `StationCard<EmptyView, EmptyView>.Tier`,
+/// and the tiers have nothing to do with the shell's generic parameters.
+enum CardTier: CaseIterable {
+    case full, reduced, essential
+
+    var fields: [CardField] {
+        switch self {
+        case .full:      [.glyph, .name, .region, .distance, .detail, .trailing]
+        case .reduced:   [.glyph, .name, .region, .trailing]
+        case .essential: [.glyph, .name, .trailing]
+        }
+    }
+}
+
 /// The one card shell. Four variants used to hand-roll this chrome; they
 /// drifted, and Task 4's ViewThatFits needs a single place to live.
 ///
@@ -25,26 +52,36 @@ struct StationCard<Trailing: View, Badge: View>: View {
     @ViewBuilder var badge: () -> Badge
     @ViewBuilder var trailing: () -> Trailing
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+    /// `message` has no `CardField` of its own and is not shed by tier: it is
+    /// prose that stands in for the whole reading on a pending card (glyph +
+    /// name + an honest "why there's nothing yet" sentence, `trailing` empty)
+    /// and dropping it at a narrow width would leave that card with no
+    /// explanation at all. It renders unconditionally, below the row, same as
+    /// before Task 4.
+    @ViewBuilder
+    func content(for tier: CardTier) -> some View {
+        let fields = tier.fields
+        VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 StationGlyph(kind: glyphKind, tone: glyphTone)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
-                    HStack(spacing: 7) {
-                        badge()
-                        Text(region)
-                            .font(.footnote)
-                            .foregroundStyle(SN.foam.opacity(0.78))
+                    if fields.contains(.region) {
+                        HStack(spacing: 7) {
+                            badge()
+                            Text(region)
+                                .font(.footnote)
+                                .foregroundStyle(SN.foam.opacity(0.78))
+                        }
                     }
-                    if let km {
+                    if fields.contains(.distance), let km {
                         Text(formatNm(km))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
-                    if let detail {
+                    if fields.contains(.detail), let detail {
                         Text(detail)
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.92))
@@ -68,6 +105,17 @@ struct StationCard<Trailing: View, Badge: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .opacity(opacity)
+    }
+
+    var body: some View {
+        // Which candidate wins is verified by screenshot (Task 6), not by unit
+        // test — ViewThatFits exposes no way to ask. The tiers' CONTENTS are
+        // unit-tested in TypeScaleTests.
+        ViewThatFits(in: .horizontal) {
+            content(for: .full)
+            content(for: .reduced)
+            content(for: .essential)
+        }
     }
 }
 

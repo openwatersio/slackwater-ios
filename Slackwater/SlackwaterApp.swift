@@ -1002,8 +1002,6 @@ struct RecentRowLabel: View {
                 Text(item.name)
                     .font(.callout.weight(.medium))
                     .foregroundStyle(SN.paper)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 HStack(spacing: 8) {
                     Text(item.region)
                         .font(.caption)

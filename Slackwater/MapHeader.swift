@@ -63,8 +63,6 @@ struct MapHeader: View {
                         Text(name)
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                         MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
                     }
                     .padding(.horizontal, 14)
