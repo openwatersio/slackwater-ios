@@ -122,6 +122,18 @@ final class ColourAndFormTests: XCTestCase {
                      "colour must never be matched against kind")
     }
 
+    func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {
+        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
+        // Every pin feature must declare a state, defaulting to unknown.
+        XCTAssertTrue(source.contains("\"state\""), "pin features must carry a state property")
+        // Colour must be matched against state, never kind.
+        XCTAssertNotNil(source.range(of: #"\["get", "state"\]"#, options: .regularExpression),
+                        "colour must be driven by state")
+        XCTAssertNil(source.range(of: #"(circle-color|icon-color)[^\n]*\["get", "kind"\]"#,
+                                  options: .regularExpression),
+                     "colour must never be matched against kind")
+    }
+
     /// `#filePath` of this test file resolves to the repo, so the source under
     /// test can be read relative to it.
     private func mapScreenPath() -> String {

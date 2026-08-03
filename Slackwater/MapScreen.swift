@@ -42,6 +42,47 @@ private let PIN_NEUTRAL = "#7d9cb8"
 // the two literals cannot drift apart again.
 private let PIN_RADIUS: Double = 5
 
+// A pin's colour by state — literally the same expression on both pin layers
+// (Task 5), so kind (which layer a pin lands in) cannot influence colour.
+// Hex literals, not `SN` tokens: MapLibre style dicts take strings and can't
+// read a Swift `Color`. Keep these in step with Theme.swift by hand.
+private let PIN_STATE_COLOUR: [Any] = [
+    "match", ["get", "state"],
+    "rising", "#4a9fd8", "flood", "#4a9fd8",
+    "falling", "#e8a33d", "ebb", "#e8a33d",
+    "slack", "#88b868",
+    "#7d9cb8",   // unknown
+]
+
+private func phaseName(_ phase: CurrentPhase) -> String {
+    switch phase {
+    case .flood: "flood"
+    case .ebb: "ebb"
+    case .slack: "slack"
+    }
+}
+
+/// A station's state as a tone name, for the pin's colour.
+///
+/// Synchronous only. Bundled NOAA stations predict on device from their own
+/// harmonics. Every CHS-provenance item — a CHS tide port, a derived gate
+/// (its slack derives from a CHS reference port's fitted tide), or a
+/// validated CHS current gate — resolves through `ChsFitService`'s async fit
+/// cache, so all three report "unknown" and draw neutral: an honest
+/// admission, not a guess. On a boat a wrong slack is worse than an admitted
+/// grey. Wiring the async CHS cache in is a follow-on, deliberately not done
+/// here.
+private func pinTone(_ item: StationItem, at now: Date) -> String {
+    switch item {
+    case .tide(let record):
+        return record.cardState(at: now).rising ? "rising" : "falling"
+    case .current(let station):
+        return phaseName(currentPhase(signed: station.cardState(at: now).signed))
+    case .chs, .chsGate, .chsCurrent:
+        return "unknown"   // async CHS fit cache — see the doc comment above
+    }
+}
+
 /// Every bundled station as a GeoJSON pin. Identity only — no readings.
 private func pinFeatures() -> [String: Any] {
     [
@@ -50,7 +91,8 @@ private func pinFeatures() -> [String: Any] {
             [
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
-                "properties": ["id": s.id, "name": s.name, "kind": s.pinKind],
+                "properties": ["id": s.id, "name": s.name, "kind": s.pinKind,
+                               "state": pinTone(s, at: appNow())],
             ] as [String: Any]
         },
     ]
@@ -114,7 +156,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
         "filter": ["all", notACluster, ["==", ["get", "kind"], "current"]] as [Any],
         "paint": [
             "circle-radius": PIN_RADIUS,
-            "circle-color": PIN_NEUTRAL,
+            "circle-color": PIN_STATE_COLOUR,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
         ],
@@ -129,7 +171,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
             "icon-ignore-placement": true,
         ],
         "paint": [
-            "icon-color": PIN_NEUTRAL,
+            "icon-color": PIN_STATE_COLOUR,
             "icon-halo-color": WATER_TONE,
             "icon-halo-width": 1.5,
         ],
