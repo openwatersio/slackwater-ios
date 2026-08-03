@@ -830,7 +830,16 @@ struct StationListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 48)
+            // Same fix as the gate button: content sizes the pill, `minHeight`
+            // keeps the 48pt look at default sizes. A fixed `.frame(height: 48)`
+            // left the field's text hanging out of its own capsule at
+            // accessibility sizes. `TextField` fails the way an `Image` does,
+            // NOT the way a `Text` does: it reports its intrinsic line height
+            // (65pt at AX5) and draws past a smaller frame, where a `Text`
+            // would have quietly truncated instead. Visible either way here,
+            // since the capsule is a background, not a clip.
+            .padding(.vertical, 13)
+            .frame(minHeight: 48)
             .background(Color.white.opacity(0.08), in: Capsule())
             .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
 
