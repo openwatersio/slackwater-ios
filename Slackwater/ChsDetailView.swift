@@ -211,7 +211,7 @@ struct ChsAmberCard: View {
             Button(action: onAction) {
                 HStack(spacing: 4) {
                     Text(action)
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)

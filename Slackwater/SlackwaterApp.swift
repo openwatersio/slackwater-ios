@@ -171,6 +171,11 @@ struct StationListView: View {
     @State private var didAutoSelect = false
     /// The FABs don't grow, but the row heights do — without this the last
     /// card ends up under them at large sizes. List-level, not card-level.
+    /// `@ScaledMetric` scales in BOTH directions from the default category, so
+    /// below default text size this shrinks too — but the FABs' own footprint
+    /// (`fab()`'s fixed 56pt circle + `fabBar`'s fixed 24pt bottom padding,
+    /// `SlackwaterApp.swift`) never does. Clamped at the call site so the
+    /// clearance can grow past 96 but never fall under it.
     @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = 96
 
     private var regular: Bool { hSize == .regular }
@@ -335,7 +340,8 @@ struct StationListView: View {
                     Group {
                         header
                         locatedSections
-                        Color.clear.frame(height: fabClearance)  // scroll clear of the FABs
+                        // max: never shrinks below the fixed FAB footprint at small text sizes.
+                        Color.clear.frame(height: max(fabClearance, 96))  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -634,7 +640,7 @@ struct StationListView: View {
                 HStack(spacing: 4) {
                     Spacer()
                     Text("Go to Settings")
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)

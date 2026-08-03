@@ -248,12 +248,23 @@ struct SunPill: View {
 /// background change and was never the tight number. Numbers in
 /// docs/testflight.md updated to match.
 struct ProvisionalBadge: View {
+    /// Tracks the icon's own `.caption2` so the disc keeps containing the
+    /// triangle instead of being outgrown by it (Task 5 fix round: the icon
+    /// was scaled here but the frame was left literal, and `.caption2` at the
+    /// largest accessibility category overflows a fixed 22pt circle).
+    @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 22
+
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
             .font(.caption2.weight(.semibold))
             .foregroundStyle(SN.amber)
-            .frame(width: 22, height: 22)
+            .frame(width: badgeSize, height: badgeSize)
             .background(SN.canvas, in: Circle())
+            // Stroke stays a fixed 1pt hairline outline, not scaled: it's a
+            // thin separator against the canvas, not a mark that needs to
+            // read at a distance, and a 1pt ring looks correct at every size
+            // tried (default through AX5) — unlike the icon, it was never
+            // sized to be legible, only to be visible.
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")
