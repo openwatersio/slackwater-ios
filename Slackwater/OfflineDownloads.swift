@@ -79,8 +79,14 @@ struct OfflineStatusButton: View {
                         .rotationEffect(.degrees(-90))
                         .frame(width: 28, height: 28)
                 }
+                // Fixed, not scaled: this button is one of the two 34pt chrome
+                // circles the list header's wordmark comment is calibrated
+                // against (SlackwaterApp.swift `header`, beside the gear,
+                // which stays fixed too) — the same 320pt iPad sidebar row.
+                // Step 5b's table called this a text companion; it isn't one —
+                // reverted to its pre-Task-5 literal size (sweep finding).
                 Image(systemName: icon)
-                    .font(.footnote.weight(.medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(tint)
             }
             .frame(width: 34, height: 34)

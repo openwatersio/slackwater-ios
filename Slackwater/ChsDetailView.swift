@@ -180,13 +180,19 @@ struct ChsAmberCard: View {
     let identifier: String
     let onAction: () -> Void
 
+    /// Tracks the icon's own `.title3` so the tile keeps containing the
+    /// triangle instead of being outgrown by it (sweep finding: Step 5b's
+    /// text-companion conversion scaled the icon but left this frame literal,
+    /// same failure shape as `ProvisionalBadge` before its own fix).
+    @ScaledMetric(relativeTo: .title3) private var iconTileSize: CGFloat = 46
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title3)
                     .foregroundStyle(SN.amber)
-                    .frame(width: 46, height: 46)
+                    .frame(width: iconTileSize, height: iconTileSize)
                     .background(SN.amber.opacity(0.16),
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .accessibilityLabel("Warning")

@@ -177,6 +177,9 @@ struct StationListView: View {
     /// `SlackwaterApp.swift`) never does. Clamped at the call site so the
     /// clearance can grow past 96 but never fall under it.
     @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = 96
+    /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
+    /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
+    @ScaledMetric(relativeTo: .title3) private var deniedIconTileSize: CGFloat = 46
 
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
@@ -625,7 +628,7 @@ struct StationListView: View {
                     Image(systemName: "location.slash")
                         .font(.title3)
                         .foregroundStyle(SN.amber)
-                        .frame(width: 46, height: 46)
+                        .frame(width: deniedIconTileSize, height: deniedIconTileSize)
                         .background(SN.amber.opacity(0.16),
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
@@ -981,6 +984,11 @@ struct RecentRowLabel: View {
     @State private var current: CurrentCardState?
     @State private var gate: DerivedGateCardState?  // derived gate: phase word, never a speed
     @ScaledMetric(relativeTo: .callout) private var tileGlyphSize: CGFloat = 26
+    /// The glyph's slot — tracks `tileGlyphSize` (sweep finding: `StationGlyph`
+    /// sizes its own internal `Canvas` from `size`, but this outer frame was
+    /// left at a literal 38, so once `tileGlyphSize` outgrew it the glyph
+    /// overflowed the slot into the row's name/reading text beside it).
+    @ScaledMetric(relativeTo: .callout) private var tileGlyphSlot: CGFloat = 38
 
     private var glyphKind: StationGlyph.GlyphKind {
         switch item {
@@ -1001,7 +1009,7 @@ struct RecentRowLabel: View {
     var body: some View {
         HStack(spacing: 12) {
             StationGlyph(kind: glyphKind, tone: glyphTone, size: tileGlyphSize)
-                .frame(width: 38, height: 38)
+                .frame(width: tileGlyphSlot, height: tileGlyphSlot)
             // The name owns the full row width (M50). It used to share the
             // line with the reading, which in the 320pt iPad sidebar left it
             // ~150pt — "Deception Pass State Park" came out "Deception Pas…",
