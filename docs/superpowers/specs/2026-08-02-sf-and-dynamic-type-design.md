@@ -58,6 +58,19 @@ Replace `.fraunces(_:_:)`, `.geist(_:_:)` and `.geistMono(_:_:)` with semantic D
 `.largeTitle`, `.title2`, `.subheadline`, `.caption` and so on — chosen to approximate the existing
 hierarchy rather than to preserve exact point sizes.
 
+**This is a collapse, not a substitution.** The 119 call sites use **41 distinct (size, weight)
+combinations** — nine different `geist` sizes from 9 to 17 alone. Very little of that spread encodes
+a real distinction; it is the accumulated residue of tuning each screen by eye. Mapping it onto ~10
+semantic styles deliberately merges neighbours (13 and 14 both become `.footnote`; 9 and 10 both
+become `.caption2`). Preserving all 41 would defeat the point — an ad-hoc scale is precisely what
+the review called "inconsistently applied."
+
+**One visible consequence, called out so it is a decision rather than a surprise:** the hero numeral
+goes from a fixed 42pt to `.largeTitle`, which is 34pt at the default setting. It reads smaller on a
+default phone. It also, for the first time, *scales* — to roughly 60pt at the largest accessibility
+size, where before it was frozen at 42 no matter what the reader asked for. That trade is the whole
+point of the piece, but it should be seen in a screenshot before it is called done.
+
 `.monospacedDigit()` goes on every numeric reading. A column of heights that shifts as digits change
 is harder to read than one that does not, and there are currently **zero** uses of it in the app.
 
@@ -81,7 +94,20 @@ matters beyond accessibility: the iPad's ~320pt sidebar truncates station names 
 size* today. A `dynamicTypeSize` threshold would never catch that; measured fit catches both with one
 mechanism, and degrades at every intermediate size rather than snapping at one boundary.
 
-All five card variants share one shell, so this is applied once.
+**The shell does not exist yet — extracting it is a prerequisite, not a given.** An earlier
+draft of this spec claimed the five variants already shared one shell and that `ViewThatFits`
+could therefore be applied once. Reading the code disproved it: the chrome (20/16 padding,
+`minHeight: 96`, `cardFill`, 24pt radius, the navy shadow) is copy-pasted across four variants,
+with a fifth spelling it differently via `.fill`.
+
+They are, however, cleanly extractable. `StationCardView` and `CurrentCardView` have the *same*
+skeleton — glyph, name, region, distance, next-extreme, spacer, trailing value block — differing
+only in three places: the glyph kind, an optional `ProvisionalBadge` beside the region, and the
+trailing content (which has a `SLACK` pill branch on currents). That is a shell with a
+`@ViewBuilder` trailing slot.
+
+So: extract first, then apply `ViewThatFits` once. Applying it five times to five hand-rolled
+layouts would be five chances to get the shed order wrong.
 
 ## 3. The three tiers
 
@@ -106,8 +132,20 @@ Nothing is lost, only deferred: every shed fact is on the detail view.
 **The glyph scales.** `@ScaledMetric` on `StationGlyph`'s size, so it grows with the text instead of
 sitting as a 24pt mark beside 40pt type.
 
-**`minimumScaleFactor` comes off** the name treatments (`SlackwaterApp.swift:1088, 1198, 1276`,
-`MapHeader.swift:67`, and the others). Names wrap instead.
+**`minimumScaleFactor` comes off the station names.** There are seven sites; six come off and one
+stays, and the difference matters:
+
+| Site | What it is | Verdict |
+|---|---|---|
+| `SlackwaterApp.swift:1088, 1198, 1276, 1387` | station name, all four card variants | **remove** — wrap instead |
+| `SlackwaterApp.swift:1006` | station name in the map tile | **remove** |
+| `MapHeader.swift:67` | station name in the map header | **remove** |
+| `SlackwaterApp.swift:658` | the **wordmark** | **keep** |
+
+The wordmark keeps its `0.6` because the code already says why: *"The wordmark never wraps: in the
+320pt iPad sidebar it shares the row with two 34pt buttons and would break as 'Slackwat/er'."* That
+is a fixed-width constraint with no reflow available, which is the one case where shrinking beats
+wrapping. A blanket removal would reintroduce precisely the bug that comment was written to record.
 
 **The FAB clearance scales.** The list's `Color.clear.frame(height: 96)` bottom spacer must grow with
 type, or the last card sits under the buttons however well the card itself reflows. This is
