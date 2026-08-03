@@ -44,3 +44,35 @@ final class TypeScaleTests: XCTestCase {
                        "no .ttf should be referenced from project.yml")
     }
 }
+
+extension TypeScaleTests {
+    /// Every formatter that produces a number feeds a Text that must not
+    /// jitter as digits change. Asserted on source text because SwiftUI
+    /// exposes no way to read a resolved Font back off a view.
+    func testNumericFormattersAreMonospacedDigit() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Slackwater")
+        let formatters = ["formatHeight(", "formatSpeed(", "formatNm(", "cardTime("]
+        let files = try XCTUnwrap(
+            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        var checked = 0
+        var offenders: [String] = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let source = try String(contentsOf: url, encoding: .utf8)
+            let lines = source.components(separatedBy: .newlines)
+            for (n, line) in lines.enumerated() where formatters.contains(where: line.contains) {
+                guard line.contains("Text(") else { continue }
+                checked += 1
+                // The .font() modifier may sit on this line or the next few.
+                let window = lines[n..<min(n + 4, lines.count)].joined(separator: "\n")
+                if !window.contains("monospacedDigit()") {
+                    offenders.append("\(url.lastPathComponent):\(n + 1): \(line.trimmingCharacters(in: .whitespaces))")
+                }
+            }
+        }
+        XCTAssertGreaterThan(checked, 5, "expected to find numeric Text sites, found \(checked)")
+        XCTAssertTrue(offenders.isEmpty,
+                      "numeric reading without .monospacedDigit():\n" + offenders.joined(separator: "\n"))
+    }
+}

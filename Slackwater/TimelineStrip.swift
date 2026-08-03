@@ -300,7 +300,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
                 ctx.draw(Text("\(arrow)\(cardTime(t, data.tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.caption2.monospaced().weight(.medium))
+                            .font(.caption2.monospaced().weight(.medium).monospacedDigit())
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
@@ -339,7 +339,7 @@ struct TimelineCanvas: View {
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                      with: .color(.white))
             ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.caption2.weight(.semibold)).foregroundStyle(.white),
+                        .font(.caption2.weight(.semibold).monospacedDigit()).foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
         }
     }
@@ -394,7 +394,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption2.weight(.semibold).monospacedDigit())
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
                          anchor: .center)
@@ -727,7 +727,7 @@ struct MultiDaySchedule: View {
                                     .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
                                 Spacer()
                                 Text(e.value ?? "—")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(.subheadline.weight(.semibold).monospacedDigit())
                                     .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                 pillView(e)
                                     .frame(width: 84, alignment: .trailing)

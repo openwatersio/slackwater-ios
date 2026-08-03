@@ -107,7 +107,7 @@ struct CurrentDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.title.weight(.medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -130,7 +130,7 @@ struct CurrentDetailView: View {
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 3) {
                         MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
-                        (Text(formatHeight(portHeight(port, at: scrubTime), imperial: imperial)).font(.title2)
+                        (Text(formatHeight(portHeight(port, at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
                          + Text(" \(heightUnit(imperial: imperial))").font(.caption))
                             .foregroundStyle(SN.foam)
                     }
@@ -140,7 +140,7 @@ struct CurrentDetailView: View {
                             MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
                                       color: SN.foam.opacity(0.5), tracking: 1.4)
                             Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, tz))")
-                                .font(.caption).foregroundStyle(SN.leaf)
+                                .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                         }
                     }
                 }
@@ -160,13 +160,13 @@ struct CurrentDetailView: View {
                         Text("Slack").font(.largeTitle)
                             .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                         Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))
+                            .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
                         // The tilde is the whole point of the provisional
                         // treatment: the number itself stops claiming to be
                         // exact, before any badge or card is read.
                         (Text(provisionalGate == nil ? "" : "~").font(.largeTitle)
-                         + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle)
+                         + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
                          + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
                             .foregroundStyle(readingColor)
                         HStack(spacing: 4) {
@@ -190,13 +190,14 @@ struct CurrentDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+                            .font(.caption.monospacedDigit())
                             // SN.go, not SN.leaf: this line says when slack is.
                             // Same value today, but the token has to name the
                             // meaning or retargeting one of them breaks it.
-                            .font(.caption).foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
+                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                                .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
+                                .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                         }
                     }
                 }

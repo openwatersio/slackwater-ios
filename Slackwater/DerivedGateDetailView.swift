@@ -83,7 +83,7 @@ struct DerivedGateDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.title.weight(.medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -105,7 +105,7 @@ struct DerivedGateDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
                     MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
-                    (Text(formatHeight(portHeight(at: scrubTime), imperial: imperial)).font(.title2)
+                    (Text(formatHeight(portHeight(at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
                      + Text(" \(heightUnit(imperial: imperial))").font(.caption))
                         .foregroundStyle(SN.foam)
                 }
@@ -115,7 +115,7 @@ struct DerivedGateDetailView: View {
                         MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, tz))")
-                            .font(.caption).foregroundStyle(SN.leaf)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
             }
@@ -143,7 +143,7 @@ struct DerivedGateDetailView: View {
                         MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
                             // SN.go, not SN.leaf: this line says when slack is.
-                            .font(.caption).foregroundStyle(SN.go)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
                         Text("at \(slack.highWater ? "high" : "low") water")
                             .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                     }

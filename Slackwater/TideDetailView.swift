@@ -66,7 +66,7 @@ struct TideDetailView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.title.weight(.medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -86,7 +86,7 @@ struct TideDetailView: View {
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
-                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle)
+                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
                      + Text(" \(unit)").font(.footnote))
                         .foregroundStyle(.white)
                     HStack(spacing: 4) {
@@ -101,9 +101,9 @@ struct TideDetailView: View {
                         MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
-                            .font(.title3).foregroundStyle(SN.foam)
+                            .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
                         Text("in \(countdown(from: scrubTime, to: next.time)) · \(cardTime(next.time, tz))")
-                            .font(.caption).foregroundStyle(SN.leaf)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
             }

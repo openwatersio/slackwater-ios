@@ -940,7 +940,7 @@ struct StationChooserSheet: View {
                 }
                 Spacer(minLength: 8)
                 Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
-                    .font(.caption.monospaced().weight(.medium))
+                    .font(.caption.monospaced().weight(.medium).monospacedDigit())
                     .foregroundStyle(SN.foam.opacity(0.85))
             }
             .padding(.horizontal, 16)
@@ -1011,7 +1011,7 @@ struct RecentRowLabel: View {
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Text(reading)
-                        .font(.subheadline)
+                        .font(.subheadline.monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -1091,12 +1091,12 @@ struct StationCardView: View {
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.next {
                         Text("\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))")
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1105,7 +1105,7 @@ struct StationCardView: View {
                 VStack(alignment: .trailing, spacing: 5) {
                     if let state {
                         (Text(formatHeight(state.height, imperial: imperial))
-                            .font(.largeTitle)
+                            .font(.largeTitle.monospacedDigit())
                          + Text(" \(heightUnit(imperial: imperial))")
                             .font(.body))
                             .foregroundStyle(.white)
@@ -1201,7 +1201,7 @@ struct ChsPendingCard: View {
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
@@ -1279,12 +1279,12 @@ struct ChsGateCardView: View {
                         .foregroundStyle(SN.foam.opacity(0.78))
                     if let km {
                         Text(formatNm(km))
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.nextSlack {
                         Text("Slack · \(cardTime(next.time, gate.tz))")
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1393,12 +1393,12 @@ struct CurrentCardView: View {
                     }
                     if let km {
                         Text(formatNm(km))
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                     if let next = state?.next {
                         Text(nextLine(next))
-                            .font(.caption)
+                            .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.92))
                             .padding(.top, 10)
                     }
@@ -1417,7 +1417,7 @@ struct CurrentCardView: View {
                                 .background(SN.go, in: Capsule())
                         } else {
                             (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
-                                .font(.largeTitle)
+                                .font(.largeTitle.monospacedDigit())
                              + Text(" \(speedUnitLabel(speedUnit))")
                                 .font(.body))
                                 .foregroundStyle(.white)
