@@ -131,6 +131,27 @@ extension TypeScaleTests {
                       + offenders.joined(separator: "\n"))
     }
 
+    /// The chrome lived in four places and drifted. One shell owns it now;
+    /// this fails if a variant grows its own copy back.
+    func testCardChromeLivesInExactlyOnePlace() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Slackwater")
+        let files = try XCTUnwrap(
+            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        var sites: [String] = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let source = try String(contentsOf: url, encoding: .utf8)
+            for (n, line) in source.components(separatedBy: .newlines).enumerated()
+            where line.contains("minHeight: 96") {
+                sites.append("\(url.lastPathComponent):\(n + 1)")
+            }
+        }
+        XCTAssertEqual(sites.count, 1, "card chrome must exist once, found: \(sites)")
+        XCTAssertTrue(sites[0].hasPrefix("StationCard.swift:"),
+                      "chrome must live in StationCard.swift, found \(sites[0])")
+    }
+
     /// The nearest enclosing `func`/computed `var` above line `n`: a line
     /// that (after any access modifiers) contains `func <name>` or
     /// `var <name>` and ends with an unmatched opening brace. Indentation-

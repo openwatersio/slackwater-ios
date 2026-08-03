@@ -1077,53 +1077,24 @@ struct StationCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: .tide, tone: Self.glyphTone(state))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.name)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(record.region)
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                    if let km {
-                        Text(formatNm(km))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                    }
-                    if let next = state?.next {
-                        Text("\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
+        StationCard(glyphKind: .tide, glyphTone: Self.glyphTone(state),
+                    name: record.name, region: record.region, km: km,
+                    detail: state?.next.map { next in
+                        "\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))"
+                    }) {
+            if let state {
+                (Text(formatHeight(state.height, imperial: imperial))
+                    .font(.largeTitle.monospacedDigit())
+                 + Text(" \(heightUnit(imperial: imperial))")
+                    .font(.body))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Text(state.rising ? "▲" : "▼").font(.caption2)
+                    Text(state.rising ? "Rising" : "Falling").font(.caption2)
                 }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let state {
-                        (Text(formatHeight(state.height, imperial: imperial))
-                            .font(.largeTitle.monospacedDigit())
-                         + Text(" \(heightUnit(imperial: imperial))")
-                            .font(.body))
-                            .foregroundStyle(.white)
-                        HStack(spacing: 4) {
-                            Text(state.rising ? "▲" : "▼").font(.caption2)
-                            Text(state.rising ? "Rising" : "Falling").font(.caption2)
-                        }
-                        .foregroundStyle(SN.foam.opacity(0.9))
-                    }
-                }
+                .foregroundStyle(SN.foam.opacity(0.9))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(SN.cardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 }
@@ -1187,43 +1158,16 @@ struct ChsPendingCard: View {
     let message: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: kind, tone: .unknown)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(region)
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                    if let km {
-                        Text(formatNm(km))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                    }
-                }
-                Spacer(minLength: 8)
-            }
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(SN.foam.opacity(0.85))
-                .padding(.top, 10)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(SN.cardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
-        .opacity(0.82)  // visibly quieter than a station with numbers
-        // Named per station (M53). "Some card on screen says 'Canadian tidal
-        // predictions'" was a unique locator at 21 Canadian stations and is
-        // meaningless at 1,097 — every undownloaded station says it, so a test
-        // waiting for THIS station's copy to go never sees it go.
-        .accessibilityIdentifier("chs-pending-\(id)")
+        StationCard(glyphKind: kind, glyphTone: .unknown,
+                    name: name, region: region, km: km,
+                    detail: message,
+                    opacity: 0.82,  // visibly quieter than a station with numbers
+                    trailing: { EmptyView() })
+            // Named per station (M53). "Some card on screen says 'Canadian tidal
+            // predictions'" was a unique locator at 21 Canadian stations and is
+            // meaningless at 1,097 — every undownloaded station says it, so a test
+            // waiting for THIS station's copy to go never sees it go.
+            .accessibilityIdentifier("chs-pending-\(id)")
     }
 }
 
@@ -1265,51 +1209,24 @@ struct ChsGateCardView: View {
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: .current, tone: Self.glyphTone(state?.phase))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(gate.name)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(gate.region)
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                    if let km {
-                        Text(formatNm(km))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                    }
-                    if let next = state?.nextSlack {
-                        Text("Slack · \(cardTime(next.time, gate.tz))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
-                }
-                Spacer(minLength: 8)
-                if let state {
-                    // The web's phase-pill words: flood / ebb / slack. Slack
-                    // takes SN.go, not the neutral chip flood/ebb still use —
-                    // otherwise the glyph beside it reads green while this
-                    // pill reads grey, the exact collision Task 2 fixed on
-                    // the detail views (testSlackIsGreenWhereverItAppears).
-                    Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
-                        .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                        .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
-                }
+        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state?.phase),
+                    name: gate.name, region: gate.region, km: km,
+                    detail: state?.nextSlack.map { next in
+                        "Slack · \(cardTime(next.time, gate.tz))"
+                    }) {
+            if let state {
+                // The web's phase-pill words: flood / ebb / slack. Slack
+                // takes SN.go, not the neutral chip flood/ebb still use —
+                // otherwise the glyph beside it reads green while this
+                // pill reads grey, the exact collision Task 2 fixed on
+                // the detail views (testSlackIsGreenWhereverItAppears).
+                Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
+                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                    .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(SN.cardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 }
@@ -1376,67 +1293,34 @@ struct CurrentCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: .current, tone: Self.glyphTone(state))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.name)
-                        .font(.title2.weight(.semibold))
+        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state),
+                    name: record.name, region: record.region, km: km,
+                    detail: state?.next.map { nextLine($0) },
+                    badge: { if provisional != nil { ProvisionalBadge() } }) {
+            if let state {
+                let phase = currentPhase(signed: state.signed)
+                if phase == .slack {
+                    // SN.go, not a neutral chip — see the matching
+                    // comment on ChsGateCardView's phase pill.
+                    Text("SLACK")
+                        .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                        .foregroundStyle(SN.navyDeep)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(SN.go, in: Capsule())
+                } else {
+                    (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
+                        .font(.largeTitle.monospacedDigit())
+                     + Text(" \(speedUnitLabel(speedUnit))")
+                        .font(.body))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    HStack(spacing: 7) {
-                        if provisional != nil { ProvisionalBadge() }
-                        Text(record.region)
-                            .font(.footnote)
-                            .foregroundStyle(SN.foam.opacity(0.78))
+                    HStack(spacing: 4) {
+                        CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
+                        Text(phaseWord(phase)).font(.caption2)
                     }
-                    if let km {
-                        Text(formatNm(km))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                    }
-                    if let next = state?.next {
-                        Text(nextLine(next))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let state {
-                        let phase = currentPhase(signed: state.signed)
-                        if phase == .slack {
-                            // SN.go, not a neutral chip — see the matching
-                            // comment on ChsGateCardView's phase pill.
-                            Text("SLACK")
-                                .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                                .foregroundStyle(SN.navyDeep)
-                                .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(SN.go, in: Capsule())
-                        } else {
-                            (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
-                                .font(.largeTitle.monospacedDigit())
-                             + Text(" \(speedUnitLabel(speedUnit))")
-                                .font(.body))
-                                .foregroundStyle(.white)
-                            HStack(spacing: 4) {
-                                CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
-                                Text(phaseWord(phase)).font(.caption2)
-                            }
-                            .foregroundStyle(SN.foam.opacity(0.9))
-                        }
-                    }
+                    .foregroundStyle(SN.foam.opacity(0.9))
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(SN.cardFill)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
         // The refinement replaces the record under an open list: recompute.
         .onChange(of: record) { _, refined in state = refined.cardState(at: appNow()) }
