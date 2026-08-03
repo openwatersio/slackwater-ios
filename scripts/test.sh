@@ -8,6 +8,25 @@
 #
 # The two plans live in TestPlans/ and are checked in; see docs/testflight.md.
 set -euo pipefail
+
+# One test run at a time on this machine. Two concurrent `xcodebuild test` runs
+# SIGKILL each other's test runner — every UI test in the losing run reports
+# "Test crashed with signal kill" with zero assertion failures, which reads as a
+# real failure and isn't one. Separate simulator devices do NOT avoid it: CI died
+# this way five times on 2026-08-02, the last with CI and a local run on
+# different devices. Whoever gets here second waits.
+#
+# lockf(1) holds the lock in the kernel for the lifetime of the process, so a
+# killed or cancelled run releases it — a lock file with a PID in it would wedge
+# the next run instead. Re-exec before the cd below, while $0 still resolves
+# against the caller's directory.
+if [[ -z "${SLACKWATER_TEST_LOCK:-}" ]]; then
+  export SLACKWATER_TEST_LOCK=1
+  lockf -t 0 /tmp/slackwater-test.lock true 2>/dev/null \
+    || echo "another test run holds /tmp/slackwater-test.lock — waiting for it"
+  exec lockf /tmp/slackwater-test.lock "$0" "$@"
+fi
+
 cd "$(dirname "$0")/.."
 
 PLAN=Slackwater

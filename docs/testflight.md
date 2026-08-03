@@ -45,13 +45,33 @@ SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save scr
 SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 ```
 
-`SLACKWATER_SIMS` exists for CI. The self-hosted runner is this same Mac, and two
-`xcodebuild` runs booting one simulator device SIGKILL each other's test runner —
-you get "Test crashed with signal kill" on a handful of UI tests, and results bleed
-between the sessions, so CI can report a test that doesn't exist on the branch under
-test. CI therefore creates and uses `SlackwaterCI-iPhone` / `SlackwaterCI-iPad`,
-separate instances of the same two device types. Run `scripts/test.sh` locally
-whenever you like.
+### One test run at a time (2026-08-02)
+
+The self-hosted runner is this same Mac, so CI and a local run can overlap. When
+they do, they SIGKILL each other's test runner: every UI test in the losing run
+reports `Test crashed with signal kill` with **zero assertion failures**. It reads
+as a real failure and is not one. If you see that signature, check whether
+something else was testing at the same time before you debug the code.
+
+Five CI runs died this way on 2026-08-02 — 3, 6 and 16 UI tests at a time — and the
+last of them had CI and the local run on *different simulator devices*, so device
+separation does not avoid it. The exact kill mechanism was never pinned down; the
+CoreSimulator logs had already rolled off. The correlation with overlap was 5 for 5.
+
+So `scripts/test.sh` takes a machine-wide `lockf(1)` lock and whoever arrives second
+waits. Your local run can therefore sit for up to a full CI run before it starts —
+it prints a line when it's waiting. The lock lives in the kernel, so a killed or
+cancelled run releases it and nothing wedges.
+
+Two smaller pieces of the same story:
+
+- `SLACKWATER_SIMS` lets CI run on its own devices (`SlackwaterCI-iPhone` /
+  `SlackwaterCI-iPad`, created by the workflow, same device types as the reference
+  pair). That doesn't prevent the kill, but it does stop results bleeding between
+  overlapping sessions — CI once reported a failing test that didn't exist on the
+  branch under test.
+- Both plans write screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
+  otherwise, CI included, so a local run and CI overwrite each other's images.
 
 | Plan | File | Contents | Wall clock (per sim) |
 |---|---|---|---|
