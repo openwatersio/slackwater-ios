@@ -1015,48 +1015,80 @@ The unit tests cover what each tier contains. They cannot cover which tier gets 
 
 **The trap, recorded because the spike hit it:** an invalid content-size-category launch argument makes UIKit **silently fall back to the default** with no error. Two screenshots at supposedly different sizes come out byte-identical, and nothing warns you. `UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge` is **not** a real category — the accessibility ones are `UICTContentSizeCategoryAccessibilityM/L/XL/XXL/XXXL`. Verify every string against `UIContentSizeCategory` before trusting a single shot.
 
-- [ ] **Step 1: Capture the matrix**
+- [ ] **Step 1: Create your own devices — never drive the suite's**
 
-Five sizes × two devices. Use the simulator's content-size override:
+`iPhone 17` and `iPad Pro 11-inch (M5)` are the two devices `./scripts/test.sh` drives. Driving one while a suite runs collides with it: a reviewer's screenshot session on `iPhone 17` mid-run produced **nine spurious UI-test failures** that cost a full cycle to diagnose. This is the same class of contention that PR #17 fixed for CI-versus-local.
+
+Create your own, use only those, delete them when done:
 
 ```bash
-xcrun simctl boot "iPhone 17" 2>/dev/null || true
-for SIZE in UICTContentSizeCategoryS UICTContentSizeCategoryL \
-            UICTContentSizeCategoryXXL \
-            UICTContentSizeCategoryAccessibilityL \
-            UICTContentSizeCategoryAccessibilityXXXL; do
-  xcrun simctl spawn "iPhone 17" defaults write -g UIPreferredContentSizeCategoryName -string "$SIZE"
+PHONE=$(xcrun simctl create sw-verify-phone "iPhone 17")
+PAD=$(xcrun simctl create sw-verify-pad "iPad Pro 11-inch (M5)")
+```
+
+Building against the shared destinations is fine — it is driving the device that collides.
+
+- [ ] **Step 2: Capture the matrix**
+
+**Six** categories × two devices. Note `extra-small` is included deliberately: `@ScaledMetric` scales in *both* directions, and Task 5 shipped a bug where a scaling spacer dropped below fixed chrome at small sizes. That direction is the one nobody thinks to check, because Dynamic Type is reflexively tested by making text bigger.
+
+Prefer `simctl ui <device> content_size`, whose category names you can enumerate with `simctl help ui`:
+
+```bash
+for SIZE in extra-small small large extra-extra-large \
+            accessibility-large accessibility-extra-extra-extra-large; do
+  xcrun simctl ui "$PHONE" content_size "$SIZE"
+  xcrun simctl ui "$PHONE" content_size          # read it BACK — see the trap below
   # relaunch the app, then:
-  xcrun simctl io "iPhone 17" screenshot "/tmp/b2-shots/iphone-$SIZE.png"
+  xcrun simctl io "$PHONE" screenshot "/tmp/b2-shots/phone-$SIZE.png"
 done
 ```
 
-Repeat for `iPad Pro 11-inch (M4)`, including the split-view sidebar at ~320pt.
+Repeat for `$PAD`, including the split-view sidebar at ~320pt — that width selects a different tier than full-screen at the *same* text size, which is the whole reason the card adapts by measured fit rather than by a type-size threshold.
 
-- [ ] **Step 2: Prove the shots differ**
+Capture at minimum: the station list (both a tide and a current card), a pending CHS card, the search overlay with a query typed, the first-run gate button, and a detail view.
+
+- [ ] **Step 3: Prove the shots differ**
 
 ```bash
-ls -la /tmp/b2-shots/ | awk '{print $5, $9}'
 md5 /tmp/b2-shots/*.png | sort
 ```
 
-Any two identical file sizes or matching hashes across *different* size settings means the override did not take — go back and check the category string. Do not proceed on a matrix you have not proved is real.
+Any two matching hashes across *different* size settings means the override did not take. Do not proceed on a matrix you have not proved is real — this trap has already cost this project once.
 
-- [ ] **Step 3: Read every shot against this checklist**
+- [ ] **Step 4: Read every shot against this checklist**
 
-For each: does the name wrap rather than truncate? Does the reading stay on one line? Is the glyph proportionate to the text beside it? Is the last card clear of the FABs? Does the tier that got picked look like the right call for that width and size?
+**The dominant defect of this branch — check for it first.** Content taught to scale inside a container that stayed fixed has been found **six** times across four files (`ProvisionalBadge`'s 22×22 disc, two 46×46 icon tiles, a 38×38 glyph slot, the gate button's 54pt capsule, the search field's 48pt capsule). Each was found by a different method and none by a test. Look for anything that has outgrown its own background shape, disc, pill or hit target.
 
-- [ ] **Step 4: Write the verification note**
+It fails in two distinguishable ways, and one is silent:
+
+| Content | Given a too-small container | Symptom |
+|---|---|---|
+| `Text` | accepts the proposal, **truncates** | words missing, often an ellipsis — easy to miss |
+| `Image` / `TextField` | ignores it, **overflows** | glyph or caret crossing the shape's edge |
+
+So do not only look for things spilling out. Read the *words* too: a button that says "Use My…" instead of "Use My Location" looks tidy and is broken.
+
+Then, for each shot: does every name wrap rather than truncate? Is the glyph proportionate to the text beside it? Is the last card clear of the FABs — **at `extra-small` as well as the large sizes**? Does the tier that got picked look like the right call for that width and size, and does the ~320pt iPad sidebar pick a different one than full-screen at the same text size?
+
+**Measure, do not eyeball.** Two rounds of this task were closed on confident visual impressions that pixel measurement later disproved — once claiming a capsule grew when its bounding box was byte-identical at both sizes. Where a judgement is close, crop and measure the bounding box, or read the element frame directly.
+
+- [ ] **Step 5: Write the verification note**
 
 Create `docs/superpowers/notes/2026-08-02-dynamic-type-verification.md` recording: the matrix captured, which tier each cell selected, anything that looked wrong, and what was changed in response. Embed nothing — reference the paths.
 
-- [ ] **Step 5: Fix what the shots exposed, then re-run**
+- [ ] **Step 6: Fix what the shots exposed, then re-run**
 
 ```bash
 ./scripts/test.sh 2>&1 | tail -40
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Delete your devices, then commit**
+
+```bash
+xcrun simctl delete "$PHONE" "$PAD"
+```
+
 
 ```bash
 git add docs/superpowers/notes/2026-08-02-dynamic-type-verification.md Slackwater
