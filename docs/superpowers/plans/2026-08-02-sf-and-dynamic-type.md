@@ -20,6 +20,7 @@ Spec: `docs/superpowers/specs/2026-08-02-sf-and-dynamic-type-design.md`
 - **`minimumScaleFactor` comes off six sites and stays on one.** `SlackwaterApp.swift:658` (the wordmark) keeps its `0.6`. Read the comment above it before touching it.
 - **Colour is untouched.** This branch changes type and layout only. Do not alter any `SN.*` token, any hex literal, or any glyph tone binding — those are `ColourAndFormTests`' territory and it will fail loudly.
 - **Copy is untouched.** No user-visible string changes.
+- **Line numbers in this plan are from before Task 1 and drift as you go.** Every task that cites one also gives you a `grep` that finds it. Trust the grep, never the number.
 
 ---
 
@@ -405,18 +406,12 @@ extension TypeScaleTests {
                 sites.append("\(url.lastPathComponent):\(n + 1)")
             }
         }
-        XCTAssertEqual(sites, ["StationCard.swift:\(sites.first?.split(separator: ":").last ?? "?")"],
-                       "card chrome must exist only in StationCard.swift, found: \(sites)")
+        XCTAssertEqual(sites.count, 1, "card chrome must exist once, found: \(sites)")
+        XCTAssertTrue(sites[0].hasPrefix("StationCard.swift:"),
+                      "chrome must live in StationCard.swift, found \(sites[0])")
     }
 }
 ```
-
-> **Note for the implementer:** that assertion is awkward to write against an unknown line number. Replace the `XCTAssertEqual` with the two assertions below once you know the shell compiles — they say the same thing without hardcoding a line:
-> ```swift
-> XCTAssertEqual(sites.count, 1, "card chrome must exist once, found: \(sites)")
-> XCTAssertTrue(sites[0].hasPrefix("StationCard.swift:"), "chrome must live in StationCard.swift, found \(sites[0])")
-> ```
-> Use the two-assertion form. It is the intended test; the first form is shown only so the failure in Step 2 is legible.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -592,11 +587,7 @@ Replace its `body` (`SlackwaterApp.swift:1189-1227`) with:
 
 Read the existing `fittedCard` body (from `SlackwaterApp.swift:1267`) and convert it the same way: `glyphKind: .current`, `glyphTone: Self.glyphTone(state?.phase)`, the gate's name and region, its "Slack · time" string as `detail`, and its phase pill as the `trailing` slot. Keep the pill's existing colours and copy exactly — this is a refactor, not a redesign.
 
-- [ ] **Step 8: Swap the guard assertion to its intended form**
-
-Replace the `XCTAssertEqual` from Step 1 with the two-assertion form given in that step's note.
-
-- [ ] **Step 9: Run the suite**
+- [ ] **Step 8: Run the suite**
 
 ```bash
 xcodegen generate
@@ -605,7 +596,7 @@ xcodegen generate
 
 Expected: all pass, including `testCardChromeLivesInExactlyOnePlace`. `ChsQueueTests` and `ChsCurrentGateTests` exercise the pending cards by accessibility identifier — if they fail, the identifier moved.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add Slackwater SlackwaterTests/TypeScaleTests.swift
@@ -629,7 +620,7 @@ At accessibility sizes there is no horizontal room for identity-left and state-r
 
 **Interfaces:**
 - Consumes: `StationCard` from Task 3.
-- Produces: `StationCard.Tier` (`.full`, `.reduced`, `.essential`) and `StationCard.content(for:)`, both `internal` so tests can call them without rendering.
+- Produces: `CardTier` (`.full`, `.reduced`, `.essential`) with `CardTier.fields -> [CardField]`, and `StationCard.content(for: CardTier)`. `CardTier` and `CardField` are **top-level** types, not nested in `StationCard` — nesting them inside a generic would force every assertion to spell `StationCard<EmptyView, EmptyView>.Tier`, and the tiers have nothing to do with the shell's generic parameters.
 
 **The tiers and the shed order:**
 
@@ -651,25 +642,25 @@ extension TypeScaleTests {
     /// weakened test, which is how this project's colour guard went wrong four
     /// times before it was restructured.
     func testTiersShedInTheSpecifiedOrder() {
-        XCTAssertEqual(StationCard<EmptyView, EmptyView>.Tier.full.fields,
+        XCTAssertEqual(CardTier.full.fields,
                        [.glyph, .name, .region, .distance, .detail, .trailing])
-        XCTAssertEqual(StationCard<EmptyView, EmptyView>.Tier.reduced.fields,
+        XCTAssertEqual(CardTier.reduced.fields,
                        [.glyph, .name, .region, .trailing])
-        XCTAssertEqual(StationCard<EmptyView, EmptyView>.Tier.essential.fields,
+        XCTAssertEqual(CardTier.essential.fields,
                        [.glyph, .name, .trailing])
     }
 
-    /// The three properties the shed order has to keep, stated as tests so a
+    /// The two properties the shed order has to keep, stated as tests so a
     /// future reorder has to argue with them.
     func testEveryTierKeepsNameAndTrailing() {
-        for tier in StationCard<EmptyView, EmptyView>.Tier.allCases {
+        for tier in CardTier.allCases {
             XCTAssertTrue(tier.fields.contains(.name), "\(tier) dropped the name")
             XCTAssertTrue(tier.fields.contains(.trailing), "\(tier) dropped the reading")
         }
     }
 
     func testRegionOutlivesDistanceAndDetail() {
-        let reduced = StationCard<EmptyView, EmptyView>.Tier.reduced.fields
+        let reduced = CardTier.reduced.fields
         XCTAssertTrue(reduced.contains(.region), "region must survive into reduced")
         XCTAssertFalse(reduced.contains(.distance), "distance sheds before region")
         XCTAssertFalse(reduced.contains(.detail), "detail sheds before region")
@@ -687,21 +678,28 @@ Expected: compile error — `Tier` does not exist.
 
 - [ ] **Step 3: Add the tier model to `StationCard.swift`**
 
+Top-level types, not nested in the generic `StationCard`:
+
 ```swift
-extension StationCard {
-    enum Field { case glyph, name, region, distance, detail, trailing }
+enum CardField { case glyph, name, region, distance, detail, trailing }
 
-    /// Shed order: distance, then detail, then nothing more — region and the
-    /// reading are load-bearing at every size. Asserted in TypeScaleTests.
-    enum Tier: CaseIterable {
-        case full, reduced, essential
+/// Shed order: distance, then detail, then nothing more — region and the
+/// reading are load-bearing at every size. Asserted in TypeScaleTests.
+///
+/// Distance goes first because the list's own grouping already answers "which
+/// of these is near me". The detail line goes second because "when" is the
+/// detail view's whole job, one tap away. Region survives longest because it
+/// is the only thing separating "Victoria" from "Victoria Harbour" from
+/// "Victoria Inner Harbour" — a truncated ambiguous name is worse than a
+/// missing one.
+enum CardTier: CaseIterable {
+    case full, reduced, essential
 
-        var fields: [Field] {
-            switch self {
-            case .full:      [.glyph, .name, .region, .distance, .detail, .trailing]
-            case .reduced:   [.glyph, .name, .region, .trailing]
-            case .essential: [.glyph, .name, .trailing]
-            }
+    var fields: [CardField] {
+        switch self {
+        case .full:      [.glyph, .name, .region, .distance, .detail, .trailing]
+        case .reduced:   [.glyph, .name, .region, .trailing]
+        case .essential: [.glyph, .name, .trailing]
         }
     }
 }
@@ -721,7 +719,7 @@ Replace `StationCard`'s `body` with a tier-parameterised builder plus the select
 
 ```swift
     @ViewBuilder
-    func content(for tier: Tier) -> some View {
+    func content(for tier: CardTier) -> some View {
         let fields = tier.fields
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
