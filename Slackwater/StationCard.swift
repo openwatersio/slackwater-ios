@@ -73,48 +73,83 @@ struct StationCard<Trailing: View, Badge: View>: View {
     /// type reads as a bullet rather than a station kind.
     @ScaledMetric(relativeTo: .title2) private var glyphSize: CGFloat = 24
 
-    /// `message` has no `CardField` of its own and is not shed by tier: it is
-    /// prose that stands in for the whole reading on a pending card (glyph +
-    /// name + an honest "why there's nothing yet" sentence, `trailing` empty)
-    /// and dropping it at a narrow width would leave that card with no
-    /// explanation at all. It renders unconditionally, below the row, same as
-    /// before Task 4.
+    /// The identity row — the only thing a tier changes, and so the only thing
+    /// `ViewThatFits` measures. `message` and the card chrome sit outside it in
+    /// `body`; see the note there for why that matters.
     @ViewBuilder
     func content(for tier: CardTier) -> some View {
         let fields = tier.fields
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                StationGlyph(kind: glyphKind, tone: glyphTone, size: glyphSize)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                    // Unconditional, like name/glyph/trailing above and below —
-                    // region (and the badge beside it) never sheds. See the
-                    // CardTier doc comment: a gated version of this shipped
-                    // once and silently dropped both the badge and the
-                    // disambiguating field the M50 chooser depends on.
-                    HStack(spacing: 7) {
-                        badge()
-                        Text(region)
-                            .font(.footnote)
-                            .foregroundStyle(SN.foam.opacity(0.78))
-                    }
-                    if fields.contains(.distance), let km {
-                        Text(formatNm(km))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                    }
-                    if fields.contains(.detail), let detail {
-                        Text(detail)
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
+        HStack(alignment: .top, spacing: 12) {
+            StationGlyph(kind: glyphKind, tone: glyphTone, size: glyphSize)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    // Wrap, never truncate. Task 6 measured the iPad's 320pt
+                    // sidebar at the accessibility sizes: the identity column
+                    // narrows to ~50pt, and without this the name accepted the
+                    // squeezed proposal and came out "Vi/ct/…" — three lines
+                    // and an ellipsis on the one field that identifies the
+                    // station — while `region` right below it wrapped to five
+                    // lines untouched. A `Text` given too little room degrades
+                    // by DROPPING CONTENT; `fixedSize(vertical:)` makes it take
+                    // the height it actually needs instead.
+                    .fixedSize(horizontal: false, vertical: true)
+                // Unconditional, like name/glyph/trailing above and below —
+                // region (and the badge beside it) never sheds. See the
+                // CardTier doc comment: a gated version of this shipped
+                // once and silently dropped both the badge and the
+                // disambiguating field the M50 chooser depends on.
+                HStack(spacing: 7) {
+                    badge()
+                    Text(region)
+                        .font(.footnote)
+                        .foregroundStyle(SN.foam.opacity(0.78))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 5) { trailing() }
+                if fields.contains(.distance), let km {
+                    Text(formatNm(km))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.7))
+                }
+                if fields.contains(.detail), let detail {
+                    Text(detail)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.92))
+                        .padding(.top, 10)
+                }
             }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 5) { trailing() }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Which candidate wins is verified by screenshot (Task 6), not by
+            // unit test — ViewThatFits exposes no way to ask. The tiers'
+            // CONTENTS are unit-tested in TypeScaleTests.
+            ViewThatFits(in: .horizontal) {
+                content(for: .full)
+                content(for: .reduced)
+            }
+            // `message` has no `CardField` of its own and is not shed by tier:
+            // it is prose standing in for the whole reading on a pending card
+            // (glyph + name + an honest "why there's nothing yet" sentence,
+            // `trailing` empty), and dropping it at a narrow width would leave
+            // that card with no explanation at all.
+            //
+            // It sits OUTSIDE the ViewThatFits, and that placement is
+            // load-bearing. `ViewThatFits` compares each candidate's IDEAL
+            // width, and a `Text`'s ideal width is its unwrapped single line —
+            // so while the message was inside the candidates, its ~470pt ideal
+            // dominated both of them, no candidate ever "fit", and every card
+            // carrying a long message fell through to `.reduced` regardless of
+            // width or text size. Task 6 caught it as two adjacent Near Me
+            // cards disagreeing about whether distance shows: "Victoria
+            // Harbour" (short message) kept its 0.1 nm, "Selkirk Water" (long
+            // one) lost it, at identical width. The message is identical in
+            // both tiers, so it has no business being measured by the picker.
             if let message {
                 Text(message)
                     .font(.caption)
@@ -129,16 +164,6 @@ struct StationCard<Trailing: View, Badge: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .opacity(opacity)
-    }
-
-    var body: some View {
-        // Which candidate wins is verified by screenshot (Task 6), not by unit
-        // test — ViewThatFits exposes no way to ask. The tiers' CONTENTS are
-        // unit-tested in TypeScaleTests.
-        ViewThatFits(in: .horizontal) {
-            content(for: .full)
-            content(for: .reduced)
-        }
     }
 }
 

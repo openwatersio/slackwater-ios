@@ -52,7 +52,18 @@ struct GateView: View {
             RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                            startRadius: 0, endRadius: 500)
                 .ignoresSafeArea()
-            VStack(spacing: 0) {
+            // The gate is one screenful of fixed copy, and since the type
+            // scales (Task 1) that screenful stops fitting at the top
+            // accessibility sizes. Task 6 measured it at AX5 on both devices:
+            // "See tides near you" came out "See tides nea…" and the subtitle
+            // "Turn on location and…", because SwiftUI resolves a too-short
+            // VStack by TRUNCATING its Texts, silently. A ScrollView gives the
+            // copy the height it needs; `minHeight: geo.size.height` keeps the
+            // Spacers' centred layout for every size that still fits, so
+            // nothing moves below AX5.
+            GeometryReader { geo in
+              ScrollView {
+                VStack(spacing: 0) {
                 HStack(alignment: .bottom) {
                     Text("Slackwater")
                         .font(.largeTitle.weight(.semibold))
@@ -137,6 +148,9 @@ struct GateView: View {
 
                 Spacer()
                 Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
+              }
             }
         }
         // The gate resolves when the ask resolves — a fix, or a denial. Either
