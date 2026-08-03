@@ -144,6 +144,39 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(build, 0.30)
     }
 
+    /// Task 5 fix round 1: the pin's direction check shrank from the list
+    /// card's 30h "next" guarantee to `PIN_TIDE_WINDOW`, to fit the budget
+    /// above. Shrinking a forward search can only ever MISS the next turn
+    /// (window ends before it — `tidePinRising` returns nil, the pin draws
+    /// neutral) or find the SAME next extreme the 30h search finds first —
+    /// never a different one, because both searches walk forward from `now`
+    /// in the same order and stop at the first root. This test checks that
+    /// claim against the real bundled set instead of trusting the argument:
+    /// every tide station, at four times spread across a day (so a station
+    /// sitting right at a turn at hour 0 isn't the only case exercised),
+    /// short-window direction compared to the 30h baseline.
+    func testShortWindowDirectionMatchesThirtyHourBaseline() {
+        let dayStart = Date(timeIntervalSince1970: 1_785_000_000)
+        let checkTimes = [0.0, 6.0, 12.0, 18.0].map { dayStart.addingTimeInterval($0 * 3600) }
+        var resolved = 0
+        var mismatches: [String] = []
+        for record in TideStationRecord.all {
+            for now in checkTimes {
+                let baseline = record.cardState(at: now).rising
+                guard let short = tidePinRising(record, at: now, window: PIN_TIDE_WINDOW) else { continue }
+                resolved += 1
+                if short != baseline {
+                    mismatches.append("\(record.id) at \(now): short=\(short) baseline=\(baseline)")
+                }
+            }
+        }
+        let checked = TideStationRecord.all.count * checkTimes.count
+        print("Short-window (\(Int(PIN_TIDE_WINDOW / 3600))h) direction: "
+              + "\(resolved)/\(checked) resolved a tone, \(mismatches.count) disagreed with the 30h baseline")
+        XCTAssertTrue(mismatches.isEmpty,
+                      "short window direction disagreed with the 30h baseline: \(mismatches.prefix(10))")
+    }
+
     /// Clustering is what makes 3,125 pins a map rather than a smear — and the
     /// zoom it stops at is what keeps the discovery view tappable.
     func testStationSourceClustersOnlyBelowTheDiscoveryZoom() throws {

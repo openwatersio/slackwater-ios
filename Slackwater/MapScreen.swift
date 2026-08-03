@@ -62,6 +62,44 @@ private func phaseName(_ phase: CurrentPhase) -> String {
     }
 }
 
+/// How far forward the map's direction check looks to find the next tidal
+/// turn. `cardState(at:)` uses 30h because it must GUARANTEE a "next" exists
+/// for the list card; the pin doesn't need that guarantee, and when the
+/// window comes up empty it draws neutral rather than defaulting to
+/// "rising" the way the card does.
+///
+/// This number is a budget, not a tidal-science constant: `extremes()`'s
+/// fixed per-station setup cost (building a harmonic parameter provider) —
+/// not the search itself — is most of what `testPinLayerBuildsInsideAFrame`
+/// measures across ~1,425 bundled tide stations, so shrinking the window
+/// buys back only the search portion. 1h was measured, not assumed: 13h
+/// (a diurnal station's ~12.4h half-period, so it would almost always find
+/// the next turn) cost 427ms; 1h costs ~265ms, with margin under the 300ms
+/// budget. The tradeoff this accepts is coverage, not correctness — at 1h,
+/// `testShortWindowDirectionMatchesThirtyHourBaseline` resolves a concrete
+/// direction for roughly 15% of (station, time) pairs checked and draws
+/// neutral for the rest, but at ZERO disagreements with the 30h baseline
+/// across the whole bundled set at four times of day. A coarser
+/// two-height-sample difference was measured as an alternative (same fixed
+/// cost, no window at all, so 100% coverage) and rejected: 62/5700
+/// disagreements with the baseline near real turns — an actual wrong
+/// colour, not just fewer coloured pins. Widening this window is a
+/// legitimate follow-on (async-fill after first paint, or a viewport-bounded
+/// subset) but is a bigger change than this budget fix; not done here.
+let PIN_TIDE_WINDOW: TimeInterval = 1 * 3600
+
+/// Direction from a short forward window, for the pin only — nil when no
+/// turn falls inside it, so the caller can draw neutral instead of guessing.
+/// Do not naively difference two height samples near a turn instead of this:
+/// the curve is flat there and sampling picks up numerical noise
+/// (`cardState(at:)`'s doc comment). This still finds the true next extreme
+/// via the same bracket-and-bisect search, just over a shorter horizon.
+func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterval) -> Bool? {
+    let next = record.engineStation.extremes(from: now, to: now.addingTimeInterval(window))
+        .first { $0.time > now }
+    return next.map { $0.kind == .high }
+}
+
 /// A station's state as a tone name, for the pin's colour.
 ///
 /// Synchronous only. Bundled NOAA stations predict on device from their own
@@ -72,12 +110,22 @@ private func phaseName(_ phase: CurrentPhase) -> String {
 /// admission, not a guess. On a boat a wrong slack is worse than an admitted
 /// grey. Wiring the async CHS cache in is a follow-on, deliberately not done
 /// here.
+///
+/// Neither bundled case calls `cardState(at:)`: it computes a 30h "next"
+/// event neither branch displays, and for a current station that's TWO
+/// 30h searches (slack roots + max roots) for a value the pin discards.
+/// `pinFeatures()` runs this for all ~3,125 bundled stations on every style
+/// build (`testPinLayerBuildsInsideAFrame` budgets the whole thing at 0.3s),
+/// so the shortcuts here are load-bearing, not stylistic.
 private func pinTone(_ item: StationItem, at now: Date) -> String {
     switch item {
     case .tide(let record):
-        return record.cardState(at: now).rising ? "rising" : "falling"
+        guard let rising = tidePinRising(record, at: now, window: PIN_TIDE_WINDOW) else { return "unknown" }
+        return rising ? "rising" : "falling"
     case .current(let station):
-        return phaseName(currentPhase(signed: station.cardState(at: now).signed))
+        let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
+            .first?.speed ?? 0
+        return phaseName(currentPhase(signed: signed))
     case .chs, .chsGate, .chsCurrent:
         return "unknown"   // async CHS fit cache — see the doc comment above
     }
