@@ -656,7 +656,9 @@ At accessibility sizes there is no horizontal room for identity-left and state-r
 | **Reduced** | glyph · name · region · trailing |
 | **Essential** | glyph · name · trailing |
 
-Distance sheds first — the list's own grouping already answers "which of these is near me". The detail line sheds second — "when" is the detail view's entire job, one tap away. Region survives longest — it is the only thing separating "Victoria" from "Victoria Harbour" from "Victoria Inner Harbour", and a truncated ambiguous name is worse than a missing one.
+Distance and the detail line go **together**, at the Full→Reduced step. Distance goes because the list's own grouping already answers "which of these is near me"; the detail line goes because "when" is the detail view's entire job, one tap away. Region survives longest — it is the only thing separating "Victoria" from "Victoria Harbour" from "Victoria Inner Harbour", and a truncated ambiguous name is worse than a missing one.
+
+*Corrected after Task 4's review:* an earlier wording claimed distance sheds "first" and the detail line "second". Three tiers cannot express that — both leave in the same transition, and no tier has one without the other. The ordering language described a precedence the model does not implement. If a genuine two-step precedence is ever wanted, it needs a fourth tier, which is a design change and not a wording fix.
 
 - [ ] **Step 1: Write the failing test**
 

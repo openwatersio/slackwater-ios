@@ -117,7 +117,12 @@ layouts would be five chances to get the shed order wrong.
 | **Reduced** | glyph · name · region · value · direction |
 | **Essential** | glyph · name · value · direction |
 
-**Shed order: distance first, next extreme second, region last.**
+**Shed order: distance and the next extreme together, region last.**
+
+*(Corrected during Task 4. This originally read "distance first, next extreme second, region last."
+Three tiers cannot express a two-step precedence between distance and the next extreme — both leave
+at the same Full→Reduced step. The reasons below stand; only the claim of ordering between those two
+was wrong.)*
 
 - **Distance** goes first because the list's own grouping already answers "which of these is near me"
   — Near Me is a section header.
