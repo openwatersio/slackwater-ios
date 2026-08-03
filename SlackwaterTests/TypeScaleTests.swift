@@ -138,11 +138,27 @@ extension TypeScaleTests {
                 // `detail:` argument is mono by construction — this codebase always
                 // shapes it as `detail: <expr>.map { next in` with the formatted
                 // string on the very next line, hence the n-1 check alongside
-                // same-line. `message:` deliberately gets NO such exemption:
-                // StationCard renders `message` as plain `.caption`, no mono
-                // treatment — it is prose, not a reading, and a formatter feeding
-                // it would be a real bug this guard should still catch.
-                if detailIsMono,
+                // same-line.
+                //
+                // `message:` deliberately gets NO such exemption: StationCard
+                // renders `message` as plain `.caption`, no mono treatment — it is
+                // prose, not a reading, and a formatter feeding it would be a real
+                // bug this guard should still catch. That asymmetry is the whole
+                // point, so it needs its own guard here: this codebase writes one
+                // named argument per line, and `!line.contains("message:")`
+                // stops a `message:` line from inheriting the exemption via the
+                // n-1 check just because the previous line happened to say
+                // `detail:` (a `StationCard(detail: ..., message: someFormatter(...))`
+                // call would otherwise wave the `message:` line through blind —
+                // no call site does this today, but the ordinary one-arg-per-line
+                // convention would produce exactly that shape the first time one
+                // did). This is a bare substring test, not scoped to a `StationCard(`
+                // call — `SlackwaterApp.swift`'s `} detail: {` (NavigationSplitView's
+                // unrelated trailing-closure label) shares the literal token with no
+                // formatter anywhere near it today, so the false-positive risk is
+                // theoretical, not live; tightening past that would need a real
+                // parser, out of scope for a line-text guard.
+                if detailIsMono, !line.contains("message:"),
                    line.contains("detail:") || (n > 0 && lines[n - 1].contains("detail:")) { continue }
                 let lo = max(0, n - 4), hi = min(lines.count, n + 5)
                 let window = lines[lo..<hi].joined(separator: "\n")
