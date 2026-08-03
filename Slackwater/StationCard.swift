@@ -2,27 +2,44 @@ import SwiftUI
 
 enum CardField: Equatable { case glyph, name, region, distance, detail, trailing }
 
-/// Shed order: distance, then detail, then nothing more — region and the
-/// reading are load-bearing at every size. Asserted in TypeScaleTests.
+/// Two tiers, one shed step: distance and detail go together; region, the
+/// name, and the reading are load-bearing at every size, never shed.
+/// Asserted in TypeScaleTests.
 ///
-/// Distance goes first because the list's own grouping already answers "which
-/// of these is near me". The detail line goes second because "when" is the
-/// detail view's whole job, one tap away. Region survives longest because it
-/// is the only thing separating "Victoria" from "Victoria Harbour" from
-/// "Victoria Inner Harbour" — a truncated ambiguous name is worse than a
-/// missing one.
+/// Distance and detail shed first because the list's own grouping already
+/// answers "which of these is near me" (distance) and "when" is the detail
+/// view's whole job, one tap away (detail). Region never sheds: it is the
+/// only thing separating "Victoria" from "Victoria Harbour" from "Victoria
+/// Inner Harbour" — a truncated ambiguous name is worse than a missing one.
+///
+/// A third, region-dropping "essential" tier shipped in the first cut of this
+/// type and was wrong: its own doc comment already called region "load-bearing
+/// at every size" while its `fields` array dropped `.region` anyway. Fix round
+/// 1 (task-4-report.md) caught it two ways at once — `ProvisionalBadge` (paired
+/// with region) silently disappeared at the largest accessibility sizes, and
+/// `ScreenshotTests.testM50MatchingStationChooser` failed on the iPad Pro 11"
+/// sidebar at DEFAULT text size, where the sidebar's width alone (not enlarged
+/// type) was enough to pick that tier. The station in that test is a collided
+/// name ("Discovery Island" ×2, NOAA current stations); its `region` field
+/// happens to be formatted as a bearing ("3.0 nm NE" / "6.6 nm SSE" — that is
+/// literally the `region` string in currents.json, not the live per-user
+/// `.distance` reading, which for that test's fix coordinate would read "0.0
+/// nm" with no compass suffix at all — `formatNm` never appends one). Dropping
+/// region dropped the one thing disambiguating the two stations. Collapsing
+/// to two tiers makes region unconditional again, matching what the doc
+/// comment always said it should be, and needs no fourth tier: nothing above
+/// this ever asks for a layout narrower than name + region + trailing.
 ///
 /// Top-level, not nested in `StationCard`: nesting inside a generic would
 /// force every assertion to spell `StationCard<EmptyView, EmptyView>.Tier`,
 /// and the tiers have nothing to do with the shell's generic parameters.
 enum CardTier: CaseIterable {
-    case full, reduced, essential
+    case full, reduced
 
     var fields: [CardField] {
         switch self {
-        case .full:      [.glyph, .name, .region, .distance, .detail, .trailing]
-        case .reduced:   [.glyph, .name, .region, .trailing]
-        case .essential: [.glyph, .name, .trailing]
+        case .full:    [.glyph, .name, .region, .distance, .detail, .trailing]
+        case .reduced: [.glyph, .name, .region, .trailing]
         }
     }
 }
@@ -68,13 +85,16 @@ struct StationCard<Trailing: View, Badge: View>: View {
                     Text(name)
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.white)
-                    if fields.contains(.region) {
-                        HStack(spacing: 7) {
-                            badge()
-                            Text(region)
-                                .font(.footnote)
-                                .foregroundStyle(SN.foam.opacity(0.78))
-                        }
+                    // Unconditional, like name/glyph/trailing above and below —
+                    // region (and the badge beside it) never sheds. See the
+                    // CardTier doc comment: a gated version of this shipped
+                    // once and silently dropped both the badge and the
+                    // disambiguating field the M50 chooser depends on.
+                    HStack(spacing: 7) {
+                        badge()
+                        Text(region)
+                            .font(.footnote)
+                            .foregroundStyle(SN.foam.opacity(0.78))
                     }
                     if fields.contains(.distance), let km {
                         Text(formatNm(km))
@@ -114,7 +134,6 @@ struct StationCard<Trailing: View, Badge: View>: View {
         ViewThatFits(in: .horizontal) {
             content(for: .full)
             content(for: .reduced)
-            content(for: .essential)
         }
     }
 }

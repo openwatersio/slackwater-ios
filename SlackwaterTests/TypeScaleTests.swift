@@ -246,17 +246,20 @@ extension TypeScaleTests {
     /// gets PICKED. Do not try to unit-test the picker — that road ends in a
     /// weakened test, which is how this project's colour guard went wrong four
     /// times before it was restructured.
+    ///
+    /// Two tiers, not three: a third "essential" tier (dropping region) shipped
+    /// once and broke two things at once — see the CardTier doc comment.
+    /// `ProvisionalBadge` disappearing and `testM50MatchingStationChooser`
+    /// failing on the iPad Pro 11" sidebar were the same bug wearing two faces.
     func testTiersShedInTheSpecifiedOrder() {
         XCTAssertEqual(CardTier.full.fields,
                        [.glyph, .name, .region, .distance, .detail, .trailing])
         XCTAssertEqual(CardTier.reduced.fields,
                        [.glyph, .name, .region, .trailing])
-        XCTAssertEqual(CardTier.essential.fields,
-                       [.glyph, .name, .trailing])
     }
 
-    /// The two properties the shed order has to keep, stated as tests so a
-    /// future reorder has to argue with them.
+    /// The properties the shed order has to keep, stated as tests so a future
+    /// reorder — or a future third tier — has to argue with them.
     func testEveryTierKeepsNameAndTrailing() {
         for tier in CardTier.allCases {
             XCTAssertTrue(tier.fields.contains(.name), "\(tier) dropped the name")
@@ -264,10 +267,21 @@ extension TypeScaleTests {
         }
     }
 
-    func testRegionOutlivesDistanceAndDetail() {
+    /// Region is not "the last thing shed" — it is never shed. It disambiguates
+    /// stations that share a name (M50's matching-station chooser exists
+    /// because of this), and for some collided-name NOAA current stations
+    /// `region` is itself formatted as the distinguishing bearing ("3.0 nm NE" /
+    /// "6.6 nm SSE" in currents.json) — dropping it loses the one thing telling
+    /// two same-named cards apart.
+    func testRegionNeverSheds() {
+        for tier in CardTier.allCases {
+            XCTAssertTrue(tier.fields.contains(.region), "\(tier) dropped region")
+        }
+    }
+
+    func testDistanceAndDetailShedTogether() {
         let reduced = CardTier.reduced.fields
-        XCTAssertTrue(reduced.contains(.region), "region must survive into reduced")
-        XCTAssertFalse(reduced.contains(.distance), "distance sheds before region")
-        XCTAssertFalse(reduced.contains(.detail), "detail sheds before region")
+        XCTAssertFalse(reduced.contains(.distance), "distance sheds going into reduced")
+        XCTAssertFalse(reduced.contains(.detail), "detail sheds going into reduced")
     }
 }
