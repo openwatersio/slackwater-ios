@@ -169,14 +169,20 @@ struct StationListView: View {
     @State private var chooser: StationMatches?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
+    /// The real, fixed FAB footprint — named so the clearance below is tied
+    /// to the actual geometry (`fab()`'s circle + `fabBar`'s bottom padding)
+    /// rather than a second, independently-editable literal.
+    private static let fabSize: CGFloat = 56
+    private static let fabBarBottomPadding: CGFloat = 24
+    private static let fabFootprint: CGFloat = fabSize + fabBarBottomPadding
     /// The FABs don't grow, but the row heights do — without this the last
     /// card ends up under them at large sizes. List-level, not card-level.
     /// `@ScaledMetric` scales in BOTH directions from the default category, so
     /// below default text size this shrinks too — but the FABs' own footprint
-    /// (`fab()`'s fixed 56pt circle + `fabBar`'s fixed 24pt bottom padding,
-    /// `SlackwaterApp.swift`) never does. Clamped at the call site so the
-    /// clearance can grow past 96 but never fall under it.
-    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = 96
+    /// never does. Base keeps the original 16pt of breathing room above the
+    /// bare footprint; clamped at the call site so the clearance can grow
+    /// past that but never fall under the fixed footprint itself.
+    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabFootprint + 16
     /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
     /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
     @ScaledMetric(relativeTo: .title3) private var deniedIconTileSize: CGFloat = 46
@@ -344,7 +350,7 @@ struct StationListView: View {
                         header
                         locatedSections
                         // max: never shrinks below the fixed FAB footprint at small text sizes.
-                        Color.clear.frame(height: max(fabClearance, 96))  // scroll clear of the FABs
+                        Color.clear.frame(height: max(fabClearance, Self.fabFootprint))  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -706,7 +712,7 @@ struct StationListView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, Self.fabBarBottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
@@ -716,7 +722,7 @@ struct StationListView: View {
             Image(systemName: icon)
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(SN.foam)
-                .frame(width: 56, height: 56)
+                .frame(width: Self.fabSize, height: Self.fabSize)
                 .background(.ultraThinMaterial, in: Circle())
                 .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
                 .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
