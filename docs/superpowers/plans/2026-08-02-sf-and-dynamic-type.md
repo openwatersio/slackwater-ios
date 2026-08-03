@@ -656,9 +656,14 @@ At accessibility sizes there is no horizontal room for identity-left and state-r
 | **Reduced** | glyph · name · region · trailing |
 | **Essential** | glyph · name · trailing |
 
-Distance and the detail line go **together**, at the Full→Reduced step. Distance goes because the list's own grouping already answers "which of these is near me"; the detail line goes because "when" is the detail view's entire job, one tap away. Region survives longest — it is the only thing separating "Victoria" from "Victoria Harbour" from "Victoria Inner Harbour", and a truncated ambiguous name is worse than a missing one.
+Distance and the detail line go **together**, at the single Full→Reduced step. Distance goes because the list's own grouping already answers "which of these is near me"; the detail line goes because "when" is the detail view's entire job, one tap away. **Region never sheds** — it is the only thing separating "Victoria" from "Victoria Harbour" from "Victoria Inner Harbour", and for two identically-named stations it is the *only* differentiator there is.
 
-*Corrected after Task 4's review:* an earlier wording claimed distance sheds "first" and the detail line "second". Three tiers cannot express that — both leave in the same transition, and no tier has one without the other. The ordering language described a precedence the model does not implement. If a genuine two-step precedence is ever wanted, it needs a fourth tier, which is a design change and not a wording fix.
+*Corrected twice during Task 4, both times by evidence rather than argument:*
+
+1. An earlier wording claimed distance sheds "first" and the detail line "second". No tier had one without the other, so the precedence was never implemented.
+2. The tier table originally had a third **Essential** tier dropping region. It was self-contradictory — its own doc comment called region "load-bearing at every size" — and it broke two things at once: `ProvisionalBadge` (which sits beside region) vanished at accessibility sizes, and `testM50MatchingStationChooser` failed on the iPad sidebar at *default* text size, because that test's two "Discovery Island" stations are told apart solely by their region strings (`"3.0 nm NE"` / `"6.6 nm SSE"` — NOAA formats a subordinate current station's region as a bearing). Essential is deleted; region, name, glyph and the reading are unconditional.
+
+Note for anyone reading the fix history: the first diagnosis of that failure was that the tiers shed *distance*, misled by region strings that look like distances. `formatNm` never appends a compass point and would have read `"0.0 nm"` for that test's coordinate. Confirm which field produces an asserted string before theorising about the design.
 
 - [ ] **Step 1: Write the failing test**
 

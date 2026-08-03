@@ -109,28 +109,50 @@ trailing content (which has a `SLACK` pill branch on currents). That is a shell 
 So: extract first, then apply `ViewThatFits` once. Applying it five times to five hand-rolled
 layouts would be five chances to get the shed order wrong.
 
-## 3. The three tiers
+## 3. The two tiers
 
 | Tier | Shows |
 |---|---|
 | **Full** | glyph · name · region · distance · value · direction · next extreme |
 | **Reduced** | glyph · name · region · value · direction |
-| **Essential** | glyph · name · value · direction |
 
-**Shed order: distance and the next extreme together, region last.**
+**One shed step: distance and the next extreme go together. Region never sheds.**
 
-*(Corrected during Task 4. This originally read "distance first, next extreme second, region last."
-Three tiers cannot express a two-step precedence between distance and the next extreme — both leave
-at the same Full→Reduced step. The reasons below stand; only the claim of ordering between those two
-was wrong.)*
-
-- **Distance** goes first because the list's own grouping already answers "which of these is near me"
-  — Near Me is a section header.
-- **Next extreme** goes second because "when" is the detail view's entire job, one tap away.
-- **Region survives longest** because it is the only thing separating "Victoria" from "Victoria
-  Harbour" from "Victoria Inner Harbour". A truncated ambiguous name is worse than a missing one.
+- **Distance** goes because the list's own grouping already answers "which of these is near me" —
+  Near Me is a section header.
+- **The next extreme** goes because "when" is the detail view's entire job, one tap away.
+- **Region, name, glyph and the reading never go.** Region is the only thing separating "Victoria"
+  from "Victoria Harbour" from "Victoria Inner Harbour", and a truncated ambiguous name is worse
+  than a missing one.
 
 Nothing is lost, only deferred: every shed fact is on the detail view.
+
+### Why this was three tiers, and what the third one broke
+
+The design shipped with an **Essential** tier (`glyph · name · value · direction`) that dropped
+region. It was incoherent on its face: its own doc comment called region "load-bearing at every
+size" while its field list dropped it. Task 4's fix round caught it failing in two ways at once.
+
+**It silently dropped `ProvisionalBadge`**, which sits beside the region — so the ⚠️ marking a
+60-day CHS fast-answer gate, and its "Fast answer — still refining" VoiceOver label, disappeared at
+the largest accessibility sizes. Exactly inverted: that affordance matters most where it vanished.
+
+**It broke `testM50MatchingStationChooser`** on the iPad Pro 11" sidebar at *default* text size —
+width alone was enough to select it. That test covers collided names: two NOAA current stations both
+called "Discovery Island". NOAA formats a subordinate current station's region as a bearing from its
+reference, so their `region` strings in `currents.json` are literally `"3.0 nm NE"` and
+`"6.6 nm SSE"`. Dropping region dropped the only thing telling two identically-named stations apart.
+
+**A misdiagnosis worth recording, since it nearly became the fix.** Those region strings read like
+distance readings, and the first diagnosis — mine — was that the tiers shed *distance* and that
+distance is the real disambiguator for collided names. That was wrong: `formatNm` returns `"3.0 nm"`
+and never appends a compass point, and for that test's fix coordinate the live distance would read
+`"0.0 nm"`. Acting on it would have reordered the shed sequence around a field that was not involved,
+left region still being dropped, and fixed nothing. The lesson is narrow and practical: when a UI
+test asserts a formatted string, confirm which field actually produces it before theorising about
+the design.
+
+Two tiers need no third: nothing in this app asks for a layout narrower than name + region + reading.
 
 ## 4. Three details that follow
 
