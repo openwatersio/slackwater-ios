@@ -427,7 +427,12 @@ and encoded nothing, which is exactly what a reviewer could not decode."
 - Modify: `SlackwaterTests/ColourAndFormTests.swift`
 
 **Interfaces:**
-- Consumes: `StationGlyph.Tone` and `StationGlyph.colour(for:)` from Task 3, for the tone vocabulary.
+- ~~Consumes: `StationGlyph.Tone` and `StationGlyph.colour(for:)` from Task 3, for the tone vocabulary.~~
+  **Corrected 2026-08-02 — it consumes neither.** MapLibre style dicts hold JSON-ish values and cannot
+  read a Swift `Color` or a Swift enum, so the map carries a *parallel string vocabulary*
+  (`"rising"`/`"falling"`/`"flood"`/`"ebb"`/`"slack"`/`"unknown"`) and hex strings. The two
+  vocabularies are tied together only by `SN`'s raw hexes (`mapHex(SN.floodHex)`) and by
+  `testMapPinHexesTrackTheTokens`.
 - Produces: no new API.
 
 - [ ] **Step 1: Write the failing test**
@@ -492,7 +497,10 @@ Register it in the existing `didFinishLoading style:` delegate callback (`MapScr
     /// MapLibre Native's SDF path, and without it the pin ignores state.
     private func squarePinImage(radius: CGFloat = 5, scale: CGFloat = 3) -> UIImage {
         let side = radius * CGFloat(Double.pi.squareRoot())
-        let size = CGSize(width: side * 2, height: side * 2)
+        // CORRECTED (2026-08-02): was `CGSize(width: side * 2, height: side * 2)`,
+        // which made the square FOUR TIMES the circle's area — `side` is already
+        // the full side length (r·√π), not a half-extent.
+        let size = CGSize(width: side, height: side)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         format.opaque = false
@@ -598,14 +606,26 @@ carry the same colour expression, so colour cannot track kind."
 
 Task 4 gave pins their shape and left them neutral. This makes colour mean what the rule says it means.
 
-**Scope limit, deliberate:** only stations that resolve **synchronously on device** get a colour — bundled NOAA tide and current stations, and derived gates, all via the `cardState(at:)` helpers that already exist. **CHS stations stay neutral**, because their readings live behind an async cache and wiring that in is a subsystem, not a step. Neutral is the honest "unknown" the rule already defines, and the async CHS read is recorded as a follow-on. Do not build it here.
+**Scope limit, deliberate:** only stations that resolve **synchronously on device** get a colour — bundled NOAA tide and current stations, ~~and derived gates,~~ all via the `cardState(at:)` helpers that already exist. **CHS stations stay neutral**, because their readings live behind an async cache and wiring that in is a subsystem, not a step. Neutral is the honest "unknown" the rule already defines, and the async CHS read is recorded as a follow-on. Do not build it here.
+
+> **Correction (2026-08-02, during Task 5 — the spec was amended to match, § "Scope limit on state").**
+> **Derived gates are NOT synchronous** and do not get a colour. A gate has no `cardState(at:)` of
+> its own; resolving one needs `ChsFitService.shared.state(gate.reference)` to be `.fitted`, and the
+> bundled gate's reference is itself a CHS port. So gates are async *exactly like the CHS stations
+> they depend on* and draw neutral with them. Shipped code (`MapScreen.swift`, `pinTone`) returns
+> `"unknown"` for `.chs`, `.chsGate` **and** `.chsCurrent`. Step 3's snippet below still shows the
+> old synchronous gate case — it is left visible, struck through, because the async-CHS follow-on
+> will be planned from this document and needs to see that this was tried and why it was retracted,
+> not inherit it as an instruction.
 
 **Files:**
 - Modify: `Slackwater/MapScreen.swift` — `pinFeatures()` (:36-48), the two pin layers from Task 4
 - Modify: `SlackwaterTests/ColourAndFormTests.swift`
 
 **Interfaces:**
-- Consumes: `StationGlyph.Tone` and `StationGlyph.colour(for:)` from Task 3; `cardState(at:)` on the station types.
+- ~~Consumes: `StationGlyph.Tone` and `StationGlyph.colour(for:)` from Task 3;~~ **corrected
+  2026-08-02: neither, for the reason under Task 4 — the map speaks strings, not the Swift enum.** It
+  does consume `cardState(at:)` on the station types, and `SN`'s raw hexes.
 - Produces: a `state` property on every pin feature, one of `rising`/`falling`/`flood`/`ebb`/`slack`/`unknown`.
 
 - [ ] **Step 1: Write the failing test**
@@ -649,14 +669,20 @@ private func pinTone(_ item: StationItem, at now: Date) -> String {
         guard let s = record.cardState(at: now) else { return "unknown" }
         return s.rising ? "rising" : "falling"
     case .current(let station):
-        return phaseName(station.cardState(at: now).phase)
-    case .chsGate(let gate):
-        return phaseName(gate.cardState(at: now).phase)
-    case .chs, .chsCurrent:
+        return phaseName(currentPhase(signed: /* velocity now */))
+    // RETRACTED — see the correction above. A derived gate has no synchronous
+    // cardState; it resolves through ChsFitService like the CHS ports do.
+    //  case .chsGate(let gate):
+    //      return phaseName(gate.cardState(at: now).phase)
+    case .chs, .chsGate, .chsCurrent:
         return "unknown"   // async cache — see the follow-on above
     }
 }
 ```
+
+*(As shipped, `MapScreen.swift`'s `pinTone` also resolves the tide direction through
+`tidePinRisingHybrid` rather than `cardState`, and the current case reads a one-sample velocity —
+both are performance work this plan did not anticipate. Read the source, not this snippet.)*
 
 Match `phaseName` to whatever the phase enum is actually called in this codebase — check `CurrentCardState` and `DerivedGateCardState` before writing it, and map the three cases to `"flood"`, `"ebb"`, `"slack"`. If `cardState(at:)` is not optional for a given type, drop the `guard`.
 

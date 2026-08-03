@@ -138,7 +138,10 @@ requires here.
 ## 5. Map pins — parity
 
 `MapScreen.swift:96,107-108` currently match `circle-color` against `["get", "kind"]`. That match is
-removed. Pins become SDF symbol icons: `icon-image` keyed on kind, `icon-color` on state, with a halo.
+removed. ~~Pins become SDF symbol icons: `icon-image` keyed on kind, `icon-color` on state, with a
+halo.~~ *Corrected 2026-08-02, as shipped:* **only the tide layer** is an SDF symbol icon. Current
+pins stay a `circle` layer with `circle-color` — a disc needs no image, and both layers carry the
+identical state expression, which is what the rule actually requires.
 
 **The map's marks are a circle and a square, not the card's glyphs.** *Amended 2026-08-02, after the
 web version was used.* The wave and dome were tried on the map there and rejected: thin curved
@@ -163,6 +166,18 @@ station kind and spells the state out — "Flooding", "Ebbing", "Slack", or an h
 state is not known. That is what makes the palette self-teaching and lets the map do without a
 legend. On web the first tap previews and the second opens; iOS should match.
 
+> **What is in force, and what is not.** *Added 2026-08-02, closing a contradiction in this
+> section.* The paragraph above is the **target state**, not this piece: the first-tap preview card
+> is explicitly deferred in § Scope, and this spec cannot both defer the popup and lean on it as the
+> reason the map needs no legend.
+>
+> **So iOS ships the map colour-only** — no legend, no popup, no state word anywhere, and no
+> accessibility label on a pin. Only the list card announces kind (`StationGlyph.swift:60`); the map
+> announces nothing. **That is an accepted interim, not an oversight**, and it is the argument for
+> the preview card being the next piece rather than a nice-to-have: until it lands, the map's colour
+> is unlabelled and unreadable to VoiceOver. Everything above this box is in force; the popup
+> paragraph is not.
+
 `StationItem.pinKind` (`CurrentStation.swift:198-204`) stays — it is the kind discriminator feeding
 the icon expression, exactly as web's `kind` feature property does.
 
@@ -171,7 +186,10 @@ if dropped:
 
 - **The SDF edge encodes at 0.75, not 0.5.** MapLibre's shader thresholds icon fill at
   `inner_edge = (256-64)/256`. Encode the edge at the intuitive 0.5 midpoint and the glyph sits below
-  the threshold and renders **invisible**, with geometry that is entirely correct.
+  the threshold and renders **invisible**, with geometry that is entirely correct. *Corrected
+  2026-08-02: this is a **web-only** hazard.* It bites when you hand-encode a distance field. iOS
+  never does — the square is a `UIImage` registered with `withRenderingMode(.alwaysTemplate)` and
+  MapLibre Native derives the field itself. Carried here for the web port's record only.
 - **Read the cache; never fetch.** State comes from what is already stored on device. Left to fetch,
   opening the map fires one request per unsynced CHS station through the IWLS client's 2.5s pacing —
   a request storm, and a map that stays neutral for minutes.
