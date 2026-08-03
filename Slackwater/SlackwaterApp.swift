@@ -1160,7 +1160,7 @@ struct ChsPendingCard: View {
     var body: some View {
         StationCard(glyphKind: kind, glyphTone: .unknown,
                     name: name, region: region, km: km,
-                    detail: message,
+                    message: message,
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
             // Named per station (M53). "Some card on screen says 'Canadian tidal

@@ -12,13 +12,21 @@ struct StationCard<Trailing: View, Badge: View>: View {
     let name: String
     let region: String
     var km: Double? = nil
+    /// A next-event reading (`High 3.2 m · 14:20`) — mono-digit, sits inside
+    /// the identity column beside the glyph.
     var detail: String? = nil
+    /// A status sentence ("Queued — Canadian tidal predictions download once,
+    /// then work offline") — prose, not a reading. Sits below the whole row
+    /// at full card width, dimmer than `detail`. Kept as its own slot rather
+    /// than a flag on `detail`: the two differ in opacity, width, and font
+    /// treatment, and conflating them regressed both (fix round 1, Task 3).
+    var message: String? = nil
     var opacity: Double = 1
     @ViewBuilder var badge: () -> Badge
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .top, spacing: 12) {
                 StationGlyph(kind: glyphKind, tone: glyphTone)
                 VStack(alignment: .leading, spacing: 2) {
@@ -46,6 +54,12 @@ struct StationCard<Trailing: View, Badge: View>: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 5) { trailing() }
             }
+            if let message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.85))
+                    .padding(.top, 10)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -60,9 +74,10 @@ struct StationCard<Trailing: View, Badge: View>: View {
 extension StationCard where Badge == EmptyView {
     init(glyphKind: StationGlyph.GlyphKind, glyphTone: StationGlyph.Tone,
          name: String, region: String, km: Double? = nil, detail: String? = nil,
-         opacity: Double = 1, @ViewBuilder trailing: @escaping () -> Trailing) {
+         message: String? = nil, opacity: Double = 1,
+         @ViewBuilder trailing: @escaping () -> Trailing) {
         self.init(glyphKind: glyphKind, glyphTone: glyphTone, name: name, region: region,
-                  km: km, detail: detail, opacity: opacity,
+                  km: km, detail: detail, message: message, opacity: opacity,
                   badge: { EmptyView() }, trailing: trailing)
     }
 }

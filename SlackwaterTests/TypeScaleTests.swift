@@ -99,6 +99,22 @@ extension TypeScaleTests {
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
         ]
+        // The `detail:` exemption below rests on one fact: StationCard's own
+        // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
+        // assumption about a file this loop may not even visit that line of
+        // on a given run, so don't take it forever on faith — check the live
+        // source once, and if it's ever no longer true (someone strips the
+        // mono trait from StationCard.swift), every `detail:` site below
+        // reverts to being checked normally instead of waved through blind.
+        let stationCardLines = try String(
+            contentsOf: root.appendingPathComponent("StationCard.swift"), encoding: .utf8)
+            .components(separatedBy: .newlines)
+        let detailIsMono: Bool = {
+            guard let i = stationCardLines.firstIndex(where: { $0.contains("Text(detail)") })
+            else { return false }
+            let hi = min(stationCardLines.count, i + 3)
+            return stationCardLines[i..<hi].joined(separator: "\n").contains("monospacedDigit()")
+        }()
         let files = try XCTUnwrap(
             FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
         var checked = 0
@@ -117,6 +133,17 @@ extension TypeScaleTests {
                 checked += 1
                 // Same-line only — see blind-spot-1 note above.
                 if line.contains("MonoLabel(") { continue }
+                // `StationCard`'s `detail` `Text` is hardcoded `.monospacedDigit()`
+                // (verified live above, `detailIsMono`), so any string reaching a
+                // `detail:` argument is mono by construction — this codebase always
+                // shapes it as `detail: <expr>.map { next in` with the formatted
+                // string on the very next line, hence the n-1 check alongside
+                // same-line. `message:` deliberately gets NO such exemption:
+                // StationCard renders `message` as plain `.caption`, no mono
+                // treatment — it is prose, not a reading, and a formatter feeding
+                // it would be a real bug this guard should still catch.
+                if detailIsMono,
+                   line.contains("detail:") || (n > 0 && lines[n - 1].contains("detail:")) { continue }
                 let lo = max(0, n - 4), hi = min(lines.count, n + 5)
                 let window = lines[lo..<hi].joined(separator: "\n")
                 if windowTokens.contains(where: window.contains) { continue }
