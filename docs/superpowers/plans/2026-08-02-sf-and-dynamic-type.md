@@ -964,9 +964,23 @@ Convert these nine, matching each icon to the style of the text it accompanies:
 | `SlackwaterApp.swift:542` | `arrow.triangle.branch` | `.caption2.weight(.semibold)` |
 | `SlackwaterApp.swift:837` | `location.north.fill` | `.caption2` |
 | `Theme.swift:253` | `exclamationmark.triangle.fill` | `.caption2.weight(.semibold)` |
-| `OfflineDownloads.swift:83` | row icon | `.footnote.weight(.medium)` |
+| ~~`OfflineDownloads.swift:83`~~ | ~~row icon~~ | **WRONG — do not convert** |
 
 Line numbers drift — find each by its `Image(systemName:)` name in that file.
+
+**Correction, found by Task 5's sweep: `OfflineDownloads.swift`'s row icon was wrongly on this list.**
+It sits in a fixed 34×34 button — one of the very "two 34pt buttons" that `SlackwaterApp.swift:658`'s
+wordmark comment is calibrated against — so it belongs with the chrome that stays fixed, alongside
+the gear button right next to it, which this table correctly left alone. It was converted and then
+reverted to `.font(.system(size: 13, weight: .medium))`. **Eight conversions, not nine.**
+
+**The general rule this table was groping at:** an icon scales when it sits *beside* text and has
+room to grow; it stays fixed when it sits *inside* a fixed container — a hit target, a disc, a slot.
+Task 5's sweep turned this into a check anyone can rerun: for every `Image(systemName:)` with a
+scaling font, measure `UIFont.preferredFont` at the largest category against whatever fixed dimension
+must contain or clear it. Three more containers failed that check and now scale with `@ScaledMetric`
+(`ChsAmberCard`'s and `unavailableCard`'s 46×46 discs, `RecentRowLabel`'s 38×38 glyph slot), and
+`ProvisionalBadge`'s 22×22 disc failed it in the round before.
 
 **Leave the other nine fixed, deliberately.** `MapHeader.swift:52, 87, 109` (back, star, return), `SlackwaterApp.swift:669, 705, 809, 896` (gear, FAB, two closes) and the two 40pt empty-state illustrations (`SlackwaterApp.swift:85, 308`) are chrome in fixed-size hit targets, not text companions. Growing them is what breaks the 320pt iPad sidebar row that `SlackwaterApp.swift:658`'s wordmark comment already warns about — the same row, the same 34pt buttons. Add a brief comment at the `MapHeader` cluster recording that the fixed size is intentional, so a later reader does not "finish the job".
 
