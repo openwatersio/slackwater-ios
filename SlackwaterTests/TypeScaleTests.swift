@@ -168,7 +168,11 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        XCTAssertGreaterThan(checked, 5, "expected to find numeric Text sites, found \(checked)")
+        // The real count is ~36 (~22 of them genuinely guarded). A floor of 5
+        // would survive the scan silently collapsing to a handful of files —
+        // the same "found nothing, passed forever" failure the retired-font
+        // test guards with its `scanned > 10`.
+        XCTAssertGreaterThan(checked, 30, "expected to find numeric Text sites, found \(checked)")
         XCTAssertTrue(offenders.isEmpty,
                       "numeric reading without mono treatment (or a named indirection exception):\n"
                       + offenders.joined(separator: "\n"))
@@ -251,38 +255,30 @@ extension TypeScaleTests {
     /// once and broke two things at once — see the CardTier doc comment.
     /// `ProvisionalBadge` disappearing and `testM50MatchingStationChooser`
     /// failing on the iPad Pro 11" sidebar were the same bug wearing two faces.
-    func testTiersShedInTheSpecifiedOrder() {
-        XCTAssertEqual(CardTier.full.fields,
-                       [.glyph, .name, .region, .distance, .detail, .trailing])
-        XCTAssertEqual(CardTier.reduced.fields,
-                       [.glyph, .name, .region, .trailing])
-    }
-
-    /// The properties the shed order has to keep, stated as tests so a future
-    /// reorder — or a future third tier — has to argue with them.
-    func testEveryTierKeepsNameAndTrailing() {
-        for tier in CardTier.allCases {
-            XCTAssertTrue(tier.fields.contains(.name), "\(tier) dropped the name")
-            XCTAssertTrue(tier.fields.contains(.trailing), "\(tier) dropped the reading")
-        }
-    }
-
-    /// Region is not "the last thing shed" — it is never shed. It disambiguates
-    /// stations that share a name (M50's matching-station chooser exists
-    /// because of this), and for some collided-name NOAA current stations
-    /// `region` is itself formatted as the distinguishing bearing ("3.0 nm NE" /
-    /// "6.6 nm SSE" in currents.json) — dropping it loses the one thing telling
-    /// two same-named cards apart.
-    func testRegionNeverSheds() {
-        for tier in CardTier.allCases {
-            XCTAssertTrue(tier.fields.contains(.region), "\(tier) dropped region")
-        }
-    }
-
+    /// `CardField` now has exactly the two cases `content(for:)` consults, so
+    /// this is the whole tier contract in one test — and unlike the three it
+    /// replaces (`testTiersShedInTheSpecifiedOrder`,
+    /// `testEveryTierKeepsNameAndTrailing`, `testRegionNeverSheds`) it can
+    /// actually fail for the reason it claims. Those three asserted `.glyph`,
+    /// `.name`, `.region` and `.trailing` in `fields`, which no code ever
+    /// read: the four render unconditionally, deliberately, because the
+    /// region-shedding tier that DID gate them shipped once and broke
+    /// `ProvisionalBadge` and `testM50MatchingStationChooser` at the same time
+    /// (see the `CardTier` doc comment). The tests passed either way, so they
+    /// guarded nothing while reading as if they guarded that.
+    ///
+    /// Region's own protection is now structural rather than asserted — there
+    /// is no `.region` case to put back without also writing the
+    /// `if fields.contains(.region)` that the doc comment forbids.
+    ///
+    /// Both directions, so neither an empty `.full` nor a non-empty `.reduced`
+    /// slips through.
     func testDistanceAndDetailShedTogether() {
-        let reduced = CardTier.reduced.fields
-        XCTAssertFalse(reduced.contains(.distance), "distance sheds going into reduced")
-        XCTAssertFalse(reduced.contains(.detail), "detail sheds going into reduced")
+        XCTAssertEqual(CardTier.full.fields, [.distance, .detail],
+                       "the full tier shows both sheddable fields")
+        XCTAssertTrue(CardTier.reduced.fields.isEmpty,
+                      "distance and detail shed together into reduced, "
+                      + "found \(CardTier.reduced.fields)")
     }
 }
 
@@ -290,15 +286,40 @@ extension TypeScaleTests {
     /// Anything sized in points beside scaling text has to scale too, or it
     /// becomes a 24pt mark next to 40pt type. @ScaledMetric is the sanctioned
     /// exception to "no literal sizes" — it scales a non-text dimension.
+    ///
+    /// Both halves of this used to be theatre and are written positively now.
+    /// `card.contains("@ScaledMetric")` passed on a *comment* mentioning the
+    /// token, and `XCTAssertFalse(app.contains("Color.clear.frame(height: 96)"))`
+    /// banned one retired literal — `height: 100` sailed straight through. A
+    /// ban on one string is not a guarantee about the surviving code.
     func testGlyphAndFabClearanceScale() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Slackwater")
-        let card = try String(contentsOf: root.appendingPathComponent("StationCard.swift"), encoding: .utf8)
-        XCTAssertTrue(card.contains("@ScaledMetric"),
-                      "the glyph must scale with the text it sits beside")
-        let app = try String(contentsOf: root.appendingPathComponent("SlackwaterApp.swift"), encoding: .utf8)
-        XCTAssertFalse(app.contains("Color.clear.frame(height: 96)"),
-                       "the FAB clearance must scale, or the last card hides under the buttons")
+        let cardLines = try String(contentsOf: root.appendingPathComponent("StationCard.swift"),
+                                   encoding: .utf8).components(separatedBy: .newlines)
+        // A real declaration, not a mention: same line carries the property
+        // wrapper and the name, and it is not a comment.
+        XCTAssertTrue(cardLines.contains {
+            let t = $0.trimmingCharacters(in: .whitespaces)
+            return !t.hasPrefix("//") && t.contains("@ScaledMetric") && t.contains("glyphSize")
+        }, "glyphSize must be declared @ScaledMetric — it sits beside the name and has to grow with it")
+        // …and the declaration has to reach the glyph, or it scales nothing.
+        XCTAssertTrue(cardLines.contains { $0.contains("size: glyphSize") },
+                      "StationGlyph must be given the scaled glyphSize")
+
+        let appLines = try String(contentsOf: root.appendingPathComponent("SlackwaterApp.swift"),
+                                  encoding: .utf8).components(separatedBy: .newlines)
+        let spacers = appLines.filter {
+            !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
+                && $0.contains("Color.clear.frame(height:")
+        }
+        XCTAssertEqual(spacers.count, 1,
+                       "expected exactly one FAB clearance spacer, found \(spacers.count)")
+        // Names the surviving expression instead of blacklisting a dead one:
+        // any bare literal height fails this, not just the retired 96.
+        XCTAssertTrue(spacers.first?.contains("fabClearance") == true,
+                      "the FAB clearance spacer must be driven by fabClearance, not a literal: "
+                      + (spacers.first ?? "<none>"))
     }
 }

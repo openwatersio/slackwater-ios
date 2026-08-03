@@ -204,12 +204,22 @@ struct StationListView: View {
     /// bare footprint is flush contact (last card touching the FABs), which
     /// is not the floor we want. Both the base and the clamp use this.
     private static let fabClearanceBase: CGFloat = fabFootprint + 16
-    /// The FABs don't grow, but the row heights do — without this the last
-    /// card ends up under them at large sizes. List-level, not card-level.
-    /// `@ScaledMetric` scales in BOTH directions from the default category, so
-    /// below default text size this shrinks too — but the FABs' own footprint
-    /// never does. Clamped at the call site so the clearance can grow past
-    /// the base but never fall below it.
+    /// Extra breathing room at large text sizes. NOT a correctness
+    /// requirement, despite what an earlier version of this comment (and spec
+    /// §4) claimed: `fab()` is `.font(.system(size: 21))` inside a fixed 56pt
+    /// frame plus `fabBar`'s 24pt bottom padding, so the footprint this has to
+    /// clear is CONSTANT at every content-size category. A flat
+    /// `fabClearanceBase` would already clear the FABs everywhere — the last
+    /// card is not going to end up under them.
+    ///
+    /// What `@ScaledMetric` buys is proportion: at large sizes the gap grows
+    /// with the rows around it instead of reading as a hairline (+210pt at
+    /// AX5, per the Task 6 verification table). What it costs is that
+    /// `@ScaledMetric` scales in BOTH directions, so below the default
+    /// category it would shrink the gap below the intended margin — which is
+    /// the only thing the `max(...)` clamp at the call site undoes. Kept
+    /// because it is harmless and the measured behaviour is good; if it ever
+    /// needs to go, the honest replacement is the flat base, not a rewrite.
     @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabClearanceBase
     /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
     /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
@@ -995,7 +1005,7 @@ struct StationChooserSheet: View {
                 }
                 Spacer(minLength: 8)
                 Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
-                    .font(.caption.monospaced().weight(.medium).monospacedDigit())
+                    .font(.caption.monospaced().weight(.medium))
                     .foregroundStyle(SN.foam.opacity(0.85))
             }
             .padding(.horizontal, 16)

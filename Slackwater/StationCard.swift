@@ -1,6 +1,14 @@
 import SwiftUI
 
-enum CardField: Equatable { case glyph, name, region, distance, detail, trailing }
+/// Only the fields a tier can actually shed. The glyph, name, region and
+/// trailing reading used to be listed here too, and it was a lie the tests
+/// then dressed up as a guard: `content(for:)` renders all four
+/// unconditionally, so `.region` in `reduced.fields` had no authority over
+/// anything. Deleting it failed a test and changed nothing on screen; putting
+/// `if fields.contains(.region)` back passed the same test and restored the
+/// exact bug it exists to prevent (see `CardTier` below). Two cases, both
+/// consulted — a guard that can't fail is worse than no guard.
+enum CardField: Equatable { case distance, detail }
 
 /// Two tiers, one shed step: distance and detail go together; region, the
 /// name, and the reading are load-bearing at every size, never shed.
@@ -36,10 +44,14 @@ enum CardField: Equatable { case glyph, name, region, distance, detail, trailing
 enum CardTier: CaseIterable {
     case full, reduced
 
+    /// What this tier keeps of the two sheddable fields. The glyph, name,
+    /// region and reading are absent by design, not by omission: they are
+    /// unconditional in `content(for:)` and enumerating them here would only
+    /// invite a future edit to gate them again.
     var fields: [CardField] {
         switch self {
-        case .full:    [.glyph, .name, .region, .distance, .detail, .trailing]
-        case .reduced: [.glyph, .name, .region, .trailing]
+        case .full:    [.distance, .detail]
+        case .reduced: []
         }
     }
 }

@@ -165,7 +165,7 @@ stays, and the difference matters:
 | Site | What it is | Verdict |
 |---|---|---|
 | `SlackwaterApp.swift:1088, 1198, 1276, 1387` | station name, all four card variants | **remove** — wrap instead |
-| `SlackwaterApp.swift:1006` | station name in the map tile | **remove** |
+| `SlackwaterApp.swift:1006` | station name in `RecentRowLabel`'s recent row — `0.8`, not the `0.7` above | **remove** |
 | `MapHeader.swift:67` | station name in the map header | **remove** |
 | `SlackwaterApp.swift:658` | the **wordmark** | **keep** |
 
@@ -174,9 +174,16 @@ The wordmark keeps its `0.6` because the code already says why: *"The wordmark n
 is a fixed-width constraint with no reflow available, which is the one case where shrinking beats
 wrapping. A blanket removal would reintroduce precisely the bug that comment was written to record.
 
-**The FAB clearance scales.** The list's `Color.clear.frame(height: 96)` bottom spacer must grow with
-type, or the last card sits under the buttons however well the card itself reflows. This is
-list-level, not card-level, and it is why `SlackwaterApp.swift` is the hard file.
+**The FAB clearance scales.** The list's `Color.clear.frame(height: 96)` bottom spacer grows with
+type. This is list-level, not card-level, and it is why `SlackwaterApp.swift` is the hard file.
+
+*Corrected after implementation:* the original wording here — "must grow with type, or the last card
+sits under the buttons" — was wrong about the reason. `fab()` is `.font(.system(size: 21))` in a fixed
+56pt frame plus 24pt of bottom padding, so the footprint to clear is **constant** at every content-size
+category and a flat 96pt spacer always clears it. The `@ScaledMetric` is a proportion improvement (the
+gap tracks the rows beside it, +210pt at AX5), not a correctness fix, and its `max(...)` clamp exists
+only to undo the *downward* scaling `@ScaledMetric` introduces below the default category. Kept as
+shipped; the code comment on `fabClearance` states the real situation.
 
 ## 5. Testing
 
