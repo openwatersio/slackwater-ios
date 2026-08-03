@@ -42,7 +42,16 @@ Two XCTestPlans, both checked in under `TestPlans/` and wired into the scheme by
 ./scripts/test.sh                                  # fast plan  — the default
 ./scripts/test.sh --full                           # full plan
 SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save screenshots
+SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 ```
+
+`SLACKWATER_SIMS` exists for CI. The self-hosted runner is this same Mac, and two
+`xcodebuild` runs booting one simulator device SIGKILL each other's test runner —
+you get "Test crashed with signal kill" on a handful of UI tests, and results bleed
+between the sessions, so CI can report a test that doesn't exist on the branch under
+test. CI therefore creates and uses `SlackwaterCI-iPhone` / `SlackwaterCI-iPad`,
+separate instances of the same two device types. Run `scripts/test.sh` locally
+whenever you like.
 
 | Plan | File | Contents | Wall clock (per sim) |
 |---|---|---|---|
