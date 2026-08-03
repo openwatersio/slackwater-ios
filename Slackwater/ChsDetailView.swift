@@ -162,7 +162,7 @@ struct ChsWaitingView: View {
 
     private var footer: some View {
         MonoLabel(text: "Predictions — not for navigation",
-                  size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
+                  color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
     }
@@ -180,29 +180,35 @@ struct ChsAmberCard: View {
     let identifier: String
     let onAction: () -> Void
 
+    /// Tracks the icon's own `.title3` so the tile keeps containing the
+    /// triangle instead of being outgrown by it (sweep finding: Step 5b's
+    /// text-companion conversion scaled the icon but left this frame literal,
+    /// same failure shape as `ProvisionalBadge` before its own fix).
+    @ScaledMetric(relativeTo: .title3) private var iconTileSize: CGFloat = 46
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 21))
+                    .font(.title3)
                     .foregroundStyle(SN.amber)
-                    .frame(width: 46, height: 46)
+                    .frame(width: iconTileSize, height: iconTileSize)
                     .background(SN.amber.opacity(0.16),
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .accessibilityLabel("Warning")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.fraunces(20, .semibold))
+                        .font(.title3.weight(.semibold))
                         .foregroundStyle(SN.paper)
                     Text(headline)
-                        .font(.geist(13))
+                        .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             Text(expectation)
-                .font(.geist(13))
+                .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
@@ -211,9 +217,9 @@ struct ChsAmberCard: View {
             Button(action: onAction) {
                 HStack(spacing: 4) {
                     Text(action)
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
-                .font(.geist(15, .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(SN.amber)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }

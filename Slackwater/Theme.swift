@@ -77,37 +77,22 @@ enum SN {
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }
 
-extension Font {
-    static func fraunces(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Fraunces-SemiBold", size: size)
-        case .medium: .custom("Fraunces-Medium", size: size)
-        default: .custom("Fraunces-Regular", size: size)
-        }
-    }
-    static func geist(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Geist-SemiBold", size: size)
-        case .medium: .custom("Geist-Medium", size: size)
-        default: .custom("Geist-Regular", size: size)
-        }
-    }
-    static func geistMono(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        weight == .medium || weight == .semibold
-            ? .custom("GeistMono-Medium", size: size)
-            : .custom("GeistMono-Regular", size: size)
-    }
-}
-
-/// The Geist Mono uppercase section-label role from the prototype.
+/// The uppercase mono section-label role. Sizes 9/10/11 used to be passed per
+/// call site; under Dynamic Type they all collapse to `.caption2` and scale
+/// with the reader's setting instead.
 struct MonoLabel: View {
     let text: String
-    var size: CGFloat = 11
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
+    /// Opt-out, `nil` everywhere but the two `TimelineStrip` track labels
+    /// ("TIDE" / "CURRENT"), which are `.position()`-pinned into `TimelineGeo`'s
+    /// literal-point geometry — see that type's doc comment. Scaling them
+    /// walks them off the chart rather than reflowing anything.
+    var fixedSize: CGFloat? = nil
     var body: some View {
         Text(text.uppercased())
-            .font(.geistMono(size, .medium))
+            .font(fixedSize.map { .system(size: $0, weight: .medium).monospaced() }
+                    ?? .caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
     }
@@ -241,7 +226,7 @@ struct SunPill: View {
     var body: some View {
         let color = kind == .sunrise ? SN.sunrise : SN.sunset
         Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
-            .font(.geistMono(10, .medium)).tracking(0.5)
+            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(color)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))
@@ -269,12 +254,23 @@ struct SunPill: View {
 /// background change and was never the tight number. Numbers in
 /// docs/testflight.md updated to match.
 struct ProvisionalBadge: View {
+    /// Tracks the icon's own `.caption2` so the disc keeps containing the
+    /// triangle instead of being outgrown by it (Task 5 fix round: the icon
+    /// was scaled here but the frame was left literal, and `.caption2` at the
+    /// largest accessibility category overflows a fixed 22pt circle).
+    @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 22
+
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
-            .font(.system(size: 11, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(SN.amber)
-            .frame(width: 22, height: 22)
+            .frame(width: badgeSize, height: badgeSize)
             .background(SN.canvas, in: Circle())
+            // Stroke stays a fixed 1pt hairline outline, not scaled: it's a
+            // thin separator against the canvas, not a mark that needs to
+            // read at a distance, and a 1pt ring looks correct at every size
+            // tried (default through AX5) — unlike the icon, it was never
+            // sized to be legible, only to be visible.
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")

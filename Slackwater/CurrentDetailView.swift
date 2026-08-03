@@ -105,9 +105,9 @@ struct CurrentDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))", size: 11)
+                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.fraunces(30, .medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -116,7 +116,7 @@ struct CurrentDetailView: View {
                 HStack(spacing: 8) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
                     Text(SunMoon.phaseName(phase: moon.phase))
-                        .font(.geist(11))
+                        .font(.caption2)
                         .foregroundStyle(SN.foam.opacity(0.6))
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 88, alignment: .trailing)
@@ -129,18 +129,18 @@ struct CurrentDetailView: View {
             if let port = pairedTide {
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 3) {
-                        MonoLabel(text: "Tide at \(port.name)", size: 10, color: SN.steel, tracking: 1.4)
-                        (Text(formatHeight(portHeight(port, at: scrubTime), imperial: imperial)).font(.fraunces(22))
-                         + Text(" \(heightUnit(imperial: imperial))").font(.geist(12)))
+                        MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
+                        (Text(formatHeight(portHeight(port, at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
+                         + Text(" \(heightUnit(imperial: imperial))").font(.caption))
                             .foregroundStyle(SN.foam)
                     }
                     Spacer()
                     if let next = tl.tideExtremes.first(where: { $0.time > scrubTime }) {
                         VStack(alignment: .trailing, spacing: 1) {
                             MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                      size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
+                                      color: SN.foam.opacity(0.5), tracking: 1.4)
                             Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, tz))")
-                                .font(.geist(12)).foregroundStyle(SN.leaf)
+                                .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                         }
                     }
                 }
@@ -157,28 +157,28 @@ struct CurrentDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
-                        Text("Slack").font(.fraunces(34))
+                        Text("Slack").font(.largeTitle)
                             .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                         Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
+                            .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                     } else {
                         // The tilde is the whole point of the provisional
                         // treatment: the number itself stops claiming to be
                         // exact, before any badge or card is read.
-                        (Text(provisionalGate == nil ? "" : "~").font(.fraunces(34))
-                         + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.fraunces(34))
-                         + Text(" \(speedUnitLabel(speedUnit))").font(.geist(14)))
+                        (Text(provisionalGate == nil ? "" : "~").font(.largeTitle)
+                         + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
+                         + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
                             .foregroundStyle(readingColor)
                         HStack(spacing: 4) {
-                            Text(phaseWord(phase)).font(.geist(13))
-                            CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.geist(13))
-                            Text(compass16(record.setDegrees(signed: scrubSigned))).font(.geist(13))
+                            Text(phaseWord(phase)).font(.footnote)
+                            CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.footnote)
+                            Text(compass16(record.setDegrees(signed: scrubSigned))).font(.footnote)
                         }
                         .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
                     }
                     if let gate = provisionalGate {
                         MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
-                                  size: 9, color: SN.amber, tracking: 1.2)
+                                  color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .background(SN.amber.opacity(0.16), in: Capsule())
                             .padding(.top, 2)
@@ -188,15 +188,16 @@ struct CurrentDetailView: View {
                 Spacer()
                 if let slack = nextSlack {
                     VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
+                        MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+                            .font(.caption.monospacedDigit())
                             // SN.go, not SN.leaf: this line says when slack is.
                             // Same value today, but the token has to name the
                             // meaning or retargeting one of them breaks it.
-                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
+                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                                .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
+                                .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                         }
                     }
                 }
@@ -204,7 +205,7 @@ struct CurrentDetailView: View {
             .padding(.top, 8)
 
             MonoLabel(text: "‹ swipe to scrub · snaps to slack & peaks ›",
-                      size: 9, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
         }
@@ -263,25 +264,25 @@ struct CurrentDetailView: View {
     private var footer: some View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
-                      size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
             if let gate = provisionalGate {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded — still refining")
-                    .font(.geist(11)).foregroundStyle(SN.amber.opacity(0.7))
+                    .font(.caption2).foregroundStyle(SN.amber.opacity(0.7))
                     .multilineTextAlignment(.center)
             } else if record.isChs {
                 // Same register as the CHS tide footer (TideDetailView).
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
             if let port = pairedTide {
                 // Honesty line for the pairing (spec §2): the tide curve is the
                 // reference port's water, not this gate's.
                 Text("Tide shown is \(port.name) — the nearby reference port, not this station")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             }
         }

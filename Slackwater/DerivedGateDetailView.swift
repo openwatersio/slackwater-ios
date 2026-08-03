@@ -81,9 +81,9 @@ struct DerivedGateDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))", size: 11)
+                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.fraunces(30, .medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -92,7 +92,7 @@ struct DerivedGateDetailView: View {
                 HStack(spacing: 8) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
                     Text(SunMoon.phaseName(phase: moon.phase))
-                        .font(.geist(11))
+                        .font(.caption2)
                         .foregroundStyle(SN.foam.opacity(0.6))
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 88, alignment: .trailing)
@@ -104,18 +104,18 @@ struct DerivedGateDetailView: View {
             // centerline time — the water the slacks are derived from.
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
-                    MonoLabel(text: "Tide at \(port.name)", size: 10, color: SN.steel, tracking: 1.4)
-                    (Text(formatHeight(portHeight(at: scrubTime), imperial: imperial)).font(.fraunces(22))
-                     + Text(" \(heightUnit(imperial: imperial))").font(.geist(12)))
+                    MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
+                    (Text(formatHeight(portHeight(at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
+                     + Text(" \(heightUnit(imperial: imperial))").font(.caption))
                         .foregroundStyle(SN.foam)
                 }
                 Spacer()
                 if let next = tl.tideExtremes.first(where: { $0.time > scrubTime }) {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                  size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
+                                  color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, tz))")
-                            .font(.geist(12)).foregroundStyle(SN.leaf)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
             }
@@ -132,20 +132,20 @@ struct DerivedGateDetailView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(phaseWord(phase))
-                        .font(.fraunces(34))
+                        .font(.largeTitle)
                         .foregroundStyle(Self.phaseColor(phase))
                     Text("speeds not predicted for this pass")
-                        .font(.geist(13)).foregroundStyle(SN.foam.opacity(0.7))
+                        .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))
                 }
                 Spacer()
                 if let slack = nextSlack {
                     VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
+                        MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
                             // SN.go, not SN.leaf: this line says when slack is.
-                            .font(.geist(12)).foregroundStyle(SN.go)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
                         Text("at \(slack.highWater ? "high" : "low") water")
-                            .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
+                            .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
             }
@@ -153,12 +153,12 @@ struct DerivedGateDetailView: View {
 
             // The web's chart note, verbatim in spirit: the curve is a shape.
             Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
-                .font(.geist(11))
+                .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.5))
                 .padding(.top, 10)
 
             MonoLabel(text: "‹ swipe to scrub · snaps to slack & tide turns ›",
-                      size: 9, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
         }
@@ -207,12 +207,12 @@ struct DerivedGateDetailView: View {
     private var footer: some View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
-                      size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
             Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
-                .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
             Text("Tide shown is \(port.name) — the reference port, not this station")
-                .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)

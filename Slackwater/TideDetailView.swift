@@ -64,9 +64,9 @@ struct TideDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))", size: 11)
+                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
                     Text(cardTime(scrubTime, tz))
-                        .font(.fraunces(30, .medium))
+                        .font(.title.weight(.medium).monospacedDigit())
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                 }
@@ -76,7 +76,7 @@ struct TideDetailView: View {
                 HStack(spacing: 8) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
                     Text(SunMoon.phaseName(phase: moon.phase))
-                        .font(.geist(11))
+                        .font(.caption2)
                         .foregroundStyle(SN.foam.opacity(0.6))
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 88, alignment: .trailing)
@@ -86,12 +86,12 @@ struct TideDetailView: View {
 
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
-                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.fraunces(34))
-                     + Text(" \(unit)").font(.geist(14)))
+                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
+                     + Text(" \(unit)").font(.footnote))
                         .foregroundStyle(.white)
                     HStack(spacing: 4) {
-                        Text(rising ? "▲" : "▼").font(.geist(10))
-                        Text(rising ? "Rising" : "Falling").font(.geist(13))
+                        Text(rising ? "▲" : "▼").font(.caption2)
+                        Text(rising ? "Rising" : "Falling").font(.footnote)
                     }
                     .foregroundStyle(rising ? SN.rising : SN.falling)
                 }
@@ -99,11 +99,11 @@ struct TideDetailView: View {
                 if let next = nextExtreme {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                  size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
+                                  color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
-                            .font(.fraunces(19)).foregroundStyle(SN.foam)
+                            .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
                         Text("in \(countdown(from: scrubTime, to: next.time)) · \(cardTime(next.time, tz))")
-                            .font(.geist(12)).foregroundStyle(SN.leaf)
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
             }
@@ -115,7 +115,7 @@ struct TideDetailView: View {
                 .padding(.top, 12)
 
             MonoLabel(text: "‹ swipe to scrub · snaps to high & low ›",
-                      size: 9, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
         }
@@ -162,14 +162,14 @@ struct TideDetailView: View {
     private var footer: some View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
-                      size: 10, color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
             if record.isChs {
                 Text("Chart datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else {
                 Text("\(record.chartDatum) datum · NOAA harmonic prediction")
-                    .font(.geist(11)).foregroundStyle(SN.foam.opacity(0.3))
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
         }
         .frame(maxWidth: .infinity)
