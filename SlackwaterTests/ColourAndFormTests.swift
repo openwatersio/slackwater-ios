@@ -114,12 +114,118 @@ final class ColourAndFormTests: XCTestCase {
         // The defect this whole change exists to remove: the map matched
         // circle-color against ["get", "kind"], so a green dot meant "current
         // station" here and "flooding" everywhere else.
+        // (The retired kind hexes this used to grep for are now covered
+        // repo-wide by testNoSourceFileSpellsARetiredColour — one file was
+        // never the right scope for them.)
         let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
-        XCTAssertFalse(source.contains("#8fd0a0"), "retired kind-green must be gone")
-        XCTAssertFalse(source.contains("#7fb3d5"), "retired kind-blue must be gone")
-        XCTAssertFalse(source.contains("#c0d8e4"), "retired chs-kind tone must be gone")
         XCTAssertNil(source.range(of: #"circle-color[^\n]*\["get", "kind"\]"#, options: .regularExpression),
                      "colour must never be matched against kind")
+    }
+
+    /// Every value this branch retired, banned from every source file — not
+    /// from the one file an audit happened to be looking at.
+    ///
+    /// Twice now a retired literal survived an audit that only greped where it
+    /// expected the bug: `0xE0B45A` sat in `SlackwaterApp.swift`'s
+    /// location-denied card, five times, through the entire amber split, in the
+    /// My Location slot directly above Near Me glyphs drawing the new ebb — the
+    /// exact adjacency the split existed to prevent. So this scans everything
+    /// and whitelists nothing. A legitimate use is a conversation, not an
+    /// exception: `Theme.swift`'s amber comment was reworded to stop spelling
+    /// the value rather than being excluded from the scan.
+    func testNoSourceFileSpellsARetiredColour() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // SlackwaterTests/
+            .deletingLastPathComponent()   // repo root
+            .appendingPathComponent("Slackwater")
+        let retired = [
+            "0xE0B45A",   // the golden amber SN.amber moved away from
+            "0x7FB4D8",   // the retired falling hue
+            "#8fd0a0",    // map kind-green
+            "#7fb3d5",    // map kind-blue
+            "#c0d8e4",    // map chs-kind tone
+        ]
+        let files = try XCTUnwrap(
+            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil),
+            "could not walk \(root.path)")
+        var scanned = 0
+        var offenders: [String] = []
+        for case let url as URL in files where url.pathExtension == "swift" {
+            scanned += 1
+            let source = try String(contentsOf: url, encoding: .utf8)
+            for (n, line) in source.components(separatedBy: .newlines).enumerated() {
+                for hex in retired where line.range(of: hex, options: .caseInsensitive) != nil {
+                    offenders.append("\(url.lastPathComponent):\(n + 1): \(hex)")
+                }
+            }
+        }
+        // A scan that silently found no files would pass forever.
+        XCTAssertGreaterThan(scanned, 10, "expected to scan the app's sources, walked \(scanned) files")
+        XCTAssertTrue(offenders.isEmpty,
+                      "retired colour literal still in source:\n" + offenders.joined(separator: "\n"))
+    }
+
+    /// The three list-card state→tone bindings. Every colour defect on this
+    /// branch lived in a binding, not a token: invert `state.rising` and the
+    /// card draws a perfectly valid flood blue on a falling tide, with every
+    /// token, `colour(for:)`, `path(for:)` and source-grep test still green.
+    func testCardGlyphToneBindings() {
+        // Tide: rising ↔ .rising, falling ↔ .falling, no reading ↔ .unknown.
+        XCTAssertEqual(StationCardView.glyphTone(CardState(height: 1, rising: true, next: nil)), .rising)
+        XCTAssertEqual(StationCardView.glyphTone(CardState(height: 1, rising: false, next: nil)), .falling)
+        XCTAssertEqual(StationCardView.glyphTone(nil), .unknown)
+
+        // Current: signed velocity through currentPhase, slack included.
+        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: 3, next: nil)), .flood)
+        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: -3, next: nil)), .ebb)
+        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: 0, next: nil)), .slack)
+        XCTAssertEqual(CurrentCardView.glyphTone(nil), .unknown)
+
+        // Derived gate: the phase word, no speed exists.
+        XCTAssertEqual(ChsGateCardView.glyphTone(.flood), .flood)
+        XCTAssertEqual(ChsGateCardView.glyphTone(.ebb), .ebb)
+        XCTAssertEqual(ChsGateCardView.glyphTone(.slack), .slack)
+        XCTAssertEqual(ChsGateCardView.glyphTone(nil), .unknown)
+
+        // And the tones each land on the colour the rule says they do — the
+        // binding and the palette asserted end to end, which is the whole
+        // chain a wrong glyph colour can break.
+        assertSameColour(StationGlyph.colour(for: StationCardView.glyphTone(
+            CardState(height: 1, rising: true, next: nil))), SN.flood, "a rising tide draws flood")
+        assertSameColour(StationGlyph.colour(for: CurrentCardView.glyphTone(
+            CurrentCardState(signed: 0, next: nil))), SN.go, "a gate at slack draws go")
+    }
+
+    /// The map's palette must BE the tokens. Its colours are hex strings
+    /// (MapLibre style dicts cannot hold a Swift `Color`), and while they were
+    /// hand-maintained nothing tied them to `Theme.swift`: retarget `SN.flood`
+    /// and the map kept the old blue — two blues both meaning flood, and not
+    /// one failing test. They are derived from the token hexes now; this
+    /// asserts the wiring, i.e. that `rising` reaches flood and not ebb.
+    func testMapPinHexesTrackTheTokens() throws {
+        let expected: [String: UInt32] = [
+            "rising": SN.floodHex, "flood": SN.floodHex,
+            "falling": SN.ebbHex, "ebb": SN.ebbHex,
+            "slack": SN.goHex,
+        ]
+        var seen: Set<String> = []
+        var i = 2   // past "match" and ["get", "state"]
+        while i + 1 < PIN_STATE_COLOUR.count {
+            let state = try XCTUnwrap(PIN_STATE_COLOUR[i] as? String)
+            let hex = try XCTUnwrap(PIN_STATE_COLOUR[i + 1] as? String)
+            XCTAssertEqual(hex, mapHex(try XCTUnwrap(expected[state], "unexpected pin state \(state)")),
+                           "map pin colour for \(state)")
+            seen.insert(state)
+            i += 2
+        }
+        XCTAssertEqual(seen, Set(expected.keys), "every state must have a pin colour")
+
+        // One grey for "unknown" across surfaces: the map's neutral pin is the
+        // same token the card glyph draws, and the match's fallback references
+        // that constant rather than repeating its value.
+        XCTAssertEqual(PIN_NEUTRAL, mapHex(SN.steelHex), "the unknown pin must be SN.steel")
+        assertSameColour(StationGlyph.colour(for: .unknown), SN.steel, "the unknown glyph must be SN.steel")
+        XCTAssertEqual(PIN_STATE_COLOUR.last as? String, PIN_NEUTRAL, "the fallback must be PIN_NEUTRAL")
     }
 
     func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {

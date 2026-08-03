@@ -190,7 +190,10 @@ struct CurrentDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.leaf : SN.amber)
+                            // SN.go, not SN.leaf: this line says when slack is.
+                            // Same value today, but the token has to name the
+                            // meaning or retargeting one of them breaks it.
+                            .font(.geist(12)).foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))

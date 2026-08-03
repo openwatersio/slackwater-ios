@@ -30,7 +30,8 @@ enum SN {
     static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of list
     static let page = Color(hex: 0x00121F)        // 1b Modular detail page
     static let leaf = Color(hex: 0x88B868)
-    static let steel = Color(hex: 0x5888A8)
+    static let steelHex: UInt32 = 0x5888A8
+    static let steel = Color(hex: steelHex)
     static let sky = Color(hex: 0xC0D8E4)
     static let foam = Color(hex: 0xE4F0E4)
     static let paper = Color(hex: 0xFCFCFC)
@@ -42,11 +43,15 @@ enum SN {
     // colourblind-safe diverging pair and it frees green, which matters: for an
     // app called Slackwater the moment you wait for is slack, and green names
     // it. Never colour anything by station kind.
-    private static let floodHex: UInt32 = 0x4A9FD8
-    private static let ebbHex: UInt32 = 0xE8A33D
+    // Raw hexes, not just the Colors: MapLibre style dicts hold strings and
+    // cannot read a Swift `Color`, so `MapScreen` formats these into "#rrggbb"
+    // rather than hand-maintaining a second copy of the palette.
+    static let floodHex: UInt32 = 0x4A9FD8
+    static let ebbHex: UInt32 = 0xE8A33D
+    static let goHex: UInt32 = 0x88B868
     static let flood = Color(hex: floodHex)
     static let ebb = Color(hex: ebbHex)
-    static let go = Color(hex: 0x88B868)
+    static let go = Color(hex: goHex)
     static let rising = flood
     static let falling = ebb
     /// Pale flood/ebb, for the chart's max-speed dot labels and FLOOD/EBB
@@ -62,8 +67,11 @@ enum SN {
     static let sun = Color(hex: 0xF0C860)          // prototype sun dot
     /// Attention, never alarm: the location-denied card, and the unfitted
     /// station's ⚠️ download warning. Deliberately red-leaning rather than
-    /// golden — the old 0xE0B45A sat close enough to `ebb` to be misread as a
-    /// tide state. Same value the web app uses for the same job.
+    /// golden — the retired golden amber sat close enough to `ebb` to be
+    /// misread as a tide state. Same value the web app uses for the same job.
+    /// (The retired literal is deliberately not spelled here: it is one of the
+    /// values `testNoSourceFileSpellsARetiredColour` bans from `Slackwater/`,
+    /// and a doc comment naming it would need a whitelist to survive.)
     static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill

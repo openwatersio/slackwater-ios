@@ -571,10 +571,18 @@ struct TimelineScrubStrip: View {
                     .frame(width: 8, height: 6)
                     .position(x: w / 2, y: 5)
                 if geo.hasTide {
-                    Circle().fill(SN.leaf)
+                    // Neutral, like the current dot below it. This was green,
+                    // which made it a mark coloured by SERIES IDENTITY — kind —
+                    // inside a canvas where green means slack: on a paired
+                    // current+tide detail the same chart carried a green dot
+                    // meaning "tide curve" and green `slack` labels at every
+                    // zero crossing. Both track lines are near-white anyway, so
+                    // the green matched nothing it sat on.
+                    // (The white ring it used to wear was there to lift green
+                    // off the track; on a white dot it drew nothing.)
+                    Circle().fill(.white)
                         .frame(width: 13, height: 13)
-                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                        .shadow(color: SN.leaf.opacity(0.9), radius: 4)
+                        .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
                     MonoLabel(text: "Tide", size: 9, color: SN.leaf.opacity(0.9), tracking: 1.4)
                         .padding(.horizontal, 4)

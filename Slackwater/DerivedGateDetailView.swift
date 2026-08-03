@@ -142,7 +142,8 @@ struct DerivedGateDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", size: 9, color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.geist(12)).foregroundStyle(SN.leaf)
+                            // SN.go, not SN.leaf: this line says when slack is.
+                            .font(.geist(12)).foregroundStyle(SN.go)
                         Text("at \(slack.highWater ? "high" : "low") water")
                             .font(.geist(12)).foregroundStyle(SN.foam.opacity(0.7))
                     }

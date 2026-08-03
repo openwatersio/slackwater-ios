@@ -37,21 +37,32 @@ private let WATER_TONE = "#0b1a2b"  // navy water
 //
 // `chs` is a Canadian tide port. That is provenance, not kind — it draws the
 // same square a NOAA tide station does.
-private let PIN_NEUTRAL = "#7d9cb8"
+/// MapLibre style dicts hold strings and cannot read a Swift `Color`, so the
+/// palette crosses over as "#rrggbb" — but derived from the same `SN` hex the
+/// token is built from, never hand-copied. A hand-maintained copy is silent
+/// drift: retarget `SN.flood` and the map would keep the old blue, leaving two
+/// blues that both mean flood and no test anywhere that fails.
+func mapHex(_ hex: UInt32) -> String { String(format: "#%06x", hex) }
+
+/// The unknown-state pin. `SN.steel`, the same token the card glyph draws for
+/// `.unknown` — one meaning, one value. It replaced a lighter map-only grey
+/// (#7d9cb8) which, besides being a second value for the same idea, sat at
+/// 2.44:1 against the map's cream land polygons — under WCAG's 3:1 for a
+/// non-text mark. Steel clears both grounds: 4.65:1 on the navy water, 3.21:1
+/// on the land.
+let PIN_NEUTRAL = mapHex(SN.steelHex)
 // The circle radius and the square's equal-area radius share this constant so
 // the two literals cannot drift apart again.
 private let PIN_RADIUS: Double = 5
 
 // A pin's colour by state — literally the same expression on both pin layers
 // (Task 5), so kind (which layer a pin lands in) cannot influence colour.
-// Hex literals, not `SN` tokens: MapLibre style dicts take strings and can't
-// read a Swift `Color`. Keep these in step with Theme.swift by hand.
-private let PIN_STATE_COLOUR: [Any] = [
+let PIN_STATE_COLOUR: [Any] = [
     "match", ["get", "state"],
-    "rising", "#4a9fd8", "flood", "#4a9fd8",
-    "falling", "#e8a33d", "ebb", "#e8a33d",
-    "slack", "#88b868",
-    "#7d9cb8",   // unknown
+    "rising", mapHex(SN.floodHex), "flood", mapHex(SN.floodHex),
+    "falling", mapHex(SN.ebbHex), "ebb", mapHex(SN.ebbHex),
+    "slack", mapHex(SN.goHex),
+    PIN_NEUTRAL,   // unknown
 ]
 
 private func phaseName(_ phase: CurrentPhase) -> String {
@@ -120,6 +131,15 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 /// is steep there, unambiguous. Only near a turn, where the difference is
 /// small relative to the station's own speed-weighted range, does this fall
 /// back to `tidePinRising`'s exact search, and only for that station.
+///
+/// The pair is a 30-minute window *around* `now`, not forward from it: the
+/// engine's `makeTimeline` floors the start and ceils the end to the `step`
+/// grid, so asking for `now … now+30min` at a 30-minute step returns the grid
+/// points bracketing `now` — at 12:29 that is 12:00 and 12:30, almost entirely
+/// behind the clock. That is fine and is what the sweep measured: the slope of
+/// a 30-minute window straddling `now` is the direction at `now` everywhere
+/// the threshold trusts it, and the near-turn cases where it would not be are
+/// exactly the ones handed to the exact search.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
