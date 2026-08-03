@@ -38,6 +38,9 @@ private let WATER_TONE = "#0b1a2b"  // navy water
 // `chs` is a Canadian tide port. That is provenance, not kind — it draws the
 // same square a NOAA tide station does.
 private let PIN_NEUTRAL = "#7d9cb8"
+// The circle radius and the square's equal-area radius share this constant so
+// the two literals cannot drift apart again.
+private let PIN_RADIUS: Double = 5
 
 /// Every bundled station as a GeoJSON pin. Identity only — no readings.
 private func pinFeatures() -> [String: Any] {
@@ -110,7 +113,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
         "id": "station-pins-current", "type": "circle", "source": "stations",
         "filter": ["all", notACluster, ["==", ["get", "kind"], "current"]] as [Any],
         "paint": [
-            "circle-radius": 5,
+            "circle-radius": PIN_RADIUS,
             "circle-color": PIN_NEUTRAL,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": WATER_TONE,
@@ -277,9 +280,9 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// radius r the side is r·√π. A same-width square always reads heavier.
     /// Registered as a template image so `icon-color` can tint it — that is
     /// MapLibre Native's SDF path, and without it the pin ignores state.
-    private func squarePinImage(radius: CGFloat = 5, scale: CGFloat = 3) -> UIImage {
+    private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS), scale: CGFloat = 3) -> UIImage {
         let side = radius * CGFloat(Double.pi.squareRoot())
-        let size = CGSize(width: side * 2, height: side * 2)
+        let size = CGSize(width: side, height: side)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         format.opaque = false

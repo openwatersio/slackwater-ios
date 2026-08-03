@@ -305,6 +305,43 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    // Colour-and-form Task 4: the dot layer split into station-pins-current
+    // (circle) and station-pins-tide (square). testM4MapPinToDetail above
+    // only ever taps a `current`-kind pin (Deception Pass is a current
+    // station) — this is the one test that proves the square/tide layer is
+    // still wired to the same tap handler. Losing this coverage is exactly
+    // the failure the split risked: the web port silently dropped tap
+    // handling for one kind when its dot layer was split, and no test caught
+    // it there either.
+    func testM4TideSquarePinToDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // let tiles (and Seascape, when reachable) come in
+        let frame = map.frame
+        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
+            let x = (lon + 180) / 360 * world
+            let phi = lat * .pi / 180
+            let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
+            return (x, y)
+        }
+        let c = mercator(48.35, -123.05)                 // SALISH_CENTER
+        let p = mercator(48.48500061035156, -123.08300018310547)  // Kanaka Bay, NOAA tide
+        let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
+        let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
+        map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
+
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+                  "map pin tap did not open a station detail")
+        XCTAssert(app.staticTexts["Kanaka Bay"].firstMatch.waitForExistence(timeout: 5))
+    }
+
     // M4: the paired current→tide detail on Deception Pass — the pane exists,
     // and every one of the reference port's schedule numbers (time + height of
     // each high/low today) appears verbatim in the gate's merged view: same
