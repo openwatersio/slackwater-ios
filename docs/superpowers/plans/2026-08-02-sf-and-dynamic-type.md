@@ -941,6 +941,28 @@ and replace the line with:
 
 and use `size: tileGlyphSize`.
 
+- [ ] **Step 5b: Scale the SF Symbols that sit inline with text**
+
+Eighteen `Image(systemName:).font(.system(size: N, …))` sites survive Task 1 — correctly, since they are icons rather than text. Nine of them sit **inline with text** and look absurd frozen at 10–21pt beside type that has grown to 40pt. SF Symbols take a semantic style directly, which is simpler than `@ScaledMetric` and scales them exactly like the text they sit beside.
+
+Convert these nine, matching each icon to the style of the text it accompanies:
+
+| Site | Icon | New |
+|---|---|---|
+| `SettingsView.swift:53` | `chevron.right` | `.footnote.weight(.semibold)` |
+| `ChsDetailView.swift:214` | `chevron.right` | `.footnote.weight(.semibold)` |
+| `SlackwaterApp.swift:634` | `chevron.right` | `.footnote.weight(.semibold)` |
+| `ChsDetailView.swift:187` | `exclamationmark.triangle.fill` | `.title3` |
+| `SlackwaterApp.swift:617` | `location.slash` | `.title3` |
+| `SlackwaterApp.swift:542` | `arrow.triangle.branch` | `.caption2.weight(.semibold)` |
+| `SlackwaterApp.swift:837` | `location.north.fill` | `.caption2` |
+| `Theme.swift:253` | `exclamationmark.triangle.fill` | `.caption2.weight(.semibold)` |
+| `OfflineDownloads.swift:83` | row icon | `.footnote.weight(.medium)` |
+
+Line numbers drift — find each by its `Image(systemName:)` name in that file.
+
+**Leave the other nine fixed, deliberately.** `MapHeader.swift:52, 87, 109` (back, star, return), `SlackwaterApp.swift:669, 705, 809, 896` (gear, FAB, two closes) and the two 40pt empty-state illustrations (`SlackwaterApp.swift:85, 308`) are chrome in fixed-size hit targets, not text companions. Growing them is what breaks the 320pt iPad sidebar row that `SlackwaterApp.swift:658`'s wordmark comment already warns about — the same row, the same 34pt buttons. Add a brief comment at the `MapHeader` cluster recording that the fixed size is intentional, so a later reader does not "finish the job".
+
 - [ ] **Step 6: Run the suite**
 
 ```bash
@@ -953,7 +975,7 @@ Expected: all pass.
 
 ```bash
 git add Slackwater SlackwaterTests/TypeScaleTests.swift
-git commit -m "type: scale the glyph and the FAB clearance with the text"
+git commit -m "type: scale the glyph, the FAB clearance, and inline SF Symbols"
 ```
 
 ---
