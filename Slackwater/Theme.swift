@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. Design tokens from the prototype design system
 // (prototype/_ds/_ds_bundle.css): sn- palette, Fraunces/Geist/Geist Mono type
-// roles, per-station gradient trios, and the web app's unit formatting.
+// roles, and the web app's unit formatting. The per-station gradient trios
+// this once carried are gone (M53 layout A) — cards take a flat SN.cardFill.
 import SwiftUI
 
 extension Color {
@@ -10,6 +11,17 @@ extension Color {
                   blue: Double(hex & 0xFF) / 255,
                   opacity: opacity)
     }
+
+    /// A pale tint of `hex`, blended toward white — for small text on a
+    /// near-black chart, where plain `.opacity()` just reads as dim rather
+    /// than pale. Takes the hex, not a Color, so callers stay one edit away
+    /// from the base token instead of a second hand-picked literal.
+    static func hex(_ hex: UInt32, lightenedBy t: Double) -> Color {
+        let r = Double((hex >> 16) & 0xFF), g = Double((hex >> 8) & 0xFF), b = Double(hex & 0xFF)
+        return Color(red: (r + (255 - r) * t) / 255,
+                     green: (g + (255 - g) * t) / 255,
+                     blue: (b + (255 - b) * t) / 255)
+    }
 }
 
 enum SN {
@@ -18,84 +30,72 @@ enum SN {
     static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of list
     static let page = Color(hex: 0x00121F)        // 1b Modular detail page
     static let leaf = Color(hex: 0x88B868)
-    static let steel = Color(hex: 0x5888A8)
+    static let steelHex: UInt32 = 0x5888A8
+    static let steel = Color(hex: steelHex)
     static let sky = Color(hex: 0xC0D8E4)
     static let foam = Color(hex: 0xE4F0E4)
     static let paper = Color(hex: 0xFCFCFC)
-    static let rising = leaf                       // web --rising
-    static let falling = Color(hex: 0x7FB4D8)      // web --falling
+    // Direction is one signed diverging axis; green means only slack.
+    //
+    // This replaced a green/blue direction pair that collided with the map's
+    // green/blue *kind* pins — a green dot meant "current station" on one
+    // screen and "flooding" on the next. Amber/blue is the standard
+    // colourblind-safe diverging pair and it frees green, which matters: for an
+    // app called Slackwater the moment you wait for is slack, and green names
+    // it. Never colour anything by station kind.
+    // Raw hexes, not just the Colors: MapLibre style dicts hold strings and
+    // cannot read a Swift `Color`, so `MapScreen` formats these into "#rrggbb"
+    // rather than hand-maintaining a second copy of the palette.
+    static let floodHex: UInt32 = 0x4A9FD8
+    static let ebbHex: UInt32 = 0xE8A33D
+    static let goHex: UInt32 = 0x88B868
+    static let flood = Color(hex: floodHex)
+    static let ebb = Color(hex: ebbHex)
+    static let go = Color(hex: goHex)
+    static let rising = flood
+    static let falling = ebb
+    /// Pale flood/ebb, for the chart's max-speed dot labels and FLOOD/EBB
+    /// reference-line legends — 9pt text on a near-black background, where
+    /// the saturated token is too heavy. Derived from the same hex as
+    /// `flood`/`ebb` so retargeting either token keeps its label in lockstep
+    /// instead of drifting the way the pre-rebrand pastel literals did.
+    static let floodLabel = Color.hex(floodHex, lightenedBy: 0.6)
+    static let ebbLabel = Color.hex(ebbHex, lightenedBy: 0.6)
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
     static let sun = Color(hex: 0xF0C860)          // prototype sun dot
     /// Attention, never alarm: the location-denied card, and the unfitted
-    /// station's ⚠️ download warning.
-    static let amber = Color(hex: 0xE0B45A)
+    /// station's ⚠️ download warning. Deliberately red-leaning rather than
+    /// golden — the retired golden amber sat close enough to `ebb` to be
+    /// misread as a tide state. Same value the web app uses for the same job.
+    /// (The retired literal is deliberately not spelled here: it is one of the
+    /// values `testNoSourceFileSpellsARetiredColour` bans from `Slackwater/`,
+    /// and a doc comment naming it would need a whitelist to survive.)
+    static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
 }
 
-extension Font {
-    static func fraunces(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Fraunces-SemiBold", size: size)
-        case .medium: .custom("Fraunces-Medium", size: size)
-        default: .custom("Fraunces-Regular", size: size)
-        }
-    }
-    static func geist(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        switch weight {
-        case .semibold, .bold: .custom("Geist-SemiBold", size: size)
-        case .medium: .custom("Geist-Medium", size: size)
-        default: .custom("Geist-Regular", size: size)
-        }
-    }
-    static func geistMono(_ size: CGFloat, _ weight: Weight = .regular) -> Font {
-        weight == .medium || weight == .semibold
-            ? .custom("GeistMono-Medium", size: size)
-            : .custom("GeistMono-Regular", size: size)
-    }
-}
-
-/// The Geist Mono uppercase section-label role from the prototype.
+/// The uppercase mono section-label role. Sizes 9/10/11 used to be passed per
+/// call site; under Dynamic Type they all collapse to `.caption2` and scale
+/// with the reader's setting instead.
 struct MonoLabel: View {
     let text: String
-    var size: CGFloat = 11
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
+    /// Opt-out, `nil` everywhere but the two `TimelineStrip` track labels
+    /// ("TIDE" / "CURRENT"), which are `.position()`-pinned into `TimelineGeo`'s
+    /// literal-point geometry — see that type's doc comment. Scaling them
+    /// walks them off the chart rather than reflowing anything.
+    var fixedSize: CGFloat? = nil
     var body: some View {
         Text(text.uppercased())
-            .font(.geistMono(size, .medium))
+            .font(fixedSize.map { .system(size: $0, weight: .medium).monospaced() }
+                    ?? .caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
     }
-}
-
-// MARK: - Per-station sky gradients (variant 1a list cards)
-
-/// The prototype's hand-tuned gradient trios (prototype/NearMe.dc.html DATA()).
-/// Assignment is a stable hash of the station id — deterministic, no semantics.
-private let gradientTrios: [(UInt32, UInt32, UInt32)] = [
-    (0x88B0CC, 0x3A6D98, 0x184870), (0x3A6D98, 0x184870, 0x083058),
-    (0x9AC0B0, 0x4A8F78, 0x184860), (0x78A8B8, 0x2F7088, 0x0D3A58),
-    (0x184870, 0x0D3358, 0x00183C), (0x88B0CC, 0x4A7BA0, 0x20486A),
-    (0xA8C4D4, 0x5888A8, 0x28587C), (0x7098B8, 0x2F6390, 0x153F66),
-    (0x88AECB, 0x3D6F9A, 0x1A4A70), (0x8AB8A0, 0x3D8068, 0x154A44),
-    (0x96BCD2, 0x4E84A8, 0x265678), (0x7FA6C6, 0x356690, 0x184568),
-]
-
-func stationGradient(id: String) -> LinearGradient {
-    // Friday Harbor keeps the prototype's teal trio; the rest hash into the family.
-    let index = id == TideStationRecord.fridayHarborID
-        ? 2
-        : Int(id.utf8.reduce(UInt64(5381)) { ($0 &* 33) &+ UInt64($1) } % UInt64(gradientTrios.count))
-    let (a, b, c) = gradientTrios[index]
-    // CSS linear-gradient(150deg, a, b 55%, c)
-    return LinearGradient(
-        stops: [.init(color: Color(hex: a), location: 0),
-                .init(color: Color(hex: b), location: 0.55),
-                .init(color: Color(hex: c), location: 1)],
-        startPoint: UnitPoint(x: 0.15, y: 0), endPoint: UnitPoint(x: 0.85, y: 1))
 }
 
 // MARK: - App clock
@@ -226,7 +226,7 @@ struct SunPill: View {
     var body: some View {
         let color = kind == .sunrise ? SN.sunrise : SN.sunset
         Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
-            .font(.geistMono(10, .medium)).tracking(0.5)
+            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(color)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))
@@ -237,39 +237,43 @@ struct SunPill: View {
 /// nothing else — the detail view carries the explanation.
 ///
 /// M52 accessibility fix. The old treatment wrote amber (#E0B45A) prose and an
-/// amber badge straight onto the station gradient, and amber sits at almost
-/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 is
+/// amber badge straight onto the per-station gradient, and amber sat at almost
+/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 was
 /// **1.06:1**, and 1.03:1 on #9AC0B0 — literally unreadable, which is what
-/// Bryan saw on device. So the glyph gets the app's own over-an-unpredictable-
-/// background chrome (MapHeader's dark disc + ring): amber on an SN.canvas disc
-/// is 9.63:1, the disc reads 10.22:1 against the palest stop, and the ring
-/// reads 9.07:1 against the darkest — every trio has one boundary at ≥3.14:1,
-/// clearing WCAG 1.4.11 for non-text. Numbers in docs/testflight.md.
+/// Bryan saw on device. So the glyph got the app's own over-an-unpredictable-
+/// background chrome (MapHeader's dark disc + ring).
+///
+/// RESOLVED (2026-08-02, M53 layout A): `stationGradient` is gone, so the
+/// question is no longer "does this clear every one of 12 gradient trios" —
+/// the card background is flat `SN.cardFill` (≈5% white) over the list's
+/// `SN.canvas`/`SN.canvasGlow` radial ground. Composited worst case (nearest
+/// the brighter `canvasGlow` top-of-list) is `#162C4A`; new amber `#EF6F4A`
+/// against it is **4.71:1**, rising to 5.59:1 lower in the list — clear of
+/// WCAG 1.4.11's 3:1 for non-text either way. The glyph-on-disc contrast
+/// (amber icon on the `SN.canvas` disc, 6.25:1) is unaffected by the
+/// background change and was never the tight number. Numbers in
+/// docs/testflight.md updated to match.
 struct ProvisionalBadge: View {
+    /// Tracks the icon's own `.caption2` so the disc keeps containing the
+    /// triangle instead of being outgrown by it (Task 5 fix round: the icon
+    /// was scaled here but the frame was left literal, and `.caption2` at the
+    /// largest accessibility category overflows a fixed 22pt circle).
+    @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 22
+
     var body: some View {
         Image(systemName: "exclamationmark.triangle.fill")
-            .font(.system(size: 11, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .foregroundStyle(SN.amber)
-            .frame(width: 22, height: 22)
+            .frame(width: badgeSize, height: badgeSize)
             .background(SN.canvas, in: Circle())
+            // Stroke stays a fixed 1pt hairline outline, not scaled: it's a
+            // thin separator against the canvas, not a mark that needs to
+            // read at a distance, and a 1pt ring looks correct at every size
+            // tried (default through AX5) — unlike the icon, it was never
+            // sized to be legible, only to be visible.
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")
-    }
-}
-
-/// The Near Me cards' nautical-miles pill; straddles a card's top-right
-/// corner (also overlaid on the My Location tile — same component).
-struct DistancePill: View {
-    let km: Double
-    var body: some View {
-        Text(formatNm(km))
-            .font(.geistMono(11, .medium))
-            .foregroundStyle(SN.navyDeep)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(SN.foam.opacity(0.92), in: Capsule())
-            .shadow(color: Color(hex: 0x001432, opacity: 0.3), radius: 4, y: 2)
-            .offset(x: -14, y: -8)
     }
 }
 

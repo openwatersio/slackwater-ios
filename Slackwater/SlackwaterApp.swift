@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. M4: first-run location gate (prototype NearMe.dc.html),
 // located list (My Location tile + Near Me by distance), settings, pin map.
-// M1's list + 1a gradient cards underneath, unchanged.
+// M1's list underneath; M53 gave the cards layout A — kind glyph, flat fill.
 import CoreLocation
 import SwiftUI
 import TideEngine
@@ -52,10 +52,21 @@ struct GateView: View {
             RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
                            startRadius: 0, endRadius: 500)
                 .ignoresSafeArea()
-            VStack(spacing: 0) {
+            // The gate is one screenful of fixed copy, and since the type
+            // scales (Task 1) that screenful stops fitting at the top
+            // accessibility sizes. Task 6 measured it at AX5 on both devices:
+            // "See tides near you" came out "See tides nea…" and the subtitle
+            // "Turn on location and…", because SwiftUI resolves a too-short
+            // VStack by TRUNCATING its Texts, silently. A ScrollView gives the
+            // copy the height it needs; `minHeight: geo.size.height` keeps the
+            // Spacers' centred layout for every size that still fits, so
+            // nothing moves below AX5.
+            GeometryReader { geo in
+              ScrollView {
+                VStack(spacing: 0) {
                 HStack(alignment: .bottom) {
                     Text("Slackwater")
-                        .font(.fraunces(36, .semibold))
+                        .font(.largeTitle.weight(.semibold))
                         .foregroundStyle(SN.paper)
                     Spacer()
                 }
@@ -69,7 +80,7 @@ struct GateView: View {
                         .controlSize(.large)
                         .tint(SN.leaf)
                     Text("Finding stations near you…")
-                        .font(.geist(16))
+                        .font(.callout)
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .padding(.top, 22)
                 } else {
@@ -86,7 +97,7 @@ struct GateView: View {
                             .foregroundStyle(SN.foam)
                     }
                     Text("See tides near you")
-                        .font(.fraunces(27, .semibold))
+                        .font(.title.weight(.semibold))
                         .foregroundStyle(SN.paper)
                         .padding(.top, 26)
                     Text("Turn on location to find the \nnearest tide & current stations.")
@@ -104,10 +115,21 @@ struct GateView: View {
                             Image(systemName: "location.fill")
                             Text("Use My Location")
                         }
-                        .font(.geist(17, .semibold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(SN.navyDeep)
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: 320)
-                        .frame(height: 54)
+                        // Content sizes the capsule; `minHeight` keeps the 54pt
+                        // look at default sizes without capping growth. A fixed
+                        // `.frame(height: 54)` here silently truncated the label
+                        // at accessibility sizes ("Use My…"), because a `Text`
+                        // given too little height degrades by DROPPING CONTENT,
+                        // not by overflowing — the opposite of an `Image`, which
+                        // ignores the proposal and draws past its frame. Text
+                        // fails silently; images fail visibly. Never pin a
+                        // height around text you need read.
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 54)
                         .background(SN.leaf, in: Capsule())
                         .shadow(color: SN.leaf.opacity(0.3), radius: 13, y: 10)
                     }
@@ -118,7 +140,7 @@ struct GateView: View {
                         seenGate = true
                     } label: {
                         Text("Or search for a harbor, bay, or channel.")
-                            .font(.geist(12))
+                            .font(.caption)
                             .foregroundStyle(SN.foam.opacity(0.4))
                     }
                     .padding(.top, 16)
@@ -126,6 +148,9 @@ struct GateView: View {
 
                 Spacer()
                 Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
+              }
             }
         }
         // The gate resolves when the ask resolves — a fix, or a denial. Either
@@ -169,6 +194,36 @@ struct StationListView: View {
     @State private var chooser: StationMatches?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
+    /// The real, fixed FAB footprint — named so the clearance below is tied
+    /// to the actual geometry (`fab()`'s circle + `fabBar`'s bottom padding)
+    /// rather than a second, independently-editable literal.
+    private static let fabSize: CGFloat = 56
+    private static let fabBarBottomPadding: CGFloat = 24
+    private static let fabFootprint: CGFloat = fabSize + fabBarBottomPadding
+    /// Footprint plus the 16pt of breathing room the design intends — the
+    /// bare footprint is flush contact (last card touching the FABs), which
+    /// is not the floor we want. Both the base and the clamp use this.
+    private static let fabClearanceBase: CGFloat = fabFootprint + 16
+    /// Extra breathing room at large text sizes. NOT a correctness
+    /// requirement, despite what an earlier version of this comment (and spec
+    /// §4) claimed: `fab()` is `.font(.system(size: 21))` inside a fixed 56pt
+    /// frame plus `fabBar`'s 24pt bottom padding, so the footprint this has to
+    /// clear is CONSTANT at every content-size category. A flat
+    /// `fabClearanceBase` would already clear the FABs everywhere — the last
+    /// card is not going to end up under them.
+    ///
+    /// What `@ScaledMetric` buys is proportion: at large sizes the gap grows
+    /// with the rows around it instead of reading as a hairline (+210pt at
+    /// AX5, per the Task 6 verification table). What it costs is that
+    /// `@ScaledMetric` scales in BOTH directions, so below the default
+    /// category it would shrink the gap below the intended margin — which is
+    /// the only thing the `max(...)` clamp at the call site undoes. Kept
+    /// because it is harmless and the measured behaviour is good; if it ever
+    /// needs to go, the honest replacement is the flat base, not a rewrite.
+    @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabClearanceBase
+    /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
+    /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
+    @ScaledMetric(relativeTo: .title3) private var deniedIconTileSize: CGFloat = 46
 
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
@@ -308,10 +363,10 @@ struct StationListView: View {
                     .font(.system(size: 40, weight: .light))
                     .foregroundStyle(SN.foam.opacity(0.5))
                 Text("Pick a station")
-                    .font(.fraunces(24, .semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(SN.paper.opacity(0.9))
                 Text("Tides and currents open here.")
-                    .font(.geist(14))
+                    .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.55))
             }
         }
@@ -332,7 +387,8 @@ struct StationListView: View {
                     Group {
                         header
                         locatedSections
-                        Color.clear.frame(height: 96)  // scroll clear of the FABs
+                        // max: never shrinks below the intended footprint + margin at small text sizes.
+                        Color.clear.frame(height: max(fabClearance, Self.fabClearanceBase))  // scroll clear of the FABs
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -362,7 +418,7 @@ struct StationListView: View {
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
             Text("Depths not reduced to chart datum — not for navigation.")
-                .font(.geist(11))
+                .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(SN.page.opacity(0.82), in: Capsule())
@@ -415,7 +471,9 @@ struct StationListView: View {
         // My Location slot: the hero tile, or the amber card in its place.
         if let fix, let nearest = heroItem {
             VStack(spacing: 0) {
-                MyLocationTile(item: nearest, fix: fix, imperial: imperial) { itemCard($0) }
+                MyLocationTile(item: nearest, fix: fix, imperial: imperial) {
+                    itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
+                }
                 matchingButton(nearest, places)
             }
                 .padding(.horizontal, 16)
@@ -446,14 +504,17 @@ struct StationListView: View {
         sectionLabel("Near Me")
         ForEach(items(groups.nearMe)) { item in
             VStack(spacing: 0) {
-                itemCard(item)
-                    .overlay(alignment: .topTrailing) {
-                        DistancePill(km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                    }
+                itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
                 matchingButton(item, places)
             }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)   // room for the straddling nm pill
+                // 8 + 4 = the 12pt gap Favorites gets from its single
+                // `.padding(.bottom, 12)`. Split across the two edges because a
+                // Near Me row is a card *plus* its matching-stations link, and
+                // the link needs the slack under it, not over it. (The original
+                // reason — clearance for a straddling nm pill — went with the
+                // pill; this is the reason the number has now.)
+                .padding(.top, 8)
                 .padding(.bottom, 4)
                 .swipeActions(edge: .leading) {
                     Button { favorites.toggle(item.id) } label: {
@@ -499,8 +560,8 @@ struct StationListView: View {
             .padding(.bottom, 4)
     }
 
-    /// A compact recently-viewed row (prototype recent rows: gradient chip,
-    /// name over region), navigating like the full cards. First/last rows
+    /// A compact recently-viewed row (prototype recent rows: kind glyph, name
+    /// over region), navigating like the full cards. First/last rows
     /// round the group's outer corners — the grouped-card look, but one List
     /// row per station so each carries its own swipe actions.
     @ViewBuilder private func recentRow(_ item: StationItem, places: StationGroups,
@@ -534,10 +595,10 @@ struct StationListView: View {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                     Text("\(matches.count) matching stations")
                 }
-                .font(.geist(12, .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(SN.leaf)
                 .padding(.horizontal, 18)
                 .padding(.top, 7)
@@ -580,22 +641,26 @@ struct StationListView: View {
         }
     }
 
-    @ViewBuilder private func itemCard(_ item: StationItem) -> some View {
+    @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
         switch item {
         case .tide(let station):
-            activatable(StationCardView(record: station, imperial: imperial), item)
+            activatable(StationCardView(record: station, imperial: imperial, km: km), item)
         case .current(let station):
-            activatable(CurrentCardView(record: station), item)
+            activatable(CurrentCardView(record: station, km: km), item)
         case .chs(let info):
-            activatable(ChsCardView(info: info, imperial: imperial), item)
+            activatable(ChsCardView(info: info, imperial: imperial, km: km), item)
         case .chsGate(let gate):
-            activatable(ChsGateCardView(gate: gate), item)
+            activatable(ChsGateCardView(gate: gate, km: km), item)
         case .chsCurrent(let gate):
-            activatable(ChsCurrentGateCardView(gate: gate), item)
+            activatable(ChsCurrentGateCardView(gate: gate, km: km), item)
         }
     }
 
-    /// Location denied — amber card, deep link to the app's iOS Settings.
+    /// Location denied — `SN.amber` card, deep link to the app's iOS Settings.
+    /// The token, not a literal: this card renders in the My Location slot
+    /// directly above Near Me cards whose glyphs draw ebb, and the retired
+    /// golden amber it used to hardcode is the value amber moved away from
+    /// precisely because it read as ebb at that adjacency.
     private var unavailableCard: some View {
         Button {
             if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -605,35 +670,35 @@ struct StationListView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 13) {
                     Image(systemName: "location.slash")
-                        .font(.system(size: 21))
-                        .foregroundStyle(Color(hex: 0xE0B45A))
-                        .frame(width: 46, height: 46)
-                        .background(Color(hex: 0xE0B45A, opacity: 0.16),
+                        .font(.title3)
+                        .foregroundStyle(SN.amber)
+                        .frame(width: deniedIconTileSize, height: deniedIconTileSize)
+                        .background(SN.amber.opacity(0.16),
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Location unavailable")
-                            .font(.fraunces(20, .semibold))
+                            .font(.title3.weight(.semibold))
                             .foregroundStyle(SN.paper)
                         Text("Turn on location for Slackwater to see stations near you.")
-                            .font(.geist(13))
+                            .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                     }
                 }
                 HStack(spacing: 4) {
                     Spacer()
                     Text("Go to Settings")
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
-                .font(.geist(15, .semibold))
-                .foregroundStyle(Color(hex: 0xE0B45A))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(SN.amber)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(hex: 0xE0B45A, opacity: 0.1),
+            .background(SN.amber.opacity(0.1),
                         in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color(hex: 0xE0B45A, opacity: 0.35), lineWidth: 0.5))
+                .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
         }
         .buttonStyle(.plain)
     }
@@ -641,7 +706,7 @@ struct StationListView: View {
     private var header: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Text("Slackwater")
-                .font(.fraunces(36, .semibold))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(SN.paper)
                 // The wordmark never wraps: in the 320pt iPad sidebar it shares
                 // the row with two 34pt buttons and would break as "Slackwat/er".
@@ -685,7 +750,7 @@ struct StationListView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, Self.fabBarBottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
@@ -695,7 +760,7 @@ struct StationListView: View {
             Image(systemName: icon)
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(SN.foam)
-                .frame(width: 56, height: 56)
+                .frame(width: Self.fabSize, height: Self.fabSize)
                 .background(.ultraThinMaterial, in: Circle())
                 .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
                 .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
@@ -728,7 +793,7 @@ struct StationListView: View {
                         // down where nobody scrolls (M53).
                         if results.count == StationItem.searchLimit {
                             MonoLabel(text: "Nearest \(StationItem.searchLimit) — keep typing to narrow",
-                                      size: 10, color: SN.foam.opacity(0.5), tracking: 1.2)
+                                      color: SN.foam.opacity(0.5), tracking: 1.2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 6)
                                 .padding(.bottom, 2)
@@ -775,7 +840,7 @@ struct StationListView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(SN.foam.opacity(0.7))
                 TextField("Harbor, bay, or channel", text: $query)
-                    .font(.geist(17))
+                    .font(.body)
                     .foregroundStyle(SN.paper)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -789,7 +854,16 @@ struct StationListView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 48)
+            // Same fix as the gate button: content sizes the pill, `minHeight`
+            // keeps the 48pt look at default sizes. A fixed `.frame(height: 48)`
+            // left the field's text hanging out of its own capsule at
+            // accessibility sizes. `TextField` fails the way an `Image` does,
+            // NOT the way a `Text` does: it reports its intrinsic line height
+            // (65pt at AX5) and draws past a smaller frame, where a `Text`
+            // would have quietly truncated instead. Visible either way here,
+            // since the capsule is a background, not a clip.
+            .padding(.vertical, 13)
+            .frame(minHeight: 48)
             .background(Color.white.opacity(0.08), in: Capsule())
             .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
 
@@ -812,9 +886,9 @@ struct StationListView: View {
 }
 
 /// The prototype's My Location hero: MY LOCATION eyebrow with the location
-/// arrow, the nearest station's ordinary card wearing the same nm pill the
-/// Near Me cards wear, then the fix coordinates in mono (NearMe.dc.html
-/// fmtCoord — 3 decimal places).
+/// arrow, the nearest station's ordinary card (distance rendered in its own
+/// identity column, layout A — same as every other card), then the fix
+/// coordinates in mono (NearMe.dc.html fmtCoord — 3 decimal places).
 struct MyLocationTile<Card: View>: View {
     let item: StationItem
     let fix: (lat: Double, lon: Double)
@@ -825,18 +899,15 @@ struct MyLocationTile<Card: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: "My Location", size: 11, color: SN.foam.opacity(0.9))
+                MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
             }
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
-                .overlay(alignment: .topTrailing) {
-                    DistancePill(km: item.km(fromLat: fix.lat, lon: fix.lon))
-                }
             Text(formatCoord(lat: fix.lat, lon: fix.lon))
-                .font(.geistMono(11))
+                .font(.caption2.monospaced())
                 .foregroundStyle(SN.foam.opacity(0.55))
                 .padding(.horizontal, 6)
         }
@@ -877,10 +948,10 @@ struct StationChooserSheet: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(place.place)
-                            .font(.fraunces(26, .semibold))
+                            .font(.title.weight(.semibold))
                             .foregroundStyle(SN.paper)
                         Text("\(place.matches.count) stations answer for this place — pick the one you mean.")
-                            .font(.geist(13))
+                            .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -919,22 +990,22 @@ struct StationChooserSheet: View {
         } label: {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(stationGradient(id: item.id))
+                    .fill(SN.cardFill)
                     .frame(width: 38, height: 38)
                 VStack(alignment: .leading, spacing: 3) {
                     // The name is the same on every row — the qualifier is the
                     // whole point, so it leads.
                     Text(item.region.isEmpty ? item.name : item.region)
-                        .font(.geist(15, .medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(SN.paper)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    MonoLabel(text: item.kindLabel, size: 10,
+                    MonoLabel(text: item.kindLabel,
                               color: SN.foam.opacity(0.55), tracking: 1.1)
                 }
                 Spacer(minLength: 8)
                 Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
-                    .font(.geistMono(12, .medium))
+                    .font(.caption.monospaced().weight(.medium))
                     .foregroundStyle(SN.foam.opacity(0.85))
             }
             .padding(.horizontal, 16)
@@ -950,22 +1021,48 @@ struct StationChooserSheet: View {
     }
 }
 
-/// The compact recent-station row body (prototype: 38pt gradient chip, name
-/// over region, current reading trailing in Fraunces).
+/// The compact recent-station row body: kind glyph, name over region, current
+/// reading trailing in Fraunces. The prototype's 38pt gradient chip is gone
+/// with the gradients (M53 layout A) — it had become a flat empty box sitting
+/// inches below cards that draw a real glyph, so it takes the same
+/// `StationGlyph` the cards do: wave or dome for kind, tone for state.
 struct RecentRowLabel: View {
     let item: StationItem
     let imperial: Bool
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
-    // Cache the engine value, format in body — unit switches re-render live.
-    @State private var height: Double?
-    @State private var signed: Double?
-    @State private var gatePhase: DerivedPhase?  // derived gate: phase word, never a speed
+    // Cache the engine state, format in body — unit switches re-render live.
+    // The whole card state, not just the number, because the glyph's tone
+    // needs the direction/phase the reading alone doesn't carry.
+    @State private var tide: CardState?
+    @State private var current: CurrentCardState?
+    @State private var gate: DerivedGateCardState?  // derived gate: phase word, never a speed
+    @ScaledMetric(relativeTo: .callout) private var tileGlyphSize: CGFloat = 26
+    /// The glyph's slot — tracks `tileGlyphSize` (sweep finding: `StationGlyph`
+    /// sizes its own internal `Canvas` from `size`, but this outer frame was
+    /// left at a literal 38, so once `tileGlyphSize` outgrew it the glyph
+    /// overflowed the slot into the row's name/reading text beside it).
+    @ScaledMetric(relativeTo: .callout) private var tileGlyphSlot: CGFloat = 38
+
+    private var glyphKind: StationGlyph.GlyphKind {
+        switch item {
+        case .tide, .chs: .tide
+        case .current, .chsGate, .chsCurrent: .current
+        }
+    }
+
+    /// Reuses the cards' own bindings so a row and its card can never disagree.
+    private var glyphTone: StationGlyph.Tone {
+        switch item {
+        case .tide, .chs: StationCardView.glyphTone(tide)
+        case .current, .chsCurrent: CurrentCardView.glyphTone(current)
+        case .chsGate: ChsGateCardView.glyphTone(gate?.phase)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(stationGradient(id: rawId))
-                .frame(width: 38, height: 38)
+            StationGlyph(kind: glyphKind, tone: glyphTone, size: tileGlyphSize)
+                .frame(width: tileGlyphSlot, height: tileGlyphSlot)
             // The name owns the full row width (M50). It used to share the
             // line with the reading, which in the 320pt iPad sidebar left it
             // ~150pt — "Deception Pass State Park" came out "Deception Pas…",
@@ -974,18 +1071,16 @@ struct RecentRowLabel: View {
             // load-bearing text here) is what gives way instead.
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
-                    .font(.geist(16, .medium))
+                    .font(.callout.weight(.medium))
                     .foregroundStyle(SN.paper)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 HStack(spacing: 8) {
                     Text(item.region)
-                        .font(.geist(12))
+                        .font(.caption)
                         .foregroundStyle(SN.foam.opacity(0.55))
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Text(reading)
-                        .font(.fraunces(15))
+                        .font(.subheadline.monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .lineLimit(1)
                         .layoutPriority(1)
@@ -995,7 +1090,7 @@ struct RecentRowLabel: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .task { if height == nil && signed == nil { load() } }
+        .task { if tide == nil && current == nil && gate == nil { load() } }
     }
 
     private var rawId: String {
@@ -1004,92 +1099,82 @@ struct RecentRowLabel: View {
     }
 
     private var reading: String {
-        if let gatePhase { return phaseWord(gatePhase).lowercased() }
-        if let signed {
-            return currentPhase(signed: signed) == .slack
-                ? "slack" : "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
+        if let gate { return phaseWord(gate.phase).lowercased() }
+        if let current {
+            return currentPhase(signed: current.signed) == .slack
+                ? "slack" : "\(formatSpeed(abs(current.signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
         }
-        guard let height else { return "" }
-        return "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        guard let tide else { return "" }
+        return "\(formatHeight(tide.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
     }
 
     private func load() {
         switch item {
         case .tide(let s):
-            height = s.cardState(at: appNow()).height
+            tide = s.cardState(at: appNow())
         case .current(let s):
-            signed = s.cardState(at: appNow()).signed
+            current = s.cardState(at: appNow())
         case .chs(let info):
             guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
-            height = record.cardState(at: appNow()).height
-        case .chsGate(let gate):
-            guard case .fitted(let port) = ChsFitService.shared.state(gate.reference) else { return }
-            gatePhase = DerivedGateRecord(gate: gate, port: port).cardState(at: appNow()).phase
-        case .chsCurrent(let gate):
-            guard case .fitted(let record) = ChsFitService.shared.currentState(gate.id) else { return }
-            signed = record.cardState(at: appNow()).signed
+            tide = record.cardState(at: appNow())
+        case .chsGate(let info):
+            guard case .fitted(let port) = ChsFitService.shared.state(info.reference) else { return }
+            gate = DerivedGateRecord(gate: info, port: port).cardState(at: appNow())
+        case .chsCurrent(let info):
+            guard case .fitted(let record) = ChsFitService.shared.currentState(info.id) else { return }
+            current = record.cardState(at: appNow())
         }
     }
 }
 
-/// Variant 1a card: per-station sky gradient, Fraunces name, big height numeral.
+/// Layout A: kind glyph left, identity (name/region/distance), state right.
+/// Fraunces name, big height numeral.
 struct StationCardView: View {
     let record: TideStationRecord
     let imperial: Bool
+    var km: Double? = nil
     @State private var state: CardState?
 
+    /// State → tone. `static`, like the detail views' `phaseColor`, so the
+    /// binding can be asserted without building a view: an inverted binding
+    /// here renders a perfectly valid flood blue on a falling tide and no
+    /// token or colour test can see it (`ColourAndFormTests`
+    /// `testCardGlyphToneBindings`).
+    static func glyphTone(_ state: CardState?) -> StationGlyph.Tone {
+        guard let state else { return .unknown }
+        return state.rising ? .rising : .falling
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.name)
-                        .font(.fraunces(23, .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(record.region)
-                        .font(.geist(13))
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                    if let next = state?.next {
-                        Text("\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))")
-                            .font(.geist(12))
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
+        StationCard(glyphKind: .tide, glyphTone: Self.glyphTone(state),
+                    name: record.name, region: record.region, km: km,
+                    detail: state?.next.map { next in
+                        "\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))"
+                    }) {
+            if let state {
+                (Text(formatHeight(state.height, imperial: imperial))
+                    .font(.largeTitle.monospacedDigit())
+                 + Text(" \(heightUnit(imperial: imperial))")
+                    .font(.body))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Text(state.rising ? "▲" : "▼").font(.caption2)
+                    Text(state.rising ? "Rising" : "Falling").font(.caption2)
                 }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let state {
-                        (Text(formatHeight(state.height, imperial: imperial))
-                            .font(.fraunces(42))
-                         + Text(" \(heightUnit(imperial: imperial))")
-                            .font(.fraunces(17)))
-                            .foregroundStyle(.white)
-                        HStack(spacing: 4) {
-                            Text(state.rising ? "▲" : "▼").font(.geist(9))
-                            Text(state.rising ? "Rising" : "Falling").font(.geist(11))
-                        }
-                        .foregroundStyle(SN.foam.opacity(0.9))
-                    }
-                }
+                .foregroundStyle(SN.foam.opacity(0.9))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: record.id))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 }
 
 /// A Canadian (CHS) tide port. Fitted: the ordinary tide card, navigable.
-/// Not yet fitted: the same gradient shell with identity and an honest message
+/// Not yet fitted: the same card shell with identity and an honest message
 /// (chs-online spec §7c — never an empty chart, never a spinner to nothing).
 struct ChsCardView: View {
     let info: ChsStationInfo
     let imperial: Bool
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -1097,15 +1182,15 @@ struct ChsCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.state(info.id) {
         case .fitted(let record):
-            StationCardView(record: record, imperial: imperial)
+            StationCardView(record: record, imperial: imperial, km: km)
         case .fitting:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: chsPendingMessage("tidal", id: info.id))
         case .failed:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id,
+            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
@@ -1133,40 +1218,25 @@ struct ChsPendingCard: View {
     let name: String
     let region: String
     let id: String
+    /// No reading has ever loaded here — there's nothing yet to fit, so the
+    /// glyph's tone is `.unknown`, never a guess. Kind still comes from the
+    /// caller: a pending tide port and a pending derived current gate look
+    /// the same wave/dome distinction as their fitted counterparts.
+    let kind: StationGlyph.GlyphKind
+    var km: Double? = nil
     let message: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.fraunces(23, .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(region)
-                        .font(.geist(13))
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                }
-                Spacer(minLength: 8)
-            }
-            Text(message)
-                .font(.geist(12))
-                .foregroundStyle(SN.foam.opacity(0.85))
-                .padding(.top, 10)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: id))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
-        .opacity(0.82)  // visibly quieter than a station with numbers
-        // Named per station (M53). "Some card on screen says 'Canadian tidal
-        // predictions'" was a unique locator at 21 Canadian stations and is
-        // meaningless at 1,097 — every undownloaded station says it, so a test
-        // waiting for THIS station's copy to go never sees it go.
-        .accessibilityIdentifier("chs-pending-\(id)")
+        StationCard(glyphKind: kind, glyphTone: .unknown,
+                    name: name, region: region, km: km,
+                    message: message,
+                    opacity: 0.82,  // visibly quieter than a station with numbers
+                    trailing: { EmptyView() })
+            // Named per station (M53). "Some card on screen says 'Canadian tidal
+            // predictions'" was a unique locator at 21 Canadian stations and is
+            // meaningless at 1,097 — every undownloaded station says it, so a test
+            // waiting for THIS station's copy to go never sees it go.
+            .accessibilityIdentifier("chs-pending-\(id)")
     }
 }
 
@@ -1176,62 +1246,56 @@ struct ChsPendingCard: View {
 /// while the reference port is unfitted, in the same register as the ports.
 struct ChsGateCardView: View {
     let gate: ChsGateInfo
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     @State private var state: DerivedGateCardState?
+
+    /// Phase → tone. `static` for the same reason as `StationCardView`'s.
+    static func glyphTone(_ phase: DerivedPhase?) -> StationGlyph.Tone {
+        switch phase {
+        case .flood: .flood
+        case .ebb: .ebb
+        case .slack: .slack
+        case nil: .unknown
+        }
+    }
 
     var body: some View {
         switch service.state(gate.reference) {
         case .fitted(let port):
             fittedCard(DerivedGateRecord(gate: gate, port: port))
         case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Downloading Canadian tidal predictions…")
         case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: chsPendingMessage("tidal", id: gate.reference))
         case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
         }
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(gate.name)
-                        .font(.fraunces(23, .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text(gate.region)
-                        .font(.geist(13))
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                    if let next = state?.nextSlack {
-                        Text("Slack · \(cardTime(next.time, gate.tz))")
-                            .font(.geist(12))
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
-                }
-                Spacer(minLength: 8)
-                if let state {
-                    // The web's phase-pill words: flood / ebb / slack.
-                    Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
-                        .font(.geistMono(11, .medium)).tracking(1)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(Color.white.opacity(0.18), in: Capsule())
-                }
+        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state?.phase),
+                    name: gate.name, region: gate.region, km: km,
+                    detail: state?.nextSlack.map { next in
+                        "Slack · \(cardTime(next.time, gate.tz))"
+                    }) {
+            if let state {
+                // The web's phase-pill words: flood / ebb / slack. Slack
+                // takes SN.go, not the neutral chip flood/ebb still use —
+                // otherwise the glyph beside it reads green while this
+                // pill reads grey, the exact collision Task 2 fixed on
+                // the detail views (testSlackIsGreenWhereverItAppears).
+                Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
+                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                    .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: gate.id))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
     }
 }
@@ -1241,6 +1305,7 @@ struct ChsGateCardView: View {
 /// register, naming currents (chs-online spec §7c — never an empty chart).
 struct ChsCurrentGateCardView: View {
     let gate: ChsCurrentGateInfo
+    var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -1248,31 +1313,34 @@ struct ChsCurrentGateCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.currentState(gate.id) {
         case .fitted(let record):
-            CurrentCardView(record: record,
+            CurrentCardView(record: record, km: km,
                             provisional: service.isProvisional(gate.id) ? gate : nil)
         case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Downloading Canadian current predictions…")
         case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: chsPendingMessage("current", id: gate.id))
         case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
                            message: "Canadian current predictions didn't finish downloading — open it to retry.")
         }
     }
 }
 
-/// The current-station card: same 1a gradient shell, but the reading is signed
+/// The current-station card: same layout-A shell, but the reading is signed
 /// velocity — speed + set arrow + Flooding/Ebbing, a Slack pill at slack, and
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
     let record: CurrentStationRecord
+    var km: Double? = nil
     /// Set while this gate is showing its 60-day fast answer. On the LIST card
     /// that is a ⚠️ badge and a `~` on the readings — nothing else (M52). The
-    /// amber prose this replaced was 1.03:1 against the palest station gradient
-    /// (see ProvisionalBadge); the full explanation, in the amber card that can
-    /// afford the contrast, lives on the detail view and is unchanged.
+    /// amber prose this replaced was unreadable on the per-station gradients of
+    /// the day; those are gone and the numbers were redone against the flat
+    /// card (see `ProvisionalBadge`, which carries the current contrast story).
+    /// The full explanation, in the amber card that can afford the contrast,
+    /// lives on the detail view and is unchanged.
     var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
@@ -1282,60 +1350,46 @@ struct CurrentCardView: View {
     /// shouting around it.
     private var tilde: String { provisional == nil ? "" : "~" }
 
+    /// Signed velocity → tone. `static` for the same reason as
+    /// `StationCardView`'s.
+    static func glyphTone(_ state: CurrentCardState?) -> StationGlyph.Tone {
+        guard let state else { return .unknown }
+        switch currentPhase(signed: state.signed) {
+        case .flood: return .flood
+        case .ebb: return .ebb
+        case .slack: return .slack
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.name)
-                        .font(.fraunces(23, .semibold))
+        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state),
+                    name: record.name, region: record.region, km: km,
+                    detail: state?.next.map { nextLine($0) },
+                    badge: { if provisional != nil { ProvisionalBadge() } }) {
+            if let state {
+                let phase = currentPhase(signed: state.signed)
+                if phase == .slack {
+                    // SN.go, not a neutral chip — see the matching
+                    // comment on ChsGateCardView's phase pill.
+                    Text("SLACK")
+                        .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                        .foregroundStyle(SN.navyDeep)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(SN.go, in: Capsule())
+                } else {
+                    (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
+                        .font(.largeTitle.monospacedDigit())
+                     + Text(" \(speedUnitLabel(speedUnit))")
+                        .font(.body))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    HStack(spacing: 7) {
-                        if provisional != nil { ProvisionalBadge() }
-                        Text(record.region)
-                            .font(.geist(13))
-                            .foregroundStyle(SN.foam.opacity(0.78))
+                    HStack(spacing: 4) {
+                        CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
+                        Text(phaseWord(phase)).font(.caption2)
                     }
-                    if let next = state?.next {
-                        Text(nextLine(next))
-                            .font(.geist(12))
-                            .foregroundStyle(SN.foam.opacity(0.92))
-                            .padding(.top, 10)
-                    }
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 5) {
-                    if let state {
-                        let phase = currentPhase(signed: state.signed)
-                        if phase == .slack {
-                            Text("SLACK")
-                                .font(.geistMono(11, .medium)).tracking(1)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(Color.white.opacity(0.18), in: Capsule())
-                        } else {
-                            (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
-                                .font(.fraunces(42))
-                             + Text(" \(speedUnitLabel(speedUnit))")
-                                .font(.fraunces(17)))
-                                .foregroundStyle(.white)
-                            HStack(spacing: 4) {
-                                CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.geist(11))
-                                Text(phaseWord(phase)).font(.geist(11))
-                            }
-                            .foregroundStyle(SN.foam.opacity(0.9))
-                        }
-                    }
+                    .foregroundStyle(SN.foam.opacity(0.9))
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(stationGradient(id: record.id))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
         .task { if state == nil { state = record.cardState(at: appNow()) } }
         // The refinement replaces the record under an open list: recompute.
         .onChange(of: record) { _, refined in state = refined.cardState(at: appNow()) }

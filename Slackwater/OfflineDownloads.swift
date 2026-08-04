@@ -79,6 +79,12 @@ struct OfflineStatusButton: View {
                         .rotationEffect(.degrees(-90))
                         .frame(width: 28, height: 28)
                 }
+                // Fixed, not scaled: this button is one of the two 34pt chrome
+                // circles the list header's wordmark comment is calibrated
+                // against (SlackwaterApp.swift `header`, beside the gear,
+                // which stays fixed too) — the same 320pt iPad sidebar row.
+                // Step 5b's table called this a text companion; it isn't one —
+                // reverted to its pre-Task-5 literal size (sweep finding).
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(tint)
@@ -176,14 +182,14 @@ struct OfflineManagerList: View {
             ProgressView(value: Double(queue.ready), total: Double(max(queue.total, 1)))
                 .tint(queue.failed > 0 ? SN.amber : SN.leaf)
             Text(summaryLine)
-                .font(.geist(14))
+                .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
             if queue.failed > 0 {
                 Button { service.retryFailed() } label: {
                     Text("Retry \(queue.failed) failed")
-                        .font(.geist(15, .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(SN.amber)
                 }
                 .buttonStyle(.plain)
@@ -248,20 +254,20 @@ struct OfflineManagerList: View {
     private func row(_ job: ChsJob) -> some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(stationGradient(id: job.id))
+                .fill(SN.cardFill)
                 .frame(width: 38, height: 38)
                 // Provisional sits between the two: usable, not finished.
                 .opacity(job.status == .ready ? 1 : service.isProvisional(job.id) ? 0.75 : 0.45)
             VStack(alignment: .leading, spacing: 3) {
                 Text(job.name)
-                    .font(.geist(16, .medium))
+                    .font(.callout.weight(.medium))
                     .foregroundStyle(SN.paper)
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     // The promotion, made visible: this is the one you opened.
                     // On the subtitle line, so a badge never truncates a name.
                     if queue.isPromoted(job.id) {
-                        MonoLabel(text: "You opened", size: 9, color: SN.amber, tracking: 1.2)
+                        MonoLabel(text: "You opened", color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(SN.amber.opacity(0.16), in: Capsule())
                     }
@@ -269,12 +275,12 @@ struct OfflineManagerList: View {
                     if service.isProvisional(job.id),
                        let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
                         MonoLabel(text: "Fast answer \(gate.provisionalTolerance)",
-                                  size: 9, color: SN.amber, tracking: 1.2)
+                                  color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(SN.amber.opacity(0.18), in: Capsule())
                     }
                     Text("\(job.isCurrent ? "Current" : "Tide") · \(job.region)")
-                        .font(.geist(12))
+                        .font(.caption)
                         .foregroundStyle(SN.foam.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -283,7 +289,7 @@ struct OfflineManagerList: View {
             if job.status == .failed {
                 Button { service.promote(job.id) } label: {
                     Text("Retry")
-                        .font(.geist(13, .semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(SN.amber)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(SN.amber.opacity(0.14), in: Capsule())
@@ -291,7 +297,7 @@ struct OfflineManagerList: View {
                 .buttonStyle(.plain)
             } else {
                 Text(statusText(job))
-                    .font(.geist(13))
+                    .font(.footnote)
                     .foregroundStyle(statusTint(job))
             }
         }

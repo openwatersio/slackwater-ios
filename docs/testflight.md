@@ -42,7 +42,36 @@ Two XCTestPlans, both checked in under `TestPlans/` and wired into the scheme by
 ./scripts/test.sh                                  # fast plan  — the default
 ./scripts/test.sh --full                           # full plan
 SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save screenshots
+SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 ```
+
+### One test run at a time (2026-08-02)
+
+The self-hosted runner is this same Mac, so CI and a local run can overlap. When
+they do, they SIGKILL each other's test runner: every UI test in the losing run
+reports `Test crashed with signal kill` with **zero assertion failures**. It reads
+as a real failure and is not one. If you see that signature, check whether
+something else was testing at the same time before you debug the code.
+
+Five CI runs died this way on 2026-08-02 — 3, 6 and 16 UI tests at a time — and the
+last of them had CI and the local run on *different simulator devices*, so device
+separation does not avoid it. The exact kill mechanism was never pinned down; the
+CoreSimulator logs had already rolled off. The correlation with overlap was 5 for 5.
+
+So `scripts/test.sh` takes a machine-wide `lockf(1)` lock and whoever arrives second
+waits. Your local run can therefore sit for up to a full CI run before it starts —
+it prints a line when it's waiting. The lock lives in the kernel, so a killed or
+cancelled run releases it and nothing wedges.
+
+Two smaller pieces of the same story:
+
+- `SLACKWATER_SIMS` lets CI run on its own devices (`SlackwaterCI-iPhone` /
+  `SlackwaterCI-iPad`, created by the workflow, same device types as the reference
+  pair). That doesn't prevent the kill, but it does stop results bleeding between
+  overlapping sessions — CI once reported a failing test that didn't exist on the
+  branch under test.
+- Both plans write screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
+  otherwise, CI included, so a local run and CI overwrite each other's images.
 
 | Plan | File | Contents | Wall clock (per sim) |
 |---|---|---|---|
@@ -81,23 +110,21 @@ the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix a
 rest on the runner. A bare `M1_SHOT_DIR` in the invoking shell never arrives and the tests
 silently fall back to `/tmp`.
 
-## Card contrast — the sn- gradients are not a safe text background (2026-08-01)
+## Card contrast — ProvisionalBadge against the flat card background (2026-08-02)
 
-Measured for the M52 provisional-marking fix; the numbers are worth keeping because they
-apply to anything anyone is tempted to write onto a station card. Amber `#E0B45A` sits at
-almost exactly the luminance of the palette's pale gradient stops:
+Superseded by M53 (layout A): the per-station `stationGradient`/`gradientTrios` this section
+used to warn about are deleted — every card background is now flat `SN.cardFill` (≈5% white)
+composited over the list's `SN.canvas`/`SN.canvasGlow` radial ground, so there is no longer a
+12-trio worst case to chase. A marking that must read on the card still can't be bare coloured
+text, though — `ProvisionalBadge` keeps its own opaque chrome (amber on an `SN.canvas` disc
+with a full-strength amber ring) rather than relying on the card fill directly.
 
-| Foreground on a station gradient | Best stop | Worst stop |
-|---|---|---|
-| Amber `#E0B45A` | 9.07:1 (`#00183C`) | **1.03:1** (`#9AC0B0`) — invisible |
-| White | 17.56:1 (`#00183C`) | 1.82:1 (`#A8C4D4`) |
-
-So a marking that must read on *every* trio can't be bare coloured text — it needs its own
-opaque chrome. `ProvisionalBadge` is amber on an `SN.canvas` disc (9.63:1 glyph-on-disc) with
-a full-strength amber ring: the disc reads 10.22:1 against the palest stop, the ring 9.07:1
-against the darkest, and the better of the two boundaries is ≥3.14:1 on every stop in the
-palette — clear of WCAG 1.4.11's 3:1 for non-text. The prose it replaced lives on the detail
-view's amber card, which has a controlled background and can afford it.
+Composited card background ranges `#121E35` (deep in the list, near `SN.canvas`) to `#162C4A`
+(top of list, near the brighter `SN.canvasGlow`). New amber `#EF6F4A` against that range is
+**4.71:1–5.59:1** — clear of WCAG 1.4.11's 3:1 for non-text either way. The glyph-on-disc
+contrast (amber icon on the `SN.canvas` disc, 6.25:1) doesn't depend on the card background and
+was never the tight number. The prose the badge replaced lives on the detail view's amber card,
+which has a controlled background and can afford it.
 
 ## CLI vs Xcode GUI — SPM cache isolation (2026-07-31)
 

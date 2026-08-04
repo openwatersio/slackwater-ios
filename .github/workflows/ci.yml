@@ -58,6 +58,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The runner is the Mac we develop on, so CI gets its own pair of
+      # simulator devices — same device types, different instances. Sharing a
+      # device with a local `xcodebuild` run makes the two SIGKILL each other's
+      # test runner, which reads as a real test failure and is not one.
+      # Created on first run; kept afterwards.
+      - name: CI-only simulators
+        run: |
+          xcrun simctl list devices | grep -q 'SlackwaterCI-iPhone' \
+            || xcrun simctl create 'SlackwaterCI-iPhone' 'iPhone 17'
+          xcrun simctl list devices | grep -q 'SlackwaterCI-iPad' \
+            || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
+
       # Runs xcodegen, then the FAST test plan on both reference simulators.
       # The full plan hits live IWLS and stays a pre-upload step run by hand.
       - run: ./scripts/test.sh
+        env:
+          SLACKWATER_SIMS: SlackwaterCI-iPhone,SlackwaterCI-iPad

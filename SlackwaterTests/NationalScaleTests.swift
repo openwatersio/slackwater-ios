@@ -144,6 +144,49 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(build, 0.30)
     }
 
+    /// Task 5 fix round 1 shrank the pin's direction search to a 1h window
+    /// and drew neutral whenever nothing turned up inside it — correct, but
+    /// only 838/5,700 (station, moment) checks actually resolved a tone
+    /// (~15% coverage): "declining to answer" isn't the same as "cheap and
+    /// correct". Round 2 is the hybrid in `tidePinRisingHybrid`: a cheap
+    /// two-sample check, its noise threshold weighted by each constituent's
+    /// astronomical speed (not just amplitude — a diurnal station's peak
+    /// slope is roughly half a semidiurnal one's at equal amplitude, so an
+    /// amplitude-only proxy over-flagged diurnal stations as "near a turn"),
+    /// that resolves almost every station directly and falls back to the
+    /// exact search only for the ones actually near a turn. This asserts
+    /// BOTH numbers the round-1 test was missing — coverage (should read
+    /// ~100%, not a fraction) and correctness (mismatches against the 30h
+    /// baseline, which must be zero) — at four times spread across a day,
+    /// across the whole bundled tide set. Threshold sweep this shipped with
+    /// (speed-weighted relative delta): 0.0003 → 2 wrong-signed trusted
+    /// samples out of 5,700; 0.00033 → 0; shipped at 0.0004 for margin above
+    /// that empirical floor (7.4% fall back to the exact search, versus 15%
+    /// for the amplitude-only version of this same idea).
+    func testHybridDirectionHasFullCoverageAndMatchesBaseline() {
+        let dayStart = Date(timeIntervalSince1970: 1_785_000_000)
+        let checkTimes = [0.0, 6.0, 12.0, 18.0].map { dayStart.addingTimeInterval($0 * 3600) }
+        var resolved = 0
+        var mismatches: [String] = []
+        for record in TideStationRecord.all {
+            for now in checkTimes {
+                let baseline = record.cardState(at: now).rising
+                guard let hybrid = tidePinRisingHybrid(record, at: now) else { continue }
+                resolved += 1
+                if hybrid != baseline {
+                    mismatches.append("\(record.id) at \(now): hybrid=\(hybrid) baseline=\(baseline)")
+                }
+            }
+        }
+        let checked = TideStationRecord.all.count * checkTimes.count
+        let coveragePct = Double(resolved) / Double(checked) * 100
+        print(String(format: "Hybrid direction: %d/%d resolved a tone (%.1f%% coverage), "
+                     + "%d disagreed with the 30h baseline", resolved, checked, coveragePct, mismatches.count))
+        XCTAssertGreaterThan(coveragePct, 99.0, "the hybrid must not quietly fall back to mostly-neutral again")
+        XCTAssertTrue(mismatches.isEmpty,
+                      "hybrid direction disagreed with the 30h baseline: \(mismatches.prefix(10))")
+    }
+
     /// Clustering is what makes 3,125 pins a map rather than a smear — and the
     /// zoom it stops at is what keeps the discovery view tappable.
     func testStationSourceClustersOnlyBelowTheDiscoveryZoom() throws {
@@ -156,8 +199,10 @@ final class NationalScaleTests: XCTestCase {
                           "the discovery camera must open on tappable stations, not clusters")
         let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
         XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-clusters" })
-        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-dots" }?["filter"],
-                        "the dot layer must exclude clusters, or every cluster draws twice")
+        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-current" }?["filter"],
+                        "the current-pin layer must exclude clusters, or every cluster draws twice")
+        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-tide" }?["filter"],
+                        "the tide-pin layer must exclude clusters, or every cluster draws twice")
         // Both land tilesets, or somewhere in the covered area is blank water.
         XCTAssertNotNil(sources["land-usca"], "the continental land floor is missing")
         XCTAssertNotNil(sources["land"], "the Salish detail layer is missing")

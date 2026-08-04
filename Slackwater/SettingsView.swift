@@ -50,7 +50,7 @@ struct SettingsView: View {
                                 Text("\(chs.queue.ready) of \(chs.queue.total) nearby Canadian stations on this device")
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.footnote.weight(.semibold))
                             }
                             .foregroundStyle(SN.leaf)
                         }
@@ -59,7 +59,7 @@ struct SettingsView: View {
                     section("About these predictions") {
                         Text("Slackwater computes harmonic tide and current predictions on this device. Predictions are not observations — actual conditions vary with weather, river flow and local effects.")
                         Text("Not for navigation.")
-                            .font(.geist(13, .semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.9))
                         Text("Canadian (CHS) stations are harmonic models fitted on this device from CHS (IWLS) predictions fetched under DFO's terms — not CHS-published numbers. CHS data is used under licence (clause 10) and is not to be used for navigation. A few Canadian waters CHS does not gauge are covered by bundled TICON-4 constants instead.")
                     }
@@ -71,7 +71,6 @@ struct SettingsView: View {
                         Text("Map bathymetry: Seascape © Open Water Software, LLC (CC BY 4.0), when online.")
                         Text("Station names & pairings: @sailingnaturali/station-corrections (MIT).")
                         Text("Prediction engine: slackwater-engine, a port of Neaps (MIT).")
-                        Text("Fonts: Fraunces, Geist and Geist Mono, used under the SIL Open Font License 1.1.")
                     }
 
                     section("License") {
@@ -80,7 +79,7 @@ struct SettingsView: View {
 
                     section("Version") {
                         Text(version)
-                            .font(.geistMono(14))
+                            .font(.footnote.monospaced())
                             .foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
@@ -105,7 +104,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             MonoLabel(text: label)
             content()
-                .font(.geist(14))
+                .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
         }

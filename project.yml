@@ -37,20 +37,11 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIAppFonts:
-          - Fraunces-Regular.ttf
-          - Fraunces-Medium.ttf
-          - Fraunces-SemiBold.ttf
-          - Geist-Regular.ttf
-          - Geist-Medium.ttf
-          - Geist-SemiBold.ttf
-          - GeistMono-Regular.ttf
-          - GeistMono-Medium.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
         MARKETING_VERSION: 0.2.0
-        CURRENT_PROJECT_VERSION: 17
+        CURRENT_PROJECT_VERSION: 18
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -41,11 +41,25 @@ final class ScreenshotTests: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized and hittable (Recents now lives
-    /// at the very bottom — often below the fold).
+    /// Scroll the list until `el` is realized, hittable, and clear of the
+    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
+    /// ~80pt exclusion already used inline for the schedule row below, "home
+    /// indicator band" case). Bare `isHittable` alone is not enough for
+    /// elements near the list's bottom — XCUITest counts an element hittable
+    /// the moment any part of it is on-screen and unobscured by an ancestor's
+    /// clipping, which can be true while it still sits directly under the
+    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
+    /// silently lands on the FAB instead and nothing happens (confirmed by
+    /// diagnostic frame dumps: at the old bare-isHittable stopping point the
+    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
+    /// one more swipe carried it clear by ~68pt and it stayed there — the
+    /// list was genuinely bottomed out, not still scrolling).
     private func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var tries = 0
-        while (!el.exists || !el.isHittable), tries < 8 {
+        while tries < 10 {
+            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
+                break
+            }
             listContainer(app).swipeUp()
             tries += 1
         }
@@ -291,6 +305,43 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    // Colour-and-form Task 4: the dot layer split into station-pins-current
+    // (circle) and station-pins-tide (square). testM4MapPinToDetail above
+    // only ever taps a `current`-kind pin (Deception Pass is a current
+    // station) — this is the one test that proves the square/tide layer is
+    // still wired to the same tap handler. Losing this coverage is exactly
+    // the failure the split risked: the web port silently dropped tap
+    // handling for one kind when its dot layer was split, and no test caught
+    // it there either.
+    func testM4TideSquarePinToDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // let tiles (and Seascape, when reachable) come in
+        let frame = map.frame
+        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
+            let x = (lon + 180) / 360 * world
+            let phi = lat * .pi / 180
+            let y = (1 - log(tan(phi) + 1 / cos(phi)) / .pi) / 2 * world
+            return (x, y)
+        }
+        let c = mercator(48.35, -123.05)                 // SALISH_CENTER
+        let p = mercator(48.48500061035156, -123.08300018310547)  // Kanaka Bay, NOAA tide
+        let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
+        let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
+        map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
+
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+                  "map pin tap did not open a station detail")
+        XCTAssert(app.staticTexts["Kanaka Bay"].firstMatch.waitForExistence(timeout: 5))
+    }
+
     // M4: the paired current→tide detail on Deception Pass — the pane exists,
     // and every one of the reference port's schedule numbers (time + height of
     // each high/low today) appears verbatim in the gate's merged view: same
@@ -329,6 +380,11 @@ final class ScreenshotTests: XCTestCase {
 
         let gateTimes = clockLabels(app)
         let gateHeights = heightLabels(app)
+        // Symmetry with the port-side guard above: if the row scope ever stops
+        // matching, say so directly instead of reporting every port value as
+        // "missing from paired view (has [])".
+        XCTAssert(!gateTimes.isEmpty && !gateHeights.isEmpty,
+                  "no schedule rows read from the gate detail")
         // Sun rows joined the schedule (design pass item 7a) and are computed
         // from each station's own position, so a port sun time may differ from
         // the gate's by seconds — allow a 1-minute neighbour for those labels.
@@ -912,9 +968,9 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m46-malibu-detail.png")
 
         // Print today's rendered schedule times for the verification table.
-        let labels = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{2}:\\d{2}$")).allElementsBoundByIndex
-        print("M46-SCHEDULE-TIMES: \(labels.compactMap { $0.exists ? $0.label : nil })")
+        // Scoped to the rows for the same reason clockLabels is: unscoped, this
+        // table would quietly include iPad sidebar card readings.
+        print("M46-SCHEDULE-TIMES: \(clockLabels(app).sorted())")
 
         // The live card (PA fitted now): "Slack · time" line + the phase pill.
         app.buttons["detail-back"].firstMatch.tap()
@@ -1587,17 +1643,58 @@ final class ScreenshotTests: XCTestCase {
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The
     /// tide detail's set must be a subset of the paired view's merged set.
-    private func clockLabels(_ app: XCUIApplication) -> Set<String> {
-        let all = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{2}:\\d{2}$")).allElementsBoundByIndex
-        return Set(all.compactMap { $0.exists ? $0.label : nil })
+    /// The schedule rows' accessibility labels — NOT the whole screen.
+    ///
+    /// Scoping matters on iPad and only on iPad. The split-view sidebar renders
+    /// live station cards, and since layout A put the reading on the card's
+    /// right they emit `X.X ft` strings that match the same regexes the schedule
+    /// rows do. A caller that scrapes twice and diffs then blames the paired
+    /// pane for a sidebar label: between two scrapes the Recents list reorders
+    /// (the station just visited moves in), so a reading present in the first
+    /// read is simply gone from the second. That produced two consecutive CI
+    /// failures on "missing" values of 4.6 ft and 4.8 ft — both sidebar
+    /// readings, never in the pane at all — while the other values drifted
+    /// between runs (6.7→6.6, 5.1→5.2) the way a live reading does and a tide
+    /// row does not. It passes on iPhone, which has no sidebar, and passes in
+    /// isolation on iPad, where the sidebar state differs.
+    ///
+    /// Each row is ONE element, not a container: `TimelineStrip` applies
+    /// `.accessibilityElement(children: .combine)`, so a row's children are
+    /// merged into its own label and `row.staticTexts` finds nothing. Hence we
+    /// read each row's label and pull the values out of it, rather than
+    /// querying descendants — querying would return an empty set and every
+    /// caller's comparison loop would pass vacuously.
+    private func scheduleRowLabels(_ app: XCUIApplication) -> [String] {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'schedule-row-d'"))
+            .allElementsBoundByIndex
+            .compactMap { $0.exists ? $0.label : nil }
     }
 
-    /// All "N.N ft/m" height labels on screen.
+    /// Every substring of the schedule rows matching `pattern`. Unanchored by
+    /// design: the row label is a combined string like "05:48 2.2 ft ↑ HIGH",
+    /// so the anchored `^…$` these helpers used when each value was its own
+    /// element would now match nothing.
+    private func scheduleValues(_ app: XCUIApplication, _ pattern: String) -> Set<String> {
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return [] }
+        var found: Set<String> = []
+        for label in scheduleRowLabels(app) {
+            let ns = label as NSString
+            for m in re.matches(in: label, range: NSRange(location: 0, length: ns.length)) {
+                found.insert(ns.substring(with: m.range))
+            }
+        }
+        return found
+    }
+
+    /// All "HH:MM" clock labels in the schedule rows.
+    private func clockLabels(_ app: XCUIApplication) -> Set<String> {
+        scheduleValues(app, "\\b\\d{2}:\\d{2}\\b")
+    }
+
+    /// All "N.N ft/m" height labels in the schedule rows.
     private func heightLabels(_ app: XCUIApplication) -> Set<String> {
-        let all = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d+\\.\\d+ (ft|m)$")).allElementsBoundByIndex
-        return Set(all.compactMap { $0.exists ? $0.label : nil })
+        scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b")
     }
 
     private func save(_ app: XCUIApplication, _ name: String) {

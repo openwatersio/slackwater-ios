@@ -163,6 +163,26 @@ struct TimelineData {
 
 // MARK: - Vertical geometry (prototype geo())
 
+/// Every number in here is a literal point, and that is why the chart's own
+/// labels are the one place in this branch that keeps a fixed `.system(size:)`.
+///
+/// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
+/// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
+/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`, and the
+/// track labels are pinned at `x: 30` / `x: 42`. Nothing here reflows: `height`
+/// is 362/258/286 by case, and `tideY`/`curY` map data onto those constants.
+///
+/// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
+/// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
+/// and reaches `tideTop`, while "Current" centred at `x: 42` runs off the left
+/// edge. Scaling text inside fixed-point geometry does not degrade by wrapping;
+/// it degrades by overprinting the chart.
+///
+/// Same rule this branch already applies to `MapHeader`'s 44pt buttons,
+/// `OfflineStatusButton`'s 34pt circle and the FABs: chrome in a fixed-size
+/// slot does not scale. Making these labels scale means making this geometry
+/// scale with them — a real chart-layout change, not a font swap. Until then
+/// the labels stay fixed; don't "finish the job" here.
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
@@ -287,9 +307,10 @@ struct TimelineCanvas: View {
                 }
                 ctx.stroke(Path(ellipseIn: disc), with: .color(.white.opacity(0.3)), lineWidth: 0.6)
             }
-            // Day label at local noon.
+            // Day label at local noon. Fixed size, not `.caption2` — see the
+            // TimelineGeo doc comment: `dayY` is 20 and the sun dot is at 34.
             ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
-                        .font(.fraunces(11, .semibold))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
                      anchor: .center)
@@ -300,7 +321,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
                 ctx.draw(Text("\(arrow)\(cardTime(t, data.tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.geistMono(10, .medium))
+                            .font(.system(size: 10, weight: .medium).monospaced())
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
@@ -339,7 +360,8 @@ struct TimelineCanvas: View {
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                      with: .color(.white))
             ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.fraunces(10, .semibold)).foregroundStyle(.white),
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
         }
     }
@@ -355,15 +377,18 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
         area.closeSubpath()
         // Flood fill above the zero line, ebb fill below (prototype clip paths).
+        // These were SN.leaf (the slack-only green) and a hardcoded blue —
+        // leftover from before the rebrand, still speaking the retired
+        // direction pair in the chart's most prominent area.
         ctx.drawLayer { l in
             l.clip(to: Path(CGRect(x: 0, y: geo.curTop - 10, width: data.totalWidth,
                                    height: geo.zeroY - (geo.curTop - 10))))
-            l.fill(area, with: .color(SN.leaf.opacity(0.32)))
+            l.fill(area, with: .color(SN.flood.opacity(0.32)))
         }
         ctx.drawLayer { l in
             l.clip(to: Path(CGRect(x: 0, y: geo.zeroY, width: data.totalWidth,
                                    height: geo.curBottom + 10 - geo.zeroY)))
-            l.fill(area, with: .color(Color(hex: 0x6096BE, opacity: 0.32)))
+            l.fill(area, with: .color(SN.ebb.opacity(0.32)))
         }
         var zero = Path()
         zero.move(to: CGPoint(x: 0, y: geo.zeroY))
@@ -381,16 +406,18 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 2.6, y: geo.zeroY - 2.6,
                                                 width: 5.2, height: 5.2)),
                          with: .color(.white.opacity(0.85)))
-                ctx.draw(Text("slack").font(.geistMono(8))
-                            .foregroundStyle(SN.foam.opacity(0.5)),
+                // Slack is the app's "go" colour, not a neutral. It is the moment the
+                // app is named for, and it must read the same on every surface.
+                ctx.draw(Text("slack").font(.system(size: 8).monospaced())
+                            .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
             case .maxFlood, .maxEbb:
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.fraunces(10, .semibold))
-                            .foregroundStyle(Color(hex: e.kind == .maxFlood ? 0xCFE6B8 : 0xBCD8EC)),
+                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
                          anchor: .center)
             }
@@ -566,12 +593,21 @@ struct TimelineScrubStrip: View {
                     .frame(width: 8, height: 6)
                     .position(x: w / 2, y: 5)
                 if geo.hasTide {
-                    Circle().fill(SN.leaf)
+                    // Neutral, like the current dot below it. This was green,
+                    // which made it a mark coloured by SERIES IDENTITY — kind —
+                    // inside a canvas where green means slack: on a paired
+                    // current+tide detail the same chart carried a green dot
+                    // meaning "tide curve" and green `slack` labels at every
+                    // zero crossing. Both track lines are near-white anyway, so
+                    // the green matched nothing it sat on.
+                    // (The white ring it used to wear was there to lift green
+                    // off the track; on a white dot it drew nothing.)
+                    Circle().fill(.white)
                         .frame(width: 13, height: 13)
-                        .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                        .shadow(color: SN.leaf.opacity(0.9), radius: 4)
+                        .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
-                    MonoLabel(text: "Tide", size: 9, color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4,
+                              fixedSize: 9)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 30, y: geo.tideTop - 3)
@@ -581,7 +617,8 @@ struct TimelineScrubStrip: View {
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    MonoLabel(text: "Current", size: 9, color: SN.leaf.opacity(0.9), tracking: 1.4)
+                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4,
+                              fixedSize: 9)
                         .padding(.horizontal, 4)
                         .background(Color(hex: 0x001020, opacity: 0.5))
                         .position(x: 42, y: (geo.hasTide ? geo.sepY : geo.curTop) - 8)
@@ -602,21 +639,32 @@ struct TimelineScrubStrip: View {
         let mf = vis.filter { $0.kind == .maxFlood }.map(\.speed).max() ?? 0
         let me = vis.filter { $0.kind == .maxEbb }.map(\.speed).min() ?? 0
         if mf > 0 {
-            Rectangle().fill(Color(hex: 0x9CC87C, opacity: 0.5)).frame(width: w, height: 1)
-                .position(x: w / 2, y: geo.curY(mf))
-            Text("FLOOD").font(.geistMono(9, .medium)).foregroundStyle(Color(hex: 0x9CC87C))
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .background(Color(hex: 0x001020, opacity: 0.55))
-                .position(x: w - 30, y: geo.curY(mf) - 10)
+            legendMarker("FLOOD", color: SN.floodLabel, width: w,
+                         lineY: geo.curY(mf), textY: geo.curY(mf) - 10, textXInset: 30)
         }
         if me < 0 {
-            Rectangle().fill(Color(hex: 0x8AB6D2, opacity: 0.5)).frame(width: w, height: 1)
-                .position(x: w / 2, y: geo.curY(me))
-            Text("EBB").font(.geistMono(9, .medium)).foregroundStyle(Color(hex: 0x8AB6D2))
-                .padding(.horizontal, 4).padding(.vertical, 1)
-                .background(Color(hex: 0x001020, opacity: 0.55))
-                .position(x: w - 24, y: geo.curY(me) + 10)
+            legendMarker("EBB", color: SN.ebbLabel, width: w,
+                         lineY: geo.curY(me), textY: geo.curY(me) + 10, textXInset: 24)
         }
+    }
+
+    /// One reference line + label, so the rectangle and the text never
+    /// diverge on colour — a hardcoded regression here lands on the same
+    /// line as the "FLOOD"/"EBB" literal instead of a separate, unguarded
+    /// one (that used to be two colour call sites per direction; this is
+    /// the one place either can go wrong).
+    @ViewBuilder
+    private func legendMarker(_ label: String, color: Color, width w: CGFloat,
+                              lineY: CGFloat, textY: CGFloat, textXInset: CGFloat) -> some View {
+        Rectangle().fill(color.opacity(0.5)).frame(width: w, height: 1)
+            .position(x: w / 2, y: lineY)
+        // Fixed size for the same reason as the track labels above — this one is
+        // `.position()`ed onto `geo.curY(...)`, a literal-point coordinate.
+        Text(label).font(.system(size: 9, weight: .medium).monospaced())
+            .foregroundStyle(color)
+            .padding(.horizontal, 4).padding(.vertical, 1)
+            .background(Color(hex: 0x001020, opacity: 0.55))
+            .position(x: w - textXInset, y: textY)
     }
 }
 
@@ -688,7 +736,7 @@ struct MultiDaySchedule: View {
                 }
                 HStack(alignment: .top, spacing: 0) {
                     Text(relativeDayLabel(group.offset, group.start, tz))
-                        .font(.geist(12, .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(SN.foam.opacity(0.9))
                         .frame(width: 74, alignment: .leading)
                         .padding(.leading, 14)
@@ -702,11 +750,11 @@ struct MultiDaySchedule: View {
                             // recognizers keep working — same tap for the user.
                             HStack(spacing: 8) {
                                 Text(clockTime(e.time, tz))
-                                    .font(.geistMono(14))
+                                    .font(.footnote.monospaced())
                                     .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
                                 Spacer()
                                 Text(e.value ?? "—")
-                                    .font(.fraunces(15, .semibold))
+                                    .font(.subheadline.weight(.semibold).monospacedDigit())
                                     .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                 pillView(e)
                                     .frame(width: 84, alignment: .trailing)
@@ -738,13 +786,13 @@ struct MultiDaySchedule: View {
         switch e.pill {
         case .high:
             Text("↑ HIGH")
-                .font(.geistMono(10, .medium)).tracking(0.5)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.rising, in: Capsule())
         case .low:
             Text("↓ LOW")
-                .font(.geistMono(10, .medium)).tracking(0.5)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.falling, in: Capsule())
@@ -753,16 +801,16 @@ struct MultiDaySchedule: View {
                 if let deg = e.arrowDeg { CompassArrow(deg: deg) }
                 Text(e.pill == .flood ? "FLOOD" : "EBB")
             }
-            .font(.geistMono(10, .medium)).tracking(0.5)
+            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(SN.navyDeep)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(e.pill == .flood ? SN.rising : SN.falling, in: Capsule())
         case .slack:
             Text("● SLACK")
-                .font(.geistMono(10, .medium)).tracking(0.5)
-                .foregroundStyle(SN.foam)
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
+                .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color.white.opacity(0.12), in: Capsule())
+                .background(SN.go, in: Capsule())
         case .sunrise:
             SunPill(kind: .sunrise)
         case .sunset:
