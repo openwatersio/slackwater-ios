@@ -455,9 +455,14 @@ final class ScreenshotTests: XCTestCase {
         let recentsLabel = app.staticTexts["RECENTS"].firstMatch
         scrollTo(recentsLabel, in: app)
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
-        // Both labels realized (tall screens / short lists): direct order check.
+        // Both labels realized (tall screens / short lists): direct order
+        // check. The sidebar reflows as CHS pending cards above update, so
+        // wait it out and snapshot both frames once (settledFrame — see
+        // testM50RecentsNamesFit) rather than reading each live.
         if near.exists {
-            XCTAssert(near.frame.minY < recentsLabel.frame.minY,
+            let recentsFrame = settledFrame(of: recentsLabel)
+            let nearFrame = near.frame
+            XCTAssert(nearFrame.minY < recentsFrame.minY,
                       "Recents must render below Near Me")
         }
         sleep(2)
@@ -1046,8 +1051,15 @@ final class ScreenshotTests: XCTestCase {
         let race = rows["download-row-chs-race-passage"].firstMatch
         let porlier = rows["download-row-chs-porlier-pass"].firstMatch
         XCTAssert(victoria.waitForExistence(timeout: 5), "no per-station rows in the manager")
-        XCTAssert(victoria.frame.minY < race.frame.minY, "queue is not proximity-ordered")
-        XCTAssert(race.frame.minY < porlier.frame.minY, "queue is not proximity-ordered")
+        // ChsFitService is actively mutating row heights here (status text
+        // flips as downloads progress) — settle on one row, then snapshot all
+        // three once each rather than re-reading .frame live (see
+        // testM50RecentsNamesFit / settledFrame).
+        let victoriaFrame = settledFrame(of: victoria)
+        let raceFrame = race.frame
+        let porlierFrame = porlier.frame
+        XCTAssert(victoriaFrame.minY < raceFrame.minY, "queue is not proximity-ordered")
+        XCTAssert(raceFrame.minY < porlierFrame.minY, "queue is not proximity-ordered")
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists,
                        "the manager is listing the catalog again, not the download set")
         sleep(1)
@@ -1087,7 +1099,11 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists,  // MonoLabel uppercases
                   "the promoted station is not marked in the manager")
         let stillQueued = app.descendants(matching: .any)["download-row-chs-porlier-pass"].firstMatch
-        XCTAssert(promoted.frame.minY < stillQueued.frame.minY,
+        // Right after service.promote — the queue is mid-transition, so
+        // settle on the promoted row before comparing (settledFrame).
+        let promotedFrame = settledFrame(of: promoted)
+        let stillQueuedFrame = stillQueued.frame
+        XCTAssert(promotedFrame.minY < stillQueuedFrame.minY,
                   "the viewed station did not jump ahead of the proximity order")
         sleep(1)
         save(app, "m48-queue-jump.png")
@@ -1236,19 +1252,9 @@ final class ScreenshotTests: XCTestCase {
         scrollTo(long, in: app)
         XCTAssert(long.exists, "the visited station is not in Recents")
         // The sidebar reflows asynchronously while the CHS pending card above
-        // Recents updates its status line, and `XCUIElement.frame` re-queries
-        // the live layout on EVERY access — so a filter that touches frames
-        // across that reflow compares coordinates from two different layouts.
-        // That is how CI watched a Near Me reading 550pt away "share the
-        // name's line" (PR #22). Wait for the row to hold still, then take
-        // ONE snapshot per element and assert on the snapshots.
-        var nameFrame = long.frame
-        for _ in 0..<20 {
-            usleep(250_000)
-            let again = long.frame
-            if again == nameFrame { break }
-            nameFrame = again
-        }
+        // Recents updates its status line — settledFrame waits the row out,
+        // then this is ONE snapshot; every comparison below uses it.
+        let nameFrame = settledFrame(of: long)
         // The name owns the row's width now. Truncated, its frame collapsed to
         // the ~150pt column left over beside the reading (iPad sidebar).
         XCTAssert(nameFrame.width > 165,
@@ -1623,9 +1629,16 @@ final class ScreenshotTests: XCTestCase {
         scrubStrip(app)
         sleep(1)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
-        XCTAssertEqual(star.frame.minX, starBefore.minX, accuracy: 0.5,
+        // The 44pt slot this guards is fixed by construction, but re-reading
+        // star/now/header live below would still be racy (settledFrame — see
+        // testM50RecentsNamesFit). Snapshot each once and compare snapshots.
+        let starAfter = settledFrame(of: star)
+        let nowFrame = settledFrame(of: now)
+        let header = app.otherElements["detail-map-header"].firstMatch
+        let headerFrame = header.frame
+        XCTAssertEqual(starAfter.minX, starBefore.minX, accuracy: 0.5,
                        "return-to-now still shifts the star")
-        XCTAssertEqual(star.frame.minY, starBefore.minY, accuracy: 0.5)
+        XCTAssertEqual(starAfter.minY, starBefore.minY, accuracy: 0.5)
         XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
@@ -1633,11 +1646,10 @@ final class ScreenshotTests: XCTestCase {
         // right — the hero-crop-and-scrub-order spec (2026-08-03) moved it
         // out of the hero's overlay into the card beside NEXT LOW, so it now
         // lives BELOW the hero rather than inside it.
-        let header = app.otherElements["detail-map-header"].firstMatch
-        XCTAssert(now.frame.minY > star.frame.maxY, "return-to-now is not below the star")
-        XCTAssert(now.frame.minY >= header.frame.maxY - 1,
+        XCTAssert(nowFrame.minY > starAfter.maxY, "return-to-now is not below the star")
+        XCTAssert(nowFrame.minY >= headerFrame.maxY - 1,
                  "return-to-now must live below the hero, in the card's readout row")
-        XCTAssertEqual(now.frame.maxX, star.frame.maxX, accuracy: 1,
+        XCTAssertEqual(nowFrame.maxX, starAfter.maxX, accuracy: 1,
                        "return-to-now must share the star's right margin")
         save(app, "m52-return-now-fixed.png")
 
@@ -1646,7 +1658,7 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         XCTAssertFalse(app.buttons["detail-return-now"].firstMatch.exists,
                        "return-to-now did not clear after returning to now")
-        XCTAssertEqual(star.frame.minX, starBefore.minX, accuracy: 0.5,
+        XCTAssertEqual(settledFrame(of: star).minX, starBefore.minX, accuracy: 0.5,
                        "the star moved when return-to-now went away")
     }
 
@@ -1739,6 +1751,24 @@ final class ScreenshotTests: XCTestCase {
     private func save(_ app: XCUIApplication, _ name: String) {
         let png = XCUIScreen.main.screenshot().pngRepresentation
         try? png.write(to: URL(fileURLWithPath: shotDir + "/" + name))
+    }
+
+    /// `XCUIElement.frame` re-queries the live layout on EVERY access, so
+    /// comparing two elements' `.frame` values across a reflow (a sidebar
+    /// row resizing as async status text lands, a queue re-sorting mid-
+    /// promotion) compares coordinates from two different layouts. That is
+    /// how CI watched a Near Me reading 550pt away "share the name's line"
+    /// (PR #22, testM50RecentsNamesFit). Wait for `el` to hold still, then
+    /// return ONE snapshot to assert on — never re-read `.frame` after this.
+    private func settledFrame(of el: XCUIElement) -> CGRect {
+        var frame = el.frame
+        for _ in 0..<20 {
+            usleep(250_000)
+            let again = el.frame
+            if again == frame { break }
+            frame = again
+        }
+        return frame
     }
 
     // MARK: - M53: the US and Canada
