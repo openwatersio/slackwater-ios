@@ -192,6 +192,7 @@ The three scrub cards each open with an identical date/time/moon block and each 
 - Produces:
   - `func scrubDayOffset(_ scrub: Date, from live: Date, _ tz: TimeZone) -> Int`
   - `struct ScrubWhen: View { init(scrubTime: Date, live: Date, tz: TimeZone) }`
+  - `struct ReturnToNowSlot: View { init(scrubTime: Date, live: Date, onReturn: @escaping () -> Void) }`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -269,6 +270,36 @@ struct ScrubWhen: View {
 
 The time keeps `.title` weight-medium monospaced-digit with `.contentTransition(.numericText())` — it is still the thing that ticks while you scrub. One row, not the old stacked block: at the bottom of the card it is a footer, not a headline.
 
+Then, immediately below `ScrubWhen`, the return slot all three cards share:
+
+```swift
+/// Return-to-now as a FIXED 44pt slot: present or not, it occupies the same
+/// points, so the readout row never reflows when a scrub starts or ends (the
+/// occupies-its-points-either-way reasoning the old hero overlay used).
+struct ReturnToNowSlot: View {
+    let scrubTime: Date
+    let live: Date
+    let onReturn: () -> Void
+
+    var body: some View {
+        ZStack {
+            if scrubbedAway(scrubTime, from: live) {
+                Button(action: onReturn) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SN.leaf)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .accessibilityLabel("Return to now")
+                .accessibilityIdentifier("detail-return-now")
+            }
+        }
+        .frame(width: 44, height: 44)
+    }
+}
+```
+
 - [ ] **Step 4: Run tests to verify green**
 
 Run: `./scripts/test.sh`
@@ -292,8 +323,7 @@ git commit -m "when-row: extract ScrubWhen + scrubDayOffset, the shared calendar
 - Modify: `Slackwater/TideDetailView.swift:26-31` (delete `dayOffset`), `:33-48` (body spacing), `:63-129` (scrubCard)
 
 **Interfaces:**
-- Consumes: `ScrubWhen`, `scrubDayOffset` (Task 3); `scrubbedAway` (`TimelineStrip.swift:35`).
-- Produces: the return-slot idiom Task 5 copies (the fixed-44pt `ZStack`).
+- Consumes: `ScrubWhen`, `ReturnToNowSlot` (Task 3).
 
 - [ ] **Step 1: Reorder the card**
 
@@ -301,25 +331,10 @@ In `scrubCard` (`TideDetailView.swift:63`):
 
 1. Delete the opening `HStack(alignment: .top) { ... }` date/time/moon block (`:65-85`).
 2. The height/NEXT LOW `HStack` (`:87-109`) becomes the card's first child; delete its `.padding(.top, 14)`.
-3. Append a return-to-now slot at the trailing edge of that `HStack`, after the NEXT LOW `VStack` — a fixed-size slot so the row never reflows when a scrub starts or ends (the same occupies-its-points-either-way reasoning as the old hero overlay, `MapHeader.swift:107-109`):
+3. Append the shared return slot at the trailing edge of that `HStack`, after the NEXT LOW `VStack`:
 
 ```swift
-// Return-to-now: a FIXED 44pt slot beside NEXT LOW — present or not, the
-// row's layout is identical, so nothing reflows when a scrub starts/ends.
-ZStack {
-    if scrubbedAway(scrubTime, from: live) {
-        Button(action: returnToNow) {
-            Image(systemName: "arrow.counterclockwise")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(SN.leaf)
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular.interactive(), in: Circle())
-        }
-        .accessibilityLabel("Return to now")
-        .accessibilityIdentifier("detail-return-now")
-    }
-}
-.frame(width: 44, height: 44)
+ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
 ```
 
 4. After the swipe-hint `MonoLabel` (`:117-120`), append the when-row:
@@ -367,7 +382,7 @@ Both cards keep their per-type anatomy (primary readout *below* the strip — th
 - Modify: `Slackwater/DerivedGateDetailView.swift:26-34` (delete `dayOffset`), `:36-50` (body spacing), `:80-172` (scrubCard)
 
 **Interfaces:**
-- Consumes: `ScrubWhen`, `scrubDayOffset`, the Task 4 return-slot idiom (repeated below in full).
+- Consumes: `ScrubWhen`, `ReturnToNowSlot` (Task 3).
 
 - [ ] **Step 1: CurrentDetailView**
 
@@ -375,23 +390,10 @@ In `scrubCard` (`:104`):
 
 1. Delete the opening date/time/moon `HStack` (`:106-125`).
 2. The `tide at port` block (`:127-148`) becomes the card's first child; its `.padding(.top, 14)` is deleted. (The block itself is explicitly out of scope — it stays above the strip.)
-3. In the current readout `HStack` below the strip (`:157`), after the Next-slack `VStack` (`:189-203`), append the identical fixed slot:
+3. In the current readout `HStack` below the strip (`:157`), after the Next-slack `VStack` (`:189-203`), append the shared slot:
 
 ```swift
-ZStack {
-    if scrubbedAway(scrubTime, from: live) {
-        Button(action: returnToNow) {
-            Image(systemName: "arrow.counterclockwise")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(SN.leaf)
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular.interactive(), in: Circle())
-        }
-        .accessibilityLabel("Return to now")
-        .accessibilityIdentifier("detail-return-now")
-    }
-}
-.frame(width: 44, height: 44)
+ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
 ```
 
 4. After the swipe-hint `MonoLabel` (`:207-210`), append:
@@ -411,7 +413,7 @@ Same four moves in `scrubCard` (`:80`):
 
 1. Delete the date/time/moon `HStack` (`:82-101`).
 2. `Tide at port` block (`:103-121`) leads; delete its `.padding(.top, 14)`.
-3. In the phase readout `HStack` (`:132`), after the Next-slack `VStack` (`:141-150`), append the same fixed 44pt `ZStack` slot verbatim.
+3. In the phase readout `HStack` (`:132`), after the Next-slack `VStack` (`:141-150`), append `ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)`.
 4. After the swipe-hint `MonoLabel` (`:160-163`), append `ScrubWhen(scrubTime: scrubTime, live: live, tz: tz).padding(.top, 14)`. The shape-only caveat text (`:154-158`) stays where it is, above the hint.
 5. Delete `dayOffset` (`:26-34`).
 
@@ -568,5 +570,5 @@ Draft the PR body for Bryan's review before `gh pr create` — outbound text get
 ## Self-Review
 
 - **Spec coverage:** hero ⅓ + intrinsic height (Task 6), glass chrome + floor (Tasks 1–2), readout leads + flush seam (Tasks 4–5), when-row last (Tasks 3–5), `ScrubWhen` shared (Task 3), FAB conversions (Task 2), pin dropped + return-to-now moved (Tasks 4–6), `ChsDetailView` loses dead params (Task 6), the under-200pt assertion (Task 6). The `tide at port` block explicitly stays put (Task 5, spec's Out list).
-- **Placeholder scan:** all code steps carry full code; the two "verbatim" repeats in Task 5 are printed in full.
-- **Type consistency:** `ScrubWhen(scrubTime:live:tz:)` and `scrubDayOffset(_:from:_:)` match between Task 3 (definition) and Tasks 4–5 (use); `MapHeader(name:region:latitude:longitude:favoriteId:)` matches between Task 6's test and rework.
+- **Placeholder scan:** all code steps carry full code.
+- **Type consistency:** `ScrubWhen(scrubTime:live:tz:)`, `ReturnToNowSlot(scrubTime:live:onReturn:)` and `scrubDayOffset(_:from:_:)` match between Task 3 (definition) and Tasks 4–5 (use); `MapHeader(name:region:latitude:longitude:favoriteId:)` matches between Task 6's test and rework.
