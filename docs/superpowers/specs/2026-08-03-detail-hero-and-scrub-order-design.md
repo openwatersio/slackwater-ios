@@ -18,13 +18,22 @@ second opaque `0x05122A` fill stacked behind it, which cancels most of what the
 material is for: the buttons read as flat navy discs on a map instead of glass
 over it.
 
+The chrome fix pulls a fourth decision in with it: the deployment target rises
+from 17 to 26. The 17 floor was XcodeGen scaffolding from the first commit
+(`e41cf76`), never a decision — the app builds against the iOS 26 SDK, has zero
+`#available` checks, and is not on the App Store yet, so the floor is free to
+set now and expensive to raise later. Raising it means the chrome uses Liquid
+Glass proper instead of a material imitation of it. (Retired lower-floor iPads
+matter for a chartplotter surface someday; a tides app should be further
+ahead — Bryan, 2026-08-05.)
+
 ## Decisions
 
 1. **The hero crops to roughly a third** — enough for the status bar, the title
    pill, and a band of chart underneath it. The map becomes the texture behind
    the station's name, not a locator.
-2. **The chrome loses its opaque backing** and rides the material alone, so the
-   map shows through it.
+2. **The chrome becomes Liquid Glass** — deployment target rises to 26, the
+   opaque backing goes, and the map shows through.
 3. **The scrub card leads with state.** Height/speed and direction sit directly
    under the hero; the strip is flush against them with no gap.
 4. **Date, time and moon go last** — the bottom of the scrub card, below the
@@ -65,16 +74,32 @@ making the title pill legible over bright chart fill.
 
 ```swift
 .background(.ultraThinMaterial, in: Circle())
-.background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())   // ← delete
+.background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
 ```
 
-The second layer goes, on all four (back `:63`, title pill `:79`, star `:96`,
-return-to-now `:118`). The material is the design; the navy fill behind it was
-belt-and-braces for legibility that the scrim already provides.
+Both layers go, on all four (back `:63`, title pill `:79`, star `:96`,
+return-to-now `:118`), replaced with the system material at its default
+opacity:
 
-Note the deployment target is iOS 17 (`project.yml`), so this is
-`.ultraThinMaterial`, not `.glassEffect` — Liquid Glass proper is iOS 26 API. If
-the target ever moves, this is the one place that changes.
+```swift
+.glassEffect(.regular.interactive(), in: Circle())        // the three buttons
+.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))  // title pill
+```
+
+The buttons and pill sit in one `GlassEffectContainer` so adjacent glass blends
+rather than double-refracting where the pill nears a button on narrow widths.
+The pill's hand-rolled `strokeBorder(Color.white.opacity(0.10))` (`:81-82`) and
+return-to-now's (`:119`) are deleted too — edge treatment is glass's job now.
+Glass adapts its own legibility to what is under it, which is exactly the job
+the deleted navy fill was doing badly.
+
+The same two-layer stack appears twice outside the hero
+(`SlackwaterApp.swift:764`, `:877` — search FAB and close-search). They convert
+in the same commit: half-converted chrome is worse than either state.
+
+`ChsDetailView`, `CurrentDetailView` and the schedule cards keep their flat
+`SN.cardFill` surfaces — glass is for chrome floating over content, not for
+content cards. Nothing else converts.
 
 **The station pin goes** (`MapHeader.swift:31-37`). It is centered, and at this
 crop the center is behind the title pill. At a third of the height the map is no
@@ -152,8 +177,9 @@ and twins). It moves into `ScrubWhen` as a private computed property off
 
 ## Scope
 
-**In:** the five decisions, across `MapHeader` (four callers) and the three
-scrub cards.
+**In:** the five decisions, across `MapHeader` (four callers), the three scrub
+cards, the two FAB conversions in `SlackwaterApp.swift`, and the
+`project.yml` deployment-target bump.
 
 **Out:**
 
@@ -174,8 +200,12 @@ harness for it:
    intrinsic height is the thing most likely to break it.
 2. `ScreenshotTests` at default and AX3, iPhone and iPad split. The AX3 pass is
    the real assertion: the title pill must not clip and the hero must grow, not
-   crop.
-3. On device: scrub away and confirm return-to-now appears in the readout row
+   crop. Run on an iOS 26 simulator — after the target bump there is no other
+   kind.
+3. Glass legibility over the brightest chart fill (sand-coloured land at the top
+   of a station like Sesuit Harbor) — the deleted navy layer existed for this;
+   confirm the scrim alone still carries it.
+4. On device: scrub away and confirm return-to-now appears in the readout row
    without reflowing the row (the same overlay-not-layout trick it uses in the
    hero today — `MapHeader.swift:107-109` explains why, and the reason survives
    the move).
