@@ -761,9 +761,7 @@ struct StationListView: View {
                 .font(.system(size: 21, weight: .medium))
                 .foregroundStyle(SN.foam)
                 .frame(width: Self.fabSize, height: Self.fabSize)
-                .background(.ultraThinMaterial, in: Circle())
-                .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
-                .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
+                .glassEffect(.regular.interactive(), in: Circle())
                 .shadow(color: Color(hex: 0x000C1E, opacity: 0.4), radius: 10, y: 6)
         }
         .accessibilityLabel(label)
@@ -874,9 +872,7 @@ struct StationListView: View {
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(SN.foam)
                     .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .background(Color(hex: 0x184870, opacity: 0.55), in: Circle())
-                    .overlay(Circle().strokeBorder(SN.leaf.opacity(0.3), lineWidth: 0.5))
+                    .glassEffect(.regular.interactive(), in: Circle())
             }
             .accessibilityLabel("Close search")
         }

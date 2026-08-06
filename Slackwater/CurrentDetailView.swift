@@ -42,32 +42,27 @@ struct CurrentDetailView: View {
             timeline?.currentEvents.first { $0.kind != .slack && $0.time > slack.time }
         }
     }
-    private var dayOffset: Int {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-        return cal.dateComponents([.day], from: cal.startOfDay(for: live),
-                                  to: cal.startOfDay(for: scrubTime)).day ?? 0
-    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: 0) {
                 MapHeader(name: record.name, region: "\(record.region) · current",
                           latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: "current:" + record.id,
-                          showReturn: scrubbedAway(scrubTime, from: live),
-                          onReturn: returnToNow)
+                          favoriteId: "current:" + record.id)
                 if let gate = provisionalGate {
                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
                                  expectation: gate.provisionalExpectation,
                                  action: "See all downloads",
                                  identifier: "chs-provisional-warning") { showDownloads = true }
+                        .padding(.top, 14)
                 }
                 if let timeline {
                     scrubCard(timeline)
                     scheduleCard(timeline)
+                        .padding(.top, 14)
                 }
                 footer
+                    .padding(.top, 14)
             }
             .padding(.bottom, 42)
         }
@@ -103,27 +98,6 @@ struct CurrentDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
-                    Text(cardTime(scrubTime, tz))
-                        .font(.title.weight(.medium).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                }
-                Spacer()
-                let moon = SunMoon.moonIllumination(date: scrubTime)
-                HStack(spacing: 8) {
-                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
-                    Text(SunMoon.phaseName(phase: moon.phase))
-                        .font(.caption2)
-                        .foregroundStyle(SN.foam.opacity(0.6))
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 88, alignment: .trailing)
-                }
-                .padding(.top, 2)
-            }
-
             // Tide readout above the strip: the paired reference port's water
             // at the centerline time (absorbs the old PairedTidePane header).
             if let port = pairedTide {
@@ -144,7 +118,6 @@ struct CurrentDetailView: View {
                         }
                     }
                 }
-                .padding(.top, 14)
             }
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
@@ -201,6 +174,7 @@ struct CurrentDetailView: View {
                         }
                     }
                 }
+                ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
             }
             .padding(.top, 8)
 
@@ -208,9 +182,12 @@ struct CurrentDetailView: View {
                       color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
+
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz)
+                .padding(.top, 14)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .padding(.top, 14)
         .padding(.bottom, 12)
         .background(SN.cardFill)
         .overlay(alignment: .bottom) {

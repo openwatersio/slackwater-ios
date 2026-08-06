@@ -112,7 +112,7 @@ struct ChsWaitingView: View {
         ScrollView {
             VStack(spacing: 14) {
                 MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
-                          favoriteId: favoriteId, showReturn: false, onReturn: {})
+                          favoriteId: favoriteId)
                 warningCard
                 footer
             }

@@ -1235,20 +1235,38 @@ final class ScreenshotTests: XCTestCase {
         let long = app.staticTexts["Deception Pass State Park"].firstMatch
         scrollTo(long, in: app)
         XCTAssert(long.exists, "the visited station is not in Recents")
+        // The sidebar reflows asynchronously while the CHS pending card above
+        // Recents updates its status line, and `XCUIElement.frame` re-queries
+        // the live layout on EVERY access — so a filter that touches frames
+        // across that reflow compares coordinates from two different layouts.
+        // That is how CI watched a Near Me reading 550pt away "share the
+        // name's line" (PR #22). Wait for the row to hold still, then take
+        // ONE snapshot per element and assert on the snapshots.
+        var nameFrame = long.frame
+        for _ in 0..<20 {
+            usleep(250_000)
+            let again = long.frame
+            if again == nameFrame { break }
+            nameFrame = again
+        }
         // The name owns the row's width now. Truncated, its frame collapsed to
         // the ~150pt column left over beside the reading (iPad sidebar).
-        XCTAssert(long.frame.width > 165,
-                  "the Recents name column is still starved: \(long.frame.width)pt")
+        XCTAssert(nameFrame.width > 165,
+                  "the Recents name column is still starved: \(nameFrame.width)pt")
         // And the reading sits below the name, not beside it.
         let readings = app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
             .allElementsBoundByIndex
             // Only this row's — the Near Me cards above carry readings too.
-            .filter { $0.exists && $0.frame.minY >= long.frame.minY && $0.frame.maxY <= long.frame.maxY + 34 }
+            .compactMap { el -> CGRect? in
+                guard el.exists else { return nil }
+                let f = el.frame  // one read; every comparison below uses it
+                return f.minY >= nameFrame.minY && f.maxY <= nameFrame.maxY + 34 ? f : nil
+            }
         XCTAssertFalse(readings.isEmpty, "the Recents row lost its reading")
-        for reading in readings {
-            XCTAssert(reading.frame.minY >= long.frame.maxY - 1,
-                      "the reading still shares the name's line")
+        for frame in readings {
+            XCTAssert(frame.minY >= nameFrame.maxY - 1,
+                      "the reading still shares the name's line: \(frame)")
         }
         sleep(1)
         save(app, "m50-recents-untruncated.png")
@@ -1490,9 +1508,26 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - M52: device-testing fixes (build 15 → 16)
 
     /// Drag from the very left edge — the interactive pop, not a content swipe.
+    /// Anchored to the map header's own band (near its bottom, not its
+    /// screen-midpoint fraction) when a header is on screen: the hero-crop
+    /// spec (2026-08-03) shrank the header to a third, and a start point
+    /// close to the top of the screen — under the status bar / Dynamic
+    /// Island — silently loses the touch to the system rather than the app's
+    /// edge-pop gesture (verified by sweeping dy: 0.05 never pops, 0.15
+    /// always does, on a 141pt-tall header). Low in the header stays clear of
+    /// that zone at any Dynamic Type size. On the root list (no header, e.g.
+    /// the no-op check) fall back to the same safe screen fraction.
     private func edgeSwipeBack(_ app: XCUIApplication) {
-        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.5))
-        let across = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        let header = app.otherElements["detail-map-header"].firstMatch
+        let edge: XCUICoordinate
+        let across: XCUICoordinate
+        if header.exists {
+            edge = header.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.9))
+            across = header.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9))
+        } else {
+            edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.15))
+            across = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.15))
+        }
         edge.press(forDuration: 0.02, thenDragTo: across,
                    withVelocity: .default, thenHoldForDuration: 0)
     }
@@ -1568,8 +1603,8 @@ final class ScreenshotTests: XCTestCase {
 
     /// (3) Return-to-now used to live in the header's top-right row and shoved
     /// the favourite star sideways the moment you scrubbed. It has its own slot
-    /// now — bottom-right of the hero, below the star, above the scrub card —
-    /// so appearing and disappearing moves nothing.
+    /// now — below the hero, in the scrub card's readout row, hard right beside
+    /// the star — so appearing and disappearing moves nothing.
     func testM52ReturnToNowHasItsOwnFixedSlot() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
@@ -1594,10 +1629,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
-        // Its own slot: below the star, above the strip, hard right.
+        // Its own slot: below the star, in the card's readout row, hard
+        // right — the hero-crop-and-scrub-order spec (2026-08-03) moved it
+        // out of the hero's overlay into the card beside NEXT LOW, so it now
+        // lives BELOW the hero rather than inside it.
         let header = app.otherElements["detail-map-header"].firstMatch
         XCTAssert(now.frame.minY > star.frame.maxY, "return-to-now is not below the star")
-        XCTAssert(now.frame.maxY <= header.frame.maxY + 1, "return-to-now escaped the hero")
+        XCTAssert(now.frame.minY >= header.frame.maxY - 1,
+                 "return-to-now must live below the hero, in the card's readout row")
         XCTAssertEqual(now.frame.maxX, star.frame.maxX, accuracy: 1,
                        "return-to-now must share the star's right margin")
         save(app, "m52-return-now-fixed.png")

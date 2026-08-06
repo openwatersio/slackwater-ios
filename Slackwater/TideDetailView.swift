@@ -23,26 +23,20 @@ struct TideDetailView: View {
         timeline?.tideExtremes.first { $0.time > scrubTime }
     }
     private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
-    private var dayOffset: Int {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-        return cal.dateComponents([.day], from: cal.startOfDay(for: live),
-                                  to: cal.startOfDay(for: scrubTime)).day ?? 0
-    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: 0) {
                 MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: record.id,
-                          showReturn: scrubbedAway(scrubTime, from: live),
-                          onReturn: returnToNow)
+                          favoriteId: record.id)
                 if let timeline {
                     scrubCard(timeline)
                     scheduleCard(timeline)
+                        .padding(.top, 14)
                 }
                 footer
+                    .padding(.top, 14)
             }
             .padding(.bottom, 42)
         }
@@ -62,28 +56,6 @@ struct TideDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: "\(relativeDayLabel(dayOffset, scrubTime, tz)) · \(dayLine(scrubTime, tz))")
-                    Text(cardTime(scrubTime, tz))
-                        .font(.title.weight(.medium).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                }
-                Spacer()
-                // Moon for the scrubbed day (prototype scrubMoon + scrubMoonName).
-                let moon = SunMoon.moonIllumination(date: scrubTime)
-                HStack(spacing: 8) {
-                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
-                    Text(SunMoon.phaseName(phase: moon.phase))
-                        .font(.caption2)
-                        .foregroundStyle(SN.foam.opacity(0.6))
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 88, alignment: .trailing)
-                }
-                .padding(.top, 2)
-            }
-
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
@@ -106,8 +78,8 @@ struct TideDetailView: View {
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
+                ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
             }
-            .padding(.top, 14)
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, now: live, scrubTime: $scrubTime)
@@ -118,9 +90,12 @@ struct TideDetailView: View {
                       color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
+
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz)
+                .padding(.top, 14)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 16)
+        .padding(.top, 14)
         .padding(.bottom, 12)
         .background(SN.cardFill)
         .overlay(alignment: .bottom) {

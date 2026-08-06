@@ -1,8 +1,12 @@
 name: Slackwater
 options:
   bundleIdPrefix: org.openwaters
+  # iOS 26: Liquid Glass chrome (MapHeader) with no #available fences. Raised
+  # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
+  # floor was still free to set. Retired nav-station iPads are a chartplotter
+  # concern, not this app's.
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
 packages:
   TideEngine:
     url: https://github.com/sailingnaturali/slackwater-engine
