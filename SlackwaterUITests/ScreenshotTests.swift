@@ -1594,10 +1594,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
-        // Its own slot: below the star, above the strip, hard right.
+        // Its own slot: below the star, in the card's readout row, hard
+        // right — the hero-crop-and-scrub-order spec (2026-08-03) moved it
+        // out of the hero's overlay into the card beside NEXT LOW, so it now
+        // lives BELOW the hero rather than inside it.
         let header = app.otherElements["detail-map-header"].firstMatch
         XCTAssert(now.frame.minY > star.frame.maxY, "return-to-now is not below the star")
-        XCTAssert(now.frame.maxY <= header.frame.maxY + 1, "return-to-now escaped the hero")
+        XCTAssert(now.frame.minY >= header.frame.maxY - 1,
+                 "return-to-now must live below the hero, in the card's readout row")
         XCTAssertEqual(now.frame.maxX, star.frame.maxX, accuracy: 1,
                        "return-to-now must share the star's right margin")
         save(app, "m52-return-now-fixed.png")
