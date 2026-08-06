@@ -53,50 +53,45 @@ struct MapHeader: View {
                 // 320pt iPad sidebar row the wordmark's comment already warns
                 // about (SlackwaterApp.swift). Leave fixed; don't "finish the
                 // job" here.
-                HStack(alignment: .top) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
+                GlassEffectContainer {
+                    HStack(alignment: .top) {
+                        Button { dismiss() } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(.regular.interactive(), in: Circle())
+                        }
+                        .accessibilityLabel("Back")
+                        .accessibilityIdentifier("detail-back")
+                        Spacer()
+                        // Title pill (prototype: Fraunces 19 name over mono region).
+                        VStack(spacing: 2) {
+                            Text(name)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.white)
+                            MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        Spacer()
+                        // Favorite star — the back button's mirror (design pass
+                        // item 4a): same 44pt circle chrome, top-right. It is the
+                        // ONLY thing in this slot: return-to-now used to share the
+                        // row and shoved the star sideways every time you scrubbed
+                        // (M52), so it moved to its own fixed slot below.
+                        let fav = favorites.contains(favoriteId)
+                        Button { favorites.toggle(favoriteId) } label: {
+                            Image(systemName: fav ? "star.fill" : "star")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(fav ? SN.sun : .white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(.regular.interactive(), in: Circle())
+                        }
+                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                        .accessibilityIdentifier("detail-favorite")
                     }
-                    .accessibilityLabel("Back")
-                    .accessibilityIdentifier("detail-back")
-                    Spacer()
-                    // Title pill (prototype: Fraunces 19 name over mono region).
-                    VStack(spacing: 2) {
-                        Text(name)
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.white)
-                        MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .background(Color(hex: 0x05122A, opacity: 0.34),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.5))
-                    Spacer()
-                    // Favorite star — the back button's mirror (design pass
-                    // item 4a): same 44pt circle chrome, top-right. It is the
-                    // ONLY thing in this slot: return-to-now used to share the
-                    // row and shoved the star sideways every time you scrubbed
-                    // (M52), so it moved to its own fixed slot below.
-                    let fav = favorites.contains(favoriteId)
-                    Button { favorites.toggle(favoriteId) } label: {
-                        Image(systemName: fav ? "star.fill" : "star")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(fav ? SN.sun : .white)
-                            .frame(width: 44, height: 44)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
-                    }
-                    .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
-                    .accessibilityIdentifier("detail-favorite")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 62)  // clears the status bar; header ignores the top safe area
@@ -114,9 +109,7 @@ struct MapHeader: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(SN.leaf)
                         .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .background(Color(hex: 0x05122A, opacity: 0.55), in: Circle())
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.5))
+                        .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .accessibilityLabel("Return to now")
                 .accessibilityIdentifier("detail-return-now")
