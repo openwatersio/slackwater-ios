@@ -219,6 +219,68 @@ struct MoonGlyph: View {
     }
 }
 
+/// Whole local days between the live "today" and the scrubbed day — the shared
+/// definition behind every card's TODAY / TOMORROW / +N label.
+func scrubDayOffset(_ scrub: Date, from live: Date, _ tz: TimeZone) -> Int {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return cal.dateComponents([.day], from: cal.startOfDay(for: live),
+                              to: cal.startOfDay(for: scrub)).day ?? 0
+}
+
+/// The *when* of a scrub reading — relative day, clock time, moon for that
+/// day. The LAST row of every scrub card: it is the calendar of the reading,
+/// secondary to what the water is doing (2026-08-03 hero-crop spec §3).
+struct ScrubWhen: View {
+    let scrubTime: Date
+    let live: Date
+    let tz: TimeZone
+
+    var body: some View {
+        let moon = SunMoon.moonIllumination(date: scrubTime)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            MonoLabel(text: "\(relativeDayLabel(scrubDayOffset(scrubTime, from: live, tz), scrubTime, tz)) · \(dayLine(scrubTime, tz))")
+            Text(cardTime(scrubTime, tz))
+                .font(.title.weight(.medium).monospacedDigit())
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+            Spacer()
+            MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
+            Text(SunMoon.phaseName(phase: moon.phase))
+                .font(.caption2)
+                .foregroundStyle(SN.foam.opacity(0.6))
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Return-to-now as a FIXED 44pt slot: present or not, it occupies the same
+/// points, so the readout row never reflows when a scrub starts or ends (the
+/// occupies-its-points-either-way reasoning the old hero overlay used).
+struct ReturnToNowSlot: View {
+    let scrubTime: Date
+    let live: Date
+    let onReturn: () -> Void
+
+    var body: some View {
+        ZStack {
+            if scrubbedAway(scrubTime, from: live) {
+                Button(action: onReturn) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(SN.leaf)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .accessibilityLabel("Return to now")
+                .accessibilityIdentifier("detail-return-now")
+            }
+        }
+        .frame(width: 44, height: 44)
+    }
+}
+
 /// The schedule table's sunrise/sunset pill (prototype PILL.sunrise/.sunset:
 /// outlined, amber family, "☀ Rise" / "☀ Set").
 struct SunPill: View {
