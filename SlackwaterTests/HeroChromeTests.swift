@@ -25,10 +25,11 @@ final class HeroChromeTests: XCTestCase {
     }
 
     func testNoMaterialImitationOfGlass() throws {
+        let materials = [".ultraThinMaterial", ".thinMaterial", ".regularMaterial", ".thickMaterial", ".ultraThickMaterial"]
         var offenders: [String] = []
         for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
-            where line.contains(".ultraThinMaterial") {
+            where materials.contains(where: { line.contains($0) }) {
                 offenders.append("\(name):\(n + 1)")
             }
         }

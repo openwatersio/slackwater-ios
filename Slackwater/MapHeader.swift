@@ -60,7 +60,7 @@ struct MapHeader: View {
                 // item 4a): same 44pt circle chrome, top-right. It is the
                 // ONLY thing in this slot: return-to-now used to share the
                 // row and shoved the star sideways every time you scrubbed
-                // (M52), so it moved to its own fixed slot below.
+                // (M52), so it moved to the scrub card's readout row (ReturnToNowSlot in Theme.swift).
                 let fav = favorites.contains(favoriteId)
                 Button { favorites.toggle(favoriteId) } label: {
                     Image(systemName: fav ? "star.fill" : "star")

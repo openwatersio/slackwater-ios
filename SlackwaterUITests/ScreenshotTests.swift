@@ -1585,8 +1585,8 @@ final class ScreenshotTests: XCTestCase {
 
     /// (3) Return-to-now used to live in the header's top-right row and shoved
     /// the favourite star sideways the moment you scrubbed. It has its own slot
-    /// now — bottom-right of the hero, below the star, above the scrub card —
-    /// so appearing and disappearing moves nothing.
+    /// now — below the hero, in the scrub card's readout row, hard right beside
+    /// the star — so appearing and disappearing moves nothing.
     func testM52ReturnToNowHasItsOwnFixedSlot() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
