@@ -48,9 +48,7 @@ struct CurrentDetailView: View {
             VStack(spacing: 0) {
                 MapHeader(name: record.name, region: "\(record.region) · current",
                           latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: "current:" + record.id,
-                          showReturn: false,
-                          onReturn: {})
+                          favoriteId: "current:" + record.id)
                 if let gate = provisionalGate {
                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
                                  expectation: gate.provisionalExpectation,

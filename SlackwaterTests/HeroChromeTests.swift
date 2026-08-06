@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import Slackwater
 
 /// The hero-crop spec's material rule, executable: floating chrome is Liquid
@@ -34,5 +35,25 @@ final class HeroChromeTests: XCTestCase {
         XCTAssertTrue(offenders.isEmpty,
                       "chrome must use .glassEffect, not material imitation:\n"
                       + offenders.joined(separator: "\n"))
+    }
+
+    /// The "a third, not a half" claim, executable: at default type the hero is
+    /// title-pill + clearances, well under 200pt. At AX3 it must GROW — a fixed
+    /// crop that clips the region line is the defect class the Dynamic Type pass
+    /// just cleared (2026-08-02 note).
+    @MainActor
+    func testHeroIsAThirdAtDefaultTypeAndGrowsAtAX3() {
+        func height(at size: DynamicTypeSize) -> CGFloat {
+            let host = UIHostingController(rootView:
+                MapHeader(name: "Sesuit Harbor", region: "EAST DENNIS",
+                          latitude: 41.75, longitude: -70.15, favoriteId: "test")
+                    .environment(\.dynamicTypeSize, size))
+            return host.sizeThatFits(in: CGSize(width: 393, height: CGFloat.greatestFiniteMagnitude)).height
+        }
+        let base = height(at: .large)
+        XCTAssertLessThan(base, 200, "hero must be a third of the screen, not half")
+        XCTAssertGreaterThan(base, 100, "hero must still clear the status bar + pill")
+        XCTAssertGreaterThan(height(at: .accessibility5), base,
+                             "the hero grows with type — it never crops the pill")
     }
 }

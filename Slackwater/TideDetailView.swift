@@ -29,9 +29,7 @@ struct TideDetailView: View {
             VStack(spacing: 0) {
                 MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: record.id,
-                          showReturn: false,
-                          onReturn: {})
+                          favoriteId: record.id)
                 if let timeline {
                     scrubCard(timeline)
                     scheduleCard(timeline)

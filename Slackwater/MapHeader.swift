@@ -1,14 +1,18 @@
 // Slackwater — GPL v3. The detail-view map header (map-hero spec §1/§2, header
 // portion only — no particle field, no universal scrub yet): the station's map
 // is the hero surface, scrim-darkened so the overlaid title reads (spec §5a/§7
-// legibility risk), with the prototype's back / title-pill / return-to-now
-// chrome (TidesApp.dc.html detail hero).
+// legibility risk), with the prototype's back / title-pill chrome
+// (TidesApp.dc.html detail hero). Cropped to intrinsic height — pill +
+// clearances — per the hero-crop-and-scrub-order spec (2026-08-03); return-to-now
+// lives in the scrub card's readout row now (ReturnToNowSlot, Theme.swift).
 import SwiftUI
 import UIKit
 import MapLibre
 
-/// Prototype hero height (420 of a 874pt frame).
-let mapHeaderHeight: CGFloat = 420
+/// Bottom band of map kept below the title pill — the border the name sits
+/// on, not a viewport. The header's height is pill + clearances, so it
+/// scales with Dynamic Type instead of cropping at AX sizes.
+let mapHeaderBottomMargin: CGFloat = 24
 /// Prototype per-station zoom (DATA() z: 12.2–13.2).
 private let stationZoom = 12.5
 
@@ -19,103 +23,71 @@ struct MapHeader: View {
     let longitude: Double
     /// StationItem id this detail shows — the favorite star toggles it.
     let favoriteId: String
-    /// Shown while scrubbed away from now (prototype st.showNow).
-    let showReturn: Bool
-    let onReturn: () -> Void
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var favorites = FavoritesStore.shared
 
     var body: some View {
-        ZStack {
-            StationMapView(latitude: latitude, longitude: longitude)
-            // Station pin: the camera is centered on the station, so the pin
-            // is a centered dot (prototype mapLayerEl "stn").
-            Circle()
-                .fill(.white)
-                .frame(width: 11, height: 11)
-                .background(Circle().stroke(Color(hex: 0x05122A, opacity: 0.6), lineWidth: 3).padding(-3))
-                .shadow(color: .white.opacity(0.85), radius: 6)
-            // Scrim: dark at the top for the title, dark at the bottom into the
-            // scrub card (prototype "scrim" gradient stops).
-            LinearGradient(stops: [
-                .init(color: Color(hex: 0x05122A, opacity: 0.80), location: 0),
-                .init(color: Color(hex: 0x05122A, opacity: 0.20), location: 0.26),
-                .init(color: Color(hex: 0x05122A, opacity: 0.10), location: 0.52),
-                .init(color: Color(hex: 0x05122A, opacity: 0.75), location: 1),
-            ], startPoint: .top, endPoint: .bottom)
-            .allowsHitTesting(false)
-
-            VStack {
-                // Back / star / return: fixed 44pt circles, deliberately not
-                // scaled with Dynamic Type (unlike Task 5's inline-with-text
-                // symbols). These are chrome in fixed-size hit targets, not
-                // text companions — growing them is what breaks the same
-                // 320pt iPad sidebar row the wordmark's comment already warns
-                // about (SlackwaterApp.swift). Leave fixed; don't "finish the
-                // job" here.
-                GlassEffectContainer {
-                    HStack(alignment: .top) {
-                        Button { dismiss() } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                                .glassEffect(.regular.interactive(), in: Circle())
-                        }
-                        .accessibilityLabel("Back")
-                        .accessibilityIdentifier("detail-back")
-                        Spacer()
-                        // Title pill (prototype: Fraunces 19 name over mono region).
-                        VStack(spacing: 2) {
-                            Text(name)
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.white)
-                            MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        Spacer()
-                        // Favorite star — the back button's mirror (design pass
-                        // item 4a): same 44pt circle chrome, top-right. It is the
-                        // ONLY thing in this slot: return-to-now used to share the
-                        // row and shoved the star sideways every time you scrubbed
-                        // (M52), so it moved to its own fixed slot below.
-                        let fav = favorites.contains(favoriteId)
-                        Button { favorites.toggle(favoriteId) } label: {
-                            Image(systemName: fav ? "star.fill" : "star")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(fav ? SN.sun : .white)
-                                .frame(width: 44, height: 44)
-                                .glassEffect(.regular.interactive(), in: Circle())
-                        }
-                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
-                        .accessibilityIdentifier("detail-favorite")
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 62)  // clears the status bar; header ignores the top safe area
-                Spacer()
-            }
-        }
-        .frame(height: mapHeaderHeight)
-        // Return-to-now: bottom-right of the hero — below the star, above the
-        // scrub card — as an OVERLAY, so it occupies the same points whether it
-        // is there or not and nothing reflows when a scrub starts or ends.
-        .overlay(alignment: .bottomTrailing) {
-            if showReturn {
-                Button(action: onReturn) {
-                    Image(systemName: "arrow.counterclockwise")
+        // Back / star: fixed 44pt circles, deliberately not scaled with
+        // Dynamic Type (unlike Task 5's inline-with-text symbols). These are
+        // chrome in fixed-size hit targets, not text companions — growing
+        // them is what breaks the same 320pt iPad sidebar row the wordmark's
+        // comment already warns about (SlackwaterApp.swift). Leave fixed;
+        // don't "finish the job" here.
+        GlassEffectContainer {
+            HStack(alignment: .top) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(SN.leaf)
+                        .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
-                .accessibilityLabel("Return to now")
-                .accessibilityIdentifier("detail-return-now")
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                .accessibilityLabel("Back")
+                .accessibilityIdentifier("detail-back")
+                Spacer()
+                // Title pill (prototype: Fraunces 19 name over mono region).
+                VStack(spacing: 2) {
+                    Text(name)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                    MonoLabel(text: region, color: SN.foam.opacity(0.8), tracking: 1.5)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                Spacer()
+                // Favorite star — the back button's mirror (design pass
+                // item 4a): same 44pt circle chrome, top-right. It is the
+                // ONLY thing in this slot: return-to-now used to share the
+                // row and shoved the star sideways every time you scrubbed
+                // (M52), so it moved to its own fixed slot below.
+                let fav = favorites.contains(favoriteId)
+                Button { favorites.toggle(favoriteId) } label: {
+                    Image(systemName: fav ? "star.fill" : "star")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(fav ? SN.sun : .white)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                }
+                .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                .accessibilityIdentifier("detail-favorite")
             }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 62)   // clears the status bar; header ignores the top safe area
+        .padding(.bottom, mapHeaderBottomMargin)
+        .frame(maxWidth: .infinity)
+        .background {
+            StationMapView(latitude: latitude, longitude: longitude)
+            // Scrim: dark at the top for the title pill, lighter into the
+            // scrub card below (prototype "scrim" gradient stops, collapsed
+            // to two — the middle stops were tuned for the old 420pt hero
+            // and read as a flat wash at a third).
+            LinearGradient(stops: [
+                .init(color: Color(hex: 0x05122A, opacity: 0.80), location: 0),
+                .init(color: Color(hex: 0x05122A, opacity: 0.35), location: 1),
+            ], startPoint: .top, endPoint: .bottom)
+            .allowsHitTesting(false)
         }
         .clipped()
         .background(Color(hex: 0x05122A))

@@ -1490,9 +1490,26 @@ final class ScreenshotTests: XCTestCase {
     // MARK: - M52: device-testing fixes (build 15 → 16)
 
     /// Drag from the very left edge — the interactive pop, not a content swipe.
+    /// Anchored to the map header's own band (near its bottom, not its
+    /// screen-midpoint fraction) when a header is on screen: the hero-crop
+    /// spec (2026-08-03) shrank the header to a third, and a start point
+    /// close to the top of the screen — under the status bar / Dynamic
+    /// Island — silently loses the touch to the system rather than the app's
+    /// edge-pop gesture (verified by sweeping dy: 0.05 never pops, 0.15
+    /// always does, on a 141pt-tall header). Low in the header stays clear of
+    /// that zone at any Dynamic Type size. On the root list (no header, e.g.
+    /// the no-op check) fall back to the same safe screen fraction.
     private func edgeSwipeBack(_ app: XCUIApplication) {
-        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.5))
-        let across = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        let header = app.otherElements["detail-map-header"].firstMatch
+        let edge: XCUICoordinate
+        let across: XCUICoordinate
+        if header.exists {
+            edge = header.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.9))
+            across = header.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9))
+        } else {
+            edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.001, dy: 0.15))
+            across = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.15))
+        }
         edge.press(forDuration: 0.02, thenDragTo: across,
                    withVelocity: .default, thenHoldForDuration: 0)
     }

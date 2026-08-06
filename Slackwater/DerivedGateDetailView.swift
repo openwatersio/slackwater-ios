@@ -32,9 +32,7 @@ struct DerivedGateDetailView: View {
             VStack(spacing: 0) {
                 MapHeader(name: gate.name, region: "\(gate.region) · current",
                           latitude: gate.latitude, longitude: gate.longitude,
-                          favoriteId: gate.id,
-                          showReturn: false,
-                          onReturn: {})
+                          favoriteId: gate.id)
                 if let timeline {
                     scrubCard(timeline)
                     scheduleCard(timeline)
