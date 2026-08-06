@@ -1235,20 +1235,38 @@ final class ScreenshotTests: XCTestCase {
         let long = app.staticTexts["Deception Pass State Park"].firstMatch
         scrollTo(long, in: app)
         XCTAssert(long.exists, "the visited station is not in Recents")
+        // The sidebar reflows asynchronously while the CHS pending card above
+        // Recents updates its status line, and `XCUIElement.frame` re-queries
+        // the live layout on EVERY access — so a filter that touches frames
+        // across that reflow compares coordinates from two different layouts.
+        // That is how CI watched a Near Me reading 550pt away "share the
+        // name's line" (PR #22). Wait for the row to hold still, then take
+        // ONE snapshot per element and assert on the snapshots.
+        var nameFrame = long.frame
+        for _ in 0..<20 {
+            usleep(250_000)
+            let again = long.frame
+            if again == nameFrame { break }
+            nameFrame = again
+        }
         // The name owns the row's width now. Truncated, its frame collapsed to
         // the ~150pt column left over beside the reading (iPad sidebar).
-        XCTAssert(long.frame.width > 165,
-                  "the Recents name column is still starved: \(long.frame.width)pt")
+        XCTAssert(nameFrame.width > 165,
+                  "the Recents name column is still starved: \(nameFrame.width)pt")
         // And the reading sits below the name, not beside it.
         let readings = app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
             .allElementsBoundByIndex
             // Only this row's — the Near Me cards above carry readings too.
-            .filter { $0.exists && $0.frame.minY >= long.frame.minY && $0.frame.maxY <= long.frame.maxY + 34 }
+            .compactMap { el -> CGRect? in
+                guard el.exists else { return nil }
+                let f = el.frame  // one read; every comparison below uses it
+                return f.minY >= nameFrame.minY && f.maxY <= nameFrame.maxY + 34 ? f : nil
+            }
         XCTAssertFalse(readings.isEmpty, "the Recents row lost its reading")
-        for reading in readings {
-            XCTAssert(reading.frame.minY >= long.frame.maxY - 1,
-                      "the reading still shares the name's line")
+        for frame in readings {
+            XCTAssert(frame.minY >= nameFrame.maxY - 1,
+                      "the reading still shares the name's line: \(frame)")
         }
         sleep(1)
         save(app, "m50-recents-untruncated.png")
