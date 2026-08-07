@@ -167,9 +167,9 @@ struct TimelineData {
 ///
 /// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
 /// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
-/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`, and the
-/// track labels are pinned at `x: 30` / `x: 42`. Nothing here reflows: `height`
-/// is 362/258/286 by case, and `tideY`/`curY` map data onto those constants.
+/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`. Nothing
+/// here reflows: two cases, one track each — tide-only `height` 258, current-only
+/// `height` 340 — and `tideY`/`curY` map data onto those constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -191,7 +191,6 @@ struct TimelineGeo {
     let moonY: CGFloat = 34
     let tideTop: CGFloat = 48
     let tideBottom: CGFloat
-    let sepY: CGFloat
     let curTop: CGFloat
     let curBottom: CGFloat
     let bodyBottom: CGFloat
@@ -203,12 +202,12 @@ struct TimelineGeo {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
         switch (hasTide, hasCurrent) {
-        case (true, true):
-            height = 362; tideBottom = 170; sepY = 192; curTop = 216; curBottom = 342
-        case (true, false):
-            height = 258; tideBottom = 226; sepY = 0; curTop = 0; curBottom = 0
+        case (true, _):
+            height = 258; tideBottom = 226; curTop = 0; curBottom = 0
         default:
-            height = 286; tideBottom = 0; sepY = 0; curTop = 68; curBottom = 270
+            // Taller than the old 286: the combined strip's reclaimed space goes to
+            // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
+            height = 340; tideBottom = 0; curTop = 68; curBottom = 320
         }
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
@@ -325,12 +324,6 @@ struct TimelineCanvas: View {
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
         }
-        if geo.hasTide && geo.hasCurrent {
-            var sep = Path()
-            sep.move(to: CGPoint(x: 0, y: geo.sepY))
-            sep.addLine(to: CGPoint(x: data.totalWidth, y: geo.sepY))
-            ctx.stroke(sep, with: .color(.white.opacity(0.16)), lineWidth: 1)
-        }
     }
 
     private func drawTide(_ ctx: GraphicsContext) {
@@ -367,9 +360,9 @@ struct TimelineCanvas: View {
                         .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
             ctx.draw(Text(cardTime(e.time, data.tz).replacingOccurrences(of: " ", with: ""))
-                        .font(.system(size: 8).monospaced())
+                        .font(.system(size: 10).monospaced())
                         .foregroundStyle(.white.opacity(0.65)),
-                     at: CGPoint(x: x, y: e.kind == .high ? y - 23 : y + 23), anchor: .center)
+                     at: CGPoint(x: x, y: e.kind == .high ? y - 26 : y + 26), anchor: .center)
         }
     }
 
@@ -415,17 +408,17 @@ struct TimelineCanvas: View {
                          with: .color(.white.opacity(0.85)))
                 // Slack is the app's "go" colour, not a neutral. It is the moment the
                 // app is named for, and it must read the same on every surface.
-                ctx.draw(Text("slack").font(.system(size: 8).monospaced())
+                ctx.draw(Text("slack").font(.system(size: 10).monospaced())
                             .foregroundStyle(SN.go),
-                         at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
+                         at: CGPoint(x: x, y: geo.zeroY + 14), anchor: .center)
             case .maxFlood, .maxEbb:
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
-                         at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
+                         at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
             }
         }
@@ -613,22 +606,12 @@ struct TimelineScrubStrip: View {
                         .frame(width: 13, height: 13)
                         .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
-                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4,
-                              fixedSize: 9)
-                        .padding(.horizontal, 4)
-                        .background(Color(hex: 0x001020, opacity: 0.5))
-                        .position(x: 30, y: geo.tideTop - 3)
                 }
                 if geo.hasCurrent {
                     Circle().fill(.white)
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4,
-                              fixedSize: 9)
-                        .padding(.horizontal, 4)
-                        .background(Color(hex: 0x001020, opacity: 0.5))
-                        .position(x: 42, y: (geo.hasTide ? geo.sepY : geo.curTop) - 8)
                     visibleMaxLines(width: w)
                 }
             }

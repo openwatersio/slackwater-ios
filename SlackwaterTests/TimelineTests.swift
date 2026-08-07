@@ -60,4 +60,24 @@ final class TimelineTests: XCTestCase {
         let days = Set(turns.map { cal.startOfDay(for: $0.time) })
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
+
+    /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
+    func testSingleTrackGeometries() {
+        let tide = TimelineGeo(data: TimelineData.build(tide: friday, current: nil, now: Date()))
+        XCTAssert(tide.hasTide && !tide.hasCurrent)
+        XCTAssertEqual(tide.height, 258, "tide-only geometry does not change in this pass (spec §4)")
+
+        // Current-only: construct TimelineData directly — the geometry keys only
+        // on which point arrays are non-empty.
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let cur = TimelineGeo(data: TimelineData(
+            tz: .current, today: t0, start: t0, end: t0.addingTimeInterval(3600),
+            days: [], tidePoints: [], tideExtremes: [],
+            currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
+            snapTimes: []))
+        XCTAssert(!cur.hasTide && cur.hasCurrent)
+        XCTAssertEqual(cur.height, 340, "the reclaimed vertical space goes to the current curve (spec §2)")
+        XCTAssertEqual(cur.curBottom, 320)
+        XCTAssertEqual(cur.bodyBottom, 320)
+    }
 }
