@@ -90,12 +90,11 @@ struct TimelineData {
         return prev.1
     }
 
-    /// A derived gate's strip: the reference port's tide above, the schematic
-    /// current below. The current track is a magnitude-less half-sine shape
-    /// (±1, NOT a speed — web chs/current.ts schematicSignedAt) with slack
-    /// events only: no peaks, so no speed labels and no FLOOD/EBB lines.
+    /// A derived gate's strip is single-track: the schematic ±1 half-sine with
+    /// slack events only. The port is the SOURCE of the slack times (engineGate
+    /// reads it), never a drawn track (split-scrubbers spec §3).
     static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
-        build(tide: gate.port, current: nil, now: now, gate: gate)
+        build(tide: nil, current: nil, now: now, gate: gate)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
