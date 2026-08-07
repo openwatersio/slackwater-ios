@@ -425,7 +425,16 @@ struct StationListView: View {
         .accessibilityIdentifier("map-canvas")
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
-            Text("Depths not reduced to chart datum — not for navigation.")
+            // Was "Depths not reduced to chart datum — not for navigation."
+            // The depths half stopped being true: the offline chart carries no
+            // bathymetry at all (Seascape's depth shading is a `color-relief`
+            // layer MapLibre Native rejects, and its contours and soundings are
+            // separate online-only sources), so the map was disclaiming a
+            // reading it never shows. The navigation half stays — it is not
+            // decoration here, `docs/appstore-metadata.md` tells the reviewer
+            // this app marks "not for navigation" on every detail footer AND
+            // the map, and that claim has to remain true on this surface.
+            Text("Not for navigation.")
                 .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.horizontal, 12).padding(.vertical, 6)
