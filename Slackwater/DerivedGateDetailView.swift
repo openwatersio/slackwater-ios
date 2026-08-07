@@ -1,11 +1,10 @@
-// Slackwater — GPL v3. Derived-gate detail (Malibu Rapids): the reference
-// port's tide track above, the gate's schematic current below, in the one
-// pan-under-centerline strip — the paired-gate anatomy of CurrentDetailView,
-// with everything speed-shaped removed. A derived gate has honest slack TIMES
-// and a flood/ebb PHASE (reference HW/LW + fixed lag, cruising-community
-// consensus) but NO predicted speed, so the readout names the phase, never
-// knots, and the curve is a shape, not a velocity (web App.tsx derived
-// treatment: schematic CurrentChart + "Shape only" note + slack-only rows).
+// Slackwater — GPL v3. Derived-gate detail (Malibu Rapids): the gate's
+// schematic current strip with phase readout and slack times, one-tap link to
+// the reference port's tide. No speed prediction exists (spec §3), so the curve
+// is a shape, not a velocity. The derivation (reference HW/LW + fixed lag,
+// cruising-community consensus) lives in text, not on the schematic (web
+// App.tsx: "Shape only" note + slack-only rows). A derived gate has honest
+// slack TIMES and flood/ebb PHASE but NO knots.
 import SwiftUI
 import TideEngine
 
@@ -73,28 +72,6 @@ struct DerivedGateDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Tide readout above the strip: the reference port's water at the
-            // centerline time — the water the slacks are derived from.
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 3) {
-                    MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
-                    (Text(formatHeight(portHeight(at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
-                     + Text(" \(heightUnit(imperial: imperial))").font(.caption))
-                        .foregroundStyle(SN.foam)
-                }
-                Spacer()
-                if let next = tl.tideExtremes.first(where: { $0.time > scrubTime }) {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                  color: SN.foam.opacity(0.5), tracking: 1.4)
-                        // Relative only — the extreme's absolute time is
-                        // marked on the strip itself (2026-08-07 feedback).
-                        Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · in \(countdown(from: scrubTime, to: next.time))")
-                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
-                    }
-                }
-            }
-
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial,
                                now: live, scrubTime: $scrubTime)
@@ -138,6 +115,9 @@ struct DerivedGateDetailView: View {
 
             ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
                 .padding(.top, 14)
+
+            TideAtPortLink(port: port)
+                .padding(.top, 12)
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
@@ -164,13 +144,9 @@ struct DerivedGateDetailView: View {
         let t0 = tl.today
         let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
         // Slack rows carry no value — "—", like the web's derived rows.
-        var out: [ScheduleEntry] = tl.currentEvents
+        let out: [ScheduleEntry] = tl.currentEvents
             .filter { $0.time >= t0 && $0.time <= t1 }
             .map { ScheduleEntry(time: $0.time, pill: .slack) }
-        out += tl.tideExtremes
-            .filter { $0.time >= t0 && $0.time <= t1 }
-            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
-                                 value: "\(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))") }
         return out.sorted { $0.time < $1.time }
     }
 
@@ -183,9 +159,6 @@ struct DerivedGateDetailView: View {
             Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
-            Text("Tide shown is \(port.name) — the reference port, not this station")
-                .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
@@ -193,11 +166,6 @@ struct DerivedGateDetailView: View {
     }
 
     // MARK: - Data
-
-    /// Engine-exact port height — the same call the port's own detail makes.
-    private func portHeight(at t: Date) -> Double {
-        port.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
-    }
 
     private func returnToNow() {
         live = appNow()
