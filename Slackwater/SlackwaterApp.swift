@@ -289,8 +289,11 @@ struct StationListView: View {
             .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
             .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
             .toolbar(.hidden, for: .navigationBar)
-            .environment(\.openTideDetail) { path.append($0) }
         }
+        // Environment set on the stack's root CONTENT (the ZStack above) never
+        // reaches pushed destinations — NavigationStack's pushed views are not
+        // descendants of that content view. It has to ride the stack itself.
+        .environment(\.openTideDetail) { path.append($0) }
     }
 
     /// Regular width — the web's tablet-and-up layout (styles.css ≥62rem):
@@ -327,8 +330,8 @@ struct StationListView: View {
                 .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
-                .environment(\.openTideDetail) { path.append($0) }
             }
+            .environment(\.openTideDetail) { path.append($0) }
             // A regular-width launch opens on the first row rather than the
             // "Pick a station" placeholder (M52): the My Location station when
             // there is a fix, else the first row the list renders. Once only,
