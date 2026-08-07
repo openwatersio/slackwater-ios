@@ -107,7 +107,7 @@ struct CurrentDetailView: View {
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 
-            // Current readout below the strip (prototype combined anatomy).
+            // Current readout below the strip.
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
@@ -186,7 +186,7 @@ struct CurrentDetailView: View {
         }
     }
 
-    // MARK: - Rolling multi-day schedule (slack/max + port turns + sun)
+    // MARK: - Rolling multi-day schedule (slack/max rows, sun in the day header)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
         MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,

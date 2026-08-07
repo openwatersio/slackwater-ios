@@ -6,7 +6,7 @@
 // day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
-// tide-only, current-only, and tide+current (gate + paired port) details.
+// the tide-only and current-only details.
 import SwiftUI
 import UIKit
 import TideEngine

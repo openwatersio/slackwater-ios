@@ -60,7 +60,7 @@ struct DerivedGateDetailView: View {
         }
     }
 
-    // MARK: - Scrub card: tide-at-port readout, strip, phase readout
+    // MARK: - Scrub card: strip, phase readout, tide link
 
     static func phaseColor(_ phase: DerivedPhase) -> Color {
         switch phase {
@@ -128,7 +128,7 @@ struct DerivedGateDetailView: View {
         }
     }
 
-    // MARK: - Rolling multi-day schedule (slacks + port turns + sun)
+    // MARK: - Rolling multi-day schedule (slack rows, sun in the day header)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
         MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,

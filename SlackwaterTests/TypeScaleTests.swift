@@ -168,14 +168,13 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        // The real count is ~34 (~22 of them genuinely guarded) as of
-        // split-scrubbers Task 5, which dropped it from ~36: CurrentDetailView
+        // Count is 29 after split-scrubbers deletions (31 before): CurrentDetailView
         // lost its paired-tide readout (two formatHeight sites) and the
         // schedule's tide-extremes rows (one more) — the track it used to
-        // borrow, not a regression here. A floor of 5 would survive the scan
-        // silently collapsing to a handful of files — the same "found
-        // nothing, passed forever" failure the retired-font test guards with
-        // its `scanned > 10`.
+        // borrow, not a regression here. A floor of 25 keeps the same headroom;
+        // a floor of 5 would survive the scan silently collapsing to a handful
+        // of files — the same "found nothing, passed forever" failure the
+        // retired-font test guards with its `scanned > 10`.
         XCTAssertGreaterThan(checked, 25, "expected to find numeric Text sites, found \(checked)")
         XCTAssertTrue(offenders.isEmpty,
                       "numeric reading without mono treatment (or a named indirection exception):\n"

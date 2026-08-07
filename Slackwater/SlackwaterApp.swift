@@ -466,8 +466,9 @@ struct StationListView: View {
     @ViewBuilder private var locatedSections: some View {
         let anchor = anchor
         // Ranked once per fix, not once per render (M53 — RankedStations).
-        // Same-named stations collapse to their nearest (M50): one entry per
-        // place in Near Me and Recents, the rest behind the chooser.
+        // Same-named stations collapse to their nearest (M50) in Near Me only;
+        // Recents are uncollapsed (explicit picks stay exact). The rest are behind
+        // the chooser.
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         let heroItem = fix == nil ? nil : ranked.first
         let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
