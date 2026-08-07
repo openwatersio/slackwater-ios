@@ -571,17 +571,23 @@ final class ScreenshotTests: XCTestCase {
             tries += 1
         }
         tomorrowRow.tap()
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'TOMORROW'")).firstMatch.waitForExistence(timeout: 5),
+        // The when-row shows only the date now ("AUG 8") — TODAY/TOMORROW went
+        // with the 2026-08-07 when-row redesign (the strip's day headers carry
+        // the relative day). Follow the scrub by the date flipping to tomorrow.
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US")
+        fmt.dateFormat = "MMM d"
+        let tomorrow = fmt.string(from: Date(timeIntervalSinceNow: 86400)).uppercased()
+        let today = fmt.string(from: Date()).uppercased()
+        XCTAssert(app.staticTexts[tomorrow].firstMatch.waitForExistence(timeout: 5),
                   "readout did not follow the cross-midnight scrub")
         app.swipeDown()
         sleep(1)
         save(app, "m42-scrub-midnight.png")
 
-        // Return to now: the readout comes back to Today.
+        // Return to now: the readout comes back to today's date.
         app.buttons["Return to now"].firstMatch.tap()
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'TODAY'")).firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts[today].firstMatch.waitForExistence(timeout: 5),
                   "return-to-now did not restore the live readout")
     }
 
@@ -1642,15 +1648,15 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
-        // Its own slot: below the star, in the card's readout row, hard
-        // right — the hero-crop-and-scrub-order spec (2026-08-03) moved it
-        // out of the hero's overlay into the card beside NEXT LOW, so it now
-        // lives BELOW the hero rather than inside it.
+        // Its own slot: below the hero, in the when-row at the bottom of the
+        // scrub card, directly beside the time/date stack on the LEADING side
+        // (2026-08-07 when-row redesign — it stopped bouncing between readout
+        // rows and settled next to the time it resets).
         XCTAssert(nowFrame.minY > starAfter.maxY, "return-to-now is not below the star")
         XCTAssert(nowFrame.minY >= headerFrame.maxY - 1,
-                 "return-to-now must live below the hero, in the card's readout row")
-        XCTAssertEqual(nowFrame.maxX, starAfter.maxX, accuracy: 1,
-                       "return-to-now must share the star's right margin")
+                 "return-to-now must live below the hero, in the scrub card")
+        XCTAssert(nowFrame.midX < app.windows.firstMatch.frame.midX,
+                  "return-to-now sits beside the time stack on the leading side")
         save(app, "m52-return-now-fixed.png")
 
         // And it still does its job — back to now, and gone again.

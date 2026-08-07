@@ -87,7 +87,9 @@ struct DerivedGateDetailView: View {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, tz))")
+                        // Relative only — the extreme's absolute time is
+                        // marked on the strip itself (2026-08-07 feedback).
+                        Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · in \(countdown(from: scrubTime, to: next.time))")
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
@@ -120,7 +122,6 @@ struct DerivedGateDetailView: View {
                             .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
-                ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
             }
             .padding(.top, 8)
 
@@ -130,12 +131,12 @@ struct DerivedGateDetailView: View {
                 .foregroundStyle(SN.foam.opacity(0.5))
                 .padding(.top, 10)
 
-            MonoLabel(text: "‹ swipe to scrub · snaps to slack & tide turns ›",
+            MonoLabel(text: "‹ swipe to scrub ›",
                       color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz)
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
                 .padding(.top, 14)
         }
         .padding(.horizontal, 16)
