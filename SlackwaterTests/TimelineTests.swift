@@ -95,4 +95,38 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.height, 258, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
+
+    /// v falls linearly 2 kn → -2 kn over 2 h (slack at +60 min); |v| < 0.5
+    /// between +45 and +75 min. Samples every 10 min like the drawn series.
+    func testSlackWindowInterpolatesCrossings() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = (0...12).map { i in
+            CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600),
+                         speed: 2.0 - Double(i) / 3.0)
+        }
+        let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(3600),
+                                          threshold: Timeline.slackThresholdKn))
+        XCTAssertEqual(w.start.timeIntervalSince(t0), 2700, accuracy: 1)
+        XCTAssertEqual(w.end.timeIntervalSince(t0), 4500, accuracy: 1)
+    }
+
+    /// A series that never leaves the window clamps to its edges.
+    func testSlackWindowClampsToSeriesEdges() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = (0...6).map { CurrentPoint(time: t0.addingTimeInterval(Double($0) * 600), speed: 0.1) }
+        let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(1800), threshold: 0.5))
+        XCTAssertEqual(w.start, pts.first!.time)
+        XCTAssertEqual(w.end, pts.last!.time)
+    }
+
+    /// No sub-threshold sample brackets the slack (a violent gate where the
+    /// 10-min sampling steps over the window) — no window, not a wrong one.
+    func testSlackWindowNilWhenSamplingStepsOver() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = (0...4).map { i in
+            CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600),
+                         speed: i < 2 ? 4.0 : -4.0)
+        }
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+    }
 }

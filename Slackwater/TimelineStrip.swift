@@ -20,6 +20,10 @@ enum Timeline {
     static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
 
+    /// The "weak current" convention: under half a knot a small boat transits.
+    /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
+    static let slackThresholdKn = 0.5
+
     /// One point of strip = 5 minutes, and UIScrollView snaps `contentOffset`
     /// to the pixel grid — so the centered-on-now strip round-trips through
     /// `scrubTime` up to ~2.5 min off before anyone has touched it. That was
@@ -34,6 +38,39 @@ enum Timeline {
 /// all three scrubable details.
 func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
     abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
+}
+
+/// The workable window around a slack: where |v| stays under `threshold`,
+/// linearly interpolated at the crossings from the drawn 10-min samples —
+/// the same series the strip renders, so the window can never disagree with
+/// the curve. Clamped to the series; nil when no sub-threshold sample
+/// brackets the slack.
+func slackWindow(_ points: [CurrentPoint], around slack: Date,
+                 threshold: Double) -> (start: Date, end: Date)? {
+    guard !points.isEmpty else { return nil }
+    let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
+    let k: Int
+    if abs(points[i].speed) < threshold { k = i }
+    else if i + 1 < points.count, abs(points[i + 1].speed) < threshold { k = i + 1 }
+    else { return nil }
+    func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
+        let va = abs(a.speed), vb = abs(b.speed)
+        let f = (threshold - va) / (vb - va)
+        return a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f)
+    }
+    var start = points[0].time
+    var a = k
+    while a > 0 {
+        if abs(points[a - 1].speed) >= threshold { start = cross(points[a - 1], points[a]); break }
+        a -= 1
+    }
+    var end = points[points.count - 1].time
+    var b = k
+    while b < points.count - 1 {
+        if abs(points[b + 1].speed) >= threshold { end = cross(points[b], points[b + 1]); break }
+        b += 1
+    }
+    return (start, end)
 }
 
 // MARK: - Data: everything the strip draws, computed once per station
