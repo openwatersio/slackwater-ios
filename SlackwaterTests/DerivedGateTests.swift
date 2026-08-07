@@ -95,7 +95,8 @@ final class DerivedGateTests: XCTestCase {
                                      port: port)
         let d = TimelineData.build(gate: gate, now: Date())
 
-        XCTAssert(d.hasTide, "the reference port's tide track must be present")
+        XCTAssertFalse(d.hasTide, "a derived gate's strip is single-track — no tide track (split-scrubbers spec §3)")
+        XCTAssert(d.tideExtremes.isEmpty, "no port turns in the data — they'd re-enter snapTimes and the schedule")
         XCTAssert(d.hasCurrent, "the schematic current track must be present")
         XCTAssert(d.currentEvents.allSatisfy { $0.kind == .slack && $0.speed == 0 },
                   "a derived gate has slack events only, never a speed")

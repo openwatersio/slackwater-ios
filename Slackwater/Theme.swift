@@ -286,20 +286,6 @@ struct ReturnToNowSlot: View {
     }
 }
 
-/// The schedule table's sunrise/sunset pill (prototype PILL.sunrise/.sunset:
-/// outlined, amber family, "☀ Rise" / "☀ Set").
-struct SunPill: View {
-    let kind: SunMoon.SunEventKind
-    var body: some View {
-        let color = kind == .sunrise ? SN.sunrise : SN.sunset
-        Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
-            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))
-    }
-}
-
 /// The provisional ("fast answer") marking on a LIST card: the ⚠️ family and
 /// nothing else — the detail view carries the explanation.
 ///
@@ -341,6 +327,49 @@ struct ProvisionalBadge: View {
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")
+    }
+}
+
+// MARK: - Detail-to-detail navigation
+
+/// Detail views push the paired port's own detail through this, not a
+/// NavigationLink: NavigationLink is a Button, and Button press tracking
+/// goes dead below the strip in the iPad split detail column while tap
+/// gestures keep working (see MultiDaySchedule's row comment).
+private struct OpenTideDetailKey: EnvironmentKey {
+    static let defaultValue: (TideStationRecord) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openTideDetail: (TideStationRecord) -> Void {
+        get { self[OpenTideDetailKey.self] }
+        set { self[OpenTideDetailKey.self] = newValue }
+    }
+}
+
+/// The one tide affordance on a current/gate detail (split-scrubbers spec
+/// §2): a quiet link in the list's matching-stations convention, navigating
+/// to the port's own TideDetailView. No tide numbers live here anymore.
+struct TideAtPortLink: View {
+    let port: TideStationRecord
+    @Environment(\.openTideDetail) private var openTide
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.caption2.weight(.semibold))
+            Text("Tide at \(port.name)")
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(SN.leaf)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { openTide(port) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("tide-at-port")
     }
 }
 

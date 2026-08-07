@@ -107,7 +107,7 @@ struct TideDetailView: View {
     // MARK: - Rolling multi-day schedule (turns + sun, day-grouped)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today,
+        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -123,11 +123,6 @@ struct TideDetailView: View {
             .filter { $0.time >= t0 && $0.time <= t1 }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
                                  value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
-        for day in tl.days {
-            for (t, pill) in [(day.sunrise, SchedulePill.sunrise), (day.sunset, .sunset)] {
-                if let t, t >= t0, t <= t1 { out.append(ScheduleEntry(time: t, pill: pill)) }
-            }
-        }
         return out.sorted { $0.time < $1.time }
     }
 

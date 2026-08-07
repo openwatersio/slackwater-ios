@@ -6,7 +6,7 @@
 // day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
-// tide-only, current-only, and tide+current (gate + paired port) details.
+// the tide-only and current-only details.
 import SwiftUI
 import UIKit
 import TideEngine
@@ -19,6 +19,10 @@ enum Timeline {
     static let forwardHours = 132.0       // TMAX
     static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+
+    /// The "weak current" convention: under half a knot a small boat transits.
+    /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
+    static let slackThresholdKn = 0.5
 
     /// One point of strip = 5 minutes, and UIScrollView snaps `contentOffset`
     /// to the pixel grid — so the centered-on-now strip round-trips through
@@ -34,6 +38,39 @@ enum Timeline {
 /// all three scrubable details.
 func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
     abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
+}
+
+/// The workable window around a slack: where |v| stays under `threshold`,
+/// linearly interpolated at the crossings from the drawn 10-min samples —
+/// the same series the strip renders, so the window can never disagree with
+/// the curve. Clamped to the series; nil when no sub-threshold sample
+/// brackets the slack.
+func slackWindow(_ points: [CurrentPoint], around slack: Date,
+                 threshold: Double) -> (start: Date, end: Date)? {
+    guard !points.isEmpty else { return nil }
+    let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
+    let k: Int
+    if abs(points[i].speed) < threshold { k = i }
+    else if i + 1 < points.count, abs(points[i + 1].speed) < threshold { k = i + 1 }
+    else { return nil }
+    func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
+        let va = abs(a.speed), vb = abs(b.speed)
+        let f = (threshold - va) / (vb - va)
+        return a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f)
+    }
+    var start = points[0].time
+    var a = k
+    while a > 0 {
+        if abs(points[a - 1].speed) >= threshold { start = cross(points[a - 1], points[a]); break }
+        a -= 1
+    }
+    var end = points[points.count - 1].time
+    var b = k
+    while b < points.count - 1 {
+        if abs(points[b + 1].speed) >= threshold { end = cross(points[b], points[b + 1]); break }
+        b += 1
+    }
+    return (start, end)
 }
 
 // MARK: - Data: everything the strip draws, computed once per station
@@ -90,12 +127,11 @@ struct TimelineData {
         return prev.1
     }
 
-    /// A derived gate's strip: the reference port's tide above, the schematic
-    /// current below. The current track is a magnitude-less half-sine shape
-    /// (±1, NOT a speed — web chs/current.ts schematicSignedAt) with slack
-    /// events only: no peaks, so no speed labels and no FLOOD/EBB lines.
+    /// A derived gate's strip is single-track: the schematic ±1 half-sine with
+    /// slack events only. The port is the SOURCE of the slack times (engineGate
+    /// reads it), never a drawn track (split-scrubbers spec §3).
     static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
-        build(tide: gate.port, current: nil, now: now, gate: gate)
+        build(tide: nil, current: nil, now: now, gate: gate)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
@@ -168,9 +204,9 @@ struct TimelineData {
 ///
 /// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
 /// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
-/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`, and the
-/// track labels are pinned at `x: 30` / `x: 42`. Nothing here reflows: `height`
-/// is 362/258/286 by case, and `tideY`/`curY` map data onto those constants.
+/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 14`. Nothing
+/// here reflows: two cases, one track each — tide-only `height` 258, current-only
+/// `height` 340 — and `tideY`/`curY` map data onto those constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -192,7 +228,6 @@ struct TimelineGeo {
     let moonY: CGFloat = 34
     let tideTop: CGFloat = 48
     let tideBottom: CGFloat
-    let sepY: CGFloat
     let curTop: CGFloat
     let curBottom: CGFloat
     let bodyBottom: CGFloat
@@ -204,12 +239,12 @@ struct TimelineGeo {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
         switch (hasTide, hasCurrent) {
-        case (true, true):
-            height = 362; tideBottom = 170; sepY = 192; curTop = 216; curBottom = 342
-        case (true, false):
-            height = 258; tideBottom = 226; sepY = 0; curTop = 0; curBottom = 0
+        case (true, _):
+            height = 258; tideBottom = 226; curTop = 0; curBottom = 0
         default:
-            height = 286; tideBottom = 0; sepY = 0; curTop = 68; curBottom = 270
+            // Taller than the old 286: the combined strip's reclaimed space goes to
+            // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
+            height = 340; tideBottom = 0; curTop = 68; curBottom = 320
         }
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
@@ -326,12 +361,6 @@ struct TimelineCanvas: View {
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
         }
-        if geo.hasTide && geo.hasCurrent {
-            var sep = Path()
-            sep.move(to: CGPoint(x: 0, y: geo.sepY))
-            sep.addLine(to: CGPoint(x: data.totalWidth, y: geo.sepY))
-            ctx.stroke(sep, with: .color(.white.opacity(0.16)), lineWidth: 1)
-        }
     }
 
     private func drawTide(_ ctx: GraphicsContext) {
@@ -368,9 +397,9 @@ struct TimelineCanvas: View {
                         .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
             ctx.draw(Text(cardTime(e.time, data.tz).replacingOccurrences(of: " ", with: ""))
-                        .font(.system(size: 8).monospaced())
+                        .font(.system(size: 10).monospaced())
                         .foregroundStyle(.white.opacity(0.65)),
-                     at: CGPoint(x: x, y: e.kind == .high ? y - 23 : y + 23), anchor: .center)
+                     at: CGPoint(x: x, y: e.kind == .high ? y - 26 : y + 26), anchor: .center)
         }
     }
 
@@ -416,17 +445,17 @@ struct TimelineCanvas: View {
                          with: .color(.white.opacity(0.85)))
                 // Slack is the app's "go" colour, not a neutral. It is the moment the
                 // app is named for, and it must read the same on every surface.
-                ctx.draw(Text("slack").font(.system(size: 8).monospaced())
+                ctx.draw(Text("slack").font(.system(size: 10).monospaced())
                             .foregroundStyle(SN.go),
-                         at: CGPoint(x: x, y: geo.zeroY + 12), anchor: .center)
+                         at: CGPoint(x: x, y: geo.zeroY + 14), anchor: .center)
             case .maxFlood, .maxEbb:
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
-                         at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 10 : y + 12),
+                         at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
             }
         }
@@ -614,22 +643,12 @@ struct TimelineScrubStrip: View {
                         .frame(width: 13, height: 13)
                         .shadow(color: .white.opacity(0.9), radius: 4)
                         .position(x: w / 2, y: geo.tideY(data.heightAt(scrubTime)))
-                    MonoLabel(text: "Tide", color: SN.leaf.opacity(0.9), tracking: 1.4,
-                              fixedSize: 9)
-                        .padding(.horizontal, 4)
-                        .background(Color(hex: 0x001020, opacity: 0.5))
-                        .position(x: 30, y: geo.tideTop - 3)
                 }
                 if geo.hasCurrent {
                     Circle().fill(.white)
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    MonoLabel(text: "Current", color: SN.leaf.opacity(0.9), tracking: 1.4,
-                              fixedSize: 9)
-                        .padding(.horizontal, 4)
-                        .background(Color(hex: 0x001020, opacity: 0.5))
-                        .position(x: 42, y: (geo.hasTide ? geo.sepY : geo.curTop) - 8)
                     visibleMaxLines(width: w)
                 }
             }
@@ -690,7 +709,7 @@ private struct Triangle: Shape {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack, sunrise, sunset
+    case high, low, flood, ebb, slack
 }
 
 struct ScheduleEntry: Identifiable {
@@ -716,6 +735,7 @@ struct MultiDaySchedule: View {
     let entries: [ScheduleEntry]  // pre-sorted, pre-filtered to the window
     let tz: TimeZone
     let today: Date               // local midnight
+    let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
 
@@ -743,12 +763,27 @@ struct MultiDaySchedule: View {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
                 HStack(alignment: .top, spacing: 0) {
-                    Text(relativeDayLabel(group.offset, group.start, tz))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(SN.foam.opacity(0.9))
-                        .frame(width: 74, alignment: .leading)
-                        .padding(.leading, 14)
-                        .padding(.top, 12)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(relativeDayLabel(group.offset, group.start, tz))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.9))
+                        if let day = days.first(where: { $0.offset == group.offset }) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                if let rise = day.sunrise {
+                                    Text("↑\(clockTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                }
+                                if let set = day.sunset {
+                                    Text("↓\(clockTime(set, tz))").foregroundStyle(SN.sunset)
+                                }
+                            }
+                            .font(.caption2.monospaced())
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("day-sun-d\(group.offset)")
+                        }
+                    }
+                    .frame(width: 74, alignment: .leading)
+                    .padding(.leading, 14)
+                    .padding(.top, 12)
                     VStack(spacing: 0) {
                         ForEach(group.items) { e in
                             let on = e.id == nearestID
@@ -819,10 +854,6 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
-        case .sunrise:
-            SunPill(kind: .sunrise)
-        case .sunset:
-            SunPill(kind: .sunset)
         }
     }
 }

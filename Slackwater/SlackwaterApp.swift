@@ -243,6 +243,14 @@ struct StationListView: View {
                 stackLayout
             }
         }
+        // Fifth-pass evidence (task-9): a pushed destination doesn't reliably
+        // inherit environment attached to the NavigationStack itself when that
+        // stack is NavigationSplitView's `detail:` column — attaching there
+        // left `TideAtPortLink`'s `openTide` reading the default no-op on
+        // iPad, tap included, in a live-logged repro. Attached here instead,
+        // above BOTH layouts, delivery rides ordinary ancestor inheritance —
+        // and there's exactly one attachment, so the two layouts can't drift.
+        .environment(\.openTideDetail) { path.append($0) }
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
@@ -458,12 +466,18 @@ struct StationListView: View {
     @ViewBuilder private var locatedSections: some View {
         let anchor = anchor
         // Ranked once per fix, not once per render (M53 — RankedStations).
-        // Same-named stations collapse to their nearest (M50): one entry per
-        // place in Near Me and Recents, the rest behind the chooser.
+        // Same-named stations collapse to their nearest (M50) in Near Me only;
+        // Recents are uncollapsed (explicit picks stay exact). The rest are behind
+        // the chooser.
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         let heroItem = fix == nil ? nil : ranked.first
         let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
-                                recentIds: places.collapse(recents.ids),
+                                // Uncollapsed on purpose: a station opened via the chooser is an explicit
+                                // pick, same principle StationGroups grants Favorites — collapsing it made
+                                // Recents silently show and reopen the nearest namesake instead
+                                // (split-scrubbers spec §6). Near Me stays collapsed: distance ranking is
+                                // not user choice.
+                                recentIds: recents.ids,
                                 rankedIds: places.collapse(ranked.map(\.id)),
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
