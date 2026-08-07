@@ -457,12 +457,11 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
         // Both labels realized (tall screens / short lists): direct order
         // check. The sidebar reflows as CHS pending cards above update, so
-        // wait it out and snapshot both frames once (settledFrame — see
+        // read both frames together and wait them out (settled — see
         // testM50RecentsNamesFit) rather than reading each live.
         if near.exists {
-            let recentsFrame = settledFrame(of: recentsLabel)
-            let nearFrame = near.frame
-            XCTAssert(nearFrame.minY < recentsFrame.minY,
+            let f = settled { [near.frame, recentsLabel.frame] }
+            XCTAssert(f[0].minY < f[1].minY,
                       "Recents must render below Near Me")
         }
         sleep(2)
@@ -1058,14 +1057,12 @@ final class ScreenshotTests: XCTestCase {
         let porlier = rows["download-row-chs-porlier-pass"].firstMatch
         XCTAssert(victoria.waitForExistence(timeout: 5), "no per-station rows in the manager")
         // ChsFitService is actively mutating row heights here (status text
-        // flips as downloads progress) — settle on one row, then snapshot all
-        // three once each rather than re-reading .frame live (see
-        // testM50RecentsNamesFit / settledFrame).
-        let victoriaFrame = settledFrame(of: victoria)
-        let raceFrame = race.frame
-        let porlierFrame = porlier.frame
-        XCTAssert(victoriaFrame.minY < raceFrame.minY, "queue is not proximity-ordered")
-        XCTAssert(raceFrame.minY < porlierFrame.minY, "queue is not proximity-ordered")
+        // flips as downloads progress) — read all three rows together and wait
+        // the layout out, so the order check compares one layout (see
+        // testM50RecentsNamesFit / settled).
+        let rowFrames = settled { [victoria.frame, race.frame, porlier.frame] }
+        XCTAssert(rowFrames[0].minY < rowFrames[1].minY, "queue is not proximity-ordered")
+        XCTAssert(rowFrames[1].minY < rowFrames[2].minY, "queue is not proximity-ordered")
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists,
                        "the manager is listing the catalog again, not the download set")
         sleep(1)
@@ -1105,11 +1102,10 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists,  // MonoLabel uppercases
                   "the promoted station is not marked in the manager")
         let stillQueued = app.descendants(matching: .any)["download-row-chs-porlier-pass"].firstMatch
-        // Right after service.promote — the queue is mid-transition, so
-        // settle on the promoted row before comparing (settledFrame).
-        let promotedFrame = settledFrame(of: promoted)
-        let stillQueuedFrame = stillQueued.frame
-        XCTAssert(promotedFrame.minY < stillQueuedFrame.minY,
+        // Right after service.promote — the queue is mid-transition, so read
+        // both rows together and let them settle (settled).
+        let queue = settled { [promoted.frame, stillQueued.frame] }
+        XCTAssert(queue[0].minY < queue[1].minY,
                   "the viewed station did not jump ahead of the proximity order")
         sleep(1)
         save(app, "m48-queue-jump.png")
@@ -1258,27 +1254,31 @@ final class ScreenshotTests: XCTestCase {
         scrollTo(long, in: app)
         XCTAssert(long.exists, "the visited station is not in Recents")
         // The sidebar reflows asynchronously while the CHS pending card above
-        // Recents updates its status line — settledFrame waits the row out,
-        // then this is ONE snapshot; every comparison below uses it.
-        let nameFrame = settledFrame(of: long)
+        // Recents updates its status line, and the row's name/reading gap is
+        // only ~2pt — so the name and EVERY reading come out of one `settled`
+        // read. Settling the name alone and reading the readings after it let
+        // a 3pt shift land in between and failed CI (PR #25).
+        let readingLabels = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
+        let frames = settled {
+            [long.frame] + readingLabels.allElementsBoundByIndex.compactMap {
+                $0.exists ? $0.frame : nil
+            }
+        }
+        let nameFrame = frames[0]
         // The name owns the row's width now. Truncated, its frame collapsed to
         // the ~150pt column left over beside the reading (iPad sidebar).
         XCTAssert(nameFrame.width > 165,
                   "the Recents name column is still starved: \(nameFrame.width)pt")
-        // And the reading sits below the name, not beside it.
-        let readings = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
-            .allElementsBoundByIndex
-            // Only this row's — the Near Me cards above carry readings too.
-            .compactMap { el -> CGRect? in
-                guard el.exists else { return nil }
-                let f = el.frame  // one read; every comparison below uses it
-                return f.minY >= nameFrame.minY && f.maxY <= nameFrame.maxY + 34 ? f : nil
-            }
+        // And the reading sits below the name, not beside it. Only this row's —
+        // the Near Me cards above carry readings too.
+        let readings = frames.dropFirst().filter {
+            $0.minY >= nameFrame.minY && $0.maxY <= nameFrame.maxY + 34
+        }
         XCTAssertFalse(readings.isEmpty, "the Recents row lost its reading")
         for frame in readings {
             XCTAssert(frame.minY >= nameFrame.maxY - 1,
-                      "the reading still shares the name's line: \(frame)")
+                      "the reading still shares the name's line: \(frame) vs name \(nameFrame)")
         }
         sleep(1)
         save(app, "m50-recents-untruncated.png")
@@ -1636,16 +1636,15 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
         // The 44pt slot this guards is fixed by construction, but re-reading
-        // star/now/header live below would still be racy (settledFrame — see
-        // testM50RecentsNamesFit). Snapshot each once and compare snapshots.
-        let starAfter = settledFrame(of: star)
-        let nowFrame = settledFrame(of: now)
+        // star/now/header/back live below would still be racy (settled — see
+        // testM50RecentsNamesFit). One read, one layout, four snapshots.
         let header = app.otherElements["detail-map-header"].firstMatch
-        let headerFrame = header.frame
+        let after = settled { [star.frame, now.frame, header.frame, back.frame] }
+        let starAfter = after[0], nowFrame = after[1], headerFrame = after[2]
         XCTAssertEqual(starAfter.minX, starBefore.minX, accuracy: 0.5,
                        "return-to-now still shifts the star")
         XCTAssertEqual(starAfter.minY, starBefore.minY, accuracy: 0.5)
-        XCTAssertEqual(back.frame.minX, backBefore.minX, accuracy: 0.5,
+        XCTAssertEqual(after[3].minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
         // Its own slot: below the hero, in the when-row at the bottom of the
@@ -1655,8 +1654,17 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(nowFrame.minY > starAfter.maxY, "return-to-now is not below the star")
         XCTAssert(nowFrame.minY >= headerFrame.maxY - 1,
                  "return-to-now must live below the hero, in the scrub card")
-        XCTAssert(nowFrame.midX < app.windows.firstMatch.frame.midX,
-                  "return-to-now sits beside the time stack on the leading side")
+        // Leading side of the DETAIL PANE, not of the window: on a portrait
+        // iPad the sidebar pushes the pane past the window's midX, so the
+        // window ruler only passed here because the test before this one
+        // leaves the device in landscape. `detail-map-header` is no ruler
+        // either — its accessibility frame spans the whole window, not the
+        // pane. The pane's own chrome is: back on its leading edge, star on
+        // its trailing one.
+        let paneMidX = (after[3].minX + starAfter.maxX) / 2
+        XCTAssert(nowFrame.midX < paneMidX,
+                  "return-to-now sits beside the time stack on the leading side: "
+                  + "\(nowFrame.midX) vs pane mid \(paneMidX)")
         save(app, "m52-return-now-fixed.png")
 
         // And it still does its job — back to now, and gone again.
@@ -1664,7 +1672,7 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         XCTAssertFalse(app.buttons["detail-return-now"].firstMatch.exists,
                        "return-to-now did not clear after returning to now")
-        XCTAssertEqual(settledFrame(of: star).minX, starBefore.minX, accuracy: 0.5,
+        XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,
                        "the star moved when return-to-now went away")
     }
 
@@ -1764,17 +1772,24 @@ final class ScreenshotTests: XCTestCase {
     /// row resizing as async status text lands, a queue re-sorting mid-
     /// promotion) compares coordinates from two different layouts. That is
     /// how CI watched a Near Me reading 550pt away "share the name's line"
-    /// (PR #22, testM50RecentsNamesFit). Wait for `el` to hold still, then
-    /// return ONE snapshot to assert on — never re-read `.frame` after this.
-    private func settledFrame(of el: XCUIElement) -> CGRect {
-        var frame = el.frame
+    /// (PR #22, testM50RecentsNamesFit).
+    ///
+    /// Settling ONE element and then reading its counterparts live is the same
+    /// bug with an extra step — the reflow lands in the gap between the settle
+    /// and the next read, which is how M50 failed again on a 3pt shift when
+    /// the row's gap is only 2pt (PR #25). So read EVERY frame a comparison
+    /// needs inside this closure: it re-reads them all together until two
+    /// consecutive passes agree, and hands back that ONE layout. Never re-read
+    /// `.frame` after this.
+    private func settled<T: Equatable>(_ read: () -> T) -> T {
+        var snapshot = read()
         for _ in 0..<20 {
             usleep(250_000)
-            let again = el.frame
-            if again == frame { break }
-            frame = again
+            let again = read()
+            if again == snapshot { break }
+            snapshot = again
         }
-        return frame
+        return snapshot
     }
 
     // MARK: - M53: the US and Canada
