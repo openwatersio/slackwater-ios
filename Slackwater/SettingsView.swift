@@ -68,6 +68,7 @@ struct SettingsView: View {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
                         Text("Additional stations: TICON-4 harmonic constants, SEANOE — used under CC BY 4.0 (seanoe.org/data/00980/109129).")
                         Text("Map land layer: © OpenStreetMap contributors (ODbL).")
+                        Text("Map chart features: Open Waters Seamap (CC BY 4.0), from OpenStreetMap contributors (ODbL) — bundled for offline use.")
                         Text("Map bathymetry: Seascape © Open Water Software, LLC (CC BY 4.0), when online.")
                         Text("Station names & pairings: @sailingnaturali/station-corrections (MIT).")
                         Text("Prediction engine: slackwater-engine, a port of Neaps (MIT).")

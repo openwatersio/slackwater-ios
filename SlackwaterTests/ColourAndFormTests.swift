@@ -240,6 +240,65 @@ final class ColourAndFormTests: XCTestCase {
                      "colour must never be matched against kind")
     }
 
+    /// WCAG relative luminance, for the contrast floor below.
+    private func luminance(_ hex: String) -> Double {
+        let h = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        let v = UInt32(h, radix: 16) ?? 0
+        let parts = [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff].map { c -> Double in
+            let s = Double(c) / 255
+            return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]
+    }
+
+    private func contrast(_ a: String, _ b: String) -> Double {
+        let (x, y) = (luminance(a), luminance(b))
+        return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+    }
+
+    /// The pale water's price, and the reason every pin carries an ink outline.
+    ///
+    /// On the old navy water a pin's FILL cleared WCAG's 3:1 for a non-text
+    /// mark by itself in every state. On `#e9f7ff` three of the four states
+    /// fail it outright — flood 2.65, ebb 1.97, slack 2.11 — so the contrast
+    /// moved to the boundary, which is a thing a bounded mark is allowed to do.
+    /// That makes the outline load-bearing rather than decorative: delete it,
+    /// or let the water drift lighter, and the map silently drops under the
+    /// floor in exactly the states it most needs to be read in.
+    ///
+    /// Asserts on the outline, NOT on the fills — the fills legitimately fail
+    /// now, and a test that demanded otherwise would be demanding the palette
+    /// go back to navy.
+    func testEveryPinOutlineClearsTheContrastFloorOnBothGrounds() throws {
+        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
+        func literal(_ name: String) throws -> String {
+            // Two-hash delimiters: the pattern contains "# (the opening quote
+            // of a hex literal), which closes a single-hash raw string.
+            let match = try XCTUnwrap(
+                source.range(of: ##"let \##(name) = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
+                "\(name) must stay a plain hex literal this test can read")
+            return String(source[match].suffix(8).prefix(7))
+        }
+        let ink = try literal("CHART_INK")
+        let water = try literal("WATER_TONE")
+        let land = try literal("LAND_TONE")
+        for (ground, hex) in [("water", water), ("land", land)] {
+            XCTAssertGreaterThanOrEqual(
+                contrast(ink, hex), 3.0,
+                "the pin outline is under 3:1 on the \(ground) — every pin state relies on it")
+        }
+        // Both kinds must actually draw that outline, and the square's comes
+        // from a backing plate because MapLibre Native renders no icon-halo on
+        // its template image. One kind outlined and the other not is how this
+        // regressed the first time.
+        XCTAssertNotNil(source.range(of: #""circle-stroke-color": CHART_INK"#),
+                        "the circle pin lost its ink stroke")
+        XCTAssertNotNil(source.range(of: #""icon-color": CHART_INK"#),
+                        "the tide square lost its ink backing plate")
+        XCTAssertTrue(source.contains("pin-square-plate"),
+                      "the backing-plate image must be registered, or the plate layer draws nothing")
+    }
+
     /// `#filePath` of this test file resolves to the repo, so the source under
     /// test can be read relative to it.
     private func mapScreenPath() -> String {

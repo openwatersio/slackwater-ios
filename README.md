@@ -61,7 +61,20 @@ NOAA currents and the CHS gates; `gen-tides.mjs` reads the CHS artefact to know 
 Canadian water it should stay out of), and the basemap by `tools/build-land.sh`. Two land tilesets
 ship and the split is deliberate — `land.pmtiles` is the Salish Sea at z0-14 (home water,
 where a station hero has to look right) and `land-usca.pmtiles` is the US and Canada at z0-9
-(everywhere else: coarse past z9, never blank). The App Store copy in
+(everywhere else: coarse past z9, never blank).
+
+The chart on top of that land is [Open Waters Seamap](https://github.com/openwatersio/seamap),
+bundled by `tools/build-seamap.sh` — buoys, beacons, lights, rocks, wrecks, obstructions and
+restricted areas, offline, in 25 MB. It is a `pmtiles extract` of the 24.9 GB weekly planet
+archive clipped to the Salish box: PMTiles is range-addressable, so that costs ~60 HTTP
+requests and about ten seconds, not a planet download. Traffic separation schemes are cut
+(`SEAMAP_OMIT` in `MapScreen.swift`) — routeing instruction is not this app's question, and
+the lanes dominated everything else on screen. Labels are not bundled yet: they need glyphs,
+and glyphs are a remote URL an offline chart cannot fetch. Seascape's bathymetry stays
+online-only — its depth shading is a `color-relief` layer MapLibre Native will not render,
+and its contours and soundings are separate sources with no public offline archive.
+
+The App Store copy in
 `docs/appstore-metadata.md` was rewritten for national coverage on 2026-08-01 — still a
 draft, nothing submitted; screenshots and a support URL are the remaining blockers
 (issues [#4](https://github.com/openwatersio/slackwater-ios/issues/4),

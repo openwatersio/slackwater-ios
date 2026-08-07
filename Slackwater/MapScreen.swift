@@ -29,7 +29,22 @@ let discoveryZoom: Double = {
 // MARK: - Style building (mirrors web mapStyle.ts)
 
 private let LAND_TONE = "#f5ecd7"   // paper-chart cream
-private let WATER_TONE = "#0b1a2b"  // navy water
+/// Seascape's own `background-color`, which is also the flat end of its depth
+/// ramp — the tone it paints once the water is deeper than 50 m and there is no
+/// longer any depth to shade. So this is not "a light blue we picked": it is
+/// literally the colour Seascape's chart settles to where depth stops being
+/// information, which is exactly the light water we want without the shading
+/// that came with it.
+private let WATER_TONE = "#e9f7ff"
+/// Was WATER_TONE, back when water was navy and "the tone under everything"
+/// and "the tone that outlines a mark" happened to be the same value. On pale
+/// water they are not, and the coincidence was load-bearing: pin fills clear
+/// WCAG's 3:1 for a non-text mark on navy (flood 6.05, ebb 8.14, slack 7.61)
+/// and fail it on #e9f7ff (2.65, 1.97, 2.11). A bounded mark may carry that
+/// contrast on its boundary, so the ink moves to the stroke — 16.05:1 on the
+/// water, 14.92:1 on the land, i.e. the pin reads on either ground in every
+/// state, which the fill alone never did.
+private let CHART_INK = "#0b1a2b"
 // A pin's COLOUR is the water's state, never the station's kind — kind is the
 // pin's SHAPE: a circle for a current station, a square for a tide one. One
 // shape per feature class, the oldest convention on any chart, and a silhouette
@@ -48,12 +63,18 @@ func mapHex(_ hex: UInt32) -> String { String(format: "#%06x", hex) }
 /// `.unknown` — one meaning, one value. It replaced a lighter map-only grey
 /// (#7d9cb8) which, besides being a second value for the same idea, sat at
 /// 2.44:1 against the map's cream land polygons — under WCAG's 3:1 for a
-/// non-text mark. Steel clears both grounds: 4.65:1 on the navy water, 3.21:1
-/// on the land.
+/// non-text mark. Steel clears both grounds on its own: 3.49:1 on the pale
+/// water, 3.25:1 on the land. It is the only state that still does, which is
+/// why every pin now also carries the `CHART_INK` stroke.
 let PIN_NEUTRAL = mapHex(SN.steelHex)
 // The circle radius and the square's equal-area radius share this constant so
 // the two literals cannot drift apart again.
 private let PIN_RADIUS: Double = 5
+/// One outline width for both pin kinds — the circle's `circle-stroke-width`
+/// and the square's `icon-halo-width`, which is also the transparent margin
+/// `squarePinImage` has to leave for that halo to have anywhere to draw. Three
+/// literals that must agree or the two kinds stop reading as one system.
+private let PIN_HALO: Double = 1.5
 
 // A pin's colour by state — literally the same expression on both pin layers
 // (Task 5), so kind (which layer a pin lands in) cannot influence colour.
@@ -211,11 +232,28 @@ private func landSources(_ landUrl: String, _ uscaUrl: String) -> [String: Any] 
     ["land": landSource(landUrl), "land-usca": landSource(uscaUrl)]
 }
 
+/// On navy water a cream fill was the whole coastline — 14.4:1, no outline
+/// needed. On #e9f7ff the same fill is 1.08:1 against the water, which is not a
+/// faint coast but no coast at all: two near-white planes meeting invisibly. So
+/// the fills keep the land tone and a stroked outline carries the shape, which
+/// is what a paper chart does and why seamap ships its own `land_outline`.
+/// Ours is drawn at full opacity from z0 — seamap's ramps in from nothing at z4
+/// and only reaches solid at z12, and the discovery map opens at 7.35.
+private let COASTLINE: [String: Any] = [
+    "line-color": CHART_INK,
+    "line-opacity": 0.55,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.4, 9, 0.8, 14, 1.4] as [Any],
+]
+
 private let landLayers: [[String: Any]] = [
     ["id": "land-usca", "type": "fill", "source": "land-usca", "source-layer": "land",
      "paint": ["fill-color": LAND_TONE]],
     ["id": "land", "type": "fill", "source": "land", "source-layer": "land",
      "paint": ["fill-color": LAND_TONE]],
+    ["id": "land-usca-coast", "type": "line", "source": "land-usca", "source-layer": "land",
+     "paint": COASTLINE],
+    ["id": "land-coast", "type": "line", "source": "land", "source-layer": "land",
+     "paint": COASTLINE],
 ]
 
 /// Cluster below this zoom, individual dots at and above it.
@@ -247,8 +285,8 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
                               2, 11, 25, 16, 150, 22, 600, 30] as [Any],
             "circle-color": PIN_NEUTRAL,
             "circle-opacity": 0.82,
-            "circle-stroke-width": 1.5,
-            "circle-stroke-color": WATER_TONE,
+            "circle-stroke-width": PIN_HALO,
+            "circle-stroke-color": CHART_INK,
         ],
     ]
     let currentPins: [String: Any] = [
@@ -257,29 +295,36 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
         "paint": [
             "circle-radius": PIN_RADIUS,
             "circle-color": PIN_STATE_COLOUR,
-            "circle-stroke-width": 1.5,
-            "circle-stroke-color": WATER_TONE,
+            "circle-stroke-width": PIN_HALO,
+            "circle-stroke-color": CHART_INK,
         ],
+    ]
+    let tideIconLayout: [String: Any] = [
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+    ]
+    /// The tide square's outline (see `squarePinImage`): a larger ink square
+    /// under the state-coloured one, because `icon-halo-*` does not render on
+    /// this image. Not in the tap layers — `handleTap` hit-tests
+    /// `station-pins-tide`, and a plate that answered too would return the
+    /// same feature twice.
+    let tidePinPlate: [String: Any] = [
+        "id": "station-pins-tide-plate", "type": "symbol", "source": "stations",
+        "filter": ["all", notACluster, ["!=", ["get", "kind"], "current"]] as [Any],
+        "layout": tideIconLayout.merging(["icon-image": "pin-square-plate"]) { _, new in new },
+        "paint": ["icon-color": CHART_INK],
     ]
     // tide and chs are both tide stations — provenance is not kind.
     let tidePins: [String: Any] = [
         "id": "station-pins-tide", "type": "symbol", "source": "stations",
         "filter": ["all", notACluster, ["!=", ["get", "kind"], "current"]] as [Any],
-        "layout": [
-            "icon-image": "pin-square",
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-        ],
-        "paint": [
-            "icon-color": PIN_STATE_COLOUR,
-            "icon-halo-color": WATER_TONE,
-            "icon-halo-width": 1.5,
-        ],
+        "layout": tideIconLayout.merging(["icon-image": "pin-square"]) { _, new in new },
+        "paint": ["icon-color": PIN_STATE_COLOUR],
     ]
     // Labels need glyphs — the local fallback declares none, so it's pins only
     // (same decisive signal as the web). A cluster with no number on it is a
     // blob, so the cluster layer is glyphless-safe by the same rule.
-    guard hasGlyphs else { return [clusters, currentPins, tidePins] }
+    guard hasGlyphs else { return [clusters, currentPins, tidePinPlate, tidePins] }
     let counts: [String: Any] = [
         "id": "station-cluster-count", "type": "symbol", "source": "stations",
         "filter": ["has", "point_count"] as [Any],
@@ -289,7 +334,7 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
             "text-size": 12,
             "text-allow-overlap": true,
         ],
-        "paint": ["text-color": WATER_TONE],
+        "paint": ["text-color": CHART_INK],
     ]
     let labels: [String: Any] = [
         "id": "station-labels", "type": "symbol", "source": "stations",
@@ -302,22 +347,78 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
             "text-anchor": "top",
             "text-optional": true,
         ],
-        "paint": ["text-color": "#e8e4d8", "text-halo-color": WATER_TONE, "text-halo-width": 1],
+        "paint": ["text-color": CHART_INK, "text-halo-color": WATER_TONE, "text-halo-width": 1],
     ]
-    return [clusters, counts, currentPins, tidePins, labels]
+    return [clusters, counts, currentPins, tidePinPlate, tidePins, labels]
+}
+
+/// Seamap layers this app does not draw. Traffic separation schemes are a
+/// routeing instrument — they tell a ship under way which side of a strait to
+/// be on, which is a question Slackwater is not in. They also dominate: the
+/// lanes and their boundaries are the widest, highest-contrast marks in the
+/// whole tileset, so at Salish zooms the TSS *is* the map and the pins read as
+/// an overlay on someone else's chart.
+///
+/// `radio_station` is the same complaint arriving as one mark: a magenta ring
+/// whose radius interpolates to 40 px by z12, marking an AIS/radio station.
+/// With the TSS gone it became the loudest thing on an otherwise empty stretch
+/// of Haro Strait — a large unexplained circle in open water, drawn for a
+/// facility that has no bearing on when the water turns.
+///
+/// Kept as a filter over the published upstream layer list rather than pruned
+/// out of the bundled artifact, so `seamap-layers.json` stays a verbatim slice
+/// of `style.json` and this stays a decision someone can read and reverse: to
+/// put either back, delete its line.
+private func SEAMAP_OMIT(_ id: String) -> Bool {
+    id.hasPrefix("TSS-")
+        || id == "radio_station"
+}
+
+/// SPIKE (research/seamap-offline): the Open Waters Seamap chart, offline.
+/// `seamap.pmtiles` is a `pmtiles extract` of the weekly planet archive clipped
+/// to the Salish box, `seamap-layers.json` the 44 seamap-source layers lifted
+/// from the published style.json with every `text-*` key stripped (no bundled
+/// glyphs yet — icons render, labels don't), and the freenauticalchart sprite
+/// is bundled beside them. Returns nil when the resources aren't in the bundle,
+/// so main stays on the land-only fallback.
+func seamapOfflineLayers() -> (sprite: String, layers: [[String: Any]], source: [String: Any])? {
+    guard let tiles = Bundle.main.url(forResource: "seamap", withExtension: "pmtiles"),
+          let layersUrl = Bundle.main.url(forResource: "seamap-layers", withExtension: "json"),
+          let data = try? Data(contentsOf: layersUrl),
+          let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+          let sprite = Bundle.main.url(forResource: "freenauticalchart", withExtension: "json")
+    else { return nil }
+    // The style spec's multi-sprite form: layers reference "freenauticalchart:foo".
+    let spriteBase = sprite.deletingPathExtension().absoluteString
+    return (spriteBase,
+            layers.filter { nativeLayerTypes.contains($0["type"] as? String ?? "") }
+                  .filter { !SEAMAP_OMIT(($0["id"] as? String) ?? "") },
+            ["type": "vector", "url": "pmtiles://\(tiles.absoluteString)",
+             "attribution": "© Open Waters: Seamap © OpenStreetMap contributors"])
 }
 
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
 func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
     var sources = landSources(landUrl, uscaUrl)
     sources["stations"] = stationSource()
-    return [
+    var style: [String: Any] = [
         "version": 8,
         "sources": sources,
         "layers": [
             ["id": "land-bg", "type": "background", "paint": ["background-color": WATER_TONE]],
         ] + landLayers + pinLayers(hasGlyphs: false, labelFont: []),
     ]
+    if let seamap = seamapOfflineLayers() {
+        sources["seamap"] = seamap.source
+        style["sources"] = sources
+        style["sprite"] = [["id": "freenauticalchart", "url": seamap.sprite]]
+        // Chart between the land floor and the pins: pins stay on top.
+        var layers = style["layers"] as! [[String: Any]]
+        let anchor = layers.firstIndex { ($0["id"] as? String) == "station-clusters" } ?? layers.count
+        layers.insert(contentsOf: seamap.layers, at: anchor)
+        style["layers"] = layers
+    }
+    return style
 }
 
 // Layer types this MapLibre Native release renders. Seascape's style leans on
@@ -422,8 +523,23 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// radius r the side is r·√π. A same-width square always reads heavier.
     /// Registered as a template image so `icon-color` can tint it — that is
     /// MapLibre Native's SDF path, and without it the pin ignores state.
-    private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS), scale: CGFloat = 3) -> UIImage {
-        let side = radius * CGFloat(Double.pi.squareRoot())
+    ///
+    /// `inflate` grows the square on every side — how the tide pin gets the
+    /// outline the circle gets from `circle-stroke-width`. MapLibre Native
+    /// draws no `icon-halo-*` on this image at all: not a clipping problem
+    /// (padding the canvas by the halo width changed nothing), the halo simply
+    /// does not render here. So the outline is a second, larger square drawn
+    /// underneath in `CHART_INK` — a backing plate, which a template image can
+    /// express because the tint is per-layer.
+    ///
+    /// It only started mattering on pale water. An ink halo on ink-navy water
+    /// was invisible either way, so the square has always drawn without one;
+    /// on #e9f7ff it meant circles got a 16:1 outline and squares got none,
+    /// leaving tide pins on fill contrast alone — the 2.65/1.97/2.11 that the
+    /// stroke exists to fix.
+    private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS),
+                                inflate: CGFloat = 0, scale: CGFloat = 3) -> UIImage {
+        let side = radius * CGFloat(Double.pi.squareRoot()) + inflate * 2
         let size = CGSize(width: side, height: side)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
@@ -442,6 +558,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fires on every style load (local fallback, then Seascape) — the
         // tide-pin icon must be re-registered each time or the swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
+        style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
     }
 }
 
