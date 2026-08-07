@@ -330,6 +330,49 @@ struct ProvisionalBadge: View {
     }
 }
 
+// MARK: - Detail-to-detail navigation
+
+/// Detail views push the paired port's own detail through this, not a
+/// NavigationLink: NavigationLink is a Button, and Button press tracking
+/// goes dead below the strip in the iPad split detail column while tap
+/// gestures keep working (see MultiDaySchedule's row comment).
+private struct OpenTideDetailKey: EnvironmentKey {
+    static let defaultValue: (TideStationRecord) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openTideDetail: (TideStationRecord) -> Void {
+        get { self[OpenTideDetailKey.self] }
+        set { self[OpenTideDetailKey.self] = newValue }
+    }
+}
+
+/// The one tide affordance on a current/gate detail (split-scrubbers spec
+/// §2): a quiet link in the list's matching-stations convention, navigating
+/// to the port's own TideDetailView. No tide numbers live here anymore.
+struct TideAtPortLink: View {
+    let port: TideStationRecord
+    @Environment(\.openTideDetail) private var openTide
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.caption2.weight(.semibold))
+            Text("Tide at \(port.name)")
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(SN.leaf)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { openTide(port) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("tide-at-port")
+    }
+}
+
 // MARK: - Recently viewed stations (prototype "Recent" list, Bryan's Recents)
 
 /// Most-recent-first, capped at 6 (prototype addRecent slice(0,6)), persisted

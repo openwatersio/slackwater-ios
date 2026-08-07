@@ -1,11 +1,9 @@
 // Slackwater — GPL v3. Current detail on the iOS scrub model (prototype
 // TidesApp.dc.html): one continuous multi-day strip pans under a fixed
-// centerline. A gate with a paired reference port renders BOTH tracks in the
-// one strip — port tide above, gate current below, a separator between — with
-// the port's readout above the strip and the gate's below (the prototype's
-// combined-station anatomy). The old separate paired-tide pane collapsed into
-// this: its "shared crosshair" is now the shared centerline time. No day
-// pager; the schedule is a rolling multi-day list, rows scrub cross-day.
+// centerline, current only — a paired reference port's tide no longer rides
+// the same track (split-scrubbers spec §1). The port stays reachable one tap
+// away via TideAtPortLink, under the scrub card's own readout. No day pager;
+// the schedule is a rolling multi-day list, rows scrub cross-day.
 import SwiftUI
 import TideEngine
 
@@ -42,6 +40,11 @@ struct CurrentDetailView: View {
             timeline?.currentEvents.first { $0.kind != .slack && $0.time > slack.time }
         }
     }
+    private var slackWin: (start: Date, end: Date)? {
+        guard let slack = nextSlack, let tl = timeline else { return nil }
+        return slackWindow(tl.currentPoints, around: slack.time,
+                           threshold: Timeline.slackThresholdKn)
+    }
 
     var body: some View {
         ScrollView {
@@ -73,18 +76,18 @@ struct CurrentDetailView: View {
         .sheet(isPresented: $showDownloads) { OfflineManagerView() }
         .onAppear {
             if timeline == nil {
-                timeline = TimelineData.build(tide: pairedTide, current: record, now: live)
+                timeline = TimelineData.build(tide: nil, current: record, now: live)
             }
             RecentsStore.shared.record("current:" + record.id)
         }
         // The refinement lands under an open page: same station, new model. The
         // curve, the schedule and the amber marking all have to follow it.
         .onChange(of: record) { _, refined in
-            timeline = TimelineData.build(tide: pairedTide, current: refined, now: live)
+            timeline = TimelineData.build(tide: nil, current: refined, now: live)
         }
     }
 
-    // MARK: - Scrub card: tide-at-port readout, strip, current readout
+    // MARK: - Scrub card: strip, current readout, tide-at-port link
 
     static func phaseColor(_ phase: CurrentPhase) -> Color {
         switch phase {
@@ -98,30 +101,6 @@ struct CurrentDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Tide readout above the strip: the paired reference port's water
-            // at the centerline time (absorbs the old PairedTidePane header).
-            if let port = pairedTide {
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        MonoLabel(text: "Tide at \(port.name)", color: SN.steel, tracking: 1.4)
-                        (Text(formatHeight(portHeight(port, at: scrubTime), imperial: imperial)).font(.title2.monospacedDigit())
-                         + Text(" \(heightUnit(imperial: imperial))").font(.caption))
-                            .foregroundStyle(SN.foam)
-                    }
-                    Spacer()
-                    if let next = tl.tideExtremes.first(where: { $0.time > scrubTime }) {
-                        VStack(alignment: .trailing, spacing: 1) {
-                            MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                      color: SN.foam.opacity(0.5), tracking: 1.4)
-                            // Relative only — the extreme's absolute time is
-                            // marked on the strip itself (2026-08-07 feedback).
-                            Text("\(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · in \(countdown(from: scrubTime, to: next.time))")
-                                .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
-                        }
-                    }
-                }
-            }
-
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, speedUnit: speedUnit,
                                now: live, scrubTime: $scrubTime)
@@ -170,6 +149,12 @@ struct CurrentDetailView: View {
                             // Same value today, but the token has to name the
                             // meaning or retargeting one of them breaks it.
                             .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
+                        if let win = slackWin {
+                            Text("\(provisionalGate == nil ? "" : "~")under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
+                                .accessibilityIdentifier("slack-window")
+                        }
                         if let then = following {
                             Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
@@ -186,6 +171,11 @@ struct CurrentDetailView: View {
 
             ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
                 .padding(.top, 14)
+
+            if let port = pairedTide {
+                TideAtPortLink(port: port)
+                    .padding(.top, 12)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
@@ -211,7 +201,7 @@ struct CurrentDetailView: View {
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
         let t0 = tl.today
         let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
-        var out: [ScheduleEntry] = tl.currentEvents
+        let out: [ScheduleEntry] = tl.currentEvents
             .filter { $0.time >= t0 && $0.time <= t1 }
             .map { e in
                 switch e.kind {
@@ -227,10 +217,6 @@ struct CurrentDetailView: View {
                                   arrowDeg: record.ebbDirection)
                 }
             }
-        out += tl.tideExtremes
-            .filter { $0.time >= t0 && $0.time <= t1 }
-            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
-                                 value: "\(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))") }
         return out.sorted { $0.time < $1.time }
     }
 
@@ -251,13 +237,6 @@ struct CurrentDetailView: View {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
-            if let port = pairedTide {
-                // Honesty line for the pairing (spec §2): the tide curve is the
-                // reference port's water, not this gate's.
-                Text("Tide shown is \(port.name) — the nearby reference port, not this station")
-                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
-                    .multilineTextAlignment(.center)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
@@ -269,11 +248,6 @@ struct CurrentDetailView: View {
     /// Engine-exact signed velocity — same call as the old committed readout.
     private func exactSigned(at t: Date) -> Double {
         record.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first?.speed ?? 0
-    }
-
-    /// Engine-exact port height — the same call the port's own detail makes.
-    private func portHeight(_ port: TideStationRecord, at t: Date) -> Double {
-        port.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
     }
 
     private func returnToNow() {

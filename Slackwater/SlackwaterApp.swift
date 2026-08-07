@@ -289,6 +289,7 @@ struct StationListView: View {
             .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
             .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
             .toolbar(.hidden, for: .navigationBar)
+            .environment(\.openTideDetail) { path.append($0) }
         }
     }
 
@@ -326,6 +327,7 @@ struct StationListView: View {
                 .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
+                .environment(\.openTideDetail) { path.append($0) }
             }
             // A regular-width launch opens on the first row rather than the
             // "Pick a station" placeholder (M52): the My Location station when
