@@ -351,7 +351,11 @@ struct TimelineCanvas: View {
             endPoint: CGPoint(x: 0, y: geo.tideBottom)))
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-        // Extreme dots + height labels (prototype fmtH at each turn).
+        // Extreme dots + height labels (prototype fmtH at each turn), and the
+        // extreme's clock time stacked outward from the height — the absolute
+        // time lives HERE, on the event itself, so the readouts above/below
+        // the strip can stay relative-only (2026-08-07 feedback). Same compact
+        // style as the day header's sun times ("↑5:40AM").
         let margin = 0.3 * 3600
         for e in data.tideExtremes
         where e.time >= data.start.addingTimeInterval(margin)
@@ -363,6 +367,10 @@ struct TimelineCanvas: View {
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
+            ctx.draw(Text(cardTime(e.time, data.tz).replacingOccurrences(of: " ", with: ""))
+                        .font(.system(size: 8).monospaced())
+                        .foregroundStyle(.white.opacity(0.65)),
+                     at: CGPoint(x: x, y: e.kind == .high ? y - 23 : y + 23), anchor: .center)
         }
     }
 

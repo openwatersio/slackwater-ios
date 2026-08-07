@@ -74,11 +74,12 @@ struct TideDetailView: View {
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
                             .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                        Text("in \(countdown(from: scrubTime, to: next.time)) · \(cardTime(next.time, tz))")
+                        // Relative only — the absolute time is marked on the
+                        // strip at the extreme itself (2026-08-07 feedback).
+                        Text("in \(countdown(from: scrubTime, to: next.time))")
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
                 }
-                ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: returnToNow)
             }
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
@@ -86,12 +87,12 @@ struct TideDetailView: View {
                 .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
                 .padding(.top, 12)
 
-            MonoLabel(text: "‹ swipe to scrub · snaps to high & low ›",
+            MonoLabel(text: "‹ swipe to scrub ›",
                       color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz)
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
                 .padding(.top, 14)
         }
         .padding(.horizontal, 16)

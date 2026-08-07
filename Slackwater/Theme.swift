@@ -219,31 +219,36 @@ struct MoonGlyph: View {
     }
 }
 
-/// Whole local days between the live "today" and the scrubbed day — the shared
-/// definition behind every card's TODAY / TOMORROW / +N label.
-func scrubDayOffset(_ scrub: Date, from live: Date, _ tz: TimeZone) -> Int {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = tz
-    return cal.dateComponents([.day], from: cal.startOfDay(for: live),
-                              to: cal.startOfDay(for: scrub)).day ?? 0
+/// "Aug 7" — the when-row's date. No weekday and no TODAY/TOMORROW: the
+/// scrubber's day headers already carry those, and repeating them here read
+/// as "SUN · SUN, AUG 9" the moment you scrubbed (design feedback 2026-08-07).
+func monthDay(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("MMM d", tz).string(from: date)
 }
 
-/// The *when* of a scrub reading — relative day, clock time, moon for that
-/// day. The LAST row of every scrub card: it is the calendar of the reading,
-/// secondary to what the water is doing (2026-08-03 hero-crop spec §3).
+/// The *when* of a scrub reading — clock time stacked over the date, the
+/// return-to-now slot directly beside them, moon trailing. The LAST row of
+/// every scrub card: it is the calendar of the reading, secondary to what the
+/// water is doing (2026-08-03 hero-crop spec §3). The slot lives HERE, in one
+/// shared row, because giving it a home per-card had it bouncing between
+/// layouts and dragging row alignment around with it (2026-08-07).
 struct ScrubWhen: View {
     let scrubTime: Date
     let live: Date
     let tz: TimeZone
+    let onReturn: () -> Void
 
     var body: some View {
         let moon = SunMoon.moonIllumination(date: scrubTime)
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            MonoLabel(text: "\(relativeDayLabel(scrubDayOffset(scrubTime, from: live, tz), scrubTime, tz)) · \(dayLine(scrubTime, tz))")
-            Text(cardTime(scrubTime, tz))
-                .font(.title.weight(.medium).monospacedDigit())
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cardTime(scrubTime, tz))
+                    .font(.title.weight(.medium).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+                MonoLabel(text: monthDay(scrubTime, tz))
+            }
+            ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: onReturn)
             Spacer()
             MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
             Text(SunMoon.phaseName(phase: moon.phase))
@@ -251,7 +256,7 @@ struct ScrubWhen: View {
                 .foregroundStyle(SN.foam.opacity(0.6))
                 .lineLimit(1)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 
