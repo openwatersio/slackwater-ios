@@ -359,8 +359,11 @@ final class ScreenshotTests: XCTestCase {
         // Nothing tide-shaped on the gate detail.
         XCTAssertFalse(app.staticTexts["TIDE AT DECEPTION PASS STATE PARK"].exists,
                        "the paired tide readout is retired")
-        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists
-                       && app.staticTexts["↓ LOW"].firstMatch.exists,
+        // Two calls, not one `&&`: an `&&` only fails when BOTH row kinds
+        // leak, so a single stray HIGH (or LOW) row would pass silently.
+        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists,
+                       "port tide rows must not appear in a gate schedule")
+        XCTAssertFalse(app.staticTexts["↓ LOW"].firstMatch.exists,
                        "port tide rows must not appear in a gate schedule")
         // The slack window is the new next-slack detail.
         XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
@@ -488,6 +491,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
             .firstMatch.waitForExistence(timeout: 5),
                   "sun times missing from the current-station day header")
+        XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
+                       "sun rows have moved to the day header — none in the current-station schedule")
     }
 
     // M4.1: location denied — the amber card sits in the My Location slot
