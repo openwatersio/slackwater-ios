@@ -167,7 +167,7 @@ struct TimelineData {
 ///
 /// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
 /// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
-/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 12`. Nothing
+/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 14`. Nothing
 /// here reflows: two cases, one track each — tide-only `height` 258, current-only
 /// `height` 340 — and `tideY`/`curY` map data onto those constants.
 ///

@@ -63,7 +63,8 @@ final class TimelineTests: XCTestCase {
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
     func testSingleTrackGeometries() {
-        let tide = TimelineGeo(data: TimelineData.build(tide: friday, current: nil, now: Date()))
+        let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
+        let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
         XCTAssertEqual(tide.height, 258, "tide-only geometry does not change in this pass (spec §4)")
 
@@ -79,5 +80,19 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(cur.height, 340, "the reclaimed vertical space goes to the current curve (spec §2)")
         XCTAssertEqual(cur.curBottom, 320)
         XCTAssertEqual(cur.bodyBottom, 320)
+
+        // Both arrays non-empty: pins that no case (true, true) exists to claim
+        // it — resurrecting the deleted combined arm ahead of `case (true, _)`
+        // would go uncaught otherwise. TidePoint has no public init outside
+        // TideEngine, so the tide side is real data borrowed from the tide-only
+        // build above; only the current side is synthesized.
+        let both = TimelineGeo(data: TimelineData(
+            tz: tideData.tz, today: tideData.today, start: tideData.start, end: tideData.end,
+            days: tideData.days, tidePoints: tideData.tidePoints, tideExtremes: tideData.tideExtremes,
+            currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
+            snapTimes: tideData.snapTimes))
+        XCTAssert(both.hasTide && both.hasCurrent)
+        XCTAssertEqual(both.height, 258, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.curTop, 0)
     }
 }
