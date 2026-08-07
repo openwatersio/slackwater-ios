@@ -243,6 +243,14 @@ struct StationListView: View {
                 stackLayout
             }
         }
+        // Fifth-pass evidence (task-9): a pushed destination doesn't reliably
+        // inherit environment attached to the NavigationStack itself when that
+        // stack is NavigationSplitView's `detail:` column — attaching there
+        // left `TideAtPortLink`'s `openTide` reading the default no-op on
+        // iPad, tap included, in a live-logged repro. Attached here instead,
+        // above BOTH layouts, delivery rides ordinary ancestor inheritance —
+        // and there's exactly one attachment, so the two layouts can't drift.
+        .environment(\.openTideDetail) { path.append($0) }
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
@@ -290,10 +298,6 @@ struct StationListView: View {
             .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
             .toolbar(.hidden, for: .navigationBar)
         }
-        // Environment set on the stack's root CONTENT (the ZStack above) never
-        // reaches pushed destinations — NavigationStack's pushed views are not
-        // descendants of that content view. It has to ride the stack itself.
-        .environment(\.openTideDetail) { path.append($0) }
     }
 
     /// Regular width — the web's tablet-and-up layout (styles.css ≥62rem):
@@ -331,7 +335,6 @@ struct StationListView: View {
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
             }
-            .environment(\.openTideDetail) { path.append($0) }
             // A regular-width launch opens on the first row rather than the
             // "Pick a station" placeholder (M52): the My Location station when
             // there is a fix, else the first row the list renders. Once only,

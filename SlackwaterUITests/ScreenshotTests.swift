@@ -372,15 +372,24 @@ final class ScreenshotTests: XCTestCase {
         sleep(1)
         save(app, "m4-gate-detail.png")
 
-        // The link opens the port's own detail with its schedule.
+        // The link opens the port's own detail with its schedule. Tide rows
+        // are the primary tell, checked FIRST: a gate schedule can never show
+        // HIGH/LOW (split-scrubbers retired that pairing), so their presence
+        // is unambiguous proof navigation actually happened. The port's name
+        // is checked second and only as a station-identity confirmation — on
+        // iPad the sidebar's always-visible Recents section can carry the
+        // exact same station name whether or not the tap navigated (bit us:
+        // an exact-text existence check on the name alone false-positived
+        // there against a stale Recents row while the pane was still showing
+        // the gate).
         let link = app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch
         XCTAssert(link.waitForExistence(timeout: 5), "tide-at-port link missing")
         link.tap()
-        XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.waitForExistence(timeout: 8),
-                  "the link did not open the reference port's detail")
-        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 5)
-                  || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 8)
+                  || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 8),
                   "port detail shows its own tide schedule")
+        XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.exists,
+                  "the link did not open the reference port's detail")
     }
 
     // M4: settings — units share the pill's store; the statement + licenses show.
