@@ -286,20 +286,6 @@ struct ReturnToNowSlot: View {
     }
 }
 
-/// The schedule table's sunrise/sunset pill (prototype PILL.sunrise/.sunset:
-/// outlined, amber family, "☀ Rise" / "☀ Set").
-struct SunPill: View {
-    let kind: SunMoon.SunEventKind
-    var body: some View {
-        let color = kind == .sunrise ? SN.sunrise : SN.sunset
-        Text(kind == .sunrise ? "☀ RISE" : "☀ SET")
-            .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .overlay(Capsule().strokeBorder(color.opacity(0.4), lineWidth: 0.5))
-    }
-}
-
 /// The provisional ("fast answer") marking on a LIST card: the ⚠️ family and
 /// nothing else — the detail view carries the explanation.
 ///

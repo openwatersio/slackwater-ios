@@ -709,7 +709,7 @@ private struct Triangle: Shape {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack, sunrise, sunset
+    case high, low, flood, ebb, slack
 }
 
 struct ScheduleEntry: Identifiable {
@@ -735,6 +735,7 @@ struct MultiDaySchedule: View {
     let entries: [ScheduleEntry]  // pre-sorted, pre-filtered to the window
     let tz: TimeZone
     let today: Date               // local midnight
+    let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
 
@@ -762,12 +763,27 @@ struct MultiDaySchedule: View {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
                 HStack(alignment: .top, spacing: 0) {
-                    Text(relativeDayLabel(group.offset, group.start, tz))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(SN.foam.opacity(0.9))
-                        .frame(width: 74, alignment: .leading)
-                        .padding(.leading, 14)
-                        .padding(.top, 12)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(relativeDayLabel(group.offset, group.start, tz))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.9))
+                        if let day = days.first(where: { $0.offset == group.offset }) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                if let rise = day.sunrise {
+                                    Text("↑\(clockTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                }
+                                if let set = day.sunset {
+                                    Text("↓\(clockTime(set, tz))").foregroundStyle(SN.sunset)
+                                }
+                            }
+                            .font(.caption2.monospaced())
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("day-sun-d\(group.offset)")
+                        }
+                    }
+                    .frame(width: 74, alignment: .leading)
+                    .padding(.leading, 14)
+                    .padding(.top, 12)
                     VStack(spacing: 0) {
                         ForEach(group.items) { e in
                             let on = e.id == nearestID
@@ -838,10 +854,6 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
-        case .sunrise:
-            SunPill(kind: .sunrise)
-        case .sunset:
-            SunPill(kind: .sunset)
         }
     }
 }
