@@ -342,64 +342,42 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Kanaka Bay"].firstMatch.waitForExistence(timeout: 5))
     }
 
-    // M4: the paired current→tide detail on Deception Pass — the pane exists,
-    // and every one of the reference port's schedule numbers (time + height of
-    // each high/low today) appears verbatim in the gate's merged view: same
-    // engine path, same values (current-detail spec §2).
-    func testM4PairedTide() throws {
+    // M4 (split-scrubbers): a gate detail shows no tide — the port's numbers
+    // live on the port's own detail, one tap through the quiet link.
+    func testM4TideAtPortLink() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
-        // First: the reference port's own detail — collect today's H/L numbers.
-        openSearch(app, "deception")
-        let port = app.staticTexts["Deception Pass State Park"].firstMatch
-        XCTAssert(port.waitForExistence(timeout: 5))
-        port.tap()
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        sleep(1)
-        let portTimes = clockLabels(app)
-        let portHeights = heightLabels(app)
-        XCTAssert(!portTimes.isEmpty && !portHeights.isEmpty, "no schedule rows read from the port detail")
-
-        // Then: the gate's detail — paired pane present, port numbers verbatim.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "deception")
         let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
         XCTAssert(gate.waitForExistence(timeout: 5))
         gate.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["TIDE AT DECEPTION PASS STATE PARK"].waitForExistence(timeout: 5))
+
+        // Nothing tide-shaped on the gate detail.
+        XCTAssertFalse(app.staticTexts["TIDE AT DECEPTION PASS STATE PARK"].exists,
+                       "the paired tide readout is retired")
+        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists
+                       && app.staticTexts["↓ LOW"].firstMatch.exists,
+                       "port tide rows must not appear in a gate schedule")
+        // The slack window is the new next-slack detail.
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
+            .firstMatch.waitForExistence(timeout: 5),
+                  "slack window missing under Next slack")
+        sleep(1)
+        save(app, "m4-gate-detail.png")
+
+        // The link opens the port's own detail with its schedule.
+        let link = app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch
+        XCTAssert(link.waitForExistence(timeout: 5), "tide-at-port link missing")
+        link.tap()
+        XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.waitForExistence(timeout: 8),
+                  "the link did not open the reference port's detail")
         XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 5)
                   || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 5),
-                  "paired tide rows missing from the events table")
-        sleep(1)
-        save(app, "m4-paired-detail.png")
-
-        let gateTimes = clockLabels(app)
-        let gateHeights = heightLabels(app)
-        // Symmetry with the port-side guard above: if the row scope ever stops
-        // matching, say so directly instead of reporting every port value as
-        // "missing from paired view (has [])".
-        XCTAssert(!gateTimes.isEmpty && !gateHeights.isEmpty,
-                  "no schedule rows read from the gate detail")
-        // Sun rows joined the schedule (design pass item 7a) and are computed
-        // from each station's own position, so a port sun time may differ from
-        // the gate's by seconds — allow a 1-minute neighbour for those labels.
-        func minutes(_ s: String) -> Int {
-            let parts = s.split(separator: ":")
-            return Int(parts[0])! * 60 + Int(parts[1])!
-        }
-        for t in portTimes {
-            let ok = gateTimes.contains(t)
-                || gateTimes.contains { abs(minutes($0) - minutes(t)) <= 1 }
-            XCTAssert(ok, "port event at \(t) missing from paired view (has \(gateTimes))")
-        }
-        for h in portHeights {
-            XCTAssert(gateHeights.contains(h), "port height \(h) missing from paired view (has \(gateHeights))")
-        }
+                  "port detail shows its own tide schedule")
     }
 
     // M4: settings — units share the pill's store; the statement + licenses show.
@@ -470,7 +448,7 @@ final class ScreenshotTests: XCTestCase {
     }
 
     // M4.1: the detail header is the station map with the title overlaid, the
-    // schedule carries sunrise/sunset rows, and the scrubber wears the moon
+    // day header carries the sun times, and the scrubber wears the moon
     // with its phase name.
     func testM41DetailMapHeaderSunMoon() throws {
         let app = XCUIApplication()
@@ -481,10 +459,11 @@ final class ScreenshotTests: XCTestCase {
         openFridayHarbor(app)
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
                   "map header missing from tide detail")
-        XCTAssert(app.staticTexts["☀ RISE"].firstMatch.waitForExistence(timeout: 5),
-                  "sunrise row missing from the day schedule")
-        XCTAssert(app.staticTexts["☀ SET"].firstMatch.exists,
-                  "sunset row missing from the day schedule")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
+            .firstMatch.waitForExistence(timeout: 5),
+                  "sun times missing from the schedule day header")
+        XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
+                       "sun rows have moved to the day header — none in the schedule")
         let phaseNames = "New Moon|Waxing Crescent|First Quarter|Waxing Gibbous|Full Moon|Waning Gibbous|Last Quarter|Waning Crescent"
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
@@ -506,8 +485,9 @@ final class ScreenshotTests: XCTestCase {
         gate.tap()
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
                   "map header missing from current detail")
-        XCTAssert(app.staticTexts["☀ RISE"].firstMatch.waitForExistence(timeout: 5),
-                  "sunrise row missing from the current-station schedule")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
+            .firstMatch.waitForExistence(timeout: 5),
+                  "sun times missing from the current-station day header")
     }
 
     // M4.1: location denied — the amber card sits in the My Location slot
@@ -927,8 +907,10 @@ final class ScreenshotTests: XCTestCase {
     }
 
     // M4.6: after the reference port fits (live IWLS, like M3), the gate card
-    // shows the phase pill + next slack, and the detail renders the dual-track
-    // strip, slack rows with no speeds, and the derived provenance copy.
+    // shows the phase pill + next slack, and the detail renders the
+    // current-only strip (split-scrubbers — the port sources slacks, it is
+    // not a track of its own), slack rows with no speeds, and the derived
+    // provenance copy.
     func testM46MalibuDerivedGate() throws {
         let app = XCUIApplication()
         // M53: Point Atkinson is 100 km from the Victoria fallback, so it is
@@ -951,12 +933,12 @@ final class ScreenshotTests: XCTestCase {
                   "tapping the gate did not open a detail")
         // ~5 min ceiling: the in-flight station finishes, then the promoted
         // Point Atkinson runs.
-        XCTAssert(app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 300),
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 300),
                   "the open detail never filled in — Point Atkinson fit missing (IWLS unreachable?)")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["TIDE AT POINT ATKINSON"].waitForExistence(timeout: 5),
-                  "reference-port tide readout missing from the gate detail")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "tide-at-port")
+            .firstMatch.waitForExistence(timeout: 5),
+                  "derived gate must link to its reference port")
         XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts.matching(
@@ -1173,7 +1155,10 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// Two "Discovery Island" cards used to sit in Near Me looking identical.
-    /// Now: one entry, and the matching stations behind the chooser.
+    /// Now: one entry, and the matching stations behind the chooser — and
+    /// once you pick the non-nearest one from that chooser, Recents remembers
+    /// exactly which one you opened (Task 7: no namesake collapse on an
+    /// explicit pick).
     func testM50MatchingStationChooser() throws {
         // Upright: the split-layout test leaves the device in landscape, and
         // these screenshots are the ones a human reads.
@@ -1224,6 +1209,22 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Discovery Island"].firstMatch.waitForExistence(timeout: 8))
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8),
                   "the chooser pick did not open a station detail")
+
+        // Recents keeps the station actually opened (Task 7 / split-scrubbers
+        // spec §6): the chooser pick is an explicit choice, not the distance
+        // ranking — collapsing it used to file the visit under the nearest
+        // namesake's id, so Recents would silently show and reopen "3.0 nm
+        // NE" instead of the "6.6 nm SSE" station tapped. Same disambiguating
+        // field the chooser assertions above key on (each station's region is
+        // literally its bearing string), so a bare text match is unambiguous.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        let recentsLabel = app.staticTexts["RECENTS"].firstMatch
+        scrollTo(recentsLabel, in: app)
+        let recentPick = app.staticTexts["6.6 nm SSE"].firstMatch
+        scrollTo(recentPick, in: app)
+        XCTAssert(recentPick.exists,
+                  "Recents must keep the chooser-picked station, not collapse it into the nearest namesake")
     }
 
     /// "Deception Pas…" — the compact Recents row starved the name column so
@@ -1286,10 +1287,12 @@ final class ScreenshotTests: XCTestCase {
 
     /// Build 13, iPad: opening a second station of the SAME kind kept the
     /// first one's chart and map — same destination type at the same depth is
-    /// the same SwiftUI identity, so @State survived. Discovery Island has no
-    /// paired reference port and Deception Pass (Narrows) does, so the paired
-    /// station's tide rows are the tell: they come from the @State timeline,
-    /// and a stale one has none.
+    /// the same SwiftUI identity, so @State survived. The tide-row tell is
+    /// gone with the paired pane (split-scrubbers); the stale-@State tell is
+    /// now the schedule contents themselves — timeline-derived, so a stale
+    /// detail keeps the previous station's rows verbatim — plus the
+    /// tide-at-port link (record-derived: Discovery Island has none, Deception
+    /// Pass (Narrows) does) as the layout check.
     func testM50DetailSwapsBetweenSameKindStations() throws {
         // Split layout only: on iPhone the detail covers the search FAB, so a
         // second station is always reached through a pop first.
@@ -1305,8 +1308,10 @@ final class ScreenshotTests: XCTestCase {
         openSearch(app, "discovery island")
         app.staticTexts["3.0 nm NE"].firstMatch.tap()
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
-        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists,
-                       "an unpaired current station must show no tide rows")
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch.exists,
+                       "an unpaired current station has no reference port to link")
+        let before = scheduleRowLabels(app)
+        XCTAssert(!before.isEmpty, "no schedule rows read from the first station")
 
         // Second station, same kind — in the split layout this replaces the
         // detail pane without a pop.
@@ -1314,11 +1319,11 @@ final class ScreenshotTests: XCTestCase {
         app.staticTexts["Deception Pass (Narrows)"].firstMatch.tap()
         XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch
             .waitForExistence(timeout: 8))
-        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 8),
-                  "the detail kept the previous station's timeline — no tide rows for a paired gate")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'the nearby reference port'")).firstMatch.exists,
-                  "the paired-tide honesty line is missing")
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "tide-at-port")
+            .firstMatch.waitForExistence(timeout: 8),
+                  "a paired gate links to its reference port")
+        XCTAssert(scheduleRowLabels(app) != before,
+                  "the detail kept the previous station's timeline — schedule did not change")
         sleep(4)  // header map tiles for the new station
         save(app, "m50-detail-swap.png")
         XCUIDevice.shared.orientation = .portrait
@@ -1707,13 +1712,15 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// All "HH:mm" labels on screen — chart annotations + schedule rows. The
-    /// tide detail's set must be a subset of the paired view's merged set.
-    /// The schedule rows' accessibility labels — NOT the whole screen.
+    /// schedule rows' accessibility labels — NOT the whole screen (the paired
+    /// current→tide detail this originally guarded is retired — split-scrubbers
+    /// — but callers still need the schedule scoped out of the whole hierarchy,
+    /// see below).
     ///
     /// Scoping matters on iPad and only on iPad. The split-view sidebar renders
     /// live station cards, and since layout A put the reading on the card's
     /// right they emit `X.X ft` strings that match the same regexes the schedule
-    /// rows do. A caller that scrapes twice and diffs then blames the paired
+    /// rows do. A caller that scrapes twice and diffs then blames the detail
     /// pane for a sidebar label: between two scrapes the Recents list reorders
     /// (the station just visited moves in), so a reading present in the first
     /// read is simply gone from the second. That produced two consecutive CI
