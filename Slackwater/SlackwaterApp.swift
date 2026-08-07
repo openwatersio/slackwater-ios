@@ -465,7 +465,12 @@ struct StationListView: View {
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         let heroItem = fix == nil ? nil : ranked.first
         let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
-                                recentIds: places.collapse(recents.ids),
+                                // Uncollapsed on purpose: a station opened via the chooser is an explicit
+                                // pick, same principle StationGroups grants Favorites — collapsing it made
+                                // Recents silently show and reopen the nearest namesake instead
+                                // (split-scrubbers spec §6). Near Me stays collapsed: distance ranking is
+                                // not user choice.
+                                recentIds: recents.ids,
                                 rankedIds: places.collapse(ranked.map(\.id)),
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
