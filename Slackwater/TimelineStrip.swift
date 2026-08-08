@@ -88,6 +88,7 @@ func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     var lastWasZero = false         // true if the previous sample was exactly zero
 
     func closeRun(_ end: Int) {     // [runStart, end] inclusive
+        guard runStart <= end else { return }  // no-op when run is empty
         // Collect only nonzero speeds; filter excludes exact-zero samples.
         let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
         guard !nonzeroInRun.isEmpty else { return }

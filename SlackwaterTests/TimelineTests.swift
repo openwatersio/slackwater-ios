@@ -190,4 +190,20 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(events.filter { $0.kind == .slack }.count, 1)
         XCTAssertEqual(events.filter { $0.kind == .slack }[0].time.timeIntervalSince(t0), 900, accuracy: 1)
     }
+
+    /// A window ending exactly on a slack sample must not trap (the post-loop
+    /// run close sees an empty run) — and the zero still reads as the slack.
+    func testSampleEventsTrailingZero() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = [1.0, -1, 0].enumerated().map {
+            CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element)
+        }
+        let events = sampleEvents(pts)
+        let slacks = events.filter { $0.kind == .slack }
+        XCTAssertEqual(slacks.count, 2)                       // the crossing + the trailing zero
+        XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 450, accuracy: 1)
+        XCTAssertEqual(slacks[1].time.timeIntervalSince(t0), 1800, accuracy: 1)
+        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+        XCTAssertEqual(events.filter { $0.kind == .maxEbb }.count, 1)
+    }
 }
