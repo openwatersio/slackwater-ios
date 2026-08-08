@@ -69,7 +69,7 @@ extension TypeScaleTests {
     /// 2. A formatter relayed through a helper `func`/computed `var` that
     ///    returns a `String`, consumed by a `Text` far away or in another
     ///    file, is invisible to line-proximity scanning — Swift puts no
-    ///    distance limit on where you can call a function. Three real sites
+    ///    distance limit on where you can call a function. Four real sites
     ///    are exactly this shape and are hand-verified into
     ///    `knownIndirections` below rather than silently passing unseen:
     ///      - `CurrentCardView.nextLine(_:)` (SlackwaterApp.swift)
@@ -77,8 +77,14 @@ extension TypeScaleTests {
     ///      - `scheduleEntries()` in the three detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FOURTH file
     ///        (TimelineStrip.swift)
+    ///      - `TimelineStrip.compactTime(_:)` calls `cardTime(` and returns
+    ///        a `String` that is only ever rendered through `gutterText(_:)`
+    ///        (and `mergedGutterText(_:_:)` once a later task lands), both
+    ///        of which apply `.system(size: 10).monospaced()` — so the
+    ///        output is mono by construction, but the mono trait sits
+    ///        outside the ±4-line window.
     ///    That allowlist is a point-in-time attestation, not a live check:
-    ///    if a future edit strips the mono font from one of those three
+    ///    if a future edit strips the mono font from one of those four
     ///    consuming `Text`s, this test will NOT catch it — the regression
     ///    would be invisible to source-text scanning. Closing that gap needs
     ///    real data-flow analysis (a SwiftSyntax pass), out of scope for an
