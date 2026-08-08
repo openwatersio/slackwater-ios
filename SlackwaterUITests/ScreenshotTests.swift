@@ -413,8 +413,12 @@ final class ScreenshotTests: XCTestCase {
     // nothing else (no catalog section, no units pill).
     func testM41GroupedListAndRecents() throws {
         let app = XCUIApplication()
-        // Deterministic Victoria fix via the -fixLat/-fixLon hook.
-        app.launchArguments = ["-seedGate", "-resetRecents",
+        // Deterministic Victoria fix via the -fixLat/-fixLon hook. Favorites
+        // reset too: this test asserts group ORDER from a clean list, so its
+        // launch args enforce that — not the goodwill of every earlier test
+        // on the simulator (a leaked favorite pushed RECENTS past the iPad
+        // sidebar's bounded scroll, 2026-08-08).
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
                                "-fixLat", "48.4235", "-fixLon", "-123.3705"]
         app.launch()
 
@@ -620,8 +624,17 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5),
                   "favoriting a pending CHS gate produced no Favorites group — the star wrote an id the list cannot resolve")
-        XCTAssert(app.staticTexts["Dodd Narrows"].firstMatch.exists,
-                  "the favorited pending gate is missing from the Favorites group")
+        let row = app.staticTexts["Dodd Narrows"].firstMatch
+        XCTAssert(row.exists, "the favorited pending gate is missing from the Favorites group")
+
+        // Leave the simulator as found: swipe-unfavorite the row so later
+        // tests that assume a clean favorites store aren't ambushed.
+        row.swipeLeft()
+        XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
+        app.buttons["Unfavorite"].firstMatch.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "cleanup unfavorite left the Favorites group behind")
     }
 
     // M4.3 design pass: favorites — the detail-header star files a station
