@@ -205,8 +205,9 @@ struct TimelineData {
 /// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
 /// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
 /// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 14`. Nothing
-/// here reflows: two cases, one track each — tide-only `height` 258, current-only
-/// `height` 340 — and `tideY`/`curY` map data onto those constants.
+/// here reflows: two cases, one track each — tide-only `height` 262 (includes
+/// event-time gutter), current-only `height` 356 (includes event-time gutter)
+/// — and `tideY`/`curY` map data onto those constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -240,11 +241,11 @@ struct TimelineGeo {
         hasCurrent = data.hasCurrent
         switch (hasTide, hasCurrent) {
         case (true, _):
-            height = 258; tideBottom = 226; curTop = 0; curBottom = 0
+            height = 262; tideBottom = 226; curTop = 0; curBottom = 0
         default:
             // Taller than the old 286: the combined strip's reclaimed space goes to
             // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
-            height = 340; tideBottom = 0; curTop = 68; curBottom = 320
+            height = 356; tideBottom = 0; curTop = 68; curBottom = 320
         }
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
@@ -256,6 +257,16 @@ struct TimelineGeo {
 
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
+
+    /// The event-time gutter (gutter spec §1): dotted droplines land here and
+    /// the exact times print, so the track itself carries only values and the
+    /// readouts above it can stay relative.
+    ///
+    /// 24pt of clearance, and the number is set by the max-EBB speed label, not
+    /// by the gutter text: that label draws at `curY(e.speed) + 14`, and `curY`
+    /// clamps to `zeroY + curHalf` = 317, so it can reach ~331. Shrink this and
+    /// the strongest ebb of the week prints on top of its own time.
+    var gutterY: CGFloat { bodyBottom + 24 }
 
     func tideY(_ h: Double) -> CGFloat {
         tideTop + (1 - CGFloat((h - (tideMid - tideSpan)) / (2 * tideSpan))) * (tideBottom - tideTop)

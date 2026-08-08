@@ -66,7 +66,10 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        XCTAssertEqual(tide.height, 258, "tide-only geometry does not change in this pass (spec §4)")
+        XCTAssertEqual(tide.height, 262, "the event-time gutter adds 24+12 below the track (gutter spec §1)")
+        XCTAssertEqual(tide.gutterY, 250)
+        XCTAssert(tide.gutterY > tide.bodyBottom && tide.gutterY < tide.height,
+                  "gutter text sits below the track and inside the canvas")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -77,9 +80,17 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-        XCTAssertEqual(cur.height, 340, "the reclaimed vertical space goes to the current curve (spec §2)")
+        XCTAssertEqual(cur.height, 356, "the event-time gutter adds 24+12 below the track (gutter spec §1)")
+        XCTAssertEqual(cur.gutterY, 344)
         XCTAssertEqual(cur.curBottom, 320)
         XCTAssertEqual(cur.bodyBottom, 320)
+        XCTAssert(cur.gutterY > cur.bodyBottom && cur.gutterY < cur.height,
+                  "gutter text sits below the track and inside the canvas")
+        // The 24pt clearance is set by the max-ebb speed label, not by the
+        // gutter text: that label draws at `curY + 14` and curY clamps to
+        // `zeroY + curHalf`, so it reaches ~331 (gutter spec §1).
+        XCTAssertGreaterThan(cur.gutterY, cur.curY(-999) + 14,
+                             "the gutter must clear a clamped max-ebb speed label")
 
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
@@ -92,7 +103,7 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes))
         XCTAssert(both.hasTide && both.hasCurrent)
-        XCTAssertEqual(both.height, 258, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.height, 262, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
 
