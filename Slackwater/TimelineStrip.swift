@@ -300,6 +300,34 @@ struct TimelineCanvas: View {
         .frame(width: data.totalWidth, height: geo.height)
     }
 
+    /// "8:15PM" — the chart's compact clock, spaces stripped. Same style the
+    /// day header's sun labels use, so the gutter reads as one family with them.
+    private func compactTime(_ t: Date) -> String {
+        cardTime(t, data.tz).replacingOccurrences(of: " ", with: "")
+    }
+
+    private func gutterText(_ time: Date) -> Text {
+        Text(compactTime(time))
+            .font(.system(size: 10).monospaced())
+            .foregroundStyle(.white.opacity(0.65))
+    }
+
+    /// The dotted dropline and its gutter time (gutter spec §2). An event's
+    /// exact time lives BELOW the track, reached by a line from the event's own
+    /// dot — that is what lets every readout above the strip stay relative.
+    ///
+    /// White, not `SN.leaf`: the leaf dash on this canvas means *now*, and it
+    /// has to keep meaning only that. Same dash pattern, different colour, so
+    /// the two read as the same family without competing.
+    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date) {
+        var p = Path()
+        p.move(to: CGPoint(x: x, y: y))
+        p.addLine(to: CGPoint(x: x, y: geo.gutterY - 8))
+        ctx.stroke(p, with: .color(.white.opacity(0.35)),
+                   style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+        ctx.draw(gutterText(time), at: CGPoint(x: x, y: geo.gutterY), anchor: .center)
+    }
+
     // Night bands, day tint, day labels, sun markers, per-night moons —
     // continuous across midnight (prototype's per-day rects abut exactly).
     private func drawDayChrome(_ ctx: GraphicsContext) {
@@ -391,11 +419,9 @@ struct TimelineCanvas: View {
             endPoint: CGPoint(x: 0, y: geo.tideBottom)))
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-        // Extreme dots + height labels (prototype fmtH at each turn), and the
-        // extreme's clock time stacked outward from the height — the absolute
-        // time lives HERE, on the event itself, so the readouts above/below
-        // the strip can stay relative-only (2026-08-07 feedback). Same compact
-        // style as the day header's sun times ("↑5:40AM").
+        // Extreme dots + height labels (prototype fmtH at each turn). The VALUE
+        // stays on the dot; the exact TIME drops to the gutter (gutter spec §2),
+        // reversing the 2026-08-07 call that kept it stacked on the event.
         let margin = 0.3 * 3600
         for e in data.tideExtremes
         where e.time >= data.start.addingTimeInterval(margin)
@@ -407,10 +433,7 @@ struct TimelineCanvas: View {
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
-            ctx.draw(Text(cardTime(e.time, data.tz).replacingOccurrences(of: " ", with: ""))
-                        .font(.system(size: 10).monospaced())
-                        .foregroundStyle(.white.opacity(0.65)),
-                     at: CGPoint(x: x, y: e.kind == .high ? y - 26 : y + 26), anchor: .center)
+            drawDrop(ctx, x: x, from: y, time: e.time)
         }
     }
 
@@ -468,6 +491,7 @@ struct TimelineCanvas: View {
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
+                drawDrop(ctx, x: x, from: y, time: e.time)
             }
         }
     }
