@@ -191,6 +191,39 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(events.filter { $0.kind == .slack }[0].time.timeIntervalSince(t0), 900, accuracy: 1)
     }
 
+    /// The online-gate path: build directly from fetched points (no engine
+    /// station involved) — current-only strip, standard 340pt geometry, and
+    /// every in-window event lands as a snap stop (mirrors the DerivedGateTests
+    /// snap assertion for the schematic-gate path).
+    func testBuildFromOnlinePointsIsCurrentOnlyAndSnaps() {
+        let now = Date()
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: now)
+        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+
+        // 15-min samples spanning the whole strip window, oscillating with a
+        // ~12h period so slack/max events recur across it (real semidiurnal shape).
+        var pts: [CurrentPoint] = []
+        var t = start
+        while t <= end {
+            let hours = t.timeIntervalSince(start) / 3600
+            pts.append(CurrentPoint(time: t, speed: 2.0 * sin(hours / 6.0 * .pi)))
+            t = t.addingTimeInterval(900)
+        }
+
+        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
+
+        XCTAssert(d.hasCurrent && !d.hasTide)
+        XCTAssertEqual(TimelineGeo(data: d).height, 340)
+        XCTAssertFalse(d.currentEvents.isEmpty)
+        XCTAssert(d.currentEvents
+            .filter { $0.time >= d.start && $0.time <= d.end }
+            .allSatisfy { e in d.snapTimes.contains { abs($0.timeIntervalSince(e.time)) < 1 } })
+    }
+
     /// A window ending exactly on a slack sample must not trap (the post-loop
     /// run close sees an empty run) — and the zero still reads as the slack.
     func testSampleEventsTrailingZero() {
