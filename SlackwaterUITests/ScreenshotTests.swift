@@ -1427,8 +1427,13 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'FAST ANSWER'")).firstMatch.exists,
                        "the low-contrast amber badge must be gone from the list card")
+        // CONTAINS, not BEGINSWITH: when the gate is inside its slack window
+        // the trailing reading is the SLACK phase pill, and the card's tilde
+        // rides the detail line instead ("Max flood ~3.0 kn · 8:20 PM") — a
+        // time-of-day form this test can land on (it did, iPad, build-20 full
+        // run at 6:07 PM). Both forms keep a hedged number on the card.
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH '~'")).firstMatch.exists,
+            NSPredicate(format: "label CONTAINS '~'")).firstMatch.exists,
                   "the tilde stays: the reading itself must still say it is not exact")
         sleep(1)
         save(app, "m51-provisional-list.png")
