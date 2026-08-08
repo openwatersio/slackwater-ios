@@ -73,6 +73,45 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (start, end)
 }
 
+/// Greedy row assignment for gutter labels, left to right: each label takes the
+/// lowest row whose previous label has cleared it. When no row has cleared, it
+/// takes the row whose last label ends earliest — with a bounded number of rows
+/// overlap can become unavoidable, so minimise it rather than pretend it can't
+/// happen. Callers pass labels already sorted by time; both event loops are.
+/// Touching labels (exactly adjacent, same edge) are unreadable and counted as overlapping.
+func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 2) -> [Int] {
+    guard centers.count == widths.count else { return [] }
+    guard !centers.isEmpty else { return [] }
+
+    var rowRightEdges = Array(repeating: CGFloat.greatestFiniteMagnitude * -1, count: rows)
+    var assignments: [Int] = []
+
+    for i in 0..<centers.count {
+        let leftEdge = centers[i] - widths[i] / 2
+        var bestRow = 0
+        var bestRightEdge = rowRightEdges[0]
+
+        // Find the lowest row whose label has cleared, or the one that ended earliest
+        for r in 0..<rows {
+            if rowRightEdges[r] < leftEdge {
+                // This row has cleared — take it (strict inequality: touching is overlap)
+                bestRow = r
+                break
+            }
+            // This row hasn't cleared — track the one that ended earliest
+            if rowRightEdges[r] < bestRightEdge {
+                bestRow = r
+                bestRightEdge = rowRightEdges[r]
+            }
+        }
+
+        assignments.append(bestRow)
+        rowRightEdges[bestRow] = centers[i] + widths[i] / 2
+    }
+
+    return assignments
+}
+
 // MARK: - Data: everything the strip draws, computed once per station
 
 struct TimelineDay {
@@ -202,12 +241,12 @@ struct TimelineData {
 /// Every number in here is a literal point, and that is why the chart's own
 /// labels are the one place in this branch that keeps a fixed `.system(size:)`.
 ///
-/// The slots are hand-packed and one row deep: `dayY` 20, `sunY` 34, `tideTop`
+/// The slots are hand-packed and two rows deep in the gutter: `dayY` 20, `sunY` 34, `tideTop`
 /// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
 /// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 14`. Nothing
-/// here reflows: two cases, one track each — tide-only `height` 262 (includes
-/// event-time gutter), current-only `height` 356 (includes event-time gutter)
-/// — and `tideY`/`curY` map data onto those constants.
+/// here reflows: two cases, one track each — tide-only `height` 274 (includes
+/// two-row event-time gutter, Amendment A), current-only `height` 368 (includes
+/// two-row event-time gutter, Amendment A) — and `tideY`/`curY` map data onto those constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -241,11 +280,12 @@ struct TimelineGeo {
         hasCurrent = data.hasCurrent
         switch (hasTide, hasCurrent) {
         case (true, _):
-            height = 262; tideBottom = 226; curTop = 0; curBottom = 0
+            height = 274; tideBottom = 226; curTop = 0; curBottom = 0
         default:
             // Taller than the old 286: the combined strip's reclaimed space goes to
             // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
-            height = 356; tideBottom = 0; curTop = 68; curBottom = 320
+            // Two-row gutter adds 48 total: 24pt baseline + 24pt for row 1 (Amendment A).
+            height = 368; tideBottom = 0; curTop = 68; curBottom = 320
         }
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
@@ -258,15 +298,23 @@ struct TimelineGeo {
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
 
+    /// Vertical step between gutter rows (Amendment A). A label that would
+    /// overprint its neighbour drops a row rather than being dropped entirely.
+    let gutterRowStep: CGFloat = 12
+
     /// The event-time gutter (gutter spec §1): dotted droplines land here and
     /// the exact times print, so the track itself carries only values and the
-    /// readouts above it can stay relative.
+    /// readouts above it can stay relative. Supports two rows to prevent label
+    /// collision (Amendment A).
     ///
     /// 24pt of clearance, and the number is set by the max-EBB speed label, not
     /// by the gutter text: that label draws at `curY(e.speed) + 14`, and `curY`
     /// clamps to `zeroY + curHalf` = 317, so it can reach ~331. Shrink this and
     /// the strongest ebb of the week prints on top of its own time.
     var gutterY: CGFloat { bodyBottom + 24 }
+
+    /// Gutter y-position for a specific row (Amendment A).
+    func gutterY(row: Int) -> CGFloat { gutterY + CGFloat(row) * gutterRowStep }
 
     func tideY(_ h: Double) -> CGFloat {
         tideTop + (1 - CGFloat((h - (tideMid - tideSpan)) / (2 * tideSpan))) * (tideBottom - tideTop)
@@ -312,20 +360,21 @@ struct TimelineCanvas: View {
             .foregroundStyle(.white.opacity(0.65))
     }
 
-    /// The dotted dropline and its gutter time (gutter spec §2). An event's
+    /// The dotted dropline and its gutter time (gutter spec §2, Amendment A). An event's
     /// exact time lives BELOW the track, reached by a line from the event's own
-    /// dot — that is what lets every readout above the strip stay relative.
+    /// dot — that is what lets every readout above the strip stay relative. Rows
+    /// prevent label collision when events are close in time.
     ///
     /// White, not `SN.leaf`: the leaf dash on this canvas means *now*, and it
     /// has to keep meaning only that. Same dash pattern, different colour, so
     /// the two read as the same family without competing.
-    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date) {
+    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date, row: Int = 0) {
         var p = Path()
         p.move(to: CGPoint(x: x, y: y))
-        p.addLine(to: CGPoint(x: x, y: geo.gutterY - 8))
+        p.addLine(to: CGPoint(x: x, y: geo.gutterY(row: row) - 8))
         ctx.stroke(p, with: .color(.white.opacity(0.35)),
                    style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-        ctx.draw(gutterText(time), at: CGPoint(x: x, y: geo.gutterY), anchor: .center)
+        ctx.draw(gutterText(time), at: CGPoint(x: x, y: geo.gutterY(row: row)), anchor: .center)
     }
 
     // Night bands, day tint, day labels, sun markers, per-night moons —
@@ -420,12 +469,23 @@ struct TimelineCanvas: View {
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
         // Extreme dots + height labels (prototype fmtH at each turn). The VALUE
-        // stays on the dot; the exact TIME drops to the gutter (gutter spec §2),
-        // reversing the 2026-08-07 call that kept it stacked on the event.
+        // stays on the dot; the exact TIME drops to the gutter (gutter spec §2,
+        // Amendment A), reversing the 2026-08-07 call that kept it stacked on the event.
+        // Gutter times are assigned to rows to prevent label collision.
         let margin = 0.3 * 3600
-        for e in data.tideExtremes
-        where e.time >= data.start.addingTimeInterval(margin)
-            && e.time <= data.end.addingTimeInterval(-margin) {
+        let filteredExtremes = data.tideExtremes.filter { e in
+            e.time >= data.start.addingTimeInterval(margin)
+                && e.time <= data.end.addingTimeInterval(-margin)
+        }
+
+        // Measure label widths and assign rows (Amendment A)
+        let centers = filteredExtremes.map { data.x($0.time) }
+        let widths = filteredExtremes.map { _ in
+            ctx.resolve(gutterText(Date())).measure(in: CGSize(width: 1000, height: 100)).width
+        }
+        let rows = gutterRows(centers: centers, widths: widths)
+
+        for (index, e) in filteredExtremes.enumerated() {
             let x = data.x(e.time), y = geo.tideY(e.height)
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                      with: .color(.white))
@@ -433,7 +493,7 @@ struct TimelineCanvas: View {
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.white),
                      at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
-            drawDrop(ctx, x: x, from: y, time: e.time)
+            drawDrop(ctx, x: x, from: y, time: e.time, row: rows[index])
         }
     }
 
@@ -468,9 +528,21 @@ struct TimelineCanvas: View {
         ctx.stroke(line, with: .color(Color(hex: 0xDFEEE0)),
                    style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         let margin = 0.3 * 3600
-        for e in data.currentEvents
-        where e.time >= data.start.addingTimeInterval(margin)
-            && e.time <= data.end.addingTimeInterval(-margin) {
+        let filteredEvents = data.currentEvents.filter { e in
+            e.time >= data.start.addingTimeInterval(margin)
+                && e.time <= data.end.addingTimeInterval(-margin)
+        }
+
+        // Measure and assign rows only to max Flood/Ebb events (Amendment A)
+        let maxEvents = filteredEvents.filter { $0.kind == .maxFlood || $0.kind == .maxEbb }
+        let maxCenters = maxEvents.map { data.x($0.time) }
+        let maxWidths = maxEvents.map { _ in
+            ctx.resolve(gutterText(Date())).measure(in: CGSize(width: 1000, height: 100)).width
+        }
+        let maxRows = gutterRows(centers: maxCenters, widths: maxWidths)
+
+        var maxEventIndex = 0
+        for e in filteredEvents {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
@@ -491,7 +563,9 @@ struct TimelineCanvas: View {
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
-                drawDrop(ctx, x: x, from: y, time: e.time)
+                let row = maxRows[maxEventIndex]
+                drawDrop(ctx, x: x, from: y, time: e.time, row: row)
+                maxEventIndex += 1
             }
         }
     }

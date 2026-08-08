@@ -66,10 +66,12 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        XCTAssertEqual(tide.height, 262, "the event-time gutter adds 24+12 below the track (gutter spec §1)")
-        XCTAssertEqual(tide.gutterY, 250)
+        XCTAssertEqual(tide.height, 274, "the two-row gutter adds 48 below the track (Amendment A)")
+        XCTAssertEqual(tide.gutterY, 250, "row 0 baseline")
         XCTAssert(tide.gutterY > tide.bodyBottom && tide.gutterY < tide.height,
-                  "gutter text sits below the track and inside the canvas")
+                  "gutter row 0 text sits below the track and inside the canvas")
+        XCTAssertEqual(tide.gutterY(row: 1), 262, "row 1 is 12pt lower")
+        XCTAssert(tide.gutterY(row: 1) < tide.height, "gutter row 1 still fits inside canvas")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -80,12 +82,14 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-        XCTAssertEqual(cur.height, 356, "the event-time gutter adds 24+12 below the track (gutter spec §1)")
-        XCTAssertEqual(cur.gutterY, 344)
+        XCTAssertEqual(cur.height, 368, "the two-row gutter adds 48 below the track (Amendment A)")
+        XCTAssertEqual(cur.gutterY, 344, "row 0 baseline")
         XCTAssertEqual(cur.curBottom, 320)
         XCTAssertEqual(cur.bodyBottom, 320)
         XCTAssert(cur.gutterY > cur.bodyBottom && cur.gutterY < cur.height,
-                  "gutter text sits below the track and inside the canvas")
+                  "gutter row 0 text sits below the track and inside the canvas")
+        XCTAssertEqual(cur.gutterY(row: 1), 356, "row 1 is 12pt lower")
+        XCTAssert(cur.gutterY(row: 1) < cur.height, "gutter row 1 still fits inside canvas")
         // The 24pt clearance is set by the max-ebb speed label, not by the
         // gutter text: that label draws at `curY + 14` and curY clamps to
         // `zeroY + curHalf`, so it reaches ~331 (gutter spec §1).
@@ -103,7 +107,7 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes))
         XCTAssert(both.hasTide && both.hasCurrent)
-        XCTAssertEqual(both.height, 262, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.height, 274, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
 
@@ -139,5 +143,28 @@ final class TimelineTests: XCTestCase {
                          speed: i < 2 ? 4.0 : -4.0)
         }
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
+    }
+
+    /// Greedy row assignment for gutter labels: each label takes the lowest row
+    /// whose previous label has cleared it (Amendment A).
+    func testGutterRowsGreedyAssignment() {
+        // Well-separated labels all land in row 0.
+        XCTAssertEqual(gutterRows(centers: [10, 100, 200], widths: [20, 20, 20]),
+                       [0, 0, 0])
+
+        // Two labels that overlap: second goes to row 1.
+        XCTAssertEqual(gutterRows(centers: [10, 30], widths: [40, 40]),
+                       [0, 1])
+
+        // Three tightly packed labels: rows 0, 1, then 0 again (first row has cleared).
+        XCTAssertEqual(gutterRows(centers: [10, 30, 60], widths: [20, 20, 20]),
+                       [0, 1, 0])
+
+        // Count matching: always returns same number of rows as there are labels.
+        let centers: [CGFloat] = [10, 50, 100, 150, 200]
+        let widths: [CGFloat] = [30, 30, 30, 30, 30]
+        let rows = gutterRows(centers: centers, widths: widths)
+        XCTAssertEqual(rows.count, centers.count)
+        XCTAssert(rows.allSatisfy { $0 < 2 }, "all rows should be in valid range [0, 1]")
     }
 }
