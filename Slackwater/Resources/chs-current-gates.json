@@ -138,7 +138,7 @@
   "tideReference": "chs-owen-bay",
   "fitDays": 0,
   "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Beazley Passage."
+  "onlineNote": "Slackwater's on-device model predicted the peak speeds here off by up to ~0.5 kn in testing, so it won't guess at Beazley Passage."
  },
  {
   "id": "chs-dent-rapids",
@@ -150,7 +150,7 @@
   "timezone": "America/Vancouver",
   "fitDays": 0,
   "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~10 minutes in testing, so it won't guess at Dent Rapids."
+  "onlineNote": "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Dent Rapids."
  },
  {
   "id": "chs-gabriola-passage",
@@ -175,7 +175,7 @@
   "tideReference": "chs-vancouver",
   "fitDays": 0,
   "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Second Narrows."
+  "onlineNote": "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Second Narrows."
  },
  {
   "id": "chs-sechelt-rapids",

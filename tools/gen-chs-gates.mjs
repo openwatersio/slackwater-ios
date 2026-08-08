@@ -115,18 +115,20 @@ const SHIPPED = new Map([
 // hazard call, not a fittability one) ship anyway as identities, backed by
 // official CHS predictions fetched on demand rather than an on-device fit
 // (online-gates spec §1: findable, never fitted, never provisional). Each
-// note quotes THAT station's own 210 d slack-max above, rounded up to the
-// nearest 5 min — the same honest-worst-case convention as
-// provisionalSlackMinutes.
+// note names THAT station's own actual failure mode from the table above —
+// slack max for the slack-rejects, but Beazley/Dent/Second Narrows failed on
+// SPEED or EXTREMA TIMING, not slack (their slack numbers are inside the
+// passing range), so their notes quote peak-speed/extrema-timing error
+// instead — rounded to a plain number, review 2026-08-08.
 const ONLINE = new Map([
   ["chs-beazley-passage", { onlineNote:
-    "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Beazley Passage." }],
+    "Slackwater's on-device model predicted the peak speeds here off by up to ~0.5 kn in testing, so it won't guess at Beazley Passage." }],
   ["chs-dent-rapids", { onlineNote:
-    "Slackwater's on-device model missed the published slacks here by up to ~10 minutes in testing, so it won't guess at Dent Rapids." }],
+    "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Dent Rapids." }],
   ["chs-gabriola-passage", { onlineNote:
     "Slackwater's on-device model missed the published slacks here by up to ~35 minutes in testing, so it won't guess at Gabriola Passage." }],
   ["chs-second-narrows", { onlineNote:
-    "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Second Narrows." }],
+    "Slackwater's on-device model missed the timing of peak flows here by ~20 minutes in testing, so it won't guess at Second Narrows." }],
   ["chs-sechelt-rapids", { onlineNote:
     "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids." }],
   // Adapted wording (per the brief): the failure mode is worth a clause of
