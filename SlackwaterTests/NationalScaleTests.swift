@@ -208,6 +208,37 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertNotNil(sources["land"], "the Salish detail layer is missing")
     }
 
+    /// Bathymetry offline (openwatersio/seascape#121). Depth used to be the one
+    /// thing that vanished with the signal: the app composed the remote
+    /// Seascape style when it could reach it, so you got soundings in the
+    /// marina and lost them offshore, which is backwards from where they
+    /// matter. `seascape.pmtiles` puts the Salish box in the bundle.
+    ///
+    /// Draw order is the assertion that earns its keep: depth is UNDER the
+    /// seamap marks and OVER the land floor. A buoy hidden behind a depth-area
+    /// fill is a chart that lies about what is there.
+    func testFallbackStyleCarriesBathymetryUnderTheChart() throws {
+        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
+        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
+        let seascape = try XCTUnwrap(sources["seascape-vector"] as? [String: Any],
+                                     "no bundled bathymetry: run tools/build-seascape.sh")
+        XCTAssertTrue((seascape["url"] as? String)?.hasPrefix("pmtiles://") == true,
+                      "bathymetry must read the bundle, not the network")
+
+        let ids = try XCTUnwrap(style["layers"] as? [[String: Any]]).map { $0["id"] as? String ?? "" }
+        let depth = try XCTUnwrap(ids.firstIndex(of: "depth-areas"), "depth areas are not drawn")
+        let contours = try XCTUnwrap(ids.firstIndex(of: "contour-lines"), "contours are not drawn")
+        XCTAssertLessThan(depth, contours, "contours must draw over the depth fill, not under it")
+        let land = try XCTUnwrap(ids.firstIndex(of: "land-usca"), "the continental floor is missing")
+        XCTAssertLessThan(land, depth, "depth must draw over the land floor")
+        let seamapIds = Set((seamapOfflineLayers()?.layers ?? []).compactMap { $0["id"] as? String })
+        if let firstMark = ids.firstIndex(where: { seamapIds.contains($0) }) {
+            XCTAssertLessThan(contours, firstMark, "the chart marks must draw over bathymetry")
+        }
+        let pins = try XCTUnwrap(ids.firstIndex(of: "station-clusters"))
+        XCTAssertLessThan(contours, pins, "station pins must stay on top")
+    }
+
     // MARK: - Canada on demand
 
     /// The download set is the nearest few, not the country — it budgets the
