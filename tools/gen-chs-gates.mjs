@@ -110,6 +110,32 @@ const SHIPPED = new Map([
 // usefulness floor, so they would not get a provisional stage either:
 //   second-narrows 45.7 · sechelt-rapids 60.4 · tillicum-bridge 79.4 ·
 //   juan-de-fuca-east 146.6
+//
+// ONLINE — those 7 (arran-rapids stays fully excluded, it's a shipped-water
+// hazard call, not a fittability one) ship anyway as identities, backed by
+// official CHS predictions fetched on demand rather than an on-device fit
+// (online-gates spec §1: findable, never fitted, never provisional). Each
+// note quotes THAT station's own 210 d slack-max above, rounded up to the
+// nearest 5 min — the same honest-worst-case convention as
+// provisionalSlackMinutes.
+const ONLINE = new Map([
+  ["chs-beazley-passage", { onlineNote:
+    "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Beazley Passage." }],
+  ["chs-dent-rapids", { onlineNote:
+    "Slackwater's on-device model missed the published slacks here by up to ~10 minutes in testing, so it won't guess at Dent Rapids." }],
+  ["chs-gabriola-passage", { onlineNote:
+    "Slackwater's on-device model missed the published slacks here by up to ~35 minutes in testing, so it won't guess at Gabriola Passage." }],
+  ["chs-second-narrows", { onlineNote:
+    "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Second Narrows." }],
+  ["chs-sechelt-rapids", { onlineNote:
+    "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids." }],
+  // Adapted wording (per the brief): the failure mode is worth a clause of
+  // its own, not just a bare number.
+  ["chs-juan-de-fuca-east", { onlineNote:
+    "Juan de Fuca's current here is weak and slow to reverse, which makes slack hard to pin down — testing missed the published slacks by up to ~85 minutes, so Slackwater won't guess at Juan de Fuca - East." }],
+  ["chs-tillicum-bridge", { onlineNote:
+    "Tillicum Bridge sits on the Gorge Waterway's reversing tidal falls, where testing missed the published slacks by up to ~95 minutes, so Slackwater won't guess here." }],
+]);
 
 const gateEntries = Object.entries(registry).filter(
   ([, e]) => e.provider === "chs" && !e.kind && !e.derived,
@@ -137,11 +163,34 @@ const currentGates = gateEntries
     };
   });
 
+// The 7 online identities — same shape as the shipped gates (name/region/
+// aliases/position/timezone/tideReference straight from the registry), but
+// fitDays: 0 (the never-fitted sentinel: offersProvisional is naturally
+// false) and online: true so the app fetches CHS predictions on demand
+// instead of fitting.
+for (const [id, { onlineNote }] of ONLINE) {
+  const e = registry[id];
+  currentGates.push({
+    id,
+    name: e.name,
+    region: e.context,
+    aliases: e.aliases ?? [],
+    latitude: e.position[0],
+    longitude: e.position[1],
+    timezone: "America/Vancouver",
+    tideReference: ports.some((p) => p.id === e.tideReference) ? e.tideReference : undefined,
+    fitDays: 0,
+    online: true,
+    onlineNote,
+  });
+}
+
 writeFileSync(join(res, "chs-current-gates.json"), JSON.stringify(currentGates, null, 1) + "\n");
-console.log(`${currentGates.length}/${gateEntries.length} validated current gate(s):`);
+console.log(`${currentGates.length}/${gateEntries.length} validated + ${ONLINE.size} online current gate(s):`);
 for (const g of currentGates) {
   console.log(`  ${g.name.padEnd(26)} ${g.fitDays} d` +
-    (g.fitDays === 60 ? "  (final on first fit)"
+    (g.online ? "  online (never fitted)"
+     : g.fitDays === 60 ? "  (final on first fit)"
      : g.provisionalSlackMinutes ? `  provisional ±${g.provisionalSlackMinutes} min`
      : `  NO provisional — over the ${PROVISIONAL_FLOOR_MIN} min floor`));
 }

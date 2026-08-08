@@ -32,6 +32,18 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
     /// Absent means no fast answer is offered: either the gate is final at 60 d
     /// anyway, or its 60-day error is over the usefulness floor.
     let provisionalSlackMinutes: Int?
+    /// True for the 7 fit-rejects: findable identities backed by official CHS
+    /// predictions fetched on demand, never fitted on-device (online-gates
+    /// spec §1). Absent/false for the 11 shipped, fittable gates.
+    var online: Bool? = nil
+    /// Plain-words measured error for the honesty card — this gate's own
+    /// number, never a generic hedge. Present only when `online`.
+    var onlineNote: String? = nil
+
+    /// A fit-reject backed by official CHS predictions fetched on demand —
+    /// never fitted, never queued (online-gates spec §1). Bundled entries
+    /// without the key decode as offline (the 11 shipped gates).
+    var isOnline: Bool { online ?? false }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 

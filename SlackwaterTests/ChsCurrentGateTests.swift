@@ -125,4 +125,31 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(record.itemId, gate.id, "a CHS gate's catalog id is bare — no NOAA prefix")
         XCTAssertNotNil(StationItem.byId[record.itemId])
     }
+
+    // MARK: - Online gates (fit-rejects backed by official CHS predictions)
+
+    /// The 7 validation rejects ship as online: true identities — findable,
+    /// never fitted, never provisional (online-gates spec §1).
+    func testOnlineGatesShipAndShippedGatesStayOffline() throws {
+        let online = ChsCurrentGateInfo.all.filter(\.isOnline)
+        XCTAssertEqual(online.count, 7, "the 7 fit-rejects ship as online gates")
+        for g in online {
+            XCTAssert(g.id.hasPrefix("chs-"))
+            XCTAssertFalse(g.offersProvisional, "an online gate never offers a fast answer")
+            XCTAssertNotNil(g.onlineNote, "\(g.id) needs its plain-words measured error")
+        }
+        // The 11 shipped gates are untouched: not online, still fittable.
+        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 11)
+        XCTAssert(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" }?.isOnline == false)
+    }
+
+    /// The origin bug: Sechelt Rapids must be findable by name AND alias.
+    func testSecheltIsSearchable() throws {
+        let sechelt = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
+        XCTAssert(sechelt.isOnline)
+        for query in ["sechelt", "skookumchuck"] {
+            XCTAssert(StationItem.search(query).contains { $0.id == sechelt.id },
+                      "search '\(query)' did not find Sechelt Rapids")
+        }
+    }
 }

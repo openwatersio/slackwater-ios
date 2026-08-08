@@ -124,5 +124,97 @@
   "timezone": "America/Vancouver",
   "fitDays": 210,
   "provisionalSlackMinutes": 35
+ },
+ {
+  "id": "chs-beazley-passage",
+  "name": "Beazley Passage",
+  "region": "Surge Narrows",
+  "aliases": [
+   "surge narrows"
+  ],
+  "latitude": 50.2263,
+  "longitude": -125.142,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-owen-bay",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Beazley Passage."
+ },
+ {
+  "id": "chs-dent-rapids",
+  "name": "Dent Rapids",
+  "region": "Cordero Channel",
+  "aliases": [],
+  "latitude": 50.41,
+  "longitude": -125.2117,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~10 minutes in testing, so it won't guess at Dent Rapids."
+ },
+ {
+  "id": "chs-gabriola-passage",
+  "name": "Gabriola Passage",
+  "region": "Gulf Islands",
+  "aliases": [],
+  "latitude": 49.1291,
+  "longitude": -123.7043,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~35 minutes in testing, so it won't guess at Gabriola Passage."
+ },
+ {
+  "id": "chs-second-narrows",
+  "name": "Second Narrows",
+  "region": "Burrard Inlet",
+  "aliases": [],
+  "latitude": 49.2947,
+  "longitude": -123.0245,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-vancouver",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~15 minutes in testing, so it won't guess at Second Narrows."
+ },
+ {
+  "id": "chs-sechelt-rapids",
+  "name": "Sechelt Rapids",
+  "region": "Skookumchuck Narrows",
+  "aliases": [
+   "skookumchuck"
+  ],
+  "latitude": 49.7383,
+  "longitude": -123.8983,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-point-atkinson",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids."
+ },
+ {
+  "id": "chs-juan-de-fuca-east",
+  "name": "Juan de Fuca - East",
+  "region": "Victoria approaches",
+  "aliases": [],
+  "latitude": 48.2317,
+  "longitude": -123.53,
+  "timezone": "America/Vancouver",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Juan de Fuca's current here is weak and slow to reverse, which makes slack hard to pin down — testing missed the published slacks by up to ~85 minutes, so Slackwater won't guess at Juan de Fuca - East."
+ },
+ {
+  "id": "chs-tillicum-bridge",
+  "name": "Tillicum Bridge",
+  "region": "Gorge Waterway",
+  "aliases": [],
+  "latitude": 48.4464,
+  "longitude": -123.4002,
+  "timezone": "America/Vancouver",
+  "tideReference": "chs-victoria",
+  "fitDays": 0,
+  "online": true,
+  "onlineNote": "Tillicum Bridge sits on the Gorge Waterway's reversing tidal falls, where testing missed the published slacks by up to ~95 minutes, so Slackwater won't guess here."
  }
 ]
