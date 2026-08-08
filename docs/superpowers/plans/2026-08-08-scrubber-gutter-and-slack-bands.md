@@ -40,6 +40,49 @@ Task order matters: 1 (geometry) → 2 (droplines) → 3 (window data) → 4 (ba
 
 ---
 
+## Amendment A — the gutter staggers onto two rows
+
+**2026-08-08, after Task 2 shipped.** The screenshots exposed a case neither
+the spec nor this plan anticipated: **adjacent gutter labels overprint**. On
+Friday Harbor the 17:02 high and 19:10 low are 2h08m apart — 25pt at 12pt/hour
+— against ~46pt labels, and they render as `5:027M10PM`. Unreadable, and not
+even legible as two labels.
+
+§4's `pair`/`merged` rule covers only a slack window's own two edges. Merging
+is wrong here: two unrelated extremes are not a range.
+
+**Decision (Bryan, 2026-08-08): stagger onto two rows.** A label that would
+overprint its neighbour drops to a second gutter row 12pt lower, and its
+dropline extends to meet it. Every time stays visible — the alternative
+considered and rejected was silently dropping the crowded label.
+
+This supersedes the single-row geometry in Task 1 and the single-row draw in
+Task 2, and Task 4's band labels must participate in the same row assignment.
+Concretely:
+
+- `TimelineGeo` gains `gutterRowStep: CGFloat = 12` and
+  `func gutterY(row: Int) -> CGFloat { gutterY + CGFloat(row) * gutterRowStep }`.
+  The existing `gutterY` property stays as row 0's baseline.
+- `height` becomes `bodyBottom + 48`: **274** tide-only (226 + 48), **368**
+  current-only (320 + 48). Task 1's assertions move with it.
+- Row assignment is a pure function, which finally gives Task 2 the unit test
+  it could not otherwise have:
+
+  ```swift
+  /// Greedy row assignment for gutter labels, left to right: the lowest row
+  /// whose last label has cleared. When no row has cleared, the row whose last
+  /// label ends earliest — overlap becomes unavoidable, so minimise it rather
+  /// than pretend it cannot happen.
+  func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 2) -> [Int]
+  ```
+
+  Callers pass labels already sorted by time (both event loops already are).
+- `drawDrop` takes a `row: Int` and draws to `geo.gutterY(row: row) - 8`.
+
+Everything else in Tasks 1–5 stands.
+
+---
+
 ### Task 1: The gutter slot in `TimelineGeo`
 
 Adds the vertical space every later task draws into. Nothing renders differently yet — the strip just gets taller.
