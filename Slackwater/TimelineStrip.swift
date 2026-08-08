@@ -73,6 +73,37 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (start, end)
 }
 
+/// Slack/max events scanned from a sampled signed-velocity series — the
+/// online-gate path draws fetched official points, so events come from the
+/// samples, not a harmonic engine. Slacks interpolate the zero crossing;
+/// each run between crossings contributes its largest |sample| as a signed
+/// maximum. 15-min official samples make interpolated slacks exact to a few
+/// minutes — the same series CHS's own tables are printed from.
+func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
+    guard points.count > 1 else { return [] }
+    var events: [CurrentEvent] = []
+    var runStart = 0
+    func closeRun(_ end: Int) {  // [runStart, end] inclusive, one sign
+        let peak = points[runStart...end].max { abs($0.speed) < abs($1.speed) }!
+        guard peak.speed != 0 else { return }
+        events.append(CurrentEvent(time: peak.time, speed: peak.speed,
+                                   kind: peak.speed > 0 ? .maxFlood : .maxEbb))
+    }
+    for i in 1..<points.count {
+        let a = points[i - 1], b = points[i]
+        if (a.speed > 0) != (b.speed > 0), a.speed != 0 {
+            let f = abs(a.speed) / (abs(a.speed) + abs(b.speed))
+            closeRun(i - 1)
+            events.append(CurrentEvent(
+                time: a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f),
+                speed: 0, kind: .slack))
+            runStart = i
+        }
+    }
+    closeRun(points.count - 1)
+    return events.sorted { $0.time < $1.time }
+}
+
 // MARK: - Data: everything the strip draws, computed once per station
 
 struct TimelineDay {

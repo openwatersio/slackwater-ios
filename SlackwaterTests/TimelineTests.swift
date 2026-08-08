@@ -129,4 +129,40 @@ final class TimelineTests: XCTestCase {
         }
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
     }
+
+    /// Events scanned from a sampled series (online gates draw fetched points,
+    /// not a harmonic engine): slacks at interpolated zero crossings, one signed
+    /// maximum per run between them.
+    func testSampleEventsScanCrossingsAndExtrema() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        // 2 → -2 → 2 over 3 h at 15-min samples: crossings at +1h and +2h... use
+        // a triangle wave: v(i) = [2,1,0.5,-0.5,-1,-2,-1,-0.5,0.5,1,2] per 15 min.
+        let vs: [Double] = [2, 1, 0.5, -0.5, -1, -2, -1, -0.5, 0.5, 1, 2]
+        let pts = vs.enumerated().map { CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element) }
+        let events = sampleEvents(pts)
+        let slacks = events.filter { $0.kind == .slack }
+        XCTAssertEqual(slacks.count, 2)
+        // First crossing: between samples 2 (0.5) and 3 (-0.5) → halfway, 2250 s.
+        XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 2250, accuracy: 1)
+        XCTAssertEqual(slacks[1].time.timeIntervalSince(t0), 6750, accuracy: 1)
+        let ebbs = events.filter { $0.kind == .maxEbb }
+        XCTAssertEqual(ebbs.count, 1)
+        XCTAssertEqual(ebbs[0].speed, -2, accuracy: 1e-9)
+        XCTAssertEqual(ebbs[0].time.timeIntervalSince(t0), 5 * 900, accuracy: 1)
+        // Leading/trailing runs also get their maxima (floods at each end).
+        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 2)
+        // Events alternate: no two slacks adjacent, no two maxima adjacent.
+        for (a, b) in zip(events, events.dropFirst()) {
+            XCTAssert((a.kind == .slack) != (b.kind == .slack))
+        }
+    }
+
+    /// A monotone window with no crossing: one maximum, no slacks, no crash.
+    func testSampleEventsMonotone() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = (0..<8).map { CurrentPoint(time: t0.addingTimeInterval(Double($0) * 900), speed: 1 + Double($0) * 0.1) }
+        let events = sampleEvents(pts)
+        XCTAssert(events.filter { $0.kind == .slack }.isEmpty)
+        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+    }
 }
