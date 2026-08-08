@@ -147,6 +147,13 @@ extension ChsCurrentGateInfo {
 extension CurrentStationRecord {
     /// Fitted-on-device CHS gate, vs a bundled NOAA harmonic station.
     var isChs: Bool { id.hasPrefix("chs-") }
+    /// This record's `StationItem` id — what the favorite star and the
+    /// Recents record must write for the list to resolve it. NOAA current
+    /// stations are namespaced "current:<id>" (Friday Harbor has both a tide
+    /// and a current station); a CHS gate keys the catalog bare. Hand-building
+    /// the prefixed form at a call site minted favorites no section could
+    /// resolve (fresh-install bug, 2026-08-08).
+    var itemId: String { isChs ? id : "current:" + id }
     /// The bundled gate identity behind a fitted CHS record — where the
     /// per-gate window and the fast answer's tolerance live.
     var chsGate: ChsCurrentGateInfo? { ChsCurrentGateInfo.all.first { $0.id == id } }

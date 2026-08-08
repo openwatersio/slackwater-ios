@@ -51,7 +51,7 @@ struct CurrentDetailView: View {
             VStack(spacing: 0) {
                 MapHeader(name: record.name, region: "\(record.region) · current",
                           latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: "current:" + record.id)
+                          favoriteId: record.itemId)
                 if let gate = provisionalGate {
                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
                                  expectation: gate.provisionalExpectation,
@@ -78,7 +78,7 @@ struct CurrentDetailView: View {
             if timeline == nil {
                 timeline = TimelineData.build(tide: nil, current: record, now: live)
             }
-            RecentsStore.shared.record("current:" + record.id)
+            RecentsStore.shared.record(record.itemId)
         }
         // The refinement lands under an open page: same station, new model. The
         // curve, the schedule and the amber marking all have to follow it.

@@ -413,8 +413,12 @@ final class ScreenshotTests: XCTestCase {
     // nothing else (no catalog section, no units pill).
     func testM41GroupedListAndRecents() throws {
         let app = XCUIApplication()
-        // Deterministic Victoria fix via the -fixLat/-fixLon hook.
-        app.launchArguments = ["-seedGate", "-resetRecents",
+        // Deterministic Victoria fix via the -fixLat/-fixLon hook. Favorites
+        // reset too: this test asserts group ORDER from a clean list, so its
+        // launch args enforce that — not the goodwill of every earlier test
+        // on the simulator (a leaked favorite pushed RECENTS past the iPad
+        // sidebar's bounded scroll, 2026-08-08).
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
                                "-fixLat", "48.4235", "-fixLon", "-123.3705"]
         app.launch()
 
@@ -582,6 +586,55 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Return to now"].firstMatch.tap()
         XCTAssert(app.staticTexts[today].firstMatch.waitForExistence(timeout: 5),
                   "return-to-now did not restore the live readout")
+    }
+
+    /// A station that hasn't downloaded yet can still be favorited from its
+    /// detail. Fresh-install bug (2026-08-08): the waiting page's star wrote
+    /// "current:chs-…" while the catalog keys CHS gates bare, so the favorite
+    /// was a phantom id — the star lit, and no Favorites group ever appeared.
+    /// The sharp assertion is the FAVORITES section label itself: it only
+    /// renders when a favorite id RESOLVES, so the phantom leaves it absent.
+    func testFavoritePendingChsGateFromDetail() throws {
+        let app = XCUIApplication()
+        // Fit only Victoria, so Dodd Narrows deterministically stays the
+        // pending ⚠️ waiting page (the M46 scoping pattern).
+        app.launchArguments = ["-seedGate", "-resetRecents", "-resetFavorites",
+                               "-chsResetModels", "-chsFitOnly", "chs-victoria",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "dodd")
+        let gate = app.staticTexts["Dodd Narrows"].firstMatch
+        XCTAssert(gate.waitForExistence(timeout: 5), "search did not find Dodd Narrows")
+        gate.tap()
+
+        // The pending detail still carries the header star — tap it.
+        let star = app.buttons["detail-favorite"].firstMatch
+        XCTAssert(star.waitForExistence(timeout: 5), "favorite star missing from the waiting detail")
+        star.tap()
+        XCTAssert(app.buttons["Remove favorite"].waitForExistence(timeout: 5),
+                  "star did not flip to favorited on the waiting detail")
+
+        // Back to the list: the favorite must RESOLVE — a Favorites group
+        // with the gate in it, not a phantom id and no group at all.
+        app.buttons["detail-back"].firstMatch.tap()
+        // iPhone closes search with the push; the iPad sidebar keeps it open.
+        if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5),
+                  "favoriting a pending CHS gate produced no Favorites group — the star wrote an id the list cannot resolve")
+        let row = app.staticTexts["Dodd Narrows"].firstMatch
+        XCTAssert(row.exists, "the favorited pending gate is missing from the Favorites group")
+
+        // Leave the simulator as found: swipe-unfavorite the row so later
+        // tests that assume a clean favorites store aren't ambushed.
+        row.swipeLeft()
+        XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
+        app.buttons["Unfavorite"].firstMatch.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "cleanup unfavorite left the Favorites group behind")
     }
 
     // M4.3 design pass: favorites — the detail-header star files a station

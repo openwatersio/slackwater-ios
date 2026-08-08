@@ -59,7 +59,9 @@ struct ChsDetailView: View {
                 if case .fitted(let record) = service.currentState(gate.id) {
                     CurrentDetailView(record: record)
                 } else {
-                    waiting(name: gate.name, region: "\(gate.region) · current", favoriteId: "current:" + gate.id,
+                    // Bare id: CHS gates key the catalog without the NOAA
+                    // "current:" prefix — see CurrentStationRecord.itemId.
+                    waiting(name: gate.name, region: "\(gate.region) · current", favoriteId: gate.id,
                             latitude: gate.latitude, longitude: gate.longitude, needs: nil)
                 }
             case .derivedGate(let gate):

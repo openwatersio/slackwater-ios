@@ -97,4 +97,32 @@ final class ChsCurrentGateTests: XCTestCase {
         // The gate store must never shadow a port model of the same key.
         XCTAssertNil(ChsModelStore.load("chs-test-store"))
     }
+
+    // MARK: - The id the star and Recents write (fresh-install favorite bug)
+
+    /// The favorite star and the Recents record must write the id the LIST
+    /// resolves through `StationItem.byId`. NOAA current stations are
+    /// namespaced "current:<id>" (Friday Harbor has both a tide and a current
+    /// station); CHS gates key the catalog by their bare registry id. Build 20
+    /// wrote the NOAA prefix onto CHS ids too, minting favorites and recents
+    /// no list section could resolve — starred stations silently never
+    /// appeared.
+    func testItemIdResolvesInTheCatalog() throws {
+        // Every bundled NOAA current station: prefixed, and resolvable.
+        let noaa = try XCTUnwrap(CurrentStationRecord.all.first)
+        XCTAssertEqual(noaa.itemId, "current:" + noaa.id)
+        XCTAssertNotNil(StationItem.byId[noaa.itemId])
+
+        // A fitted CHS gate record (the shape ChsFitService hands the detail):
+        // bare registry id, and resolvable.
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first)
+        let record = CurrentStationRecord(
+            id: gate.id, name: gate.name, region: gate.region, aliases: [],
+            latitude: gate.latitude, longitude: gate.longitude,
+            timezone: "America/Vancouver", floodDirection: 355, ebbDirection: 155,
+            meanFlow: 0, tideReference: nil,
+            constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
+        XCTAssertEqual(record.itemId, gate.id, "a CHS gate's catalog id is bare — no NOAA prefix")
+        XCTAssertNotNil(StationItem.byId[record.itemId])
+    }
 }
