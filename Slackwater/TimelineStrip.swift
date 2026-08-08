@@ -480,8 +480,8 @@ struct TimelineCanvas: View {
 
         // Measure label widths and assign rows (Amendment A)
         let centers = filteredExtremes.map { data.x($0.time) }
-        let widths = filteredExtremes.map { _ in
-            ctx.resolve(gutterText(Date())).measure(in: CGSize(width: 1000, height: 100)).width
+        let widths = filteredExtremes.map { e in
+            ctx.resolve(gutterText(e.time)).measure(in: CGSize(width: 1000, height: 100)).width
         }
         let rows = gutterRows(centers: centers, widths: widths)
 
@@ -536,8 +536,8 @@ struct TimelineCanvas: View {
         // Measure and assign rows only to max Flood/Ebb events (Amendment A)
         let maxEvents = filteredEvents.filter { $0.kind == .maxFlood || $0.kind == .maxEbb }
         let maxCenters = maxEvents.map { data.x($0.time) }
-        let maxWidths = maxEvents.map { _ in
-            ctx.resolve(gutterText(Date())).measure(in: CGSize(width: 1000, height: 100)).width
+        let maxWidths = maxEvents.map { e in
+            ctx.resolve(gutterText(e.time)).measure(in: CGSize(width: 1000, height: 100)).width
         }
         let maxRows = gutterRows(centers: maxCenters, widths: maxWidths)
 

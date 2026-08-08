@@ -160,6 +160,16 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(gutterRows(centers: [10, 30, 60], widths: [20, 20, 20]),
                        [0, 1, 0])
 
+        // Fallback branch: four densely packed labels where neither row clears by label 3.
+        // Centers [0, 30, 60, 90] with widths [60, 60, 60, 60]:
+        // - Label 0: [-30, 30] → row 0
+        // - Label 1: [0, 60] → row 0 blocked (30 >= 0), row 1 clear → row 1
+        // - Label 2: [30, 90] → both blocked (row 0 at 30, row 1 at 60), pick row 0 (ends earliest)
+        // - Label 3: [60, 120] → both blocked, pick row 1 (ends earliest after row 0 updated to 90)
+        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60]),
+                       [0, 1, 0, 1],
+                       "fallback branch: when both rows blocked, picks row with earliest end")
+
         // Count matching: always returns same number of rows as there are labels.
         let centers: [CGFloat] = [10, 50, 100, 150, 200]
         let widths: [CGFloat] = [30, 30, 30, 30, 30]
