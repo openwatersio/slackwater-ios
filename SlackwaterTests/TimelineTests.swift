@@ -150,7 +150,12 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(ebbs[0].speed, -2, accuracy: 1e-9)
         XCTAssertEqual(ebbs[0].time.timeIntervalSince(t0), 5 * 900, accuracy: 1)
         // Leading/trailing runs also get their maxima (floods at each end).
-        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 2)
+        let floods = events.filter { $0.kind == .maxFlood }
+        XCTAssertEqual(floods.count, 2)
+        XCTAssertEqual(floods[0].speed, 2, accuracy: 1e-9)
+        XCTAssertEqual(floods[0].time.timeIntervalSince(t0), 0, accuracy: 1)
+        XCTAssertEqual(floods[1].speed, 2, accuracy: 1e-9)
+        XCTAssertEqual(floods[1].time.timeIntervalSince(t0), 10 * 900, accuracy: 1)
         // Events alternate: no two slacks adjacent, no two maxima adjacent.
         for (a, b) in zip(events, events.dropFirst()) {
             XCTAssert((a.kind == .slack) != (b.kind == .slack))
@@ -164,5 +169,25 @@ final class TimelineTests: XCTestCase {
         let events = sampleEvents(pts)
         XCTAssert(events.filter { $0.kind == .slack }.isEmpty)
         XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+    }
+
+    /// An exact-zero sample IS the slack — both polarities, no interpolation.
+    func testSampleEventsExactZeroSample() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        func pts(_ vs: [Double]) -> [CurrentPoint] {
+            vs.enumerated().map { CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element) }
+        }
+        for vs in [[-2.0, -1, 0, 1], [2.0, 1, 0, -1]] {
+            let events = sampleEvents(pts(vs))
+            let slacks = events.filter { $0.kind == .slack }
+            XCTAssertEqual(slacks.count, 1, "\(vs): the zero sample is one slack")
+            XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 2 * 900, accuracy: 1)
+            XCTAssertEqual(events.filter { $0.kind == .maxEbb }.count, 1, "\(vs)")
+            XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1, "\(vs)")
+        }
+        // Consecutive zeros: one slack, at the first zero sample.
+        let events = sampleEvents(pts([1, 0, 0, -1]))
+        XCTAssertEqual(events.filter { $0.kind == .slack }.count, 1)
+        XCTAssertEqual(events.filter { $0.kind == .slack }[0].time.timeIntervalSince(t0), 900, accuracy: 1)
     }
 }

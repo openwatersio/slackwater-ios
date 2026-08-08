@@ -75,29 +75,54 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
 
 /// Slack/max events scanned from a sampled signed-velocity series — the
 /// online-gate path draws fetched official points, so events come from the
-/// samples, not a harmonic engine. Slacks interpolate the zero crossing;
-/// each run between crossings contributes its largest |sample| as a signed
-/// maximum. 15-min official samples make interpolated slacks exact to a few
-/// minutes — the same series CHS's own tables are printed from.
+/// samples, not a harmonic engine. Slacks interpolate the zero crossing or
+/// land exactly on a zero sample; each run between crossings contributes its
+/// largest |sample| as a signed maximum. 15-min official samples make
+/// interpolated slacks exact to a few minutes — the same series CHS's own
+/// tables are printed from.
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     guard points.count > 1 else { return [] }
     var events: [CurrentEvent] = []
     var runStart = 0
-    func closeRun(_ end: Int) {  // [runStart, end] inclusive, one sign
-        let peak = points[runStart...end].max { abs($0.speed) < abs($1.speed) }!
-        guard peak.speed != 0 else { return }
+    var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
+    var lastWasZero = false         // true if the previous sample was exactly zero
+
+    func closeRun(_ end: Int) {     // [runStart, end] inclusive
+        // Collect only nonzero speeds; filter excludes exact-zero samples.
+        let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
+        guard !nonzeroInRun.isEmpty else { return }
+        let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
         events.append(CurrentEvent(time: peak.time, speed: peak.speed,
                                    kind: peak.speed > 0 ? .maxFlood : .maxEbb))
     }
-    for i in 1..<points.count {
-        let a = points[i - 1], b = points[i]
-        if (a.speed > 0) != (b.speed > 0), a.speed != 0 {
-            let f = abs(a.speed) / (abs(a.speed) + abs(b.speed))
-            closeRun(i - 1)
-            events.append(CurrentEvent(
-                time: a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f),
-                speed: 0, kind: .slack))
-            runStart = i
+
+    for i in 0..<points.count {
+        let current = points[i]
+        let sign = current.speed > 0 ? 1 : (current.speed < 0 ? -1 : 0)
+
+        if sign == 0 {
+            // Exact-zero sample: if preceded by nonzero and not consecutive zeros,
+            // this zero IS the slack.
+            if lastNonzeroSign != 0 && !lastWasZero {
+                closeRun(i - 1)
+                events.append(CurrentEvent(time: current.time, speed: 0, kind: .slack))
+                runStart = i + 1
+            }
+            lastWasZero = true
+        } else {
+            // Nonzero sample
+            if lastNonzeroSign != 0 && lastNonzeroSign != sign && !lastWasZero {
+                // Sign opposes last nonzero, no zero between: interpolate crossing.
+                let prev = points[i - 1]
+                let f = abs(prev.speed) / (abs(prev.speed) + abs(current.speed))
+                closeRun(i - 1)
+                events.append(CurrentEvent(
+                    time: prev.time.addingTimeInterval(current.time.timeIntervalSince(prev.time) * f),
+                    speed: 0, kind: .slack))
+                runStart = i
+            }
+            lastNonzeroSign = sign
+            lastWasZero = false
         }
     }
     closeRun(points.count - 1)
