@@ -397,6 +397,25 @@ func seamapOfflineLayers() -> (sprite: String, layers: [[String: Any]], source: 
              "attribution": "© Open Waters: Seamap © OpenStreetMap contributors"])
 }
 
+/// The Open Waters Seascape bathymetry, offline (openwatersio/seascape#121):
+/// `seascape.pmtiles` is a `pmtiles extract` of the planet vector archive
+/// clipped to the same Salish box as seamap, `seascape-layers.json` the four
+/// `seascape-vector` layers from the published style.json with every `text-*`
+/// key stripped. Same shape as `seamapOfflineLayers`, same nil-means-absent
+/// contract, and the same open follow-on: two of those four (`soundings`,
+/// `contour-labels`) are text-only symbol layers, so they ship inert and light
+/// up the day a fontstack does. Depth areas and contours draw today.
+func seascapeOfflineLayers() -> (layers: [[String: Any]], source: [String: Any])? {
+    guard let tiles = Bundle.main.url(forResource: "seascape", withExtension: "pmtiles"),
+          let layersUrl = Bundle.main.url(forResource: "seascape-layers", withExtension: "json"),
+          let data = try? Data(contentsOf: layersUrl),
+          let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+    else { return nil }
+    return (layers.filter { nativeLayerTypes.contains($0["type"] as? String ?? "") },
+            ["type": "vector", "url": "pmtiles://\(tiles.absoluteString)",
+             "attribution": "© Open Waters: Seascape"])
+}
+
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
 func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
     var sources = landSources(landUrl, uscaUrl)
@@ -408,15 +427,25 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
             ["id": "land-bg", "type": "background", "paint": ["background-color": WATER_TONE]],
         ] + landLayers + pinLayers(hasGlyphs: false, labelFont: []),
     ]
+    // Everything slots in above the land floor and below the pins, and depth
+    // goes in before the chart marks so the marks draw over it — a buoy behind
+    // a depth-area fill is a chart that lies about what is there.
+    func insertAboveLand(_ slice: [[String: Any]]) {
+        var layers = style["layers"] as! [[String: Any]]
+        let anchor = layers.firstIndex { ($0["id"] as? String) == "station-clusters" } ?? layers.count
+        layers.insert(contentsOf: slice, at: anchor)
+        style["layers"] = layers
+    }
+    if let seascape = seascapeOfflineLayers() {
+        sources["seascape-vector"] = seascape.source
+        style["sources"] = sources
+        insertAboveLand(seascape.layers)
+    }
     if let seamap = seamapOfflineLayers() {
         sources["seamap"] = seamap.source
         style["sources"] = sources
         style["sprite"] = [["id": "freenauticalchart", "url": seamap.sprite]]
-        // Chart between the land floor and the pins: pins stay on top.
-        var layers = style["layers"] as! [[String: Any]]
-        let anchor = layers.firstIndex { ($0["id"] as? String) == "station-clusters" } ?? layers.count
-        layers.insert(contentsOf: seamap.layers, at: anchor)
-        style["layers"] = layers
+        insertAboveLand(seamap.layers)
     }
     return style
 }

@@ -70,9 +70,20 @@ archive clipped to the Salish box: PMTiles is range-addressable, so that costs ~
 requests and about ten seconds, not a planet download. Traffic separation schemes are cut
 (`SEAMAP_OMIT` in `MapScreen.swift`) — routeing instruction is not this app's question, and
 the lanes dominated everything else on screen. Labels are not bundled yet: they need glyphs,
-and glyphs are a remote URL an offline chart cannot fetch. Seascape's bathymetry stays
-online-only — its depth shading is a `color-relief` layer MapLibre Native will not render,
-and its contours and soundings are separate sources with no public offline archive.
+and glyphs are a remote URL an offline chart cannot fetch.
+
+Under that chart is [Open Waters Seascape](https://github.com/openwatersio/seascape),
+bundled by `tools/build-seascape.sh` — depth areas and contours, offline, in 35 MB, the same
+Salish box at z12 and the same range-extract trick (45 requests, six seconds out of a 7.3 GB
+planet archive). Depth used to be the thing that vanished with the signal, which is backwards
+from where it matters; it now draws over the land floor and under the chart marks. Two
+caveats. Seascape publishes no downloadable archive yet
+([#121](https://github.com/openwatersio/seascape/issues/121) — the planet build costs its
+author real money), so the URL in the script is a one-off build handed over directly and the
+content hash is the pin. And `soundings` and `contour-labels` are text-only symbol layers, so
+they ship inert for want of glyphs — bundling a fontstack lights up those and seamap's labels
+in the same stroke. The `color-relief` depth shading is a separate loss for a separate reason:
+MapLibre Native will not render that layer type, online or off.
 
 The App Store copy in
 `docs/appstore-metadata.md` was rewritten for national coverage on 2026-08-01 — still a
