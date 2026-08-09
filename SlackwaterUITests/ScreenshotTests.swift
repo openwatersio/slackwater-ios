@@ -1282,6 +1282,36 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
+    /// Issue #32: the map-header title jumps to the map, focused on the
+    /// detail's own station (SlackwaterApp.swift `openMapFocused`/`mapFocus`,
+    /// MapHeader.swift's title pill). No accessibility surface exposes an
+    /// `MLNMapView`'s live center/zoom to XCUITest — nothing in this file
+    /// reads one — so this proves the navigation contract (map up, detail
+    /// gone) rather than the actual camera position; `mapFocus`/`stationZoom`
+    /// wiring the correct center/zoom into `MapViewRepresentable` is covered
+    /// by reading the source, same as the rest of MapStyler's camera
+    /// assertion, which nothing here exercises either.
+    func testHeaderTitleFocusesMap() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+
+        // Top of the detail, under the status bar clearance — should be
+        // hittable the moment the header renders, no scroll needed.
+        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
+        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
+        title.tap()
+
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
+        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+                       "the title tap must pop the detail, not layer the map over it")
+    }
+
     // M48: the map needed no map-specific work — a pin tap goes through the
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.

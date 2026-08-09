@@ -365,6 +365,21 @@ extension EnvironmentValues {
     }
 }
 
+/// Same reasoning as `openChsRoute` above: the map-header title (issue #32)
+/// jumps straight to the map, focused on the detail's own station — not a
+/// NavigationLink or Button, same press-tracking hazard in the iPad split
+/// detail column.
+private struct OpenMapFocusedKey: EnvironmentKey {
+    static let defaultValue: (StationItem) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openMapFocused: (StationItem) -> Void {
+        get { self[OpenMapFocusedKey.self] }
+        set { self[OpenMapFocusedKey.self] = newValue }
+    }
+}
+
 /// The one tide affordance on a current/gate detail (split-scrubbers spec
 /// §2): a quiet link in the list's matching-stations convention, navigating
 /// to the port's own TideDetailView. No tide numbers live here anymore.

@@ -230,6 +230,11 @@ struct StationListView: View {
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
+    /// One-shot: set by the map-header title tap (issue #32), read once by
+    /// `mapPane` as its initial camera override, then cleared on the map's own
+    /// `onAppear` — the next fix landing or user pan owns the camera after
+    /// that, same as the plain discovery map today.
+    @State private var mapFocus: StationItem?
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
@@ -293,6 +298,19 @@ struct StationListView: View {
     /// property so they can't drift apart.
     private var openChsRoute: (ChsRoute) -> Void { { path.append($0) } }
 
+    /// The map-header title tap (issue #32): pop whatever detail is pushed,
+    /// switch to the map, and hand it a one-shot focus on this station.
+    /// Unconditional path reset (unlike the FAB toggle's `regular && showMap`
+    /// case below) — this always fires FROM a pushed detail in both layouts,
+    /// where the fabBar-toggle path only needs it at regular width.
+    private var openMapFocused: (StationItem) -> Void {
+        { item in
+            mapFocus = item
+            path = NavigationPath()
+            showMap = true
+        }
+    }
+
     var body: some View {
         Group {
             if regular {
@@ -318,6 +336,11 @@ struct StationListView: View {
         // the sheet stays under the newly pushed route on the back stack —
         // correct behavior, not a side effect to work around.
         .environment(\.openChsRoute, openChsRoute)
+        // Same attachment point, same reasoning — the map-header title lives
+        // inside a pushed detail in both layouts, so ordinary ancestor
+        // inheritance from here is enough; no `.sheet` re-forward needed
+        // because MapHeader never appears inside Settings or Downloads.
+        .environment(\.openMapFocused, openMapFocused)
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
@@ -496,13 +519,26 @@ struct StationListView: View {
     /// The in-place map surface (prototype READY·MAP): no header, no close —
     /// the toggle FAB is the only way back.
     private var mapPane: some View {
-        MapViewRepresentable(center: fix.map {
-            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
-        } ?? SALISH_CENTER) { item in
+        // `mapFocus` wins when set (header-title tap, issue #32): centers on
+        // that station at its own detail zoom rather than the fix/discovery
+        // camera. `makeUIView` runs fresh each time this branch swaps back in
+        // (`if showMap { mapPane }` is a structural identity change), so this
+        // read is exactly the one-shot init the design calls for — no camera
+        // re-assertion machinery needed beyond MapStyler's existing one.
+        MapViewRepresentable(
+            center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                ?? SALISH_CENTER,
+            zoom: mapFocus == nil ? discoveryZoom : stationZoom
+        ) { item in
             if regular { showMap = false }  // the detail pane shows the pick
             open(item)
         }
         .accessibilityIdentifier("map-canvas")
+        // Consumed once: the next appearance of this pane (fab toggle, a
+        // fresh pick) starts from the fix/discovery camera again, not a stale
+        // focus from a station visited an hour ago.
+        .onAppear { mapFocus = nil }
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
             // Was "Depths not reduced to chart datum — not for navigation."

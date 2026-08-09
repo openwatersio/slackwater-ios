@@ -598,6 +598,10 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// Boston must not open the map on the Salish Sea (M53) — and the Salish
     /// camera when there isn't, which is also what the UI tests see.
     let center: CLLocationCoordinate2D
+    /// Discovery zoom by default; the map-header title tap (issue #32) passes
+    /// `stationZoom` instead so a focused jump lands framed on one station,
+    /// not the whole Salish Sea.
+    var zoom: Double = discoveryZoom
     let onSelect: (StationItem) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
@@ -607,7 +611,7 @@ struct MapViewRepresentable: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         map.showsUserLocation = LocationService.shared.authorized
-        context.coordinator.install(on: map, center: center)
+        context.coordinator.install(on: map, center: center, zoom: zoom)
         return map
     }
 
@@ -620,10 +624,10 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         init(onSelect: @escaping (StationItem) -> Void) { self.onSelect = onSelect }
 
-        func install(on map: MLNMapView, center: CLLocationCoordinate2D) {
+        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
             self.map = map
             styler = MapStyler(map: map, cacheName: "discovery",
-                               center: center, zoom: discoveryZoom)
+                               center: center, zoom: zoom)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }
