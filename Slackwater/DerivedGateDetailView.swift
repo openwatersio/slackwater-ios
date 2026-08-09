@@ -72,13 +72,7 @@ struct DerivedGateDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial,
-                               now: live, scrubTime: $scrubTime)
-                .padding(.horizontal, -16)  // full-bleed strip
-                .padding(.top, 12)
-
-            // Phase readout below the strip: the word, never a number — no
+            // Phase readout above the strip: the word, never a number — no
             // speed exists for a derived gate (web hero phase-pill).
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -92,7 +86,7 @@ struct DerivedGateDetailView: View {
                 if let slack = nextSlack {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+                        Text("in \(countdown(from: scrubTime, to: slack.time))")
                             // SN.go, not SN.leaf: this line says when slack is.
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
                         Text("at \(slack.highWater ? "high" : "low") water")
@@ -100,7 +94,12 @@ struct DerivedGateDetailView: View {
                     }
                 }
             }
-            .padding(.top, 8)
+
+            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                               imperial: imperial,
+                               now: live, scrubTime: $scrubTime)
+                .padding(.horizontal, -16)  // full-bleed strip
+                .padding(.top, 12)
 
             // The web's chart note, verbatim in spirit: the curve is a shape.
             Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")

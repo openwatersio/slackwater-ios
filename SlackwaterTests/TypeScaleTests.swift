@@ -175,14 +175,16 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        // Count is 29 after split-scrubbers deletions (31 before): CurrentDetailView
-        // lost its paired-tide readout (two formatHeight sites) and the
-        // schedule's tide-extremes rows (one more) — the track it used to
-        // borrow, not a regression here. A floor of 25 keeps the same headroom;
+        // Count is 23 after gutter-readouts-go-relative deletions (29 before):
+        // CurrentDetailView lost three cardTime() sites (next-slack, window
+        // start, window end) and the then-max-flood formatSpeed() line;
+        // DerivedGateDetailView lost its next-slack cardTime() site. The
+        // absolute clock times moved to the gutter and ScrubWhen, not a
+        // regression here. A floor of 20 keeps the same headroom as before;
         // a floor of 5 would survive the scan silently collapsing to a handful
         // of files — the same "found nothing, passed forever" failure the
         // retired-font test guards with its `scanned > 10`.
-        XCTAssertGreaterThan(checked, 25, "expected to find numeric Text sites, found \(checked)")
+        XCTAssertGreaterThan(checked, 20, "expected to find numeric Text sites, found \(checked)")
         XCTAssertTrue(offenders.isEmpty,
                       "numeric reading without mono treatment (or a named indirection exception):\n"
                       + offenders.joined(separator: "\n"))
