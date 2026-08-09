@@ -83,6 +83,41 @@ Everything else in Tasks 1–5 stands.
 
 ---
 
+## Amendment B — the gutter carries slack windows only
+
+**2026-08-08, after Task 4 shipped.** Task 4's bands rendered correctly and its
+review was clean, but the screenshots showed the gutter is oversubscribed at
+frequent-slack stations. Deception Pass (Narrows) has slacks roughly every 3h —
+36pt at 12pt/hour — and each band contributes a *merged* range label
+(`1:49PM–2:07PM`, ~90pt), interleaved with max-flood/max-ebb times (~46pt).
+Four labels needing ~270pt inside 72pt. Two rows cannot absorb it; the gutter
+rendered as an unreadable ribbon.
+
+Nothing in the test suite can see this — the tests cover the row-assignment
+rule, not whether the result is legible — and the task review was clean. It was
+caught by reading the screenshot.
+
+**Decision (Bryan, 2026-08-08): drop the max-flood/max-ebb times from the
+gutter.** Peaks keep their speed value on the dot, and their exact time stays in
+the schedule table below the strip. The gutter belongs to the slack windows —
+the question the app is named for.
+
+- `drawCurrent` no longer calls `drawDrop` for `.maxFlood` / `.maxEbb`. The
+  peak's speed label on the dot is unchanged.
+- Max events no longer enter the `gutterRows` candidate set, so the row
+  assignment runs over band labels (and windowless-slack droplines) only.
+- **Tide is untouched.** Its extremes stay in the gutter — they are ~6h apart
+  with single labels, and the tide strip has never been crowded.
+
+**Known residual, accepted going in.** This halves the label count but does not
+fully solve the geometry: ~90pt merged labels at ~36pt slack spacing still
+collide on the third label of a run, by roughly 18pt on a hand-trace. Bryan
+chose this option with that caveat stated. Measure the real result on a
+Deception Pass screenshot after implementing and report what it actually looks
+like — do not assume the arithmetic.
+
+---
+
 ### Task 1: The gutter slot in `TimelineGeo`
 
 Adds the vertical space every later task draws into. Nothing renders differently yet — the strip just gets taller.
