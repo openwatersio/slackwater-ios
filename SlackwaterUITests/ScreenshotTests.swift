@@ -2174,4 +2174,42 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
                        "a covering window must render the real detail, not the honesty card")
     }
+
+    /// Full-plan only (skipped in the Fast plan — see TestPlans/Slackwater.xctestplan):
+    /// the spec's open item, verified against REAL IWLS rather than a seeded window.
+    /// Sechelt Rapids is one of the 7 fit-reject gates (ChsCurrentGate.swift) — this
+    /// proves IWLS actually resolves and serves wcsp1/wcdp1 (its station pair) for a
+    /// gate CHS rejects for on-device fitting, which is the online set's entire premise.
+    /// No `-networkKillSwitch`, no `-seedOnlineWindow`: `-chsResetModels` wipes any
+    /// stored window so `OnlineGateDetailView.onAppear` has to fetch live. If IWLS
+    /// stops resolving or serving this station, the honesty card persists and the
+    /// `online-provenance` wait times out — see the failure message below, which is
+    /// the actual signal this test exists to produce (Task 7 Step 3: a timeout here
+    /// means Sechelt may need dropping from the online set, a human call).
+    func testOnlineGateLiveFetch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+
+        // Generous, M46-idiom ceiling: a live IWLS fetch, not a seeded window.
+        let provenance = app.staticTexts["online-provenance"].firstMatch
+        XCTAssert(provenance.waitForExistence(timeout: 300),
+                  "Sechelt never fetched — check whether IWLS resolves/serves this gate")
+
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "the live fetch did not render the strip")
+        XCTAssert(provenance.label.contains("CHS-published"),
+                  "the fetched footer must say CHS-published — never claim an on-device computation")
+        XCTAssert(provenance.label.range(of: "covers to [A-Z][a-z]{2} \\d{1,2}",
+                                          options: .regularExpression) != nil,
+                  "provenance must carry a real covers-to date, not a placeholder")
+    }
 }
