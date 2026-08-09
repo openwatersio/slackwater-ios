@@ -17,6 +17,13 @@ struct SlackwaterApp: App {
         if CommandLine.arguments.contains("-seedGate") {
             UserDefaults.standard.set(true, forKey: seenGateKey)
         }
+        // -seedOnlineWindow <id>: writes a fetched-looking ChsOnlineWindow for
+        // one of the 7 online (fit-reject) gates, so a UI test can land on
+        // OnlineGateDetailView's fetched single-track detail with no network.
+        if let i = CommandLine.arguments.firstIndex(of: "-seedOnlineWindow"),
+           CommandLine.arguments.indices.contains(i + 1) {
+            seedOnlineWindow(stationID: CommandLine.arguments[i + 1])
+        }
     }
 
     var body: some Scene {
@@ -25,6 +32,43 @@ struct SlackwaterApp: App {
                 .preferredColorScheme(.dark)
         }
     }
+}
+
+/// UI-test hook (SlackwaterApp.init's `-seedOnlineWindow <id>`): writes a
+/// synthetic `ChsOnlineWindow` covering exactly the strip `Timeline` builds
+/// right now — the same -48h/+132h-around-today's-local-midnight math
+/// `ChsFitService.fetchOnlineWindow` uses for a real fetch (`coversStrip`'s
+/// neighborhood, ChsCurrentGate.swift) — so `OnlineGateDetailView` reads it as
+/// current and renders the fetched detail on first launch, no network
+/// involved. An M2-ish sine (12.42h period, ~2 kn amplitude) at 15-min samples
+/// gives the strip real slacks and maxima to assert against, not a flat line.
+///
+/// `-chsResetModels` (ChsStation.swift) already clears this file too: it
+/// removes the whole `ChsModelStore.dir`, the same directory `-online.json`
+/// files live in beside the fitted `.json`/`-current.json` ones
+/// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
+private func seedOnlineWindow(stationID: String) {
+    guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = gate.tz
+    let today = cal.startOfDay(for: appNow())
+    let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+    let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+    let period = 12.42 * 3600.0   // M2 tidal period, seconds
+    let amplitude = 2.0           // kn
+    var times: [Double] = []
+    var speeds: [Double] = []
+    var t = start
+    while t <= end {
+        times.append(t.timeIntervalSince1970)
+        speeds.append(amplitude * sin(2 * .pi * t.timeIntervalSince(start) / period))
+        t = t.addingTimeInterval(900)  // 15-min official-sample cadence
+    }
+    let window = ChsOnlineWindow(
+        stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
+        fetchedAt: appNow(), start: start, end: end,
+        floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
+    try? ChsModelStore.saveOnline(window)
 }
 
 /// Gate until a choice is made (prototype phase machine); list ever after.
