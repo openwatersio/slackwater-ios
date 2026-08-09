@@ -572,11 +572,15 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // Slack-window band labels join the same gutter row assignment as the
-        // max-flood/max-ebb times (Amendment A): a band edge cannot overprint
-        // a neighbouring extreme. Each window contributes either two pair
-        // labels (edges growing inward) or one merged label — decided by
-        // measured widths — before any row is assigned.
+        // Slack-window band labels are the gutter's only occupant now
+        // (Amendment B): max-flood/max-ebb times were pulled out because at
+        // frequent-slack stations (Deception Pass, slacks ~3h apart) they
+        // interleaved with ~90pt merged band ranges and oversubscribed two
+        // rows into an unreadable ribbon. The peak's speed label stays on its
+        // dot; its exact time lives in the schedule table below the strip.
+        // Each window contributes either two pair labels (edges growing
+        // inward) or one merged label — decided by measured widths — before
+        // any row is assigned.
         struct BandLabel {
             let text: Text
             let drawX: CGFloat
@@ -605,36 +609,13 @@ struct TimelineCanvas: View {
                                             rowCenter: cx, width: mw))
             }
         }
+        // Sort by centre so gutterRows' left-to-right greedy assumption
+        // holds — window order in data.slackWindows already gives this, this
+        // is defensive, matching the other two callers.
+        bandLabels.sort { $0.rowCenter < $1.rowCenter }
+        let bandLabelRow = gutterRows(centers: bandLabels.map(\.rowCenter),
+                                      widths: bandLabels.map(\.width))
 
-        // Measure the max-flood/max-ebb times, then run ONE row assignment
-        // over both them and the band labels above — the whole point of
-        // Amendment A is a single pass over everything competing for the
-        // gutter, not per-source row assignments that can still collide with
-        // each other.
-        let maxEvents = filteredEvents.filter { $0.kind == .maxFlood || $0.kind == .maxEbb }
-        let maxWidths = maxEvents.map { e in
-            ctx.resolve(gutterText(e.time)).measure(in: box).width
-        }
-        enum GutterSource { case maxEvent(Int), bandLabel(Int) }
-        var candidates: [(center: CGFloat, width: CGFloat, source: GutterSource)] = []
-        for (i, e) in maxEvents.enumerated() {
-            candidates.append((data.x(e.time), maxWidths[i], .maxEvent(i)))
-        }
-        for (i, bl) in bandLabels.enumerated() {
-            candidates.append((bl.rowCenter, bl.width, .bandLabel(i)))
-        }
-        candidates.sort { $0.center < $1.center }
-        let assignedRows = gutterRows(centers: candidates.map(\.center), widths: candidates.map(\.width))
-        var maxEventRow = [Int](repeating: 0, count: maxEvents.count)
-        var bandLabelRow = [Int](repeating: 0, count: bandLabels.count)
-        for (i, c) in candidates.enumerated() {
-            switch c.source {
-            case .maxEvent(let idx): maxEventRow[idx] = assignedRows[i]
-            case .bandLabel(let idx): bandLabelRow[idx] = assignedRows[i]
-            }
-        }
-
-        var maxEventIndex = 0
         for e in filteredEvents {
             let x = data.x(e.time)
             switch e.kind {
@@ -656,6 +637,9 @@ struct TimelineCanvas: View {
                     drawDrop(ctx, x: x, from: geo.zeroY, time: e.time)
                 }
             case .maxFlood, .maxEbb:
+                // Speed label on the dot only (Amendment B) — no dropline,
+                // no gutter time. The exact time still lives in the
+                // schedule table below the strip.
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
                          with: .color(.white))
@@ -664,9 +648,6 @@ struct TimelineCanvas: View {
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
-                let row = maxEventRow[maxEventIndex]
-                drawDrop(ctx, x: x, from: y, time: e.time, row: row)
-                maxEventIndex += 1
             }
         }
 
