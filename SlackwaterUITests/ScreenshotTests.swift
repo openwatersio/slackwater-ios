@@ -1207,6 +1207,81 @@ final class ScreenshotTests: XCTestCase {
                        "tapping a row must dismiss the Downloads sheet")
     }
 
+    /// Issue #33 review finding #2: the row's own tap gesture and the Retry
+    /// button (`service.promote`, shown only on a `.failed` job) are siblings
+    /// in the same `HStack` — the Retry button ahead of `.contentShape`/
+    /// `.onTapGesture` in the modifier chain, per the row-tap comment. No test
+    /// covered that combination; this proves the button wins the hit test
+    /// rather than the row's gesture swallowing it. `-chsFailOnly` (new hook,
+    /// ChsFitService.swift) marks a job `.failed` at launch, no network
+    /// attempt — a real fetch failure isn't deterministic for a fast test, and
+    /// `-networkKillSwitch` keeps every OTHER job inert too (`run()`'s claim
+    /// loop only ever touches `.pending` jobs, so the seeded `.failed` status
+    /// sticks until something explicitly retries it).
+    ///
+    /// Seeded on Victoria HARBOUR, deliberately NOT plain Victoria: at regular
+    /// width the split layout auto-selects a first detail on `.onAppear`
+    /// (SlackwaterApp.swift), and with no fix that's the nearest station to
+    /// the Victoria fallback — chs-victoria itself. `ChsDetailView.onAppear`
+    /// unconditionally promotes whatever route it shows, so seeding
+    /// chs-victoria as `.failed` was self-defeating on iPad: auto-select
+    /// opened it and silently un-failed it before this test ever touched the
+    /// sheet (confirmed live — the Retry button and the "still failed"
+    /// precondition were gone by the time of the very first read). Victoria
+    /// Harbour is the second-nearest port — queued (inside the auto-fit set's
+    /// nearest 6 ports) but never auto-selected — so it stays genuinely
+    /// `.failed` until this test's own tap.
+    func testDownloadsRowRetryButtonWinsOverRowTap() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch",
+                               "-chsFailOnly", "chs-victoria-harbour"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+
+        let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
+        XCTAssert(row.waitForExistence(timeout: 5), "the seeded failed row is missing")
+        if !row.isHittable { app.swipeUp() }
+        XCTAssert(row.isHittable, "download-row-chs-victoria-harbour exists but never became hittable")
+        // `.accessibilityElement(children: .combine)` on the row merges its
+        // plain text into one label but does NOT absorb the nested Button —
+        // confirmed live (`app.buttons["Retry"]` resolves as its own element,
+        // separate from the row).
+        let retry = row.buttons["Retry"].firstMatch
+        XCTAssert(retry.waitForExistence(timeout: 5), "seeded chs-victoria-harbour never shows the Retry button")
+        if !retry.isHittable { app.swipeUp() }
+        XCTAssert(retry.isHittable, "Retry button exists but never became hittable")
+        retry.tap()
+        sleep(1)  // the queue re-sort/re-render isn't instant
+
+        // Promote's own visible effect proves the BUTTON's action ran: the
+        // failed row flips to promoted+pending — "YOU OPENED" and "Waiting"
+        // replace the Retry pill. The row renders EITHER the Retry button OR
+        // `statusText(job)`, never both (OfflineDownloads.swift's `row(_:)`),
+        // so "Waiting" in the label already implies Retry is gone.
+        let label = row.label
+        XCTAssert(label.contains("YOU OPENED") && label.contains("Waiting"),
+                  "tapping Retry did not promote the row — expected \"YOU OPENED\"/\"Waiting\" in its label, got \"\(label)\"")
+
+        // And the row tap's OWN effect never fired: the sheet is still up.
+        // NOT a bare "no detail-map-header exists" check — on iPad the split
+        // layout auto-selects Victoria's OWN detail underneath this sheet
+        // regardless of anything this test does (the same auto-select the
+        // doc comment above routes around), so a header legitimately exists
+        // throughout. The header's NAME is the tell: if the row's gesture had
+        // fired instead of the button, it would have pushed Victoria
+        // Harbour's detail, replacing what's shown.
+        XCTAssert(app.staticTexts["Downloads"].exists,
+                  "the row's onTapGesture must not have fired — the Retry button owns this tap")
+        let header = app.otherElements["detail-map-header"].firstMatch
+        if header.exists {
+            XCTAssertFalse(header.staticTexts["Victoria Harbour"].firstMatch.exists,
+                           "no detail should have opened — the button, not the row, must have handled the tap")
+        }
+    }
+
     // M48: the map needed no map-specific work — a pin tap goes through the
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.
@@ -2104,7 +2179,7 @@ final class ScreenshotTests: XCTestCase {
     /// detail out from under the assertions (SlackwaterApp.swift's
     /// `seedOnlineWindow` doc comment covers the other half of this same
     /// coverage question). The nearest-gate-link push is NOT a list-driven
-    /// reset (`openChsGate`'s doc comment, OnlineGateDetailView.swift): it
+    /// reset (`OpenChsRouteKey`'s doc comment, Theme.swift): it
     /// stacks onto Sechelt's own detail, so one `detail-back` lands back on
     /// Sechelt, not the list — which is exactly the page this test stars, to
     /// exercise the bare-id favorite rule (ChsCurrentGate.swift's `itemId`

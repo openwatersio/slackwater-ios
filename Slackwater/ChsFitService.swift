@@ -67,6 +67,17 @@ final class ChsFitService: ObservableObject {
         return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
     }()
 
+    /// UI-test hook: `-chsFailOnly <id,id>` marks jobs `.failed` at launch, no
+    /// network attempt — a `.failed` row (and its Retry button) otherwise only
+    /// happens after a real fetch fails, which isn't deterministic for a fast
+    /// test. `run()`'s claim loop only ever touches `.pending` jobs, so this
+    /// status sticks until something explicitly retries it.
+    private static let failOnly: Set<String> = {
+        guard let at = CommandLine.arguments.firstIndex(of: "-chsFailOnly"),
+              CommandLine.arguments.indices.contains(at + 1) else { return [] }
+        return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
+    }()
+
     private var started = false
     private var running = false
 
@@ -170,6 +181,9 @@ final class ChsFitService: ObservableObject {
         // Never an arbitrary order, even before a fix lands: the prototype's
         // Victoria fallback anchors the first sort, and a real fix re-sorts.
         adopt(lat: fallbackFix.lat, lon: fallbackFix.lon)
+        // After adopt(), so a `-chsFailOnly` id not already in the auto-fit
+        // set (added by adopt() above) still gets marked.
+        for id in Self.failOnly { queue.set(id, .failed) }
     }
 
     /// Take the nearest stations into the download set and re-sort. Jobs only

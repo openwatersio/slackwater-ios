@@ -322,7 +322,12 @@ struct StationListView: View {
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        // Re-forwarded here too: Settings pushes `OfflineManagerList` in its
+        // OWN `NavigationStack` (SettingsView.swift), and that push inherits
+        // fine — but SettingsView itself is this `.sheet`'s ROOT content, so
+        // without this it's SettingsView's environment that's broken, not
+        // OfflineManagerList's. Same boundary as the comment below.
+        .sheet(isPresented: $showSettings) { SettingsView().environment(\.openChsRoute, openChsRoute) }
         // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
         // a separate presentation hierarchy that only crosses SYSTEM
         // environment keys (like `\.dismiss`) automatically — a custom key set
