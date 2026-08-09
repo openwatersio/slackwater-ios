@@ -230,11 +230,18 @@ struct StationListView: View {
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
-    /// One-shot: set by the map-header title tap (issue #32), read once by
-    /// `mapPane` as its initial camera override, then cleared on the map's own
-    /// `onAppear` — the next fix landing or user pan owns the camera after
-    /// that, same as the plain discovery map today.
+    /// One-shot: set by the map-header title tap (issue #32), read by
+    /// `mapPane` as a camera override, then cleared — on a fresh mount via
+    /// `.onAppear`, or (review finding: a detail reached via a MAP PIN tap
+    /// leaves `showMap` already `true`, so the map never remounts) via
+    /// `MapViewRepresentable.onFocusApplied` once `updateUIView` actually
+    /// moves an already-live camera. Either way, the next fix landing or
+    /// user pan owns the camera after that, same as the plain discovery map.
     @State private var mapFocus: StationItem?
+    /// Bumped on every focus tap — `MapViewRepresentable.focusToken`'s
+    /// "did a NEW focus arrive" signal for `updateUIView`, distinct from the
+    /// coordinate itself so re-focusing the SAME station twice still counts.
+    @State private var mapFocusToken = 0
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
@@ -306,6 +313,7 @@ struct StationListView: View {
     private var openMapFocused: (StationItem) -> Void {
         { item in
             mapFocus = item
+            mapFocusToken += 1
             path = NavigationPath()
             showMap = true
         }
@@ -521,23 +529,31 @@ struct StationListView: View {
     private var mapPane: some View {
         // `mapFocus` wins when set (header-title tap, issue #32): centers on
         // that station at its own detail zoom rather than the fix/discovery
-        // camera. `makeUIView` runs fresh each time this branch swaps back in
-        // (`if showMap { mapPane }` is a structural identity change), so this
-        // read is exactly the one-shot init the design calls for — no camera
-        // re-assertion machinery needed beyond MapStyler's existing one.
+        // camera. Usually `makeUIView` runs fresh here (`if showMap { mapPane
+        // }` is a structural identity change, so this read is a plain
+        // one-shot init) — EXCEPT a detail reached via a map PIN tap leaves
+        // `showMap` already `true`, so the pane never remounts and the same
+        // `MLNMapView` survives the push/pop. `focusToken`/`onFocusApplied`
+        // exist for exactly that case: `updateUIView` (not `makeUIView`)
+        // catches the new focus and moves the live camera (review finding on
+        // the first cut of #32) — see `MapViewRepresentable`'s doc comments.
         MapViewRepresentable(
             center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
                 ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
                 ?? SALISH_CENTER,
-            zoom: mapFocus == nil ? discoveryZoom : stationZoom
+            zoom: mapFocus == nil ? discoveryZoom : stationZoom,
+            focusToken: mapFocus == nil ? nil : mapFocusToken,
+            // Only reached on the NO-remount path (see above) — a fresh
+            // mount's `mapFocus` is cleared by `.onAppear` below instead.
+            onFocusApplied: { DispatchQueue.main.async { mapFocus = nil } }
         ) { item in
             if regular { showMap = false }  // the detail pane shows the pick
             open(item)
         }
         .accessibilityIdentifier("map-canvas")
-        // Consumed once: the next appearance of this pane (fab toggle, a
-        // fresh pick) starts from the fix/discovery camera again, not a stale
-        // focus from a station visited an hour ago.
+        // Consumed once, fresh-mount case: the next appearance of this pane
+        // (fab toggle, a fresh pick) starts from the fix/discovery camera
+        // again, not a stale focus from a station visited an hour ago.
         .onAppear { mapFocus = nil }
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {

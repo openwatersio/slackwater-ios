@@ -1312,6 +1312,55 @@ final class ScreenshotTests: XCTestCase {
                        "the title tap must pop the detail, not layer the map over it")
     }
 
+    /// Review finding on the first cut of #32: a detail reached via a MAP PIN
+    /// tap (not a list row) leaves `showMap` already `true` on iPhone — only
+    /// the regular layout's `mapPane` `onSelect` resets it before pushing.
+    /// So the map pane never remounts for the title tap that follows, and
+    /// `makeUIView` (which only runs on a fresh mount) never gets a chance to
+    /// apply the new focus; `MapViewRepresentable.focusToken`/
+    /// `onFocusApplied` are what close that gap through `updateUIView`
+    /// instead (MapScreen.swift). iPhone-only: this is specifically the
+    /// compact stack layout's showMap-stays-true path — on iPad the split
+    /// layout's `mapPane` DOES reset `showMap` on a pin tap, so this
+    /// scenario can't arise there.
+    func testHeaderTitleAfterMapPinFocusesMap() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            throw XCTSkip("iPhone-only: the split layout's onSelect already resets showMap on a pin tap")
+        }
+        let app = XCUIApplication()
+        // Camera dead-centered on Friday Harbor (stations.json), same
+        // convention as testM48MapPinToUnfittedDetail — a finger-sized box at
+        // the exact center of a station-scale zoom holds one pin.
+        app.launchArguments = ["-seedGate", "-fixLat", "48.5453", "-fixLon", "-123.0125", "-mapZoom", "11"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // tiles
+
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5), "the pin tap did not open a detail")
+
+        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
+        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
+        title.tap()
+
+        // Same navigation contract testHeaderTitleFocusesMap asserts, but
+        // reached through the no-remount path — `showMap` was already `true`
+        // going in, which is the entire point of this test. The camera move
+        // itself still isn't independently assertable here (no accessibility
+        // surface exposes MLNMapView's live center — see
+        // testHeaderTitleFocusesMap's doc comment); the token/updateUIView
+        // fix is verified by reading MapScreen.swift, traced in the issue-32
+        // report.
+        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
+        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+                       "the title tap must pop the detail, not layer the map over it")
+    }
+
     // M48: the map needed no map-specific work — a pin tap goes through the
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.
