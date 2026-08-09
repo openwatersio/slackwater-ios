@@ -256,8 +256,11 @@ struct OnlineGateDetailView: View {
     // MARK: - Unfetched/expired/fetch-failed: the honesty card
 
     private var honestyCard: some View {
+        // `fetching` already makes a tap during the ~30s auto-fetch a no-op
+        // (fetchNow's own `guard !fetching`) — but "Try again" during that
+        // window reads as broken, not busy. Smallest fix: say so.
         ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
-                     expectation: expectation, action: "Try again",
+                     expectation: expectation, action: fetching ? "Fetching…" : "Try again",
                      identifier: "online-honesty-card") { fetchNow() }
     }
 

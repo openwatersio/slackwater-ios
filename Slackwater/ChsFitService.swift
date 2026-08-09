@@ -504,9 +504,16 @@ extension ChsFitService {
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
         }
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        // A chunk IWLS truncates mid-series (a short response, a gap at one
+        // edge) must not be saved under the full requested start/end — that
+        // would make `coversStrip` pass on a window with a hole in it and
+        // render a strip with a dead zone. Clamp to what actually came back,
+        // symmetrically, so a truncated fetch honestly fails coverage instead.
+        let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
+        let sampleEnd = projected.last.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? end
         let window = ChsOnlineWindow(
             stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
-            fetchedAt: .now, start: start, end: end,
+            fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
             floodDirection: flood, ebbDirection: ebb,
             times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
         do {

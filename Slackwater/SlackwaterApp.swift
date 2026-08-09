@@ -22,6 +22,15 @@ struct SlackwaterApp: App {
         // OnlineGateDetailView's fetched single-track detail with no network.
         if let i = CommandLine.arguments.firstIndex(of: "-seedOnlineWindow"),
            CommandLine.arguments.indices.contains(i + 1) {
+            // Trap: ChsFitService.shared's own init calls
+            // ChsModelStore.resetIfRequested(), which wipes ChsModelStore.dir
+            // — the same directory the seed file below lands in. `shared` is a
+            // lazy `static let`, so if nothing has touched it yet, its init
+            // (and the wipe) fires the first time something does — e.g. the
+            // list view's `.task` — which would run AFTER this seed write and
+            // silently delete it. Touch `.shared` now so the one-time
+            // init/reset happens before the write, never after.
+            _ = ChsFitService.shared
             seedOnlineWindow(stationID: CommandLine.arguments[i + 1])
         }
     }
