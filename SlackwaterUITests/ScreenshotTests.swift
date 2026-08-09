@@ -1161,6 +1161,206 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Done"].tap()
     }
 
+    /// Issue #33: a Downloads row is a dead tap no longer — tapping it closes
+    /// the sheet and opens the station's own detail via `openChsRoute`
+    /// (Theme.swift), the same generalized closure the online-gate honesty
+    /// card's nearest-shipped link now shares. `-chsResetModels` wipes the
+    /// model store so the whole queue starts `.pending`; no `-fixLat`/`-fixLon`
+    /// needed because `ChsFitService.init` unconditionally adopts the
+    /// `fallbackFix` (Victoria) before any real fix can land (its own doc
+    /// comment: "never an arbitrary order, even before a fix lands"), and
+    /// Victoria itself is distance zero from that anchor — so it is always the
+    /// queue's first job, deterministic without a location launch argument.
+    func testDownloadsRowOpensDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+                  "the indicator did not open the downloads manager")
+
+        let victoria = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
+        XCTAssert(victoria.waitForExistence(timeout: 5), "Victoria is not in the download queue")
+        if !victoria.isHittable { app.swipeUp() }  // it should already be the first row
+        XCTAssert(victoria.isHittable, "download-row-chs-victoria exists but never became hittable")
+        victoria.tap()
+
+        // Wait on the positive signal first — the pushed detail's header —
+        // rather than an immediate non-existence check on "Downloads": the
+        // sheet's dismiss animation is not instant, so checking right after
+        // the tap synthesizes races it. Scoped to the header, not a bare name
+        // lookup: on iPad the persistent sidebar can carry "Victoria" in its
+        // own list ranking independently of what got pushed (same trap
+        // testOnlineGateUnfetchedShowsHonestyCard's header lookup dodges).
+        let header = app.otherElements["detail-map-header"].firstMatch
+        XCTAssert(header.waitForExistence(timeout: 5),
+                  "the row tap did not push a detail")
+        XCTAssert(header.staticTexts["Victoria"].firstMatch.exists,
+                  "the row tap opened the wrong station's detail")
+
+        // The sheet is gone — "Downloads" was its own nav title, so its
+        // disappearance is the dismiss signal, not just the row. Checked last:
+        // by now the dismiss animation has long since settled.
+        XCTAssertFalse(app.staticTexts["Downloads"].exists,
+                       "tapping a row must dismiss the Downloads sheet")
+    }
+
+    /// Issue #33 review finding #2: the row's own tap gesture and the Retry
+    /// button (`service.promote`, shown only on a `.failed` job) are siblings
+    /// in the same `HStack` — the Retry button ahead of `.contentShape`/
+    /// `.onTapGesture` in the modifier chain, per the row-tap comment. No test
+    /// covered that combination; this proves the button wins the hit test
+    /// rather than the row's gesture swallowing it. `-chsFailOnly` (new hook,
+    /// ChsFitService.swift) marks a job `.failed` at launch, no network
+    /// attempt — a real fetch failure isn't deterministic for a fast test, and
+    /// `-networkKillSwitch` keeps every OTHER job inert too (`run()`'s claim
+    /// loop only ever touches `.pending` jobs, so the seeded `.failed` status
+    /// sticks until something explicitly retries it).
+    ///
+    /// Seeded on Victoria HARBOUR, deliberately NOT plain Victoria: at regular
+    /// width the split layout auto-selects a first detail on `.onAppear`
+    /// (SlackwaterApp.swift), and with no fix that's the nearest station to
+    /// the Victoria fallback — chs-victoria itself. `ChsDetailView.onAppear`
+    /// unconditionally promotes whatever route it shows, so seeding
+    /// chs-victoria as `.failed` was self-defeating on iPad: auto-select
+    /// opened it and silently un-failed it before this test ever touched the
+    /// sheet (confirmed live — the Retry button and the "still failed"
+    /// precondition were gone by the time of the very first read). Victoria
+    /// Harbour is the second-nearest port — queued (inside the auto-fit set's
+    /// nearest 6 ports) but never auto-selected — so it stays genuinely
+    /// `.failed` until this test's own tap.
+    func testDownloadsRowRetryButtonWinsOverRowTap() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels", "-networkKillSwitch",
+                               "-chsFailOnly", "chs-victoria-harbour"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+
+        let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
+        XCTAssert(row.waitForExistence(timeout: 5), "the seeded failed row is missing")
+        if !row.isHittable { app.swipeUp() }
+        XCTAssert(row.isHittable, "download-row-chs-victoria-harbour exists but never became hittable")
+        // `.accessibilityElement(children: .combine)` on the row merges its
+        // plain text into one label but does NOT absorb the nested Button —
+        // confirmed live (`app.buttons["Retry"]` resolves as its own element,
+        // separate from the row).
+        let retry = row.buttons["Retry"].firstMatch
+        XCTAssert(retry.waitForExistence(timeout: 5), "seeded chs-victoria-harbour never shows the Retry button")
+        if !retry.isHittable { app.swipeUp() }
+        XCTAssert(retry.isHittable, "Retry button exists but never became hittable")
+        retry.tap()
+        sleep(1)  // the queue re-sort/re-render isn't instant
+
+        // Promote's own visible effect proves the BUTTON's action ran: the
+        // failed row flips to promoted+pending — "YOU OPENED" and "Waiting"
+        // replace the Retry pill. The row renders EITHER the Retry button OR
+        // `statusText(job)`, never both (OfflineDownloads.swift's `row(_:)`),
+        // so "Waiting" in the label already implies Retry is gone.
+        let label = row.label
+        XCTAssert(label.contains("YOU OPENED") && label.contains("Waiting"),
+                  "tapping Retry did not promote the row — expected \"YOU OPENED\"/\"Waiting\" in its label, got \"\(label)\"")
+
+        // And the row tap's OWN effect never fired: the sheet is still up.
+        // NOT a bare "no detail-map-header exists" check — on iPad the split
+        // layout auto-selects Victoria's OWN detail underneath this sheet
+        // regardless of anything this test does (the same auto-select the
+        // doc comment above routes around), so a header legitimately exists
+        // throughout. The header's NAME is the tell: if the row's gesture had
+        // fired instead of the button, it would have pushed Victoria
+        // Harbour's detail, replacing what's shown.
+        XCTAssert(app.staticTexts["Downloads"].exists,
+                  "the row's onTapGesture must not have fired — the Retry button owns this tap")
+        let header = app.otherElements["detail-map-header"].firstMatch
+        if header.exists {
+            XCTAssertFalse(header.staticTexts["Victoria Harbour"].firstMatch.exists,
+                           "no detail should have opened — the button, not the row, must have handled the tap")
+        }
+    }
+
+    /// Issue #32: the map-header title jumps to the map, focused on the
+    /// detail's own station (SlackwaterApp.swift `openMapFocused`/`mapFocus`,
+    /// MapHeader.swift's title pill). No accessibility surface exposes an
+    /// `MLNMapView`'s live center/zoom to XCUITest — nothing in this file
+    /// reads one — so this proves the navigation contract (map up, detail
+    /// gone) rather than the actual camera position; `mapFocus`/`stationZoom`
+    /// wiring the correct center/zoom into `MapViewRepresentable` is covered
+    /// by reading the source, same as the rest of MapStyler's camera
+    /// assertion, which nothing here exercises either.
+    func testHeaderTitleFocusesMap() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+
+        // Top of the detail, under the status bar clearance — should be
+        // hittable the moment the header renders, no scroll needed.
+        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
+        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
+        title.tap()
+
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
+        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+                       "the title tap must pop the detail, not layer the map over it")
+    }
+
+    /// Review finding on the first cut of #32: a detail reached via a MAP PIN
+    /// tap (not a list row) leaves `showMap` already `true` on iPhone — only
+    /// the regular layout's `mapPane` `onSelect` resets it before pushing.
+    /// So the map pane never remounts for the title tap that follows, and
+    /// `makeUIView` (which only runs on a fresh mount) never gets a chance to
+    /// apply the new focus; `MapViewRepresentable.focusToken`/
+    /// `onFocusApplied` are what close that gap through `updateUIView`
+    /// instead (MapScreen.swift). iPhone-only: this is specifically the
+    /// compact stack layout's showMap-stays-true path — on iPad the split
+    /// layout's `mapPane` DOES reset `showMap` on a pin tap, so this
+    /// scenario can't arise there.
+    func testHeaderTitleAfterMapPinFocusesMap() throws {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
+            throw XCTSkip("iPhone-only: the split layout's onSelect already resets showMap on a pin tap")
+        }
+        let app = XCUIApplication()
+        // Camera dead-centered on Friday Harbor (stations.json), same
+        // convention as testM48MapPinToUnfittedDetail — a finger-sized box at
+        // the exact center of a station-scale zoom holds one pin.
+        app.launchArguments = ["-seedGate", "-fixLat", "48.5453", "-fixLon", "-123.0125", "-mapZoom", "11"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["Map"].tap()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // tiles
+
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5), "the pin tap did not open a detail")
+
+        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
+        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
+        title.tap()
+
+        // Same navigation contract testHeaderTitleFocusesMap asserts, but
+        // reached through the no-remount path — `showMap` was already `true`
+        // going in, which is the entire point of this test. The camera move
+        // itself still isn't independently assertable here (no accessibility
+        // surface exposes MLNMapView's live center — see
+        // testHeaderTitleFocusesMap's doc comment); the token/updateUIView
+        // fix is verified by reading MapScreen.swift, traced in the issue-32
+        // report.
+        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
+        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+                       "the title tap must pop the detail, not layer the map over it")
+    }
+
     // M48: the map needed no map-specific work — a pin tap goes through the
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.
@@ -2058,7 +2258,7 @@ final class ScreenshotTests: XCTestCase {
     /// detail out from under the assertions (SlackwaterApp.swift's
     /// `seedOnlineWindow` doc comment covers the other half of this same
     /// coverage question). The nearest-gate-link push is NOT a list-driven
-    /// reset (`openChsGate`'s doc comment, OnlineGateDetailView.swift): it
+    /// reset (`OpenChsRouteKey`'s doc comment, Theme.swift): it
     /// stacks onto Sechelt's own detail, so one `detail-back` lands back on
     /// Sechelt, not the list — which is exactly the page this test stars, to
     /// exercise the bare-id favorite rule (ChsCurrentGate.swift's `itemId`

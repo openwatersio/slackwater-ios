@@ -153,6 +153,8 @@ struct OfflineManagerView: View {
 struct OfflineManagerList: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openChsRoute) private var openChsRoute
 
     private var queue: ChsQueue { service.queue }
 
@@ -251,6 +253,26 @@ struct OfflineManagerList: View {
         }
     }
 
+    /// This job's navigation target — a job is identity only (ChsJob's doc
+    /// comment), so the route is looked up from the same bundled catalogs the
+    /// list and search already key off of. `ChsFitService.candidates` builds
+    /// every job from exactly these two arrays, so the lookup always succeeds
+    /// in practice; `nil` is handled anyway (issue #33's own instruction) so a
+    /// row can never crash if that ever stops being true.
+    private func route(for job: ChsJob) -> ChsRoute? {
+        if job.isCurrent {
+            return ChsCurrentGateInfo.all.first { $0.id == job.id }.map { .currentGate($0) }
+        }
+        return ChsStationInfo.all.first { $0.id == job.id }.map { .port($0) }
+    }
+
+    /// A tap opens the station's own detail — closes Downloads first, then
+    /// pushes: `openChsRoute` always appends to the ROOT stack's path, so this
+    /// works identically whether Downloads was reached from the list's status
+    /// button or a detail's amber "See all downloads" card. A detail that
+    /// presented the sheet stays exactly where it was on the back stack, under
+    /// the newly pushed route — correct back-stack behavior (issue #33 §3),
+    /// not something to special-case per presenting context.
     private func row(_ job: ChsJob) -> some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -305,7 +327,21 @@ struct OfflineManagerList: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // Gesture, never a Button/NavigationLink wrapper: this sheet can be
+        // presented over the iPad split detail column, where Button press
+        // tracking goes dead below the strip but tap gestures keep working
+        // (same rule `activatable`/`TideAtPortLink` follow). The Retry button
+        // above sits inside this HStack, ahead of the gesture in the
+        // hierarchy, so its own tap still wins there — this only catches taps
+        // elsewhere on the row.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let route = route(for: job) else { return }
+            dismiss()
+            openChsRoute(route)
+        }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("download-row-\(job.id)")
     }
 }

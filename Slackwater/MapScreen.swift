@@ -500,8 +500,15 @@ func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -
 final class MapStyler: NSObject, MLNMapViewDelegate {
     private weak var map: MLNMapView?
     private let cacheName: String
-    private let center: CLLocationCoordinate2D
-    private let zoom: Double
+    /// Mutable, not `let`: `moveCamera` (issue #32 review — a focus landing
+    /// on a map that's already mounted, no style reload involved) updates
+    /// these so a LATER style load (Seascape arriving after the fallback, or
+    /// any future reload) re-asserts the latest camera in
+    /// `didFinishLoading`, not whatever this styler was built with — without
+    /// this a second focus followed by a late style swap would snap back to
+    /// the first one.
+    private var center: CLLocationCoordinate2D
+    private var zoom: Double
     private let killSwitch = CommandLine.arguments.contains("-networkKillSwitch")
 
     init(map: MLNMapView, cacheName: String, center: CLLocationCoordinate2D, zoom: Double) {
@@ -589,6 +596,17 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
     }
+
+    /// Moves the live camera immediately — no style reload involved, so
+    /// `didFinishLoading` won't do this on its own. Stores the new
+    /// center/zoom too (see the property comments above) so if a style DOES
+    /// reload later, it re-asserts THIS camera, not the one this styler
+    /// launched with.
+    func moveCamera(to center: CLLocationCoordinate2D, zoom: Double, animated: Bool) {
+        self.center = center
+        self.zoom = zoom
+        map?.setCenter(center, zoomLevel: zoom, animated: animated)
+    }
 }
 
 // MARK: - The map view
@@ -598,6 +616,25 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// Boston must not open the map on the Salish Sea (M53) — and the Salish
     /// camera when there isn't, which is also what the UI tests see.
     let center: CLLocationCoordinate2D
+    /// Discovery zoom by default; the map-header title tap (issue #32) passes
+    /// `stationZoom` instead so a focused jump lands framed on one station,
+    /// not the whole Salish Sea.
+    var zoom: Double = discoveryZoom
+    /// Non-nil while a header-title focus (issue #32) is live. `makeUIView`
+    /// alone only moves the camera on a FRESH mount — but a detail reached
+    /// via a MAP PIN tap leaves `showMap` already `true` (only the regular
+    /// layout's `onSelect` resets it), so the map instance survives the
+    /// push/pop and never remounts. `updateUIView` is what has to catch a
+    /// title tap in THAT case, and it needs a way to tell "a new focus
+    /// landed" apart from "an unrelated re-render" — a changed token is that
+    /// signal (review finding on the first cut of #32; equality on the
+    /// center coordinate isn't enough since re-focusing the SAME station
+    /// twice must still count as new).
+    var focusToken: Int? = nil
+    /// Fires once a `focusToken` is actually applied via `updateUIView` — the
+    /// no-remount path only. A fresh mount already gets its one-shot clear
+    /// from `mapPane`'s `.onAppear`; this covers the case that doesn't fire.
+    var onFocusApplied: (() -> Void)? = nil
     let onSelect: (StationItem) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
@@ -607,25 +644,47 @@ struct MapViewRepresentable: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         map.showsUserLocation = LocationService.shared.authorized
-        context.coordinator.install(on: map, center: center)
+        context.coordinator.install(on: map, center: center, zoom: zoom, focusToken: focusToken)
         return map
     }
 
-    func updateUIView(_ uiView: MLNMapView, context: Context) {}
+    /// SwiftUI calls this right after `makeUIView` too (with the same
+    /// values) — `Coordinator.applyFocusIfNeeded` no-ops that first call
+    /// because `install` already recorded the token, so a fresh mount never
+    /// double-applies the camera.
+    func updateUIView(_ uiView: MLNMapView, context: Context) {
+        context.coordinator.applyFocusIfNeeded(center: center, zoom: zoom, focusToken: focusToken,
+                                                onApplied: onFocusApplied)
+    }
 
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
         private weak var map: MLNMapView?
         private var styler: MapStyler?
+        private var lastAppliedFocusToken: Int?
 
         init(onSelect: @escaping (StationItem) -> Void) { self.onSelect = onSelect }
 
-        func install(on map: MLNMapView, center: CLLocationCoordinate2D) {
+        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double, focusToken: Int?) {
             self.map = map
+            lastAppliedFocusToken = focusToken  // this mount's camera already reflects it
             styler = MapStyler(map: map, cacheName: "discovery",
-                               center: center, zoom: discoveryZoom)
+                               center: center, zoom: zoom)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
+        }
+
+        /// Moves an already-mounted map's live camera when a NEW focus token
+        /// shows up without a remount (the pin-tap-then-title-tap path — see
+        /// `MapViewRepresentable.focusToken`). A no-op on every ordinary
+        /// re-render: `focusToken == nil` (no focus asserted this render) or
+        /// unchanged from what's already applied.
+        func applyFocusIfNeeded(center: CLLocationCoordinate2D, zoom: Double, focusToken: Int?,
+                                 onApplied: (() -> Void)?) {
+            guard let focusToken, focusToken != lastAppliedFocusToken else { return }
+            lastAppliedFocusToken = focusToken
+            styler?.moveCamera(to: center, zoom: zoom, animated: true)
+            onApplied?()
         }
 
         /// Tap → nearest station dot within a finger-sized box → detail. A

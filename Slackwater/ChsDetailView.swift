@@ -118,6 +118,10 @@ struct ChsWaitingView: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     @State private var showDownloads = false
+    // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
+    // custom `@Environment` key set above the presenting view on its own
+    // (SlackwaterApp.swift's `.sheet(showDownloads)` comment has the story).
+    @Environment(\.openChsRoute) private var openChsRoute
 
     private var job: ChsJob? { service.queue.job(jobID) }
     private var isCurrent: Bool { job?.isCurrent ?? false }
@@ -137,7 +141,7 @@ struct ChsWaitingView: View {
         .ignoresSafeArea(edges: .top)
         .background(SN.page.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
     }
 
     private var warningCard: some View {

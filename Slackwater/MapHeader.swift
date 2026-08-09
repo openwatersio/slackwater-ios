@@ -13,8 +13,11 @@ import MapLibre
 /// on, not a viewport. The header's height is pill + clearances, so it
 /// scales with Dynamic Type instead of cropping at AX sizes.
 let mapHeaderBottomMargin: CGFloat = 24
-/// Prototype per-station zoom (DATA() z: 12.2–13.2).
-private let stationZoom = 12.5
+/// Prototype per-station zoom (DATA() z: 12.2–13.2). Not `private`: the
+/// header title tap (issue #32) reuses it as the discovery map's focus zoom
+/// so a jump-to-map lands at the same per-station framing this header shows,
+/// rather than a second hand-picked number drifting from this one.
+let stationZoom = 12.5
 
 struct MapHeader: View {
     let name: String
@@ -24,6 +27,7 @@ struct MapHeader: View {
     /// StationItem id this detail shows — the favorite star toggles it.
     let favoriteId: String
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
 
     var body: some View {
@@ -55,6 +59,20 @@ struct MapHeader: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                // Scoped to the pill itself, not the whole header — the back
+                // button and favorite star sit either side of this in the same
+                // HStack, and a wider hit target would swallow their taps
+                // (issue #32 design note).
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // Lookup should never fail post-itemId-fix (every detail's
+                    // favoriteId is a catalog-exact StationItem id); a miss is
+                    // a no-op, not a crash.
+                    if let item = StationItem.byId[favoriteId] { openMapFocused(item) }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("map-header-title")
                 Spacer()
                 // Favorite star — the back button's mirror (design pass
                 // item 4a): same 44pt circle chrome, top-right. It is the

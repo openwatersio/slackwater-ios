@@ -347,6 +347,39 @@ extension EnvironmentValues {
     }
 }
 
+/// Same reasoning as `openTideDetail` above, generalized to any CHS route: a
+/// detail or the Downloads sheet pushes a port/gate through this, not a
+/// NavigationLink or a Button — NavigationLink is a Button, and Button press
+/// tracking goes dead below the strip in the iPad split detail column (same
+/// hazard `openTideDetail` avoids). One closure for every CHS push — the
+/// online gate's nearest-shipped link and the downloads-row tap both go
+/// through this, rather than each carrying its own single-case key.
+private struct OpenChsRouteKey: EnvironmentKey {
+    static let defaultValue: (ChsRoute) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openChsRoute: (ChsRoute) -> Void {
+        get { self[OpenChsRouteKey.self] }
+        set { self[OpenChsRouteKey.self] = newValue }
+    }
+}
+
+/// Same reasoning as `openChsRoute` above: the map-header title (issue #32)
+/// jumps straight to the map, focused on the detail's own station — not a
+/// NavigationLink or Button, same press-tracking hazard in the iPad split
+/// detail column.
+private struct OpenMapFocusedKey: EnvironmentKey {
+    static let defaultValue: (StationItem) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openMapFocused: (StationItem) -> Void {
+        get { self[OpenMapFocusedKey.self] }
+        set { self[OpenMapFocusedKey.self] = newValue }
+    }
+}
+
 /// The one tide affordance on a current/gate detail (split-scrubbers spec
 /// §2): a quiet link in the list's matching-stations convention, navigating
 /// to the port's own TideDetailView. No tide numbers live here anymore.

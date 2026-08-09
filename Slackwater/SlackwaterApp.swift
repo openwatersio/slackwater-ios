@@ -230,6 +230,18 @@ struct StationListView: View {
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
+    /// One-shot: set by the map-header title tap (issue #32), read by
+    /// `mapPane` as a camera override, then cleared — on a fresh mount via
+    /// `.onAppear`, or (review finding: a detail reached via a MAP PIN tap
+    /// leaves `showMap` already `true`, so the map never remounts) via
+    /// `MapViewRepresentable.onFocusApplied` once `updateUIView` actually
+    /// moves an already-live camera. Either way, the next fix landing or
+    /// user pan owns the camera after that, same as the plain discovery map.
+    @State private var mapFocus: StationItem?
+    /// Bumped on every focus tap — `MapViewRepresentable.focusToken`'s
+    /// "did a NEW focus arrive" signal for `updateUIView`, distinct from the
+    /// coordinate itself so re-focusing the SAME station twice still counts.
+    @State private var mapFocusToken = 0
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
@@ -288,6 +300,25 @@ struct StationListView: View {
     /// What distances are measured from: the fix, or the Victoria fallback.
     private var anchor: (lat: Double, lon: Double) { fix ?? fallbackFix }
 
+    /// One definition, two attachment points (the root `.environment` below,
+    /// and the re-forward into `.sheet(showDownloads)`) — kept as a single
+    /// property so they can't drift apart.
+    private var openChsRoute: (ChsRoute) -> Void { { path.append($0) } }
+
+    /// The map-header title tap (issue #32): pop whatever detail is pushed,
+    /// switch to the map, and hand it a one-shot focus on this station.
+    /// Unconditional path reset (unlike the FAB toggle's `regular && showMap`
+    /// case below) — this always fires FROM a pushed detail in both layouts,
+    /// where the fabBar-toggle path only needs it at regular width.
+    private var openMapFocused: (StationItem) -> Void {
+        { item in
+            mapFocus = item
+            mapFocusToken += 1
+            path = NavigationPath()
+            showMap = true
+        }
+    }
+
     var body: some View {
         Group {
             if regular {
@@ -304,16 +335,39 @@ struct StationListView: View {
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
         .environment(\.openTideDetail) { path.append($0) }
-        // Same reasoning, same attachment point — an online gate's honesty
-        // card pushes its nearest shipped gate through this, not a
-        // NavigationLink (OnlineGateDetailView's OpenChsGateKey doc comment).
-        .environment(\.openChsGate) { path.append(ChsRoute.currentGate($0)) }
+        // Same reasoning, same attachment point — every CHS push (an online
+        // gate's honesty card, a Downloads-sheet row) rides this one closure,
+        // never a NavigationLink (OpenChsRouteKey doc comment, Theme.swift).
+        // Dismiss-then-append (OfflineManagerView's row tap) still lands here:
+        // this appends to the ROOT stack's path regardless of which presented
+        // sheet or pushed screen the tap came from, so a detail that opened
+        // the sheet stays under the newly pushed route on the back stack —
+        // correct behavior, not a side effect to work around.
+        .environment(\.openChsRoute, openChsRoute)
+        // Same attachment point, same reasoning — the map-header title lives
+        // inside a pushed detail in both layouts, so ordinary ancestor
+        // inheritance from here is enough; no `.sheet` re-forward needed
+        // because MapHeader never appears inside Settings or Downloads.
+        .environment(\.openMapFocused, openMapFocused)
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
-        .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
+        // Re-forwarded here too: Settings pushes `OfflineManagerList` in its
+        // OWN `NavigationStack` (SettingsView.swift), and that push inherits
+        // fine — but SettingsView itself is this `.sheet`'s ROOT content, so
+        // without this it's SettingsView's environment that's broken, not
+        // OfflineManagerList's. Same boundary as the comment below.
+        .sheet(isPresented: $showSettings) { SettingsView().environment(\.openChsRoute, openChsRoute) }
+        // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
+        // a separate presentation hierarchy that only crosses SYSTEM
+        // environment keys (like `\.dismiss`) automatically — a custom key set
+        // above the `.sheet(...)` call resolves to `openChsRoute`'s no-op
+        // `defaultValue` inside it otherwise (confirmed live: the row's
+        // `dismiss()` fired, the following `openChsRoute(route)` silently did
+        // nothing). Every `.sheet` that can present `OfflineManagerView` needs
+        // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place, anchor: anchor) { open($0) }
         }
@@ -473,13 +527,34 @@ struct StationListView: View {
     /// The in-place map surface (prototype READY·MAP): no header, no close —
     /// the toggle FAB is the only way back.
     private var mapPane: some View {
-        MapViewRepresentable(center: fix.map {
-            CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon)
-        } ?? SALISH_CENTER) { item in
+        // `mapFocus` wins when set (header-title tap, issue #32): centers on
+        // that station at its own detail zoom rather than the fix/discovery
+        // camera. Usually `makeUIView` runs fresh here (`if showMap { mapPane
+        // }` is a structural identity change, so this read is a plain
+        // one-shot init) — EXCEPT a detail reached via a map PIN tap leaves
+        // `showMap` already `true`, so the pane never remounts and the same
+        // `MLNMapView` survives the push/pop. `focusToken`/`onFocusApplied`
+        // exist for exactly that case: `updateUIView` (not `makeUIView`)
+        // catches the new focus and moves the live camera (review finding on
+        // the first cut of #32) — see `MapViewRepresentable`'s doc comments.
+        MapViewRepresentable(
+            center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                ?? SALISH_CENTER,
+            zoom: mapFocus == nil ? discoveryZoom : stationZoom,
+            focusToken: mapFocus == nil ? nil : mapFocusToken,
+            // Only reached on the NO-remount path (see above) — a fresh
+            // mount's `mapFocus` is cleared by `.onAppear` below instead.
+            onFocusApplied: { DispatchQueue.main.async { mapFocus = nil } }
+        ) { item in
             if regular { showMap = false }  // the detail pane shows the pick
             open(item)
         }
         .accessibilityIdentifier("map-canvas")
+        // Consumed once, fresh-mount case: the next appearance of this pane
+        // (fab toggle, a fresh pick) starts from the fix/discovery camera
+        // again, not a stale focus from a station visited an hour ago.
+        .onAppear { mapFocus = nil }
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
             // Was "Depths not reduced to chart datum — not for navigation."

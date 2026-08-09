@@ -11,7 +11,7 @@ struct OnlineGateDetailView: View {
     @AppStorage(unitsKey) private var units = "imperial"
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @ObservedObject private var net = Connectivity.shared
-    @Environment(\.openChsGate) private var openGate
+    @Environment(\.openChsRoute) private var openChsRoute
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
@@ -290,7 +290,7 @@ struct OnlineGateDetailView: View {
             .foregroundStyle(SN.leaf)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture { openGate(nearest) }
+            .onTapGesture { openChsRoute(.currentGate(nearest)) }
             .padding(.horizontal, 36)  // lines up with ChsAmberCard's text inset (16 outer + 20 inner)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)
@@ -303,20 +303,5 @@ struct OnlineGateDetailView: View {
     private func returnToNow() {
         live = appNow()
         scrubTime = live
-    }
-}
-
-// MARK: - Detail-to-detail navigation (a CHS current gate — matches
-// `openTideDetail`'s reasoning in Theme.swift exactly: not a NavigationLink,
-// so press tracking survives the iPad split detail column, and this closure
-// is attached ONCE above both layouts in SlackwaterApp, never per-layout).
-private struct OpenChsGateKey: EnvironmentKey {
-    static let defaultValue: (ChsCurrentGateInfo) -> Void = { _ in }
-}
-
-extension EnvironmentValues {
-    var openChsGate: (ChsCurrentGateInfo) -> Void {
-        get { self[OpenChsGateKey.self] }
-        set { self[OpenChsGateKey.self] = newValue }
     }
 }
