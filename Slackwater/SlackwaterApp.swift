@@ -251,6 +251,10 @@ struct StationListView: View {
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
         .environment(\.openTideDetail) { path.append($0) }
+        // Same reasoning, same attachment point — an online gate's honesty
+        // card pushes its nearest shipped gate through this, not a
+        // NavigationLink (OnlineGateDetailView's OpenChsGateKey doc comment).
+        .environment(\.openChsGate) { path.append(ChsRoute.currentGate($0)) }
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
@@ -1327,23 +1331,92 @@ struct ChsCurrentGateCardView: View {
     var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
+    /// Only ever read for an online gate — a fitted gate never touches this.
+    @State private var onlineWindow: ChsOnlineWindow?
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
-        switch service.currentState(gate.id) {
-        case .fitted(let record):
-            CurrentCardView(record: record, km: km,
-                            provisional: service.isProvisional(gate.id) ? gate : nil)
-        case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Downloading Canadian current predictions…")
-        case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: chsPendingMessage("current", id: gate.id))
-        case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Canadian current predictions didn't finish downloading — open it to retry.")
+        Group {
+            if gate.isOnline {
+                onlineCard
+            } else {
+                switch service.currentState(gate.id) {
+                case .fitted(let record):
+                    CurrentCardView(record: record, km: km,
+                                    provisional: service.isProvisional(gate.id) ? gate : nil)
+                case .fitting:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: "Downloading Canadian current predictions…")
+                case .pending:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: chsPendingMessage("current", id: gate.id))
+                case .failed:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: "Canadian current predictions didn't finish downloading — open it to retry.")
+                }
+            }
         }
+        .task { if gate.isOnline, onlineWindow == nil { onlineWindow = ChsModelStore.loadOnline(gate.id) } }
+    }
+
+    /// The 7 online gates (online-gates spec §4): a covering fetched window
+    /// reads like any other current card; without one, the pending shell
+    /// carries the honest "fetched when connected" line instead of a queue
+    /// status this gate never has.
+    @ViewBuilder private var onlineCard: some View {
+        if let onlineWindow, onlineWindow.coversStrip(now: appNow()) {
+            OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
+        } else {
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                           message: "Online — official CHS predictions, fetched when connected")
+        }
+    }
+}
+
+/// An online gate's list card with a covering fetched window: same shell and
+/// reading treatment as `CurrentCardView`, off `ChsOnlineWindow.cardState`
+/// instead of a `CurrentStationRecord` — this gate has no harmonic model to
+/// build one from.
+struct OnlineGateCardView: View {
+    let gate: ChsCurrentGateInfo
+    let window: ChsOnlineWindow
+    var km: Double? = nil
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+
+    private var state: CurrentCardState { window.cardState(at: appNow()) }
+
+    var body: some View {
+        let state = state
+        StationCard(glyphKind: .current, glyphTone: CurrentCardView.glyphTone(state),
+                    name: gate.name, region: gate.region, km: km,
+                    detail: state.next.map { nextLine($0) }) {
+            if currentPhase(signed: state.signed) == .slack {
+                Text("SLACK")
+                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                    .foregroundStyle(SN.navyDeep)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(SN.go, in: Capsule())
+            } else {
+                (Text(formatSpeed(abs(state.signed), unit: speedUnit))
+                    .font(.largeTitle.monospacedDigit())
+                 + Text(" \(speedUnitLabel(speedUnit))")
+                    .font(.body))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    CompassArrow(deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection)
+                        .font(.caption2)
+                    Text(phaseWord(currentPhase(signed: state.signed))).font(.caption2)
+                }
+                .foregroundStyle(SN.foam.opacity(0.9))
+            }
+        }
+    }
+
+    private func nextLine(_ next: CurrentEvent) -> String {
+        let when = cardTime(next.time, gate.tz)
+        return next.kind == .slack
+            ? "Slack · \(when)"
+            : "\(next.turnLabel) \(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
     }
 }
 

@@ -98,13 +98,18 @@ final class ChsFitService: ObservableObject {
     static let autoFitGates = 3
     static let autoFitGateRadiusKm = 150.0
 
-    /// Every CHS station the app could fit, ports and validated gates.
+    /// Every CHS station the app could fit, ports and validated gates. The 7
+    /// online (fit-reject) gates are excluded here, at the source every job —
+    /// auto-fit and opened-by-hand alike — is drawn from (`autoFitSet` below,
+    /// and `promote`'s add-if-missing): they never get an on-device model, so
+    /// there is no fit for them to wait in line for (online-gates spec §1,
+    /// `ChsCurrentGateInfo.isOnline`'s "never queued").
     private static let candidates: [ChsJob] = {
         var jobs = ChsStationInfo.all.map {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: false,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: tideFitDays)
         }
-        jobs += ChsCurrentGateInfo.all.map {
+        jobs += ChsCurrentGateInfo.all.filter { !$0.isOnline }.map {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: true,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: $0.fitDays)
         }

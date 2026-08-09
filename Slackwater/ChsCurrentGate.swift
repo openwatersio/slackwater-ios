@@ -177,6 +177,18 @@ struct ChsOnlineWindow: Codable {
         let neededEnd = today.addingTimeInterval(Timeline.forwardHours * 3600)
         return start <= neededStart && end >= neededEnd
     }
+
+    /// The list/search card's reading: nearest 15-min sample to `now` (a card
+    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
+    /// interpolating the drawn curve earns its keep), and the next event from
+    /// the same fetched series `sampleEvents` scans — the same shape
+    /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
+    /// card rendering doesn't need to know which kind of gate it's reading.
+    func cardState(at now: Date) -> CurrentCardState {
+        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
+        let next = sampleEvents(points).first { $0.time > now }
+        return CurrentCardState(signed: signed, next: next)
+    }
 }
 
 // MARK: - The fast answer, in words
