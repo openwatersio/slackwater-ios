@@ -79,7 +79,7 @@ extension TypeScaleTests {
     ///        (TimelineStrip.swift)
     ///      - `TimelineStrip.compactTime(_:)` calls `cardTime(` and returns
     ///        a `String` that is only ever rendered through `gutterText(_:)`
-    ///        (and `mergedGutterText(_:_:)` once a later task lands), both
+    ///        and `mergedGutterText(_:_:)`, both
     ///        of which apply `.system(size: 10).monospaced()` — so the
     ///        output is mono by construction, but the mono trait sits
     ///        outside the ±4-line window.
@@ -184,7 +184,8 @@ extension TypeScaleTests {
         // window-remaining duration, now labelled with the threshold speed
         // instead of a clock range), net -3. The absolute clock times moved
         // to the gutter and ScrubWhen, not a regression here. A floor of 20
-        // keeps the same headroom as before;
+        // leaves 3 points of headroom (23 real), down from 4 (29 vs the old
+        // floor of 25) — still enough that a genuine drop reads as a signal;
         // a floor of 5 would survive the scan silently collapsing to a handful
         // of files — the same "found nothing, passed forever" failure the
         // retired-font test guards with its `scanned > 10`.

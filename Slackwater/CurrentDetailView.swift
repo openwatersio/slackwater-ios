@@ -43,8 +43,8 @@ struct CurrentDetailView: View {
     }
 
     /// The fast answer's marking, on every number this page prints: the tilde
-    /// appears when the reading IS provisional. Three call sites inlined this
-    /// ternary; the next-slack block below reaches it three more times.
+    /// appears when the reading IS provisional. Every call site below reaches
+    /// it rather than inlining the ternary.
     private var tilde: String { provisionalGate == nil ? "" : "~" }
 
     var body: some View {
@@ -114,7 +114,7 @@ struct CurrentDetailView: View {
                         // The tilde is the whole point of the provisional
                         // treatment: the number itself stops claiming to be
                         // exact, before any badge or card is read.
-                        (Text(provisionalGate == nil ? "" : "~").font(.largeTitle)
+                        (Text(tilde).font(.largeTitle)
                          + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
                          + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
                             .foregroundStyle(readingColor)

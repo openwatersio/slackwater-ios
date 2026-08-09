@@ -24,6 +24,10 @@ closing times are labelled.
 
 ## §1 Geometry — one gutter, one rule
 
+> Superseded by Amendment A (two-row gutter staggering; heights are 274
+> tide-only / 368 current-only, not the 262/356 below) — see
+> `docs/superpowers/plans/2026-08-08-scrubber-gutter-and-slack-bands.md`.
+
 `TimelineGeo` grows a label gutter below the track:
 
 ```swift
@@ -51,6 +55,11 @@ gutter labels are `.system(size: 10)`, not Dynamic Type. Do not "finish the
 job" here either.
 
 ## §2 Droplines and gutter times
+
+> Superseded by Amendment B: max flood/max ebb were dropped from the gutter
+> entirely — the gutter now carries slack windows only, and peaks keep their
+> speed label on the dot plus their exact time in the schedule table. See
+> `docs/superpowers/plans/2026-08-08-scrubber-gutter-and-slack-bands.md`.
 
 One helper on `TimelineCanvas`, called from both `drawTide` and `drawCurrent`:
 

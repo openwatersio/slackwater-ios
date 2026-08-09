@@ -227,11 +227,21 @@ struct TimelineData {
         }
         var currentPoints: [CurrentPoint] = []
         var currentEvents: [CurrentEvent] = []
+        // Only a real current station gets windows — computed inside this
+        // block (rather than behind a later `current != nil` guard) so the
+        // gate branch below, which overwrites `currentPoints`/`currentEvents`
+        // with schematic data, can never make windows out of that fiction.
+        var windows: [(slack: Date, start: Date, end: Date)] = []
         if let current {
             let s = current.engineStation
             currentPoints = s.speeds(from: start, to: end, step: 600)
             currentEvents = s.events(from: start.addingTimeInterval(-pad),
                                      to: end.addingTimeInterval(pad))
+            windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
+                slackWindow(currentPoints, around: e.time,
+                            threshold: Timeline.slackThresholdKn)
+                    .map { (slack: e.time, start: $0.start, end: $0.end) }
+            }
         }
         if let gate {
             let g = gate.engineGate
@@ -242,17 +252,6 @@ struct TimelineData {
             while t <= end {
                 currentPoints.append(CurrentPoint(time: t, speed: g.schematicSigned(at: t, slacks: slacks)))
                 t = t.addingTimeInterval(600)
-            }
-        }
-
-        // Only a real current station gets windows — the gate branch above
-        // leaves `current` nil, which is exactly the fiction guard.
-        var windows: [(slack: Date, start: Date, end: Date)] = []
-        if current != nil {
-            windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
-                slackWindow(currentPoints, around: e.time,
-                            threshold: Timeline.slackThresholdKn)
-                    .map { (slack: e.time, start: $0.start, end: $0.end) }
             }
         }
 
@@ -343,7 +342,8 @@ struct TimelineGeo {
     /// 24pt of clearance, and the number is set by the max-EBB speed label, not
     /// by the gutter text: that label draws at `curY(e.speed) + 14`, and `curY`
     /// clamps to `zeroY + curHalf` = 317, so it can reach ~331. Shrink this and
-    /// the strongest ebb of the week prints on top of its own time.
+    /// the strongest ebb of the week prints on top of a slack's time in the
+    /// gutter (peaks no longer carry a gutter time of their own — Amendment B).
     var gutterY: CGFloat { bodyBottom + 24 }
 
     /// Gutter y-position for a specific row (Amendment A).
