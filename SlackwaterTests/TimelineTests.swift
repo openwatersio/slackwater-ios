@@ -254,4 +254,125 @@ final class TimelineTests: XCTestCase {
         // A zero-width band (a window shorter than a rendering point) merges.
         XCTAssertEqual(gutterLabels(bandWidth: 0, startWidth: 46, endWidth: 46), .merged)
     }
+
+    /// Events scanned from a sampled series (online gates draw fetched points,
+    /// not a harmonic engine): slacks at interpolated zero crossings, one signed
+    /// maximum per run between them.
+    func testSampleEventsScanCrossingsAndExtrema() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        // 2 → -2 → 2 over 3 h at 15-min samples: crossings at +1h and +2h... use
+        // a triangle wave: v(i) = [2,1,0.5,-0.5,-1,-2,-1,-0.5,0.5,1,2] per 15 min.
+        let vs: [Double] = [2, 1, 0.5, -0.5, -1, -2, -1, -0.5, 0.5, 1, 2]
+        let pts = vs.enumerated().map { CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element) }
+        let events = sampleEvents(pts)
+        let slacks = events.filter { $0.kind == .slack }
+        XCTAssertEqual(slacks.count, 2)
+        // First crossing: between samples 2 (0.5) and 3 (-0.5) → halfway, 2250 s.
+        XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 2250, accuracy: 1)
+        XCTAssertEqual(slacks[1].time.timeIntervalSince(t0), 6750, accuracy: 1)
+        let ebbs = events.filter { $0.kind == .maxEbb }
+        XCTAssertEqual(ebbs.count, 1)
+        XCTAssertEqual(ebbs[0].speed, -2, accuracy: 1e-9)
+        XCTAssertEqual(ebbs[0].time.timeIntervalSince(t0), 5 * 900, accuracy: 1)
+        // Leading/trailing runs also get their maxima (floods at each end).
+        let floods = events.filter { $0.kind == .maxFlood }
+        XCTAssertEqual(floods.count, 2)
+        XCTAssertEqual(floods[0].speed, 2, accuracy: 1e-9)
+        XCTAssertEqual(floods[0].time.timeIntervalSince(t0), 0, accuracy: 1)
+        XCTAssertEqual(floods[1].speed, 2, accuracy: 1e-9)
+        XCTAssertEqual(floods[1].time.timeIntervalSince(t0), 10 * 900, accuracy: 1)
+        // Events alternate: no two slacks adjacent, no two maxima adjacent.
+        for (a, b) in zip(events, events.dropFirst()) {
+            XCTAssert((a.kind == .slack) != (b.kind == .slack))
+        }
+    }
+
+    /// A monotone window with no crossing: one maximum, no slacks, no crash.
+    func testSampleEventsMonotone() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = (0..<8).map { CurrentPoint(time: t0.addingTimeInterval(Double($0) * 900), speed: 1 + Double($0) * 0.1) }
+        let events = sampleEvents(pts)
+        XCTAssert(events.filter { $0.kind == .slack }.isEmpty)
+        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+    }
+
+    /// An exact-zero sample IS the slack — both polarities, no interpolation.
+    func testSampleEventsExactZeroSample() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        func pts(_ vs: [Double]) -> [CurrentPoint] {
+            vs.enumerated().map { CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element) }
+        }
+        for vs in [[-2.0, -1, 0, 1], [2.0, 1, 0, -1]] {
+            let events = sampleEvents(pts(vs))
+            let slacks = events.filter { $0.kind == .slack }
+            XCTAssertEqual(slacks.count, 1, "\(vs): the zero sample is one slack")
+            XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 2 * 900, accuracy: 1)
+            XCTAssertEqual(events.filter { $0.kind == .maxEbb }.count, 1, "\(vs)")
+            XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1, "\(vs)")
+        }
+        // Consecutive zeros: one slack, at the first zero sample.
+        let events = sampleEvents(pts([1, 0, 0, -1]))
+        XCTAssertEqual(events.filter { $0.kind == .slack }.count, 1)
+        XCTAssertEqual(events.filter { $0.kind == .slack }[0].time.timeIntervalSince(t0), 900, accuracy: 1)
+    }
+
+    /// The online-gate path: build directly from fetched points (no engine
+    /// station involved) — current-only strip, standard 340pt geometry, and
+    /// every in-window event lands as a snap stop (mirrors the DerivedGateTests
+    /// snap assertion for the schematic-gate path).
+    func testBuildFromOnlinePointsIsCurrentOnlyAndSnaps() {
+        let now = Date()
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: now)
+        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+
+        // 15-min samples spanning the whole strip window, oscillating with a
+        // ~12h period so slack/max events recur across it (real semidiurnal shape).
+        var pts: [CurrentPoint] = []
+        var t = start
+        while t <= end {
+            let hours = t.timeIntervalSince(start) / 3600
+            pts.append(CurrentPoint(time: t, speed: 2.0 * sin(hours / 6.0 * .pi)))
+            t = t.addingTimeInterval(900)
+        }
+
+        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
+
+        XCTAssert(d.hasCurrent && !d.hasTide)
+        // 380, not the 340 this test was written against: the gutter branch put
+        // a three-row event-time gutter under the track (Amendment C).
+        XCTAssertEqual(TimelineGeo(data: d).height, 380)
+        XCTAssertFalse(d.currentEvents.isEmpty)
+        // Fetched official samples are real velocities, so the online-gate path
+        // gets slack windows — the derived-gate path does not, because its curve
+        // is a schematic shape (gutter spec §3).
+        XCTAssertFalse(d.slackWindows.isEmpty,
+                       "online gates draw fetched speeds, so their slacks carry windows")
+        for w in d.slackWindows {
+            XCTAssert(w.start <= w.slack && w.slack <= w.end,
+                      "a window must bracket its own slack: \(w)")
+        }
+        XCTAssert(d.currentEvents
+            .filter { $0.time >= d.start && $0.time <= d.end }
+            .allSatisfy { e in d.snapTimes.contains { abs($0.timeIntervalSince(e.time)) < 1 } })
+    }
+
+    /// A window ending exactly on a slack sample must not trap (the post-loop
+    /// run close sees an empty run) — and the zero still reads as the slack.
+    func testSampleEventsTrailingZero() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let pts = [1.0, -1, 0].enumerated().map {
+            CurrentPoint(time: t0.addingTimeInterval(Double($0.offset) * 900), speed: $0.element)
+        }
+        let events = sampleEvents(pts)
+        let slacks = events.filter { $0.kind == .slack }
+        XCTAssertEqual(slacks.count, 2)                       // the crossing + the trailing zero
+        XCTAssertEqual(slacks[0].time.timeIntervalSince(t0), 450, accuracy: 1)
+        XCTAssertEqual(slacks[1].time.timeIntervalSince(t0), 1800, accuracy: 1)
+        XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+        XCTAssertEqual(events.filter { $0.kind == .maxEbb }.count, 1)
+    }
 }

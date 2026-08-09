@@ -12,6 +12,7 @@
 // axis arrives from IWLS station metadata at fit time. Nothing CHS-published
 // ships in the app — same licensing posture as the tide ports (chs-online §2).
 import Foundation
+import TideEngine
 
 /// Bundled identity for one validated CHS current gate.
 struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
@@ -32,6 +33,18 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
     /// Absent means no fast answer is offered: either the gate is final at 60 d
     /// anyway, or its 60-day error is over the usefulness floor.
     let provisionalSlackMinutes: Int?
+    /// True for the 7 fit-rejects: findable identities backed by official CHS
+    /// predictions fetched on demand, never fitted on-device (online-gates
+    /// spec §1). Absent/false for the 11 shipped, fittable gates.
+    var online: Bool? = nil
+    /// Plain-words measured error for the honesty card — this gate's own
+    /// number, never a generic hedge. Present only when `online`.
+    var onlineNote: String? = nil
+
+    /// A fit-reject backed by official CHS predictions fetched on demand —
+    /// never fitted, never queued (online-gates spec §1). Bundled entries
+    /// without the key decode as offline (the 11 shipped gates).
+    var isOnline: Bool { online ?? false }
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
@@ -106,6 +119,75 @@ extension ChsModelStore {
     static func saveCurrent(_ model: ChsCurrentModel) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try JSONEncoder().encode(model).write(to: currentUrl(model.stationID), options: .atomic)
+    }
+
+    /// The online gate's fetched window lives beside the fitted models, under
+    /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
+    static func onlineUrl(_ stationID: String) -> URL {
+        dir.appendingPathComponent("\(stationID)-online.json")
+    }
+
+    static func loadOnline(_ stationID: String) -> ChsOnlineWindow? {
+        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
+        return try? JSONDecoder().decode(ChsOnlineWindow.self, from: data)
+    }
+
+    static func saveOnline(_ window: ChsOnlineWindow) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try JSONEncoder().encode(window).write(to: onlineUrl(window.stationID), options: .atomic)
+    }
+}
+
+// MARK: - The fetched window (online gates: official CHS predictions, no fit)
+
+/// A window of official CHS current predictions for one online (fit-reject)
+/// gate — fetched on demand, never fitted, kept local like the fitted models.
+/// The strip span (`start`/`end`) is `Timeline`'s ‑48h…+132h around today's
+/// local midnight AT FETCH TIME, so a stale window is a coverage question,
+/// not a staleness heuristic — see `coversStrip`.
+struct ChsOnlineWindow: Codable {
+    var schemaVersion = 1
+    let stationID: String
+    let iwlsName: String
+    /// The gate's own timezone (added beyond the brief's shape): `coversStrip`
+    /// has to rebuild "today's local midnight" the same way `TimelineData`
+    /// does, and a window has to carry that alongside its dates to do it
+    /// without reaching back into the bundled gate identity.
+    let timezone: String
+    let fetchedAt: Date
+    let start: Date            // today −48h at fetch, the Timeline window
+    let end: Date              // today +132h at fetch
+    let floodDirection: Double // IWLS metadata at fetch time, kept local
+    let ebbDirection: Double
+    let times: [Double]        // epoch seconds, 15-min official samples
+    let speeds: [Double]       // signed kn along the flood axis (project())
+
+    var points: [CurrentPoint] {
+        zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
+    }
+
+    /// Does the stored window still cover the FULL strip `Timeline` would
+    /// build right now? True iff it reaches at least `now`'s local
+    /// −48h…+132h — the exact rule Task 5 refetches against.
+    func coversStrip(now: Date) -> Bool {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: timezone) ?? .current
+        let today = cal.startOfDay(for: now)
+        let neededStart = today.addingTimeInterval(-Timeline.backHours * 3600)
+        let neededEnd = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        return start <= neededStart && end >= neededEnd
+    }
+
+    /// The list/search card's reading: nearest 15-min sample to `now` (a card
+    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
+    /// interpolating the drawn curve earns its keep), and the next event from
+    /// the same fetched series `sampleEvents` scans — the same shape
+    /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
+    /// card rendering doesn't need to know which kind of gate it's reading.
+    func cardState(at now: Date) -> CurrentCardState {
+        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
+        let next = sampleEvents(points).first { $0.time > now }
+        return CurrentCardState(signed: signed, next: next)
     }
 }
 

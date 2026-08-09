@@ -56,7 +56,12 @@ struct ChsDetailView: View {
                             latitude: info.latitude, longitude: info.longitude, needs: nil)
                 }
             case .currentGate(let gate):
-                if case .fitted(let record) = service.currentState(gate.id) {
+                if gate.isOnline {
+                    // The 7 fit-rejects: no on-device model ever exists for
+                    // these, so there is no fit to wait on — a fetched
+                    // window or the honest why-not, never the waiting page.
+                    OnlineGateDetailView(gate: gate)
+                } else if case .fitted(let record) = service.currentState(gate.id) {
                     CurrentDetailView(record: record)
                 } else {
                     // Bare id: CHS gates key the catalog without the NOAA
@@ -78,7 +83,16 @@ struct ChsDetailView: View {
         // CHUNK boundary (~2.5 s), not its next station boundary (up to ~2.5
         // min for a 210-day gate). Nothing paid for is thrown away — chunks are
         // cached, so the yielded job resumes exactly where it stopped.
-        .onAppear { service.promote(route.jobID) }
+        //
+        // An online gate has no job — it was never queued (isOnline never
+        // queued, ChsFitService.candidates) — so there is nothing to promote.
+        .onAppear { if !isOnlineGate { service.promote(route.jobID) } }
+    }
+
+    /// True only for `.currentGate` routes on one of the 7 online gates.
+    private var isOnlineGate: Bool {
+        if case .currentGate(let gate) = route { return gate.isOnline }
+        return false
     }
 
     private func waiting(name: String, region: String, favoriteId: String,

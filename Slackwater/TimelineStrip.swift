@@ -125,6 +125,63 @@ func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 3) -> [Int] {
     return assignments
 }
 
+/// Slack/max events scanned from a sampled signed-velocity series — the
+/// online-gate path draws fetched official points, so events come from the
+/// samples, not a harmonic engine. Slacks interpolate the zero crossing or
+/// land exactly on a zero sample; each run between crossings contributes its
+/// largest |sample| as a signed maximum. 15-min official samples make
+/// interpolated slacks exact to a few minutes — the same series CHS's own
+/// tables are printed from.
+func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
+    guard points.count > 1 else { return [] }
+    var events: [CurrentEvent] = []
+    var runStart = 0
+    var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
+    var lastWasZero = false         // true if the previous sample was exactly zero
+
+    func closeRun(_ end: Int) {     // [runStart, end] inclusive
+        guard runStart <= end else { return }  // no-op when run is empty
+        // Collect only nonzero speeds; filter excludes exact-zero samples.
+        let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
+        guard !nonzeroInRun.isEmpty else { return }
+        let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
+        events.append(CurrentEvent(time: peak.time, speed: peak.speed,
+                                   kind: peak.speed > 0 ? .maxFlood : .maxEbb))
+    }
+
+    for i in 0..<points.count {
+        let current = points[i]
+        let sign = current.speed > 0 ? 1 : (current.speed < 0 ? -1 : 0)
+
+        if sign == 0 {
+            // Exact-zero sample: if preceded by nonzero and not consecutive zeros,
+            // this zero IS the slack.
+            if lastNonzeroSign != 0 && !lastWasZero {
+                closeRun(i - 1)
+                events.append(CurrentEvent(time: current.time, speed: 0, kind: .slack))
+                runStart = i + 1
+            }
+            lastWasZero = true
+        } else {
+            // Nonzero sample
+            if lastNonzeroSign != 0 && lastNonzeroSign != sign && !lastWasZero {
+                // Sign opposes last nonzero, no zero between: interpolate crossing.
+                let prev = points[i - 1]
+                let f = abs(prev.speed) / (abs(prev.speed) + abs(current.speed))
+                closeRun(i - 1)
+                events.append(CurrentEvent(
+                    time: prev.time.addingTimeInterval(current.time.timeIntervalSince(prev.time) * f),
+                    speed: 0, kind: .slack))
+                runStart = i
+            }
+            lastNonzeroSign = sign
+            lastWasZero = false
+        }
+    }
+    closeRun(points.count - 1)
+    return events.sorted { $0.time < $1.time }
+}
+
 // MARK: - Data: everything the strip draws, computed once per station
 
 struct TimelineDay {
@@ -188,11 +245,83 @@ struct TimelineData {
         return prev.1
     }
 
+    /// Everything both `build` overloads need before touching tide/current/
+    /// gate data: the timezone-anchored window and the per-day sun chrome.
+    /// Shared so the two builds can never drift on how "today" or the sun
+    /// times are computed.
+    private struct DayChrome {
+        let tz: TimeZone
+        let today: Date
+        let start: Date
+        let end: Date
+        let days: [TimelineDay]
+    }
+
+    private static func dayChrome(tz: TimeZone, lat: Double, lon: Double, now: Date) -> DayChrome {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: now)
+        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        let days: [TimelineDay] = (-2...6).map { off in
+            let d0 = cal.date(byAdding: .day, value: off, to: today)!
+            let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
+            return TimelineDay(offset: off, start: d0,
+                               sunrise: sun.first { $0.kind == .sunrise }?.time,
+                               sunset: sun.first { $0.kind == .sunset }?.time)
+        }
+        return DayChrome(tz: tz, today: today, start: start, end: end, days: days)
+    }
+
+    // Widen the event scans a touch so nothing at the edges is clipped.
+    private static let eventPad = 6.0 * 3600
+
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
     /// reads it), never a drawn track (split-scrubbers spec §3).
     static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
         build(tide: nil, current: nil, now: now, gate: gate)
+    }
+
+    /// The online-gate path: current-only strip drawn from fetched CHS/NOAA
+    /// samples rather than a harmonic engine. Events come from `sampleEvents`
+    /// scanning the unclipped fetched series (mirrors the padded engine scan
+    /// below) so a slack/max sitting just outside the strip window still
+    /// counts if it lands within the pad; only `currentPoints`/`snapTimes`
+    /// clip to the visible window.
+    static func build(onlinePoints: [CurrentPoint], tz: TimeZone, lat: Double, lon: Double,
+                      now: Date) -> TimelineData {
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+        let start = chrome.start, end = chrome.end
+
+        let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
+        let currentEvents = sampleEvents(onlinePoints).filter {
+            $0.time >= start.addingTimeInterval(-eventPad) && $0.time <= end.addingTimeInterval(eventPad)
+        }
+
+        // Online gates DO get slack windows, unlike derived gates. The reason
+        // the derived path has none is that its curve is a schematic ±1 shape,
+        // so a sub-threshold window measured off it would be fiction (gutter
+        // spec §3). These are fetched OFFICIAL samples — real velocities, just
+        // downloaded rather than computed — so the window means exactly what it
+        // means at a harmonic station. Same computation, same series the strip
+        // draws.
+        let windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
+            slackWindow(currentPoints, around: e.time,
+                        threshold: Timeline.slackThresholdKn)
+                .map { (slack: e.time, start: $0.start, end: $0.end) }
+        }
+
+        let sunTimes = chrome.days.filter { $0.offset <= 5 }
+            .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
+        let snaps = (currentEvents.map(\.time) + sunTimes)
+            .filter { $0 >= start && $0 <= end }
+            .sorted()
+
+        return TimelineData(tz: chrome.tz, today: chrome.today, start: start, end: end, days: chrome.days,
+                            tidePoints: [], tideExtremes: [],
+                            currentPoints: currentPoints, currentEvents: currentEvents,
+                            snapTimes: snaps, slackWindows: windows)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
@@ -201,22 +330,10 @@ struct TimelineData {
         let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
         let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
         let lon = gate?.gate.longitude ?? current?.longitude ?? tide?.longitude ?? -123.0
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-        let today = cal.startOfDay(for: now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+        let today = chrome.today, start = chrome.start, end = chrome.end, days = chrome.days
 
-        let days: [TimelineDay] = (-2...6).map { off in
-            let d0 = cal.date(byAdding: .day, value: off, to: today)!
-            let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
-            return TimelineDay(offset: off, start: d0,
-                               sunrise: sun.first { $0.kind == .sunrise }?.time,
-                               sunset: sun.first { $0.kind == .sunset }?.time)
-        }
-
-        // Widen the event scans a touch so nothing at the edges is clipped.
-        let pad = 6.0 * 3600
+        let pad = eventPad
         var tidePoints: [TidePoint] = []
         var tideExtremes: [TideExtreme] = []
         if let tide {

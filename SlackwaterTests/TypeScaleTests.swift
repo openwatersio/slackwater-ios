@@ -74,8 +74,8 @@ extension TypeScaleTests {
     ///    `knownIndirections` below rather than silently passing unseen:
     ///      - `CurrentCardView.nextLine(_:)` (SlackwaterApp.swift)
     ///      - `RecentRowLabel.reading` (SlackwaterApp.swift)
-    ///      - `scheduleEntries()` in the three detail views, consumed by
-    ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FOURTH file
+    ///      - `scheduleEntries()` in the four detail views, consumed by
+    ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
     ///      - `TimelineStrip.compactTime(_:)` calls `cardTime(` and returns
     ///        a `String` that is only ever rendered through `gutterText(_:)`
@@ -104,6 +104,7 @@ extension TypeScaleTests {
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
+            "OnlineGateDetailView.swift:scheduleEntries",
             "TimelineStrip.swift:compactTime", // calls cardTime() but .monospaced() is in gutterText() renderer
         ]
         // The `detail:` exemption below rests on one fact: StationCard's own
@@ -175,21 +176,17 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        // Count is 23 after gutter-readouts-go-relative deletions (26 before,
-        // verified against 3aec399): four formatter lines went — CurrentDetailView's
-        // next-slack cardTime() line, its window band line (formatSpeed() +
-        // two cardTime()s, one checked line), and its then-max-flood
-        // formatSpeed() line; plus DerivedGateDetailView's next-slack
-        // cardTime() line — offset by one newly added formatSpeed() line (the
-        // window-remaining duration, now labelled with the threshold speed
-        // instead of a clock range), net -3. The absolute clock times moved
-        // to the gutter and ScrubWhen, not a regression here. A floor of 20
-        // leaves 3 points of headroom (23 real), down from 4 (29 vs the old
-        // floor of 25) — still enough that a genuine drop reads as a signal;
-        // a floor of 5 would survive the scan silently collapsing to a handful
-        // of files — the same "found nothing, passed forever" failure the
-        // retired-font test guards with its `scanned > 10`.
-        XCTAssertGreaterThan(checked, 20, "expected to find numeric Text sites, found \(checked)")
+        // Count is 33, measured across this merge. The gutter branch dropped it
+        // to 23 — the readouts lost their absolute cardTime()/formatSpeed()
+        // lines when exact times moved to the strip's gutter — and the branch
+        // lowered this floor to 20 to match. Merging online-gates put it back
+        // up: OnlineGateDetailView alone contributes 7 sites. The floor returns
+        // to 25 because the premise for lowering it is gone, not because 25 is
+        // magic; 33 against 25 is the same order of headroom the number was
+        // originally chosen with. A floor of 5 would survive the scan silently
+        // collapsing to a handful of files — the same "found nothing, passed
+        // forever" failure the retired-font test guards with its `scanned > 10`.
+        XCTAssertGreaterThan(checked, 25, "expected to find numeric Text sites, found \(checked)")
         XCTAssertTrue(offenders.isEmpty,
                       "numeric reading without mono treatment (or a named indirection exception):\n"
                       + offenders.joined(separator: "\n"))

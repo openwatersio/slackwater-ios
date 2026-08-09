@@ -27,8 +27,10 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tides, 1_100, "NOAA tide stations")
         XCTAssertGreaterThanOrEqual(currents, 800, "NOAA current stations")
         XCTAssertGreaterThanOrEqual(chs, 1_000, "CHS tide station identities")
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 11,
-                       "Canadian CURRENT gates stay the 11 validated Salish ones (M47/M53)")
+        // +7 online fit-reject identities (online-gates task 1) — count moved
+        // by exactly the 7 new entries, so this floor is bumped, not broken.
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 18,
+                       "the 11 validated Salish gates (M47/M53) plus the 7 online fit-rejects")
         XCTAssertEqual(Set(StationItem.all.map(\.id)).count, StationItem.all.count,
                        "two stations sharing an id is a duplicate row, pin and model file")
     }

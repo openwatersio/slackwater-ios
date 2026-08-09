@@ -2040,4 +2040,176 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertFalse(heightLabels(app).isEmpty, "fitted, but no numbers")
         save(app, "m53-canada-fitted.png")
     }
+
+    // MARK: - Online gates (task-6: the 7 fit-reject gates, fetched-on-demand
+    // CHS predictions instead of an on-device fit — no network in either test:
+    // the unfetched page below relies on `-networkKillSwitch` staying up for
+    // its whole run, the fetched one relies on `ChsModelStore.saveOnline`
+    // writing a covering window before the app ever draws a frame.)
+
+    /// The origin report: a fresh install can FIND Sechelt Rapids by its
+    /// "skookumchuck" alias, and the tap lands on the honest explanation, not a
+    /// dead end (M48). `-chsResetModels` leaves no stored window (it wipes the
+    /// whole `ChsModelStore.dir`, `-online.json` included — same directory as
+    /// the fitted files); `-networkKillSwitch` is what keeps the honesty card
+    /// up for the length of the test — without it, `OnlineGateDetailView.onAppear`
+    /// fires a REAL IWLS fetch the moment the honesty card would otherwise be
+    /// asserted, and a fetch that lands mid-test would swap it for the fetched
+    /// detail out from under the assertions (SlackwaterApp.swift's
+    /// `seedOnlineWindow` doc comment covers the other half of this same
+    /// coverage question). The nearest-gate-link push is NOT a list-driven
+    /// reset (`openChsGate`'s doc comment, OnlineGateDetailView.swift): it
+    /// stacks onto Sechelt's own detail, so one `detail-back` lands back on
+    /// Sechelt, not the list — which is exactly the page this test stars, to
+    /// exercise the bare-id favorite rule (ChsCurrentGate.swift's `itemId`
+    /// comment, the 2026-08-08 fresh-install bug) on an online gate
+    /// specifically, never fitted, never queued.
+    func testOnlineGateUnfetchedShowsHonestyCard() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-chsResetModels", "-seedGate", "-networkKillSwitch",
+                               "-resetRecents", "-resetFavorites",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+
+        let honesty = app.descendants(matching: .any)["online-honesty-card"].firstMatch
+        XCTAssert(honesty.waitForExistence(timeout: 5),
+                  "an online gate with no window must show the honesty card, never a dead end")
+
+        // Its one tap out: the nearest of the 11 shipped (fittable) gates —
+        // Dodd Narrows, ~67 km away. Bundled-identity distance, independent of
+        // the fix, so this is deterministic without depending on -fixLat/-fixLon.
+        let link = app.descendants(matching: .any)["nearest-gate-link"].firstMatch
+        XCTAssert(link.waitForExistence(timeout: 5), "nearest-gate-link missing from the honesty card")
+        if !link.isHittable { app.swipeUp() }  // it sits under the honesty card — likely already clear
+        XCTAssert(link.isHittable, "nearest-gate-link exists but never became hittable")
+        link.tap()
+
+        // Scoped to the now-active detail header, not a bare name lookup: on
+        // iPad the persistent sidebar can carry "Dodd Narrows" in its own Near
+        // Me ranking independently of what's pushed, so the name alone is a
+        // secondary tell at best.
+        let header = app.otherElements["detail-map-header"].firstMatch
+        XCTAssert(header.waitForExistence(timeout: 5), "nearest-gate-link did not open a detail")
+        XCTAssert(header.staticTexts["Dodd Narrows"].firstMatch.exists,
+                  "nearest-gate-link did not land on the nearest shipped gate's detail")
+
+        // Back to Sechelt's own (still-honesty) detail — one pop, since the
+        // link pushed rather than reset the path.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch.waitForExistence(timeout: 5),
+                  "one back from the nearest-gate-link push should land on Sechelt's own honesty card")
+
+        // Star round-trip on the online gate itself — the bare-id rule.
+        let star = app.buttons["detail-favorite"].firstMatch
+        XCTAssert(star.waitForExistence(timeout: 5), "favorite star missing from the honesty-card detail")
+        star.tap()
+        XCTAssert(app.buttons["Remove favorite"].waitForExistence(timeout: 5),
+                  "star did not flip to favorited on the honesty-card detail")
+
+        // Back to the list: the favorite must RESOLVE — a Favorites group with
+        // Sechelt Rapids in it, not a phantom id and no group at all.
+        app.buttons["detail-back"].firstMatch.tap()
+        // iPhone closes search with the push; the iPad sidebar keeps it open.
+        if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5),
+                  "favoriting an online gate produced no Favorites group — the star wrote an id the list cannot resolve")
+        let row = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(row.exists, "the favorited online gate is missing from the Favorites group")
+
+        // Leave the simulator as found.
+        row.swipeLeft()
+        XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
+        app.buttons["Unfavorite"].firstMatch.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "cleanup unfavorite left the Favorites group behind")
+    }
+
+    /// Seeded window: the online gate renders the exact single-track detail a
+    /// real fetch would produce (`OnlineGateDetailView`'s fetched branch), and
+    /// nothing from the fitted-station provisional story leaks onto it — an
+    /// online gate is never queued and never fits, so there is no fast answer
+    /// to mark (`ChsCurrentGateInfo.isOnline`'s exclusion from
+    /// `ChsFitService.candidates`).
+    func testOnlineGateFetchedRendersDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-seedOnlineWindow", "chs-sechelt-rapids",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "the seeded window did not render the fetched strip")
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))  // MonoLabel uppercases
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
+            .firstMatch.waitForExistence(timeout: 5), "slack window missing under Next slack")
+
+        let provenance = app.staticTexts["online-provenance"].firstMatch
+        XCTAssert(provenance.waitForExistence(timeout: 5), "provenance footer missing")
+        XCTAssert(provenance.label.contains("CHS-published"),
+                  "the fetched footer must say CHS-published — never claim an on-device computation")
+
+        XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
+            .firstMatch.waitForExistence(timeout: 5), "today's schedule row missing")
+
+        // No fitted-station provisional story belongs anywhere near this page.
+        XCTAssertFalse(app.descendants(matching: .any)["provisional-badge"].firstMatch.exists,
+                       "an online gate can never carry the fitted-station provisional badge")
+        XCTAssertFalse(app.descendants(matching: .any)["provisional-reading-badge"].firstMatch.exists,
+                       "an online gate can never show a fitted-station fast-answer amber reading")
+        XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
+                       "a covering window must render the real detail, not the honesty card")
+    }
+
+    /// Full-plan only (skipped in the Fast plan — see TestPlans/Slackwater.xctestplan):
+    /// the spec's open item, verified against REAL IWLS rather than a seeded window.
+    /// Sechelt Rapids is one of the 7 fit-reject gates (ChsCurrentGate.swift) — this
+    /// proves IWLS actually resolves and serves wcsp1/wcdp1 (its station pair) for a
+    /// gate CHS rejects for on-device fitting, which is the online set's entire premise.
+    /// No `-networkKillSwitch`, no `-seedOnlineWindow`: `-chsResetModels` wipes any
+    /// stored window so `OnlineGateDetailView.onAppear` has to fetch live. If IWLS
+    /// stops resolving or serving this station, the honesty card persists and the
+    /// `online-provenance` wait times out — see the failure message below, which is
+    /// the actual signal this test exists to produce (Task 7 Step 3: a timeout here
+    /// means Sechelt may need dropping from the online set, a human call).
+    func testOnlineGateLiveFetch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels",
+                               "-fixLat", "48.4235", "-fixLon", "-123.3705"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+
+        // Generous, M46-idiom ceiling: a live IWLS fetch, not a seeded window.
+        let provenance = app.staticTexts["online-provenance"].firstMatch
+        XCTAssert(provenance.waitForExistence(timeout: 300),
+                  "Sechelt never fetched — check whether IWLS resolves/serves this gate")
+
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "the live fetch did not render the strip")
+        XCTAssert(provenance.label.contains("CHS-published"),
+                  "the fetched footer must say CHS-published — never claim an on-device computation")
+        XCTAssert(provenance.label.range(of: "covers to [A-Z][a-z]{2} \\d{1,2}",
+                                          options: .regularExpression) != nil,
+                  "provenance must carry a real covers-to date, not a placeholder")
+    }
 }
