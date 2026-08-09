@@ -504,6 +504,12 @@ extension ChsFitService {
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
         }
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        // IWLS can 200 with an empty series (a quiet chunk boundary, no error
+        // to catch). Saving anyway would fall through to the requested
+        // start/end below and stick forever — a zero-sample window that
+        // still reads as "covers the strip". Fail the fetch instead: the
+        // caller already turns any thrown error into the honesty card + retry.
+        guard !projected.isEmpty else { throw ChsError.emptySeries(gate.name) }
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
         // would make `coversStrip` pass on a window with a hole in it and
@@ -537,6 +543,8 @@ enum ChsError: Error {
     case noStations
     case noStationWithinTolerance(String, String, Double)
     case noFloodAxis(String)
+    /// IWLS 200'd with zero samples for the requested window.
+    case emptySeries(String)
     case badResponse(Int)
     case jsError(String)
 }
