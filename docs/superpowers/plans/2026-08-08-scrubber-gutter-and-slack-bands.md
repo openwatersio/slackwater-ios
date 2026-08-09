@@ -83,6 +83,34 @@ Everything else in Tasks 1–5 stands.
 
 ---
 
+## Amendment C — the gutter gets a third row
+
+**2026-08-09.** Amendment B left one residual: at dense stations two merged band
+labels could still land on the same row and overprint (observed on
+`m2-current-scrubbed.png`: `6:57AM–7:17AM` and `1:49PM–2:07PM` running
+together). It was parked as a product decision — a third row or a shorter label
+format.
+
+**Decision (Bryan, 2026-08-09): a third row.** The label format stays; the
+gutter grows.
+
+- `gutterRows`' default becomes `rows: Int = 3`.
+- `TimelineGeo.height` becomes `bodyBottom + 60`: **286** tide-only (226 + 60),
+  **380** current-only (320 + 60). Row baselines are `gutterY`, `gutterY + 12`,
+  `gutterY + 24`.
+- The band rect ends at `gutterY(row: 2) - 8` so the fill still reaches a label
+  that staggered to the last row.
+- `TimelineTests` height assertions move to 286 / 380, and the `gutterY(row:)`
+  in-bounds assertions must cover row 2.
+- `gutterRows`' doc comment says overlap becomes unavoidable "with a bounded
+  number of rows" — still true, just a larger bound. Its existing tests pass
+  `rows` explicitly where they mean 2; check none of them silently depend on
+  the default being 2, and add a case exercising three rows.
+
+The strip is now 28pt taller than it was before this branch on the tide side
+(258 → 286) and 40pt on the current side (340 → 380). That is the cost of
+every event time being legible.
+
 ## Amendment B — the gutter carries slack windows only
 
 **2026-08-08, after Task 4 shipped.** Task 4's bands rendered correctly and its
