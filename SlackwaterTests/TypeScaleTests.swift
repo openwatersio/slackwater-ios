@@ -175,12 +175,16 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        // Count is 23 after gutter-readouts-go-relative deletions (29 before):
-        // CurrentDetailView lost three cardTime() sites (next-slack, window
-        // start, window end) and the then-max-flood formatSpeed() line;
-        // DerivedGateDetailView lost its next-slack cardTime() site. The
-        // absolute clock times moved to the gutter and ScrubWhen, not a
-        // regression here. A floor of 20 keeps the same headroom as before;
+        // Count is 23 after gutter-readouts-go-relative deletions (26 before,
+        // verified against 3aec399): four formatter lines went — CurrentDetailView's
+        // next-slack cardTime() line, its window band line (formatSpeed() +
+        // two cardTime()s, one checked line), and its then-max-flood
+        // formatSpeed() line; plus DerivedGateDetailView's next-slack
+        // cardTime() line — offset by one newly added formatSpeed() line (the
+        // window-remaining duration, now labelled with the threshold speed
+        // instead of a clock range), net -3. The absolute clock times moved
+        // to the gutter and ScrubWhen, not a regression here. A floor of 20
+        // keeps the same headroom as before;
         // a floor of 5 would survive the scan silently collapsing to a handful
         // of files — the same "found nothing, passed forever" failure the
         // retired-font test guards with its `scanned > 10`.
