@@ -69,16 +69,22 @@ extension TypeScaleTests {
     /// 2. A formatter relayed through a helper `func`/computed `var` that
     ///    returns a `String`, consumed by a `Text` far away or in another
     ///    file, is invisible to line-proximity scanning — Swift puts no
-    ///    distance limit on where you can call a function. Three real sites
+    ///    distance limit on where you can call a function. Four real sites
     ///    are exactly this shape and are hand-verified into
     ///    `knownIndirections` below rather than silently passing unseen:
     ///      - `CurrentCardView.nextLine(_:)` (SlackwaterApp.swift)
     ///      - `RecentRowLabel.reading` (SlackwaterApp.swift)
-    ///      - `scheduleEntries()` in the three detail views, consumed by
-    ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FOURTH file
+    ///      - `scheduleEntries()` in the four detail views, consumed by
+    ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
+    ///      - `TimelineStrip.compactTime(_:)` calls `cardTime(` and returns
+    ///        a `String` that is only ever rendered through `gutterText(_:)`
+    ///        and `mergedGutterText(_:_:)`, both
+    ///        of which apply `.system(size: 10).monospaced()` — so the
+    ///        output is mono by construction, but the mono trait sits
+    ///        outside the ±4-line window.
     ///    That allowlist is a point-in-time attestation, not a live check:
-    ///    if a future edit strips the mono font from one of those three
+    ///    if a future edit strips the mono font from one of those four
     ///    consuming `Text`s, this test will NOT catch it — the regression
     ///    would be invisible to source-text scanning. Closing that gap needs
     ///    real data-flow analysis (a SwiftSyntax pass), out of scope for an
@@ -99,6 +105,7 @@ extension TypeScaleTests {
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
             "OnlineGateDetailView.swift:scheduleEntries",
+            "TimelineStrip.swift:compactTime", // calls cardTime() but .monospaced() is in gutterText() renderer
         ]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
@@ -169,13 +176,16 @@ extension TypeScaleTests {
                 offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
             }
         }
-        // Count is 29 after split-scrubbers deletions (31 before): CurrentDetailView
-        // lost its paired-tide readout (two formatHeight sites) and the
-        // schedule's tide-extremes rows (one more) — the track it used to
-        // borrow, not a regression here. A floor of 25 keeps the same headroom;
-        // a floor of 5 would survive the scan silently collapsing to a handful
-        // of files — the same "found nothing, passed forever" failure the
-        // retired-font test guards with its `scanned > 10`.
+        // Count is 33, measured across this merge. The gutter branch dropped it
+        // to 23 — the readouts lost their absolute cardTime()/formatSpeed()
+        // lines when exact times moved to the strip's gutter — and the branch
+        // lowered this floor to 20 to match. Merging online-gates put it back
+        // up: OnlineGateDetailView alone contributes 7 sites. The floor returns
+        // to 25 because the premise for lowering it is gone, not because 25 is
+        // magic; 33 against 25 is the same order of headroom the number was
+        // originally chosen with. A floor of 5 would survive the scan silently
+        // collapsing to a handful of files — the same "found nothing, passed
+        // forever" failure the retired-font test guards with its `scanned > 10`.
         XCTAssertGreaterThan(checked, 25, "expected to find numeric Text sites, found \(checked)")
         XCTAssertTrue(offenders.isEmpty,
                       "numeric reading without mono treatment (or a named indirection exception):\n"

@@ -74,8 +74,8 @@ struct TideDetailView: View {
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
                             .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                        // Relative only — the absolute time is marked on the
-                        // strip at the extreme itself (2026-08-07 feedback).
+                        // Relative only — the absolute time drops to the strip's
+                        // gutter (gutter spec §1/§2, reversing the 2026-08-07 call).
                         Text("in \(countdown(from: scrubTime, to: next.time))")
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }

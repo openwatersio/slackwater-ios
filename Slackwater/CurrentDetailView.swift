@@ -34,17 +34,18 @@ struct CurrentDetailView: View {
     private var nextSlack: CurrentEvent? {
         timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
     }
-    /// The peak after the next slack — "then Max ebb 3.1 kn" (web `following`).
-    private var following: CurrentEvent? {
-        nextSlack.flatMap { slack in
-            timeline?.currentEvents.first { $0.kind != .slack && $0.time > slack.time }
-        }
-    }
+    /// The window around the next slack — looked up, not recomputed. The strip
+    /// draws these same numbers as a band (gutter spec §3).
     private var slackWin: (start: Date, end: Date)? {
-        guard let slack = nextSlack, let tl = timeline else { return nil }
-        return slackWindow(tl.currentPoints, around: slack.time,
-                           threshold: Timeline.slackThresholdKn)
+        guard let slack = nextSlack else { return nil }
+        return timeline?.slackWindows.first { $0.slack == slack.time }
+            .map { (start: $0.start, end: $0.end) }
     }
+
+    /// The fast answer's marking, on every number this page prints: the tilde
+    /// appears when the reading IS provisional. Every call site below reaches
+    /// it rather than inlining the ternary.
+    private var tilde: String { provisionalGate == nil ? "" : "~" }
 
     var body: some View {
         ScrollView {
@@ -101,13 +102,7 @@ struct CurrentDetailView: View {
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial, speedUnit: speedUnit,
-                               now: live, scrubTime: $scrubTime)
-                .padding(.horizontal, -16)  // full-bleed strip
-                .padding(.top, 12)
-
-            // Current readout below the strip.
+            // Current readout above the strip.
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     if phase == .slack {
@@ -119,7 +114,7 @@ struct CurrentDetailView: View {
                         // The tilde is the whole point of the provisional
                         // treatment: the number itself stops claiming to be
                         // exact, before any badge or card is read.
-                        (Text(provisionalGate == nil ? "" : "~").font(.largeTitle)
+                        (Text(tilde).font(.largeTitle)
                          + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
                          + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
                             .foregroundStyle(readingColor)
@@ -143,26 +138,40 @@ struct CurrentDetailView: View {
                 if let slack = nextSlack {
                     VStack(alignment: .trailing, spacing: 1) {
                         MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("\(provisionalGate == nil ? "" : "~")in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                            .font(.caption.monospacedDigit())
-                            // SN.go, not SN.leaf: this line says when slack is.
-                            // Same value today, but the token has to name the
-                            // meaning or retargeting one of them breaks it.
-                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         if let win = slackWin {
-                            Text("\(provisionalGate == nil ? "" : "~")under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
+                            // Counts to the window OPENING, not the slack instant:
+                            // this readout answers "when can I be there", and the
+                            // window is when the pass is transitable. The window
+                            // brackets the slack, so it is often already open —
+                            // then it says `now` (gutter spec §5).
+                            Text(win.start > scrubTime
+                                 ? "\(tilde)in \(countdown(from: scrubTime, to: win.start))"
+                                 : "\(tilde)now")
+                                .font(.caption.monospacedDigit())
+                                // SN.go, not SN.leaf: this line says when slack is.
+                                // Same value today, but the token has to name the
+                                // meaning or retargeting one of them breaks it.
+                                .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
+                            // Time REMAINING, not the window's original length —
+                            // an already-open window must not claim its full run.
+                            Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                                 .accessibilityIdentifier("slack-window")
-                        }
-                        if let then = following {
-                            Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                                .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                        } else {
+                            Text("\(tilde)in \(countdown(from: scrubTime, to: slack.time))")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                         }
                     }
                 }
             }
-            .padding(.top, 8)
+
+            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                               imperial: imperial, speedUnit: speedUnit,
+                               now: live, scrubTime: $scrubTime)
+                .padding(.horizontal, -16)  // full-bleed strip
+                .padding(.top, 12)
 
             MonoLabel(text: "‹ swipe to scrub ›",
                       color: SN.foam.opacity(0.4), tracking: 1.4)
