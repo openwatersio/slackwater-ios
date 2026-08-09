@@ -73,6 +73,19 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (start, end)
 }
 
+/// How a slack window's two edge times fit in the gutter (gutter spec §4).
+enum GutterLabels { case pair, merged }
+
+/// Two labels growing inward from the band's edges, or one merged range
+/// centred on it. Pure so the rule is testable without a `Canvas` — the widths
+/// come from `ctx.resolve(_:).measure(in:)` at the call site, never from a
+/// hardcoded point estimate, so this survives a font change.
+///
+/// Equality merges: labels that exactly touch are unreadable.
+func gutterLabels(bandWidth: CGFloat, startWidth: CGFloat, endWidth: CGFloat) -> GutterLabels {
+    startWidth + endWidth < bandWidth ? .pair : .merged
+}
+
 /// Greedy row assignment for gutter labels, left to right: each label takes the
 /// lowest row whose previous label has cleared it. When no row has cleared, it
 /// takes the row whose last label ends earliest — with a bounded number of rows
@@ -380,6 +393,12 @@ struct TimelineCanvas: View {
             .foregroundStyle(.white.opacity(0.65))
     }
 
+    private func mergedGutterText(_ a: Date, _ b: Date) -> Text {
+        Text("\(compactTime(a))–\(compactTime(b))")
+            .font(.system(size: 10).monospaced())
+            .foregroundStyle(.white.opacity(0.65))
+    }
+
     /// The dotted dropline and its gutter time (gutter spec §2, Amendment A). An event's
     /// exact time lives BELOW the track, reached by a line from the event's own
     /// dot — that is what lets every readout above the strip stay relative. Rows
@@ -553,13 +572,67 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // Measure and assign rows only to max Flood/Ebb events (Amendment A)
-        let maxEvents = filteredEvents.filter { $0.kind == .maxFlood || $0.kind == .maxEbb }
-        let maxCenters = maxEvents.map { data.x($0.time) }
-        let maxWidths = maxEvents.map { e in
-            ctx.resolve(gutterText(e.time)).measure(in: CGSize(width: 1000, height: 100)).width
+        // Slack-window band labels join the same gutter row assignment as the
+        // max-flood/max-ebb times (Amendment A): a band edge cannot overprint
+        // a neighbouring extreme. Each window contributes either two pair
+        // labels (edges growing inward) or one merged label — decided by
+        // measured widths — before any row is assigned.
+        struct BandLabel {
+            let text: Text
+            let drawX: CGFloat
+            let anchor: UnitPoint
+            let rowCenter: CGFloat  // the label's own centre, for collision math
+            let width: CGFloat
         }
-        let maxRows = gutterRows(centers: maxCenters, widths: maxWidths)
+        let box = CGSize(width: 1000, height: 100)
+        var bandLabels: [BandLabel] = []
+        for w in data.slackWindows {
+            let x0 = data.x(w.start), x1 = data.x(w.end)
+            let a = gutterText(w.start), b = gutterText(w.end)
+            let aw = ctx.resolve(a).measure(in: box).width
+            let bw = ctx.resolve(b).measure(in: box).width
+            switch gutterLabels(bandWidth: x1 - x0, startWidth: aw, endWidth: bw) {
+            case .pair:
+                bandLabels.append(BandLabel(text: a, drawX: x0, anchor: .leading,
+                                            rowCenter: x0 + aw / 2, width: aw))
+                bandLabels.append(BandLabel(text: b, drawX: x1, anchor: .trailing,
+                                            rowCenter: x1 - bw / 2, width: bw))
+            case .merged:
+                let m = mergedGutterText(w.start, w.end)
+                let mw = ctx.resolve(m).measure(in: box).width
+                let cx = (x0 + x1) / 2
+                bandLabels.append(BandLabel(text: m, drawX: cx, anchor: .center,
+                                            rowCenter: cx, width: mw))
+            }
+        }
+
+        // Measure the max-flood/max-ebb times, then run ONE row assignment
+        // over both them and the band labels above — the whole point of
+        // Amendment A is a single pass over everything competing for the
+        // gutter, not per-source row assignments that can still collide with
+        // each other.
+        let maxEvents = filteredEvents.filter { $0.kind == .maxFlood || $0.kind == .maxEbb }
+        let maxWidths = maxEvents.map { e in
+            ctx.resolve(gutterText(e.time)).measure(in: box).width
+        }
+        enum GutterSource { case maxEvent(Int), bandLabel(Int) }
+        var candidates: [(center: CGFloat, width: CGFloat, source: GutterSource)] = []
+        for (i, e) in maxEvents.enumerated() {
+            candidates.append((data.x(e.time), maxWidths[i], .maxEvent(i)))
+        }
+        for (i, bl) in bandLabels.enumerated() {
+            candidates.append((bl.rowCenter, bl.width, .bandLabel(i)))
+        }
+        candidates.sort { $0.center < $1.center }
+        let assignedRows = gutterRows(centers: candidates.map(\.center), widths: candidates.map(\.width))
+        var maxEventRow = [Int](repeating: 0, count: maxEvents.count)
+        var bandLabelRow = [Int](repeating: 0, count: bandLabels.count)
+        for (i, c) in candidates.enumerated() {
+            switch c.source {
+            case .maxEvent(let idx): maxEventRow[idx] = assignedRows[i]
+            case .bandLabel(let idx): bandLabelRow[idx] = assignedRows[i]
+            }
+        }
 
         var maxEventIndex = 0
         for e in filteredEvents {
@@ -574,6 +647,14 @@ struct TimelineCanvas: View {
                 ctx.draw(Text("slack").font(.system(size: 10).monospaced())
                             .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 14), anchor: .center)
+                // A slack WITH a window is drawn by its band below — the band
+                // already reaches the gutter, so a dropline would be a second
+                // mark saying the same thing. Without one (a violent gate the
+                // 10-min sampling steps over, and every derived gate) the plain
+                // dropline is what's left.
+                if !data.slackWindows.contains(where: { $0.slack == e.time }) {
+                    drawDrop(ctx, x: x, from: geo.zeroY, time: e.time)
+                }
             case .maxFlood, .maxEbb:
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
@@ -583,10 +664,30 @@ struct TimelineCanvas: View {
                             .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
                          at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
                          anchor: .center)
-                let row = maxRows[maxEventIndex]
+                let row = maxEventRow[maxEventIndex]
                 drawDrop(ctx, x: x, from: y, time: e.time, row: row)
                 maxEventIndex += 1
             }
+        }
+
+        // Bands LAST, over the curve: at 0.12 the fill reads as a highlight
+        // column tinting the ebb fill under it rather than an opaque patch
+        // fighting it, and the 2pt near-white curve still reads through
+        // (gutter spec §3). This opacity is the one number here expected to
+        // want a tuning pass against a real screenshot.
+        //
+        // The rect always reaches row 1's baseline, not row 0's: with two
+        // gutter rows the fill has to stay connected to a label that
+        // staggered down a row, not just the common case.
+        for w in data.slackWindows {
+            let x0 = data.x(w.start), x1 = data.x(w.end)
+            ctx.fill(Path(CGRect(x: x0, y: geo.zeroY, width: x1 - x0,
+                                 height: geo.gutterY(row: 1) - 8 - geo.zeroY)),
+                     with: .color(SN.go.opacity(0.12)))
+        }
+        for (i, bl) in bandLabels.enumerated() {
+            ctx.draw(bl.text, at: CGPoint(x: bl.drawX, y: geo.gutterY(row: bandLabelRow[i])),
+                     anchor: bl.anchor)
         }
     }
 }

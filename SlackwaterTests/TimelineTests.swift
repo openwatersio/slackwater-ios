@@ -211,4 +211,18 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(d.currentEvents.isEmpty, "the gate has slack events")
         XCTAssert(d.slackWindows.isEmpty, "but no windows — the curve is a shape (gutter spec §3)")
     }
+
+    /// The window's two edge labels grow INWARD from the band and collapse to
+    /// one merged range when they'd overlap (gutter spec §4). At 12pt/hour a
+    /// typical 1–3h window is 12–36pt wide and a "12:30PM" label is ~46pt, so
+    /// `merged` is the COMMON render — `pair` is the weak-station case.
+    func testGutterLabelsCollapseWhenTheyWouldOverlap() {
+        XCTAssertEqual(gutterLabels(bandWidth: 200, startWidth: 46, endWidth: 46), .pair)
+        XCTAssertEqual(gutterLabels(bandWidth: 30, startWidth: 46, endWidth: 46), .merged)
+        // Touching labels are unreadable, so equality merges.
+        XCTAssertEqual(gutterLabels(bandWidth: 92, startWidth: 46, endWidth: 46), .merged)
+        XCTAssertEqual(gutterLabels(bandWidth: 93, startWidth: 46, endWidth: 46), .pair)
+        // A zero-width band (a window shorter than a rendering point) merges.
+        XCTAssertEqual(gutterLabels(bandWidth: 0, startWidth: 46, endWidth: 46), .merged)
+    }
 }
