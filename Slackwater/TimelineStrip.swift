@@ -133,6 +133,15 @@ struct TimelineData {
     let currentEvents: [CurrentEvent]
     let snapTimes: [Date]    // prototype stops(): turns + slacks/maxes + sun events
 
+    /// The workable sub-threshold window around each slack, computed ONCE here
+    /// off the same `currentPoints` the strip draws (gutter spec §3). The green
+    /// band on the strip and the duration in the readout are therefore the same
+    /// numbers by construction, not by two call sites agreeing.
+    ///
+    /// Empty for a derived gate: `build(gate:)` synthesises a schematic ±1
+    /// shape, and a 0.5 kn window measured off a shape would be fiction.
+    let slackWindows: [(slack: Date, start: Date, end: Date)]
+
     var hasTide: Bool { !tidePoints.isEmpty }
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
@@ -223,6 +232,17 @@ struct TimelineData {
             }
         }
 
+        // Only a real current station gets windows — the gate branch above
+        // leaves `current` nil, which is exactly the fiction guard.
+        var windows: [(slack: Date, start: Date, end: Date)] = []
+        if current != nil {
+            windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
+                slackWindow(currentPoints, around: e.time,
+                            threshold: Timeline.slackThresholdKn)
+                    .map { (slack: e.time, start: $0.start, end: $0.end) }
+            }
+        }
+
         let sunTimes = days.filter { $0.offset <= 5 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = (tideExtremes.map(\.time) + currentEvents.map(\.time) + sunTimes)
@@ -232,7 +252,7 @@ struct TimelineData {
         return TimelineData(tz: tz, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps)
+                            snapTimes: snaps, slackWindows: windows)
     }
 }
 

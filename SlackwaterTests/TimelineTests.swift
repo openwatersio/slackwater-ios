@@ -80,7 +80,7 @@ final class TimelineTests: XCTestCase {
             tz: .current, today: t0, start: t0, end: t0.addingTimeInterval(3600),
             days: [], tidePoints: [], tideExtremes: [],
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
-            snapTimes: []))
+            snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
         XCTAssertEqual(cur.height, 368, "the two-row gutter adds 48 below the track (Amendment A)")
         XCTAssertEqual(cur.gutterY, 344, "row 0 baseline")
@@ -105,7 +105,7 @@ final class TimelineTests: XCTestCase {
             tz: tideData.tz, today: tideData.today, start: tideData.start, end: tideData.end,
             days: tideData.days, tidePoints: tideData.tidePoints, tideExtremes: tideData.tideExtremes,
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
-            snapTimes: tideData.snapTimes))
+            snapTimes: tideData.snapTimes, slackWindows: []))
         XCTAssert(both.hasTide && both.hasCurrent)
         XCTAssertEqual(both.height, 274, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
@@ -176,5 +176,39 @@ final class TimelineTests: XCTestCase {
         let rows = gutterRows(centers: centers, widths: widths)
         XCTAssertEqual(rows.count, centers.count)
         XCTAssert(rows.allSatisfy { $0 < 2 }, "all rows should be in valid range [0, 1]")
+    }
+
+    /// The window computation is build-time data now, not a per-view recompute
+    /// (gutter spec §3) — so the band on the strip and the duration in the
+    /// readout are the same numbers by construction.
+    func testSlackWindowsBracketTheirSlacks() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+        let d = TimelineData.build(tide: nil, current: station, now: Date())
+        let slacks = d.currentEvents.filter { $0.kind == .slack }
+        XCTAssertGreaterThan(slacks.count, 10, "a week of slacks must exist to window")
+        XCTAssertFalse(d.slackWindows.isEmpty)
+        for w in d.slackWindows {
+            XCTAssert(w.start <= w.slack && w.slack <= w.end,
+                      "a window must bracket its own slack: \(w)")
+            XCTAssert(slacks.contains { $0.time == w.slack },
+                      "every window belongs to a drawn slack event")
+        }
+    }
+
+    /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a
+    /// 0.5 kn window measured off it would be fiction (gutter spec §3). Its
+    /// slacks fall back to a plain dropline instead.
+    func testDerivedGateHasNoSlackWindows() throws {
+        let port = TideStationRecord(
+            id: "chs-point-atkinson", name: "Point Atkinson", region: "West Vancouver",
+            aliases: [], latitude: 49.337, longitude: -123.254,
+            timezone: "America/Vancouver", chartDatum: "Chart", datumOffset: 3.0,
+            constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
+        let gate = DerivedGateRecord(gate: ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }!,
+                                     port: port)
+        let d = TimelineData.build(gate: gate, now: Date())
+        XCTAssert(d.hasCurrent, "the schematic track exists")
+        XCTAssertFalse(d.currentEvents.isEmpty, "the gate has slack events")
+        XCTAssert(d.slackWindows.isEmpty, "but no windows — the curve is a shape (gutter spec §3)")
     }
 }
