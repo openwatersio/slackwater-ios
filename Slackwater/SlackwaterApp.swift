@@ -17,6 +17,22 @@ struct SlackwaterApp: App {
         if CommandLine.arguments.contains("-seedGate") {
             UserDefaults.standard.set(true, forKey: seenGateKey)
         }
+        // -seedOnlineWindow <id>: writes a fetched-looking ChsOnlineWindow for
+        // one of the 7 online (fit-reject) gates, so a UI test can land on
+        // OnlineGateDetailView's fetched single-track detail with no network.
+        if let i = CommandLine.arguments.firstIndex(of: "-seedOnlineWindow"),
+           CommandLine.arguments.indices.contains(i + 1) {
+            // Trap: ChsFitService.shared's own init calls
+            // ChsModelStore.resetIfRequested(), which wipes ChsModelStore.dir
+            // — the same directory the seed file below lands in. `shared` is a
+            // lazy `static let`, so if nothing has touched it yet, its init
+            // (and the wipe) fires the first time something does — e.g. the
+            // list view's `.task` — which would run AFTER this seed write and
+            // silently delete it. Touch `.shared` now so the one-time
+            // init/reset happens before the write, never after.
+            _ = ChsFitService.shared
+            seedOnlineWindow(stationID: CommandLine.arguments[i + 1])
+        }
     }
 
     var body: some Scene {
@@ -25,6 +41,43 @@ struct SlackwaterApp: App {
                 .preferredColorScheme(.dark)
         }
     }
+}
+
+/// UI-test hook (SlackwaterApp.init's `-seedOnlineWindow <id>`): writes a
+/// synthetic `ChsOnlineWindow` covering exactly the strip `Timeline` builds
+/// right now — the same -48h/+132h-around-today's-local-midnight math
+/// `ChsFitService.fetchOnlineWindow` uses for a real fetch (`coversStrip`'s
+/// neighborhood, ChsCurrentGate.swift) — so `OnlineGateDetailView` reads it as
+/// current and renders the fetched detail on first launch, no network
+/// involved. An M2-ish sine (12.42h period, ~2 kn amplitude) at 15-min samples
+/// gives the strip real slacks and maxima to assert against, not a flat line.
+///
+/// `-chsResetModels` (ChsStation.swift) already clears this file too: it
+/// removes the whole `ChsModelStore.dir`, the same directory `-online.json`
+/// files live in beside the fitted `.json`/`-current.json` ones
+/// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
+private func seedOnlineWindow(stationID: String) {
+    guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = gate.tz
+    let today = cal.startOfDay(for: appNow())
+    let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+    let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+    let period = 12.42 * 3600.0   // M2 tidal period, seconds
+    let amplitude = 2.0           // kn
+    var times: [Double] = []
+    var speeds: [Double] = []
+    var t = start
+    while t <= end {
+        times.append(t.timeIntervalSince1970)
+        speeds.append(amplitude * sin(2 * .pi * t.timeIntervalSince(start) / period))
+        t = t.addingTimeInterval(900)  // 15-min official-sample cadence
+    }
+    let window = ChsOnlineWindow(
+        stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
+        fetchedAt: appNow(), start: start, end: end,
+        floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
+    try? ChsModelStore.saveOnline(window)
 }
 
 /// Gate until a choice is made (prototype phase machine); list ever after.
@@ -251,6 +304,10 @@ struct StationListView: View {
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
         .environment(\.openTideDetail) { path.append($0) }
+        // Same reasoning, same attachment point — an online gate's honesty
+        // card pushes its nearest shipped gate through this, not a
+        // NavigationLink (OnlineGateDetailView's OpenChsGateKey doc comment).
+        .environment(\.openChsGate) { path.append(ChsRoute.currentGate($0)) }
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
@@ -1327,23 +1384,108 @@ struct ChsCurrentGateCardView: View {
     var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
+    /// Only ever read for an online gate — a fitted gate never touches this.
+    @State private var onlineWindow: ChsOnlineWindow?
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
-        switch service.currentState(gate.id) {
-        case .fitted(let record):
-            CurrentCardView(record: record, km: km,
-                            provisional: service.isProvisional(gate.id) ? gate : nil)
-        case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Downloading Canadian current predictions…")
-        case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: chsPendingMessage("current", id: gate.id))
-        case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Canadian current predictions didn't finish downloading — open it to retry.")
+        Group {
+            if gate.isOnline {
+                onlineCard
+            } else {
+                switch service.currentState(gate.id) {
+                case .fitted(let record):
+                    CurrentCardView(record: record, km: km,
+                                    provisional: service.isProvisional(gate.id) ? gate : nil)
+                case .fitting:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: "Downloading Canadian current predictions…")
+                case .pending:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: chsPendingMessage("current", id: gate.id))
+                case .failed:
+                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                                   message: "Canadian current predictions didn't finish downloading — open it to retry.")
+                }
+            }
         }
+        .task { refreshOnlineWindow() }
+        // The fitted path re-renders off `service.currentRecords` (the
+        // `@ObservedObject` above) the moment a fit lands. An online gate's
+        // data isn't in that dictionary — it's a disk read — so without this
+        // the row stayed on its stale `.task`-time read: opening the gate's
+        // detail (which fetches, saves, and pops back to this same
+        // still-mounted row) never re-fired `.task`, and the card sat on
+        // "fetched when connected" after the fetch had already landed.
+        // `onlineFetchStamp` is the same "something changed, reload" signal
+        // for the online-gate seam that `currentRecords` already is for the
+        // fitted one.
+        .onReceive(service.$onlineFetchStamp) { _ in refreshOnlineWindow() }
+    }
+
+    private func refreshOnlineWindow() {
+        guard gate.isOnline else { return }
+        onlineWindow = ChsModelStore.loadOnline(gate.id)
+    }
+
+    /// The 7 online gates (online-gates spec §4): a covering fetched window
+    /// reads like any other current card; without one, the pending shell
+    /// carries the honest "fetched when connected" line instead of a queue
+    /// status this gate never has.
+    @ViewBuilder private var onlineCard: some View {
+        if let onlineWindow, onlineWindow.coversStrip(now: appNow()) {
+            OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
+        } else {
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                           message: "Online — official CHS predictions, fetched when connected")
+        }
+    }
+}
+
+/// An online gate's list card with a covering fetched window: same shell and
+/// reading treatment as `CurrentCardView`, off `ChsOnlineWindow.cardState`
+/// instead of a `CurrentStationRecord` — this gate has no harmonic model to
+/// build one from.
+struct OnlineGateCardView: View {
+    let gate: ChsCurrentGateInfo
+    let window: ChsOnlineWindow
+    var km: Double? = nil
+    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+
+    private var state: CurrentCardState { window.cardState(at: appNow()) }
+
+    var body: some View {
+        let state = state
+        StationCard(glyphKind: .current, glyphTone: CurrentCardView.glyphTone(state),
+                    name: gate.name, region: gate.region, km: km,
+                    detail: state.next.map { nextLine($0) }) {
+            if currentPhase(signed: state.signed) == .slack {
+                Text("SLACK")
+                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                    .foregroundStyle(SN.navyDeep)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(SN.go, in: Capsule())
+            } else {
+                (Text(formatSpeed(abs(state.signed), unit: speedUnit))
+                    .font(.largeTitle.monospacedDigit())
+                 + Text(" \(speedUnitLabel(speedUnit))")
+                    .font(.body))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    CompassArrow(deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection)
+                        .font(.caption2)
+                    Text(phaseWord(currentPhase(signed: state.signed))).font(.caption2)
+                }
+                .foregroundStyle(SN.foam.opacity(0.9))
+            }
+        }
+    }
+
+    private func nextLine(_ next: CurrentEvent) -> String {
+        let when = cardTime(next.time, gate.tz)
+        return next.kind == .slack
+            ? "Slack · \(when)"
+            : "\(next.turnLabel) \(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
     }
 }
 

@@ -34,7 +34,8 @@
         "ScreenshotTests\/testM51PromotionInterruptsAnInFlightDownload()",
         "ScreenshotTests\/testM51ProvisionalGateShowsFastAnswerThenRefines()",
         "ScreenshotTests\/testM51ValidatedGateReachesFinalWithNoProvisionalStage()",
-        "ScreenshotTests\/testM53OnDemandCanadianStationFitsWhenOpened()"
+        "ScreenshotTests\/testM53OnDemandCanadianStationFitsWhenOpened()",
+        "ScreenshotTests\/testOnlineGateLiveFetch()"
       ],
       "target" : {
         "containerPath" : "container:Slackwater.xcodeproj",

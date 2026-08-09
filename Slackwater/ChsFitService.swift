@@ -46,6 +46,14 @@ final class ChsFitService: ObservableObject {
     /// Gates whose current record is the 60-day fast answer, not the full
     /// model. Published for the same reason.
     @Published private(set) var provisional: Set<String> = []
+    /// Bumped whenever an online gate's fetched window is saved
+    /// (`fetchOnlineWindow`, below). An online gate has no `currentRecords`
+    /// entry to publish — its data lives on disk (`ChsModelStore.loadOnline`)
+    /// — so this is the fit-landing signal's stand-in: a card holding a
+    /// stale disk read (opened before the fetch, still on screen after)
+    /// reloads off this the same way a fitted card re-renders off
+    /// `currentRecords` changing.
+    @Published private(set) var onlineFetchStamp = 0
 
     /// True once launched with `-networkKillSwitch` (UI tests' honest
     /// airplane-mode stand-in: every IWLS request throws before the socket).
@@ -98,13 +106,18 @@ final class ChsFitService: ObservableObject {
     static let autoFitGates = 3
     static let autoFitGateRadiusKm = 150.0
 
-    /// Every CHS station the app could fit, ports and validated gates.
+    /// Every CHS station the app could fit, ports and validated gates. The 7
+    /// online (fit-reject) gates are excluded here, at the source every job —
+    /// auto-fit and opened-by-hand alike — is drawn from (`autoFitSet` below,
+    /// and `promote`'s add-if-missing): they never get an on-device model, so
+    /// there is no fit for them to wait in line for (online-gates spec §1,
+    /// `ChsCurrentGateInfo.isOnline`'s "never queued").
     private static let candidates: [ChsJob] = {
         var jobs = ChsStationInfo.all.map {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: false,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: tideFitDays)
         }
-        jobs += ChsCurrentGateInfo.all.map {
+        jobs += ChsCurrentGateInfo.all.filter { !$0.isOnline }.map {
             ChsJob(id: $0.id, name: $0.name, region: $0.region, isCurrent: true,
                    latitude: $0.latitude, longitude: $0.longitude, fitDays: $0.fitDays)
         }
@@ -451,6 +464,77 @@ final class ChsFitService: ObservableObject {
     }
 }
 
+// MARK: - Online gates: fetched, never fitted
+
+extension ChsFitService {
+    /// The 7 fit-reject gates (online-gates spec §1) get no on-device fit —
+    /// only the current `Timeline` strip's official wcsp1/wcdp1 predictions,
+    /// resolved/projected exactly like `fitCurrent` (:345-363) but served as
+    /// fetched samples rather than harmonic constituents. No queue, no yield
+    /// point: these gates never join the fit queue, so there is nothing to
+    /// step aside for — a throw here is the whole story, and Task 5's caller
+    /// shows the honesty card on it.
+    ///
+    /// Persists the window itself (never just returns it for the caller to
+    /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
+    /// so every caller, today's and any future one, gets the same
+    /// "the fetch landed" signal without re-deriving it.
+    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo) async throws -> ChsOnlineWindow {
+        let fetcher = IwlsFetcher()
+        let list = try await fetcher.stationList()
+        let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
+                                       series: "wcsp1", in: list)
+        let meta = try await fetcher.metadata(stationID: station.id)
+        guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
+            throw ChsError.noFloodAxis(gate.name)
+        }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = gate.tz
+        let today = cal.startOfDay(for: .now)
+        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
+        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
+        // strip's total span in days, ending at the strip's own end, gives
+        // exactly the chunk set covering start…end (up to 7 days of slop at
+        // the grid boundary, same tradeoff the fit path already makes).
+        let plan = Self.chunkPlan(days: (Timeline.backHours + Timeline.forwardHours) / 24, end: end)
+        var speeds: [ChsSample] = [], dirs: [ChsSample] = []
+        for chunk in plan {
+            speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
+            dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
+        }
+        let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        // IWLS can 200 with an empty series (a quiet chunk boundary, no error
+        // to catch). Saving anyway would fall through to the requested
+        // start/end below and stick forever — a zero-sample window that
+        // still reads as "covers the strip". Fail the fetch instead: the
+        // caller already turns any thrown error into the honesty card + retry.
+        guard !projected.isEmpty else { throw ChsError.emptySeries(gate.name) }
+        // A chunk IWLS truncates mid-series (a short response, a gap at one
+        // edge) must not be saved under the full requested start/end — that
+        // would make `coversStrip` pass on a window with a hole in it and
+        // render a strip with a dead zone. Clamp to what actually came back,
+        // symmetrically, so a truncated fetch honestly fails coverage instead.
+        let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
+        let sampleEnd = projected.last.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? end
+        let window = ChsOnlineWindow(
+            stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
+            fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
+            floodDirection: flood, ebbDirection: ebb,
+            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
+        do {
+            try ChsModelStore.saveOnline(window)
+            await MainActor.run { shared.onlineFetchStamp += 1 }
+        } catch {
+            // ponytail: a local disk-write failure on an already-fetched
+            // window isn't worth failing the whole fetch over — the caller
+            // still gets `window` to render; only the reload-elsewhere signal
+            // (the stamp) and next launch's offline copy are what's lost.
+        }
+        return window
+    }
+}
+
 enum ChsError: Error {
     case networkDisabled
     /// Stepped aside at a chunk boundary for a station the user opened. Not a
@@ -459,6 +543,8 @@ enum ChsError: Error {
     case noStations
     case noStationWithinTolerance(String, String, Double)
     case noFloodAxis(String)
+    /// IWLS 200'd with zero samples for the requested window.
+    case emptySeries(String)
     case badResponse(Int)
     case jsError(String)
 }

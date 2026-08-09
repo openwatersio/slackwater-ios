@@ -98,6 +98,7 @@ extension TypeScaleTests {
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
+            "OnlineGateDetailView.swift:scheduleEntries",
         ]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an

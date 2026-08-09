@@ -23,8 +23,11 @@ final class ChsProvisionalTests: XCTestCase {
     // MARK: - The bundled per-gate windows
 
     func testEveryBundledGateCarriesItsOwnValidatedWindow() {
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 11)
-        for g in ChsCurrentGateInfo.all {
+        // +7 online fit-reject identities (online-gates task 1): fitDays 0 is
+        // their documented never-fitted sentinel, so the window check below
+        // is scoped to the fitted (offline) gates.
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 18)
+        for g in ChsCurrentGateInfo.all where !g.isOnline {
             XCTAssert(g.fitDays == 60 || g.fitDays == 210, "\(g.id): unexpected window \(g.fitDays)")
         }
         let fast = ChsCurrentGateInfo.all.filter { $0.fitDays == 60 }.map(\.id).sorted()

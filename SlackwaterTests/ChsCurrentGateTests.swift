@@ -125,4 +125,78 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(record.itemId, gate.id, "a CHS gate's catalog id is bare — no NOAA prefix")
         XCTAssertNotNil(StationItem.byId[record.itemId])
     }
+
+    // MARK: - The fetched window (online gates: official CHS predictions, no fit)
+
+    func testOnlineWindowStoreRoundTrip() throws {
+        let window = ChsOnlineWindow(
+            stationID: "chs-test-online", iwlsName: "Test Online Station",
+            timezone: "America/Vancouver", fetchedAt: .now,
+            start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
+            floodDirection: 45, ebbDirection: 225, times: [0, 900], speeds: [1.5, -1.5])
+        try ChsModelStore.saveOnline(window)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(window.stationID)) }
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-online"))
+        XCTAssertEqual(loaded.floodDirection, 45)
+        XCTAssertEqual(loaded.times, [0, 900])
+        XCTAssertEqual(loaded.speeds, [1.5, -1.5])
+        // The online store must never shadow a fitted model of the same key.
+        XCTAssertNil(ChsModelStore.loadCurrent("chs-test-online"))
+        XCTAssertNil(ChsModelStore.load("chs-test-online"))
+    }
+
+    func testOnlineWindowCoversStrip() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let now0 = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 1, day: 15, hour: 12)))
+        let today0 = cal.startOfDay(for: now0)
+        let requiredStart = today0.addingTimeInterval(-Timeline.backHours * 3600)
+        let requiredEnd = today0.addingTimeInterval(Timeline.forwardHours * 3600)
+
+        func window(start: Date, end: Date) -> ChsOnlineWindow {
+            ChsOnlineWindow(stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
+                            fetchedAt: .now, start: start, end: end,
+                            floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+        }
+
+        // Inside: a window wider than the strip needs still covers it.
+        let padded = window(start: requiredStart.addingTimeInterval(-3600), end: requiredEnd.addingTimeInterval(3600))
+        XCTAssert(padded.coversStrip(now: now0))
+
+        // Exact edge: start/end exactly matching the required strip bounds.
+        let exact = window(start: requiredStart, end: requiredEnd)
+        XCTAssert(exact.coversStrip(now: now0))
+
+        // 3 days later: the same window no longer reaches the shifted strip end.
+        let later = now0.addingTimeInterval(3 * 86_400)
+        XCTAssertFalse(exact.coversStrip(now: later))
+    }
+
+    // MARK: - Online gates (fit-rejects backed by official CHS predictions)
+
+    /// The 7 validation rejects ship as online: true identities — findable,
+    /// never fitted, never provisional (online-gates spec §1).
+    func testOnlineGatesShipAndShippedGatesStayOffline() throws {
+        let online = ChsCurrentGateInfo.all.filter(\.isOnline)
+        XCTAssertEqual(online.count, 7, "the 7 fit-rejects ship as online gates")
+        for g in online {
+            XCTAssert(g.id.hasPrefix("chs-"))
+            XCTAssertFalse(g.offersProvisional, "an online gate never offers a fast answer")
+            XCTAssertNotNil(g.onlineNote, "\(g.id) needs its plain-words measured error")
+        }
+        // The 11 shipped gates are untouched: not online, still fittable.
+        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 11)
+        XCTAssert(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" }?.isOnline == false)
+    }
+
+    /// The origin bug: Sechelt Rapids must be findable by name AND alias.
+    func testSecheltIsSearchable() throws {
+        let sechelt = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
+        XCTAssert(sechelt.isOnline)
+        for query in ["sechelt", "skookumchuck"] {
+            XCTAssert(StationItem.search(query).contains { $0.id == sechelt.id },
+                      "search '\(query)' did not find Sechelt Rapids")
+        }
+    }
 }
