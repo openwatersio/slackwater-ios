@@ -1356,7 +1356,23 @@ struct ChsCurrentGateCardView: View {
                 }
             }
         }
-        .task { if gate.isOnline, onlineWindow == nil { onlineWindow = ChsModelStore.loadOnline(gate.id) } }
+        .task { refreshOnlineWindow() }
+        // The fitted path re-renders off `service.currentRecords` (the
+        // `@ObservedObject` above) the moment a fit lands. An online gate's
+        // data isn't in that dictionary — it's a disk read — so without this
+        // the row stayed on its stale `.task`-time read: opening the gate's
+        // detail (which fetches, saves, and pops back to this same
+        // still-mounted row) never re-fired `.task`, and the card sat on
+        // "fetched when connected" after the fetch had already landed.
+        // `onlineFetchStamp` is the same "something changed, reload" signal
+        // for the online-gate seam that `currentRecords` already is for the
+        // fitted one.
+        .onReceive(service.$onlineFetchStamp) { _ in refreshOnlineWindow() }
+    }
+
+    private func refreshOnlineWindow() {
+        guard gate.isOnline else { return }
+        onlineWindow = ChsModelStore.loadOnline(gate.id)
     }
 
     /// The 7 online gates (online-gates spec §4): a covering fetched window

@@ -46,6 +46,14 @@ final class ChsFitService: ObservableObject {
     /// Gates whose current record is the 60-day fast answer, not the full
     /// model. Published for the same reason.
     @Published private(set) var provisional: Set<String> = []
+    /// Bumped whenever an online gate's fetched window is saved
+    /// (`fetchOnlineWindow`, below). An online gate has no `currentRecords`
+    /// entry to publish — its data lives on disk (`ChsModelStore.loadOnline`)
+    /// — so this is the fit-landing signal's stand-in: a card holding a
+    /// stale disk read (opened before the fetch, still on screen after)
+    /// reloads off this the same way a fitted card re-renders off
+    /// `currentRecords` changing.
+    @Published private(set) var onlineFetchStamp = 0
 
     /// True once launched with `-networkKillSwitch` (UI tests' honest
     /// airplane-mode stand-in: every IWLS request throws before the socket).
@@ -466,6 +474,11 @@ extension ChsFitService {
     /// point: these gates never join the fit queue, so there is nothing to
     /// step aside for — a throw here is the whole story, and Task 5's caller
     /// shows the honesty card on it.
+    ///
+    /// Persists the window itself (never just returns it for the caller to
+    /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
+    /// so every caller, today's and any future one, gets the same
+    /// "the fetch landed" signal without re-deriving it.
     nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo) async throws -> ChsOnlineWindow {
         let fetcher = IwlsFetcher()
         let list = try await fetcher.stationList()
@@ -491,11 +504,21 @@ extension ChsFitService {
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
         }
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
-        return ChsOnlineWindow(
+        let window = ChsOnlineWindow(
             stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
             fetchedAt: .now, start: start, end: end,
             floodDirection: flood, ebbDirection: ebb,
             times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
+        do {
+            try ChsModelStore.saveOnline(window)
+            await MainActor.run { shared.onlineFetchStamp += 1 }
+        } catch {
+            // ponytail: a local disk-write failure on an already-fetched
+            // window isn't worth failing the whole fetch over — the caller
+            // still gets `window` to render; only the reload-elsewhere signal
+            // (the stamp) and next launch's offline copy are what's lost.
+        }
+        return window
     }
 }
 

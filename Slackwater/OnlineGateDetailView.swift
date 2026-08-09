@@ -112,8 +112,11 @@ struct OnlineGateDetailView: View {
         fetchFailed = false
         Task { @MainActor in
             do {
+                // Persists itself and bumps ChsFitService.onlineFetchStamp on
+                // success — this view's own `window` update below is for its
+                // OWN redraw; the stamp is what tells any other still-mounted
+                // card/detail for this gate to reload the disk copy too.
                 let fresh = try await ChsFitService.fetchOnlineWindow(for: gate)
-                try? ChsModelStore.saveOnline(fresh)
                 window = fresh
                 fetching = false
             } catch {
