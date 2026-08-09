@@ -407,7 +407,7 @@ struct TimelineCanvas: View {
     /// White, not `SN.leaf`: the leaf dash on this canvas means *now*, and it
     /// has to keep meaning only that. Same dash pattern, different colour, so
     /// the two read as the same family without competing.
-    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date, row: Int = 0) {
+    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date, row: Int) {
         var p = Path()
         p.move(to: CGPoint(x: x, y: y))
         p.addLine(to: CGPoint(x: x, y: geo.gutterY(row: row) - 8))
@@ -572,24 +572,30 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // Slack-window band labels are the gutter's only occupant now
-        // (Amendment B): max-flood/max-ebb times were pulled out because at
-        // frequent-slack stations (Deception Pass, slacks ~3h apart) they
-        // interleaved with ~90pt merged band ranges and oversubscribed two
-        // rows into an unreadable ribbon. The peak's speed label stays on its
-        // dot; its exact time lives in the schedule table below the strip.
-        // Each window contributes either two pair labels (edges growing
-        // inward) or one merged label — decided by measured widths — before
-        // any row is assigned.
-        struct BandLabel {
+        // Every label competing for the gutter — slack-window bands AND
+        // windowless-slack droplines — goes through ONE row assignment.
+        // Finding 1 (post-Amendment-B review): `drawDrop`'s old `row: Int = 0`
+        // default let windowless slacks skip the assignment silently, and
+        // every derived gate has NO windows at all (`slackWindows` is always
+        // empty there), so every one of its slack labels was pinned to row 0
+        // — exactly the overprint the row assigner exists to prevent, on
+        // mixed-semidiurnal tides where an alternating high/low pair can sit
+        // under 6h apart. A band label reaches the gutter via its own fill
+        // and needs no dropline; a windowless slack still needs one. Each
+        // window contributes either two pair labels (edges growing inward)
+        // or one merged label — decided by measured widths — before any row
+        // is assigned.
+        struct GutterLabel {
             let text: Text
             let drawX: CGFloat
             let anchor: UnitPoint
             let rowCenter: CGFloat  // the label's own centre, for collision math
             let width: CGFloat
+            let dropFrom: CGFloat?  // non-nil: also draw a dotted line from this y
+            let dropTime: Date?
         }
         let box = CGSize(width: 1000, height: 100)
-        var bandLabels: [BandLabel] = []
+        var labels: [GutterLabel] = []
         for w in data.slackWindows {
             let x0 = data.x(w.start), x1 = data.x(w.end)
             let a = gutterText(w.start), b = gutterText(w.end)
@@ -597,24 +603,36 @@ struct TimelineCanvas: View {
             let bw = ctx.resolve(b).measure(in: box).width
             switch gutterLabels(bandWidth: x1 - x0, startWidth: aw, endWidth: bw) {
             case .pair:
-                bandLabels.append(BandLabel(text: a, drawX: x0, anchor: .leading,
-                                            rowCenter: x0 + aw / 2, width: aw))
-                bandLabels.append(BandLabel(text: b, drawX: x1, anchor: .trailing,
-                                            rowCenter: x1 - bw / 2, width: bw))
+                labels.append(GutterLabel(text: a, drawX: x0, anchor: .leading,
+                                          rowCenter: x0 + aw / 2, width: aw, dropFrom: nil, dropTime: nil))
+                labels.append(GutterLabel(text: b, drawX: x1, anchor: .trailing,
+                                          rowCenter: x1 - bw / 2, width: bw, dropFrom: nil, dropTime: nil))
             case .merged:
                 let m = mergedGutterText(w.start, w.end)
                 let mw = ctx.resolve(m).measure(in: box).width
                 let cx = (x0 + x1) / 2
-                bandLabels.append(BandLabel(text: m, drawX: cx, anchor: .center,
-                                            rowCenter: cx, width: mw))
+                labels.append(GutterLabel(text: m, drawX: cx, anchor: .center,
+                                          rowCenter: cx, width: mw, dropFrom: nil, dropTime: nil))
             }
         }
+        // A slack WITH a window is drawn by its band below — the band
+        // already reaches the gutter, so a dropline would be a second mark
+        // saying the same thing. Without one (a violent gate the 10-min
+        // sampling steps over, and every derived gate) the plain dropline is
+        // what's left, and it now joins the same assignment as the bands.
+        for e in filteredEvents where e.kind == .slack
+            && !data.slackWindows.contains(where: { $0.slack == e.time }) {
+            let x = data.x(e.time)
+            let t = gutterText(e.time)
+            let w = ctx.resolve(t).measure(in: box).width
+            labels.append(GutterLabel(text: t, drawX: x, anchor: .center,
+                                      rowCenter: x, width: w, dropFrom: geo.zeroY, dropTime: e.time))
+        }
         // Sort by centre so gutterRows' left-to-right greedy assumption
-        // holds — window order in data.slackWindows already gives this, this
-        // is defensive, matching the other two callers.
-        bandLabels.sort { $0.rowCenter < $1.rowCenter }
-        let bandLabelRow = gutterRows(centers: bandLabels.map(\.rowCenter),
-                                      widths: bandLabels.map(\.width))
+        // holds — window/event order is already chronological, this is
+        // defensive, matching drawTide's caller.
+        labels.sort { $0.rowCenter < $1.rowCenter }
+        let labelRow = gutterRows(centers: labels.map(\.rowCenter), widths: labels.map(\.width))
 
         for e in filteredEvents {
             let x = data.x(e.time)
@@ -628,14 +646,8 @@ struct TimelineCanvas: View {
                 ctx.draw(Text("slack").font(.system(size: 10).monospaced())
                             .foregroundStyle(SN.go),
                          at: CGPoint(x: x, y: geo.zeroY + 14), anchor: .center)
-                // A slack WITH a window is drawn by its band below — the band
-                // already reaches the gutter, so a dropline would be a second
-                // mark saying the same thing. Without one (a violent gate the
-                // 10-min sampling steps over, and every derived gate) the plain
-                // dropline is what's left.
-                if !data.slackWindows.contains(where: { $0.slack == e.time }) {
-                    drawDrop(ctx, x: x, from: geo.zeroY, time: e.time)
-                }
+                // Its dropline (if any) and gutter time draw below, with the
+                // rest of the gutter, once every row is assigned.
             case .maxFlood, .maxEbb:
                 // Speed label on the dot only (Amendment B) — no dropline,
                 // no gutter time. The exact time still lives in the
@@ -666,9 +678,13 @@ struct TimelineCanvas: View {
                                  height: geo.gutterY(row: 1) - 8 - geo.zeroY)),
                      with: .color(SN.go.opacity(0.12)))
         }
-        for (i, bl) in bandLabels.enumerated() {
-            ctx.draw(bl.text, at: CGPoint(x: bl.drawX, y: geo.gutterY(row: bandLabelRow[i])),
-                     anchor: bl.anchor)
+        for (i, gl) in labels.enumerated() {
+            let row = labelRow[i]
+            if let dropFrom = gl.dropFrom, let dropTime = gl.dropTime {
+                drawDrop(ctx, x: gl.drawX, from: dropFrom, time: dropTime, row: row)
+            } else {
+                ctx.draw(gl.text, at: CGPoint(x: gl.drawX, y: geo.gutterY(row: row)), anchor: gl.anchor)
+            }
         }
     }
 }
