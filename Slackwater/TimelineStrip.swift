@@ -92,7 +92,7 @@ func gutterLabels(bandWidth: CGFloat, startWidth: CGFloat, endWidth: CGFloat) ->
 /// overlap can become unavoidable, so minimise it rather than pretend it can't
 /// happen. Callers pass labels already sorted by time; both event loops are.
 /// Touching labels (exactly adjacent, same edge) are unreadable and counted as overlapping.
-func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 2) -> [Int] {
+func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 3) -> [Int] {
     guard centers.count == widths.count else { return [] }
     guard !centers.isEmpty else { return [] }
 
@@ -273,12 +273,13 @@ struct TimelineData {
 /// Every number in here is a literal point, and that is why the chart's own
 /// labels are the one place in this branch that keeps a fixed `.system(size:)`.
 ///
-/// The slots are hand-packed and two rows deep in the gutter: `dayY` 20, `sunY` 34, `tideTop`
-/// 48 — 14pt between the day label's centre and the sun dot's. Extreme labels
-/// are drawn at `y ± 11` off their own dot, `slack` at `zeroY + 14`. Nothing
-/// here reflows: two cases, one track each — tide-only `height` 274 (includes
-/// two-row event-time gutter, Amendment A), current-only `height` 368 (includes
-/// two-row event-time gutter, Amendment A) — and `tideY`/`curY` map data onto those constants.
+/// The slots are hand-packed: `dayY` 20, `sunY` 34, `tideTop` 48 — 14pt
+/// between the day label's centre and the sun dot's. Extreme labels are drawn
+/// at `y ± 11` off their own dot, `slack` at `zeroY + 14`. The gutter below is
+/// three rows deep (Amendment A, extended to three in Amendment C). Nothing
+/// here reflows: two cases, one track each — tide-only `height` 286 (includes
+/// the three-row event-time gutter), current-only `height` 380 (includes
+/// the three-row event-time gutter) — and `tideY`/`curY` map data onto those constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -312,12 +313,13 @@ struct TimelineGeo {
         hasCurrent = data.hasCurrent
         switch (hasTide, hasCurrent) {
         case (true, _):
-            height = 274; tideBottom = 226; curTop = 0; curBottom = 0
+            height = 286; tideBottom = 226; curTop = 0; curBottom = 0
         default:
             // Taller than the old 286: the combined strip's reclaimed space goes to
             // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
-            // Two-row gutter adds 48 total: 24pt baseline + 24pt for row 1 (Amendment A).
-            height = 368; tideBottom = 0; curTop = 68; curBottom = 320
+            // Three-row gutter adds 60 total: 24pt baseline clearance + 12pt each
+            // for rows 1 and 2 + 12pt margin below the last row (Amendment C).
+            height = 380; tideBottom = 0; curTop = 68; curBottom = 320
         }
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
@@ -336,8 +338,8 @@ struct TimelineGeo {
 
     /// The event-time gutter (gutter spec §1): dotted droplines land here and
     /// the exact times print, so the track itself carries only values and the
-    /// readouts above it can stay relative. Supports two rows to prevent label
-    /// collision (Amendment A).
+    /// readouts above it can stay relative. Supports three rows to prevent
+    /// label collision (Amendment A, extended from two to three in Amendment C).
     ///
     /// 24pt of clearance, and the number is set by the max-EBB speed label, not
     /// by the gutter text: that label draws at `curY(e.speed) + 14`, and `curY`
@@ -346,7 +348,8 @@ struct TimelineGeo {
     /// gutter (peaks no longer carry a gutter time of their own — Amendment B).
     var gutterY: CGFloat { bodyBottom + 24 }
 
-    /// Gutter y-position for a specific row (Amendment A).
+    /// Gutter y-position for a specific row — 0, 1 or 2 (Amendment A; row 2
+    /// added in Amendment C).
     func gutterY(row: Int) -> CGFloat { gutterY + CGFloat(row) * gutterRowStep }
 
     func tideY(_ h: Double) -> CGFloat {
@@ -669,13 +672,13 @@ struct TimelineCanvas: View {
         // (gutter spec §3). This opacity is the one number here expected to
         // want a tuning pass against a real screenshot.
         //
-        // The rect always reaches row 1's baseline, not row 0's: with two
-        // gutter rows the fill has to stay connected to a label that
-        // staggered down a row, not just the common case.
+        // The rect always reaches row 2's baseline, the last row, not row 0's:
+        // with three gutter rows (Amendment C) the fill has to stay connected
+        // to a label that staggered all the way down, not just the common case.
         for w in data.slackWindows {
             let x0 = data.x(w.start), x1 = data.x(w.end)
             ctx.fill(Path(CGRect(x: x0, y: geo.zeroY, width: x1 - x0,
-                                 height: geo.gutterY(row: 1) - 8 - geo.zeroY)),
+                                 height: geo.gutterY(row: 2) - 8 - geo.zeroY)),
                      with: .color(SN.go.opacity(0.12)))
         }
         for (i, gl) in labels.enumerated() {

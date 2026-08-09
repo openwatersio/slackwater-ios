@@ -66,12 +66,15 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        XCTAssertEqual(tide.height, 274, "the two-row gutter adds 48 below the track (Amendment A)")
+        XCTAssertEqual(tide.height, 286, "the three-row gutter adds 60 below the track (Amendment C)")
         XCTAssertEqual(tide.gutterY, 250, "row 0 baseline")
         XCTAssert(tide.gutterY > tide.bodyBottom && tide.gutterY < tide.height,
                   "gutter row 0 text sits below the track and inside the canvas")
         XCTAssertEqual(tide.gutterY(row: 1), 262, "row 1 is 12pt lower")
         XCTAssert(tide.gutterY(row: 1) < tide.height, "gutter row 1 still fits inside canvas")
+        XCTAssertEqual(tide.gutterY(row: 2), 274,
+                       "row 2 baseline, 24pt below row 0 (Amendment C) — coincides with yesterday's two-row height, not a stale assertion")
+        XCTAssert(tide.gutterY(row: 2) < tide.height, "gutter row 2 still fits inside canvas")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -82,7 +85,7 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-        XCTAssertEqual(cur.height, 368, "the two-row gutter adds 48 below the track (Amendment A)")
+        XCTAssertEqual(cur.height, 380, "the three-row gutter adds 60 below the track (Amendment C)")
         XCTAssertEqual(cur.gutterY, 344, "row 0 baseline")
         XCTAssertEqual(cur.curBottom, 320)
         XCTAssertEqual(cur.bodyBottom, 320)
@@ -90,6 +93,9 @@ final class TimelineTests: XCTestCase {
                   "gutter row 0 text sits below the track and inside the canvas")
         XCTAssertEqual(cur.gutterY(row: 1), 356, "row 1 is 12pt lower")
         XCTAssert(cur.gutterY(row: 1) < cur.height, "gutter row 1 still fits inside canvas")
+        XCTAssertEqual(cur.gutterY(row: 2), 368,
+                       "row 2 baseline, 24pt below row 0 (Amendment C) — coincides with yesterday's two-row height, not a stale assertion")
+        XCTAssert(cur.gutterY(row: 2) < cur.height, "gutter row 2 still fits inside canvas")
         // The 24pt clearance is set by the max-ebb speed label, not by the
         // gutter text: that label draws at `curY + 14` and curY clamps to
         // `zeroY + curHalf`, so it reaches ~331 (gutter spec §1).
@@ -107,7 +113,7 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
         XCTAssert(both.hasTide && both.hasCurrent)
-        XCTAssertEqual(both.height, 274, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.height, 286, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
 
@@ -161,21 +167,44 @@ final class TimelineTests: XCTestCase {
                        [0, 1, 0])
 
         // Fallback branch: four densely packed labels where neither row clears by label 3.
+        // Pinned to `rows: 2` explicitly — the default is now 3 (Amendment C), and with
+        // a third row available label 2 finds it clear instead of falling back; see
+        // testGutterRowsUsesThirdRowWhenAvailable for that case.
         // Centers [0, 30, 60, 90] with widths [60, 60, 60, 60]:
         // - Label 0: [-30, 30] → row 0
         // - Label 1: [0, 60] → row 0 blocked (30 >= 0), row 1 clear → row 1
         // - Label 2: [30, 90] → both blocked (row 0 at 30, row 1 at 60), pick row 0 (ends earliest)
         // - Label 3: [60, 120] → both blocked, pick row 1 (ends earliest after row 0 updated to 90)
-        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60]),
+        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60], rows: 2),
                        [0, 1, 0, 1],
                        "fallback branch: when both rows blocked, picks row with earliest end")
 
         // Count matching: always returns same number of rows as there are labels.
+        // Pinned to `rows: 2` to match the "valid range [0, 1]" assertion below.
         let centers: [CGFloat] = [10, 50, 100, 150, 200]
         let widths: [CGFloat] = [30, 30, 30, 30, 30]
-        let rows = gutterRows(centers: centers, widths: widths)
+        let rows = gutterRows(centers: centers, widths: widths, rows: 2)
         XCTAssertEqual(rows.count, centers.count)
         XCTAssert(rows.allSatisfy { $0 < 2 }, "all rows should be in valid range [0, 1]")
+    }
+
+    /// Amendment C: the same four densely packed labels as the fallback-branch
+    /// case above, but at the new default of three rows. Expectations reasoned
+    /// by hand from the algorithm, not by running it and copying the output:
+    /// - Label 0 [-30, 30]: row 0 clears immediately (starts at -inf) → row 0.
+    /// - Label 1 [0, 60]: row 0's right edge (30) is not < 0, so row 0 is
+    ///   blocked; row 1 clears (still -inf) → row 1.
+    /// - Label 2 [30, 90]: row 0's right edge (30) is not < 30 (touching counts
+    ///   as blocked), so row 0 is blocked; row 1's right edge (60) is not < 30
+    ///   either, and 60 is not earlier than row 0's 30, so it doesn't win the
+    ///   fallback comparison; row 2 clears (still -inf) → row 2, the row that
+    ///   only exists with the wider default.
+    /// - Label 3 [60, 120]: row 0's right edge (30) IS < 60, so row 0 clears
+    ///   again → row 0.
+    func testGutterRowsUsesThirdRowWhenAvailable() {
+        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60]),
+                       [0, 1, 2, 0],
+                       "the third row absorbs what the two-row fallback used to overlap")
     }
 
     /// The window computation is build-time data now, not a per-view recompute
