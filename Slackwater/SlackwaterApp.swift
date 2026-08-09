@@ -288,6 +288,11 @@ struct StationListView: View {
     /// What distances are measured from: the fix, or the Victoria fallback.
     private var anchor: (lat: Double, lon: Double) { fix ?? fallbackFix }
 
+    /// One definition, two attachment points (the root `.environment` below,
+    /// and the re-forward into `.sheet(showDownloads)`) — kept as a single
+    /// property so they can't drift apart.
+    private var openChsRoute: (ChsRoute) -> Void { { path.append($0) } }
+
     var body: some View {
         Group {
             if regular {
@@ -304,16 +309,29 @@ struct StationListView: View {
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
         .environment(\.openTideDetail) { path.append($0) }
-        // Same reasoning, same attachment point — an online gate's honesty
-        // card pushes its nearest shipped gate through this, not a
-        // NavigationLink (OnlineGateDetailView's OpenChsGateKey doc comment).
-        .environment(\.openChsGate) { path.append(ChsRoute.currentGate($0)) }
+        // Same reasoning, same attachment point — every CHS push (an online
+        // gate's honesty card, a Downloads-sheet row) rides this one closure,
+        // never a NavigationLink (OpenChsRouteKey doc comment, Theme.swift).
+        // Dismiss-then-append (OfflineManagerView's row tap) still lands here:
+        // this appends to the ROOT stack's path regardless of which presented
+        // sheet or pushed screen the tap came from, so a detail that opened
+        // the sheet stays under the newly pushed route on the back stack —
+        // correct behavior, not a side effect to work around.
+        .environment(\.openChsRoute, openChsRoute)
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
+        // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
+        // a separate presentation hierarchy that only crosses SYSTEM
+        // environment keys (like `\.dismiss`) automatically — a custom key set
+        // above the `.sheet(...)` call resolves to `openChsRoute`'s no-op
+        // `defaultValue` inside it otherwise (confirmed live: the row's
+        // `dismiss()` fired, the following `openChsRoute(route)` silently did
+        // nothing). Every `.sheet` that can present `OfflineManagerView` needs
+        // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place, anchor: anchor) { open($0) }
         }

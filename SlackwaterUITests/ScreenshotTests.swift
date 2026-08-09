@@ -1161,6 +1161,52 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Done"].tap()
     }
 
+    /// Issue #33: a Downloads row is a dead tap no longer — tapping it closes
+    /// the sheet and opens the station's own detail via `openChsRoute`
+    /// (Theme.swift), the same generalized closure the online-gate honesty
+    /// card's nearest-shipped link now shares. `-chsResetModels` wipes the
+    /// model store so the whole queue starts `.pending`; no `-fixLat`/`-fixLon`
+    /// needed because `ChsFitService.init` unconditionally adopts the
+    /// `fallbackFix` (Victoria) before any real fix can land (its own doc
+    /// comment: "never an arbitrary order, even before a fix lands"), and
+    /// Victoria itself is distance zero from that anchor — so it is always the
+    /// queue's first job, deterministic without a location launch argument.
+    func testDownloadsRowOpensDetail() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate", "-chsResetModels"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+                  "the indicator did not open the downloads manager")
+
+        let victoria = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
+        XCTAssert(victoria.waitForExistence(timeout: 5), "Victoria is not in the download queue")
+        if !victoria.isHittable { app.swipeUp() }  // it should already be the first row
+        XCTAssert(victoria.isHittable, "download-row-chs-victoria exists but never became hittable")
+        victoria.tap()
+
+        // Wait on the positive signal first — the pushed detail's header —
+        // rather than an immediate non-existence check on "Downloads": the
+        // sheet's dismiss animation is not instant, so checking right after
+        // the tap synthesizes races it. Scoped to the header, not a bare name
+        // lookup: on iPad the persistent sidebar can carry "Victoria" in its
+        // own list ranking independently of what got pushed (same trap
+        // testOnlineGateUnfetchedShowsHonestyCard's header lookup dodges).
+        let header = app.otherElements["detail-map-header"].firstMatch
+        XCTAssert(header.waitForExistence(timeout: 5),
+                  "the row tap did not push a detail")
+        XCTAssert(header.staticTexts["Victoria"].firstMatch.exists,
+                  "the row tap opened the wrong station's detail")
+
+        // The sheet is gone — "Downloads" was its own nav title, so its
+        // disappearance is the dismiss signal, not just the row. Checked last:
+        // by now the dismiss animation has long since settled.
+        XCTAssertFalse(app.staticTexts["Downloads"].exists,
+                       "tapping a row must dismiss the Downloads sheet")
+    }
+
     // M48: the map needed no map-specific work — a pin tap goes through the
     // same open() as a row, so an unfitted station lands on the same warning
     // detail. Held unfitted by the kill switch, so this is deterministic.

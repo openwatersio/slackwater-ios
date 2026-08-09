@@ -17,6 +17,10 @@ struct CurrentDetailView: View {
     @State private var scrubTime = appNow()
     @State private var timeline: TimelineData?
     @State private var showDownloads = false
+    // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
+    // custom `@Environment` key set above the presenting view on its own
+    // (SlackwaterApp.swift's `.sheet(showDownloads)` comment has the story).
+    @Environment(\.openChsRoute) private var openChsRoute
 
     /// The gate identity behind a provisional fast answer — nil for a final
     /// model, which is what every readout below keys on.
@@ -74,7 +78,7 @@ struct CurrentDetailView: View {
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showDownloads) { OfflineManagerView() }
+        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         .onAppear {
             if timeline == nil {
                 timeline = TimelineData.build(tide: nil, current: record, now: live)
