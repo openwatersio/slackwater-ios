@@ -169,7 +169,10 @@ struct OnlineGateDetailView: View {
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.go)
                         if let win = slackWin {
-                            Text("under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
+                            // "under 0.5 kn ·" dropped for the same reason as the
+                            // current detail's "@ 0.5 kn": the threshold is the
+                            // value at both ends of the strip's slack column now.
+                            Text("\(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(SN.foam.opacity(0.7))
                                 .accessibilityIdentifier("slack-window")

@@ -782,39 +782,45 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
                                                 width: 8, height: 8)),
                          with: .color(SN.go))
-                // The word "slack" used to print on the curve at zeroY + 14; it
-                // is a glyph in the band now, like everything else. There is no
-                // value row — the reading is "none", and a number would be a
-                // lie dressed as data.
+                // The word "slack" used to print on the curve at zeroY + 14; the
+                // window is two banded readings now, like every other event.
                 //
-                // ponytail: the glyph itself is UNSETTLED. An em dash was tried
-                // first (flat = no flow) and reads as a stray rule or a minus
-                // sign at 15pt. `●` is the interim because it is not a new
-                // invention: the schedule pill one card below already says
-                // "● SLACK", so the chart and the list agree today. It is still
-                // a weak mark next to two arrows — it says "not an arrow"
-                // rather than "no set". Candidates if this gets another pass:
-                // `○` (hollow = zero vector), `⊘`, or a drawn glyph of two
-                // arrowheads meeting nose to nose.
-                let glyph = "●"
+                // The glyphs are a matched pair about the column between them,
+                // which is what a slack window actually is — a span you can
+                // transit, not an instant. `↦` runs OUT of a bar: workable
+                // water starts here. `⇥` runs INTO one: it runs until it stops
+                // here. They are the same bar-means-a-limit language as the
+                // tide track's ⤒/⤓, turned on its side because this limit is in
+                // time rather than in height. (Earlier passes tried an em dash
+                // and then `●`; both said "not an arrow" instead of saying
+                // anything, and `●` was a third green dot beside the curve's.)
+                //
+                // The value is the threshold that DEFINES the window — under
+                // this much stream, a small boat transits — so the same number
+                // prints at both ends. That is not redundancy: each end is a
+                // complete reading in the same glyph/value/time shape as a max
+                // beside it, and it is the reason this number can now come out
+                // of the readout above the strip.
+                let threshold = formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)
                 if let w = data.slackWindows.first(where: { $0.slack == e.time }) {
-                    // A real window: its start opens the column at the top, its
-                    // end closes it at the bottom.
-                    drawBand(ctx, x: data.x(w.start), top: true, glyph: glyph,
-                             value: nil, time: w.start, tint: SN.go)
-                    drawBand(ctx, x: data.x(w.end), top: false, glyph: glyph,
-                             value: nil, time: w.end, tint: SN.go)
+                    drawBand(ctx, x: data.x(w.start), top: true, glyph: "↦",
+                             value: threshold, time: w.start, tint: SN.go)
+                    drawBand(ctx, x: data.x(w.end), top: false, glyph: "⇥",
+                             value: threshold, time: w.end, tint: SN.go)
                 } else {
                     // No window — a violent gate the 10-min sampling steps over,
                     // and every derived gate, whose schematic curve can't honestly
                     // yield one (gutter spec §3). One instant, so one label, and a
                     // hairline instead of a column: a zero-width window is not a
-                    // window and must not look like one.
+                    // window and must not look like one. `⇥` alone, and NO value:
+                    // there is no window here, so there is no threshold that
+                    // describes one, and printing 0.5 would invent the very
+                    // window this branch exists to say it doesn't have.
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
-                    drawBand(ctx, x: x, top: true, glyph: glyph, value: nil,
+                    drawBand(ctx, x: x, top: true, glyph: "⇥", value: nil,
                              time: e.time, tint: SN.go)
                 }
             case .maxFlood, .maxEbb:

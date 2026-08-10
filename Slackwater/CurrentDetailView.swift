@@ -158,7 +158,12 @@ struct CurrentDetailView: View {
                                 .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                             // Time REMAINING, not the window's original length —
                             // an already-open window must not claim its full run.
-                            Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            // The "@ 0.5 kn" that used to close this line moved
+                            // onto the strip, where it prints as the value at
+                            // both ends of the slack column. Two statements of
+                            // one constant, a foot apart on the same screen, and
+                            // this was the one where it read as noise.
+                            Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                                 .accessibilityIdentifier("slack-window")
