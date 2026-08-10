@@ -54,7 +54,7 @@ struct CurrentDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                MapHeader(name: record.name, region: "\(record.region) · current",
+                MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
                           favoriteId: record.itemId)
                 if let gate = provisionalGate {
@@ -173,7 +173,9 @@ struct CurrentDetailView: View {
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, speedUnit: speedUnit,
-                               now: live, scrubTime: $scrubTime)
+                               now: live,
+                               floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                               scrubTime: $scrubTime)
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 

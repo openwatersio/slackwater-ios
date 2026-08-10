@@ -231,8 +231,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored model did not survive relaunch")
         app.staticTexts["Victoria"].firstMatch.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 5)
-                  || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.waitForExistence(timeout: 5)
+                  || app.staticTexts["⤓ LOW"].firstMatch.waitForExistence(timeout: 5))
         sleep(2)
         save(app, "m3-offline.png")
     }
@@ -361,9 +361,9 @@ final class ScreenshotTests: XCTestCase {
                        "the paired tide readout is retired")
         // Two calls, not one `&&`: an `&&` only fails when BOTH row kinds
         // leak, so a single stray HIGH (or LOW) row would pass silently.
-        XCTAssertFalse(app.staticTexts["↑ HIGH"].firstMatch.exists,
+        XCTAssertFalse(app.staticTexts["⤒ HIGH"].firstMatch.exists,
                        "port tide rows must not appear in a gate schedule")
-        XCTAssertFalse(app.staticTexts["↓ LOW"].firstMatch.exists,
+        XCTAssertFalse(app.staticTexts["⤓ LOW"].firstMatch.exists,
                        "port tide rows must not appear in a gate schedule")
         // The slack window is the new next-slack detail.
         XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
@@ -385,8 +385,8 @@ final class ScreenshotTests: XCTestCase {
         let link = app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch
         XCTAssert(link.waitForExistence(timeout: 5), "tide-at-port link missing")
         link.tap()
-        XCTAssert(app.staticTexts["↑ HIGH"].firstMatch.waitForExistence(timeout: 8)
-                  || app.staticTexts["↓ LOW"].firstMatch.waitForExistence(timeout: 8),
+        XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.waitForExistence(timeout: 8)
+                  || app.staticTexts["⤓ LOW"].firstMatch.waitForExistence(timeout: 8),
                   "port detail shows its own tide schedule")
         XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.exists,
                   "the link did not open the reference port's detail")

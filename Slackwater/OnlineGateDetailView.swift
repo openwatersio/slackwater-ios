@@ -76,7 +76,7 @@ struct OnlineGateDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // Bare gate.id, per PR #31 — left as-is (task-5-brief).
-                MapHeader(name: gate.name, region: "\(gate.region) · current",
+                MapHeader(name: gate.name, region: gate.region,
                           latitude: gate.latitude, longitude: gate.longitude, favoriteId: gate.id)
                 if let window, let tl = timeline {
                     scrubCard(tl, window)
@@ -136,7 +136,9 @@ struct OnlineGateDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, speedUnit: speedUnit,
-                               now: live, scrubTime: $scrubTime)
+                               now: live,
+                               floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
+                               scrubTime: $scrubTime)
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 
