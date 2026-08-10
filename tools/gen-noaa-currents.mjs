@@ -51,14 +51,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBundledResolver } from "@sailingnaturali/station-corrections";
+import { createRequire } from "node:module";
+import { createPlacesResolver } from "@sailingnaturali/station-corrections";
 import tzLookup from "tz-lookup";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const res = join(here, "..", "Slackwater", "Resources");
 const bundle = JSON.parse(readFileSync(join(here, "..", "data", "noaa-currents.json"), "utf8"));
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
-const resolve = createBundledResolver();
+const resolve = createPlacesResolver(JSON.parse(readFileSync(
+  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/places.json"),
+  "utf8")));
 
 /** "0.9 nm east of" -> "0.9 nm east" (see gen-tides.mjs). */
 const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
@@ -96,7 +99,13 @@ const stations = bundle.stations
     const out = {
       id,
       name: r.name,
-      region: (r.derived ? "" : undangle(r.context)) || near.t.region,
+      // A derived context is kept now, and outranks the borrowed one. It used
+      // to be discarded in favour of the nearest tide station's region because
+      // the gazetteer behind it was 19 Salish towns; since station-corrections
+      // 2.8.0 it is a national list capped at 40 km, which is both closer to
+      // this station than its neighbouring gauge and more specific than that
+      // gauge's own label.
+      region: undangle(r.context) || near.t.region,
       aliases: r.aliases ?? [],
       latitude: s.latitude,
       longitude: s.longitude,

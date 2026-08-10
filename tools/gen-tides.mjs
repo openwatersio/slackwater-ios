@@ -73,8 +73,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { allStations } from "@neaps/tide-database";
-import { createBundledResolver } from "@sailingnaturali/station-corrections";
+import { createPlacesResolver } from "@sailingnaturali/station-corrections";
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
 /** US (states + territories) and Canada — the app's stated coverage. */
@@ -194,7 +195,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, "..", "Slackwater", "Resources", "stations.json");
 const chs = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
-const resolve = createBundledResolver();
+const resolve = createPlacesResolver(JSON.parse(readFileSync(
+  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/places.json"),
+  "utf8")));
 
 /** "6.6 nm SSE of" -> "6.6 nm SSE". */
 export const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
@@ -324,14 +327,27 @@ const stations = shippable
   })
   .map((s) => {
     const r = resolve({ id: s.id, name: s.name, latitude: s.latitude, longitude: s.longitude });
-    // Fallback chain: state/province, then country — the unincorporated
-    // Pacific islands (Midway, Wake, Johnston Atoll) carry no region at all.
-    const region = (r.derived ? "" : undangle(r.context)) ||
-      ((countryOf(s) === "United States" || countryOf(s) === "Canada") && regionOf(s)) ||
-      countryOf(s);
+    // The state/province code. Not always the region line any more — a derived
+    // context outranks it — but still its own fact, and `untrail` needs it
+    // whatever gets displayed (see below).
+    const code = ((countryOf(s) === "United States" || countryOf(s) === "Canada") && regionOf(s)) || "";
+    // Fallback chain: curated or derived context, then state/province, then
+    // country — the unincorporated Pacific islands (Midway, Wake, Johnston
+    // Atoll) carry no region at all.
+    //
+    // A DERIVED context is no longer discarded. It used to be, because the
+    // gazetteer behind it held 19 Salish towns and nationally produced "San
+    // Francisco · near Olympia, WA"; station-corrections 2.8.0 derives from a
+    // national places list instead, capped at 40 km, so "~Bellingham, WA" beats
+    // the bare "WA" it replaces — it says the same thing and more.
+    const region = undangle(r.context) || code || countryOf(s);
     return {
       id: s.id,
-      name: untrail(r.name, region),
+      // Trailing-state cleanup keys on the CODE, not the region line. Those
+      // parted company when a derived context started winning: "Abercorn Creek
+      // near Savannah Ga" reads beside "~Savannah, GA", and passing the label
+      // here would stop stripping the "Ga" on 571 cards.
+      name: untrail(r.name, code),
       region,
       aliases: r.aliases ?? [],
       latitude: s.latitude,
@@ -367,7 +383,12 @@ if (allStations.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)
 // TICON must never compete with CHS in the water CHS serves. If a Victoria or
 // a Point Atkinson shows up here, servedByChs has stopped working and the app
 // is about to show two of them.
-const canadian = stations.filter((s) => /^(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NT|NU)$/.test(s.region));
+// Canadian by the SOURCE's country, not by the region line reading like a
+// province code. The line stopped being a reliable carrier of that the moment
+// a derived context could win it ("~Sidney, BC"), and this guard failing open
+// is how two Victorias reach the map — so it reads the fact, not the label.
+const canadianIds = new Set(allStations.filter((s) => countryOf(s) === "Canada").map((s) => s.id));
+const canadian = stations.filter((s) => canadianIds.has(s.id));
 const contested = canadian.filter((s) =>
   s.id.startsWith("ticon/") && chs.some((c) => km(s, c) <= CHS_COVERAGE_KM));
 if (contested.length) {
@@ -377,10 +398,12 @@ if (contested.length) {
 }
 
 writeFileSync(out, JSON.stringify(stations));
-const derived = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
+const towns = stations.filter((s) => s.region.startsWith("~")).length;
+const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
 console.log(
   `${stations.length} reference tide stations, ` +
   `${(JSON.stringify(stations).length / 1024 / 1024).toFixed(2)} MB ` +
-  `(${stations.length - derived} curated contexts, ${derived} state/province; ` +
+  `(${stations.length - towns - codes} curated contexts, ${towns} nearest town, ` +
+  `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
   `${dropped} duplicates dropped)`);
