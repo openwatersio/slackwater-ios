@@ -432,8 +432,16 @@ struct TimelineGeo {
             tideTop = 106; tideBottom = 256; height = 328
             curTop = 0; curBottom = 0
         default:
+            // The current track's layout diverged from tide's here, and the
+            // reason is what each answer is FOR. A tide turn's height is the
+            // reading; a current's peak speed is something you steer around,
+            // while the slack window is what you plan the day around. So the
+            // current strip spends its rows differently: ONE green range above,
+            // ONE small time below, and the speeds annotate the curve itself.
+            // That is two rows instead of six, which is why this box is taller
+            // and the canvas shorter than the tide case.
             tideTop = 0; tideBottom = 0
-            curTop = 106; curBottom = 256; height = 328
+            curTop = 80; curBottom = 280; height = 312
         }
         bodyTop = hasTide ? tideTop : curTop
         bodyBottom = hasCurrent ? curBottom : tideBottom
@@ -462,6 +470,13 @@ struct TimelineGeo {
     // Slack has no side — it takes BOTH, its window's start time on top and its
     // end time below, which is what stops a short window from printing
     // "8:17AM–8:33AM" as one unreadable run.
+    // Current-only rows. Deliberately NOT the shared band slots above: the
+    // current track prints one thing over the curve and one under it, so
+    // borrowing tide's three-row grid would leave four empty rows of dead
+    // height on every gate.
+    var slackRangeY: CGFloat { curTop - 18 }
+    var maxTimeY: CGFloat { curBottom + 18 }
+
     var topGlyphY: CGFloat { bodyTop - 14 }
     var topValueY: CGFloat { bodyTop - 32 }
     var topTimeY: CGFloat { bodyTop - 54 }
@@ -725,6 +740,9 @@ struct TimelineCanvas: View {
         }
     }
 
+    /// This station's set for one direction, nil on a derived gate.
+    private func deg(_ flood: Bool) -> Double? { flood ? floodDeg : ebbDeg }
+
     private func drawCurrent(_ ctx: GraphicsContext) {
         var line = Path()
         for (i, p) in data.currentPoints.enumerated() {
@@ -783,75 +801,88 @@ struct TimelineCanvas: View {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
-                // Slack is the app's "go" colour, not a neutral. It is the moment
-                // the app is named for, and it must read the same on every surface.
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
                                                 width: 8, height: 8)),
                          with: .color(SN.go))
-                // The word "slack" used to print on the curve at zeroY + 14; the
-                // window is two banded readings now, like every other event.
+                // ONE label, centred over the column, no glyph. The window's
+                // two ends were living at opposite ends of the strip to keep
+                // them from merging into an unreadable "8:17AM–8:33AM" run;
+                // trimming the repeated hour does the same job in one place
+                // and gives the whole top row back to slack. Nothing else is
+                // up here now, which is the point — at a gate this row IS the
+                // answer, and it can afford to be the widest thing on screen.
+                // ONE time, and it is the SLACK ITSELF — not the window's
+                // opening edge, which is what this printed first.
                 //
-                // The glyphs are a matched pair about the column between them,
-                // which is what a slack window actually is — a span you can
-                // transit, not an instant. `↦` runs OUT of a bar: workable
-                // water starts here. `⇥` runs INTO one: it runs until it stops
-                // here. They are the same bar-means-a-limit language as the
-                // tide track's ⤒/⤓, turned on its side because this limit is in
-                // time rather than in height. (Earlier passes tried an em dash
-                // and then `●`; both said "not an arrow" instead of saying
-                // anything, and `●` was a third green dot beside the curve's.)
+                // The magnet snaps the strip to `snapTimes`, and a slack's entry
+                // there is the zero crossing, the middle of the window. Labelling
+                // the edge meant the number you read and the moment the scrubber
+                // parked you on were minutes apart with nothing to explain the
+                // gap — the chart contradicting itself at the one event this app
+                // is named for. Print what the strip can actually stop on.
                 //
-                // Slack leads with its TIME, in the big row, green, where every
-                // other event puts a number — and has no small row under it.
-                //
-                // The previous pass put the sub-threshold constant there to fill
-                // the slot, which meant a busy day printed "0.5" six times and
-                // the one genuinely repeated number on the screen was also the
-                // least informative. The fix is not to blank the row (that
-                // leaves the gap the grid exists to avoid) but to promote the
-                // fact that belongs there: at a gate, WHEN slack runs is the
-                // answer you plan the day around, while the exact knots at peak
-                // ebb is something you steer around rather than schedule by.
-                // Slack times now share a baseline with the speeds beside them,
-                // which is the point — same grid, and the important number is
-                // the big one. The threshold goes back to the "Next slack"
-                // readout above, stated once.
-                if let w = data.slackWindows.first(where: { $0.slack == e.time }) {
-                    drawBand(ctx, x: data.x(w.start), top: true, glyph: "↦",
-                             primary: chartTime(w.start, data.tz), secondary: nil, tint: SN.go)
-                    drawBand(ctx, x: data.x(w.end), top: false, glyph: "⇥",
-                             primary: chartTime(w.end, data.tz), secondary: nil, tint: SN.go)
-                } else {
-                    // No window — a violent gate the 10-min sampling steps over,
-                    // and every derived gate, whose schematic curve can't honestly
-                    // yield one (gutter spec §3). One instant, so one label, and a
-                    // hairline instead of a column: a zero-width window is not a
-                    // window and must not look like one.
+                // The window is still DRAWN, as the green column: it is context
+                // you look at, not a time you read off. Planning a transit
+                // through it is later work, and it can bring its own readout.
+                if data.slackWindows.first(where: { $0.slack == e.time }) == nil {
+                    // No window (a violent gate the sampling steps over, every
+                    // derived gate): a hairline rather than a column — a
+                    // zero-width window must not look like a window.
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
-                    drawBand(ctx, x: x, top: true, glyph: "⇥",
-                             primary: chartTime(e.time, data.tz), secondary: nil, tint: SN.go)
                 }
+                ctx.draw(Text(chartTime(e.time, data.tz))
+                            .font(.system(size: 18, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(SN.go),
+                         at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
             case .maxFlood, .maxEbb:
-                // The COMPASS arrow, rotated to this station's set — the same
-                // mark `CompassArrow` puts in the schedule pill and the readout,
-                // saying "the stream runs this way". An up/down arrow here would
-                // only have restated which side of the zero line the peak is
-                // already drawn on, which the band's side and colour say twice
-                // over; the bearing is the thing the chart wasn't telling you.
-                // Falls back to up/down on a derived gate, which has slacks but
-                // no set to point at.
                 let flood = e.kind == .maxFlood
                 let tint = flood ? SN.floodLabel : SN.ebbLabel
-                let deg = flood ? floodDeg : ebbDeg
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
                          with: .color(tint))
-                drawBand(ctx, x: x, top: flood, glyph: deg == nil ? (flood ? "↑" : "↓") : "↑",
-                         primary: formatSpeed(abs(e.speed), unit: speedUnit),
-                         secondary: chartTime(e.time, data.tz), tint: tint, rotateDeg: deg)
+
+                // The speed annotates the CURVE, not a band: it is context you
+                // read off the shape, not a number you plan by. It sits between
+                // the peak and the zero line — inside the fill — whenever the
+                // fill is deep enough to hold it, and inverts to white there
+                // because it is then sitting on colour. A weak peak has no room
+                // under it, so the label sits outside on the dark ground and
+                // keeps its direction tint instead. That is the whole rule, and
+                // it is why a big flood reads white while a small ebb doesn't.
+                // No chip behind it. White on the flood fill carries itself, and
+                // a box made the label an object sitting ON the chart instead of
+                // an annotation belonging to it — which is the opposite of
+                // "informal information you read off the shape".
+                let toward: CGFloat = flood ? 1 : -1      // toward the zero line
+                let labelH: CGFloat = 30
+                let inside = abs(y - geo.zeroY) >= labelH + 12
+                let cy = y + toward * (labelH / 2 + 8)
+                let mark = inside ? Color.white : tint
+                ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
+                            .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(mark),
+                         at: CGPoint(x: x, y: cy - 7), anchor: .center)
+                let arrow = Text(deg(flood) == nil ? (flood ? "↑" : "↓") : "↑")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(mark)
+                if let d = deg(flood) {
+                    ctx.drawLayer { l in
+                        l.translateBy(x: x, y: cy + 8)
+                        l.rotate(by: .degrees(d))
+                        l.draw(arrow, at: .zero, anchor: .center)
+                    }
+                } else {
+                    ctx.draw(arrow, at: CGPoint(x: x, y: cy + 8), anchor: .center)
+                }
+
+                // The time drops to the one small row under the track, in the
+                // same weight it had as a band's secondary line.
+                ctx.draw(Text(chartTime(e.time, data.tz))
+                            .font(.system(size: 12).monospaced())
+                            .foregroundStyle(.white.opacity(0.6)),
+                         at: CGPoint(x: x, y: geo.maxTimeY), anchor: .center)
             }
         }
     }

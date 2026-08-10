@@ -61,36 +61,31 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
 
-    /// The strip drops the leading zero, the schedule keeps it. Both facts
-    /// matter: the chart centres each label on its own event so the pad is pure
-    /// width, while the schedule's times are a left-aligned monospaced column
-    /// where an unpadded "7:03" hangs a character left of "12:53" down the
-    /// whole list. Collapsing these two back into one formatter breaks one or
-    /// the other, so this pins them apart.
-    func testChartTimeDropsThePadAndClockTimeKeepsIt() {
+    /// The strip is 12-hour with a bare lowercase suffix; the schedule stays
+    /// 24-hour and zero-padded. Both facts matter and pinning them apart is the
+    /// point: the schedule's times are a left-aligned monospaced column where
+    /// the pad keeps the colons in line and a suffix only some rows carry would
+    /// ragged it, while the strip centres each label on its own event and pays
+    /// for every character it prints.
+    func testChartTimeIsBareTwelveHourAndClockTimeStaysPadded() {
         var cal = Calendar(identifier: .gregorian)
         let utc = TimeZone(identifier: "UTC")!
         cal.timeZone = utc
-        let morning = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
-                                                    hour: 7, minute: 3))!
-        let afternoon = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
-                                                      hour: 14, minute: 51))!
-        let midnight = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
-                                                     hour: 0, minute: 36))!
-
-        XCTAssertEqual(chartTime(morning, utc), "7:03", "the strip drops the pad")
-        XCTAssertEqual(clockTime(morning, utc), "07:03", "the schedule column keeps it")
-        // Past noon the two agree — the pad only ever existed before 10:00.
-        XCTAssertEqual(chartTime(afternoon, utc), "14:51")
-        XCTAssertEqual(clockTime(afternoon, utc), "14:51")
-        // Midnight is the case a "%d"-style fix gets wrong: hour 0 must stay 0,
-        // not become 12 or empty.
-        XCTAssertEqual(chartTime(midnight, utc), "0:36")
-        XCTAssertEqual(clockTime(midnight, utc), "00:36")
-        // Both are 24h — no meridiem leaks back in on either.
-        for t in [morning, afternoon, midnight] {
-            XCTAssertFalse(chartTime(t, utc).contains("M"), "chartTime must stay 24h")
+        func at(_ h: Int, _ m: Int) -> Date {
+            cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: m))!
         }
+        XCTAssertEqual(chartTime(at(7, 3), utc), "7:03am", "no pad, bare lowercase suffix")
+        XCTAssertEqual(clockTime(at(7, 3), utc), "07:03", "the schedule column keeps its pad")
+        XCTAssertEqual(chartTime(at(16, 22), utc), "4:22pm")
+        XCTAssertEqual(clockTime(at(16, 22), utc), "16:22")
+        // The two ends of the clock, where 12-hour conversion goes wrong:
+        // midnight is 12am and noon is 12pm, never 0am/0pm and never each other.
+        XCTAssertEqual(chartTime(at(0, 36), utc), "12:36am")
+        XCTAssertEqual(chartTime(at(12, 5), utc), "12:05pm")
+        XCTAssertEqual(chartTime(at(23, 59), utc), "11:59pm")
+        // No space and no periods — " p.m." is four characters the strip can't spend.
+        XCTAssertFalse(chartTime(at(16, 22), utc).contains(" "))
+        XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
     /// The band rows must stay in reading order and inside the canvas, for
@@ -107,6 +102,44 @@ final class TimelineTests: XCTestCase {
                              "the top band must clear the sun dots above it", file: file, line: line)
         XCTAssertLessThan(g.bottomTimeY, g.height - 8,
                           "the last row must sit inside the canvas", file: file, line: line)
+    }
+
+    /// EVERY time the strip prints must be a time the strip can stop on.
+    ///
+    /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
+    /// number on screen that the scrubber will never park you at. The slack
+    /// label printed its WINDOW'S OPENING EDGE for one iteration and that edge
+    /// is not a snap stop — you read "7:48pm", let go, and landed on 7:56pm
+    /// with nothing explaining the gap.
+    ///
+    /// The second half is the part that makes this a real guard rather than a
+    /// tautology: it proves the window edges genuinely AREN'T snap stops, so
+    /// re-labelling with one would fail here rather than pass by coincidence.
+    func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
+        let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
+        let d = TimelineData.build(tide: nil, current: victoria, now: Date())
+        let stops = Set(d.snapTimes)
+        XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
+
+        let slacks = d.currentEvents.filter { $0.kind == .slack && $0.time >= d.start && $0.time <= d.end }
+        XCTAssertFalse(slacks.isEmpty, "no slacks at this station — pick another fixture")
+        for e in slacks {
+            XCTAssert(stops.contains(e.time),
+                      "the strip labels slack at \(e.time) but the magnet cannot stop there")
+        }
+        // Maxes are labelled too, and they are snap stops for the same reason.
+        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end {
+            XCTAssert(stops.contains(e.time),
+                      "the strip labels a max at \(e.time) but the magnet cannot stop there")
+        }
+
+        // And the window edges are NOT stops — which is exactly why they can't
+        // be what the label shows.
+        let edges = d.slackWindows.filter { $0.start >= d.start && $0.start <= d.end }
+        XCTAssertFalse(edges.isEmpty, "no windows at this station — pick another fixture")
+        XCTAssert(edges.contains { !stops.contains($0.start) },
+                  "window edges turn out to be snap stops after all — if the magnet "
+                  + "learned to park on them, this guard needs rethinking, not deleting")
     }
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
@@ -131,23 +164,25 @@ final class TimelineTests: XCTestCase {
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
 
-        // The two tracks are the SAME box now. They diverged while the current
-        // strip drew speed labels on its curve and carried FLOOD/EBB reference
-        // lines; both are gone, so a current reading and a tide reading sit in
-        // the same rows and the two details are the same size on screen. If a
-        // future change reintroduces a per-track height, it should have to
-        // argue with this assertion first.
-        XCTAssertEqual(cur.height, tide.height, "one strip height, both tracks")
-        XCTAssertEqual(cur.curTop, tide.tideTop)
-        XCTAssertEqual(cur.curBottom, tide.tideBottom)
+        // The tracks diverge again, on purpose. They were briefly one box while
+        // both drew three-row bands; the current strip now prints ONE green
+        // slack time above the curve and ONE small time below it, with the
+        // speeds annotating the curve itself — two rows, not six — so borrowing
+        // tide's grid would leave four rows of dead height on every gate.
+        // Shorter canvas, taller track.
+        XCTAssertEqual(cur.height, 312)
+        XCTAssertLessThan(cur.height, tide.height, "fewer rows, shorter canvas")
+        XCTAssertGreaterThan(cur.curBottom - cur.curTop, tide.tideBottom - tide.tideTop,
+                             "and the reclaimed height goes to the curve")
         XCTAssertEqual(cur.bodyTop, cur.curTop)
         XCTAssertEqual(cur.bodyBottom, cur.curBottom)
-        assertBandsAreReadable(cur)
-        // Slack's column spans the whole track, so a max-ebb band below and a
-        // slack's end-time band below must share the one bottom row without the
-        // column swallowing either.
-        XCTAssertGreaterThan(cur.bottomGlyphY, cur.curY(-999),
-                             "the bottom band must clear a clamped max-ebb dot")
+
+        // One row above and one below, both outside the track and inside the
+        // canvas, with the top one clear of the sun chrome.
+        XCTAssertLessThan(cur.slackRangeY, cur.curTop, "the slack time sits above the track")
+        XCTAssertGreaterThan(cur.slackRangeY, cur.sunY + 12, "and clears the sun dots")
+        XCTAssertGreaterThan(cur.maxTimeY, cur.curBottom, "max times sit below the track")
+        XCTAssertLessThan(cur.maxTimeY, cur.height - 8, "and inside the canvas")
 
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
@@ -377,9 +412,10 @@ final class TimelineTests: XCTestCase {
         let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
 
         XCTAssert(d.hasCurrent && !d.hasTide)
-        // 328: one strip height for both tracks since the NEAPS bands retired
-        // the gutter (was 340 pre-gutter, 380 with the three-row gutter).
-        XCTAssertEqual(TimelineGeo(data: d).height, 328)
+        // 312: the current strip's own height since its rows collapsed to one
+        // above and one below (was 380 with the three-row gutter, 328 while
+        // both tracks briefly shared tide's band grid).
+        XCTAssertEqual(TimelineGeo(data: d).height, 312)
         XCTAssertFalse(d.currentEvents.isEmpty)
         // Fetched official samples are real velocities, so the online-gate path
         // gets slack windows — the derived-gate path does not, because its curve

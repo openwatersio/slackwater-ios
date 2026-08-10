@@ -171,16 +171,28 @@ func clockTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("HH:mm", tz).string(from: date)
 }
 
-/// "7:48" — the same 24h clock with the leading zero dropped, for the strip.
+/// "4:22pm" — the strip's clock. Twelve-hour, lowercase, no space and no
+/// periods: the meridiem is a two-character suffix here, not a word.
 ///
-/// Nothing on the chart is in a column; every label is centred on its own
-/// event, so the pad buys no alignment there and costs real width. That width
-/// is the whole reason this exists: promoting slack's TIME into the band's big
-/// row put an 18pt five-character label where a three-character speed used to
-/// sit, and at 18pt/hour a slack and the max ~3h either side of it are only
-/// ~54pt apart. The pad was the difference between clearing and touching.
+/// The strip went 24h to kill "10:54 p.m." labels that were mostly meridiem and
+/// collided because of it. A bare suffix keeps that win — it is four characters
+/// shorter than " p.m." — while reading the way the readout above the strip and
+/// the whole rest of the app already do. `MultiDaySchedule` stays on 24h
+/// `clockTime`: its times are a zero-padded monospaced column, and a suffix
+/// that only some rows carry would ragged it.
 func chartTime(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("H:mm", tz).string(from: date)
+    bareTime(date, tz) + meridiem(date, tz)
+}
+
+/// "4:22" — the clock face with no meridiem, for the left half of a range whose
+/// suffix is carried once at the end.
+private func bareTime(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("h:mm", tz).string(from: date)
+}
+
+/// "am" / "pm".
+private func meridiem(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("a", tz).string(from: date).lowercased()
 }
 
 /// "Wed, Jul 30" — the schedule date line.
