@@ -74,8 +74,9 @@ struct TideDetailView: View {
                                   color: SN.foam.opacity(0.5), tracking: 1.4)
                         Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
                             .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                        // Relative only — the absolute time drops to the strip's
-                        // gutter (gutter spec §1/§2, reversing the 2026-08-07 call).
+                        // Relative only — the absolute time lives on the strip,
+                        // now in the turn's own band rather than the retired
+                        // tide gutter (gutter spec §1/§2, NEAPS pass).
                         Text("in \(countdown(from: scrubTime, to: next.time))")
                             .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
                     }
