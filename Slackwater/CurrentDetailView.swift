@@ -158,12 +158,14 @@ struct CurrentDetailView: View {
                                 .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                             // Time REMAINING, not the window's original length —
                             // an already-open window must not claim its full run.
-                            // The "@ 0.5 kn" that used to close this line moved
-                            // onto the strip, where it prints as the value at
-                            // both ends of the slack column. Two statements of
-                            // one constant, a foot apart on the same screen, and
-                            // this was the one where it read as noise.
-                            Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end))")
+                            // The threshold lives HERE, once, and not on the
+                            // strip. It briefly moved onto the slack bands to
+                            // fill their value row; six identical "0.5"s across
+                            // a day made it the most repeated and least useful
+                            // number on screen. One statement of a constant is
+                            // information, six is texture — and the strip's
+                            // value row went to the slack times instead.
+                            Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                                 .accessibilityIdentifier("slack-window")

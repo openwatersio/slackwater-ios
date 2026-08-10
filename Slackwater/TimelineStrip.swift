@@ -540,16 +540,25 @@ struct TimelineCanvas: View {
                    style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
     }
 
-    /// One event's band: glyph, value and time in the three fixed rows on one
-    /// side of the track. Both tracks draw through here, which is what keeps a
-    /// current's reading and a tide's reading the same object rendered twice
-    /// rather than two label systems that drift apart.
+    /// One event's band: glyph, then a `primary` line and an optional
+    /// `secondary` one, in the three fixed rows on one side of the track. Both
+    /// tracks draw through here, which is what keeps a current's reading and a
+    /// tide's reading the same object rendered twice rather than two label
+    /// systems that drift apart.
     ///
-    /// `value` is nil for slack — there is no number to print when the answer
-    /// is "none" — and the glyph carries the whole meaning in that row.
+    /// The rows are deliberately named by WEIGHT, not by content: `primary` is
+    /// the big line and `secondary` is the small one, and which fact goes in
+    /// which is the caller's judgement about what that event is for. A tide
+    /// turn or a current max leads with its number and drops its time to the
+    /// small row. Slack leads with the TIME and has no small row at all —
+    /// slack timing is the whole answer at a gate, while the exact knots at
+    /// peak ebb is trivia you steer around rather than plan by. Naming these
+    /// `value`/`time` is what made the earlier version print the sub-threshold
+    /// constant six times a screen: the grid demanded a number in the big row,
+    /// so slack got handed the only number it had.
     private func drawBand(_ ctx: GraphicsContext, x: CGFloat, top: Bool,
-                          glyph: String, value: String?, time: Date, tint: Color,
-                          rotateDeg: Double? = nil) {
+                          glyph: String, primary: String, secondary: String?,
+                          tint: Color, rotateDeg: Double? = nil) {
         let glyphAt = CGPoint(x: x, y: top ? geo.topGlyphY : geo.bottomGlyphY)
         let mark = Text(glyph).font(.system(size: 15, weight: .semibold)).foregroundStyle(tint)
         if let rotateDeg {
@@ -563,18 +572,14 @@ struct TimelineCanvas: View {
         } else {
             ctx.draw(mark, at: glyphAt, anchor: .center)
         }
-        if let value {
-            ctx.draw(Text(value).font(.system(size: 18, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(tint),
-                     at: CGPoint(x: x, y: top ? geo.topValueY : geo.bottomValueY), anchor: .center)
+        ctx.draw(Text(primary).font(.system(size: 18, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(tint),
+                 at: CGPoint(x: x, y: top ? geo.topValueY : geo.bottomValueY), anchor: .center)
+        if let secondary {
+            ctx.draw(Text(secondary).font(.system(size: 12).monospaced())
+                        .foregroundStyle(.white.opacity(0.6)),
+                     at: CGPoint(x: x, y: top ? geo.topTimeY : geo.bottomTimeY), anchor: .center)
         }
-        // 24h, the style the schedule table under this strip already uses. It
-        // also answers the meridiem problem by deleting it: "a.m."/"p.m." on
-        // every one of these was both the widest part of the label and the part
-        // that collided.
-        ctx.draw(Text(clockTime(time, data.tz)).font(.system(size: 12).monospaced())
-                    .foregroundStyle(.white.opacity(0.6)),
-                 at: CGPoint(x: x, y: top ? geo.topTimeY : geo.bottomTimeY), anchor: .center)
     }
 
     // Night bands, day tint, day labels, sun markers, per-night moons —
@@ -715,7 +720,8 @@ struct TimelineCanvas: View {
             // a shorter label is the difference between clearing a neighbour
             // and overprinting it.
             drawBand(ctx, x: x, top: high, glyph: high ? "⤒" : "⤓",
-                     value: formatHeight(e.height, imperial: imperial), time: e.time, tint: tint)
+                     primary: formatHeight(e.height, imperial: imperial),
+                     secondary: clockTime(e.time, data.tz), tint: tint)
         }
     }
 
@@ -795,33 +801,38 @@ struct TimelineCanvas: View {
                 // and then `●`; both said "not an arrow" instead of saying
                 // anything, and `●` was a third green dot beside the curve's.)
                 //
-                // The value is the threshold that DEFINES the window — under
-                // this much stream, a small boat transits — so the same number
-                // prints at both ends. That is not redundancy: each end is a
-                // complete reading in the same glyph/value/time shape as a max
-                // beside it, and it is the reason this number can now come out
-                // of the readout above the strip.
-                let threshold = formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)
+                // Slack leads with its TIME, in the big row, green, where every
+                // other event puts a number — and has no small row under it.
+                //
+                // The previous pass put the sub-threshold constant there to fill
+                // the slot, which meant a busy day printed "0.5" six times and
+                // the one genuinely repeated number on the screen was also the
+                // least informative. The fix is not to blank the row (that
+                // leaves the gap the grid exists to avoid) but to promote the
+                // fact that belongs there: at a gate, WHEN slack runs is the
+                // answer you plan the day around, while the exact knots at peak
+                // ebb is something you steer around rather than schedule by.
+                // Slack times now share a baseline with the speeds beside them,
+                // which is the point — same grid, and the important number is
+                // the big one. The threshold goes back to the "Next slack"
+                // readout above, stated once.
                 if let w = data.slackWindows.first(where: { $0.slack == e.time }) {
                     drawBand(ctx, x: data.x(w.start), top: true, glyph: "↦",
-                             value: threshold, time: w.start, tint: SN.go)
+                             primary: clockTime(w.start, data.tz), secondary: nil, tint: SN.go)
                     drawBand(ctx, x: data.x(w.end), top: false, glyph: "⇥",
-                             value: threshold, time: w.end, tint: SN.go)
+                             primary: clockTime(w.end, data.tz), secondary: nil, tint: SN.go)
                 } else {
                     // No window — a violent gate the 10-min sampling steps over,
                     // and every derived gate, whose schematic curve can't honestly
                     // yield one (gutter spec §3). One instant, so one label, and a
                     // hairline instead of a column: a zero-width window is not a
-                    // window and must not look like one. `⇥` alone, and NO value:
-                    // there is no window here, so there is no threshold that
-                    // describes one, and printing 0.5 would invent the very
-                    // window this branch exists to say it doesn't have.
+                    // window and must not look like one.
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
-                    drawBand(ctx, x: x, top: true, glyph: "⇥", value: nil,
-                             time: e.time, tint: SN.go)
+                    drawBand(ctx, x: x, top: true, glyph: "⇥",
+                             primary: clockTime(e.time, data.tz), secondary: nil, tint: SN.go)
                 }
             case .maxFlood, .maxEbb:
                 // The COMPASS arrow, rotated to this station's set — the same
@@ -839,8 +850,8 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
                          with: .color(tint))
                 drawBand(ctx, x: x, top: flood, glyph: deg == nil ? (flood ? "↑" : "↓") : "↑",
-                         value: formatSpeed(abs(e.speed), unit: speedUnit),
-                         time: e.time, tint: tint, rotateDeg: deg)
+                         primary: formatSpeed(abs(e.speed), unit: speedUnit),
+                         secondary: clockTime(e.time, data.tz), tint: tint, rotateDeg: deg)
             }
         }
     }
