@@ -29,15 +29,23 @@
  * station-code order so the id a device stored yesterday is the id it reads
  * today.
  *
- * CONTEXT. IWLS publishes no region, and the station-corrections gazetteer is
- * 19 Salish towns, so its derived tier would label Halifax "near Nanaimo, BC".
- * The fallback is a COARSE COAST label from position — deliberately coarse
- * enough to stay true at every boundary (an Ungava Bay station reading
- * "Atlantic Coast" is a fact about the ocean basin, not a guess about a
- * county). The generator prints the census so the labelling stays reviewable,
- * and the way to make any one station better is the registry, which is where
- * curated identity belongs.
- * ponytail: six coast labels; per-station context goes in station-corrections.
+ * CONTEXT. IWLS publishes no region, so the label is derived here, in two
+ * tiers. First the NEAREST TOWN from station-corrections' national places list
+ * ("~Nanaimo, BC") — capped at 40 km and skipped when it would only restate
+ * the station's own name, so Halifax does not read "~Halifax, NS". Then, for a
+ * station with no town in range, a COARSE COAST label from position,
+ * deliberately coarse enough to stay true at every boundary (an Ungava Bay
+ * station reading "Atlantic Coast" is a fact about the ocean basin, not a
+ * guess about a county).
+ *
+ * The coast tier used to be the ONLY tier, because the gazetteer that fed the
+ * derived one held 19 Salish towns and would have labelled Halifax "near
+ * Nanaimo, BC". station-corrections 2.8.0 added the national list, which is
+ * what makes the first tier safe; it is passed in rather than bundled because
+ * it is ~890 KB. The generator prints the census so the labelling stays
+ * reviewable, and the way to make any one station better is still the
+ * registry, which is where curated identity belongs.
+ * ponytail: two derived tiers; per-station context goes in station-corrections.
  *
  * Run: cd tools && npm install && node gen-chs-stations.mjs
  */
@@ -45,10 +53,15 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { createPlacesResolver } from "@sailingnaturali/station-corrections";
 import tzLookup from "tz-lookup";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 const out = join(here, "..", "Slackwater", "Resources", "chs-stations.json");
+const places = JSON.parse(readFileSync(
+  require.resolve("@sailingnaturali/station-corrections/data/places.json"), "utf8"));
+const resolvePlace = createPlacesResolver(places);
 const registry = JSON.parse(readFileSync(
   createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/registry.json"),
   "utf8",
@@ -83,6 +96,25 @@ const COASTS = [
   ["Atlantic Coast", () => true],
 ];
 const coastOf = (la, lo) => COASTS.find(([, hit]) => hit(la, lo))[0];
+
+/**
+ * Nearest town, else the coast. The id is one this generator is about to mint
+ * and the registry has already declined, so the resolver only ever reaches its
+ * derived tier here — the call is for the town, not for an identity.
+ *
+ * The raw name goes in because the resolver needs it to suppress a context
+ * that only restates it: a station called Halifax must not be labelled
+ * "~Halifax, NS". Its cleaned name comes back out unused, deliberately —
+ * renaming a thousand IWLS stations is a separate change from labelling them.
+ */
+function contextOf(id, name, latitude, longitude) {
+  const r = resolvePlace({ id, name, latitude, longitude });
+  // `derived` only. The resolver's other unowned tier splits a name on its
+  // comma qualifier, which IWLS names are not written for: "Charlottetown,
+  // PEI" came back with the context "Pei", and a dozen more like it. The coast
+  // label is a better answer than a miscased fragment of the name above it.
+  return r.derived ? r.context : coastOf(latitude, longitude);
+}
 
 const slug = (name) =>
   "chs-" + name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -128,7 +160,8 @@ for (const s of iwls) {
   const aliases = [...new Set((s.alternativeName ?? "").split(",")
     .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== s.officialName.toLowerCase()))];
   stations.push({
-    id, name: s.officialName, region: coastOf(s.latitude, s.longitude), aliases,
+    id, name: s.officialName,
+    region: contextOf(id, s.officialName, s.latitude, s.longitude), aliases,
     latitude: s.latitude, longitude: s.longitude,
     timezone: tzLookup(s.latitude, s.longitude),
   });

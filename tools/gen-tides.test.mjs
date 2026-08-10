@@ -84,8 +84,14 @@ test("every station has a region line and a usable model", () => {
 test("no bundled Canadian station duplicates a CHS station", () => {
   const chs = JSON.parse(readFileSync(
     join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
+  // The province code either IS the region line or ends it — "BC" and
+  // "~Sidney, BC" are both Canadian. Matching only the bare code quietly
+  // shrank this check to 25 stations the day nearest-town labels landed, which
+  // is the wrong way for a duplicate-detector to fail. Read from the shipped
+  // file rather than the generator's own bookkeeping, deliberately: that is
+  // what makes this an independent check and not a restatement.
   const ca = stations.filter((s) =>
-    /^(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NT|NU)$/.test(s.region));
+    /(^|,\s)(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NT|NU)$/.test(s.region));
   // NOAA rows are exempt: their datums are adopted, and Hyder was already
   // shipping when CHS gauges Stewart 1.3 km away.
   const contested = ca
