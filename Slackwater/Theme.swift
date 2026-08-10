@@ -163,9 +163,24 @@ func cardTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("h:mm a", tz).string(from: date)
 }
 
-/// "14:05" — the chart/table style (web en-CA 24h).
+/// "14:05" — the chart/table style (web en-CA 24h). Zero-padded, and that
+/// padding is load-bearing in `MultiDaySchedule`: the times there are a
+/// left-aligned monospaced COLUMN, and "7:03" would hang a character left of
+/// "12:53" all the way down the list.
 func clockTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("HH:mm", tz).string(from: date)
+}
+
+/// "7:48" — the same 24h clock with the leading zero dropped, for the strip.
+///
+/// Nothing on the chart is in a column; every label is centred on its own
+/// event, so the pad buys no alignment there and costs real width. That width
+/// is the whole reason this exists: promoting slack's TIME into the band's big
+/// row put an 18pt five-character label where a three-character speed used to
+/// sit, and at 18pt/hour a slack and the max ~3h either side of it are only
+/// ~54pt apart. The pad was the difference between clearing and touching.
+func chartTime(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("H:mm", tz).string(from: date)
 }
 
 /// "Wed, Jul 30" — the schedule date line.

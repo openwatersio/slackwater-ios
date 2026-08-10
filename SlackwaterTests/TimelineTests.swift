@@ -61,6 +61,38 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
 
+    /// The strip drops the leading zero, the schedule keeps it. Both facts
+    /// matter: the chart centres each label on its own event so the pad is pure
+    /// width, while the schedule's times are a left-aligned monospaced column
+    /// where an unpadded "7:03" hangs a character left of "12:53" down the
+    /// whole list. Collapsing these two back into one formatter breaks one or
+    /// the other, so this pins them apart.
+    func testChartTimeDropsThePadAndClockTimeKeepsIt() {
+        var cal = Calendar(identifier: .gregorian)
+        let utc = TimeZone(identifier: "UTC")!
+        cal.timeZone = utc
+        let morning = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
+                                                    hour: 7, minute: 3))!
+        let afternoon = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
+                                                      hour: 14, minute: 51))!
+        let midnight = cal.date(from: DateComponents(year: 2026, month: 8, day: 10,
+                                                     hour: 0, minute: 36))!
+
+        XCTAssertEqual(chartTime(morning, utc), "7:03", "the strip drops the pad")
+        XCTAssertEqual(clockTime(morning, utc), "07:03", "the schedule column keeps it")
+        // Past noon the two agree — the pad only ever existed before 10:00.
+        XCTAssertEqual(chartTime(afternoon, utc), "14:51")
+        XCTAssertEqual(clockTime(afternoon, utc), "14:51")
+        // Midnight is the case a "%d"-style fix gets wrong: hour 0 must stay 0,
+        // not become 12 or empty.
+        XCTAssertEqual(chartTime(midnight, utc), "0:36")
+        XCTAssertEqual(clockTime(midnight, utc), "00:36")
+        // Both are 24h — no meridiem leaks back in on either.
+        for t in [morning, afternoon, midnight] {
+            XCTAssertFalse(chartTime(t, utc).contains("M"), "chartTime must stay 24h")
+        }
+    }
+
     /// The band rows must stay in reading order and inside the canvas, for
     /// whichever track owns the box. Get one slot backwards and the glyph
     /// prints over the value with nothing to say so.

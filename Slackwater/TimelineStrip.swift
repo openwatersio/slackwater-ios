@@ -721,7 +721,7 @@ struct TimelineCanvas: View {
             // and overprinting it.
             drawBand(ctx, x: x, top: high, glyph: high ? "⤒" : "⤓",
                      primary: formatHeight(e.height, imperial: imperial),
-                     secondary: clockTime(e.time, data.tz), tint: tint)
+                     secondary: chartTime(e.time, data.tz), tint: tint)
         }
     }
 
@@ -818,9 +818,9 @@ struct TimelineCanvas: View {
                 // readout above, stated once.
                 if let w = data.slackWindows.first(where: { $0.slack == e.time }) {
                     drawBand(ctx, x: data.x(w.start), top: true, glyph: "↦",
-                             primary: clockTime(w.start, data.tz), secondary: nil, tint: SN.go)
+                             primary: chartTime(w.start, data.tz), secondary: nil, tint: SN.go)
                     drawBand(ctx, x: data.x(w.end), top: false, glyph: "⇥",
-                             primary: clockTime(w.end, data.tz), secondary: nil, tint: SN.go)
+                             primary: chartTime(w.end, data.tz), secondary: nil, tint: SN.go)
                 } else {
                     // No window — a violent gate the 10-min sampling steps over,
                     // and every derived gate, whose schematic curve can't honestly
@@ -832,7 +832,7 @@ struct TimelineCanvas: View {
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
                     drawBand(ctx, x: x, top: true, glyph: "⇥",
-                             primary: clockTime(e.time, data.tz), secondary: nil, tint: SN.go)
+                             primary: chartTime(e.time, data.tz), secondary: nil, tint: SN.go)
                 }
             case .maxFlood, .maxEbb:
                 // The COMPASS arrow, rotated to this station's set — the same
@@ -851,7 +851,7 @@ struct TimelineCanvas: View {
                          with: .color(tint))
                 drawBand(ctx, x: x, top: flood, glyph: deg == nil ? (flood ? "↑" : "↓") : "↑",
                          primary: formatSpeed(abs(e.speed), unit: speedUnit),
-                         secondary: clockTime(e.time, data.tz), tint: tint, rotateDeg: deg)
+                         secondary: chartTime(e.time, data.tz), tint: tint, rotateDeg: deg)
             }
         }
     }
