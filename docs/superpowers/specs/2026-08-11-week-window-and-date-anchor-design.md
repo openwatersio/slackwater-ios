@@ -49,7 +49,7 @@ re-plumb of every detail view.
    with honest failure rather than a range-limited picker.
 6. **The picker is date-granular, not week-granular.** Tap Sept 14, get
    Sept 14–21.
-7. **A range bar heads the schedule card** — `Aug 11 – 18` — and tapping it
+7. **A range bar heads the schedule card** — `Aug 11 – 17` — and tapping it
    opens the picker.
 
 ## 1. Two dates where there was one
@@ -205,13 +205,20 @@ and it would reopen `2026-08-03-detail-hero-and-scrub-order-design.md`'s rule
 that the `when` row is always the last thing in the scrub card. The bar is also
 semantically the *list's* range, so the list's card is where it belongs.
 
-**The bar states the span it shows, not a calendar week: `Aug 11 – 18`.** The
-window is rolling (§1), so on a Tuesday it runs Tue→Tue; a "Week of Aug 9 – 16"
-label would name two days that are not on screen and omit two that are. Rules:
+**The bar states the span it shows, not a calendar week: `Aug 11 – 17`.** The
+window is rolling (§1), so anchoring on a Tuesday runs Tue→Mon; a
+"Week of Aug 9 – 16" label would name two days that are not on screen and omit
+two that are.
 
-- Same month: `Aug 11 – 18`.
-- Month crossing: `Aug 28 – Sep 4`.
-- Year crossing: `Dec 29 – Jan 5, 2027` — the year appears only when it differs
+**The second date is the last day SHOWN, `anchor + 6` — not `scheduleRange`'s
+exclusive upper bound.** `scheduleRange` runs `anchor … anchor + 168h`, so the
+seven day-groups are Aug 11 through Aug 17; Aug 18 is the boundary, not a row.
+Printing `Aug 11 – 18` would name a day that is not in the list directly
+beneath it, which is the same defect this label exists to avoid.
+
+- Same month: `Aug 11 – 17`.
+- Month crossing: `Aug 28 – Sep 3`.
+- Year crossing: `Dec 29 – Jan 4, 2027` — the year appears only when it differs
   from the anchor's.
 
 When `anchor != today` the bar also carries the return-to-now affordance, since
@@ -245,9 +252,10 @@ Two plans against this spec:
    edge.
 6. Merge-on-save — an overlapping fetch produces no duplicate timestamps, and
    the prune drops everything before `today − 48h`.
-7. The range-bar label — same month (`Aug 11 – 18`), month crossing
-   (`Aug 28 – Sep 4`), and year crossing (`Dec 29 – Jan 5, 2027`, with the year
-   suppressed when it matches the anchor's).
+7. The range-bar label — same month (`Aug 11 – 17`), month crossing
+   (`Aug 28 – Sep 3`), and year crossing (`Dec 29 – Jan 4, 2027`, with the year
+   suppressed when it matches the anchor's), and in every case the second date
+   is the last day the list actually renders.
 8. Existing assertions at `TimelineTests:56`, `TimelineTests:399-400` and
    `ChsCurrentGateTests:154-155` follow the new constants.
 
