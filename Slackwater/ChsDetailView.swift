@@ -66,14 +66,14 @@ struct ChsDetailView: View {
                 } else {
                     // Bare id: CHS gates key the catalog without the NOAA
                     // "current:" prefix — see CurrentStationRecord.itemId.
-                    waiting(name: gate.name, region: "\(gate.region) · current", favoriteId: gate.id,
+                    waiting(name: gate.name, region: gate.region, favoriteId: gate.id,
                             latitude: gate.latitude, longitude: gate.longitude, needs: nil)
                 }
             case .derivedGate(let gate):
                 if case .fitted(let port) = service.state(gate.reference) {
                     DerivedGateDetailView(record: DerivedGateRecord(gate: gate, port: port))
                 } else {
-                    waiting(name: gate.name, region: "\(gate.region) · current", favoriteId: gate.id,
+                    waiting(name: gate.name, region: gate.region, favoriteId: gate.id,
                             latitude: gate.latitude, longitude: gate.longitude, needs: gate.referenceName)
                 }
             }

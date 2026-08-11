@@ -61,20 +61,98 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
 
+    /// The strip is 12-hour with a bare lowercase suffix; the schedule stays
+    /// 24-hour and zero-padded. Both facts matter and pinning them apart is the
+    /// point: the schedule's times are a left-aligned monospaced column where
+    /// the pad keeps the colons in line and a suffix only some rows carry would
+    /// ragged it, while the strip centres each label on its own event and pays
+    /// for every character it prints.
+    func testChartTimeIsBareTwelveHourAndClockTimeStaysPadded() {
+        var cal = Calendar(identifier: .gregorian)
+        let utc = TimeZone(identifier: "UTC")!
+        cal.timeZone = utc
+        func at(_ h: Int, _ m: Int) -> Date {
+            cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: m))!
+        }
+        XCTAssertEqual(chartTime(at(7, 3), utc), "7:03am", "no pad, bare lowercase suffix")
+        XCTAssertEqual(clockTime(at(7, 3), utc), "07:03", "the schedule column keeps its pad")
+        XCTAssertEqual(chartTime(at(16, 22), utc), "4:22pm")
+        XCTAssertEqual(clockTime(at(16, 22), utc), "16:22")
+        // The two ends of the clock, where 12-hour conversion goes wrong:
+        // midnight is 12am and noon is 12pm, never 0am/0pm and never each other.
+        XCTAssertEqual(chartTime(at(0, 36), utc), "12:36am")
+        XCTAssertEqual(chartTime(at(12, 5), utc), "12:05pm")
+        XCTAssertEqual(chartTime(at(23, 59), utc), "11:59pm")
+        // No space and no periods — " p.m." is four characters the strip can't spend.
+        XCTAssertFalse(chartTime(at(16, 22), utc).contains(" "))
+        XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
+    }
+
+    /// The band rows must stay in reading order and inside the canvas, for
+    /// whichever track owns the box. Get one slot backwards and the glyph
+    /// prints over the value with nothing to say so.
+    private func assertBandsAreReadable(_ g: TimelineGeo,
+                                        file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssert(g.topTimeY < g.topValueY && g.topValueY < g.topGlyphY && g.topGlyphY < g.bodyTop,
+                  "top band reads time → value → glyph → curve", file: file, line: line)
+        XCTAssert(g.bodyBottom < g.bottomGlyphY && g.bottomGlyphY < g.bottomValueY
+                    && g.bottomValueY < g.bottomTimeY,
+                  "bottom band reads curve → glyph → value → time", file: file, line: line)
+        XCTAssertGreaterThan(g.topTimeY, g.sunY + 8,
+                             "the top band must clear the sun dots above it", file: file, line: line)
+        XCTAssertLessThan(g.bottomTimeY, g.height - 8,
+                          "the last row must sit inside the canvas", file: file, line: line)
+    }
+
+    /// EVERY time the strip prints must be a time the strip can stop on.
+    ///
+    /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
+    /// number on screen that the scrubber will never park you at. The slack
+    /// label printed its WINDOW'S OPENING EDGE for one iteration and that edge
+    /// is not a snap stop — you read "7:48pm", let go, and landed on 7:56pm
+    /// with nothing explaining the gap.
+    ///
+    /// The second half is the part that makes this a real guard rather than a
+    /// tautology: it proves the window edges genuinely AREN'T snap stops, so
+    /// re-labelling with one would fail here rather than pass by coincidence.
+    func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
+        let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
+        let d = TimelineData.build(tide: nil, current: victoria, now: Date())
+        let stops = Set(d.snapTimes)
+        XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
+
+        let slacks = d.currentEvents.filter { $0.kind == .slack && $0.time >= d.start && $0.time <= d.end }
+        XCTAssertFalse(slacks.isEmpty, "no slacks at this station — pick another fixture")
+        for e in slacks {
+            XCTAssert(stops.contains(e.time),
+                      "the strip labels slack at \(e.time) but the magnet cannot stop there")
+        }
+        // Maxes are labelled too, and they are snap stops for the same reason.
+        for e in d.currentEvents where e.kind != .slack && e.time >= d.start && e.time <= d.end {
+            XCTAssert(stops.contains(e.time),
+                      "the strip labels a max at \(e.time) but the magnet cannot stop there")
+        }
+
+        // And the window edges are NOT stops — which is exactly why they can't
+        // be what the label shows.
+        let edges = d.slackWindows.filter { $0.start >= d.start && $0.start <= d.end }
+        XCTAssertFalse(edges.isEmpty, "no windows at this station — pick another fixture")
+        XCTAssert(edges.contains { !stops.contains($0.start) },
+                  "window edges turn out to be snap stops after all — if the magnet "
+                  + "learned to park on them, this guard needs rethinking, not deleting")
+    }
+
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
     func testSingleTrackGeometries() {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        XCTAssertEqual(tide.height, 286, "the three-row gutter adds 60 below the track (Amendment C)")
-        XCTAssertEqual(tide.gutterY, 250, "row 0 baseline")
-        XCTAssert(tide.gutterY > tide.bodyBottom && tide.gutterY < tide.height,
-                  "gutter row 0 text sits below the track and inside the canvas")
-        XCTAssertEqual(tide.gutterY(row: 1), 262, "row 1 is 12pt lower")
-        XCTAssert(tide.gutterY(row: 1) < tide.height, "gutter row 1 still fits inside canvas")
-        XCTAssertEqual(tide.gutterY(row: 2), 274,
-                       "row 2 baseline, 24pt below row 0 (Amendment C) — coincides with yesterday's two-row height, not a stale assertion")
-        XCTAssert(tide.gutterY(row: 2) < tide.height, "gutter row 2 still fits inside canvas")
+        XCTAssertEqual(tide.height, 328, "NEAPS bands above and below the track, no gutter")
+        XCTAssertEqual(tide.tideTop, 106)
+        XCTAssertEqual(tide.tideBottom, 256)
+        XCTAssertEqual(tide.bodyTop, tide.tideTop)
+        XCTAssertEqual(tide.bodyBottom, tide.tideBottom)
+        assertBandsAreReadable(tide)
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -85,22 +163,26 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-        XCTAssertEqual(cur.height, 380, "the three-row gutter adds 60 below the track (Amendment C)")
-        XCTAssertEqual(cur.gutterY, 344, "row 0 baseline")
-        XCTAssertEqual(cur.curBottom, 320)
-        XCTAssertEqual(cur.bodyBottom, 320)
-        XCTAssert(cur.gutterY > cur.bodyBottom && cur.gutterY < cur.height,
-                  "gutter row 0 text sits below the track and inside the canvas")
-        XCTAssertEqual(cur.gutterY(row: 1), 356, "row 1 is 12pt lower")
-        XCTAssert(cur.gutterY(row: 1) < cur.height, "gutter row 1 still fits inside canvas")
-        XCTAssertEqual(cur.gutterY(row: 2), 368,
-                       "row 2 baseline, 24pt below row 0 (Amendment C) — coincides with yesterday's two-row height, not a stale assertion")
-        XCTAssert(cur.gutterY(row: 2) < cur.height, "gutter row 2 still fits inside canvas")
-        // The 24pt clearance is set by the max-ebb speed label, not by the
-        // gutter text: that label draws at `curY + 14` and curY clamps to
-        // `zeroY + curHalf`, so it reaches ~331 (gutter spec §1).
-        XCTAssertGreaterThan(cur.gutterY, cur.curY(-999) + 14,
-                             "the gutter must clear a clamped max-ebb speed label")
+
+        // The tracks diverge again, on purpose. They were briefly one box while
+        // both drew three-row bands; the current strip now prints ONE green
+        // slack time above the curve and ONE small time below it, with the
+        // speeds annotating the curve itself — two rows, not six — so borrowing
+        // tide's grid would leave four rows of dead height on every gate.
+        // Shorter canvas, taller track.
+        XCTAssertEqual(cur.height, 312)
+        XCTAssertLessThan(cur.height, tide.height, "fewer rows, shorter canvas")
+        XCTAssertGreaterThan(cur.curBottom - cur.curTop, tide.tideBottom - tide.tideTop,
+                             "and the reclaimed height goes to the curve")
+        XCTAssertEqual(cur.bodyTop, cur.curTop)
+        XCTAssertEqual(cur.bodyBottom, cur.curBottom)
+
+        // One row above and one below, both outside the track and inside the
+        // canvas, with the top one clear of the sun chrome.
+        XCTAssertLessThan(cur.slackRangeY, cur.curTop, "the slack time sits above the track")
+        XCTAssertGreaterThan(cur.slackRangeY, cur.sunY + 12, "and clears the sun dots")
+        XCTAssertGreaterThan(cur.maxTimeY, cur.curBottom, "max times sit below the track")
+        XCTAssertLessThan(cur.maxTimeY, cur.height - 8, "and inside the canvas")
 
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
@@ -113,7 +195,7 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
         XCTAssert(both.hasTide && both.hasCurrent)
-        XCTAssertEqual(both.height, 286, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.height, 328, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
 
@@ -151,62 +233,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
     }
 
-    /// Greedy row assignment for gutter labels: each label takes the lowest row
-    /// whose previous label has cleared it (Amendment A).
-    func testGutterRowsGreedyAssignment() {
-        // Well-separated labels all land in row 0.
-        XCTAssertEqual(gutterRows(centers: [10, 100, 200], widths: [20, 20, 20]),
-                       [0, 0, 0])
-
-        // Two labels that overlap: second goes to row 1.
-        XCTAssertEqual(gutterRows(centers: [10, 30], widths: [40, 40]),
-                       [0, 1])
-
-        // Three tightly packed labels: rows 0, 1, then 0 again (first row has cleared).
-        XCTAssertEqual(gutterRows(centers: [10, 30, 60], widths: [20, 20, 20]),
-                       [0, 1, 0])
-
-        // Fallback branch: four densely packed labels where neither row clears by label 3.
-        // Pinned to `rows: 2` explicitly — the default is now 3 (Amendment C), and with
-        // a third row available label 2 finds it clear instead of falling back; see
-        // testGutterRowsUsesThirdRowWhenAvailable for that case.
-        // Centers [0, 30, 60, 90] with widths [60, 60, 60, 60]:
-        // - Label 0: [-30, 30] → row 0
-        // - Label 1: [0, 60] → row 0 blocked (30 >= 0), row 1 clear → row 1
-        // - Label 2: [30, 90] → both blocked (row 0 at 30, row 1 at 60), pick row 0 (ends earliest)
-        // - Label 3: [60, 120] → both blocked, pick row 1 (ends earliest after row 0 updated to 90)
-        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60], rows: 2),
-                       [0, 1, 0, 1],
-                       "fallback branch: when both rows blocked, picks row with earliest end")
-
-        // Count matching: always returns same number of rows as there are labels.
-        // Pinned to `rows: 2` to match the "valid range [0, 1]" assertion below.
-        let centers: [CGFloat] = [10, 50, 100, 150, 200]
-        let widths: [CGFloat] = [30, 30, 30, 30, 30]
-        let rows = gutterRows(centers: centers, widths: widths, rows: 2)
-        XCTAssertEqual(rows.count, centers.count)
-        XCTAssert(rows.allSatisfy { $0 < 2 }, "all rows should be in valid range [0, 1]")
-    }
-
-    /// Amendment C: the same four densely packed labels as the fallback-branch
-    /// case above, but at the new default of three rows. Expectations reasoned
-    /// by hand from the algorithm, not by running it and copying the output:
-    /// - Label 0 [-30, 30]: row 0 clears immediately (starts at -inf) → row 0.
-    /// - Label 1 [0, 60]: row 0's right edge (30) is not < 0, so row 0 is
-    ///   blocked; row 1 clears (still -inf) → row 1.
-    /// - Label 2 [30, 90]: row 0's right edge (30) is not < 30 (touching counts
-    ///   as blocked), so row 0 is blocked; row 1's right edge (60) is not < 30
-    ///   either, and 60 is not earlier than row 0's 30, so it doesn't win the
-    ///   fallback comparison; row 2 clears (still -inf) → row 2, the row that
-    ///   only exists with the wider default.
-    /// - Label 3 [60, 120]: row 0's right edge (30) IS < 60, so row 0 clears
-    ///   again → row 0.
-    func testGutterRowsUsesThirdRowWhenAvailable() {
-        XCTAssertEqual(gutterRows(centers: [0, 30, 60, 90], widths: [60, 60, 60, 60]),
-                       [0, 1, 2, 0],
-                       "the third row absorbs what the two-row fallback used to overlap")
-    }
-
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.
@@ -241,18 +267,62 @@ final class TimelineTests: XCTestCase {
         XCTAssert(d.slackWindows.isEmpty, "but no windows — the curve is a shape (gutter spec §3)")
     }
 
-    /// The window's two edge labels grow INWARD from the band and collapse to
-    /// one merged range when they'd overlap (gutter spec §4). At 12pt/hour a
-    /// typical 1–3h window is 12–36pt wide and a "12:30PM" label is ~46pt, so
-    /// `merged` is the COMMON render — `pair` is the weak-station case.
-    func testGutterLabelsCollapseWhenTheyWouldOverlap() {
-        XCTAssertEqual(gutterLabels(bandWidth: 200, startWidth: 46, endWidth: 46), .pair)
-        XCTAssertEqual(gutterLabels(bandWidth: 30, startWidth: 46, endWidth: 46), .merged)
-        // Touching labels are unreadable, so equality merges.
-        XCTAssertEqual(gutterLabels(bandWidth: 92, startWidth: 46, endWidth: 46), .merged)
-        XCTAssertEqual(gutterLabels(bandWidth: 93, startWidth: 46, endWidth: 46), .pair)
-        // A zero-width band (a window shorter than a rendering point) merges.
-        XCTAssertEqual(gutterLabels(bandWidth: 0, startWidth: 46, endWidth: 46), .merged)
+    /// The strip is wider than one Metal texture. A `Canvas` is a single
+    /// backing layer capped at 8192px per side, and the whole chart renders
+    /// EMPTY past it — silently, no error, which is why this needs a test and
+    /// not a comment. Widening `pph` from 12 to 18 crossed it on a 3× phone
+    /// (9720px) and blanked every tide detail; the tiles exist to keep each
+    /// layer under the cap, so the assertion is on a tile, not on the strip.
+    func testCanvasTilesStayUnderTheTextureCap() {
+        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let cap: CGFloat = 8192
+        let scale: CGFloat = 3        // the densest screen this ships to
+
+        XCTAssertGreaterThan(d.totalWidth * scale, cap,
+                             "if the whole strip fits in one texture the tiling is dead code — delete it, don't keep an untested branch")
+        XCTAssertLessThan(TimelineCanvas.tileWidth * scale, cap,
+                          "a tile must fit in one texture at 3×")
+        XCTAssertLessThan(TimelineGeo(data: d).height * scale, cap,
+                          "and so must its height")
+        // Whole points at every scale factor: a fractional boundary antialiases
+        // against transparent on both sides and leaves a hairline seam.
+        for s in [1.0, 2.0, 3.0] as [CGFloat] {
+            XCTAssertEqual((TimelineCanvas.tileWidth * s).truncatingRemainder(dividingBy: 1), 0,
+                           "tile boundary must land on a pixel at \(s)×")
+        }
+    }
+
+    /// The fixed left axis: round values, at most six of them, inside the
+    /// plotted span. The step has to adapt — a Salish spring range and a
+    /// half-metre creek can't share one interval — and the labels have to be
+    /// values a chart datum is actually quoted in, not raw span edges.
+    func testAxisTicksAreRoundAndBounded() {
+        // ~4.4 m of range: whole metres, all inside the span.
+        let m = axisTicks(lo: -0.4, hi: 4.0, imperial: false)
+        XCTAssertEqual(m, [0, 1, 2, 3, 4])
+        XCTAssert(m.allSatisfy { $0 >= -0.4 && $0 <= 4.0 }, "a tick outside the span points at nothing")
+
+        // A narrow station drops to the half-metre step rather than showing one label.
+        XCTAssertEqual(axisTicks(lo: 0.1, hi: 1.4, imperial: false), [0.5, 1.0])
+
+        // A big range coarsens instead of printing a wall of numbers.
+        XCTAssert(axisTicks(lo: -1, hi: 12, imperial: false).count <= 6)
+        XCTAssert(axisTicks(lo: -1, hi: 12, imperial: true).count <= 6,
+                  "~43 ft of range in feet still fits the column")
+
+        // Imperial reads the span in feet: 4 m is ~13.1 ft, so the ticks must
+        // be foot values, not metre ones leaking through.
+        let ft = axisTicks(lo: 0, hi: 4.0, imperial: true)
+        XCTAssertEqual(ft.last, 10, "ticks are display units — 10 ft, not 4")
+        XCTAssertEqual(axisTickMetres(10, imperial: true), 10 / 3.28084, accuracy: 1e-9)
+        XCTAssertEqual(axisTickMetres(3, imperial: false), 3, "metric ticks are already metres")
+
+        // Degenerate spans can't loop forever or emit junk.
+        XCTAssert(axisTicks(lo: 2, hi: 2, imperial: false).isEmpty)
+
+        XCTAssertEqual(axisTickLabel(4), "4", "no trailing zeros in an axis column")
+        XCTAssertEqual(axisTickLabel(0.5), "0.5")
+        XCTAssertEqual(axisTickLabel(-0.0), "0", "no negative zero at chart datum")
     }
 
     /// Events scanned from a sampled series (online gates draw fetched points,
@@ -342,9 +412,10 @@ final class TimelineTests: XCTestCase {
         let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
 
         XCTAssert(d.hasCurrent && !d.hasTide)
-        // 380, not the 340 this test was written against: the gutter branch put
-        // a three-row event-time gutter under the track (Amendment C).
-        XCTAssertEqual(TimelineGeo(data: d).height, 380)
+        // 312: the current strip's own height since its rows collapsed to one
+        // above and one below (was 380 with the three-row gutter, 328 while
+        // both tracks briefly shared tide's band grid).
+        XCTAssertEqual(TimelineGeo(data: d).height, 312)
         XCTAssertFalse(d.currentEvents.isEmpty)
         // Fetched official samples are real velocities, so the online-gate path
         // gets slack windows — the derived-gate path does not, because its curve

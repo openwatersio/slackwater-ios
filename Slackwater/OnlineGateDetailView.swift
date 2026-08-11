@@ -76,7 +76,7 @@ struct OnlineGateDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // Bare gate.id, per PR #31 — left as-is (task-5-brief).
-                MapHeader(name: gate.name, region: "\(gate.region) · current",
+                MapHeader(name: gate.name, region: gate.region,
                           latitude: gate.latitude, longitude: gate.longitude, favoriteId: gate.id)
                 if let window, let tl = timeline {
                     scrubCard(tl, window)
@@ -136,7 +136,9 @@ struct OnlineGateDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, speedUnit: speedUnit,
-                               now: live, scrubTime: $scrubTime)
+                               now: live,
+                               floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
+                               scrubTime: $scrubTime)
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 
@@ -167,6 +169,9 @@ struct OnlineGateDetailView: View {
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.go)
                         if let win = slackWin {
+                            // "under 0.5 kn" is restored here for the same reason
+                            // it came back on the current detail: this is the one
+                            // place the threshold earns its space.
                             Text("under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(SN.foam.opacity(0.7))

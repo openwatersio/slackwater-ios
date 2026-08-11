@@ -14,7 +14,13 @@ import TideEngine
 // MARK: - Fixed window + scale (prototype TMIN / TMAX / PPH)
 
 enum Timeline {
-    static let pph: CGFloat = 12          // points per hour
+    /// Points per hour. Widened from 12 in the NEAPS pass: the tide track's
+    /// times and heights moved off the curve into fixed bands above and below
+    /// it, and those labels only ever collide with the SAME kind — high with
+    /// high, low with low. The tightest real pair in a mixed-semidiurnal cycle
+    /// is ~4h, which is 72pt here against a ~45pt label; at 12 it was 48pt and
+    /// overprinted. A phone still shows ~22h at a glance.
+    static let pph: CGFloat = 18          // points per hour
     static let backHours = 48.0           // TMIN
     static let forwardHours = 132.0       // TMAX
     static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
@@ -73,56 +79,33 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (start, end)
 }
 
-/// How a slack window's two edge times fit in the gutter (gutter spec §4).
-enum GutterLabels { case pair, merged }
-
-/// Two labels growing inward from the band's edges, or one merged range
-/// centred on it. Pure so the rule is testable without a `Canvas` — the widths
-/// come from `ctx.resolve(_:).measure(in:)` at the call site, never from a
-/// hardcoded point estimate, so this survives a font change.
+/// Round tick values for the tide track's fixed left axis, in DISPLAY units
+/// (feet when imperial, metres otherwise) — the NEAPS "4 m / 3 m / 2 m" column.
+/// `lo`/`hi` come in as metres, the units the geometry works in.
 ///
-/// Equality merges: labels that exactly touch are unreadable.
-func gutterLabels(bandWidth: CGFloat, startWidth: CGFloat, endWidth: CGFloat) -> GutterLabels {
-    startWidth + endWidth < bandWidth ? .pair : .merged
+/// The step is the first candidate that keeps the column under seven labels, so
+/// a 1.5 m creek and a 6 m Salish spring both get a readable axis instead of one
+/// hardcoded interval that's too coarse for one and too fine for the other.
+func axisTicks(lo: Double, hi: Double, imperial: Bool) -> [Double] {
+    let l = imperial ? toFeet(lo) : lo
+    let h = imperial ? toFeet(hi) : hi
+    guard h > l else { return [] }
+    let steps: [Double] = imperial ? [1, 2, 5, 10, 20] : [0.5, 1, 2, 5]
+    let step = steps.first { (h - l) / $0 <= 6 } ?? steps[steps.count - 1]
+    var out: [Double] = []
+    var v = (l / step).rounded(.up) * step
+    while v <= h { out.append(v); v += step }
+    return out
 }
 
-/// Greedy row assignment for gutter labels, left to right: each label takes the
-/// lowest row whose previous label has cleared it. When no row has cleared, it
-/// takes the row whose last label ends earliest — with a bounded number of rows
-/// overlap can become unavoidable, so minimise it rather than pretend it can't
-/// happen. Callers pass labels already sorted by time; both event loops are.
-/// Touching labels (exactly adjacent, same edge) are unreadable and counted as overlapping.
-func gutterRows(centers: [CGFloat], widths: [CGFloat], rows: Int = 3) -> [Int] {
-    guard centers.count == widths.count else { return [] }
-    guard !centers.isEmpty else { return [] }
+/// A tick back to metres, the geometry's unit — the inverse of `toFeet`.
+func axisTickMetres(_ tick: Double, imperial: Bool) -> Double {
+    imperial ? tick / 3.28084 : tick
+}
 
-    var rowRightEdges = Array(repeating: CGFloat.greatestFiniteMagnitude * -1, count: rows)
-    var assignments: [Int] = []
-
-    for i in 0..<centers.count {
-        let leftEdge = centers[i] - widths[i] / 2
-        var bestRow = 0
-        var bestRightEdge = rowRightEdges[0]
-
-        // Find the lowest row whose label has cleared, or the one that ended earliest
-        for r in 0..<rows {
-            if rowRightEdges[r] < leftEdge {
-                // This row has cleared — take it (strict inequality: touching is overlap)
-                bestRow = r
-                break
-            }
-            // This row hasn't cleared — track the one that ended earliest
-            if rowRightEdges[r] < bestRightEdge {
-                bestRow = r
-                bestRightEdge = rowRightEdges[r]
-            }
-        }
-
-        assignments.append(bestRow)
-        rowRightEdges[bestRow] = centers[i] + widths[i] / 2
-    }
-
-    return assignments
+/// "4", "0.5", "-1" — trailing zeros are noise in an axis column.
+func axisTickLabel(_ tick: Double) -> String {
+    String(format: "%g", tick == 0 ? 0 : tick)   // strip a negative zero
 }
 
 /// Slack/max events scanned from a sampled signed-velocity series — the
@@ -390,13 +373,18 @@ struct TimelineData {
 /// Every number in here is a literal point, and that is why the chart's own
 /// labels are the one place in this branch that keeps a fixed `.system(size:)`.
 ///
-/// The slots are hand-packed: `dayY` 20, `sunY` 34, `tideTop` 48 — 14pt
-/// between the day label's centre and the sun dot's. Extreme labels are drawn
-/// at `y ± 11` off their own dot, `slack` at `zeroY + 14`. The gutter below is
-/// three rows deep (Amendment A, extended to three in Amendment C). Nothing
-/// here reflows: two cases, one track each — tide-only `height` 286 (includes
-/// the three-row event-time gutter), current-only `height` 380 (includes
-/// the three-row event-time gutter) — and `tideY`/`curY` map data onto those constants.
+/// The slots are hand-packed: `dayY` 20, `sunY` 34 — 14pt between the day
+/// label's centre and the sun dot's — then one track box at 106…256 inside a
+/// canvas 328 tall, whichever track fills it.
+///
+/// Every event's reading lives in a fixed band on one side of that box —
+/// `topTimeY`/`topValueY`/`topGlyphY` above, the mirror below — leaving only a
+/// coloured dot on the curve. Tide sends highs up and lows down; current sends
+/// flood up and ebb down; slack takes both ends, start above and end below.
+/// That is what retired the three-row gutter on both tracks: the rows existed
+/// to arbitrate labels that can no longer reach each other.
+///
+/// Nothing here reflows, and `tideY`/`curY` map data onto these constants.
 ///
 /// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
 /// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
@@ -416,8 +404,9 @@ struct TimelineGeo {
     let dayY: CGFloat = 20
     let sunY: CGFloat = 34
     let moonY: CGFloat = 34
-    let tideTop: CGFloat = 48
+    let tideTop: CGFloat
     let tideBottom: CGFloat
+    let bodyTop: CGFloat
     let curTop: CGFloat
     let curBottom: CGFloat
     let bodyBottom: CGFloat
@@ -428,46 +417,72 @@ struct TimelineGeo {
     init(data: TimelineData) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
+        // ONE track box, whichever track fills it. NEAPS-style bands replaced
+        // the gutter on both tracks, and a band's rows are the same rows
+        // whether the thing in them is a tide height or a current speed — so
+        // the two cases no longer differ by a single number, and the strips are
+        // now the same size and the same shape as each other. (They diverged
+        // before because the current track needed extra room for speed labels
+        // drawn ON the curve and for the FLOOD/EBB reference lines; both are
+        // gone.) The switch survives its own collapse on purpose: it is what
+        // makes a hypothetical both-tracks input resolve tide-first instead of
+        // drawing two curves through each other.
         switch (hasTide, hasCurrent) {
         case (true, _):
-            height = 286; tideBottom = 226; curTop = 0; curBottom = 0
+            tideTop = 106; tideBottom = 256; height = 328
+            curTop = 0; curBottom = 0
         default:
-            // Taller than the old 286: the combined strip's reclaimed space goes to
-            // the curve — speed labels and the FLOOD/EBB lines breathe (spec §2).
-            // Three-row gutter adds 60 total: 24pt baseline clearance + 12pt each
-            // for rows 1 and 2 + 12pt margin below the last row (Amendment C).
-            height = 380; tideBottom = 0; curTop = 68; curBottom = 320
+            // The current track's layout diverged from tide's here, and the
+            // reason is what each answer is FOR. A tide turn's height is the
+            // reading; a current's peak speed is something you steer around,
+            // while the slack window is what you plan the day around. So the
+            // current strip spends its rows differently: ONE green range above,
+            // ONE small time below, and the speeds annotate the curve itself.
+            // That is two rows instead of six, which is why this box is taller
+            // and the canvas shorter than the tide case.
+            tideTop = 0; tideBottom = 0
+            curTop = 80; curBottom = 280; height = 312
         }
+        bodyTop = hasTide ? tideTop : curTop
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
         let mn = heights.min() ?? 0, mx = heights.max() ?? 1
         tideMid = (mn + mx) / 2
-        tideSpan = max((mx - mn) / 2, 0.01) * 1.18
+        // 1.06, down from 1.18: the padding existed to keep a turn's stacked
+        // height label off the top and bottom edges, and those labels have left
+        // the curve. What's left only has to clear a 4pt dot.
+        tideSpan = max((mx - mn) / 2, 0.01) * 1.06
         maxAbsCur = max(data.currentPoints.map { abs($0.speed) }.max() ?? 1, 0.01) * 1.05
     }
 
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
 
-    /// Vertical step between gutter rows (Amendment A). A label that would
-    /// overprint its neighbour drops a row rather than being dropped entirely.
-    let gutterRowStep: CGFloat = 12
+    // MARK: The event bands (NEAPS model), shared by both tracks
+    //
+    // Above the track, reading down toward it: time, value, glyph, then the
+    // event's own dot on the curve. Below the track, the mirror. `height` is
+    // the last row plus a margin.
+    //
+    // Which events take which side is the track's business, not the geometry's:
+    // tide puts highs on top and lows underneath; current puts flood on top and
+    // ebb underneath, matching the side of the zero line each already lives on.
+    // Slack has no side — it takes BOTH, its window's start time on top and its
+    // end time below, which is what stops a short window from printing
+    // "8:17AM–8:33AM" as one unreadable run.
+    // Current-only rows. Deliberately NOT the shared band slots above: the
+    // current track prints one thing over the curve and one under it, so
+    // borrowing tide's three-row grid would leave four empty rows of dead
+    // height on every gate.
+    var slackRangeY: CGFloat { curTop - 18 }
+    var maxTimeY: CGFloat { curBottom + 18 }
 
-    /// The event-time gutter (gutter spec §1): dotted droplines land here and
-    /// the exact times print, so the track itself carries only values and the
-    /// readouts above it can stay relative. Supports three rows to prevent
-    /// label collision (Amendment A, extended from two to three in Amendment C).
-    ///
-    /// 24pt of clearance, and the number is set by the max-EBB speed label, not
-    /// by the gutter text: that label draws at `curY(e.speed) + 14`, and `curY`
-    /// clamps to `zeroY + curHalf` = 317, so it can reach ~331. Shrink this and
-    /// the strongest ebb of the week prints on top of a slack's time in the
-    /// gutter (peaks no longer carry a gutter time of their own — Amendment B).
-    var gutterY: CGFloat { bodyBottom + 24 }
-
-    /// Gutter y-position for a specific row — 0, 1 or 2 (Amendment A; row 2
-    /// added in Amendment C).
-    func gutterY(row: Int) -> CGFloat { gutterY + CGFloat(row) * gutterRowStep }
+    var topGlyphY: CGFloat { bodyTop - 14 }
+    var topValueY: CGFloat { bodyTop - 32 }
+    var topTimeY: CGFloat { bodyTop - 54 }
+    var bottomGlyphY: CGFloat { bodyBottom + 16 }
+    var bottomValueY: CGFloat { bodyBottom + 36 }
+    var bottomTimeY: CGFloat { bodyBottom + 58 }
 
     func tideY(_ h: Double) -> CGFloat {
         tideTop + (1 - CGFloat((h - (tideMid - tideSpan)) / (2 * tideSpan))) * (tideBottom - tideTop)
@@ -486,54 +501,100 @@ struct TimelineCanvas: View {
     let speedUnit: String
     let now: Date
 
+    /// True set bearings for this station's flood and ebb, so a max's glyph on
+    /// the chart is the compass arrow the schedule pill and the readout already
+    /// show — "the stream runs THIS way" — rather than an up/down arrow that
+    /// only restates which side of the zero line the peak sits on. Nil on a
+    /// derived gate: it knows slack times and nothing about set, and inventing
+    /// a bearing there would be the schematic-curve mistake in glyph form.
+    var floodDeg: Double? = nil
+    var ebbDeg: Double? = nil
+
+    /// A `Canvas` renders into ONE backing texture and Metal caps that at
+    /// 8192px on a side. The 180-hour strip is `180 * pph` points wide, tripled
+    /// on a 3× phone: at 12pt/hour that was 6480px and fit, at 18 it is 9720px
+    /// and the entire chart renders EMPTY — no curve, no day chrome, no labels,
+    /// and no error. (Caught on the NEAPS pass: the left axis kept drawing,
+    /// because it's a separate SwiftUI overlay, which is exactly what made the
+    /// blank canvas look like a layout bug rather than a texture limit.)
+    ///
+    /// Slicing the strip into tiles gives each its own layer, so the cap now
+    /// applies per tile instead of to the whole timeline and `pph` is free to
+    /// move again. Every tile runs the same drawing code translated into strip
+    /// coordinates and clipped to its own slice — the clip is what makes this
+    /// safe, since the translucent night bands and area fills would otherwise
+    /// stack on each other wherever two tiles overdrew.
+    static let tileWidth: CGFloat = 900
+
     var body: some View {
-        Canvas { ctx, _ in
-            drawDayChrome(ctx)
-            if geo.hasTide { drawTide(ctx) }
-            if geo.hasCurrent { drawCurrent(ctx) }
-            // Real-now faint marker rides the timeline (prototype 'nowt').
-            var nowLine = Path()
-            nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
-            nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
-            ctx.stroke(nowLine, with: .color(SN.leaf.opacity(0.55)),
-                       style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+        let tiles = Array(0..<max(Int((data.totalWidth / Self.tileWidth).rounded(.up)), 1))
+        HStack(spacing: 0) {
+            ForEach(tiles, id: \.self) { i in
+                let x0 = CGFloat(i) * Self.tileWidth
+                let w = min(Self.tileWidth, data.totalWidth - x0)
+                Canvas { ctx, _ in
+                    ctx.translateBy(x: -x0, y: 0)
+                    ctx.clip(to: Path(CGRect(x: x0, y: 0, width: w, height: geo.height)))
+                    draw(ctx)
+                }
+                .frame(width: w, height: geo.height)
+            }
         }
         .frame(width: data.totalWidth, height: geo.height)
     }
 
-    /// "8:15PM" — the chart's compact clock, spaces stripped. Same style the
-    /// day header's sun labels use, so the gutter reads as one family with them.
-    private func compactTime(_ t: Date) -> String {
-        cardTime(t, data.tz).replacingOccurrences(of: " ", with: "")
-    }
-
-    private func gutterText(_ time: Date) -> Text {
-        Text(compactTime(time))
-            .font(.system(size: 10).monospaced())
-            .foregroundStyle(.white.opacity(0.65))
-    }
-
-    private func mergedGutterText(_ a: Date, _ b: Date) -> Text {
-        Text("\(compactTime(a))–\(compactTime(b))")
-            .font(.system(size: 10).monospaced())
-            .foregroundStyle(.white.opacity(0.65))
-    }
-
-    /// The dotted dropline and its gutter time (gutter spec §2, Amendment A). An event's
-    /// exact time lives BELOW the track, reached by a line from the event's own
-    /// dot — that is what lets every readout above the strip stay relative. Rows
-    /// prevent label collision when events are close in time.
-    ///
-    /// White, not `SN.leaf`: the leaf dash on this canvas means *now*, and it
-    /// has to keep meaning only that. Same dash pattern, different colour, so
-    /// the two read as the same family without competing.
-    private func drawDrop(_ ctx: GraphicsContext, x: CGFloat, from y: CGFloat, time: Date, row: Int) {
-        var p = Path()
-        p.move(to: CGPoint(x: x, y: y))
-        p.addLine(to: CGPoint(x: x, y: geo.gutterY(row: row) - 8))
-        ctx.stroke(p, with: .color(.white.opacity(0.35)),
+    private func draw(_ ctx: GraphicsContext) {
+        drawDayChrome(ctx)
+        if geo.hasTide { drawTide(ctx) }
+        if geo.hasCurrent { drawCurrent(ctx) }
+        // Real-now faint marker rides the timeline (prototype 'nowt').
+        var nowLine = Path()
+        nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
+        nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
+        ctx.stroke(nowLine, with: .color(SN.leaf.opacity(0.55)),
                    style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-        ctx.draw(gutterText(time), at: CGPoint(x: x, y: geo.gutterY(row: row)), anchor: .center)
+    }
+
+    /// One event's band: glyph, then a `primary` line and an optional
+    /// `secondary` one, in the three fixed rows on one side of the track. Both
+    /// tracks draw through here, which is what keeps a current's reading and a
+    /// tide's reading the same object rendered twice rather than two label
+    /// systems that drift apart.
+    ///
+    /// The rows are deliberately named by WEIGHT, not by content: `primary` is
+    /// the big line and `secondary` is the small one, and which fact goes in
+    /// which is the caller's judgement about what that event is for. A tide
+    /// turn or a current max leads with its number and drops its time to the
+    /// small row. Slack leads with the TIME and has no small row at all —
+    /// slack timing is the whole answer at a gate, while the exact knots at
+    /// peak ebb is trivia you steer around rather than plan by. Naming these
+    /// `value`/`time` is what made the earlier version print the sub-threshold
+    /// constant six times a screen: the grid demanded a number in the big row,
+    /// so slack got handed the only number it had.
+    private func drawBand(_ ctx: GraphicsContext, x: CGFloat, top: Bool,
+                          glyph: String, primary: String, secondary: String?,
+                          tint: Color, rotateDeg: Double? = nil) {
+        let glyphAt = CGPoint(x: x, y: top ? geo.topGlyphY : geo.bottomGlyphY)
+        let mark = Text(glyph).font(.system(size: 15, weight: .semibold)).foregroundStyle(tint)
+        if let rotateDeg {
+            // Rotate about the glyph's own centre, not the canvas origin — a
+            // bare ctx.rotate would swing the mark somewhere off in the strip.
+            ctx.drawLayer { l in
+                l.translateBy(x: glyphAt.x, y: glyphAt.y)
+                l.rotate(by: .degrees(rotateDeg))
+                l.draw(mark, at: .zero, anchor: .center)
+            }
+        } else {
+            ctx.draw(mark, at: glyphAt, anchor: .center)
+        }
+        ctx.draw(Text(primary).font(.system(size: 18, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(tint),
+                 at: CGPoint(x: x, y: top ? geo.topValueY : geo.bottomValueY), anchor: .center)
+        if let secondary {
+            ctx.draw(Text(secondary).font(.system(size: 12).monospaced())
+                        .foregroundStyle(.white.opacity(0.6)),
+                     at: CGPoint(x: x, y: top ? geo.topTimeY : geo.bottomTimeY), anchor: .center)
+        }
     }
 
     // Night bands, day tint, day labels, sun markers, per-night moons —
@@ -592,7 +653,7 @@ struct TimelineCanvas: View {
             // Day label at local noon. Fixed size, not `.caption2` — see the
             // TimelineGeo doc comment: `dayY` is 20 and the sun dot is at 34.
             ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
                      anchor: .center)
@@ -603,7 +664,7 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
                 ctx.draw(Text("\(arrow)\(cardTime(t, data.tz).replacingOccurrences(of: " ", with: ""))")
-                            .font(.system(size: 10, weight: .medium).monospaced())
+                            .font(.system(size: 11, weight: .medium).monospaced())
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
@@ -627,34 +688,60 @@ struct TimelineCanvas: View {
             endPoint: CGPoint(x: 0, y: geo.tideBottom)))
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-        // Extreme dots + height labels (prototype fmtH at each turn). The VALUE
-        // stays on the dot; the exact TIME drops to the gutter (gutter spec §2,
-        // Amendment A), reversing the 2026-08-07 call that kept it stacked on the event.
-        // Gutter times are assigned to rows to prevent label collision.
+
+        // Chart datum, the reference every printed height is quoted against —
+        // the axis column names it "0" and this is the line it points at. Drawn
+        // only when datum is actually inside the plotted span; a week where the
+        // tide never drops near it would otherwise get a rule pinned to an edge
+        // it isn't at.
+        if 0 > geo.tideMid - geo.tideSpan && 0 < geo.tideMid + geo.tideSpan {
+            var datum = Path()
+            datum.move(to: CGPoint(x: 0, y: geo.tideY(0)))
+            datum.addLine(to: CGPoint(x: data.totalWidth, y: geo.tideY(0)))
+            ctx.stroke(datum, with: .color(.white.opacity(0.28)),
+                       style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
+        }
+
+        // Turns, the NEAPS way: the curve carries a coloured DOT and nothing
+        // else, and the reading — time, height, direction arrow — is pulled out
+        // into a fixed band on the turn's own side of the track. That replaces
+        // both the value-stacked-on-the-dot label and the three-row gutter
+        // beneath it (Amendment A/C), because kind now does the separating that
+        // rows used to: a high's label physically cannot land on a low's.
+        //
+        // Colour is the existing direction axis — high is the top of rising
+        // (flood), low the bottom of falling (ebb) — not NEAPS' green/amber.
+        // Green in this app means slack and only slack, and the same pair
+        // already labels HIGH/LOW in the schedule directly below this strip.
+        // The pale variants are the tokens meant for small text on near-black.
         let margin = 0.3 * 3600
         let filteredExtremes = data.tideExtremes.filter { e in
             e.time >= data.start.addingTimeInterval(margin)
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
-
-        // Measure label widths and assign rows (Amendment A)
-        let centers = filteredExtremes.map { data.x($0.time) }
-        let widths = filteredExtremes.map { e in
-            ctx.resolve(gutterText(e.time)).measure(in: CGSize(width: 1000, height: 100)).width
-        }
-        let rows = gutterRows(centers: centers, widths: widths)
-
-        for (index, e) in filteredExtremes.enumerated() {
+        for e in filteredExtremes {
             let x = data.x(e.time), y = geo.tideY(e.height)
-            ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
-                     with: .color(.white))
-            ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.white),
-                     at: CGPoint(x: x, y: e.kind == .high ? y - 11 : y + 11), anchor: .center)
-            drawDrop(ctx, x: x, from: y, time: e.time, row: rows[index])
+            let high = e.kind == .high
+            let tint = high ? SN.floodLabel : SN.ebbLabel
+            ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+                     with: .color(tint))
+            // ⤒ / ⤓ — arrow TO BAR, not a bare arrow. A turn is where the water
+            // stops, and the bar is the stop; a plain ↑ says "rising", which is
+            // the one thing that is no longer true at a high. (NEAPS uses the
+            // same pair for the same reason. The current track keeps bare
+            // arrows, because there flood/ebb really is a direction of travel.)
+            //
+            // No unit on the value — the fixed axis column carries it once, and
+            // a shorter label is the difference between clearing a neighbour
+            // and overprinting it.
+            drawBand(ctx, x: x, top: high, glyph: high ? "⤒" : "⤓",
+                     primary: formatHeight(e.height, imperial: imperial),
+                     secondary: chartTime(e.time, data.tz), tint: tint)
         }
     }
+
+    /// This station's set for one direction, nil on a derived gate.
+    private func deg(_ flood: Bool) -> Double? { flood ? floodDeg : ebbDeg }
 
     private func drawCurrent(_ ctx: GraphicsContext) {
         var line = Path()
@@ -692,118 +779,110 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // Every label competing for the gutter — slack-window bands AND
-        // windowless-slack droplines — goes through ONE row assignment.
-        // Finding 1 (post-Amendment-B review): `drawDrop`'s old `row: Int = 0`
-        // default let windowless slacks skip the assignment silently, and
-        // every derived gate has NO windows at all (`slackWindows` is always
-        // empty there), so every one of its slack labels was pinned to row 0
-        // — exactly the overprint the row assigner exists to prevent, on
-        // mixed-semidiurnal tides where an alternating high/low pair can sit
-        // under 6h apart. A band label reaches the gutter via its own fill
-        // and needs no dropline; a windowless slack still needs one. Each
-        // window contributes either two pair labels (edges growing inward)
-        // or one merged label — decided by measured widths — before any row
-        // is assigned.
-        struct GutterLabel {
-            let text: Text
-            let drawX: CGFloat
-            let anchor: UnitPoint
-            let rowCenter: CGFloat  // the label's own centre, for collision math
-            let width: CGFloat
-            let dropFrom: CGFloat?  // non-nil: also draw a dotted line from this y
-            let dropTime: Date?
-        }
-        let box = CGSize(width: 1000, height: 100)
-        var labels: [GutterLabel] = []
+        // The workable slack column spans the WHOLE track, not zeroY-downward
+        // as the old band did. Two things follow from that, and the second is
+        // the point: the window reads as a column of time you can transit
+        // rather than a patch hanging off the zero line, and its two edge times
+        // get to live at opposite ends of the chart — start on top, end
+        // underneath. A 16-minute window used to print "8:17AM–8:33AM" as one
+        // merged run because two labels 5pt apart are unreadable; 150pt apart
+        // vertically, they are just two labels.
+        //
+        // Drawn before the events so the dots and the curve stay on top of the
+        // tint. 0.12 keeps it a highlight rather than an opaque patch.
         for w in data.slackWindows {
             let x0 = data.x(w.start), x1 = data.x(w.end)
-            let a = gutterText(w.start), b = gutterText(w.end)
-            let aw = ctx.resolve(a).measure(in: box).width
-            let bw = ctx.resolve(b).measure(in: box).width
-            switch gutterLabels(bandWidth: x1 - x0, startWidth: aw, endWidth: bw) {
-            case .pair:
-                labels.append(GutterLabel(text: a, drawX: x0, anchor: .leading,
-                                          rowCenter: x0 + aw / 2, width: aw, dropFrom: nil, dropTime: nil))
-                labels.append(GutterLabel(text: b, drawX: x1, anchor: .trailing,
-                                          rowCenter: x1 - bw / 2, width: bw, dropFrom: nil, dropTime: nil))
-            case .merged:
-                let m = mergedGutterText(w.start, w.end)
-                let mw = ctx.resolve(m).measure(in: box).width
-                let cx = (x0 + x1) / 2
-                labels.append(GutterLabel(text: m, drawX: cx, anchor: .center,
-                                          rowCenter: cx, width: mw, dropFrom: nil, dropTime: nil))
-            }
+            ctx.fill(Path(CGRect(x: x0, y: geo.curTop, width: x1 - x0,
+                                 height: geo.curBottom - geo.curTop)),
+                     with: .color(SN.go.opacity(0.12)))
         }
-        // A slack WITH a window is drawn by its band below — the band
-        // already reaches the gutter, so a dropline would be a second mark
-        // saying the same thing. Without one (a violent gate the 10-min
-        // sampling steps over, and every derived gate) the plain dropline is
-        // what's left, and it now joins the same assignment as the bands.
-        for e in filteredEvents where e.kind == .slack
-            && !data.slackWindows.contains(where: { $0.slack == e.time }) {
-            let x = data.x(e.time)
-            let t = gutterText(e.time)
-            let w = ctx.resolve(t).measure(in: box).width
-            labels.append(GutterLabel(text: t, drawX: x, anchor: .center,
-                                      rowCenter: x, width: w, dropFrom: geo.zeroY, dropTime: e.time))
-        }
-        // Sort by centre so gutterRows' left-to-right greedy assumption
-        // holds — window/event order is already chronological, this is
-        // defensive, matching drawTide's caller.
-        labels.sort { $0.rowCenter < $1.rowCenter }
-        let labelRow = gutterRows(centers: labels.map(\.rowCenter), widths: labels.map(\.width))
 
         for e in filteredEvents {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 2.6, y: geo.zeroY - 2.6,
-                                                width: 5.2, height: 5.2)),
-                         with: .color(.white.opacity(0.85)))
-                // Slack is the app's "go" colour, not a neutral. It is the moment the
-                // app is named for, and it must read the same on every surface.
-                ctx.draw(Text("slack").font(.system(size: 10).monospaced())
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
+                                                width: 8, height: 8)),
+                         with: .color(SN.go))
+                // ONE label, centred over the column, no glyph. The window's
+                // two ends were living at opposite ends of the strip to keep
+                // them from merging into an unreadable "8:17AM–8:33AM" run;
+                // trimming the repeated hour does the same job in one place
+                // and gives the whole top row back to slack. Nothing else is
+                // up here now, which is the point — at a gate this row IS the
+                // answer, and it can afford to be the widest thing on screen.
+                // ONE time, and it is the SLACK ITSELF — not the window's
+                // opening edge, which is what this printed first.
+                //
+                // The magnet snaps the strip to `snapTimes`, and a slack's entry
+                // there is the zero crossing, the middle of the window. Labelling
+                // the edge meant the number you read and the moment the scrubber
+                // parked you on were minutes apart with nothing to explain the
+                // gap — the chart contradicting itself at the one event this app
+                // is named for. Print what the strip can actually stop on.
+                //
+                // The window is still DRAWN, as the green column: it is context
+                // you look at, not a time you read off. Planning a transit
+                // through it is later work, and it can bring its own readout.
+                if data.slackWindows.first(where: { $0.slack == e.time }) == nil {
+                    // No window (a violent gate the sampling steps over, every
+                    // derived gate): a hairline rather than a column — a
+                    // zero-width window must not look like a window.
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: x, y: geo.curTop))
+                    tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
+                    ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
+                }
+                ctx.draw(Text(chartTime(e.time, data.tz))
+                            .font(.system(size: 18, weight: .semibold).monospacedDigit())
                             .foregroundStyle(SN.go),
-                         at: CGPoint(x: x, y: geo.zeroY + 14), anchor: .center)
-                // Its dropline (if any) and gutter time draw below, with the
-                // rest of the gutter, once every row is assigned.
+                         at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
             case .maxFlood, .maxEbb:
-                // Speed label on the dot only (Amendment B) — no dropline,
-                // no gutter time. The exact time still lives in the
-                // schedule table below the strip.
+                let flood = e.kind == .maxFlood
+                let tint = flood ? SN.floodLabel : SN.ebbLabel
                 let y = geo.curY(e.speed)
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)),
-                         with: .color(.white))
-                ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(e.kind == .maxFlood ? SN.floodLabel : SN.ebbLabel),
-                         at: CGPoint(x: x, y: e.kind == .maxFlood ? y - 12 : y + 14),
-                         anchor: .center)
-            }
-        }
+                ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
+                         with: .color(tint))
 
-        // Bands LAST, over the curve: at 0.12 the fill reads as a highlight
-        // column tinting the ebb fill under it rather than an opaque patch
-        // fighting it, and the 2pt near-white curve still reads through
-        // (gutter spec §3). This opacity is the one number here expected to
-        // want a tuning pass against a real screenshot.
-        //
-        // The rect always reaches row 2's baseline, the last row, not row 0's:
-        // with three gutter rows (Amendment C) the fill has to stay connected
-        // to a label that staggered all the way down, not just the common case.
-        for w in data.slackWindows {
-            let x0 = data.x(w.start), x1 = data.x(w.end)
-            ctx.fill(Path(CGRect(x: x0, y: geo.zeroY, width: x1 - x0,
-                                 height: geo.gutterY(row: 2) - 8 - geo.zeroY)),
-                     with: .color(SN.go.opacity(0.12)))
-        }
-        for (i, gl) in labels.enumerated() {
-            let row = labelRow[i]
-            if let dropFrom = gl.dropFrom, let dropTime = gl.dropTime {
-                drawDrop(ctx, x: gl.drawX, from: dropFrom, time: dropTime, row: row)
-            } else {
-                ctx.draw(gl.text, at: CGPoint(x: gl.drawX, y: geo.gutterY(row: row)), anchor: gl.anchor)
+                // The speed annotates the CURVE, not a band: it is context you
+                // read off the shape, not a number you plan by. It sits between
+                // the peak and the zero line — inside the fill — whenever the
+                // fill is deep enough to hold it, and inverts to white there
+                // because it is then sitting on colour. A weak peak has no room
+                // under it, so the label sits outside on the dark ground and
+                // keeps its direction tint instead. That is the whole rule, and
+                // it is why a big flood reads white while a small ebb doesn't.
+                // No chip behind it. White on the flood fill carries itself, and
+                // a box made the label an object sitting ON the chart instead of
+                // an annotation belonging to it — which is the opposite of
+                // "informal information you read off the shape".
+                let toward: CGFloat = flood ? 1 : -1      // toward the zero line
+                let labelH: CGFloat = 30
+                let inside = abs(y - geo.zeroY) >= labelH + 12
+                let cy = y + toward * (labelH / 2 + 8)
+                let mark = inside ? Color.white : tint
+                ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
+                            .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(mark),
+                         at: CGPoint(x: x, y: cy - 7), anchor: .center)
+                let arrow = Text(deg(flood) == nil ? (flood ? "↑" : "↓") : "↑")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(mark)
+                if let d = deg(flood) {
+                    ctx.drawLayer { l in
+                        l.translateBy(x: x, y: cy + 8)
+                        l.rotate(by: .degrees(d))
+                        l.draw(arrow, at: .zero, anchor: .center)
+                    }
+                } else {
+                    ctx.draw(arrow, at: CGPoint(x: x, y: cy + 8), anchor: .center)
+                }
+
+                // The time drops to the one small row under the track, in the
+                // same weight it had as a band's secondary line.
+                ctx.draw(Text(chartTime(e.time, data.tz))
+                            .font(.system(size: 12).monospaced())
+                            .foregroundStyle(.white.opacity(0.6)),
+                         at: CGPoint(x: x, y: geo.maxTimeY), anchor: .center)
             }
         }
     }
@@ -831,6 +910,8 @@ struct TimelineScrubber: UIViewRepresentable {
     let imperial: Bool
     let speedUnit: String
     let now: Date
+    var floodDeg: Double? = nil
+    var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -888,7 +969,8 @@ struct TimelineScrubber: UIViewRepresentable {
     }
 
     private var canvas: TimelineCanvas {
-        TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit, now: now)
+        TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
+                       now: now, floodDeg: floodDeg, ebbDeg: ebbDeg)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
@@ -952,11 +1034,13 @@ struct TimelineScrubStrip: View {
     let imperial: Bool
     var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
+    var floodDeg: Double? = nil
+    var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
-                         now: now, scrubTime: $scrubTime)
+                         now: now, floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime)
             .frame(height: geo.height)
             .overlay { overlay }
             .accessibilityElement(children: .contain)
@@ -967,6 +1051,10 @@ struct TimelineScrubStrip: View {
         GeometryReader { proxy in
             let w = proxy.size.width
             ZStack(alignment: .topLeading) {
+                // The height axis belongs to the viewport, not the strip: it is
+                // the one thing on this chart that never moves when you pan, and
+                // it is what lets the turn labels drop their unit.
+                if geo.hasTide { tideAxis }
                 // Fixed reading line + cap triangle (prototype chartEl overlay).
                 LinearGradient(colors: [.white.opacity(0.95), .white.opacity(0.3)],
                                startPoint: .top, endPoint: .bottom)
@@ -996,50 +1084,31 @@ struct TimelineScrubStrip: View {
                         .frame(width: 10, height: 10)
                         .shadow(color: .white.opacity(0.9), radius: 3)
                         .position(x: w / 2, y: geo.curY(data.velocityAt(scrubTime)))
-                    visibleMaxLines(width: w)
                 }
             }
             .allowsHitTesting(false)
         }
     }
 
-    /// FLOOD / EBB reference lines at the strongest peaks visible in the
-    /// window around the centerline (prototype chartEl mf/me).
-    @ViewBuilder
-    private func visibleMaxLines(width w: CGFloat) -> some View {
-        let half = Double(w / 2 / Timeline.pph) * 3600
-        let lo = scrubTime.addingTimeInterval(-half), hi = scrubTime.addingTimeInterval(half)
-        let vis = data.currentEvents.filter { $0.time >= lo && $0.time <= hi }
-        let mf = vis.filter { $0.kind == .maxFlood }.map(\.speed).max() ?? 0
-        let me = vis.filter { $0.kind == .maxEbb }.map(\.speed).min() ?? 0
-        if mf > 0 {
-            legendMarker("FLOOD", color: SN.floodLabel, width: w,
-                         lineY: geo.curY(mf), textY: geo.curY(mf) - 10, textXInset: 30)
-        }
-        if me < 0 {
-            legendMarker("EBB", color: SN.ebbLabel, width: w,
-                         lineY: geo.curY(me), textY: geo.curY(me) + 10, textXInset: 24)
+    /// The fixed height axis down the left edge (NEAPS "4 m / 3 m / 2 m …").
+    /// The scrim is doing real work: the strip is full-bleed and the tide fill
+    /// is at its brightest exactly where this column sits, so without it the
+    /// numbers wash out on a spring high.
+    private var tideAxis: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [SN.page.opacity(0.9), SN.page.opacity(0)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: 60)
+            ForEach(axisTicks(lo: geo.tideMid - geo.tideSpan, hi: geo.tideMid + geo.tideSpan,
+                              imperial: imperial), id: \.self) { tick in
+                Text("\(axisTickLabel(tick)) \(heightUnit(imperial: imperial))")
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.5))
+                    .position(x: 26, y: geo.tideY(axisTickMetres(tick, imperial: imperial)))
+            }
         }
     }
 
-    /// One reference line + label, so the rectangle and the text never
-    /// diverge on colour — a hardcoded regression here lands on the same
-    /// line as the "FLOOD"/"EBB" literal instead of a separate, unguarded
-    /// one (that used to be two colour call sites per direction; this is
-    /// the one place either can go wrong).
-    @ViewBuilder
-    private func legendMarker(_ label: String, color: Color, width w: CGFloat,
-                              lineY: CGFloat, textY: CGFloat, textXInset: CGFloat) -> some View {
-        Rectangle().fill(color.opacity(0.5)).frame(width: w, height: 1)
-            .position(x: w / 2, y: lineY)
-        // Fixed size for the same reason as the track labels above — this one is
-        // `.position()`ed onto `geo.curY(...)`, a literal-point coordinate.
-        Text(label).font(.system(size: 9, weight: .medium).monospaced())
-            .foregroundStyle(color)
-            .padding(.horizontal, 4).padding(.vertical, 1)
-            .background(Color(hex: 0x001020, opacity: 0.55))
-            .position(x: w - textXInset, y: textY)
-    }
 }
 
 private struct Triangle: Shape {
@@ -1175,13 +1244,17 @@ struct MultiDaySchedule: View {
     private func pillView(_ e: ScheduleEntry) -> some View {
         switch e.pill {
         case .high:
-            Text("↑ HIGH")
+            // ⤒ / ⤓, the strip's turn glyph — arrow to bar, "arrives and stops".
+            // A bare ↑ here said "rising" next to a row that means the rising is
+            // over. The two surfaces sit one above the other on every tide
+            // detail, so they have to speak the same glyph.
+            Text("⤒ HIGH")
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.rising, in: Capsule())
         case .low:
-            Text("↓ LOW")
+            Text("⤓ LOW")
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)

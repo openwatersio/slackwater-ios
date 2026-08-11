@@ -163,9 +163,36 @@ func cardTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("h:mm a", tz).string(from: date)
 }
 
-/// "14:05" — the chart/table style (web en-CA 24h).
+/// "14:05" — the chart/table style (web en-CA 24h). Zero-padded, and that
+/// padding is load-bearing in `MultiDaySchedule`: the times there are a
+/// left-aligned monospaced COLUMN, and "7:03" would hang a character left of
+/// "12:53" all the way down the list.
 func clockTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("HH:mm", tz).string(from: date)
+}
+
+/// "4:22pm" — the strip's clock. Twelve-hour, lowercase, no space and no
+/// periods: the meridiem is a two-character suffix here, not a word.
+///
+/// The strip went 24h to kill "10:54 p.m." labels that were mostly meridiem and
+/// collided because of it. A bare suffix keeps that win — it is four characters
+/// shorter than " p.m." — while reading the way the readout above the strip and
+/// the whole rest of the app already do. `MultiDaySchedule` stays on 24h
+/// `clockTime`: its times are a zero-padded monospaced column, and a suffix
+/// that only some rows carry would ragged it.
+func chartTime(_ date: Date, _ tz: TimeZone) -> String {
+    bareTime(date, tz) + meridiem(date, tz)
+}
+
+/// "4:22" — the clock face with no meridiem, for the left half of a range whose
+/// suffix is carried once at the end.
+private func bareTime(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("h:mm", tz).string(from: date)
+}
+
+/// "am" / "pm".
+private func meridiem(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("a", tz).string(from: date).lowercased()
 }
 
 /// "Wed, Jul 30" — the schedule date line.

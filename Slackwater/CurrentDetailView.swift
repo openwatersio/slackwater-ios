@@ -54,7 +54,7 @@ struct CurrentDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                MapHeader(name: record.name, region: "\(record.region) · current",
+                MapHeader(name: record.name, region: record.region,
                           latitude: record.latitude, longitude: record.longitude,
                           favoriteId: record.itemId)
                 if let gate = provisionalGate {
@@ -158,6 +158,13 @@ struct CurrentDetailView: View {
                                 .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
                             // Time REMAINING, not the window's original length —
                             // an already-open window must not claim its full run.
+                            // The threshold lives HERE, once, and not on the
+                            // strip. It briefly moved onto the slack bands to
+                            // fill their value row; six identical "0.5"s across
+                            // a day made it the most repeated and least useful
+                            // number on screen. One statement of a constant is
+                            // information, six is texture — and the strip's
+                            // value row went to the slack times instead.
                             Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
@@ -173,7 +180,9 @@ struct CurrentDetailView: View {
 
             TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                imperial: imperial, speedUnit: speedUnit,
-                               now: live, scrubTime: $scrubTime)
+                               now: live,
+                               floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                               scrubTime: $scrubTime)
                 .padding(.horizontal, -16)  // full-bleed strip
                 .padding(.top, 12)
 

@@ -29,7 +29,7 @@ struct DerivedGateDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                MapHeader(name: gate.name, region: "\(gate.region) · current",
+                MapHeader(name: gate.name, region: gate.region,
                           latitude: gate.latitude, longitude: gate.longitude,
                           favoriteId: gate.id)
                 if let timeline {

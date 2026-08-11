@@ -77,14 +77,11 @@ extension TypeScaleTests {
     ///      - `scheduleEntries()` in the four detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
-    ///      - `TimelineStrip.compactTime(_:)` calls `cardTime(` and returns
-    ///        a `String` that is only ever rendered through `gutterText(_:)`
-    ///        and `mergedGutterText(_:_:)`, both
-    ///        of which apply `.system(size: 10).monospaced()` — so the
-    ///        output is mono by construction, but the mono trait sits
-    ///        outside the ±4-line window.
+    ///    (`TimelineStrip.compactTime(_:)` was a fifth until the NEAPS pass
+    ///    deleted it along with the gutter — its `cardTime(` reading now
+    ///    prints as 24h `clockTime(`, which is not a watched formatter.)
     ///    That allowlist is a point-in-time attestation, not a live check:
-    ///    if a future edit strips the mono font from one of those four
+    ///    if a future edit strips the mono font from one of those
     ///    consuming `Text`s, this test will NOT catch it — the regression
     ///    would be invisible to source-text scanning. Closing that gap needs
     ///    real data-flow analysis (a SwiftSyntax pass), out of scope for an
@@ -105,7 +102,13 @@ extension TypeScaleTests {
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
             "OnlineGateDetailView.swift:scheduleEntries",
-            "TimelineStrip.swift:compactTime", // calls cardTime() but .monospaced() is in gutterText() renderer
+            // The NEAPS bands: both tracks format their reading at the
+            // `drawBand(...)` call and the `.monospacedDigit()` lives in
+            // `drawBand`'s own value `Text`, one renderer for the whole chart.
+            // Two entries buy back what the gutter's five separate label
+            // builders used to cost.
+            "TimelineStrip.swift:drawTide",
+            "TimelineStrip.swift:drawCurrent",
         ]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
