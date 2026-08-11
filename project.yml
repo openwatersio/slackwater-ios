@@ -29,6 +29,21 @@ targets:
       properties:
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        # Without this the plist ships XcodeGen's literal default of "1" and the
+        # build number that reaches TestFlight is whatever `exportArchive`
+        # assigns (see scripts/testflight.sh) — a plain upload counter, not this
+        # file. CURRENT_PROJECT_VERSION below was a hand-kept guess at that
+        # counter for builds 1–21; now it IS the build number.
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Same omission, other half: builds 1–21 all shipped XcodeGen's literal
+        # "1.0", so every TestFlight build so far reads 1.0 to testers and
+        # 0.3.0/0.5.0/0.6.0 exist only in git. `manageAppVersionAndBuildNumber`
+        # only ever managed the build number, never this. Build 22 takes
+        # TestFlight BACKWARDS, 1.0 → 0.6.0, and whether App Store Connect
+        # accepts a lower pre-release train is the thing this upload finds out.
+        # If it is rejected, the fallback is MARKETING_VERSION 1.0.1, not
+        # reverting this line.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
         NSLocationWhenInUseUsageDescription: >-
           Your location is used on this device to find the nearest tide and
           current stations. It never leaves the device.
