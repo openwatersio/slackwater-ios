@@ -16,6 +16,15 @@ set -euo pipefail
 # this way five times on 2026-08-02, the last with CI and a local run on
 # different devices. Whoever gets here second waits.
 #
+# The lock covers `xcodebuild test` and NOTHING ELSE. A bare `xcodebuild build`
+# or `build-for-testing` in this worktree takes no lock and writes the same
+# DerivedData, so running one while tests are in flight swaps Slackwater.app out
+# from under the live run. Every remaining UI test then fails with "Cannot launch
+# simulated executable: no file found at .../Slackwater.app" — zero assertion
+# failures, which again reads as a real regression and isn't one. Same shape if
+# you kill a run and then clean its DerivedData. Don't run any xcodebuild in a
+# worktree that has tests running; wait for the lock like everyone else.
+#
 # lockf(1) holds the lock in the kernel for the lifetime of the process, so a
 # killed or cancelled run releases it — a lock file with a PID in it would wedge
 # the next run instead. Re-exec before the cd below, while $0 still resolves
