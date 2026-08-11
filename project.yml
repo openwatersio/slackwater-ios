@@ -29,6 +29,12 @@ targets:
       properties:
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
+        # Without this the plist ships XcodeGen's literal default of "1" and the
+        # build number that reaches TestFlight is whatever `exportArchive`
+        # assigns (see scripts/testflight.sh) — a plain upload counter, not this
+        # file. CURRENT_PROJECT_VERSION below was a hand-kept guess at that
+        # counter for builds 1–21; now it IS the build number.
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSLocationWhenInUseUsageDescription: >-
           Your location is used on this device to find the nearest tide and
           current stations. It never leaves the device.

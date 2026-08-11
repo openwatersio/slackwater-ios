@@ -34,6 +34,13 @@ cat > build/exportUpload.plist <<'EOF'
 <dict>
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>upload</string>
+  <!-- Defaults to YES, and that default is why builds 1-21 numbered themselves:
+       Xcode rewrites CFBundleVersion to the next number free on App Store
+       Connect at upload time, so the archive's own build number never mattered
+       and the ASC number was an upload counter. NO makes project.yml's
+       CURRENT_PROJECT_VERSION the build number. It must exceed the highest
+       already uploaded or the upload is rejected as a duplicate. -->
+  <key>manageAppVersionAndBuildNumber</key><false/>
   <key>signingStyle</key><string>manual</string>
   <key>teamID</key><string>R3H8DPTV9C</string>
   <key>signingCertificate</key><string>02FBDB9A5D2DB409A4331349069A8C8B09D73069</string>
