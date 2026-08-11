@@ -883,6 +883,20 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.otherElements["map-canvas"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header")
         XCTAssert(app.buttons["List"].exists, "toggle did not flip to the list icon")
+
+        // #43: the "not for navigation" pill belongs ON the FAB row, not
+        // floating above it mid-chart. Asserted as geometry rather than by
+        // eye — the old bug was a constant (96pt from the screen edge, past
+        // the safe area) that looked right in one simulator and wrong on the
+        // next, which is exactly what a frame comparison catches.
+        let disclaimer = app.staticTexts["map-disclaimer"].firstMatch
+        XCTAssert(disclaimer.waitForExistence(timeout: 5), "map disclaimer missing")
+        let toggle = app.buttons["List"].firstMatch
+        XCTAssertGreaterThan(disclaimer.frame.minY, toggle.frame.minY,
+                             "the pill floats above the FABs instead of sitting on their row")
+        XCTAssertLessThanOrEqual(disclaimer.frame.maxY, toggle.frame.maxY + 1,
+                                 "the pill hangs below the FAB row, into the home indicator")
+
         sleep(4)  // tiles
         save(app, "m45-map-toggled.png")
 

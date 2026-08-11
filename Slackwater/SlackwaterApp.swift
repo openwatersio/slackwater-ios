@@ -537,26 +537,34 @@ struct StationListView: View {
         // exist for exactly that case: `updateUIView` (not `makeUIView`)
         // catches the new focus and moves the live camera (review finding on
         // the first cut of #32) — see `MapViewRepresentable`'s doc comments.
-        MapViewRepresentable(
-            center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
-                ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
-                ?? SALISH_CENTER,
-            zoom: mapFocus == nil ? discoveryZoom : stationZoom,
-            focusToken: mapFocus == nil ? nil : mapFocusToken,
-            // Only reached on the NO-remount path (see above) — a fresh
-            // mount's `mapFocus` is cleared by `.onAppear` below instead.
-            onFocusApplied: { DispatchQueue.main.async { mapFocus = nil } }
-        ) { item in
-            if regular { showMap = false }  // the detail pane shows the pick
-            open(item)
-        }
-        .accessibilityIdentifier("map-canvas")
-        // Consumed once, fresh-mount case: the next appearance of this pane
-        // (fab toggle, a fresh pick) starts from the fix/discovery camera
-        // again, not a stale focus from a station visited an hour ago.
-        .onAppear { mapFocus = nil }
-        .ignoresSafeArea()
-        .overlay(alignment: .bottom) {
+        //
+        // A ZStack, not `.overlay` on the map: the map ignores the safe area
+        // and an overlay on it inherits that frame, so the pill's offset was
+        // measured from the screen edge — 96pt put it ABOVE the 56pt FABs
+        // rather than beside them, hovering mid-chart (#43). The ZStack keeps
+        // its safe area, so the pill takes the same `fabBarBottomPadding` the
+        // FAB row does and lands on that row, clear of the home indicator.
+        ZStack(alignment: .bottom) {
+            MapViewRepresentable(
+                center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                    ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                    ?? SALISH_CENTER,
+                zoom: mapFocus == nil ? discoveryZoom : stationZoom,
+                focusToken: mapFocus == nil ? nil : mapFocusToken,
+                // Only reached on the NO-remount path (see above) — a fresh
+                // mount's `mapFocus` is cleared by `.onAppear` below instead.
+                onFocusApplied: { DispatchQueue.main.async { mapFocus = nil } }
+            ) { item in
+                if regular { showMap = false }  // the detail pane shows the pick
+                open(item)
+            }
+            .accessibilityIdentifier("map-canvas")
+            // Consumed once, fresh-mount case: the next appearance of this pane
+            // (fab toggle, a fresh pick) starts from the fix/discovery camera
+            // again, not a stale focus from a station visited an hour ago.
+            .onAppear { mapFocus = nil }
+            .ignoresSafeArea()
+
             // Was "Depths not reduced to chart datum — not for navigation."
             // The depths half stopped being true: the offline chart carries no
             // bathymetry at all (Seascape's depth shading is a `color-relief`
@@ -571,7 +579,8 @@ struct StationListView: View {
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.horizontal, 12).padding(.vertical, 6)
                 .background(SN.page.opacity(0.82), in: Capsule())
-                .padding(.bottom, 96)   // clear of the FABs
+                .accessibilityIdentifier("map-disclaimer")
+                .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
         }
         .background(SN.page.ignoresSafeArea())
     }
@@ -1037,9 +1046,15 @@ struct StationListView: View {
 }
 
 /// The prototype's My Location hero: MY LOCATION eyebrow with the location
-/// arrow, the nearest station's ordinary card (distance rendered in its own
-/// identity column, layout A — same as every other card), then the fix
-/// coordinates in mono (NearMe.dc.html fmtCoord — 3 decimal places).
+/// arrow and, opposite it, the fix coordinates in mono (NearMe.dc.html
+/// fmtCoord — 3 decimal places), over the nearest station's ordinary card
+/// (distance rendered in its own identity column, layout A — same as every
+/// other card).
+///
+/// The coordinates shared the eyebrow's row from #42. On their own line under
+/// the card they bought a full row of tile height for one short mono string,
+/// and left the eyebrow row half-empty above it — the card ended up sandwiched
+/// in padding that encoded nothing.
 struct MyLocationTile<Card: View>: View {
     let item: StationItem
     let fix: (lat: Double, lon: Double)
@@ -1053,14 +1068,21 @@ struct MyLocationTile<Card: View>: View {
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
                 MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
+                Spacer(minLength: 8)
+                Text(formatCoord(lat: fix.lat, lon: fix.lon))
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(SN.foam.opacity(0.55))
+                    // Deliberately neither shrunk to fit nor line-limited: the
+                    // wordmark is the only text in the app allowed to scale
+                    // down (TypeScaleTests `testOnlyTheWordmarkShrinks` — a
+                    // line scan, so naming the modifier here would fail it),
+                    // and a truncated position is worse than a wrapped one.
+                    // At the largest accessibility sizes this wraps and the
+                    // row grows.
             }
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
-            Text(formatCoord(lat: fix.lat, lon: fix.lon))
-                .font(.caption2.monospaced())
-                .foregroundStyle(SN.foam.opacity(0.55))
-                .padding(.horizontal, 6)
         }
         .padding(8)
         .background(Color.white.opacity(0.04),
