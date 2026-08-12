@@ -48,7 +48,7 @@ struct DerivedGateDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if timeline == nil {
-                let tl = TimelineData.build(gate: record, now: live)
+                let tl = TimelineData.build(gate: record, now: live, anchor: todayLocal(tz))
                 timeline = tl
                 // Same padded window the strip's events were derived over, so
                 // the phase/readout and the drawn dots can never disagree.

@@ -1,9 +1,8 @@
 // Slackwater — GPL v3. The continuous pan-under-centerline scrubber, the iOS
 // model from prototype/TidesApp.dc.html (DCLogic innerChart / chartEl /
 // onTideScroll / magnet / tableEl). The reading line is FIXED at the viewport
-// center; dragging pans a fixed multi-day timeline strip (-48h…+180h around
-// the window's anchor on the current week, 18pt per hour) underneath it, so
-// nights bleed across
+// center; dragging pans a fixed multi-day timeline strip (-48h on the current
+// week only, always +180h, 18pt per hour) underneath it, so nights bleed across
 // day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
@@ -203,10 +202,14 @@ struct TimelineDay {
 
 struct TimelineData {
     let tz: TimeZone
-    let today: Date          // today's local midnight
+    /// The local midnight this window is built around. Geometry only.
+    let anchor: Date
+    /// The REAL local midnight. Language and liveness only — the
+    /// Today/Tomorrow labels, the now-marker, return-to-now. Never geometry.
+    let today: Date
     let start: Date          // today - 48h
     let end: Date            // today + 132h
-    let days: [TimelineDay]  // offsets -2…6 (6 exists for the last night's moon)
+    let days: [TimelineDay]  // offsets -2…8 (8 exists for the last night's moon)
     let tidePoints: [TidePoint]        // empty when current-only
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
@@ -261,26 +264,29 @@ struct TimelineData {
     /// times are computed.
     private struct DayChrome {
         let tz: TimeZone
+        let anchor: Date
         let today: Date
         let start: Date
         let end: Date
         let days: [TimelineDay]
     }
 
-    private static func dayChrome(tz: TimeZone, lat: Double, lon: Double, now: Date) -> DayChrome {
+    private static func dayChrome(tz: TimeZone, lat: Double, lon: Double,
+                                  anchor: Date, today: Date) -> DayChrome {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
-        let today = cal.startOfDay(for: now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
-        let days: [TimelineDay] = (-2...6).map { off in
-            let d0 = cal.date(byAdding: .day, value: off, to: today)!
+        let w = Timeline.window(anchor: anchor, today: today)
+        // -2 covers the back-pad on the current week; 8 exists so the last
+        // visible night (offset 7) can find the following sunrise for its moon.
+        let days: [TimelineDay] = (-2...8).map { off in
+            let d0 = cal.date(byAdding: .day, value: off, to: anchor)!
             let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .sunrise }?.time,
                                sunset: sun.first { $0.kind == .sunset }?.time)
         }
-        return DayChrome(tz: tz, today: today, start: start, end: end, days: days)
+        return DayChrome(tz: tz, anchor: anchor, today: today,
+                         start: w.start, end: w.end, days: days)
     }
 
     // Widen the event scans a touch so nothing at the edges is clipped.
@@ -289,8 +295,8 @@ struct TimelineData {
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
     /// reads it), never a drawn track (split-scrubbers spec §3).
-    static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
-        build(tide: nil, current: nil, now: now, gate: gate)
+    static func build(gate: DerivedGateRecord, now: Date, anchor: Date) -> TimelineData {
+        build(tide: nil, current: nil, now: now, anchor: anchor, gate: gate)
     }
 
     /// The online-gate path: current-only strip drawn from fetched CHS/NOAA
@@ -300,8 +306,8 @@ struct TimelineData {
     /// counts if it lands within the pad; only `currentPoints`/`snapTimes`
     /// clip to the visible window.
     static func build(onlinePoints: [CurrentPoint], tz: TimeZone, lat: Double, lon: Double,
-                      now: Date) -> TimelineData {
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+                      now: Date, anchor: Date) -> TimelineData {
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, today: todayLocal(tz))
         let start = chrome.start, end = chrome.end
 
         let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
@@ -322,25 +328,26 @@ struct TimelineData {
                 .map { (slack: e.time, start: $0.start, end: $0.end) }
         }
 
-        let sunTimes = chrome.days.filter { $0.offset <= 5 }
+        let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = (currentEvents.map(\.time) + sunTimes)
             .filter { $0 >= start && $0 <= end }
             .sorted()
 
-        return TimelineData(tz: chrome.tz, today: chrome.today, start: start, end: end, days: chrome.days,
+        return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
+                            start: start, end: end, days: chrome.days,
                             tidePoints: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
-                      now: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
+                      now: Date, anchor: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
         // The primary station names the timezone and the sky position.
         let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
         let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
         let lon = gate?.gate.longitude ?? current?.longitude ?? tide?.longitude ?? -123.0
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, today: todayLocal(tz))
         let today = chrome.today, start = chrome.start, end = chrome.end, days = chrome.days
 
         let pad = eventPad
@@ -382,13 +389,13 @@ struct TimelineData {
             }
         }
 
-        let sunTimes = days.filter { $0.offset <= 5 }
+        let sunTimes = days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = (tideExtremes.map(\.time) + currentEvents.map(\.time) + sunTimes)
             .filter { $0 >= start && $0 <= end }
             .sorted()
 
-        return TimelineData(tz: tz, today: today, start: start, end: end, days: days,
+        return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows)

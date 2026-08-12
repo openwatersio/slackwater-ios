@@ -43,7 +43,7 @@ struct OnlineGateDetailView: View {
     private var timeline: TimelineData? {
         guard let window, window.coversStrip(now: live) else { return nil }
         return TimelineData.build(onlinePoints: window.points, tz: tz,
-                                  lat: gate.latitude, lon: gate.longitude, now: live)
+                                  lat: gate.latitude, lon: gate.longitude, now: live, anchor: todayLocal(tz))
     }
 
     private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }

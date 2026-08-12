@@ -46,7 +46,7 @@ struct TideDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if timeline == nil {
-                timeline = TimelineData.build(tide: record, current: nil, now: live)
+                timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: todayLocal(tz))
             }
             RecentsStore.shared.record(record.id)
         }

@@ -11,7 +11,7 @@ final class TimelineTests: XCTestCase {
 
     func testWindowAndMapping() {
         let now = Date()
-        let d = TimelineData.build(tide: friday, current: nil, now: now)
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
         // -48h … +180h around today's local midnight (spec §2).
         XCTAssertEqual(d.end.timeIntervalSince(d.start), 228 * 3600, accuracy: 3601)
         XCTAssertEqual(d.totalWidth, 228 * Timeline.pph, accuracy: 13)
@@ -21,6 +21,36 @@ final class TimelineTests: XCTestCase {
         // Snap stops exist across the whole window (turns + sun events).
         XCTAssert(d.snapTimes.count > 20, "expected a full week of stops, got \(d.snapTimes.count)")
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
+    }
+
+    /// The anchor drives geometry; `today` stays the real day. A September strip
+    /// must be built around September and still know what day it actually is.
+    func testFutureAnchorMovesTheWindowButNotToday() {
+        let now = Date()
+        let tz = friday.tz
+        let today = todayLocal(tz)
+        let future = today.addingTimeInterval(34 * 86_400)
+
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: future)
+        XCTAssertEqual(d.anchor, future)
+        XCTAssertEqual(d.today, today, "today is the real day, not the anchor")
+        XCTAssertEqual(d.start, future, "no back-pad off the current week")
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), 180 * 3600, accuracy: 3601)
+        XCTAssert(d.tidePoints.allSatisfy { $0.time >= d.start && $0.time <= d.end })
+    }
+
+    /// Day chrome must reach far enough that the LAST night on the strip still
+    /// finds the following sunrise — `drawDayChrome` reads day+1 to place the moon
+    /// mid-night. Window ends at anchor+7.5d, so offset 8 has to exist.
+    func testDayChromeCoversTheLastNightsMoon() {
+        let today = todayLocal(friday.tz)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: today)
+        XCTAssertEqual(d.days.first?.offset, -2)
+        XCTAssertEqual(d.days.last?.offset, 8)
+        let lastVisible = d.days.first { $0.offset == 7 }
+        XCTAssertNotNil(lastVisible?.sunset)
+        XCTAssertNotNil(d.days.first { $0.offset == 8 }?.sunrise,
+                        "the last visible night needs the next day's sunrise for its moon")
     }
 
     // MARK: - The window (spec §1, §2)
@@ -77,7 +107,7 @@ final class TimelineTests: XCTestCase {
         let now = Date()
         let engine = friday.engineStation
             .heights(from: now, to: now.addingTimeInterval(1), step: 1).first!.height
-        let d = TimelineData.build(tide: friday, current: nil, now: now)
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
         XCTAssertEqual(d.heightAt(now), engine, accuracy: 0.02)
         print("NOW-READOUT Friday Harbor @ \(now): engine=\(engine) m, strip=\(d.heightAt(now)) m")
     }
@@ -85,7 +115,7 @@ final class TimelineTests: XCTestCase {
     /// Days bleed into each other: every night band runs sunset → next
     /// sunrise, straddling the midnight between them.
     func testNightContinuityAcrossMidnight() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         var checked = 0
         for (a, b) in zip(d.days, d.days.dropFirst()) {
             guard let set = a.sunset, let rise = b.sunrise else { continue }
@@ -99,7 +129,7 @@ final class TimelineTests: XCTestCase {
     /// The schedule window (today 00:00 → +54h, prototype tableEl TOP) spans
     /// at least two local days of tide turns — the rolling multi-day list.
     func testScheduleWindowSpansMultipleDays() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let t1 = d.today.addingTimeInterval(Timeline.scheduleHours * 3600)
         let turns = d.tideExtremes.filter { $0.time >= d.today && $0.time <= t1 }
         var cal = Calendar(identifier: .gregorian)
@@ -164,7 +194,7 @@ final class TimelineTests: XCTestCase {
     /// re-labelling with one would fail here rather than pass by coincidence.
     func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
         let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
-        let d = TimelineData.build(tide: nil, current: victoria, now: Date())
+        let d = TimelineData.build(tide: nil, current: victoria, now: Date(), anchor: todayLocal(victoria.tz))
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
 
@@ -191,7 +221,7 @@ final class TimelineTests: XCTestCase {
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
     func testSingleTrackGeometries() {
-        let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
+        let tideData = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
         XCTAssertEqual(tide.height, 328, "NEAPS bands above and below the track, no gutter")
@@ -205,7 +235,7 @@ final class TimelineTests: XCTestCase {
         // on which point arrays are non-empty.
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let cur = TimelineGeo(data: TimelineData(
-            tz: .current, today: t0, start: t0, end: t0.addingTimeInterval(3600),
+            tz: .current, anchor: t0, today: t0, start: t0, end: t0.addingTimeInterval(3600),
             days: [], tidePoints: [], tideExtremes: [],
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
@@ -237,7 +267,7 @@ final class TimelineTests: XCTestCase {
         // TideEngine, so the tide side is real data borrowed from the tide-only
         // build above; only the current side is synthesized.
         let both = TimelineGeo(data: TimelineData(
-            tz: tideData.tz, today: tideData.today, start: tideData.start, end: tideData.end,
+            tz: tideData.tz, anchor: tideData.anchor, today: tideData.today, start: tideData.start, end: tideData.end,
             days: tideData.days, tidePoints: tideData.tidePoints, tideExtremes: tideData.tideExtremes,
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
@@ -285,7 +315,7 @@ final class TimelineTests: XCTestCase {
     /// readout are the same numbers by construction.
     func testSlackWindowsBracketTheirSlacks() throws {
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
-        let d = TimelineData.build(tide: nil, current: station, now: Date())
+        let d = TimelineData.build(tide: nil, current: station, now: Date(), anchor: todayLocal(station.tz))
         let slacks = d.currentEvents.filter { $0.kind == .slack }
         XCTAssertGreaterThan(slacks.count, 10, "a week of slacks must exist to window")
         XCTAssertFalse(d.slackWindows.isEmpty)
@@ -308,7 +338,7 @@ final class TimelineTests: XCTestCase {
             constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
         let gate = DerivedGateRecord(gate: ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }!,
                                      port: port)
-        let d = TimelineData.build(gate: gate, now: Date())
+        let d = TimelineData.build(gate: gate, now: Date(), anchor: todayLocal(gate.gate.tz))
         XCTAssert(d.hasCurrent, "the schematic track exists")
         XCTAssertFalse(d.currentEvents.isEmpty, "the gate has slack events")
         XCTAssert(d.slackWindows.isEmpty, "but no windows — the curve is a shape (gutter spec §3)")
@@ -321,7 +351,7 @@ final class TimelineTests: XCTestCase {
     /// (9720px) and blanked every tide detail; the tiles exist to keep each
     /// layer under the cap, so the assertion is on a tile, not on the strip.
     func testCanvasTilesStayUnderTheTextureCap() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let cap: CGFloat = 8192
         let scale: CGFloat = 3        // the densest screen this ships to
 
@@ -456,7 +486,7 @@ final class TimelineTests: XCTestCase {
             t = t.addingTimeInterval(900)
         }
 
-        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
+        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now, anchor: today)
 
         XCTAssert(d.hasCurrent && !d.hasTide)
         // 312: the current strip's own height since its rows collapsed to one

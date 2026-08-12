@@ -81,14 +81,14 @@ struct CurrentDetailView: View {
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         .onAppear {
             if timeline == nil {
-                timeline = TimelineData.build(tide: nil, current: record, now: live)
+                timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: todayLocal(tz))
             }
             RecentsStore.shared.record(record.itemId)
         }
         // The refinement lands under an open page: same station, new model. The
         // curve, the schedule and the amber marking all have to follow it.
         .onChange(of: record) { _, refined in
-            timeline = TimelineData.build(tide: nil, current: refined, now: live)
+            timeline = TimelineData.build(tide: nil, current: refined, now: live, anchor: todayLocal(tz))
         }
     }
 

@@ -93,7 +93,7 @@ final class DerivedGateTests: XCTestCase {
         _ = reference
         let gate = DerivedGateRecord(gate: ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }!,
                                      port: port)
-        let d = TimelineData.build(gate: gate, now: Date())
+        let d = TimelineData.build(gate: gate, now: Date(), anchor: todayLocal(gate.gate.tz))
 
         XCTAssertFalse(d.hasTide, "a derived gate's strip is single-track — no tide track (split-scrubbers spec §3)")
         XCTAssert(d.tideExtremes.isEmpty, "no port turns in the data — they'd re-enter snapTimes and the schedule")
