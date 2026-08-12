@@ -233,7 +233,9 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(depth, contours, "contours must draw over the depth fill, not under it")
         let land = try XCTUnwrap(ids.firstIndex(of: "land-usca"), "the continental floor is missing")
         XCTAssertLessThan(land, depth, "depth must draw over the land floor")
-        let seamapIds = Set((seamapOfflineLayers()?.layers ?? []).compactMap { $0["id"] as? String })
+        let seamapIds = Set((offlineLayers("seamap", sprite: "freenauticalchart",
+                                           attribution: "© Open Waters: Seamap © OpenStreetMap contributors")?.layers ?? [])
+            .compactMap { $0["id"] as? String })
         if let firstMark = ids.firstIndex(where: { seamapIds.contains($0) }) {
             XCTAssertLessThan(contours, firstMark, "the chart marks must draw over bathymetry")
         }
