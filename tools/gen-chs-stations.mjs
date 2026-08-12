@@ -49,35 +49,18 @@
  *
  * Run: cd tools && npm install && node gen-chs-stations.mjs
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { createPlacesResolver } from "@sailingnaturali/station-corrections";
+import { join } from "node:path";
 import tzLookup from "tz-lookup";
+import { here, placesResolver, stationData, byNameThenId, writeBundle } from "./bundle.mjs";
+import { km } from "./geo.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
 const out = join(here, "..", "Slackwater", "Resources", "chs-stations.json");
-const places = JSON.parse(readFileSync(
-  require.resolve("@sailingnaturali/station-corrections/data/places.json"), "utf8"));
-const resolvePlace = createPlacesResolver(places);
-const registry = JSON.parse(readFileSync(
-  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/registry.json"),
-  "utf8",
-));
+const resolvePlace = placesResolver();
+const registry = stationData("registry.json");
 
 /** Same tolerance the app resolves with (ChsFitService.resolveToleranceKm). */
 const REGISTRY_MATCH_KM = 3.0;
 const IWLS = "https://api-iwls.dfo-mpo.gc.ca/api/v1/stations";
-
-function km(aLat, aLon, bLat, bLon) {
-  const R = 6371, toR = (x) => (x * Math.PI) / 180;
-  const dLa = toR(bLat - aLat), dLo = toR(bLon - aLon);
-  const h = Math.sin(dLa / 2) ** 2 +
-    Math.cos(toR(aLat)) * Math.cos(toR(bLat)) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 /**
  * Coarse coast labels, first match wins. Chosen so that every station the rule
@@ -138,7 +121,8 @@ const stations = [];
 
 for (const s of iwls) {
   const match = ports.find(([id, e]) =>
-    !claimed.has(id) && km(e.position[0], e.position[1], s.latitude, s.longitude) <= REGISTRY_MATCH_KM);
+    !claimed.has(id) &&
+    km({ latitude: e.position[0], longitude: e.position[1] }, s) <= REGISTRY_MATCH_KM);
   if (match) {
     const [id, e] = match;
     claimed.add(id);
@@ -173,12 +157,11 @@ if (missing.length) {
     `${missing.join(", ")} — their ids would change, orphaning every stored model`);
 }
 
-stations.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : 1));
-writeFileSync(out, JSON.stringify(stations));
+stations.sort(byNameThenId);
+const size = writeBundle(out, stations);
 
 const census = {};
 for (const s of stations) census[s.region] = (census[s.region] ?? 0) + 1;
-console.log(`${stations.length} CHS tide stations (${claimed.size} registry-curated), ` +
-  `${(JSON.stringify(stations).length / 1024).toFixed(0)} KB`);
+console.log(`${stations.length} CHS tide stations (${claimed.size} registry-curated), ${size}`);
 console.log(Object.entries(census).sort((a, b) => b[1] - a[1])
   .map(([k, n]) => `  ${String(n).padStart(4)}  ${k}`).join("\n"));

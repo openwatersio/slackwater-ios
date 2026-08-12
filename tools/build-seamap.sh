@@ -50,21 +50,6 @@ for f in freenauticalchart.json freenauticalchart.png \
 done
 
 curl -fsS "$BASE/style.json" -o /tmp/seamap-style.json
-python3 - <<'PY'
-import json
-style = json.load(open('/tmp/seamap-style.json'))
-out = []
-for layer in style['layers']:
-    if layer.get('source') != 'seamap':
-        continue
-    for key in ('layout', 'paint'):
-        block = layer.get(key)
-        if block:
-            for k in [k for k in block if k.startswith('text-')]:
-                block.pop(k)
-    out.append(layer)
-json.dump(out, open('Slackwater/Resources/seamap-layers.json', 'w'))
-print(f'{len(out)} seamap layers')
-PY
+python3 tools/slice-layers.py /tmp/seamap-style.json seamap Slackwater/Resources/seamap-layers.json
 
 ls -la Slackwater/Resources/seamap.pmtiles Slackwater/Resources/seamap-layers.json

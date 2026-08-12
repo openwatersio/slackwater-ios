@@ -15,16 +15,11 @@
  * Run: cd tools && npm install && node gen-chs-gates.mjs
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
+import { join } from "node:path";
+import { here, stationData } from "./bundle.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
 const res = join(here, "..", "Slackwater", "Resources");
-const registry = JSON.parse(readFileSync(
-  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/registry.json"),
-  "utf8",
-));
+const registry = stationData("registry.json");
 const ports = JSON.parse(readFileSync(join(res, "chs-stations.json"), "utf8"));
 
 const gates = [];
