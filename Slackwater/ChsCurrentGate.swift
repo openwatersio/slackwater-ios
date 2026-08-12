@@ -132,9 +132,24 @@ extension ChsModelStore {
         return try? JSONDecoder().decode(ChsOnlineWindow.self, from: data)
     }
 
+    /// Merges into whatever is already on disk rather than replacing it.
+    /// Replacing would make a prefetch destructive: fetching the next block
+    /// would discard the current one, and paging back would refetch what the
+    /// user just had.
+    ///
+    /// The prune cut is the start of TODAY's strip — `Timeline.window`'s own
+    /// answer, never re-derived here, for the reason its doc comment gives.
+    ///
+    // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
+    // someone who pages a year out accumulates ~1MB on a gate they evidently
+    // care about, and -chsResetModels already clears it. Add a cap when a real
+    // file gets big.
     static func saveOnline(_ window: ChsOnlineWindow) throws {
+        let today = todayLocal(TimeZone(identifier: window.timezone) ?? .current)
+        let cut = Timeline.window(anchor: today, today: today).start
+        let merged = loadOnline(window.stationID)?.merging(window, prunedBefore: cut) ?? window
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(window).write(to: onlineUrl(window.stationID), options: .atomic)
+        try JSONEncoder().encode(merged).write(to: onlineUrl(window.stationID), options: .atomic)
     }
 }
 
@@ -142,8 +157,9 @@ extension ChsModelStore {
 
 /// A window of official CHS current predictions for one online (fit-reject)
 /// gate — fetched on demand, never fitted, kept local like the fitted models.
-/// The strip span (`start`/`end`) is `Timeline.window(anchor:today:)`'s span
-/// for today's local midnight AT FETCH TIME, so a stale window is a coverage
+/// `start`/`end` is the span the samples actually cover — 30 days forward of
+/// the fetch's anchor, `Timeline.window`'s back-pad behind it — and it grows
+/// as later fetches merge in (`merging`). So a stale window is a coverage
 /// question, not a staleness heuristic — see `covers`.
 struct ChsOnlineWindow: Codable {
     var schemaVersion = 1
@@ -154,8 +170,8 @@ struct ChsOnlineWindow: Codable {
     /// gate identity.
     let timezone: String
     let fetchedAt: Date
-    let start: Date            // Timeline.window(anchor:today:).start at fetch
-    let end: Date              // Timeline.window(anchor:today:).end at fetch
+    let start: Date            // Timeline.window(anchor:today:).start at fetch, pruned forward
+    let end: Date              // anchor + Timeline.onlineFetchDays, clamped to the samples
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
     let times: [Double]        // epoch seconds, 15-min official samples
@@ -173,6 +189,35 @@ struct ChsOnlineWindow: Codable {
     func covers(anchor: Date, today: Date) -> Bool {
         let need = Timeline.window(anchor: anchor, today: today)
         return start <= need.start && end >= need.end
+    }
+
+    /// Union `other`'s samples into this window by timestamp and widen the
+    /// bounds, dropping everything before `prunedBefore`.
+    ///
+    /// Union, not append: the fetch chunks land on an absolute 7-day grid, so
+    /// a refetch routinely overlaps what is already stored, and appending
+    /// would hand `sampleEvents` a series with every overlapped sample twice.
+    ///
+    /// `start` follows the prune. If it did not, `covers` would keep claiming
+    /// a range whose samples had just been deleted.
+    func merging(_ other: ChsOnlineWindow, prunedBefore: Date) -> ChsOnlineWindow {
+        // Two blocks that don't touch have no samples between them, and a
+        // window spanning both would answer `covers` true for an anchor in the
+        // gap — the same lie as an unpruned `start`, from the other end. The
+        // newer block wins outright, prune and all: it is a fresh fetch, whose
+        // own start is never earlier than the cut.
+        guard start <= other.end, other.start <= end else { return other }
+        let cut = prunedBefore.timeIntervalSince1970
+        var byTime = Dictionary(zip(times, speeds), uniquingKeysWith: { _, b in b })
+        for (t, v) in zip(other.times, other.speeds) { byTime[t] = v }
+        let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
+        return ChsOnlineWindow(
+            stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,
+            fetchedAt: other.fetchedAt,
+            start: max(min(start, other.start), prunedBefore),
+            end: max(end, other.end),
+            floodDirection: other.floodDirection, ebbDirection: other.ebbDirection,
+            times: kept.map(\.key), speeds: kept.map(\.value))
     }
 
     /// The list/search card's reading: nearest 15-min sample to `now` (a card

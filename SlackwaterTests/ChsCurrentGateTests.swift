@@ -194,6 +194,83 @@ final class ChsCurrentGateTests: XCTestCase {
                        "past the edge it must fail, not silently render a hole")
     }
 
+    // MARK: - Merging (the 30-day fetch, unioned on save)
+
+    /// A window whose bounds are exactly its own samples — the shape a fetch
+    /// clamps itself to, and the only shape these merge tests need.
+    private func onlineWindow(_ times: [Double], _ speeds: [Double],
+                              id: String = "chs-test-merge") -> ChsOnlineWindow {
+        ChsOnlineWindow(stationID: id, iwlsName: "Test", timezone: "America/Vancouver",
+                        fetchedAt: .now,
+                        start: Date(timeIntervalSince1970: times.first ?? 0),
+                        end: Date(timeIntervalSince1970: times.last ?? 0),
+                        floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
+    }
+
+    /// Merging must union by timestamp, not append — a refetch overlapping the
+    /// stored window would otherwise duplicate every sample in the overlap and
+    /// hand `sampleEvents` a doubled series.
+    func testMergingUnionsByTimestampAndWidensTheWindow() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let a = onlineWindow([t0, t0 + 900, t0 + 1800], [1, 2, 3])
+        let b = onlineWindow([t0 + 1800, t0 + 2700], [3, 4])
+
+        let m = a.merging(b, prunedBefore: Date(timeIntervalSince1970: t0 - 1))
+        XCTAssertEqual(m.times, [t0, t0 + 900, t0 + 1800, t0 + 2700], "no duplicate at the seam")
+        XCTAssertEqual(m.speeds, [1, 2, 3, 4])
+        XCTAssertEqual(m.end, Date(timeIntervalSince1970: t0 + 2700), "the window widens")
+        XCTAssertEqual(m.start, Date(timeIntervalSince1970: t0))
+    }
+
+    /// Past current has no value once it is past, and pruning is what keeps the
+    /// file from growing in the direction nobody looks.
+    func testMergingPrunesTheStalePast() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let a = onlineWindow([t0, t0 + 900, t0 + 1800, t0 + 2700], [1, 2, 3, 4])
+        let m = a.merging(a, prunedBefore: Date(timeIntervalSince1970: t0 + 1800))
+        XCTAssertEqual(m.times, [t0 + 1800, t0 + 2700])
+        XCTAssertEqual(m.speeds, [3, 4])
+        XCTAssertEqual(m.start, Date(timeIntervalSince1970: t0 + 1800),
+                       "start follows the prune, or coverage would lie")
+    }
+
+    /// Blocks that don't touch must not union. Nothing sampled the gap between
+    /// them, so a window spanning both would answer `covers` true for an anchor
+    /// in the middle — the dead-zone strip this plan exists to prevent. Reachable
+    /// once an anchor can jump further than one fetch is wide.
+    func testMergingDropsAStaleDisjointBlock() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let stale = onlineWindow([t0, t0 + 900], [1, 2])
+        let far = onlineWindow([t0 + 60 * 86_400, t0 + 60 * 86_400 + 900], [3, 4])
+
+        let m = stale.merging(far, prunedBefore: Date(timeIntervalSince1970: t0 - 1))
+        XCTAssertEqual(m.times, far.times, "the stale block is dropped, not bridged")
+        XCTAssertEqual(m.start, far.start, "an unsampled gap is never claimed as covered")
+        XCTAssertEqual(m.end, far.end)
+    }
+
+    /// Saving merges into what is already on disk. Replacing would make any
+    /// prefetch destructive: fetching the next block would discard the current
+    /// one, and paging back would refetch what the user just had.
+    func testSaveOnlineMergesInsteadOfReplacing() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        // Today's local midnight is inside the 48h prune cut, so nothing here
+        // is dropped for being stale.
+        let t0 = todayLocal(tz).timeIntervalSince1970
+        let url = ChsModelStore.onlineUrl("chs-test-merge")
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try ChsModelStore.saveOnline(onlineWindow([t0, t0 + 900, t0 + 1800], [1, 2, 3]))
+        try ChsModelStore.saveOnline(onlineWindow([t0 + 1800, t0 + 2700], [3, 4]))
+
+        let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
+        XCTAssertEqual(loaded.times, [t0, t0 + 900, t0 + 1800, t0 + 2700])
+        XCTAssertEqual(loaded.speeds, [1, 2, 3, 4])
+        XCTAssertEqual(loaded.start, Date(timeIntervalSince1970: t0), "the earlier block survives the save")
+        XCTAssertEqual(loaded.end, Date(timeIntervalSince1970: t0 + 2700))
+    }
+
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)
 
     /// The 7 validation rejects ship as online: true identities — findable,

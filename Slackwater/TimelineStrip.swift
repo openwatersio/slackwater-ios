@@ -38,6 +38,12 @@ enum Timeline {
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
 
+    /// How much an online gate fetches in one go. Four times the strip it
+    /// needs, so ordinary paging lands in cache instead of on the network —
+    /// the gates people plan a passage around are exactly the ones that must
+    /// not need a signal to look at next month.
+    static let onlineFetchDays = 30.0
+
     /// The "weak current" convention: under half a knot a small boat transits.
     /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
     static let slackThresholdKn = 0.5

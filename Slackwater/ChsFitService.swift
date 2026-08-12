@@ -482,8 +482,9 @@ final class ChsFitService: ObservableObject {
 
 extension ChsFitService {
     /// The 7 fit-reject gates (online-gates spec §1) get no on-device fit —
-    /// only the current `Timeline` strip's official wcsp1/wcdp1 predictions,
-    /// resolved/projected exactly like `fitCurrent` (:345-363) but served as
+    /// only official wcsp1/wcdp1 predictions, `Timeline.onlineFetchDays` forward
+    /// of `anchor` (today unless a caller says otherwise) and back-padded like
+    /// the strip, resolved/projected exactly like `fitCurrent` (:345-363) but served as
     /// fetched samples rather than harmonic constituents. No queue, no yield
     /// point: these gates never join the fit queue, so there is nothing to
     /// step aside for — a throw here is the whole story, and Task 5's caller
@@ -493,7 +494,8 @@ extension ChsFitService {
     /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
     /// so every caller, today's and any future one, gets the same
     /// "the fetch landed" signal without re-deriving it.
-    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo) async throws -> ChsOnlineWindow {
+    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
+                                             from anchor: Date? = nil) async throws -> ChsOnlineWindow {
         let fetcher = IwlsFetcher()
         let list = try await fetcher.stationList()
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
@@ -502,16 +504,18 @@ extension ChsFitService {
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
             throw ChsError.noFloodAxis(gate.name)
         }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = gate.tz
-        let today = cal.startOfDay(for: .now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        let today = todayLocal(gate.tz)
+        let from = anchor ?? today
+        // The strip's own start — `Timeline.window`'s answer, back-pad and all,
+        // never re-derived here. The fetch runs 30 days forward of the anchor,
+        // four strips' worth, so ordinary paging lands in cache.
+        let start = Timeline.window(anchor: from, today: today).start
+        let end = from.addingTimeInterval(Timeline.onlineFetchDays * 86_400)
         // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
-        // strip's total span in days, ending at the strip's own end, gives
-        // exactly the chunk set covering start…end (up to 7 days of slop at
-        // the grid boundary, same tradeoff the fit path already makes).
-        let plan = Self.chunkPlan(days: (Timeline.backHours + Timeline.forwardHours) / 24, end: end)
+        // fetched span in days, ending at its own end, gives exactly the chunk
+        // set covering start…end (up to 7 days of slop at the grid boundary,
+        // same tradeoff the fit path already makes).
+        let plan = Self.chunkPlan(days: end.timeIntervalSince(start) / 86_400, end: end)
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []
         for chunk in plan {
             speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
