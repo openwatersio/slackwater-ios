@@ -249,6 +249,48 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(m.end, far.end)
     }
 
+    /// The seam is exact-instant, and a one-sample gap at it is producible, not
+    /// theoretical: `fetchOnlineWindow` clamps a stored `end` down to the last
+    /// sample IWLS actually returned, while a new block starts at its anchor.
+    /// Discarding a stored month over that would defeat the whole point of
+    /// merging — but tolerating MORE would paper over a real missing sample.
+    func testMergingSeamToleratesOneSampleGapAndNoMore() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let stored = onlineWindow([t0, t0 + 900], [1, 2])
+        let past = Date(timeIntervalSince1970: t0 - 1)
+        /// A fresh block whose first sample sits `gap` after the stored last one.
+        func merged(gap: Double) -> ChsOnlineWindow {
+            stored.merging(onlineWindow([t0 + 900 + gap, t0 + 1800 + gap], [3, 4]), prunedBefore: past)
+        }
+        XCTAssertEqual(merged(gap: 0).times, [t0, t0 + 900, t0 + 1800],
+                       "blocks that abut exactly merge, sharing the seam sample")
+        XCTAssertEqual(merged(gap: 900).times, [t0, t0 + 900, t0 + 1800, t0 + 2700],
+                       "one interval of slack is what a clamped fetch end produces — still continuous")
+        XCTAssertEqual(merged(gap: 1800).times, [t0 + 2700, t0 + 3600],
+                       "two intervals means a sample is genuinely missing: a hole, kept disjoint")
+    }
+
+    /// `other` is the fresh fetch, but it is not always the LATER block — a
+    /// fetch for today after paging a month out arrives earlier than what is
+    /// stored. Union and sort must not care which side it lands on.
+    func testMergingHandlesAFreshBlockEarlierThanTheStoredOne() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let stored = onlineWindow([t0 + 1800, t0 + 2700], [3, 4])
+        let earlier = onlineWindow([t0, t0 + 900], [1, 2])
+
+        let m = stored.merging(earlier, prunedBefore: Date(timeIntervalSince1970: t0 - 1))
+        XCTAssertEqual(m.times, [t0, t0 + 900, t0 + 1800, t0 + 2700], "sorted whichever side is older")
+        XCTAssertEqual(m.speeds, [1, 2, 3, 4], "speeds follow their own timestamps")
+        XCTAssertEqual(m.start, Date(timeIntervalSince1970: t0), "the window widens backwards too")
+        XCTAssertEqual(m.end, Date(timeIntervalSince1970: t0 + 2700))
+
+        // Far enough back to be a hole rather than a seam: the fresh block still
+        // wins outright, even though it is the earlier of the two.
+        let far = onlineWindow([t0 - 60 * 86_400, t0 - 60 * 86_400 + 900], [5, 6])
+        XCTAssertEqual(stored.merging(far, prunedBefore: Date(timeIntervalSince1970: t0 - 61 * 86_400)).times,
+                       far.times, "the gap is not claimed from either direction")
+    }
+
     /// Saving merges into what is already on disk. Replacing would make any
     /// prefetch destructive: fetching the next block would discard the current
     /// one, and paging back would refetch what the user just had.
@@ -269,6 +311,43 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(loaded.speeds, [1, 2, 3, 4])
         XCTAssertEqual(loaded.start, Date(timeIntervalSince1970: t0), "the earlier block survives the save")
         XCTAssertEqual(loaded.end, Date(timeIntervalSince1970: t0 + 2700))
+    }
+
+    /// The anchored fetch's arithmetic, without the IWLS round trip the rest of
+    /// `fetchOnlineWindow` needs: 30 days forward of the anchor, back-padded
+    /// only when the anchor IS today, and a chunk plan that reaches both ends of
+    /// it. The `from:` branch is what a date picker will call.
+    func testOnlineFetchSpanBackPadsOnlyTodayAndRunsThirtyDaysForward() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let today = todayLocal(tz)
+        let month = Timeline.onlineFetchDays * 86_400
+
+        let now = ChsFitService.onlineFetchSpan(anchor: nil, today: today)
+        XCTAssertEqual(now.start, today.addingTimeInterval(-Timeline.backHours * 3600),
+                       "no anchor means today, which keeps the 48h look-back")
+        XCTAssertEqual(now.end, today.addingTimeInterval(month))
+
+        let ahead = today.addingTimeInterval(21 * 86_400)
+        let paged = ChsFitService.onlineFetchSpan(anchor: ahead, today: today)
+        XCTAssertEqual(paged.start, ahead, "an anchor that is not today gets no look-back")
+        XCTAssertEqual(paged.end, ahead.addingTimeInterval(month))
+
+        // The plan the fetch builds from that span must reach both of its ends,
+        // or the saved window would claim samples no chunk asked for.
+        let plan = ChsFitService.chunkPlan(days: paged.end.timeIntervalSince(paged.start) / 86_400,
+                                           end: paged.end)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(plan.last).start, paged.start,
+                                 "the oldest chunk must reach the window start")
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(plan.first).end, paged.end,
+                                    "the newest chunk must reach the window end")
+
+        // And the window that span produces covers the strip its own anchor draws.
+        let fetched = ChsOnlineWindow(
+            stationID: "chs-test-online", iwlsName: "Test", timezone: tz.identifier,
+            fetchedAt: .now, start: paged.start, end: paged.end,
+            floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+        XCTAssert(fetched.covers(anchor: ahead, today: today),
+                  "a fetch from an anchor must cover that anchor's own strip")
     }
 
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)

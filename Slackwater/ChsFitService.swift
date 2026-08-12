@@ -481,6 +481,20 @@ final class ChsFitService: ObservableObject {
 // MARK: - Online gates: fetched, never fitted
 
 extension ChsFitService {
+    /// The span one fetch covers: `Timeline.window`'s start for the anchor —
+    /// back-padded only when the anchor IS today, never re-derived here — and
+    /// `Timeline.onlineFetchDays` forward of it, four strips' worth, so ordinary
+    /// paging lands in cache instead of on the network.
+    ///
+    /// Split out of `fetchOnlineWindow` only so it can be tested: everything
+    /// around it in that function needs IWLS, which would leave the anchored
+    /// branch — the one a date picker will use — shipping unexercised.
+    nonisolated static func onlineFetchSpan(anchor: Date?, today: Date) -> (start: Date, end: Date) {
+        let from = anchor ?? today
+        return (Timeline.window(anchor: from, today: today).start,
+                from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
+    }
+
     /// The 7 fit-reject gates (online-gates spec §1) get no on-device fit —
     /// only official wcsp1/wcdp1 predictions, `Timeline.onlineFetchDays` forward
     /// of `anchor` (today unless a caller says otherwise) and back-padded like
@@ -504,13 +518,7 @@ extension ChsFitService {
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
             throw ChsError.noFloodAxis(gate.name)
         }
-        let today = todayLocal(gate.tz)
-        let from = anchor ?? today
-        // The strip's own start — `Timeline.window`'s answer, back-pad and all,
-        // never re-derived here. The fetch runs 30 days forward of the anchor,
-        // four strips' worth, so ordinary paging lands in cache.
-        let start = Timeline.window(anchor: from, today: today).start
-        let end = from.addingTimeInterval(Timeline.onlineFetchDays * 86_400)
+        let (start, end) = Self.onlineFetchSpan(anchor: anchor, today: todayLocal(gate.tz))
         // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
         // fetched span in days, ending at its own end, gives exactly the chunk
         // set covering start…end (up to 7 days of slop at the grid boundary,

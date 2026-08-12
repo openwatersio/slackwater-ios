@@ -191,6 +191,14 @@ struct ChsOnlineWindow: Codable {
         return start <= need.start && end >= need.end
     }
 
+    /// IWLS's last returned sample routinely lands one 15-min interval short of
+    /// the requested end, and `fetchOnlineWindow` clamps `end` down to it — so
+    /// two blocks that ought to abut can arrive one sample apart. `merging`
+    /// tolerates exactly that much at the seam and no more: a wider gap means a
+    /// sample is genuinely missing, which is a hole, and a hole must stay
+    /// disjoint rather than be papered over.
+    static let sampleInterval = 900.0
+
     /// Union `other`'s samples into this window by timestamp and widen the
     /// bounds, dropping everything before `prunedBefore`.
     ///
@@ -201,12 +209,14 @@ struct ChsOnlineWindow: Codable {
     /// `start` follows the prune. If it did not, `covers` would keep claiming
     /// a range whose samples had just been deleted.
     func merging(_ other: ChsOnlineWindow, prunedBefore: Date) -> ChsOnlineWindow {
-        // Two blocks that don't touch have no samples between them, and a
-        // window spanning both would answer `covers` true for an anchor in the
-        // gap — the same lie as an unpruned `start`, from the other end. The
-        // newer block wins outright, prune and all: it is a fresh fetch, whose
-        // own start is never earlier than the cut.
-        guard start <= other.end, other.start <= end else { return other }
+        // Two blocks separated by more than a sample have no samples between
+        // them, and a window spanning both would answer `covers` true for an
+        // anchor in the gap — the same lie as an unpruned `start`, from the
+        // other end. The newer block wins outright, prune and all: it is a
+        // fresh fetch, whose own start is never earlier than the cut.
+        let slack = Self.sampleInterval
+        guard start <= other.end.addingTimeInterval(slack),
+              other.start <= end.addingTimeInterval(slack) else { return other }
         let cut = prunedBefore.timeIntervalSince1970
         var byTime = Dictionary(zip(times, speeds), uniquingKeysWith: { _, b in b })
         for (t, v) in zip(other.times, other.speeds) { byTime[t] = v }

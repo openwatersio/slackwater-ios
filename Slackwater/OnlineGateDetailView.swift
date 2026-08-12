@@ -41,8 +41,12 @@ struct OnlineGateDetailView: View {
     /// Fetched view only when the stored window still covers the full strip
     /// (online-gates spec §3: an expired window is the honesty card's job,
     /// same as no window at all — never a chart with a dead zone in it). Not
-    /// cached in `@State`: a few hundred filtered/sorted points is cheap next
+    /// cached in `@State`: filtering and sorting the stored series is cheap next
     /// to the tide/current harmonic synthesis `CurrentDetailView` caches for.
+    /// The magnitude has moved, though — the 30-day fetch
+    /// (`Timeline.onlineFetchDays`) made that series ~2,900 samples, roughly 4×
+    /// the strip it draws, and this rebuilds on every body evaluation including
+    /// scrub frames. Nobody has measured a regression; measure before caching.
     ///
     /// Computed, not `@State` — unlike the other three details, which store
     /// their `TimelineData`. It re-reads `window`/`anchor`/`live` on every
