@@ -1,8 +1,9 @@
 // Slackwater — GPL v3. The continuous pan-under-centerline scrubber, the iOS
 // model from prototype/TidesApp.dc.html (DCLogic innerChart / chartEl /
 // onTideScroll / magnet / tableEl). The reading line is FIXED at the viewport
-// center; dragging pans a fixed multi-day timeline strip (-48h…+132h around
-// today's local midnight, 12pt per hour) underneath it, so nights bleed across
+// center; dragging pans a fixed multi-day timeline strip (-48h…+180h around
+// the window's anchor on the current week, 18pt per hour) underneath it, so
+// nights bleed across
 // day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
