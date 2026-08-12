@@ -49,6 +49,8 @@ re-plumb of every detail view.
    with honest failure rather than a range-limited picker.
 6. **The picker is date-granular, not week-granular.** Tap Sept 14, get
    Sept 14–21.
+7. **A range bar heads the schedule card** — `Aug 11 – 17` — and tapping it
+   opens the picker.
 
 ## 1. Two dates where there was one
 
@@ -190,10 +192,38 @@ Not week-granular — calendar weeks would mean picking a Saturday shows a two-d
 stub, which serves planning worst at the moment it matters most. Unbounded in
 both directions: last Saturday's tide is as free as next month's.
 
-**Placement is deliberately not decided here.** Toolbar, the `when` row, or
-tapping the day label are all plausible, and it is a layout question better
-answered against mockups than a paragraph. It belongs to the second
-implementation plan.
+### Where it lives
+
+**A range bar, as the schedule card's header** — the top of the list's rounded
+card, above the first day group. Tapping it presents the picker.
+
+That position is below the scrub card and above the list, which keeps it at the
+fold on a phone without touching the scrub card's anatomy. Putting it *inside*
+the scrub card was considered and rejected: it would land below the swipe hint,
+`ScrubWhen`, and the tide-at-port link — further down the page than it looks —
+and it would reopen `2026-08-03-detail-hero-and-scrub-order-design.md`'s rule
+that the `when` row is always the last thing in the scrub card. The bar is also
+semantically the *list's* range, so the list's card is where it belongs.
+
+**The bar states the span it shows, not a calendar week: `Aug 11 – 17`.** The
+window is rolling (§1), so anchoring on a Tuesday runs Tue→Mon; a
+"Week of Aug 9 – 16" label would name two days that are not on screen and omit
+two that are.
+
+**The second date is the last day SHOWN, `anchor + 6` — not `scheduleRange`'s
+exclusive upper bound.** `scheduleRange` runs `anchor … anchor + 168h`, so the
+seven day-groups are Aug 11 through Aug 17; Aug 18 is the boundary, not a row.
+Printing `Aug 11 – 18` would name a day that is not in the list directly
+beneath it, which is the same defect this label exists to avoid.
+
+- Same month: `Aug 11 – 17`.
+- Month crossing: `Aug 28 – Sep 3`.
+- Year crossing: `Dec 29 – Jan 4, 2027` — the year appears only when it differs
+  from the anchor's.
+
+When `anchor != today` the bar also carries the return-to-now affordance, since
+it is now the clearest statement on screen that you are not looking at this
+week.
 
 ## Implementation order
 
@@ -202,8 +232,8 @@ Two plans against this spec:
 - **Plan A** — the anchor model, the window constants, `Timeline.window`, and
   the 30-day online fetch, shipping with `anchor = today` and no picker UI. The
   visible win (a week in the list) with no new surface.
-- **Plan B** — the picker, its placement, and the prefetch trigger, on top of an
-  anchor that is already a parameter.
+- **Plan B** — the range bar, the picker it presents, and the prefetch trigger,
+  on top of an anchor that is already a parameter.
 
 ## Verification
 
@@ -222,13 +252,16 @@ Two plans against this spec:
    edge.
 6. Merge-on-save — an overlapping fetch produces no duplicate timestamps, and
    the prune drops everything before `today − 48h`.
-7. Existing assertions at `TimelineTests:56`, `TimelineTests:399-400` and
+7. The range-bar label — same month (`Aug 11 – 17`), month crossing
+   (`Aug 28 – Sep 3`), and year crossing (`Dec 29 – Jan 4, 2027`, with the year
+   suppressed when it matches the anchor's), and in every case the second date
+   is the last day the list actually renders.
+8. Existing assertions at `TimelineTests:56`, `TimelineTests:399-400` and
    `ChsCurrentGateTests:154-155` follow the new constants.
 
 ## Not in scope
 
 - **`pph` and the strip's scroll length.** See §2.
-- **Picker placement.** See §5.
 - **Alerts on a paged date.** Tapping a row to set a threshold notification
   (`2026-07-12-tide-app-design.md` §5a) is orthogonal and unbuilt on iOS.
 - **slackwater-web.** It has its own ‹ Today › day-pager (`EventList.tsx:130`)

@@ -57,6 +57,16 @@ if (cmd === 'whoami') {
 } else if (cmd === 'list-certs') {
   const r = await api('GET', '/v1/certificates?limit=20');
   for (const c of r.data) console.log(c.id, c.attributes.certificateType, c.attributes.displayName, c.attributes.expirationDate);
+} else if (cmd === 'builds') {
+  // What TestFlight actually holds, which is the only place the version story
+  // can be checked: project.yml states an intent, this is the outcome.
+  const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups');
+  const inc = (id) => r.included?.find((i) => i.id === id);
+  for (const b of r.data) {
+    const v = inc(b.relationships?.preReleaseVersion?.data?.id)?.attributes?.version ?? '?';
+    const groups = (b.relationships?.betaGroups?.data ?? []).map((g) => inc(g.id)?.attributes?.name ?? g.id);
+    console.log(`${v} (${b.attributes.version})  ${b.attributes.processingState}  ${b.attributes.uploadedDate}  [${groups.join(', ')}]`);
+  }
 } else if (cmd === 'create-profile') {
   const [bundleIdRes, certId, outPath] = args;
   const b = await api('GET', `/v1/bundleIds?filter[identifier]=${bundleIdRes}`);
@@ -77,5 +87,5 @@ if (cmd === 'whoami') {
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
 } else {
-  console.log('usage: asc.mjs whoami | register-bundle <id> | create-cert <csr> <out.cer> | list-certs | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
+  console.log('usage: asc.mjs whoami | builds | register-bundle <id> | create-cert <csr> <out.cer> | list-certs | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
 }
