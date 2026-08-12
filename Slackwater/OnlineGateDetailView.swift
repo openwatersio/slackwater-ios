@@ -50,7 +50,7 @@ struct OnlineGateDetailView: View {
     /// moves; SwiftUI re-evaluates it. Don't add a `rebuild()` seam for
     /// symmetry with the others — it would have an empty body.
     private var timeline: TimelineData? {
-        guard let window, window.coversStrip(now: live) else { return nil }
+        guard let window, window.covers(anchor: anchor, today: todayLocal(tz)) else { return nil }
         return TimelineData.build(onlinePoints: window.points, tz: tz,
                                   lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
     }
@@ -107,10 +107,10 @@ struct OnlineGateDetailView: View {
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            anchor = todayLocal(tz)
+            if anchor == .distantPast { anchor = todayLocal(tz) }
             if window == nil { window = ChsModelStore.loadOnline(gate.id) }
             RecentsStore.shared.record(gate.id)
-            if window?.coversStrip(now: live) != true, net.online { fetchNow() }
+            if window?.covers(anchor: anchor, today: todayLocal(tz)) != true, net.online { fetchNow() }
         }
     }
 

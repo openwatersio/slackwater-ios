@@ -142,21 +142,20 @@ extension ChsModelStore {
 
 /// A window of official CHS current predictions for one online (fit-reject)
 /// gate — fetched on demand, never fitted, kept local like the fitted models.
-/// The strip span (`start`/`end`) is `Timeline`'s ‑48h…+132h around today's
-/// local midnight AT FETCH TIME, so a stale window is a coverage question,
-/// not a staleness heuristic — see `coversStrip`.
+/// The strip span (`start`/`end`) is `Timeline.window(anchor:today:)`'s span
+/// for today's local midnight AT FETCH TIME, so a stale window is a coverage
+/// question, not a staleness heuristic — see `covers`.
 struct ChsOnlineWindow: Codable {
     var schemaVersion = 1
     let stationID: String
     let iwlsName: String
-    /// The gate's own timezone (added beyond the brief's shape): `coversStrip`
-    /// has to rebuild "today's local midnight" the same way `TimelineData`
-    /// does, and a window has to carry that alongside its dates to do it
-    /// without reaching back into the bundled gate identity.
+    /// The gate's own timezone (added beyond the brief's shape), carried
+    /// alongside the window's dates without reaching back into the bundled
+    /// gate identity.
     let timezone: String
     let fetchedAt: Date
-    let start: Date            // today −48h at fetch, the Timeline window
-    let end: Date              // today +132h at fetch
+    let start: Date            // Timeline.window(anchor:today:).start at fetch
+    let end: Date              // Timeline.window(anchor:today:).end at fetch
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
     let times: [Double]        // epoch seconds, 15-min official samples
@@ -166,16 +165,14 @@ struct ChsOnlineWindow: Codable {
         zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
     }
 
-    /// Does the stored window still cover the FULL strip `Timeline` would
-    /// build right now? True iff it reaches at least `now`'s local
-    /// −48h…+132h — the exact rule Task 5 refetches against.
-    func coversStrip(now: Date) -> Bool {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: timezone) ?? .current
-        let today = cal.startOfDay(for: now)
-        let neededStart = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let neededEnd = today.addingTimeInterval(Timeline.forwardHours * 3600)
-        return start <= neededStart && end >= neededEnd
+    /// Does the stored window cover the FULL strip `Timeline` would build for
+    /// `anchor`? The window is computed by `Timeline.window`, never re-derived
+    /// here — with a conditional back-pad, a second derivation drifts, and the
+    /// failure mode is this returning true for a window with a hole in it,
+    /// which renders as a strip with a dead zone.
+    func covers(anchor: Date, today: Date) -> Bool {
+        let need = Timeline.window(anchor: anchor, today: today)
+        return start <= need.start && end >= need.end
     }
 
     /// The list/search card's reading: nearest 15-min sample to `now` (a card

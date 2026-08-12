@@ -948,7 +948,7 @@ struct TimelineCanvas: View {
 }
 
 /// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype
-/// dayName). Takes the day itself and the REAL today, never an offset: on an
+/// dayName). Takes the day itself and the caller's today, never an offset: on an
 /// anchored strip `TimelineDay.offset` is days-from-anchor, so feeding it here
 /// would label the first day of a September window "Today".
 func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
@@ -1217,7 +1217,7 @@ struct MultiDaySchedule: View {
     /// The window's anchor — day-group offsets are anchor-relative, matching
     /// `TimelineDay.offset`, because that is what `days` is keyed on below.
     let anchor: Date
-    /// The real today, for the Today/Tomorrow labels only.
+    /// The caller's today, for the Today/Tomorrow labels only.
     let today: Date
     let days: [TimelineDay]
     let scrubTime: Date

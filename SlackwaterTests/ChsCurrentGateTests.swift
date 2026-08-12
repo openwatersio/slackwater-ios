@@ -151,8 +151,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let now0 = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 1, day: 15, hour: 12)))
         let today0 = cal.startOfDay(for: now0)
-        let requiredStart = today0.addingTimeInterval(-Timeline.backHours * 3600)
-        let requiredEnd = today0.addingTimeInterval(Timeline.forwardHours * 3600)
+        let need = Timeline.window(anchor: today0, today: today0)
 
         func window(start: Date, end: Date) -> ChsOnlineWindow {
             ChsOnlineWindow(stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
@@ -161,16 +160,38 @@ final class ChsCurrentGateTests: XCTestCase {
         }
 
         // Inside: a window wider than the strip needs still covers it.
-        let padded = window(start: requiredStart.addingTimeInterval(-3600), end: requiredEnd.addingTimeInterval(3600))
-        XCTAssert(padded.coversStrip(now: now0))
+        let padded = window(start: need.start.addingTimeInterval(-3600), end: need.end.addingTimeInterval(3600))
+        XCTAssert(padded.covers(anchor: today0, today: today0))
 
         // Exact edge: start/end exactly matching the required strip bounds.
-        let exact = window(start: requiredStart, end: requiredEnd)
-        XCTAssert(exact.coversStrip(now: now0))
+        let exact = window(start: need.start, end: need.end)
+        XCTAssert(exact.covers(anchor: today0, today: today0))
 
-        // 3 days later: the same window no longer reaches the shifted strip end.
-        let later = now0.addingTimeInterval(3 * 86_400)
-        XCTAssertFalse(exact.coversStrip(now: later))
+        // 3 days later (a later today, anchor following it): the same window
+        // no longer reaches the shifted strip end.
+        let later = today0.addingTimeInterval(3 * 86_400)
+        XCTAssertFalse(exact.covers(anchor: later, today: later))
+    }
+
+    /// A 30-day fetched window covers every anchor whose own 7.5-day strip fits
+    /// inside it — 30 − 7.5 ≈ 22 days out — and honestly fails past that.
+    func testCoversHoldsForThreeWeeksOfAnchors() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: Date())
+        let w = Timeline.window(anchor: today, today: today)
+        let window = ChsOnlineWindow(
+            stationID: "test", iwlsName: "Test", timezone: tz.identifier,
+            fetchedAt: Date(), start: w.start,
+            end: today.addingTimeInterval(30 * 86_400),
+            floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+
+        XCTAssert(window.covers(anchor: today, today: today))
+        XCTAssert(window.covers(anchor: today.addingTimeInterval(22 * 86_400), today: today),
+                  "22 days out still fits its 7.5-day strip inside 30 days of samples")
+        XCTAssertFalse(window.covers(anchor: today.addingTimeInterval(24 * 86_400), today: today),
+                       "past the edge it must fail, not silently render a hole")
     }
 
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)

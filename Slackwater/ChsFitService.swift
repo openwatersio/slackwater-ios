@@ -526,7 +526,7 @@ extension ChsFitService {
         guard !projected.isEmpty else { throw ChsError.emptySeries(gate.name) }
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
-        // would make `coversStrip` pass on a window with a hole in it and
+        // would make `covers` pass on a window with a hole in it and
         // render a strip with a dead zone. Clamp to what actually came back,
         // symmetrically, so a truncated fetch honestly fails coverage instead.
         let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
