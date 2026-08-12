@@ -463,39 +463,22 @@ struct TimelineData {
 // MARK: - Vertical geometry (prototype geo())
 
 /// Every number in here is a literal point, and that is why the chart's own
-/// labels are the one place in this branch that keeps a fixed `.system(size:)`.
+/// labels are the one place in this branch that keeps a fixed `.system(size:)`
+/// — text scaled inside fixed-point geometry degrades by OVERPRINTING the
+/// chart, not by wrapping (measured at AX5). Making the labels scale means
+/// making this geometry scale with them — a real chart-layout change, not a
+/// font swap. Until then the labels stay fixed; don't "finish the job" here.
 ///
-/// The slots are hand-packed: `dayY` 20, `sunY` 34 — 14pt between the day
-/// label's centre and the sun dot's — then one track box at 106…256 inside a
-/// canvas 328 tall, whichever track fills it.
-///
-/// Every event's reading lives in a fixed band on one side of that box —
-/// `topTimeY`/`topValueY`/`topGlyphY` above, the mirror below — leaving only a
-/// coloured dot on the curve. Tide sends highs up and lows down; current sends
-/// flood up and ebb down; slack takes both ends, start above and end below.
-/// That is what retired the three-row gutter on both tracks: the rows existed
-/// to arbitrate labels that can no longer reach each other.
-///
-/// Nothing here reflows, and `tideY`/`curY` map data onto these constants.
-///
-/// Task 1 mapped the labels to `.caption2`, which does respond to Dynamic Type
-/// — and at AX5 `.caption2` is ~26pt, so the day label overprints the sun dot
-/// and reaches `tideTop`, while "Current" centred at `x: 42` runs off the left
-/// edge. Scaling text inside fixed-point geometry does not degrade by wrapping;
-/// it degrades by overprinting the chart.
-///
-/// Same rule this branch already applies to `MapHeader`'s 44pt buttons,
-/// `OfflineStatusButton`'s 34pt circle and the FABs: chrome in a fixed-size
-/// slot does not scale. Making these labels scale means making this geometry
-/// scale with them — a real chart-layout change, not a font swap. Until then
-/// the labels stay fixed; don't "finish the job" here.
+/// Each event's reading lives in the fixed band rows on its own side of the
+/// track (`topTimeY`/`topValueY`/`topGlyphY` and the mirror below), leaving
+/// only a coloured dot on the curve; `tideY`/`curY` map data onto these
+/// constants.
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
     let height: CGFloat
     let dayY: CGFloat = 20
-    let sunY: CGFloat = 34
-    let moonY: CGFloat = 34
+    let sunY: CGFloat = 34   // also the night moons' centre line
     let tideTop: CGFloat
     let tideBottom: CGFloat
     let bodyTop: CGFloat
@@ -509,29 +492,16 @@ struct TimelineGeo {
     init(data: TimelineData) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
-        // ONE track box, whichever track fills it. NEAPS-style bands replaced
-        // the gutter on both tracks, and a band's rows are the same rows
-        // whether the thing in them is a tide height or a current speed — so
-        // the two cases no longer differ by a single number, and the strips are
-        // now the same size and the same shape as each other. (They diverged
-        // before because the current track needed extra room for speed labels
-        // drawn ON the curve and for the FLOOD/EBB reference lines; both are
-        // gone.) The switch survives its own collapse on purpose: it is what
-        // makes a hypothetical both-tracks input resolve tide-first instead of
-        // drawing two curves through each other.
+        // ONE track box, whichever track fills it. The switch resolves a
+        // hypothetical both-tracks input tide-first instead of drawing two
+        // curves through each other. The current box is taller and its canvas
+        // shorter because it spends only two band rows (slack range above,
+        // max time below) — the speeds annotate the curve itself.
         switch (hasTide, hasCurrent) {
         case (true, _):
             tideTop = 106; tideBottom = 256; height = 328
             curTop = 0; curBottom = 0
         default:
-            // The current track's layout diverged from tide's here, and the
-            // reason is what each answer is FOR. A tide turn's height is the
-            // reading; a current's peak speed is something you steer around,
-            // while the slack window is what you plan the day around. So the
-            // current strip spends its rows differently: ONE green range above,
-            // ONE small time below, and the speeds annotate the curve itself.
-            // That is two rows instead of six, which is why this box is taller
-            // and the canvas shorter than the tide case.
             tideTop = 0; tideBottom = 0
             curTop = 80; curBottom = 280; height = 312
         }
@@ -654,21 +624,11 @@ struct TimelineCanvas: View {
     }
 
     /// One event's band: glyph, then a `primary` line and an optional
-    /// `secondary` one, in the three fixed rows on one side of the track. Both
-    /// tracks draw through here, which is what keeps a current's reading and a
-    /// tide's reading the same object rendered twice rather than two label
-    /// systems that drift apart.
-    ///
-    /// The rows are deliberately named by WEIGHT, not by content: `primary` is
-    /// the big line and `secondary` is the small one, and which fact goes in
-    /// which is the caller's judgement about what that event is for. A tide
-    /// turn or a current max leads with its number and drops its time to the
-    /// small row. Slack leads with the TIME and has no small row at all —
-    /// slack timing is the whole answer at a gate, while the exact knots at
-    /// peak ebb is trivia you steer around rather than plan by. Naming these
-    /// `value`/`time` is what made the earlier version print the sub-threshold
-    /// constant six times a screen: the grid demanded a number in the big row,
-    /// so slack got handed the only number it had.
+    /// `secondary` one, in the three fixed rows on one side of the track.
+    /// Both tracks draw through here — one renderer, not two label systems.
+    /// Rows are named by WEIGHT, not content, on purpose: naming them
+    /// `value`/`time` is what once printed the sub-threshold constant six
+    /// times a screen (slack leads with the TIME).
     private func drawBand(_ ctx: GraphicsContext, x: CGFloat, top: Bool,
                           glyph: String, primary: String, secondary: String?,
                           tint: Color, rotateDeg: Double? = nil) {
@@ -728,18 +688,17 @@ struct TimelineCanvas: View {
                 let moon = SunMoon.moonIllumination(date: mid)
                 let cx = data.x(mid)
                 let glowR = 28 + CGFloat(moon.fraction) * 84
-                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: geo.moonY - glowR,
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: geo.sunY - glowR,
                                                 width: glowR * 2, height: glowR * 2)),
                          with: .radialGradient(
                             Gradient(stops: [
                                 .init(color: Color(hex: 0xE6EEFF, opacity: 0.95 * (0.1 + moon.fraction * 0.66)), location: 0),
                                 .init(color: Color(hex: 0xCFE0FF, opacity: 0.28 * (0.1 + moon.fraction * 0.66)), location: 0.45),
                                 .init(color: Color(hex: 0xCFE0FF, opacity: 0), location: 1)]),
-                            center: CGPoint(x: cx, y: geo.moonY), startRadius: 0, endRadius: glowR))
+                            center: CGPoint(x: cx, y: geo.sunY), startRadius: 0, endRadius: glowR))
                 let r: CGFloat = 8
-                let disc = CGRect(x: cx - r, y: geo.moonY - r, width: 2 * r, height: 2 * r)
-                // Corrected limb shift (see MoonGlyph): clear at full, covering at new.
-                let shift = (moon.waxing ? -1 : 1) * CGFloat(moon.fraction) * 2 * r
+                let disc = CGRect(x: cx - r, y: geo.sunY - r, width: 2 * r, height: 2 * r)
+                let shift = moonLimbShift(fraction: moon.fraction, waxing: moon.waxing, radius: r)
                 ctx.drawLayer { l in
                     l.clip(to: Path(ellipseIn: disc))
                     l.fill(Path(ellipseIn: disc), with: .color(Color(hex: 0xEEF4FF)))
@@ -800,18 +759,10 @@ struct TimelineCanvas: View {
                        style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
         }
 
-        // Turns, the NEAPS way: the curve carries a coloured DOT and nothing
-        // else, and the reading — time, height, direction arrow — is pulled out
-        // into a fixed band on the turn's own side of the track. That replaces
-        // both the value-stacked-on-the-dot label and the three-row gutter
-        // beneath it (Amendment A/C), because kind now does the separating that
-        // rows used to: a high's label physically cannot land on a low's.
-        //
-        // Colour is the existing direction axis — high is the top of rising
-        // (flood), low the bottom of falling (ebb) — not NEAPS' green/amber.
-        // Green in this app means slack and only slack, and the same pair
-        // already labels HIGH/LOW in the schedule directly below this strip.
-        // The pale variants are the tokens meant for small text on near-black.
+        // Turns: a coloured dot on the curve, the reading in the fixed band on
+        // the turn's own side (highs up, lows down — kind does the separating
+        // rows used to). Colour is the direction axis, never NEAPS'
+        // green/amber: green here means slack and only slack.
         let margin = 0.3 * 3600
         let filteredExtremes = data.tideExtremes.filter { e in
             e.time >= data.start.addingTimeInterval(margin)
@@ -823,15 +774,10 @@ struct TimelineCanvas: View {
             let tint = high ? SN.floodLabel : SN.ebbLabel
             ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
                      with: .color(tint))
-            // ⤒ / ⤓ — arrow TO BAR, not a bare arrow. A turn is where the water
-            // stops, and the bar is the stop; a plain ↑ says "rising", which is
-            // the one thing that is no longer true at a high. (NEAPS uses the
-            // same pair for the same reason. The current track keeps bare
-            // arrows, because there flood/ebb really is a direction of travel.)
-            //
-            // No unit on the value — the fixed axis column carries it once, and
-            // a shorter label is the difference between clearing a neighbour
-            // and overprinting it.
+            // ⤒ / ⤓ — arrow TO BAR: a plain ↑ says "rising", the one thing no
+            // longer true at a high. (The current track keeps bare arrows —
+            // there flood/ebb really is a direction of travel.) No unit on the
+            // value: the fixed axis column carries it once.
             drawBand(ctx, x: x, top: high, glyph: high ? "⤒" : "⤓",
                      primary: formatHeight(e.height, imperial: imperial),
                      secondary: chartTime(e.time, data.tz), tint: tint)
@@ -877,17 +823,10 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // The workable slack column spans the WHOLE track, not zeroY-downward
-        // as the old band did. Two things follow from that, and the second is
-        // the point: the window reads as a column of time you can transit
-        // rather than a patch hanging off the zero line, and its two edge times
-        // get to live at opposite ends of the chart — start on top, end
-        // underneath. A 16-minute window used to print "8:17AM–8:33AM" as one
-        // merged run because two labels 5pt apart are unreadable; 150pt apart
-        // vertically, they are just two labels.
-        //
-        // Drawn before the events so the dots and the curve stay on top of the
-        // tint. 0.12 keeps it a highlight rather than an opaque patch.
+        // The workable slack column spans the WHOLE track — a column of time
+        // you can transit, not a patch hanging off the zero line. Drawn before
+        // the events so the dots and the curve stay on top of the tint; 0.12
+        // keeps it a highlight rather than an opaque patch.
         for w in data.slackWindows {
             let x0 = data.x(w.start), x1 = data.x(w.end)
             ctx.fill(Path(CGRect(x: x0, y: geo.curTop, width: x1 - x0,
@@ -902,26 +841,11 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
                                                 width: 8, height: 8)),
                          with: .color(SN.go))
-                // ONE label, centred over the column, no glyph. The window's
-                // two ends were living at opposite ends of the strip to keep
-                // them from merging into an unreadable "8:17AM–8:33AM" run;
-                // trimming the repeated hour does the same job in one place
-                // and gives the whole top row back to slack. Nothing else is
-                // up here now, which is the point — at a gate this row IS the
-                // answer, and it can afford to be the widest thing on screen.
-                // ONE time, and it is the SLACK ITSELF — not the window's
-                // opening edge, which is what this printed first.
-                //
-                // The magnet snaps the strip to `snapTimes`, and a slack's entry
-                // there is the zero crossing, the middle of the window. Labelling
-                // the edge meant the number you read and the moment the scrubber
-                // parked you on were minutes apart with nothing to explain the
-                // gap — the chart contradicting itself at the one event this app
-                // is named for. Print what the strip can actually stop on.
-                //
-                // The window is still DRAWN, as the green column: it is context
-                // you look at, not a time you read off. Planning a transit
-                // through it is later work, and it can bring its own readout.
+                // ONE label, centred over the column: the SLACK ITSELF, not
+                // the window's opening edge — the magnet parks the strip on
+                // the zero crossing, so print what the strip can actually
+                // stop on. The window stays drawn as the green column:
+                // context you look at, not a time you read off.
                 if data.slackWindows.first(where: { $0.slack == e.time }) == nil {
                     // No window (a violent gate the sampling steps over, every
                     // derived gate): a hairline rather than a column — a
@@ -942,18 +866,10 @@ struct TimelineCanvas: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
                          with: .color(tint))
 
-                // The speed annotates the CURVE, not a band: it is context you
-                // read off the shape, not a number you plan by. It sits between
-                // the peak and the zero line — inside the fill — whenever the
-                // fill is deep enough to hold it, and inverts to white there
-                // because it is then sitting on colour. A weak peak has no room
-                // under it, so the label sits outside on the dark ground and
-                // keeps its direction tint instead. That is the whole rule, and
-                // it is why a big flood reads white while a small ebb doesn't.
-                // No chip behind it. White on the flood fill carries itself, and
-                // a box made the label an object sitting ON the chart instead of
-                // an annotation belonging to it — which is the opposite of
-                // "informal information you read off the shape".
+                // The speed annotates the CURVE, not a band: inside the fill
+                // (inverted to white — it sits on colour) when the fill is
+                // deep enough to hold it, outside on the dark ground in its
+                // direction tint otherwise. No chip behind it.
                 let toward: CGFloat = flood ? 1 : -1      // toward the zero line
                 let labelH: CGFloat = 30
                 let inside = abs(y - geo.zeroY) >= labelH + 12
@@ -997,12 +913,8 @@ func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
     case 0: "Today"
     case 1: "Tomorrow"
     case -1: "Yesterday"
-    default: formatterShortWeekday(dayStart, tz)
+    default: shortWeekday(dayStart, tz)
     }
-}
-
-private func formatterShortWeekday(_ date: Date, _ tz: TimeZone) -> String {
-    String(weekdayName(date, tz).prefix(3))
 }
 
 // MARK: - The scroll host: native pan + momentum, magnet on settle
@@ -1134,7 +1046,7 @@ struct TimelineScrubber: UIViewRepresentable {
 struct TimelineScrubStrip: View {
     let data: TimelineData
     let geo: TimelineGeo
-    let imperial: Bool
+    var imperial = true    // only read by the tide track; current-only strips omit it
     var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
     var floodDeg: Double? = nil
@@ -1163,20 +1075,15 @@ struct TimelineScrubStrip: View {
                                startPoint: .top, endPoint: .bottom)
                     .frame(width: 2, height: geo.bodyBottom - 8)
                     .position(x: w / 2, y: 8 + (geo.bodyBottom - 8) / 2)
-                Triangle()
-                    .fill(.white)
+                Image(systemName: "arrowtriangle.down.fill")
+                    .resizable()
+                    .foregroundStyle(.white)
                     .frame(width: 8, height: 6)
                     .position(x: w / 2, y: 5)
                 if geo.hasTide {
-                    // Neutral, like the current dot below it. This was green,
-                    // which made it a mark coloured by SERIES IDENTITY — kind —
-                    // inside a canvas where green means slack: on a paired
-                    // current+tide detail the same chart carried a green dot
-                    // meaning "tide curve" and green `slack` labels at every
-                    // zero crossing. Both track lines are near-white anyway, so
-                    // the green matched nothing it sat on.
-                    // (The white ring it used to wear was there to lift green
-                    // off the track; on a white dot it drew nothing.)
+                    // Neutral white, like the current dot below it — a green
+                    // dot coloured the mark by SERIES IDENTITY inside a canvas
+                    // where green means slack.
                     Circle().fill(.white)
                         .frame(width: 13, height: 13)
                         .shadow(color: .white.opacity(0.9), radius: 4)
@@ -1214,17 +1121,6 @@ struct TimelineScrubStrip: View {
 
 }
 
-private struct Triangle: Shape {
-    func path(in rect: CGRect) -> Path {
-        var p = Path()
-        p.move(to: CGPoint(x: rect.midX, y: rect.maxY))
-        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        p.closeSubpath()
-        return p
-    }
-}
-
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
@@ -1246,10 +1142,13 @@ struct ScheduleEntry: Identifiable {
     }
 }
 
-/// Day-grouped events list, today 00:00 → +54h (prototype tableEl TOP): day
-/// name in a left column, rows scrub on tap, the row nearest the centerline
-/// time is highlighted. The prototype dims nothing for the past — the nearest-
-/// row highlight is the time cue.
+/// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
+/// `anchor`, which is why this takes the anchor and `today` separately: day
+/// groups key on the first, labels read the second. Day name in a left column,
+/// rows scrub on tap, the row nearest the centerline time is highlighted. The
+/// prototype dims nothing for the past — the nearest-row highlight is the time
+/// cue. (The prototype's `tableEl` TOP, a flat today+54h, is what
+/// `scheduleRange` replaced.)
 struct MultiDaySchedule: View {
     let entries: [ScheduleEntry]  // pre-sorted, pre-filtered to the window
     let tz: TimeZone

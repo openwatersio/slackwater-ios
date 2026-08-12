@@ -1,8 +1,8 @@
 // Slackwater — GPL v3. Sun/moon calculator: a Swift port of the exact subset
 // of suncalc 2.0.1 (BSD-2, © Vladimir Agafonkin) that slackwater-web uses plus
 // what the scrubber design needs — sunrise/sunset (getTimes' -0.833° pair) and
-// moon illumination/phase (getMoonIllumination, full Meeus term tables so the
-// numbers match the web's dependency, not an approximation of it).
+// moon illumination/phase (Meeus ch. 48 low-precision phase angle; consumers
+// only need ~1e-2 so the full term tables were cut).
 // Parity-tested against the web's own suncalc outputs in SunMoonTests.
 import Foundation
 
@@ -24,20 +24,11 @@ enum SunMoon {
         date.timeIntervalSince1970 * 1000 / dayMs - 0.5 + J1970 - J2000
     }
 
-    /// ΔT (TT − UT), seconds — suncalc's Espenak/Meeus piecewise fit.
-    private static func deltaT(_ d: Double) -> Double {
-        let y = 2000 + d / 365.2425
-        var t: Double
-        if y < 1920 { t = y - 1900; return -2.79 + t * (1.494119 + t * (-0.0598939 + t * (0.0061966 - t * 197e-6))) }
-        if y < 1941 { t = y - 1920; return 21.2 + t * (0.84493 + t * (-0.0761 + t * 0.0020936)) }
-        if y < 1961 { t = y - 1950; return 29.07 + t * (0.407 + t * (-1 / 233 + t / 2547)) }
-        if y < 1986 { t = y - 1975; return 45.45 + t * (1.067 + t * (-1 / 260 - t / 718)) }
-        if y < 2005 { t = y - 2000; return 63.86 + t * (0.3345 + t * (-0.060374 + t * (0.0017275 + t * (651814e-9 + t * 2373599e-11)))) }
-        if y < 2050 { t = y - 2000; return 62.92 + t * (0.32217 + t * 0.005589) }
-        t = (y - 1820) / 100
-        return -20 + 32 * t * t - 0.5628 * (2150 - y)
-    }
-    private static func toDaysTT(_ d: Double) -> Double { d + deltaT(d) / 86_400 }
+    /// ΔT (TT − UT), seconds.
+    // ponytail: constant — fine for present-day dates; restore the Espenak/Meeus
+    // piecewise polynomial if historic dates are ever needed.
+    private static let deltaT = 69.0
+    private static func toDaysTT(_ d: Double) -> Double { d + deltaT / 86_400 }
 
     private static func altitude(_ H: Double, _ phi: Double, _ dec: Double) -> Double {
         asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H))
@@ -48,7 +39,7 @@ enum SunMoon {
 
     // MARK: - Sun position (suncalc sunCoords)
 
-    private struct EqCoords { let ra: Double; let dec: Double; var dist: Double = 0 }
+    private struct EqCoords { let ra: Double; let dec: Double }
 
     private static func sunCoords(_ d: Double) -> EqCoords {
         let t = d / 36525
@@ -126,186 +117,7 @@ enum SunMoon {
         return events.sorted { $0.time < $1.time }
     }
 
-    // MARK: - Moon (suncalc moonCoords — full Meeus tables — + getMoonIllumination)
-
-    private static func nutationObliquity(_ t: Double) -> (dpsi: Double, eps: Double) {
-        let om = rad * (125.04452 - 1934.136261 * t)
-        let ls = rad * (280.4665 + 36000.7698 * t)
-        let lm = rad * (218.3165 + 481267.8813 * t)
-        let dpsi = (-17.2 * sin(om) - 1.32 * sin(2 * ls) - 0.23 * sin(2 * lm) + 0.21 * sin(2 * om)) / 3600
-        let deps = (9.2 * cos(om) + 0.57 * cos(2 * ls) + 0.1 * cos(2 * lm) - 0.09 * cos(2 * om)) / 3600
-        return (dpsi, rad * (23.439291 - t * (0.0130042 + t * (16e-8 - t * 504e-9)) + deps))
-    }
-
-    // [D, M, Mp, F, sinCoeff(lon ×1e-6°), cosCoeff(dist ×1e-3 km)] × 60 terms
-    private static let moonLon: [Double] = [
-        0, 0, 1, 0, 6288774, -20905355,
-        2, 0, -1, 0, 1274027, -3699111,
-        2, 0, 0, 0, 658314, -2955968,
-        0, 0, 2, 0, 213618, -569925,
-        0, 1, 0, 0, -185116, 48888,
-        0, 0, 0, 2, -114332, -3149,
-        2, 0, -2, 0, 58793, 246158,
-        2, -1, -1, 0, 57066, -152138,
-        2, 0, 1, 0, 53322, -170733,
-        2, -1, 0, 0, 45758, -204586,
-        0, 1, -1, 0, -40923, -129620,
-        1, 0, 0, 0, -34720, 108743,
-        0, 1, 1, 0, -30383, 104755,
-        2, 0, 0, -2, 15327, 10321,
-        0, 0, 1, 2, -12528, 0,
-        0, 0, 1, -2, 10980, 79661,
-        4, 0, -1, 0, 10675, -34782,
-        0, 0, 3, 0, 10034, -23210,
-        4, 0, -2, 0, 8548, -21636,
-        2, 1, -1, 0, -7888, 24208,
-        2, 1, 0, 0, -6766, 30824,
-        1, 0, -1, 0, -5163, -8379,
-        1, 1, 0, 0, 4987, -16675,
-        2, -1, 1, 0, 4036, -12831,
-        2, 0, 2, 0, 3994, -10445,
-        4, 0, 0, 0, 3861, -11650,
-        2, 0, -3, 0, 3665, 14403,
-        0, 1, -2, 0, -2689, -7003,
-        2, 0, -1, 2, -2602, 0,
-        2, -1, -2, 0, 2390, 10056,
-        1, 0, 1, 0, -2348, 6322,
-        2, -2, 0, 0, 2236, -9884,
-        0, 1, 2, 0, -2120, 5751,
-        0, 2, 0, 0, -2069, 0,
-        2, -2, -1, 0, 2048, -4950,
-        2, 0, 1, -2, -1773, 4130,
-        2, 0, 0, 2, -1595, 0,
-        4, -1, -1, 0, 1215, -3958,
-        0, 0, 2, 2, -1110, 0,
-        3, 0, -1, 0, -892, 3258,
-        2, 1, 1, 0, -810, 2616,
-        4, -1, -2, 0, 759, -1897,
-        0, 2, -1, 0, -713, -2117,
-        2, 2, -1, 0, -700, 2354,
-        2, 1, -2, 0, 691, 0,
-        2, -1, 0, -2, 596, 0,
-        4, 0, 1, 0, 549, -1423,
-        0, 0, 4, 0, 537, -1117,
-        4, -1, 0, 0, 520, -1571,
-        1, 0, -2, 0, -487, -1739,
-        2, 1, 0, -2, -399, 0,
-        0, 0, 2, -2, -381, -4421,
-        1, 1, 1, 0, 351, 0,
-        3, 0, -2, 0, -340, 0,
-        4, 0, -3, 0, 330, 0,
-        2, -1, 2, 0, 327, 0,
-        0, 2, 1, 0, -323, 1165,
-        1, 1, -1, 0, 299, 0,
-        2, 0, 3, 0, 294, 0,
-        2, 0, -1, -2, 0, 8752,
-    ]
-
-    // [D, M, Mp, F, sinCoeff(lat ×1e-6°)] × 60 terms
-    private static let moonLat: [Double] = [
-        0, 0, 0, 1, 5128122,
-        0, 0, 1, 1, 280602,
-        0, 0, 1, -1, 277693,
-        2, 0, 0, -1, 173237,
-        2, 0, -1, 1, 55413,
-        2, 0, -1, -1, 46271,
-        2, 0, 0, 1, 32573,
-        0, 0, 2, 1, 17198,
-        2, 0, 1, -1, 9266,
-        0, 0, 2, -1, 8822,
-        2, -1, 0, -1, 8216,
-        2, 0, -2, -1, 4324,
-        2, 0, 1, 1, 4200,
-        2, 1, 0, -1, -3359,
-        2, -1, -1, 1, 2463,
-        2, -1, 0, 1, 2211,
-        2, -1, -1, -1, 2065,
-        0, 1, -1, -1, -1870,
-        4, 0, -1, -1, 1828,
-        0, 1, 0, 1, -1794,
-        0, 0, 0, 3, -1749,
-        0, 1, -1, 1, -1565,
-        1, 0, 0, 1, -1491,
-        0, 1, 1, 1, -1475,
-        0, 1, 1, -1, -1410,
-        0, 1, 0, -1, -1344,
-        1, 0, 0, -1, -1335,
-        0, 0, 3, 1, 1107,
-        4, 0, 0, -1, 1021,
-        4, 0, -1, 1, 833,
-        0, 0, 1, -3, 777,
-        4, 0, -2, 1, 671,
-        2, 0, 0, -3, 607,
-        2, 0, 2, -1, 596,
-        2, -1, 1, -1, 491,
-        2, 0, -2, 1, -451,
-        0, 0, 3, -1, 439,
-        2, 0, 2, 1, 422,
-        2, 0, -3, -1, 421,
-        2, 1, -1, 1, -366,
-        2, 1, 0, 1, -351,
-        4, 0, 0, 1, 331,
-        2, -1, 1, 1, 315,
-        2, -2, 0, -1, 302,
-        0, 0, 1, 3, -283,
-        2, 1, 1, -1, -229,
-        1, 1, 0, -1, 223,
-        1, 1, 0, 1, 223,
-        0, 1, -2, -1, -220,
-        2, 1, -1, -1, -220,
-        1, 0, 1, 1, -185,
-        2, -1, -2, -1, 181,
-        0, 1, 2, 1, -177,
-        4, 0, -2, -1, 176,
-        4, -1, -1, -1, 166,
-        1, 0, 1, -1, -164,
-        4, 0, 1, -1, 132,
-        1, 0, -1, -1, -119,
-        4, -1, 0, -1, 115,
-        2, -2, 0, 1, 107,
-    ]
-
-    private static func moonCoords(_ d: Double) -> EqCoords {
-        let t = d / 36525
-        let Lp = 218.3164477 + t * (481267.88123421 + t * (-0.0015786 + t * (1 / 538841 - t / 65194e3)))
-        let D = 297.8501921 + t * (445267.1114034 + t * (-0.0018819 + t * (1 / 545868 - t / 113065e3)))
-        let M = 357.5291092 + t * (35999.0502909 + t * (-1536e-7 + t / 2449e4))
-        let Mp = 134.9633964 + t * (477198.8675055 + t * (0.0087414 + t * (1 / 69699 - t / 14712e3)))
-        let F = 93.272095 + t * (483202.0175233 + t * (-0.0036539 + t * (-1 / 3526e3 + t / 86331e4)))
-        let A1 = 119.75 + 131.849 * t
-        let A2 = 53.09 + 479264.29 * t
-        let A3 = 313.45 + 481266.484 * t
-        let E = 1 - t * (0.002516 + t * 74e-7)
-        let Dr = rad * D, Mr = rad * M, Mpr = rad * Mp, Fr = rad * F
-        var sl = 0.0, sr = 0.0, sb = 0.0
-        var i = 0
-        while i < moonLon.count {
-            let m = moonLon[i + 1]
-            let arg = moonLon[i] * Dr + m * Mr + moonLon[i + 2] * Mpr + moonLon[i + 3] * Fr
-            let f = (m == 1 || m == -1) ? E : (m == 2 || m == -2) ? E * E : 1
-            sl += moonLon[i + 4] * f * sin(arg)
-            sr += moonLon[i + 5] * f * cos(arg)
-            i += 6
-        }
-        i = 0
-        while i < moonLat.count {
-            let m = moonLat[i + 1]
-            let arg = moonLat[i] * Dr + m * Mr + moonLat[i + 2] * Mpr + moonLat[i + 3] * Fr
-            let f = (m == 1 || m == -1) ? E : (m == 2 || m == -2) ? E * E : 1
-            sb += moonLat[i + 4] * f * sin(arg)
-            i += 5
-        }
-        let A1r = rad * A1, Lpr = rad * Lp
-        sl += 3958 * sin(A1r) + 1962 * sin(Lpr - Fr) + 318 * sin(rad * A2)
-        sb += -2235 * sin(Lpr) + 382 * sin(rad * A3) + 175 * sin(A1r - Fr)
-            + 175 * sin(A1r + Fr) + 127 * sin(Lpr - Mpr) - 115 * sin(Lpr + Mpr)
-        let (dpsi, eps) = nutationObliquity(t)
-        let l = rad * (Lp + sl / 1e6 + dpsi)
-        let b = rad * (sb / 1e6)
-        return EqCoords(ra: atan2(sin(l) * cos(eps) - tan(b) * sin(eps), cos(l)),
-                        dec: asin(sin(b) * cos(eps) + cos(b) * sin(eps) * sin(l)),
-                        dist: 385000.56 + sr / 1e3)
-    }
+    // MARK: - Moon illumination (Meeus ch. 48 low-precision phase angle)
 
     struct MoonIllumination {
         /// Illuminated fraction 0…1.
@@ -315,16 +127,20 @@ enum SunMoon {
         let waxing: Bool
     }
 
+    // ponytail: Meeus ch. 48 eq. 48.4 — good to ~2e-3 in fraction; the glyph,
+    // glow, and phase-name buckets need ~1e-2. Restore the suncalc/Meeus full
+    // term tables (git history) if anything ever needs 1e-6 parity again.
     static func moonIllumination(date: Date) -> MoonIllumination {
-        let d = toDaysTT(toDays(date))
-        let s = sunCoords(d)
-        let m = moonCoords(d)
-        let sdist = 149598e3
-        let phi = acos(sin(s.dec) * sin(m.dec) + cos(s.dec) * cos(m.dec) * cos(s.ra - m.ra))
-        let inc = atan2(sdist * sin(phi), m.dist - sdist * cos(phi))
-        let angle = atan2(cos(s.dec) * sin(s.ra - m.ra),
-                          sin(s.dec) * cos(m.dec) - cos(s.dec) * sin(m.dec) * cos(s.ra - m.ra))
-        let waxing = angle < 0
+        let t = toDaysTT(toDays(date)) / 36525
+        let D = rad * (297.8501921 + 445267.1114034 * t)   // mean elongation
+        let M = rad * (357.5291092 + 35999.0502909 * t)    // sun mean anomaly
+        let Mp = rad * (134.9633964 + 477198.8675055 * t)  // moon mean anomaly
+        let iRaw = Double.pi - D - rad * (6.289 * sin(Mp) - 2.100 * sin(M)
+            + 1.274 * sin(2 * D - Mp) + 0.658 * sin(2 * D)
+            + 0.214 * sin(2 * Mp) + 0.110 * sin(D))
+        let signed = wrapPi(iRaw)   // phase angle, sign carries waxing/waning
+        let inc = abs(signed)
+        let waxing = signed > 0
         return MoonIllumination(fraction: (1 + cos(inc)) / 2,
                                 phase: 0.5 + 0.5 * inc * (waxing ? -1 : 1) / .pi,
                                 waxing: waxing)

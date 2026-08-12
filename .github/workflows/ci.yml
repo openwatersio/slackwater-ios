@@ -70,8 +70,10 @@ jobs:
           xcrun simctl list devices | grep -q 'SlackwaterCI-iPad' \
             || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
 
-      # Runs xcodegen, then the FAST test plan on both reference simulators.
-      # The full plan hits live IWLS and stays a pre-upload step run by hand.
+      # Runs xcodegen, then the fast suite on both reference simulators — the
+      # live-IWLS UI tests skip themselves unless SLACKWATER_FULL is set
+      # (scripts/test.sh --full), and that full run stays a pre-upload step
+      # run by hand.
       - run: ./scripts/test.sh
         env:
           SLACKWATER_SIMS: SlackwaterCI-iPhone,SlackwaterCI-iPad

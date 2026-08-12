@@ -104,11 +104,10 @@ schemes:
     test:
       config: Debug
       targets: [SlackwaterTests, SlackwaterUITests]
-      # Two plans, both checked in (TestPlans/). Fast is the default: every unit
-      # test and every UI test that runs on stored/mocked state. Full adds the
-      # eight UI tests that fetch live IWLS and fit on-device — minutes each.
-      # Drive them with scripts/test.sh (`--full` for the second).
+      # One plan (TestPlans/). The UI tests that fetch live IWLS and fit
+      # on-device — minutes each — skip themselves unless SLACKWATER_FULL
+      # reaches the runner (ScreenshotTests.skipUnlessFull). Drive with
+      # scripts/test.sh; `--full` sets TEST_RUNNER_SLACKWATER_FULL=1.
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true
-        - path: TestPlans/Slackwater-Full.xctestplan

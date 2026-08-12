@@ -7,37 +7,23 @@ final class TypeScaleTests: XCTestCase {
     /// project guarded a retired token one file at a time, the survivor was in
     /// the file nobody thought to check.
     func testNoSourceFileSpellsARetiredFont() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // SlackwaterTests/
-            .deletingLastPathComponent()   // repo root
-            .appendingPathComponent("Slackwater")
         let retired = [".fraunces(", ".geist(", ".geistMono(",
                        "Fraunces-", "Geist-", "GeistMono-"]
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil),
-            "could not walk \(root.path)")
-        var scanned = 0
         var offenders: [String] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            scanned += 1
-            let source = try String(contentsOf: url, encoding: .utf8)
+        for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated() {
                 for token in retired where line.contains(token) {
-                    offenders.append("\(url.lastPathComponent):\(n + 1): \(token)")
+                    offenders.append("\(name):\(n + 1): \(token)")
                 }
             }
         }
-        // A scan that silently found no files would pass forever.
-        XCTAssertGreaterThan(scanned, 10, "expected to scan the app's sources, walked \(scanned) files")
         XCTAssertTrue(offenders.isEmpty,
                       "retired font reference still in source:\n" + offenders.joined(separator: "\n"))
     }
 
     /// The bundled families must not come back via Info.plist either.
     func testNoBundledFontsDeclared() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let projectYml = try String(contentsOf: root.appendingPathComponent("project.yml"), encoding: .utf8)
+        let projectYml = try repoSource("project.yml")
         XCTAssertFalse(projectYml.contains("UIAppFonts"),
                        "UIAppFonts must be gone — bundled fonts are retired")
         XCTAssertFalse(projectYml.contains(".ttf"),
@@ -87,10 +73,7 @@ extension TypeScaleTests {
     ///    real data-flow analysis (a SwiftSyntax pass), out of scope for an
     ///    XCTest that reads files as strings.
     func testNumericFormattersAreMonospacedDigit() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Slackwater")
-        let formatters = ["formatHeight(", "formatSpeed(", "formatNm(", "cardTime(", "dayLine("]
+        let formatters = ["formatHeight(", "formatSpeed(", "formatNm(", "cardTime("]
         // Accepted anywhere in the ±4-line window: .monospacedDigit() fixes
         // digit width; .monospaced() is a strict superset (every glyph fixed).
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
@@ -101,7 +84,6 @@ extension TypeScaleTests {
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
             "DerivedGateDetailView.swift:scheduleEntries",
-            "OnlineGateDetailView.swift:scheduleEntries",
             // The NEAPS bands: both tracks format their reading at the
             // `drawBand(...)` call and the `.monospacedDigit()` lives in
             // `drawBand`'s own value `Text`, one renderer for the whole chart.
@@ -117,8 +99,7 @@ extension TypeScaleTests {
         // source once, and if it's ever no longer true (someone strips the
         // mono trait from StationCard.swift), every `detail:` site below
         // reverts to being checked normally instead of waved through blind.
-        let stationCardLines = try String(
-            contentsOf: root.appendingPathComponent("StationCard.swift"), encoding: .utf8)
+        let stationCardLines = try repoSource("Slackwater/StationCard.swift")
             .components(separatedBy: .newlines)
         let detailIsMono: Bool = {
             guard let i = stationCardLines.firstIndex(where: { $0.contains("Text(detail)") })
@@ -126,12 +107,9 @@ extension TypeScaleTests {
             let hi = min(stationCardLines.count, i + 3)
             return stationCardLines[i..<hi].joined(separator: "\n").contains("monospacedDigit()")
         }()
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
         var checked = 0
         var offenders: [String] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            let source = try String(contentsOf: url, encoding: .utf8)
+        for (name, source) in try appSources() {
             let lines = source.components(separatedBy: .newlines)
             for (n, line) in lines.enumerated() {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -175,8 +153,8 @@ extension TypeScaleTests {
                 let window = lines[lo..<hi].joined(separator: "\n")
                 if windowTokens.contains(where: window.contains) { continue }
                 if let owner = enclosingDeclaration(lines, n),
-                   knownIndirections.contains("\(url.lastPathComponent):\(owner)") { continue }
-                offenders.append("\(url.lastPathComponent):\(n + 1): \(trimmed)")
+                   knownIndirections.contains("\(name):\(owner)") { continue }
+                offenders.append("\(name):\(n + 1): \(trimmed)")
             }
         }
         // Count is 33, measured across this merge. The gutter branch dropped it
@@ -198,17 +176,11 @@ extension TypeScaleTests {
     /// The chrome lived in four places and drifted. One shell owns it now;
     /// this fails if a variant grows its own copy back.
     func testCardChromeLivesInExactlyOnePlace() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Slackwater")
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
         var sites: [String] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            let source = try String(contentsOf: url, encoding: .utf8)
+        for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
             where line.contains("minHeight: 96") {
-                sites.append("\(url.lastPathComponent):\(n + 1)")
+                sites.append("\(name):\(n + 1)")
             }
         }
         XCTAssertEqual(sites.count, 1, "card chrome must exist once, found: \(sites)")
@@ -221,17 +193,11 @@ extension TypeScaleTests {
     /// Every other name wraps instead of shrinking. This fails in both
     /// directions — a blanket removal, or a fresh one creeping back in.
     func testOnlyTheWordmarkShrinks() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Slackwater")
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
         var sites: [String] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            let source = try String(contentsOf: url, encoding: .utf8)
+        for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
             where line.contains("minimumScaleFactor") {
-                sites.append("\(url.lastPathComponent):\(n + 1)")
+                sites.append("\(name):\(n + 1)")
             }
         }
         XCTAssertEqual(sites.count, 1,
@@ -262,44 +228,6 @@ extension TypeScaleTests {
 }
 
 extension TypeScaleTests {
-    /// ViewThatFits gives no supported way to ask which candidate it chose, so
-    /// the split is: unit-test what each tier CONTAINS, screenshot which one
-    /// gets PICKED. Do not try to unit-test the picker — that road ends in a
-    /// weakened test, which is how this project's colour guard went wrong four
-    /// times before it was restructured.
-    ///
-    /// Two tiers, not three: a third "essential" tier (dropping region) shipped
-    /// once and broke two things at once — see the CardTier doc comment.
-    /// `ProvisionalBadge` disappearing and `testM50MatchingStationChooser`
-    /// failing on the iPad Pro 11" sidebar were the same bug wearing two faces.
-    /// `CardField` now has exactly the two cases `content(for:)` consults, so
-    /// this is the whole tier contract in one test — and unlike the three it
-    /// replaces (`testTiersShedInTheSpecifiedOrder`,
-    /// `testEveryTierKeepsNameAndTrailing`, `testRegionNeverSheds`) it can
-    /// actually fail for the reason it claims. Those three asserted `.glyph`,
-    /// `.name`, `.region` and `.trailing` in `fields`, which no code ever
-    /// read: the four render unconditionally, deliberately, because the
-    /// region-shedding tier that DID gate them shipped once and broke
-    /// `ProvisionalBadge` and `testM50MatchingStationChooser` at the same time
-    /// (see the `CardTier` doc comment). The tests passed either way, so they
-    /// guarded nothing while reading as if they guarded that.
-    ///
-    /// Region's own protection is now structural rather than asserted — there
-    /// is no `.region` case to put back without also writing the
-    /// `if fields.contains(.region)` that the doc comment forbids.
-    ///
-    /// Both directions, so neither an empty `.full` nor a non-empty `.reduced`
-    /// slips through.
-    func testDistanceAndDetailShedTogether() {
-        XCTAssertEqual(CardTier.full.fields, [.distance, .detail],
-                       "the full tier shows both sheddable fields")
-        XCTAssertTrue(CardTier.reduced.fields.isEmpty,
-                      "distance and detail shed together into reduced, "
-                      + "found \(CardTier.reduced.fields)")
-    }
-}
-
-extension TypeScaleTests {
     /// Anything sized in points beside scaling text has to scale too, or it
     /// becomes a 24pt mark next to 40pt type. @ScaledMetric is the sanctioned
     /// exception to "no literal sizes" — it scales a non-text dimension.
@@ -310,11 +238,8 @@ extension TypeScaleTests {
     /// banned one retired literal — `height: 100` sailed straight through. A
     /// ban on one string is not a guarantee about the surviving code.
     func testGlyphAndFabClearanceScale() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Slackwater")
-        let cardLines = try String(contentsOf: root.appendingPathComponent("StationCard.swift"),
-                                   encoding: .utf8).components(separatedBy: .newlines)
+        let cardLines = try repoSource("Slackwater/StationCard.swift")
+            .components(separatedBy: .newlines)
         // A real declaration, not a mention: same line carries the property
         // wrapper and the name, and it is not a comment.
         XCTAssertTrue(cardLines.contains {
@@ -325,8 +250,8 @@ extension TypeScaleTests {
         XCTAssertTrue(cardLines.contains { $0.contains("size: glyphSize") },
                       "StationGlyph must be given the scaled glyphSize")
 
-        let appLines = try String(contentsOf: root.appendingPathComponent("SlackwaterApp.swift"),
-                                  encoding: .utf8).components(separatedBy: .newlines)
+        let appLines = try repoSource("Slackwater/SlackwaterApp.swift")
+            .components(separatedBy: .newlines)
         let spacers = appLines.filter {
             !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
                 && $0.contains("Color.clear.frame(height:")

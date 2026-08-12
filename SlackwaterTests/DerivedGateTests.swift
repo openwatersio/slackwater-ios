@@ -82,15 +82,12 @@ final class DerivedGateTests: XCTestCase {
     // MARK: - The strip: schematic shape (±1, no speed), slack-only events
 
     func testTimelineIsSchematicAndSlackOnly() {
-        let reference = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 1.5, phase: 0)],
-                                offset: 3.0)
-        // A fitted-model-shaped record around the synthetic reference.
+        // A fitted-model-shaped record around a synthetic M2-only reference.
         let port = TideStationRecord(
             id: "chs-point-atkinson", name: "Point Atkinson", region: "West Vancouver",
             aliases: [], latitude: 49.337, longitude: -123.254,
             timezone: "America/Vancouver", chartDatum: "Chart", datumOffset: 3.0,
             constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
-        _ = reference
         let gate = DerivedGateRecord(gate: ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }!,
                                      port: port)
         let d = TimelineData.build(gate: gate, now: Date(), anchor: todayLocal(gate.gate.tz))

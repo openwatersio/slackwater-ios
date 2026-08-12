@@ -8,8 +8,43 @@ import TideEngine
 /// Below this magnitude the water reads "Slack", not a direction (web chs/current.ts SLACK_KN).
 let slackKn = 0.15
 
-struct CurrentStationRecord: Decodable, Identifiable, Hashable {
-    struct Con: Decodable, Hashable { let name: String; let amplitude: Double; let phase: Double }
+// MARK: - Shared station identity
+
+/// The stored identity every bundled station type carries — one search
+/// ranking and one bundle loader for all five.
+protocol StationIdentity {
+    var id: String { get }
+    var name: String { get }
+    var region: String { get }
+    var aliases: [String] { get }
+    var latitude: Double { get }
+    var longitude: Double { get }
+}
+
+extension StationIdentity {
+    /// Name, region, then alias — same ranking as the web (search.ts): a name
+    /// match is what the user typed on purpose; region/aliases are how you find
+    /// a station when you only know the water.
+    func searchRank(_ query: String) -> Int? {
+        if name.lowercased().contains(query) { return 0 }
+        if region.lowercased().contains(query) { return 1 }
+        if aliases.contains(where: { $0.contains(query) }) { return 2 }
+        return nil
+    }
+}
+
+/// A harmonic constituent as it appears in bundled and on-device JSON.
+struct Con: Codable, Hashable { let name: String; let amplitude: Double; let phase: Double }
+
+/// A bundled JSON station catalog, name-sorted; missing or undecodable → empty.
+func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
+    guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let items = try? JSONDecoder().decode([T].self, from: data) else { return [] }
+    return items.sorted { $0.name < $1.name }
+}
+
+struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
     let region: String
@@ -45,20 +80,7 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable {
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
-    static let all: [CurrentStationRecord] = {
-        guard let url = Bundle.main.url(forResource: "currents", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let stations = try? JSONDecoder().decode([CurrentStationRecord].self, from: data) else { return [] }
-        return stations.sorted { $0.name < $1.name }
-    }()
-
-    /// Same ranking as TideStationRecord.searchRank (mirrors web search.ts).
-    func searchRank(_ query: String) -> Int? {
-        if name.lowercased().contains(query) { return 0 }
-        if region.lowercased().contains(query) { return 1 }
-        if aliases.contains(where: { $0.contains(query) }) { return 2 }
-        return nil
-    }
+    static let all: [CurrentStationRecord] = bundled("currents")
 }
 
 /// The set the water flows toward at signed velocity `v` — rectilinear pass
@@ -67,19 +89,23 @@ extension CurrentStationRecord {
     func setDegrees(signed: Double) -> Double { signed >= 0 ? floodDirection : ebbDirection }
 }
 
-enum CurrentPhase { case flood, ebb, slack }
+enum CurrentPhase {
+    case flood, ebb, slack
+
+    /// "Flooding" / "Ebbing" / "Slack" — the phase pill's word.
+    var word: String {
+        switch self {
+        case .flood: "Flooding"
+        case .ebb: "Ebbing"
+        case .slack: "Slack"
+        }
+    }
+}
 
 func currentPhase(signed: Double) -> CurrentPhase {
     abs(signed) < slackKn ? .slack : signed > 0 ? .flood : .ebb
 }
 
-func phaseWord(_ phase: CurrentPhase) -> String {
-    switch phase {
-    case .flood: "Flooding"
-    case .ebb: "Ebbing"
-    case .slack: "Slack"
-    }
-}
 
 private let points16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
                         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
@@ -128,60 +154,27 @@ enum StationItem: Identifiable, Hashable {
     case chsGate(ChsGateInfo)  // derived current gate: slack from a reference port's fitted tide
     case chsCurrent(ChsCurrentGateInfo)  // validated CHS gate: real velocities, fitted on-device
 
+    /// The payload's shared identity — one switch, not one per field.
+    var info: StationIdentity {
+        switch self {
+        case .tide(let s): s
+        case .current(let s): s
+        case .chs(let s): s
+        case .chsGate(let s): s
+        case .chsCurrent(let s): s
+        }
+    }
+
     var id: String {
-        switch self {
-        case .tide(let s): s.id
-        case .current(let s): "current:" + s.id  // Friday Harbor has both a tide and a current station
-        case .chs(let s): s.id
-        case .chsGate(let s): s.id
-        case .chsCurrent(let s): s.id
-        }
+        // Friday Harbor has both a tide and a current station.
+        if case .current(let s) = self { return "current:" + s.id }
+        return info.id
     }
-    var name: String {
-        switch self {
-        case .tide(let s): s.name
-        case .current(let s): s.name
-        case .chs(let s): s.name
-        case .chsGate(let s): s.name
-        case .chsCurrent(let s): s.name
-        }
-    }
-    var region: String {
-        switch self {
-        case .tide(let s): s.region
-        case .current(let s): s.region
-        case .chs(let s): s.region
-        case .chsGate(let s): s.region
-        case .chsCurrent(let s): s.region
-        }
-    }
-    func searchRank(_ query: String) -> Int? {
-        switch self {
-        case .tide(let s): s.searchRank(query)
-        case .current(let s): s.searchRank(query)
-        case .chs(let s): s.searchRank(query)
-        case .chsGate(let s): s.searchRank(query)
-        case .chsCurrent(let s): s.searchRank(query)
-        }
-    }
-    var latitude: Double {
-        switch self {
-        case .tide(let s): s.latitude
-        case .current(let s): s.latitude
-        case .chs(let s): s.latitude
-        case .chsGate(let s): s.latitude
-        case .chsCurrent(let s): s.latitude
-        }
-    }
-    var longitude: Double {
-        switch self {
-        case .tide(let s): s.longitude
-        case .current(let s): s.longitude
-        case .chs(let s): s.longitude
-        case .chsGate(let s): s.longitude
-        case .chsCurrent(let s): s.longitude
-        }
-    }
+    var name: String { info.name }
+    var region: String { info.region }
+    func searchRank(_ query: String) -> Int? { info.searchRank(query) }
+    var latitude: Double { info.latitude }
+    var longitude: Double { info.longitude }
     /// "Current · NOAA" — what this station measures and whose data it is.
     /// The matching-station chooser's disambiguator: when two entries share a
     /// name, series and provider are the difference that isn't distance.

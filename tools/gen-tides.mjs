@@ -70,16 +70,15 @@
  *
  * Run: cd tools && npm install && node gen-tides.mjs
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
-import { createPlacesResolver } from "@sailingnaturali/station-corrections";
+import { here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle } from "./bundle.mjs";
+import { km } from "./geo.mjs";
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
 /** US (states + territories) and Canada — the app's stated coverage. */
-export const COUNTRIES = new Set([
+const COUNTRIES = new Set([
   "United States", "Puerto Rico", "Virgin Islands", "Guam",
   "Northern Mariana Islands", "American Samoa", "Canada",
 ]);
@@ -94,7 +93,7 @@ export const COUNTRIES = new Set([
  * just have to be labelled honestly. Here the COUNTRIES gate drops them as a
  * consequence of the fix rather than as a special case.
  */
-export const COUNTRY_FIX = new Map([
+const COUNTRY_FIX = new Map([
   ["ticon/barbuda-9761115-usa-noaa", "Antigua and Barbuda"],
   ["ticon/bermuda-2695540-usa-noaa", "Bermuda"],
   ["ticon/bermuda_biological_station-2695535-usa-noaa", "Bermuda"],
@@ -191,29 +190,10 @@ const networkOf = (s) =>
  */
 const CHS_COVERAGE_KM = 10;
 
-const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, "..", "Slackwater", "Resources", "stations.json");
 const chs = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
-const resolve = createPlacesResolver(JSON.parse(readFileSync(
-  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/places.json"),
-  "utf8")));
-
-/** "6.6 nm SSE of" -> "6.6 nm SSE". */
-export const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
-
-/**
- * The word TICON trails a name with, where it is not the code itself:
- * "Brockville Ontario · ON". Only the regions that actually occur in the
- * bundle, because an entry here is only ever a way to DELETE text — a code
- * missing from this map costs a redundant word, not a wrong station.
- * Alternates exist because upstream's spelling is upstream's ("Massachussets").
- */
-const REGION_WORD = {
-  AK: "Alaska", HI: "Hawaii", MA: "Massachusetts|Massachussets", ME: "Maine",
-  MI: "Michigan", NU: "Nunavut", NY: "New York", ON: "Ontario",
-  QC: "Quebec|Québec", BC: "British Columbia",
-};
+const resolve = placesResolver();
 
 /**
  * TICON repeats the state in the name, which the region line is already
@@ -225,7 +205,7 @@ const REGION_WORD = {
  * form only strips when it EXPANDS that same code, which is what keeps
  * "Kewaunee Lake Michigan · WI" intact.
  */
-export const untrail = (name, region) => {
+const untrail = (name, region) => {
   if (!/^[A-Z]{2}$/.test(region)) return name;
   const word = REGION_WORD[region];
   const trimmed = name
@@ -233,15 +213,6 @@ export const untrail = (name, region) => {
     .trim();
   return trimmed || name;
 };
-
-/** Same signature as gen-noaa-currents.mjs, deliberately. */
-function km(a, b) {
-  const R = 6371, toR = (x) => (x * Math.PI) / 180;
-  const dLa = toR(b.latitude - a.latitude), dLo = toR(b.longitude - a.longitude);
-  const h = Math.sin(dLa / 2) ** 2 +
-    Math.cos(toR(a.latitude)) * Math.cos(toR(b.latitude)) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
 const regionOf = (s) => {
@@ -363,9 +334,7 @@ const stations = shippable
         .map((c) => ({ name: c.name, amplitude: c.amplitude, phase: c.phase })),
     };
   })
-  // Codepoint compare with an id tiebreak, not localeCompare: the sort must be
-  // the same on every machine that regenerates this file.
-  .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : 1));
+  .sort(byNameThenId);
 
 if (stations.length < 1300) {
   throw new Error(`only ${stations.length} stations survived the filters — refusing to ship`);
@@ -397,12 +366,11 @@ if (contested.length) {
     contested.slice(0, 5).map((s) => s.name).join(", "));
 }
 
-writeFileSync(out, JSON.stringify(stations));
+const size = writeBundle(out, stations);
 const towns = stations.filter((s) => s.region.startsWith("~")).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
 console.log(
-  `${stations.length} reference tide stations, ` +
-  `${(JSON.stringify(stations).length / 1024 / 1024).toFixed(2)} MB ` +
+  `${stations.length} reference tide stations, ${size} ` +
   `(${stations.length - towns - codes} curated contexts, ${towns} nearest town, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +

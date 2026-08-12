@@ -10,21 +10,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
+import { here, REGION_WORD } from "./bundle.mjs";
+import { km } from "./geo.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "stations.json"), "utf8"));
-
-function km(a, b) {
-  const R = 6371, toR = (x) => (x * Math.PI) / 180;
-  const dLa = toR(b.latitude - a.latitude), dLo = toR(b.longitude - a.longitude);
-  const h = Math.sin(dLa / 2) ** 2 +
-    Math.cos(toR(a.latitude)) * Math.cos(toR(b.latitude)) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 // The one failure that is a legal problem rather than a quality one, checked
 // independently of the generator that is supposed to prevent it.
@@ -59,14 +51,9 @@ test("no TICON station sits within the dedupe radius of another station", () => 
 // untrail(): TICON repeats the state the region line already shows, as the
 // code ("... Savannah Ga · GA") and as the word ("Brockville Ontario · ON").
 test("no name ends in its own region", () => {
-  const WORD = {
-    AK: "Alaska", HI: "Hawaii", MA: "Massachusetts|Massachussets", ME: "Maine",
-    MI: "Michigan", NU: "Nunavut", NY: "New York", ON: "Ontario",
-    QC: "Quebec|Québec", BC: "British Columbia",
-  };
   const doubled = stations
     .filter((s) => new RegExp(
-      `\\s(${s.region}${WORD[s.region] ? `|${WORD[s.region]}` : ""})$`, "i").test(s.name))
+      `\\s(${s.region}${REGION_WORD[s.region] ? `|${REGION_WORD[s.region]}` : ""})$`, "i").test(s.name))
     .map((s) => `${s.name} · ${s.region}`);
   assert.deepEqual(doubled, []);
 });

@@ -10,7 +10,6 @@ import TideEngine
 
 struct DerivedGateDetailView: View {
     let record: DerivedGateRecord
-    @AppStorage(unitsKey) private var units = "imperial"
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
@@ -24,119 +23,73 @@ struct DerivedGateDetailView: View {
 
     private var gate: ChsGateInfo { record.gate }
     private var port: TideStationRecord { record.port }
-    private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { gate.tz }
     private var phase: DerivedPhase { record.engineGate.phase(at: scrubTime, slacks: slacks) }
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                MapHeader(name: gate.name, region: gate.region,
-                          latitude: gate.latitude, longitude: gate.longitude,
-                          favoriteId: gate.id)
-                if let timeline {
-                    scrubCard(timeline)
-                    scheduleCard(timeline)
-                        .padding(.top, 14)
+        ScrubDetailScaffold(name: gate.name, region: gate.region,
+                            latitude: gate.latitude, longitude: gate.longitude,
+                            favoriteId: gate.id, tz: tz,
+                            timeline: timeline, entries: scheduleEntries,
+                            live: $live, scrubTime: $scrubTime,
+                            onReturn: returnToNow,
+                            above: { EmptyView() },
+                            card: { tl in
+                                readout
+                                TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                                                   now: live, scrubTime: $scrubTime)
+                                    .padding(.horizontal, -16)  // full-bleed strip
+                                    .padding(.top, 12)
+                                // The web's chart note, verbatim in spirit: the curve is a shape.
+                                Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
+                                    .font(.caption2)
+                                    .foregroundStyle(SN.foam.opacity(0.5))
+                                    .padding(.top, 10)
+                            },
+                            links: { TideAtPortLink(port: port) },
+                            bottom: { footer })
+            .onAppear {
+                if timeline == nil {
+                    anchor = todayLocal(tz)
+                    rebuild()
                 }
-                footer
-                    .padding(.top, 14)
+                RecentsStore.shared.record(gate.id)
             }
-            .padding(.bottom, 42)
-        }
-        .ignoresSafeArea(edges: .top)
-        .background(SN.page.ignoresSafeArea())
-        .environment(\.timeZone, tz)
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            if timeline == nil {
-                anchor = todayLocal(tz)
-                rebuild()
-            }
-            RecentsStore.shared.record(gate.id)
-        }
     }
 
-    // MARK: - Scrub card: strip, phase readout, tide link
+    // MARK: - Readout above the strip: the phase word, never a number
 
+    /// Kept as the tests' named binding (ColourAndFormTests); the palette
+    /// itself lives in `StationGlyph.colour(for:)`.
     static func phaseColor(_ phase: DerivedPhase) -> Color {
-        switch phase {
-        case .flood: SN.rising
-        case .ebb: SN.falling
-        case .slack: SN.go
-        }
+        StationGlyph.colour(for: ChsGateCardView.glyphTone(phase))
     }
 
-    private func scrubCard(_ tl: TimelineData) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Phase readout above the strip: the word, never a number — no
-            // speed exists for a derived gate (web hero phase-pill).
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(phaseWord(phase))
-                        .font(.largeTitle)
-                        .foregroundStyle(Self.phaseColor(phase))
-                    Text("speeds not predicted for this pass")
-                        .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))
-                }
-                Spacer()
-                if let slack = nextSlack {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("in \(countdown(from: scrubTime, to: slack.time))")
-                            // SN.go, not SN.leaf: this line says when slack is.
-                            .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
-                        Text("at \(slack.highWater ? "high" : "low") water")
-                            .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
-                    }
+    private var readout: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(phase.word)
+                    .font(.largeTitle)
+                    .foregroundStyle(Self.phaseColor(phase))
+                Text("speeds not predicted for this pass")
+                    .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))
+            }
+            Spacer()
+            if let slack = nextSlack {
+                VStack(alignment: .trailing, spacing: 1) {
+                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
+                    Text("in \(countdown(from: scrubTime, to: slack.time))")
+                        // SN.go, not SN.leaf: this line says when slack is.
+                        .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
+                    Text("at \(slack.highWater ? "high" : "low") water")
+                        .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                 }
             }
-
-            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial,
-                               now: live, scrubTime: $scrubTime)
-                .padding(.horizontal, -16)  // full-bleed strip
-                .padding(.top, 12)
-
-            // The web's chart note, verbatim in spirit: the curve is a shape.
-            Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
-                .font(.caption2)
-                .foregroundStyle(SN.foam.opacity(0.5))
-                .padding(.top, 10)
-
-            MonoLabel(text: "‹ swipe to scrub ›",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
-                .padding(.top, 14)
-
-            TideAtPortLink(port: port)
-                .padding(.top, 12)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .background(SN.cardFill)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(SN.leaf.opacity(0.22)).frame(height: 0.5)
         }
     }
 
     // MARK: - Rolling multi-day schedule (slack rows, sun in the day header)
-
-    private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, anchor: tl.anchor,
-                         today: tl.today, days: tl.days,
-                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
-            .background(SN.cardFill)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-            .padding(.horizontal, 16)
-    }
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
         // Slack rows carry no value — "—", like the web's derived rows.
@@ -149,16 +102,11 @@ struct DerivedGateDetailView: View {
     // The provenance footer (web App.tsx derived footer, in the app's CHS
     // register): derived on this device, no CHS current prediction exists.
     private var footer: some View {
-        VStack(spacing: 6) {
-            MonoLabel(text: "Predictions — not for navigation",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
+        DetailFooter {
             Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.top, 8)
     }
 
     // MARK: - Data

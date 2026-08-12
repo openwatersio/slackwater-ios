@@ -1,12 +1,13 @@
 #!/bin/zsh
 # Run the test suite on both reference simulators.
 #
-#   ./scripts/test.sh              fast plan  — iterate with this
-#   ./scripts/test.sh --full       full plan  — live IWLS + on-device fits; before an upload
+#   ./scripts/test.sh              fast run   — iterate with this
+#   ./scripts/test.sh --full       full run   — live IWLS + on-device fits; before an upload
 #   SHOT_DIR=/tmp/shots ./scripts/test.sh     where the UI tests save their screenshots
 #   SLACKWATER_SIMS='A,B' ./scripts/test.sh   run on other devices (CI sets this)
 #
-# The two plans live in TestPlans/ and are checked in; see docs/testflight.md.
+# One plan (TestPlans/Slackwater.xctestplan). The live-IWLS UI tests skip
+# themselves unless SLACKWATER_FULL reaches the runner; see docs/testflight.md.
 set -euo pipefail
 
 # One test run at a time on this machine. Two concurrent `xcodebuild test` runs
@@ -38,8 +39,13 @@ fi
 
 cd "$(dirname "$0")/.."
 
-PLAN=Slackwater
-[[ "${1:-}" == "--full" ]] && PLAN=Slackwater-Full
+MODE=fast
+if [[ "${1:-}" == "--full" ]]; then
+  MODE=full
+  # TEST_RUNNER_ prefix (same mechanism as M1_SHOT_DIR below): reaches
+  # ScreenshotTests.skipUnlessFull, which otherwise skips the live-IWLS tests.
+  export TEST_RUNNER_SLACKWATER_FULL=1
+fi
 
 # TEST_RUNNER_ prefix: xcodebuild strips it and sets the rest on the UI-test
 # RUNNER process, which is where ScreenshotTests reads M1_SHOT_DIR. A bare
@@ -58,16 +64,16 @@ sims=("iPhone 17" "iPad Pro 11-inch (M5)")
 [[ -n "${SLACKWATER_SIMS:-}" ]] && sims=("${(@s/,/)SLACKWATER_SIMS}")
 
 for sim in "${sims[@]}"; do
-  echo "=== $PLAN · $sim ==="
+  echo "=== $MODE · $sim ==="
   start=$SECONDS
-  bundle="build/results-$PLAN-${sim// /_}.xcresult"
+  bundle="build/results-$MODE-${sim// /_}.xcresult"
   rm -rf "$bundle"   # xcodebuild refuses to overwrite one
   # -clonedSourcePackagesDirPath: repo-local SPM cache, never the Xcode GUI's
   # (docs/testflight.md — two resolvers on the MapLibre artifact corrupt it).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
-    -testPlan "$PLAN" -destination "platform=iOS Simulator,name=$sim" \
+    -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
     | tail -40
-  echo "=== $PLAN · $sim: $((SECONDS - start))s ==="
+  echo "=== $MODE · $sim: $((SECONDS - start))s ==="
 done
