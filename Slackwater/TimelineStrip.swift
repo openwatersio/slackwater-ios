@@ -21,9 +21,21 @@ enum Timeline {
     /// is ~4h, which is 72pt here against a ~45pt label; at 12 it was 48pt and
     /// overprinted. A phone still shows ~22h at a glance.
     static let pph: CGFloat = 18          // points per hour
-    static let backHours = 48.0           // TMIN
-    static let forwardHours = 132.0       // TMAX
-    static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
+    /// The look-back, and it applies ONLY to the current week — see `window`.
+    static let backHours = 48.0
+    /// A week in the list. The product decision this whole spec is about; the
+    /// 54 it replaced was the HTML prototype's `tableEl` TOP, never a decision.
+    static let scheduleDays = 7.0
+    static let scheduleHours = scheduleDays * 24          // 168
+    /// Half a viewport, so the LAST listed event can still sit under the
+    /// centerline instead of jamming against UIScrollView's contentOffset
+    /// clamp. Tapping a schedule row scrubs the strip, and a row exactly at
+    /// the strip's edge would park the centerline short of the event it names
+    /// — the readout disagreeing with the row you just tapped. The old
+    /// 132-vs-54 mismatch kept this property by accident; this keeps it on
+    /// purpose, at the smallest width that still clears half a phone.
+    static let centerPad = 12.0
+    static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
 
     /// The "weak current" convention: under half a knot a small boat transits.
@@ -38,6 +50,20 @@ enum Timeline {
     /// A whole point is the smallest honest answer: below it, the centerline
     /// has not visibly moved.
     static let scrubbedSeconds = 3600.0 / Double(pph)
+
+    /// THE window definition. Four sites used to re-derive `today ± hours`
+    /// independently — day chrome, the online-gate coverage check, the
+    /// UI-test seed, and the online fetch — and with a conditional back-pad
+    /// they would drift. The failure mode is a coverage check that passes on
+    /// a window with a hole in it, which renders as a strip with a dead zone.
+    ///
+    /// The back-pad is the whole reason this takes two dates: it answers a
+    /// question about NOW, so it exists only when the anchor IS now.
+    static func window(anchor: Date, today: Date) -> (start: Date, end: Date) {
+        let back = anchor == today ? backHours : 0
+        return (anchor.addingTimeInterval(-back * 3600),
+                anchor.addingTimeInterval(forwardHours * 3600))
+    }
 }
 
 /// Is the strip parked somewhere other than now? The one definition, shared by

@@ -12,15 +12,62 @@ final class TimelineTests: XCTestCase {
     func testWindowAndMapping() {
         let now = Date()
         let d = TimelineData.build(tide: friday, current: nil, now: now)
-        // -48h … +132h around today's local midnight (prototype TMIN/TMAX).
-        XCTAssertEqual(d.end.timeIntervalSince(d.start), 180 * 3600, accuracy: 3601)
-        XCTAssertEqual(d.totalWidth, 180 * Timeline.pph, accuracy: 13)
+        // -48h … +180h around today's local midnight (spec §2).
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), 228 * 3600, accuracy: 3601)
+        XCTAssertEqual(d.totalWidth, 228 * Timeline.pph, accuracy: 13)
         XCTAssert(d.start <= now && now <= d.end)
         // x ↔ time round trip under the centerline.
         XCTAssertEqual(d.time(atX: d.x(now)).timeIntervalSince(now), 0, accuracy: 1)
         // Snap stops exist across the whole window (turns + sun events).
         XCTAssert(d.snapTimes.count > 20, "expected a full week of stops, got \(d.snapTimes.count)")
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
+    }
+
+    // MARK: - The window (spec §1, §2)
+
+    private func vancouverMidnight(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Vancouver")!
+        return cal.date(from: DateComponents(year: y, month: m, day: d))!
+    }
+
+    /// The 48h look-back exists to answer "what did the water just do", which is a
+    /// question about NOW. On a Tuesday in September it is two days of the previous
+    /// week scrolled in behind you for no reason.
+    func testWindowBackPadOnlyOnTheCurrentWeek() {
+        let today = vancouverMidnight(2026, 8, 11)
+
+        let current = Timeline.window(anchor: today, today: today)
+        XCTAssertEqual(current.start, today.addingTimeInterval(-48 * 3600))
+        XCTAssertEqual(current.end, today.addingTimeInterval(180 * 3600))
+
+        let future = vancouverMidnight(2026, 9, 14)
+        let ahead = Timeline.window(anchor: future, today: today)
+        XCTAssertEqual(ahead.start, future, "a future week starts clean at its own midnight")
+        XCTAssertEqual(ahead.end, future.addingTimeInterval(180 * 3600))
+
+        let past = vancouverMidnight(2026, 7, 6)
+        let behind = Timeline.window(anchor: past, today: today)
+        XCTAssertEqual(behind.start, past, "a past week gets no pad either")
+    }
+
+    /// The strip must stay WIDER than the list, or tapping the last schedule row
+    /// lands the centerline short of the event it names (UIScrollView clamps
+    /// contentOffset). The pad is what guarantees it.
+    func testStripOutrunsTheScheduleByTheCenterPad() {
+        XCTAssertEqual(Timeline.scheduleHours, 168, "a week in the list")
+        XCTAssertEqual(Timeline.forwardHours, Timeline.scheduleHours + Timeline.centerPad)
+        XCTAssertGreaterThan(Timeline.centerPad * Timeline.pph, 200,
+                             "the pad must exceed half a phone's width in points")
+    }
+
+    func testTodayLocalIsMidnightInTheGivenZone() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let t = todayLocal(tz)
+        XCTAssertEqual(t, cal.startOfDay(for: appNow()))
+        XCTAssertEqual(cal.component(.hour, from: t), 0)
     }
 
     /// The centerline readout at "now" must equal the old model's now-readout:

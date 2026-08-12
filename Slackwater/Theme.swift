@@ -111,6 +111,14 @@ private let appNowOffset: TimeInterval = {
 
 func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
 
+/// Today's local midnight in `tz`, on the app clock. The anchor every detail
+/// view starts on, and the `today` half of every `Timeline.window` call.
+func todayLocal(_ tz: TimeZone) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return cal.startOfDay(for: appNow())
+}
+
 // MARK: - Units (mirrors slackwater-web src/units.ts)
 
 let unitsKey = "slackwater.units"  // "imperial" | "metric", same values as the web
