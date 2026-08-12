@@ -90,6 +90,16 @@ func testTodayLocalIsMidnightInTheGivenZone() {
 }
 ```
 
+In the same edit, update the two assertions in the **existing** `testWindowAndMapping` that pin the old width — widening `forwardHours` changes the total from 180h to 228h, and this task must commit green:
+
+```swift
+        // -48h … +180h around today's local midnight (spec §2).
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), 228 * 3600, accuracy: 3601)
+        XCTAssertEqual(d.totalWidth, 228 * Timeline.pph, accuracy: 13)
+```
+
+Leave the rest of that test body alone. `testScheduleWindowSpansMultipleDays` needs no change — it asserts `days.count >= 2`, which a 7-day window still satisfies.
+
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
@@ -158,7 +168,7 @@ Then add, after `scrubbedSeconds`:
 ./scripts/test.sh
 ```
 
-Expected: the four new tests PASS. `testWindowAndMapping` and `testScheduleWindowSpansMultipleDays` will still FAIL — they assert the old 180h total against a window that is now 228h. Task 2 fixes them; leave them failing here.
+Expected: **the whole suite green.** The four new tests pass, and `testWindowAndMapping` passes on its updated 228h assertions. This task commits green — no red intermediate state is handed to Task 2.
 
 - [ ] **Step 6: Commit**
 
@@ -222,19 +232,7 @@ func testDayChromeCoversTheLastNightsMoon() {
 }
 ```
 
-Update the two existing tests that pin the old width:
-
-```swift
-    func testWindowAndMapping() {
-        let now = Date()
-        let d = TimelineData.build(tide: friday, current: nil, now: now,
-                                   anchor: todayLocal(friday.tz))
-        // -48h … +180h around today's local midnight (spec §2).
-        XCTAssertEqual(d.end.timeIntervalSince(d.start), 228 * 3600, accuracy: 3601)
-        XCTAssertEqual(d.totalWidth, 228 * Timeline.pph, accuracy: 13)
-```
-
-(leave the rest of that test body unchanged), and in `testScheduleWindowSpansMultipleDays` / `testNowReadoutEquivalence` / `testNightContinuityAcrossMidnight`, add `anchor: todayLocal(friday.tz)` to each `build` call.
+Task 1 already fixed the width assertions, so the only change to existing tests here is threading the new argument: add `anchor: todayLocal(friday.tz)` to every `TimelineData.build` call in `testWindowAndMapping`, `testScheduleWindowSpansMultipleDays`, `testNowReadoutEquivalence` and `testNightContinuityAcrossMidnight`.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
