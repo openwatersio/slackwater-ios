@@ -11,8 +11,6 @@ against prototype. Re-export after meaningful design changes.
 | `Tides and Currents.dc.html` | The canvas page — lays out the three frames side by side (badges **1a**, **1b**, **FTUE**) |
 | `TidesApp.dc.html` | The location detail view, variants `a` (Immersive — full-bleed sky, floating glass) and `b` (Modular — dark canvas, data-forward chart hero) |
 | `NearMe.dc.html` | First-run flow: location gate → locating → Near Me list / map toggle, search, location-denied fallback |
-| `support.js` | Generated `dc-runtime` (renders the `.dc.html` component format) |
-| `frames/ios-frame.jsx` | iOS 26 device-frame scaffold (status bar, glass pills, keyboard) |
 | `_ds/…/styles.css` + `_ds_bundle.css` | Sailing Naturali design-system layer — brand fonts (Fraunces/Geist), `--color-sn-*` palette. Bundle is generated from the `web` repo's design system |
 
 These are Claude Design component documents (`<x-dc>` template + a `DCLogic` class), not

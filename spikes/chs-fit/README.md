@@ -1,5 +1,7 @@
 # CHS fit spike — M0 exit check: PASS (2026-07-30)
 
+> The harness files this README describes were deleted — superseded by `tools/FitValidation`. The findings below stand.
+
 Proves the [milestones spec](../../docs/research/design-readiness-2026-07-22.md)'s M0 wedge risk
 dead: **`chs-constituents` runs as-is inside JavaScriptCore** (no library changes, no polyfills
 hit), fits Victoria Harbour from live IWLS predictions, and the JSCore output is **bit-identical
