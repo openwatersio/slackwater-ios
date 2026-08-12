@@ -1528,7 +1528,12 @@ struct ChsCurrentGateCardView: View {
     /// carries the honest "fetched when connected" line instead of a queue
     /// status this gate never has.
     @ViewBuilder private var onlineCard: some View {
-        if let onlineWindow, onlineWindow.covers(anchor: todayLocal(gate.tz), today: todayLocal(gate.tz)) {
+        // ONE snapshot of today, not two calls: `Timeline.window` back-pads only
+        // when `anchor == today` by exact equality, so a local midnight landing
+        // between two evaluations would silently drop the 48h look-back and let
+        // `covers` pass on a window with a hole in it.
+        let today = todayLocal(gate.tz)
+        if let onlineWindow, onlineWindow.covers(anchor: today, today: today) {
             OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
         } else {
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,

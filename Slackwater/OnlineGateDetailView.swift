@@ -107,10 +107,15 @@ struct OnlineGateDetailView: View {
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            if anchor == .distantPast { anchor = todayLocal(tz) }
+            // ONE snapshot of today: the anchor set here is compared against it
+            // two lines down, and `Timeline.window` back-pads only on exact
+            // equality — a midnight between two `todayLocal` calls would drop
+            // the 48h look-back from the coverage question silently.
+            let today = todayLocal(tz)
+            if anchor == .distantPast { anchor = today }
             if window == nil { window = ChsModelStore.loadOnline(gate.id) }
             RecentsStore.shared.record(gate.id)
-            if window?.covers(anchor: anchor, today: todayLocal(tz)) != true, net.online { fetchNow() }
+            if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow() }
         }
     }
 
