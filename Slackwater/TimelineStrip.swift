@@ -218,8 +218,8 @@ struct TimelineData {
     /// The REAL local midnight. Language and liveness only — the
     /// Today/Tomorrow labels, the now-marker, return-to-now. Never geometry.
     let today: Date
-    let start: Date          // today - 48h
-    let end: Date            // today + 132h
+    let start: Date          // anchor - 48h, and only when the anchor is today
+    let end: Date            // anchor + 180h
     let days: [TimelineDay]  // offsets -2…8 (8 exists for the last night's moon)
     let tidePoints: [TidePoint]        // empty when current-only
     let tideExtremes: [TideExtreme]
@@ -592,19 +592,21 @@ struct TimelineCanvas: View {
     var ebbDeg: Double? = nil
 
     /// A `Canvas` renders into ONE backing texture and Metal caps that at
-    /// 8192px on a side. The 180-hour strip is `180 * pph` points wide, tripled
-    /// on a 3× phone: at 12pt/hour that was 6480px and fit, at 18 it is 9720px
-    /// and the entire chart renders EMPTY — no curve, no day chrome, no labels,
-    /// and no error. (Caught on the NEAPS pass: the left axis kept drawing,
+    /// 8192px on a side. The 228-hour strip is `228 * pph` = 4104pt wide,
+    /// tripled on a 3× phone: 12312px, half again past the cap, and the entire
+    /// chart would render EMPTY — no curve, no day chrome, no labels, and no
+    /// error. (Caught on the NEAPS pass, at 180h × 18 = 9720px, when 180h × 12
+    /// = 6480px had fit; the week widened it further. The left axis kept drawing,
     /// because it's a separate SwiftUI overlay, which is exactly what made the
     /// blank canvas look like a layout bug rather than a texture limit.)
     ///
     /// Slicing the strip into tiles gives each its own layer, so the cap now
     /// applies per tile instead of to the whole timeline and `pph` is free to
-    /// move again. Every tile runs the same drawing code translated into strip
-    /// coordinates and clipped to its own slice — the clip is what makes this
-    /// safe, since the translucent night bands and area fills would otherwise
-    /// stack on each other wherever two tiles overdrew.
+    /// move again — five tiles at today's width. Every tile runs the same
+    /// drawing code translated into strip coordinates and clipped to its own
+    /// slice — the clip is what makes this safe, since the translucent night
+    /// bands and area fills would otherwise stack on each other wherever two
+    /// tiles overdrew.
     static let tileWidth: CGFloat = 900
 
     var body: some View {

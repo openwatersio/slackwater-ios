@@ -294,18 +294,25 @@ struct OnlineGateDetailView: View {
     // MARK: - Unfetched/expired/fetch-failed: the honesty card
 
     private var honestyCard: some View {
-        // `fetching` already makes a tap during the ~30s auto-fetch a no-op
+        // `fetching` already makes a tap during the auto-fetch a no-op
         // (fetchNow's own `guard !fetching`) — but "Try again" during that
-        // window reads as broken, not busy. Smallest fix: say so.
+        // window reads as broken, not busy. Smallest fix: say so. (No
+        // wall-clock figure here on purpose: the 30-day fetch is five or six
+        // weekly chunks × two series, up from the old 7.5-day window's two or
+        // three, and nobody has timed the new one.)
         ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
                      expectation: expectation, action: fetching ? "Fetching…" : "Try again",
                      identifier: "online-honesty-card") { fetchNow() }
     }
 
     private var expectation: String {
+        // "About a month", not "about a week": one fetch is
+        // `Timeline.onlineFetchDays` forward of the anchor. The footer two
+        // views up prints the real covers-to date, and the two lines sat on
+        // one screen contradicting each other.
         var text = net.online
-            ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a week."
-            : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a week."
+            ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a month ahead."
+            : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a month ahead."
         if let window {
             text += " Last fetch covered to \(monthDay(window.end, tz))."
         }

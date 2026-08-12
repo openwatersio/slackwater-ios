@@ -247,12 +247,14 @@ final class TimelineTests: XCTestCase {
         }
     }
 
-    /// The schedule window (today 00:00 → +54h, prototype tableEl TOP) spans
-    /// at least two local days of tide turns — the rolling multi-day list.
+    /// The schedule window (the anchor's midnight → +7d) spans at least two
+    /// local days of tide turns — the rolling multi-day list. Asked of
+    /// `scheduleRange`, the one definition the list itself filters on; the
+    /// hand-built `today ± hours` version here only agreed by accident of
+    /// `anchor == today`.
     func testScheduleWindowSpansMultipleDays() {
         let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
-        let t1 = d.today.addingTimeInterval(Timeline.scheduleHours * 3600)
-        let turns = d.tideExtremes.filter { $0.time >= d.today && $0.time <= t1 }
+        let turns = d.tideExtremes.filter { d.scheduleRange.contains($0.time) }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = d.tz
         let days = Set(turns.map { cal.startOfDay(for: $0.time) })
@@ -609,8 +611,9 @@ final class TimelineTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        // The shared definition, not a second derivation of it — this test only
+        // passed by hand because `anchor == today` here.
+        let (start, end) = Timeline.window(anchor: today, today: today)
 
         // 15-min samples spanning the whole strip window, oscillating with a
         // ~12h period so slack/max events recur across it (real semidiurnal shape).
