@@ -25,8 +25,16 @@ used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → impo
 
 ## Cadence
 
+Per-release procedure lives in the `releasing-to-testflight` skill
+(`.claude/skills/`) — bump, test, PR, upload, verify. What follows is the state
+that procedure sits on.
+
 - Bump `CURRENT_PROJECT_VERSION` in `project.yml` per upload (App Store Connect rejects reused
-  build numbers per version); `MARKETING_VERSION` per release.
+  build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
+  because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and
+  the export sets `manageAppVersionAndBuildNumber` `<false/>`** — through build 21 neither was
+  wired, Xcode renumbered every upload itself, and every build shipped as `1.0`. Check the
+  result with `node scripts/asc.mjs builds`.
 - App record ("Slackwater — Tides & Currents") + tester management stay in the App Store
   Connect UI — records can't be created via the public API.
 - Export-only variant (signed .ipa, no upload): `build/exportOptions.plist` with
