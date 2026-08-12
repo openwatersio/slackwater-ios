@@ -9,6 +9,21 @@ import TideEngine
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
+    /// Calendar days, never `n * 86_400`. Only durations belong in
+    /// `addingTimeInterval`: across a DST transition a 34×86,400-second offset
+    /// from a local midnight lands at 01:00 or 23:00, and an anchor that isn't
+    /// a midnight fails every assertion that compares one. Measured over 2026
+    /// in Pacific, 68 of 365 start dates land off midnight — the suite was
+    /// green today and red for roughly two months of the year.
+    ///
+    /// The calendar carries the STATION's zone, not the device's: a
+    /// calendar-day add is only correct in the zone the dates belong to.
+    private func addingDays(_ n: Int, to date: Date, in tz: TimeZone) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal.date(byAdding: .day, value: n, to: date)!
+    }
+
     func testWindowAndMapping() {
         let now = Date()
         let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
@@ -43,7 +58,7 @@ final class TimelineTests: XCTestCase {
         let now = Date()
         let tz = friday.tz
         let today = todayLocal(tz)
-        let future = today.addingTimeInterval(34 * 86_400)
+        let future = addingDays(34, to: today, in: tz)
 
         let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: future)
         XCTAssertEqual(d.anchor, future)
@@ -54,13 +69,14 @@ final class TimelineTests: XCTestCase {
     }
 
     func testContainsBoundsTheStripWindow() {
-        let today = todayLocal(friday.tz)
+        let tz = friday.tz
+        let today = todayLocal(tz)
         let now = Date()
         let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: today)
         XCTAssert(d.contains(now), "a today-anchored strip contains now")
 
         let ahead = TimelineData.build(tide: friday, current: nil, now: now,
-                                       anchor: today.addingTimeInterval(34 * 86_400))
+                                       anchor: addingDays(34, to: today, in: tz))
         XCTAssertFalse(ahead.contains(now),
                        "a September strip must not claim to hold today's now-marker")
         XCTAssert(ahead.contains(ahead.anchor.addingTimeInterval(3 * 86_400)))
@@ -126,7 +142,7 @@ final class TimelineTests: XCTestCase {
     func testFutureAnchorFirstDayIsNotLabelledToday() {
         let tz = friday.tz
         let today = todayLocal(tz)
-        let future = today.addingTimeInterval(34 * 86_400)
+        let future = addingDays(34, to: today, in: tz)
         let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
         let firstDay = d.days.first { $0.offset == 0 }!
         XCTAssertEqual(firstDay.start, future, "offset 0 is the ANCHOR's day")
@@ -147,7 +163,7 @@ final class TimelineTests: XCTestCase {
     /// Seven day-groups, and the first is the anchor's own day.
     func testFutureAnchorSchedulesSevenDays() {
         let tz = friday.tz
-        let future = todayLocal(tz).addingTimeInterval(34 * 86_400)
+        let future = addingDays(34, to: todayLocal(tz), in: tz)
         let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
         let turns = d.tideExtremes.filter { d.scheduleRange.contains($0.time) }
         var cal = Calendar(identifier: .gregorian)
@@ -239,7 +255,7 @@ final class TimelineTests: XCTestCase {
     /// a literal offset range, and it must survive a change to `forwardHours`.
     func testVisibleDaysFollowTheWindowNotAFixedOffset() {
         let tz = friday.tz
-        for anchor in [todayLocal(tz), todayLocal(tz).addingTimeInterval(-7 * 86_400)] {
+        for anchor in [todayLocal(tz), addingDays(-7, to: todayLocal(tz), in: tz)] {
             let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: anchor)
             let visible = d.visibleDays
             let drawn = Set(visible.map(\.offset))
