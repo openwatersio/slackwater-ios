@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-11-week-window-and-date-anchor-design.md` §5
 
-**Depends on:** Plan A (`2026-08-11-week-window-anchor.md`) — complete and merged. This plan assumes `TimelineData.anchor`, `Timeline.window`, `TimelineData.scheduleRange`, `ChsOnlineWindow.covers(anchor:today:)`, `merging(_:prunedBefore:)`, `fetchOnlineWindow(for:from:)`, and each detail view's `@State anchor` + `rebuild()` all exist.
+**Depends on:** Plan A (`2026-08-11-week-window-anchor.md`) — complete and merged. This plan assumes `TimelineData.anchor`, `Timeline.window`, `TimelineData.scheduleRange`, `ChsOnlineWindow.covers(anchor:today:)`, `merging(_:prunedBefore:)`, `fetchOnlineWindow(for:from:)`, and each detail view's `@State anchor` all exist. Note `rebuild()` exists on **three** of the four views — `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView`, which store `timeline` in `@State`. `OnlineGateDetailView` computes its `timeline`, so it has no `rebuild()` and needs none; setting `anchor` is sufficient there.
 
 ## Global Constraints
 
@@ -301,7 +301,7 @@ git commit -m "feat: a range bar heads the schedule card"
 - Test: `SlackwaterUITests/ScreenshotTests.swift`
 
 **Interfaces:**
-- Consumes: `todayLocal(_:)`, each view's `anchor` state and `rebuild()`
+- Consumes: `todayLocal(_:)`, each view's `anchor` state, and `rebuild()` on the three views that have one (not `OnlineGateDetailView` — see Depends on)
 - Produces:
 
 ```swift
@@ -429,6 +429,8 @@ In each, alongside the existing sheets:
         }
 ```
 
+**`OnlineGateDetailView` is the exception**: it has no `rebuild()` (its `timeline` is computed, not `@State`), so its `onPick` closure is `{ _ in }` here — Task 4 replaces it with `applyAnchor()` anyway.
+
 For the three non-online views, `prefetchNextBlock` is a no-op — add it as such so the four call sites read identically:
 
 ```swift
@@ -549,8 +551,15 @@ and add:
     /// The anchor moved. If the merged window covers it we are done; if not,
     /// this is the same situation `.onAppear` already handles — fetch when
     /// online, show the amber honesty card when that throws.
+    ///
+    /// No `rebuild()` call, and deliberately: this view's `timeline` is a
+    /// COMPUTED property (unlike the other three details, which store theirs in
+    /// `@State`), so setting `anchor` is already enough — SwiftUI re-evaluates
+    /// it on the next render. Plan A briefly had a `rebuild()` here with an
+    /// empty body for symmetry with the other views; it was deleted, because a
+    /// function named for an action it does not perform is how the next person
+    /// gets fooled.
     private func applyAnchor() {
-        rebuild()
         if window?.covers(anchor: anchor, today: todayLocal(tz)) != true {
             if net.online { fetchNow(from: anchor) } else { fetchFailed = true }
         }
@@ -567,9 +576,10 @@ Give `fetchNow` the anchor it should fetch from:
         Task { @MainActor in
             do {
                 let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: anchor)
+                // Assigning `window` is the whole update: `timeline` is computed
+                // off it, so there is no stored data to rebuild.
                 window = fresh
                 fetching = false
-                rebuild()
             } catch {
                 fetching = false
                 fetchFailed = true
