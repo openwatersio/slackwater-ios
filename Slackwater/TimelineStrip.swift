@@ -220,7 +220,7 @@ struct TimelineData {
     let today: Date
     let start: Date          // anchor - 48h, and only when the anchor is today
     let end: Date            // anchor + 180h
-    let days: [TimelineDay]  // offsets -2…8 (8 exists for the last night's moon)
+    let days: [TimelineDay]  // offsets -3…8 (the ends are DST/moon slack, see dayChrome)
     let tidePoints: [TidePoint]        // empty when current-only
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
@@ -323,9 +323,20 @@ struct TimelineData {
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)   // the caller's clock, not the app's
         let w = Timeline.window(anchor: anchor, today: today)
-        // -2 covers the back-pad on the current week; 8 exists so the last
-        // visible night (offset 7) can find the following sunrise for its moon.
-        let days: [TimelineDay] = (-2...8).map { off in
+        // -3, not the -2 the 48h back-pad suggests: the look-back spans THREE
+        // calendar days whenever a spring-forward falls inside it. The day
+        // after that transition is 23 hours long, so `anchor - 48h` lands an
+        // hour BEFORE the second day back began — in Pacific, the two anchors
+        // following each March change (e.g. 2026-03-09 and -10, start
+        // 2026-03-06 23:00). A day the window reaches but `days` never built
+        // draws no chrome at all, which is the 36-hour gap this branch already
+        // fixed once, one hour wide and twice a year.
+        //
+        // Costs one `sunEvents` call per build; `visibleDays` picks -3 up only
+        // when the window actually reaches it, so nothing else changes. 8 is
+        // the other end: never visible, it exists so the last visible night
+        // (offset 7) can find the following sunrise for its moon.
+        let days: [TimelineDay] = (-3...8).map { off in
             let d0 = cal.date(byAdding: .day, value: off, to: anchor)!
             let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
             return TimelineDay(offset: off, start: d0,

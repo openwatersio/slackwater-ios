@@ -66,18 +66,42 @@ final class TimelineTests: XCTestCase {
         XCTAssert(ahead.contains(ahead.anchor.addingTimeInterval(3 * 86_400)))
     }
 
-    /// Day chrome must reach far enough that the LAST night on the strip still
-    /// finds the following sunrise — `drawDayChrome` reads day+1 to place the moon
-    /// mid-night. Window ends at anchor+7.5d, so offset 8 has to exist.
+    /// `days` must reach one day PAST the last visible night — `drawDayChrome`
+    /// reads day+1's sunrise to place the moon mid-night — and far enough BACK
+    /// that the day containing `start` was built, which is what `visibleDays`
+    /// needs to decide what draws.
+    ///
+    /// Both stated against the window, never against the literal range. This
+    /// test used to pin `days.first?.offset == -2` and `.last?.offset == 8`,
+    /// and the -2 went red the moment the range legitimately widened to -3: a
+    /// bound of `dayChrome`'s own array is an implementation detail, not a
+    /// property anything depends on. What IS depended on is that the array
+    /// covers the window at both ends.
+    ///
+    /// The March pair keeps the backward half honest year-round. On the two
+    /// anchors following a spring-forward the 48h look-back reaches an hour
+    /// into the THIRD calendar day back, because the day between them is only
+    /// 23 hours long — narrow the range to -2 again and this fails on any day
+    /// of the year, not just in March. It carries its own `now` because the
+    /// back-pad exists only when the anchor IS today, so a March anchor with a
+    /// real `now` would be a past anchor and exercise nothing.
     func testDayChromeCoversTheLastNightsMoon() {
-        let today = todayLocal(friday.tz)
-        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: today)
-        XCTAssertEqual(d.days.first?.offset, -2)
-        XCTAssertEqual(d.days.last?.offset, 8)
-        let lastVisible = d.days.first { $0.offset == 7 }
-        XCTAssertNotNil(lastVisible?.sunset)
-        XCTAssertNotNil(d.days.first { $0.offset == 8 }?.sunrise,
-                        "the last visible night needs the next day's sunrise for its moon")
+        let springForwardPlusOne = vancouverMidnight(2026, 3, 9)
+        for (anchor, now) in [(todayLocal(friday.tz), Date()),
+                              (springForwardPlusOne, springForwardPlusOne.addingTimeInterval(9 * 3600))] {
+            let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: anchor)
+
+            XCTAssertNotNil(d.day(of: d.start),
+                            "no built day contains the strip's start (anchor \(anchor))")
+
+            let lastNight = d.visibleDays.last!
+            let nextDay = d.days.first { $0.offset == lastNight.offset + 1 }
+            XCTAssertNotNil(nextDay,
+                            "the last visible night has no following day (anchor \(anchor))")
+            XCTAssertNotNil(lastNight.sunset)
+            XCTAssertNotNil(nextDay?.sunrise,
+                            "the last visible night needs the next day's sunrise for its moon")
+        }
     }
 
     /// "Today" must mean today, on any strip. The old signature took a
