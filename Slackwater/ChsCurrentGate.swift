@@ -138,7 +138,13 @@ extension ChsModelStore {
     /// user just had.
     ///
     /// The prune cut is the start of TODAY's strip — `Timeline.window`'s own
-    /// answer, never re-derived here, for the reason its doc comment gives.
+    /// answer, never re-derived here, for the reason its doc comment gives —
+    /// or the incoming window's own start, whichever is earlier. The cut never
+    /// discards data the incoming window itself covers: a fetch anchored in the
+    /// past (the picker is unbounded in both directions, spec §5) starts before
+    /// today's strip does, and a fixed `today − 48h` cut would delete the block
+    /// that fetch just paid for, fail `covers` for that anchor, and refetch it
+    /// on every visit forever.
     ///
     // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
     // someone who pages a year out accumulates ~1MB on a gate they evidently
@@ -146,7 +152,7 @@ extension ChsModelStore {
     // file gets big.
     static func saveOnline(_ window: ChsOnlineWindow) throws {
         let today = todayLocal(TimeZone(identifier: window.timezone) ?? .current)
-        let cut = Timeline.window(anchor: today, today: today).start
+        let cut = min(Timeline.window(anchor: today, today: today).start, window.start)
         let merged = loadOnline(window.stationID)?.merging(window, prunedBefore: cut) ?? window
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try JSONEncoder().encode(merged).write(to: onlineUrl(window.stationID), options: .atomic)
