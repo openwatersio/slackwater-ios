@@ -53,10 +53,25 @@ struct OnlineGateDetailView: View {
     /// access, so nothing here needs an explicit rebuild when the anchor
     /// moves; SwiftUI re-evaluates it. Don't add a `rebuild()` seam for
     /// symmetry with the others — it would have an empty body.
+    ///
+    /// Built FIRST, then asked to cover its own `today` — not a fresh
+    /// `todayLocal(tz)`. `build` derives `today` from `live`, a `@State`
+    /// snapshot only `returnToNow` moves, and `Timeline.window` back-pads on
+    /// exact `anchor == today` equality: two clocks answering one question can
+    /// disagree over whether the 48h look-back is in the window, so a fresh
+    /// read here could validate the UNPADDED span while the strip below drew
+    /// the padded one — coverage passing on a strip with a 48h hole at its left
+    /// end. One snapshot, used for both the decision and the thing it guards.
+    /// (Same defect commit 3fe1f44 fixed twice, four lines down.)
+    ///
+    /// The uncovered path pays for a build it discards. That path renders the
+    /// honesty card, which nobody scrubs, and the alternative is a second
+    /// derivation of `today` — which is the bug.
     private var timeline: TimelineData? {
-        guard let window, window.covers(anchor: anchor, today: todayLocal(tz)) else { return nil }
-        return TimelineData.build(onlinePoints: window.points, tz: tz,
-                                  lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
+        guard let window else { return nil }
+        let tl = TimelineData.build(onlinePoints: window.points, tz: tz,
+                                    lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
+        return window.covers(anchor: anchor, today: tl.today) ? tl : nil
     }
 
     private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }
