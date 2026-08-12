@@ -1,7 +1,5 @@
-// Slackwater — GPL v3. M4 FTUE location: CoreLocation wrapper + the station
-// match-quality grading (tide-app spec §5f, ported from slackwater-web
-// src/tides.ts matchQuality / m2SpreadMinutes — same thresholds, same M2
-// gradient signal, so both apps hedge a location snap identically).
+// Slackwater — GPL v3. M4 FTUE location: the CoreLocation wrapper
+// (tide-app spec §5f).
 import Foundation
 import CoreLocation
 
@@ -89,13 +87,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
 // MARK: - Distance + coordinate formatting (prototype NearMe.dc.html semantics)
 
-/// Great-circle distance in kilometres.
+/// Great-circle distance in kilometres (the labelled spelling; forwards to
+/// the positional one in ChsFitService.swift).
 func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
-    let r = 6371.0
-    let toR = { (x: Double) in x * .pi / 180 }
-    let dLa = toR(lat2 - lat1), dLo = toR(lon2 - lon1)
-    let h = pow(sin(dLa / 2), 2) + cos(toR(lat1)) * cos(toR(lat2)) * pow(sin(dLo / 2), 2)
-    return 2 * r * asin(sqrt(h))
+    distanceKm(lat1, lon1, lat2, lon2)
 }
 
 /// "1.2 nm" / "14 nm" — the prototype's fmtDist.
@@ -108,38 +103,4 @@ func formatNm(_ km: Double) -> String {
 func formatCoord(lat: Double, lon: Double) -> String {
     String(format: "%.3f°%@, %.3f°%@", abs(lat), lat >= 0 ? "N" : "S",
            abs(lon), lon >= 0 ? "E" : "W")
-}
-
-// MARK: - Match quality (spec §5f; web tides.ts thresholds verbatim)
-
-enum MatchQuality: String { case good = "good match", approximate = "approximate", nearest = "nearest station" }
-
-/// M2 phase spread across candidate tide stations, in minutes — the tidal
-/// gradient signal that keeps a same-distance snap across a pass from grading
-/// like one along open shore. M2 advances 28.98°/hr.
-func m2SpreadMinutes(_ phases: [Double]) -> Double {
-    guard phases.count >= 2 else { return 0 }
-    let spread = phases.max()! - phases.min()!
-    let wrapped = min(spread, 360 - spread)
-    return wrapped / 28.9841042 * 60
-}
-
-func matchQuality(distanceKm d: Double, spreadMinutes: Double) -> MatchQuality {
-    if d < 2 { return .good }  // standing at the station: no snap to hedge
-    if d > 40 { return .nearest }
-    if spreadMinutes > 20 || d > 10 { return .approximate }
-    return .good
-}
-
-/// Grade the auto-located nearest station against the fix: distance plus the
-/// M2 spread of the 3 nearest bundled tide stations (web heroMatchFor).
-func gradeMatch(km: Double, lat: Double, lon: Double) -> MatchQuality {
-    let nearest = TideStationRecord.all
-        .sorted {
-            distanceKm(lat1: lat, lon1: lon, lat2: $0.latitude, lon2: $0.longitude) <
-            distanceKm(lat1: lat, lon1: lon, lat2: $1.latitude, lon2: $1.longitude)
-        }
-        .prefix(3)
-    let phases = nearest.compactMap { s in s.constituents.first { $0.name == "M2" }?.phase }
-    return matchQuality(distanceKm: km, spreadMinutes: m2SpreadMinutes(phases))
 }

@@ -32,20 +32,12 @@ enum SN {
     static let leaf = Color(hex: 0x88B868)
     static let steelHex: UInt32 = 0x5888A8
     static let steel = Color(hex: steelHex)
-    static let sky = Color(hex: 0xC0D8E4)
     static let foam = Color(hex: 0xE4F0E4)
     static let paper = Color(hex: 0xFCFCFC)
-    // Direction is one signed diverging axis; green means only slack.
-    //
-    // This replaced a green/blue direction pair that collided with the map's
-    // green/blue *kind* pins — a green dot meant "current station" on one
-    // screen and "flooding" on the next. Amber/blue is the standard
-    // colourblind-safe diverging pair and it frees green, which matters: for an
-    // app called Slackwater the moment you wait for is slack, and green names
-    // it. Never colour anything by station kind.
-    // Raw hexes, not just the Colors: MapLibre style dicts hold strings and
-    // cannot read a Swift `Color`, so `MapScreen` formats these into "#rrggbb"
-    // rather than hand-maintaining a second copy of the palette.
+    // Direction is one signed diverging axis (colourblind-safe amber/blue);
+    // green means only slack — never colour anything by station kind.
+    // Raw hexes too: MapLibre style dicts hold strings, so MapScreen formats
+    // these into "#rrggbb" rather than hand-maintaining a second palette.
     static let floodHex: UInt32 = 0x4A9FD8
     static let ebbHex: UInt32 = 0xE8A33D
     static let goHex: UInt32 = 0x88B868
@@ -54,24 +46,17 @@ enum SN {
     static let go = Color(hex: goHex)
     static let rising = flood
     static let falling = ebb
-    /// Pale flood/ebb, for the chart's max-speed dot labels and FLOOD/EBB
-    /// reference-line legends — 9pt text on a near-black background, where
-    /// the saturated token is too heavy. Derived from the same hex as
-    /// `flood`/`ebb` so retargeting either token keeps its label in lockstep
-    /// instead of drifting the way the pre-rebrand pastel literals did.
+    /// Pale flood/ebb for small chart text on near-black — derived from the
+    /// same hex so retargeting a token keeps its label in lockstep.
     static let floodLabel = Color.hex(floodHex, lightenedBy: 0.6)
     static let ebbLabel = Color.hex(ebbHex, lightenedBy: 0.6)
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
     static let sun = Color(hex: 0xF0C860)          // prototype sun dot
-    /// Attention, never alarm: the location-denied card, and the unfitted
-    /// station's ⚠️ download warning. Deliberately red-leaning rather than
-    /// golden — the retired golden amber sat close enough to `ebb` to be
-    /// misread as a tide state. Same value the web app uses for the same job.
-    /// (The retired literal is deliberately not spelled here: it is one of the
-    /// values `testNoSourceFileSpellsARetiredColour` bans from `Slackwater/`,
-    /// and a doc comment naming it would need a whitelist to survive.)
+    /// Attention, never alarm: deliberately red-leaning so it cannot be
+    /// misread as `ebb`. Same value the web app uses. (The retired literal is
+    /// not spelled here — `testNoSourceFileSpellsARetiredColour` bans it.)
     static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
@@ -84,15 +69,9 @@ struct MonoLabel: View {
     let text: String
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
-    /// Opt-out, `nil` everywhere but the two `TimelineStrip` track labels
-    /// ("TIDE" / "CURRENT"), which are `.position()`-pinned into `TimelineGeo`'s
-    /// literal-point geometry — see that type's doc comment. Scaling them
-    /// walks them off the chart rather than reflowing anything.
-    var fixedSize: CGFloat? = nil
     var body: some View {
         Text(text.uppercased())
-            .font(fixedSize.map { .system(size: $0, weight: .medium).monospaced() }
-                    ?? .caption2.monospaced().weight(.medium))
+            .font(.caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)
     }
@@ -100,14 +79,11 @@ struct MonoLabel: View {
 
 // MARK: - App clock
 
-/// Real time, or shifted by `-nowOffsetDays N` — the UI-test hook behind the
-/// M3 airplane-mode day-after check (relaunch offline "tomorrow").
-private let appNowOffset: TimeInterval = {
-    guard let i = CommandLine.arguments.firstIndex(of: "-nowOffsetDays"),
-          i + 1 < CommandLine.arguments.count,
-          let days = Double(CommandLine.arguments[i + 1]) else { return 0 }
-    return days * 86_400
-}()
+/// Real time, or shifted by `-nowOffsetDays N` (read via UserDefaults'
+/// argument domain) — the UI-test hook behind the M3 airplane-mode
+/// day-after check (relaunch offline "tomorrow").
+private let appNowOffset: TimeInterval =
+    UserDefaults.standard.double(forKey: "nowOffsetDays") * 86_400
 
 func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
 
@@ -145,16 +121,18 @@ func speedUnitLabel(_ unit: String) -> String {
 
 // MARK: - Station-local time formatting
 
-private var formatterCache: [String: DateFormatter] = [:]
+/// NSCache, not a Dictionary: thread-safe (Canvas draws can run off-main) and
+/// bounded. DateFormatter itself is thread-safe for formatting since iOS 7.
+private let formatterCache = NSCache<NSString, DateFormatter>()
 
 private func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
-    let key = pattern + tz.identifier
-    if let cached = formatterCache[key] { return cached }
+    let key = (pattern + tz.identifier) as NSString
+    if let cached = formatterCache.object(forKey: key) { return cached }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = tz
     f.dateFormat = pattern
-    formatterCache[key] = f
+    formatterCache.setObject(f, forKey: key)
     return f
 }
 
@@ -172,36 +150,15 @@ func clockTime(_ date: Date, _ tz: TimeZone) -> String {
 }
 
 /// "4:22pm" — the strip's clock. Twelve-hour, lowercase, no space and no
-/// periods: the meridiem is a two-character suffix here, not a word.
-///
-/// The strip went 24h to kill "10:54 p.m." labels that were mostly meridiem and
-/// collided because of it. A bare suffix keeps that win — it is four characters
-/// shorter than " p.m." — while reading the way the readout above the strip and
-/// the whole rest of the app already do. `MultiDaySchedule` stays on 24h
-/// `clockTime`: its times are a zero-padded monospaced column, and a suffix
-/// that only some rows carry would ragged it.
+/// periods: " p.m." labels were mostly meridiem and collided because of it.
+/// `MultiDaySchedule` stays on 24h `clockTime` — its column needs the pad.
 func chartTime(_ date: Date, _ tz: TimeZone) -> String {
-    bareTime(date, tz) + meridiem(date, tz)
+    formatter("h:mma", tz).string(from: date).lowercased()
 }
 
-/// "4:22" — the clock face with no meridiem, for the left half of a range whose
-/// suffix is carried once at the end.
-private func bareTime(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("h:mm", tz).string(from: date)
-}
-
-/// "am" / "pm".
-private func meridiem(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("a", tz).string(from: date).lowercased()
-}
-
-/// "Wed, Jul 30" — the schedule date line.
-func dayLine(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("EEE, MMM d", tz).string(from: date)
-}
-
-func weekdayName(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("EEEE", tz).string(from: date)
+/// "Wed" — the strip's non-relative day label.
+func shortWeekday(_ date: Date, _ tz: TimeZone) -> String {
+    formatter("EEE", tz).string(from: date)
 }
 
 // MARK: - Detail-view shared pieces (tide + current)
@@ -220,6 +177,15 @@ struct CompassArrow: View {
     }
 }
 
+/// The moon's dark-limb offset for a disc of radius `r`: covering at new
+/// (shift 0), clear at full (2r), lit side right while waxing. (The prototype
+/// export's (1-fraction)·1.9r is inverted — it blacks out a full moon.)
+/// Shared by `MoonGlyph` and the strip's night moons: the SwiftUI and
+/// GraphicsContext renderers can't merge, so the geometry must.
+func moonLimbShift(fraction: Double, waxing: Bool, radius: CGFloat) -> CGFloat {
+    (waxing ? -1 : 1) * CGFloat(fraction) * 2 * radius
+}
+
 /// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
 /// an offset circle clipped to the disc — fullness and waxing side track the
 /// illumination as you scrub across days.
@@ -230,10 +196,7 @@ struct MoonGlyph: View {
 
     var body: some View {
         let r = size / 2 - 1
-        // Dark limb slides off as illumination grows: covering at new (shift 0),
-        // clear at full (shift 2r), lit side right while waxing. (The prototype
-        // export's (1-fraction)·1.9r is inverted — it blacks out a full moon.)
-        let shift = (waxing ? -1.0 : 1.0) * fraction * 2 * r
+        let shift = moonLimbShift(fraction: fraction, waxing: waxing, radius: r)
         ZStack {
             Circle().fill(SN.foam)
             Circle().fill(Color(hex: 0x00122C, opacity: 0.92)).offset(x: shift)
@@ -313,31 +276,119 @@ struct ReturnToNowSlot: View {
     }
 }
 
+// MARK: - The scrub-detail scaffold (tide / current / derived gate / online gate)
+
+/// The four scrub details' shared anatomy: map-header hero, scrub card
+/// (caller's readout + strip, then the shared swipe hint, ScrubWhen and card
+/// chrome), the rolling schedule card, and the bottom slot (footer — or the
+/// online gate's honesty card, which is also what shows while `timeline` is
+/// nil). Return-to-now lives here: live = appNow(), scrub back onto it.
+struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: View {
+    let name: String
+    let region: String
+    let latitude: Double
+    let longitude: Double
+    let favoriteId: String
+    let tz: TimeZone
+    let timeline: TimelineData?
+    let entries: (TimelineData) -> [ScheduleEntry]
+    @Binding var live: Date
+    @Binding var scrubTime: Date
+    /// Between the header and the scrub card (the fast-answer amber card).
+    @ViewBuilder var above: () -> Above
+    /// Readout + strip (+ any notes), in the caller's order — everything in
+    /// the scrub card above its shared tail.
+    @ViewBuilder var card: (TimelineData) -> Card
+    /// After ScrubWhen, still inside the scrub card (TideAtPortLink).
+    @ViewBuilder var links: () -> Links
+    /// Below the schedule card; each element gets the standard 14pt top gap.
+    @ViewBuilder var bottom: () -> Bottom
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                MapHeader(name: name, region: region,
+                          latitude: latitude, longitude: longitude,
+                          favoriteId: favoriteId)
+                above()
+                if let timeline {
+                    scrubCard(timeline)
+                    scheduleCard(timeline)
+                        .padding(.top, 14)
+                }
+                bottom()
+                    .padding(.top, 14)
+            }
+            .padding(.bottom, 42)
+        }
+        .ignoresSafeArea(edges: .top)
+        .background(SN.page.ignoresSafeArea())
+        .environment(\.timeZone, tz)
+        .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private func scrubCard(_ tl: TimelineData) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            card(tl)
+
+            MonoLabel(text: "‹ swipe to scrub ›",
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz) {
+                live = appNow()
+                scrubTime = live
+            }
+            .padding(.top, 14)
+
+            links()
+                .padding(.top, 12)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
+        .background(SN.cardFill)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(SN.leaf.opacity(0.22)).frame(height: 0.5)
+        }
+    }
+
+    private func scheduleCard(_ tl: TimelineData) -> some View {
+        MultiDaySchedule(entries: entries(tl), tz: tz, today: tl.today, days: tl.days,
+                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
+            .background(SN.cardFill)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+            .padding(.horizontal, 16)
+    }
+}
+
+/// The provenance footer: the not-for-navigation label over the caller's
+/// caption line(s).
+struct DetailFooter<Note: View>: View {
+    @ViewBuilder var note: () -> Note
+
+    var body: some View {
+        VStack(spacing: 6) {
+            MonoLabel(text: "Predictions — not for navigation",
+                      color: SN.foam.opacity(0.4), tracking: 1.4)
+            note()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+    }
+}
+
 /// The provisional ("fast answer") marking on a LIST card: the ⚠️ family and
-/// nothing else — the detail view carries the explanation.
-///
-/// M52 accessibility fix. The old treatment wrote amber (#E0B45A) prose and an
-/// amber badge straight onto the per-station gradient, and amber sat at almost
-/// exactly the luminance of the palette's pale stops: #E0B45A on #A8C4D4 was
-/// **1.06:1**, and 1.03:1 on #9AC0B0 — literally unreadable, which is what
-/// Bryan saw on device. So the glyph got the app's own over-an-unpredictable-
-/// background chrome (MapHeader's dark disc + ring).
-///
-/// RESOLVED (2026-08-02, M53 layout A): `stationGradient` is gone, so the
-/// question is no longer "does this clear every one of 12 gradient trios" —
-/// the card background is flat `SN.cardFill` (≈5% white) over the list's
-/// `SN.canvas`/`SN.canvasGlow` radial ground. Composited worst case (nearest
-/// the brighter `canvasGlow` top-of-list) is `#162C4A`; new amber `#EF6F4A`
-/// against it is **4.71:1**, rising to 5.59:1 lower in the list — clear of
-/// WCAG 1.4.11's 3:1 for non-text either way. The glyph-on-disc contrast
-/// (amber icon on the `SN.canvas` disc, 6.25:1) is unaffected by the
-/// background change and was never the tight number. Numbers in
-/// docs/testflight.md updated to match.
+/// nothing else — the detail view carries the explanation. Amber on the flat
+/// card fill clears WCAG 1.4.11's 3:1 on both grounds (4.71:1 worst case;
+/// the measured numbers and their M52/M53 history live in docs/testflight.md).
 struct ProvisionalBadge: View {
     /// Tracks the icon's own `.caption2` so the disc keeps containing the
-    /// triangle instead of being outgrown by it (Task 5 fix round: the icon
-    /// was scaled here but the frame was left literal, and `.caption2` at the
-    /// largest accessibility category overflows a fixed 22pt circle).
+    /// triangle at the largest accessibility sizes.
     @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 22
 
     var body: some View {
@@ -346,11 +397,8 @@ struct ProvisionalBadge: View {
             .foregroundStyle(SN.amber)
             .frame(width: badgeSize, height: badgeSize)
             .background(SN.canvas, in: Circle())
-            // Stroke stays a fixed 1pt hairline outline, not scaled: it's a
-            // thin separator against the canvas, not a mark that needs to
-            // read at a distance, and a 1pt ring looks correct at every size
-            // tried (default through AX5) — unlike the icon, it was never
-            // sized to be legible, only to be visible.
+            // A fixed 1pt hairline, deliberately not scaled: a separator, not
+            // a mark that needs to read at a distance.
             .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
             .accessibilityLabel("Fast answer — still refining")
             .accessibilityIdentifier("provisional-badge")
@@ -407,29 +455,45 @@ extension EnvironmentValues {
     }
 }
 
-/// The one tide affordance on a current/gate detail (split-scrubbers spec
-/// §2): a quiet link in the list's matching-stations convention, navigating
-/// to the port's own TideDetailView. No tide numbers live here anymore.
-struct TideAtPortLink: View {
-    let port: TideStationRecord
-    @Environment(\.openTideDetail) private var openTide
+/// The quiet branch-affordance row (matching stations, tide at port, nearest
+/// gate): leaf caption text after a branch icon. A tap gesture, not a Button —
+/// Button press tracking goes dead below the strip in the iPad split detail
+/// column (see the environment keys below).
+struct BranchLink: View {
+    let text: String
+    let id: String
+    var chevron = true
+    let action: () -> Void
 
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.caption2.weight(.semibold))
-            Text("Tide at \(port.name)")
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.semibold))
+            Text(text)
+            if chevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+            }
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(SN.leaf)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
-        .onTapGesture { openTide(port) }
+        .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityIdentifier("tide-at-port")
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// The one tide affordance on a current/gate detail (split-scrubbers spec
+/// §2): navigating to the port's own TideDetailView. No tide numbers here.
+struct TideAtPortLink: View {
+    let port: TideStationRecord
+    @Environment(\.openTideDetail) private var openTide
+
+    var body: some View {
+        BranchLink(text: "Tide at \(port.name)", id: "tide-at-port") { openTide(port) }
     }
 }
 

@@ -48,37 +48,22 @@
  *
  * Run: cd tools && npm install && node gen-tides.mjs && node gen-noaa-currents.mjs
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { createPlacesResolver } from "@sailingnaturali/station-corrections";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import tzLookup from "tz-lookup";
+import { here, placesResolver, byNameThenId, undangle, writeBundle } from "./bundle.mjs";
+import { km } from "./geo.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
 const res = join(here, "..", "Slackwater", "Resources");
 const bundle = JSON.parse(readFileSync(join(here, "..", "data", "noaa-currents.json"), "utf8"));
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
-const resolve = createPlacesResolver(JSON.parse(readFileSync(
-  createRequire(import.meta.url).resolve("@sailingnaturali/station-corrections/data/places.json"),
-  "utf8")));
-
-/** "0.9 nm east of" -> "0.9 nm east" (see gen-tides.mjs). */
-const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
+const resolve = placesResolver();
 
 /** Distance wins outright under this (slackwater-web tides.ts matchQuality). */
 const PAIR_KM = 2.0;
 /** A current station further than this from any tide gauge is somewhere the
  *  tide network does not reach, and its region line would be a guess. */
 const REGION_SANITY_KM = 250;
-
-function km(a, b) {
-  const R = 6371, toR = (x) => (x * Math.PI) / 180;
-  const dLa = toR(b.latitude - a.latitude), dLo = toR(b.longitude - a.longitude);
-  const h = Math.sin(dLa / 2) ** 2 +
-    Math.cos(toR(a.latitude)) * Math.cos(toR(b.latitude)) * Math.sin(dLo / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 const nearestTide = (s) =>
   tides.reduce((best, t) => {
@@ -124,10 +109,9 @@ const stations = bundle.stations
     }
     return out;
   })
-  // Codepoint compare with an id tiebreak, not localeCompare: the sort must be
-  // the same on every machine that regenerates this file (37 station names
-  // collide, and locale collation of punctuation varies across ICU builds).
-  .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : 1));
+  // (37 station names collide, and locale collation of punctuation varies
+  // across ICU builds — hence byNameThenId's codepoint compare.)
+  .sort(byNameThenId);
 
 if (stations.length < 700) {
   throw new Error(`only ${stations.length} current stations survived the filters — refusing to ship`);
@@ -137,9 +121,8 @@ if (worstNeighbour > REGION_SANITY_KM) {
     "station — its region line would be a guess; check the extract's extent");
 }
 
-writeFileSync(join(res, "currents.json"), JSON.stringify(stations));
+const size = writeBundle(join(res, "currents.json"), stations);
 console.log(
-  `${stations.length} NOAA current stations, ` +
-  `${(JSON.stringify(stations).length / 1024 / 1024).toFixed(2)} MB; ` +
+  `${stations.length} NOAA current stations, ${size}; ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);

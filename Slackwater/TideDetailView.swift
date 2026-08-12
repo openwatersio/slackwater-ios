@@ -25,102 +25,64 @@ struct TideDetailView: View {
     private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                MapHeader(name: record.name, region: record.region,
-                          latitude: record.latitude, longitude: record.longitude,
-                          favoriteId: record.id)
-                if let timeline {
-                    scrubCard(timeline)
-                    scheduleCard(timeline)
-                        .padding(.top, 14)
+        ScrubDetailScaffold(name: record.name, region: record.region,
+                            latitude: record.latitude, longitude: record.longitude,
+                            favoriteId: record.id, tz: tz,
+                            timeline: timeline, entries: scheduleEntries,
+                            live: $live, scrubTime: $scrubTime,
+                            above: { EmptyView() },
+                            card: { tl in
+                                readout
+                                TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                                                   imperial: imperial, now: live, scrubTime: $scrubTime)
+                                    .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
+                                    .padding(.top, 12)
+                            },
+                            links: { EmptyView() },
+                            bottom: { footer })
+            .onAppear {
+                if timeline == nil {
+                    timeline = TimelineData.build(tide: record, current: nil, now: live)
                 }
-                footer
-                    .padding(.top, 14)
+                RecentsStore.shared.record(record.id)
             }
-            .padding(.bottom, 42)
-        }
-        .ignoresSafeArea(edges: .top)
-        .background(SN.page.ignoresSafeArea())
-        .environment(\.timeZone, tz)
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            if timeline == nil {
-                timeline = TimelineData.build(tide: record, current: nil, now: live)
+    }
+
+    // MARK: - Readout above the strip
+
+    private var readout: some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
+                 + Text(" \(unit)").font(.footnote))
+                    .foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Text(rising ? "▲" : "▼").font(.caption2)
+                    Text(rising ? "Rising" : "Falling").font(.footnote)
+                }
+                .foregroundStyle(rising ? SN.rising : SN.falling)
             }
-            RecentsStore.shared.record(record.id)
+            Spacer()
+            if let next = nextExtreme {
+                VStack(alignment: .trailing, spacing: 1) {
+                    MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
+                              color: SN.foam.opacity(0.5), tracking: 1.4)
+                    Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
+                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
+                    // Relative only — the absolute time lives on the strip.
+                    Text("in \(countdown(from: scrubTime, to: next.time))")
+                        .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
+                }
+            }
         }
     }
 
-    // MARK: - Scrub card (readout + pan-under-centerline strip)
-
-    private func scrubCard(_ tl: TimelineData) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 4) {
-                    (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
-                     + Text(" \(unit)").font(.footnote))
-                        .foregroundStyle(.white)
-                    HStack(spacing: 4) {
-                        Text(rising ? "▲" : "▼").font(.caption2)
-                        Text(rising ? "Rising" : "Falling").font(.footnote)
-                    }
-                    .foregroundStyle(rising ? SN.rising : SN.falling)
-                }
-                Spacer()
-                if let next = nextExtreme {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                                  color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
-                            .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                        // Relative only — the absolute time lives on the strip,
-                        // now in the turn's own band rather than the retired
-                        // tide gutter (gutter spec §1/§2, NEAPS pass).
-                        Text("in \(countdown(from: scrubTime, to: next.time))")
-                            .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
-                    }
-                }
-            }
-
-            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial, now: live, scrubTime: $scrubTime)
-                .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
-                .padding(.top, 12)
-
-            MonoLabel(text: "‹ swipe to scrub ›",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
-                .padding(.top, 14)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .background(SN.cardFill)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(SN.leaf.opacity(0.22)).frame(height: 0.5)
-        }
-    }
-
-    // MARK: - Rolling multi-day schedule (turns + sun, day-grouped)
-
-    private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,
-                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
-            .background(SN.cardFill)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-            .padding(.horizontal, 16)
-    }
+    // MARK: - Rolling multi-day schedule (turns, day-grouped)
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
         let t0 = tl.today
         let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
-        var out: [ScheduleEntry] = tl.tideExtremes
+        let out: [ScheduleEntry] = tl.tideExtremes
             .filter { $0.time >= t0 && $0.time <= t1 }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
                                  value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
@@ -132,9 +94,7 @@ struct TideDetailView: View {
     // from, keep the honesty clause that the numbers are device-computed. The
     // full clause-10 licence statement carries its weight in Settings.
     private var footer: some View {
-        VStack(spacing: 6) {
-            MonoLabel(text: "Predictions — not for navigation",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
+        DetailFooter {
             if record.isChs {
                 Text("Chart datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
@@ -144,9 +104,6 @@ struct TideDetailView: View {
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.top, 8)
     }
 
     // MARK: - Data
@@ -155,10 +112,5 @@ struct TideDetailView: View {
     /// made, so the now-readout is unchanged by the scrub rework.
     private func exactHeight(at t: Date) -> Double {
         record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
-    }
-
-    private func returnToNow() {
-        live = appNow()
-        scrubTime = live
     }
 }

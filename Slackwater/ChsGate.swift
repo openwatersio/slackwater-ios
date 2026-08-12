@@ -13,7 +13,7 @@ import TideEngine
 /// port (chs-stations.json) whose on-device fitted model supplies the
 /// high/low water the gate's slacks derive from — the gate is predictable
 /// offline exactly when its reference port is fitted.
-struct ChsGateInfo: Decodable, Identifiable, Hashable {
+struct ChsGateInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String        // registry key, e.g. "chs-malibu-rapids"
     let name: String
     let region: String
@@ -28,20 +28,7 @@ struct ChsGateInfo: Decodable, Identifiable, Hashable {
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
-    static let all: [ChsGateInfo] = {
-        guard let url = Bundle.main.url(forResource: "chs-gates", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let gates = try? JSONDecoder().decode([ChsGateInfo].self, from: data) else { return [] }
-        return gates.sorted { $0.name < $1.name }
-    }()
-
-    /// Same ranking as TideStationRecord.searchRank (mirrors web search.ts).
-    func searchRank(_ query: String) -> Int? {
-        if name.lowercased().contains(query) { return 0 }
-        if region.lowercased().contains(query) { return 1 }
-        if aliases.contains(where: { $0.contains(query) }) { return 2 }
-        return nil
-    }
+    static let all: [ChsGateInfo] = bundled("chs-gates")
 }
 
 /// A derived gate whose reference port has a fitted model — everything the
@@ -73,10 +60,14 @@ extension DerivedGateRecord {
     }
 }
 
-func phaseWord(_ phase: DerivedPhase) -> String {
-    switch phase {
-    case .flood: "Flooding"
-    case .ebb: "Ebbing"
-    case .slack: "Slack"
+extension DerivedPhase {
+    /// "Flooding" / "Ebbing" / "Slack" — the phase pill's word.
+    var word: String {
+        switch self {
+        case .flood: "Flooding"
+        case .ebb: "Ebbing"
+        case .slack: "Slack"
+        }
     }
 }
+

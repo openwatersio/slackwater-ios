@@ -64,12 +64,8 @@ final class ColourAndFormTests: XCTestCase {
     /// a reformat that rewraps these lines can disable a trigger or, just as
     /// easily, false-positive on neutral chrome that happens to land on the
     /// same line. Treat it as a tripwire, not a guarantee.
-    func testChartDoesNotHardcodeDirectionColour() {
-        let path = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Slackwater/TimelineStrip.swift")
-        let source = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
-        XCTAssertFalse(source.isEmpty, "could not read TimelineStrip.swift at \(path.path)")
+    func testChartDoesNotHardcodeDirectionColour() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
         let offenders = source.components(separatedBy: .newlines).filter { line in
             // A raw hex on a line that also names a direction marker.
             // "Rectangle().fill(" is paired with hex only, not SN.leaf — that
@@ -110,18 +106,6 @@ final class ColourAndFormTests: XCTestCase {
                           "tide and current must draw different shapes")
     }
 
-    func testMapNeverColoursByStationKind() throws {
-        // The defect this whole change exists to remove: the map matched
-        // circle-color against ["get", "kind"], so a green dot meant "current
-        // station" here and "flooding" everywhere else.
-        // (The retired kind hexes this used to grep for are now covered
-        // repo-wide by testNoSourceFileSpellsARetiredColour — one file was
-        // never the right scope for them.)
-        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
-        XCTAssertNil(source.range(of: #"circle-color[^\n]*\["get", "kind"\]"#, options: .regularExpression),
-                     "colour must never be matched against kind")
-    }
-
     /// Every value this branch retired, banned from every source file — not
     /// from the one file an audit happened to be looking at.
     ///
@@ -134,10 +118,6 @@ final class ColourAndFormTests: XCTestCase {
     /// exception: `Theme.swift`'s amber comment was reworded to stop spelling
     /// the value rather than being excluded from the scan.
     func testNoSourceFileSpellsARetiredColour() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // SlackwaterTests/
-            .deletingLastPathComponent()   // repo root
-            .appendingPathComponent("Slackwater")
         let retired = [
             "0xE0B45A",   // the golden amber SN.amber moved away from
             "0x7FB4D8",   // the retired falling hue
@@ -145,22 +125,14 @@ final class ColourAndFormTests: XCTestCase {
             "#7fb3d5",    // map kind-blue
             "#c0d8e4",    // map chs-kind tone
         ]
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil),
-            "could not walk \(root.path)")
-        var scanned = 0
         var offenders: [String] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            scanned += 1
-            let source = try String(contentsOf: url, encoding: .utf8)
+        for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated() {
                 for hex in retired where line.range(of: hex, options: .caseInsensitive) != nil {
-                    offenders.append("\(url.lastPathComponent):\(n + 1): \(hex)")
+                    offenders.append("\(name):\(n + 1): \(hex)")
                 }
             }
         }
-        // A scan that silently found no files would pass forever.
-        XCTAssertGreaterThan(scanned, 10, "expected to scan the app's sources, walked \(scanned) files")
         XCTAssertTrue(offenders.isEmpty,
                       "retired colour literal still in source:\n" + offenders.joined(separator: "\n"))
     }
@@ -229,7 +201,7 @@ final class ColourAndFormTests: XCTestCase {
     }
 
     func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {
-        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
+        let source = try repoSource("Slackwater/MapScreen.swift")
         // Every pin feature must declare a state, defaulting to unknown.
         XCTAssertTrue(source.contains("\"state\""), "pin features must carry a state property")
         // Colour must be matched against state, never kind.
@@ -270,7 +242,7 @@ final class ColourAndFormTests: XCTestCase {
     /// now, and a test that demanded otherwise would be demanding the palette
     /// go back to navy.
     func testEveryPinOutlineClearsTheContrastFloorOnBothGrounds() throws {
-        let source = try String(contentsOfFile: mapScreenPath(), encoding: .utf8)
+        let source = try repoSource("Slackwater/MapScreen.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
             // of a hex literal), which closes a single-hash raw string.
@@ -297,14 +269,5 @@ final class ColourAndFormTests: XCTestCase {
                         "the tide square lost its ink backing plate")
         XCTAssertTrue(source.contains("pin-square-plate"),
                       "the backing-plate image must be registered, or the plate layer draws nothing")
-    }
-
-    /// `#filePath` of this test file resolves to the repo, so the source under
-    /// test can be read relative to it.
-    private func mapScreenPath() -> String {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // SlackwaterTests/
-            .deletingLastPathComponent()   // repo root
-            .appendingPathComponent("Slackwater/MapScreen.swift").path
     }
 }

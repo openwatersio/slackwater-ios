@@ -13,14 +13,13 @@ import MapLibre
 let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.35, longitude: -123.05)
 let SALISH_ZOOM = 7.35
 
-/// UI-test hook, like `-openMap`: `-mapZoom 3.2` opens the discovery map at a
-/// stated zoom. Synthesised pinches are not a camera — five of them land
-/// somewhere the test cannot name, which is no way to screenshot "continental".
+/// UI-test hook, like `-openMap`: `-mapZoom 3.2` (UserDefaults argument
+/// domain) opens the discovery map at a stated zoom. Synthesised pinches are
+/// not a camera — five of them land somewhere the test cannot name. Zoom 0
+/// (whole earth) is never a real request, so it doubles as "unset".
 let discoveryZoom: Double = {
-    guard let at = CommandLine.arguments.firstIndex(of: "-mapZoom"),
-          CommandLine.arguments.indices.contains(at + 1),
-          let zoom = Double(CommandLine.arguments[at + 1]) else { return SALISH_ZOOM }
-    return zoom
+    let zoom = UserDefaults.standard.double(forKey: "mapZoom")
+    return zoom == 0 ? SALISH_ZOOM : zoom
 }()
 
 // The MapScreen full-screen-cover wrapper (header + X) is gone — M4.5 shows
@@ -29,43 +28,23 @@ let discoveryZoom: Double = {
 // MARK: - Style building (mirrors web mapStyle.ts)
 
 private let LAND_TONE = "#f5ecd7"   // paper-chart cream
-/// Seascape's own `background-color`, which is also the flat end of its depth
-/// ramp — the tone it paints once the water is deeper than 50 m and there is no
-/// longer any depth to shade. So this is not "a light blue we picked": it is
-/// literally the colour Seascape's chart settles to where depth stops being
-/// information, which is exactly the light water we want without the shading
-/// that came with it.
+/// Seascape's own `background-color` — the flat tone its depth ramp settles
+/// to past 50 m, not a hand-picked blue.
 private let WATER_TONE = "#e9f7ff"
-/// Was WATER_TONE, back when water was navy and "the tone under everything"
-/// and "the tone that outlines a mark" happened to be the same value. On pale
-/// water they are not, and the coincidence was load-bearing: pin fills clear
-/// WCAG's 3:1 for a non-text mark on navy (flood 6.05, ebb 8.14, slack 7.61)
-/// and fail it on #e9f7ff (2.65, 1.97, 2.11). A bounded mark may carry that
-/// contrast on its boundary, so the ink moves to the stroke — 16.05:1 on the
-/// water, 14.92:1 on the land, i.e. the pin reads on either ground in every
-/// state, which the fill alone never did.
+/// Pin fills fail WCAG's 3:1 on pale water, so the contrast lives on the
+/// stroke — every pin carries this ink outline (asserted in
+/// `testEveryPinOutlineClearsTheContrastFloorOnBothGrounds`).
 private let CHART_INK = "#0b1a2b"
 // A pin's COLOUR is the water's state, never the station's kind — kind is the
-// pin's SHAPE: a circle for a current station, a square for a tide one. One
-// shape per feature class, the oldest convention on any chart, and a silhouette
-// difference reads where an interior one does not.
-//
-// `chs` is a Canadian tide port. That is provenance, not kind — it draws the
-// same square a NOAA tide station does.
-/// MapLibre style dicts hold strings and cannot read a Swift `Color`, so the
-/// palette crosses over as "#rrggbb" — but derived from the same `SN` hex the
-/// token is built from, never hand-copied. A hand-maintained copy is silent
-/// drift: retarget `SN.flood` and the map would keep the old blue, leaving two
-/// blues that both mean flood and no test anywhere that fails.
+// pin's SHAPE: circle for current, square for tide. `chs` is provenance, not
+// kind — it draws the same square a NOAA tide station does.
+/// MapLibre style dicts hold strings, so the palette crosses over as
+/// "#rrggbb" — always derived from the `SN` hex, never hand-copied (a copy is
+/// silent drift no test catches).
 func mapHex(_ hex: UInt32) -> String { String(format: "#%06x", hex) }
 
-/// The unknown-state pin. `SN.steel`, the same token the card glyph draws for
-/// `.unknown` — one meaning, one value. It replaced a lighter map-only grey
-/// (#7d9cb8) which, besides being a second value for the same idea, sat at
-/// 2.44:1 against the map's cream land polygons — under WCAG's 3:1 for a
-/// non-text mark. Steel clears both grounds on its own: 3.49:1 on the pale
-/// water, 3.25:1 on the land. It is the only state that still does, which is
-/// why every pin now also carries the `CHART_INK` stroke.
+/// The unknown-state pin: `SN.steel`, the same token the card glyph draws for
+/// `.unknown` — one meaning, one value.
 let PIN_NEUTRAL = mapHex(SN.steelHex)
 // The circle radius and the square's equal-area radius share this constant so
 // the two literals cannot drift apart again.
@@ -86,24 +65,9 @@ let PIN_STATE_COLOUR: [Any] = [
     PIN_NEUTRAL,   // unknown
 ]
 
-private func phaseName(_ phase: CurrentPhase) -> String {
-    switch phase {
-    case .flood: "flood"
-    case .ebb: "ebb"
-    case .slack: "slack"
-    }
-}
-
-/// Fix round 1 shrank the pin's direction search from `cardState(at:)`'s
-/// 30h window to a short one — fast, but only 838/5,700 (station, moment)
-/// checks in `testShortWindowDirectionMatchesThirtyHourBaseline` actually
-/// resolved a tone; the rest silently drew neutral. That traded correctness
-/// for coverage nobody asked to give up (fix round 2). This is the exact
-/// search a *fallback* uses instead, once round 2's cheap check below has
-/// already flagged that this one station needs it — so it runs for a small
-/// minority of stations, not all 1,425, and can afford a window wide enough
-/// to always find the next turn (13h clears a diurnal station's ~12.4h
-/// half-period; semidiurnal turns roughly every 6.2h).
+/// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
+/// half-period, so it always finds the next turn. Only the minority of
+/// stations flagged by the cheap check below pay for it.
 let PIN_TIDE_FALLBACK_WINDOW: TimeInterval = 13 * 3600
 
 /// Exact direction via the same search `cardState(at:)` uses, just over a
@@ -116,28 +80,12 @@ func tidePinRising(_ record: TideStationRecord, at now: Date, window: TimeInterv
     return next.map { $0.kind == .high }
 }
 
-/// How far apart the cheap two-sample check looks, and how big a height
-/// change counts as a trustworthy signal rather than turn-adjacent noise.
-///
-/// `cardState(at:)`'s doc comment warns against differencing two height
-/// samples: near a turn the curve is flat, so a naive diff can point the
-/// wrong way. That is real — measured directly, a raw (unnormalised) diff
-/// disagreed with the 30h baseline in 62/5,700 checks — but the failure
-/// announces itself: every wrong sign showed up on a small |Δh|. So rather
-/// than discard the cheap path, only distrust it near that floor and fall
-/// back to the exact search for that one station.
-///
-/// The threshold weights each constituent's amplitude by its known
-/// astronomical SPEED (degrees/hour — Doodson/NOAA constants, fixed and not
-/// something that can drift the way a display colour hex can), not just
-/// amplitude. Amplitude alone under-flags fast (semidiurnal) stations and
-/// over-flags slow (diurnal) ones at the same amplitude, because a diurnal
-/// wave's peak slope is roughly half a semidiurnal one's — proportional to
-/// A·ω, not A. Weighting by speed cut the fallback population from 15% to
-/// 7% of checks at zero mismatches (see the sweep this shipped with in
-/// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment: an
-/// amplitude-only proxy needed 0.008 for zero wrong-signed trusted samples;
-/// speed-weighted needed only 0.0004, for less than half the fallback rate).
+/// The cheap two-sample check's spacing and trust floor. A raw height diff
+/// points the wrong way only near a turn (measured: 62/5,700 mismatches, all
+/// on small |Δh|), so small diffs fall back to the exact search. The floor is
+/// speed-weighted (A·ω, not A — a diurnal wave's peak slope is roughly half a
+/// semidiurnal one's); the sweep behind 0.0004 lives in
+/// `testHybridDirectionHasFullCoverageAndMatchesBaseline`'s doc comment.
 let PIN_TIDE_DIFF_DT: TimeInterval = 30 * 60
 let PIN_TIDE_DIFF_THRESHOLD: Double = 0.0004
 private let constituentSpeed: [String: Double] = [   // degrees/hour
@@ -145,22 +93,13 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
     "K1": 15.0411, "O1": 13.9430, "P1": 14.9589, "Q1": 13.3987,
 ]
 
-/// Direction for one tide station: cheap almost everywhere, exact always.
-/// One `heights()` call (same fixed setup cost as any other engine call,
-/// amortised over its two samples) gives a height difference; if that's
-/// comfortably above the noise floor its sign IS the direction — the curve
-/// is steep there, unambiguous. Only near a turn, where the difference is
-/// small relative to the station's own speed-weighted range, does this fall
-/// back to `tidePinRising`'s exact search, and only for that station.
+/// Direction for one tide station: cheap almost everywhere, exact always —
+/// a two-sample height diff, falling back to `tidePinRising`'s exact search
+/// when the diff is under the station's speed-weighted trust floor.
 ///
-/// The pair is a 30-minute window *around* `now`, not forward from it: the
-/// engine's `makeTimeline` floors the start and ceils the end to the `step`
-/// grid, so asking for `now … now+30min` at a 30-minute step returns the grid
-/// points bracketing `now` — at 12:29 that is 12:00 and 12:30, almost entirely
-/// behind the clock. That is fine and is what the sweep measured: the slope of
-/// a 30-minute window straddling `now` is the direction at `now` everywhere
-/// the threshold trusts it, and the near-turn cases where it would not be are
-/// exactly the ones handed to the exact search.
+/// GOTCHA kept on purpose: the engine's `makeTimeline` snaps to the `step`
+/// grid, so the pair is a 30-minute window *straddling* `now` (at 12:29 that
+/// is 12:00 and 12:30) — which is what the sweep measured and trusts.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
@@ -175,21 +114,13 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
 
 /// A station's state as a tone name, for the pin's colour.
 ///
-/// Synchronous only. Bundled NOAA stations predict on device from their own
-/// harmonics. Every CHS-provenance item — a CHS tide port, a derived gate
-/// (its slack derives from a CHS reference port's fitted tide), or a
-/// validated CHS current gate — resolves through `ChsFitService`'s async fit
-/// cache, so all three report "unknown" and draw neutral: an honest
-/// admission, not a guess. On a boat a wrong slack is worse than an admitted
-/// grey. Wiring the async CHS cache in is a follow-on, deliberately not done
-/// here.
-///
-/// Neither bundled case calls `cardState(at:)`: it computes a 30h "next"
-/// event neither branch displays, and for a current station that's TWO
-/// 30h searches (slack roots + max roots) for a value the pin discards.
-/// `pinFeatures()` runs this for all ~3,125 bundled stations on every style
-/// build (`testPinLayerBuildsInsideAFrame` budgets the whole thing at 0.3s),
-/// so the shortcuts here are load-bearing, not stylistic.
+/// Synchronous only: every CHS-provenance item resolves through
+/// `ChsFitService`'s async fit cache, so all three report "unknown" and draw
+/// neutral — an honest admission, not a guess (wiring the async cache in is
+/// a deliberate follow-on). Neither bundled case calls `cardState(at:)`: it
+/// computes 30h searches the pin discards, and `pinFeatures()` runs this for
+/// all ~3,125 stations per style build (`testPinLayerBuildsInsideAFrame`
+/// budgets 0.3s), so the shortcuts here are load-bearing.
 private func pinTone(_ item: StationItem, at now: Date) -> String {
     switch item {
     case .tide(let record):
@@ -198,7 +129,10 @@ private func pinTone(_ item: StationItem, at now: Date) -> String {
     case .current(let station):
         let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
             .first?.speed ?? 0
-        return phaseName(currentPhase(signed: signed))
+        // Exact PIN_STATE_COLOUR match keys — CurrentPhase.word ("Flooding")
+        // is the pill's word, not these.
+        let phase = currentPhase(signed: signed)
+        return phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
     case .chs, .chsGate, .chsCurrent:
         return "unknown"   // async CHS fit cache — see the doc comment above
     }
@@ -232,13 +166,9 @@ private func landSources(_ landUrl: String, _ uscaUrl: String) -> [String: Any] 
     ["land": landSource(landUrl), "land-usca": landSource(uscaUrl)]
 }
 
-/// On navy water a cream fill was the whole coastline — 14.4:1, no outline
-/// needed. On #e9f7ff the same fill is 1.08:1 against the water, which is not a
-/// faint coast but no coast at all: two near-white planes meeting invisibly. So
-/// the fills keep the land tone and a stroked outline carries the shape, which
-/// is what a paper chart does and why seamap ships its own `land_outline`.
-/// Ours is drawn at full opacity from z0 — seamap's ramps in from nothing at z4
-/// and only reaches solid at z12, and the discovery map opens at 7.35.
+/// The stroked outline carries the coast: land fill on pale water is 1.08:1 —
+/// no coast at all. Full opacity from z0 (seamap's own ramps in too late for
+/// a discovery map opening at 7.35).
 private let COASTLINE: [String: Any] = [
     "line-color": CHART_INK,
     "line-opacity": 0.55,
@@ -352,68 +282,41 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
     return [clusters, counts, currentPins, tidePinPlate, tidePins, labels]
 }
 
-/// Seamap layers this app does not draw. Traffic separation schemes are a
-/// routeing instrument — they tell a ship under way which side of a strait to
-/// be on, which is a question Slackwater is not in. They also dominate: the
-/// lanes and their boundaries are the widest, highest-contrast marks in the
-/// whole tileset, so at Salish zooms the TSS *is* the map and the pins read as
-/// an overlay on someone else's chart.
-///
-/// `radio_station` is the same complaint arriving as one mark: a magenta ring
-/// whose radius interpolates to 40 px by z12, marking an AIS/radio station.
-/// With the TSS gone it became the loudest thing on an otherwise empty stretch
-/// of Haro Strait — a large unexplained circle in open water, drawn for a
-/// facility that has no bearing on when the water turns.
-///
-/// Kept as a filter over the published upstream layer list rather than pruned
-/// out of the bundled artifact, so `seamap-layers.json` stays a verbatim slice
-/// of `style.json` and this stays a decision someone can read and reverse: to
-/// put either back, delete its line.
+/// Seamap layers this app does not draw (TSS routeing lanes and the
+/// `radio_station` ring dominate the chart and answer questions Slackwater is
+/// not in). A filter, not a pruned artifact, so `seamap-layers.json` stays a
+/// verbatim slice of style.json — to put either back, delete its line.
 private func SEAMAP_OMIT(_ id: String) -> Bool {
     id.hasPrefix("TSS-")
         || id == "radio_station"
 }
 
-/// SPIKE (research/seamap-offline): the Open Waters Seamap chart, offline.
-/// `seamap.pmtiles` is a `pmtiles extract` of the weekly planet archive clipped
-/// to the Salish box, `seamap-layers.json` the 44 seamap-source layers lifted
-/// from the published style.json with every `text-*` key stripped (no bundled
-/// glyphs yet — icons render, labels don't), and the freenauticalchart sprite
-/// is bundled beside them. Returns nil when the resources aren't in the bundle,
-/// so main stays on the land-only fallback.
-func seamapOfflineLayers() -> (sprite: String, layers: [[String: Any]], source: [String: Any])? {
-    guard let tiles = Bundle.main.url(forResource: "seamap", withExtension: "pmtiles"),
-          let layersUrl = Bundle.main.url(forResource: "seamap-layers", withExtension: "json"),
+/// SPIKE (research/seamap-offline, openwatersio/seascape#121): a bundled
+/// offline PMTiles layer-set — "seamap" (Open Waters Seamap chart marks +
+/// freenauticalchart sprite) or "seascape" (bathymetry). `<name>.pmtiles` is a
+/// `pmtiles extract` clipped to the Salish box; `<name>-layers.json` is a
+/// verbatim slice of the published style.json with every `text-*` key
+/// stripped (no bundled glyphs yet — text-only layers ship inert and light up
+/// the day a fontstack does). Returns nil when the resources aren't in the
+/// bundle, so main stays on the land-only fallback.
+func offlineLayers(_ name: String, sprite: String? = nil, attribution: String)
+        -> (sprite: String?, layers: [[String: Any]], source: [String: Any])? {
+    guard let tiles = Bundle.main.url(forResource: name, withExtension: "pmtiles"),
+          let layersUrl = Bundle.main.url(forResource: "\(name)-layers", withExtension: "json"),
           let data = try? Data(contentsOf: layersUrl),
-          let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-          let sprite = Bundle.main.url(forResource: "freenauticalchart", withExtension: "json")
+          let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
     else { return nil }
-    // The style spec's multi-sprite form: layers reference "freenauticalchart:foo".
-    let spriteBase = sprite.deletingPathExtension().absoluteString
+    var spriteBase: String?
+    if let sprite {
+        guard let url = Bundle.main.url(forResource: sprite, withExtension: "json") else { return nil }
+        // The style spec's multi-sprite form: layers reference "freenauticalchart:foo".
+        spriteBase = url.deletingPathExtension().absoluteString
+    }
     return (spriteBase,
             layers.filter { nativeLayerTypes.contains($0["type"] as? String ?? "") }
                   .filter { !SEAMAP_OMIT(($0["id"] as? String) ?? "") },
             ["type": "vector", "url": "pmtiles://\(tiles.absoluteString)",
-             "attribution": "© Open Waters: Seamap © OpenStreetMap contributors"])
-}
-
-/// The Open Waters Seascape bathymetry, offline (openwatersio/seascape#121):
-/// `seascape.pmtiles` is a `pmtiles extract` of the planet vector archive
-/// clipped to the same Salish box as seamap, `seascape-layers.json` the four
-/// `seascape-vector` layers from the published style.json with every `text-*`
-/// key stripped. Same shape as `seamapOfflineLayers`, same nil-means-absent
-/// contract, and the same open follow-on: two of those four (`soundings`,
-/// `contour-labels`) are text-only symbol layers, so they ship inert and light
-/// up the day a fontstack does. Depth areas and contours draw today.
-func seascapeOfflineLayers() -> (layers: [[String: Any]], source: [String: Any])? {
-    guard let tiles = Bundle.main.url(forResource: "seascape", withExtension: "pmtiles"),
-          let layersUrl = Bundle.main.url(forResource: "seascape-layers", withExtension: "json"),
-          let data = try? Data(contentsOf: layersUrl),
-          let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
-    else { return nil }
-    return (layers.filter { nativeLayerTypes.contains($0["type"] as? String ?? "") },
-            ["type": "vector", "url": "pmtiles://\(tiles.absoluteString)",
-             "attribution": "© Open Waters: Seascape"])
+             "attribution": attribution])
 }
 
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
@@ -436,15 +339,17 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
         layers.insert(contentsOf: slice, at: anchor)
         style["layers"] = layers
     }
-    if let seascape = seascapeOfflineLayers() {
+    if let seascape = offlineLayers("seascape", attribution: "© Open Waters: Seascape") {
         sources["seascape-vector"] = seascape.source
         style["sources"] = sources
         insertAboveLand(seascape.layers)
     }
-    if let seamap = seamapOfflineLayers() {
+    if let seamap = offlineLayers("seamap", sprite: "freenauticalchart",
+                                  attribution: "© Open Waters: Seamap © OpenStreetMap contributors"),
+       let spriteUrl = seamap.sprite {
         sources["seamap"] = seamap.source
         style["sources"] = sources
-        style["sprite"] = [["id": "freenauticalchart", "url": seamap.sprite]]
+        style["sprite"] = [["id": "freenauticalchart", "url": spriteUrl]]
         insertAboveLand(seamap.layers)
     }
     return style
@@ -500,16 +405,8 @@ func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -
 final class MapStyler: NSObject, MLNMapViewDelegate {
     private weak var map: MLNMapView?
     private let cacheName: String
-    /// Mutable, not `let`: `moveCamera` (issue #32 review — a focus landing
-    /// on a map that's already mounted, no style reload involved) updates
-    /// these so a LATER style load (Seascape arriving after the fallback, or
-    /// any future reload) re-asserts the latest camera in
-    /// `didFinishLoading`, not whatever this styler was built with — without
-    /// this a second focus followed by a late style swap would snap back to
-    /// the first one.
-    private var center: CLLocationCoordinate2D
-    private var zoom: Double
-    private let killSwitch = CommandLine.arguments.contains("-networkKillSwitch")
+    private let center: CLLocationCoordinate2D
+    private let zoom: Double
 
     init(map: MLNMapView, cacheName: String, center: CLLocationCoordinate2D, zoom: Double) {
         self.map = map
@@ -541,7 +438,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     }
 
     private func fetchSeascape() {
-        guard !killSwitch else { return }
+        guard !networkKillSwitch else { return }
         let imperial = UserDefaults.standard.string(forKey: unitsKey) != "metric"
         guard let url = URL(string: "https://tiles.openwaters.io/seascape/style.json?unit=\(imperial ? "ft" : "m")")
         else { return }
@@ -555,24 +452,12 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         }.resume()
     }
 
-    /// A filled square, drawn to equal AREA with the 5pt circle pins: for
-    /// radius r the side is r·√π. A same-width square always reads heavier.
-    /// Registered as a template image so `icon-color` can tint it — that is
-    /// MapLibre Native's SDF path, and without it the pin ignores state.
-    ///
-    /// `inflate` grows the square on every side — how the tide pin gets the
-    /// outline the circle gets from `circle-stroke-width`. MapLibre Native
-    /// draws no `icon-halo-*` on this image at all: not a clipping problem
-    /// (padding the canvas by the halo width changed nothing), the halo simply
-    /// does not render here. So the outline is a second, larger square drawn
-    /// underneath in `CHART_INK` — a backing plate, which a template image can
-    /// express because the tint is per-layer.
-    ///
-    /// It only started mattering on pale water. An ink halo on ink-navy water
-    /// was invisible either way, so the square has always drawn without one;
-    /// on #e9f7ff it meant circles got a 16:1 outline and squares got none,
-    /// leaving tide pins on fill contrast alone — the 2.65/1.97/2.11 that the
-    /// stroke exists to fix.
+    /// A filled square at equal AREA with the 5pt circle pins (side r·√π —
+    /// same-width reads heavier). Template image so `icon-color` can tint it
+    /// (MapLibre Native's SDF path; without it the pin ignores state).
+    /// GOTCHA: Native draws no `icon-halo-*` on this image at all, so the
+    /// outline is `inflate` — a larger backing square drawn underneath in
+    /// `CHART_INK`.
     private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS),
                                 inflate: CGFloat = 0, scale: CGFloat = 3) -> UIImage {
         let side = radius * CGFloat(Double.pi.squareRoot()) + inflate * 2
@@ -596,17 +481,6 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
     }
-
-    /// Moves the live camera immediately — no style reload involved, so
-    /// `didFinishLoading` won't do this on its own. Stores the new
-    /// center/zoom too (see the property comments above) so if a style DOES
-    /// reload later, it re-asserts THIS camera, not the one this styler
-    /// launched with.
-    func moveCamera(to center: CLLocationCoordinate2D, zoom: Double, animated: Bool) {
-        self.center = center
-        self.zoom = zoom
-        map?.setCenter(center, zoomLevel: zoom, animated: animated)
-    }
 }
 
 // MARK: - The map view
@@ -620,21 +494,6 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// `stationZoom` instead so a focused jump lands framed on one station,
     /// not the whole Salish Sea.
     var zoom: Double = discoveryZoom
-    /// Non-nil while a header-title focus (issue #32) is live. `makeUIView`
-    /// alone only moves the camera on a FRESH mount — but a detail reached
-    /// via a MAP PIN tap leaves `showMap` already `true` (only the regular
-    /// layout's `onSelect` resets it), so the map instance survives the
-    /// push/pop and never remounts. `updateUIView` is what has to catch a
-    /// title tap in THAT case, and it needs a way to tell "a new focus
-    /// landed" apart from "an unrelated re-render" — a changed token is that
-    /// signal (review finding on the first cut of #32; equality on the
-    /// center coordinate isn't enough since re-focusing the SAME station
-    /// twice must still count as new).
-    var focusToken: Int? = nil
-    /// Fires once a `focusToken` is actually applied via `updateUIView` — the
-    /// no-remount path only. A fresh mount already gets its one-shot clear
-    /// from `mapPane`'s `.onAppear`; this covers the case that doesn't fire.
-    var onFocusApplied: (() -> Void)? = nil
     let onSelect: (StationItem) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
@@ -644,47 +503,27 @@ struct MapViewRepresentable: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         map.showsUserLocation = LocationService.shared.authorized
-        context.coordinator.install(on: map, center: center, zoom: zoom, focusToken: focusToken)
+        context.coordinator.install(on: map, center: center, zoom: zoom)
         return map
     }
 
-    /// SwiftUI calls this right after `makeUIView` too (with the same
-    /// values) — `Coordinator.applyFocusIfNeeded` no-ops that first call
-    /// because `install` already recorded the token, so a fresh mount never
-    /// double-applies the camera.
-    func updateUIView(_ uiView: MLNMapView, context: Context) {
-        context.coordinator.applyFocusIfNeeded(center: center, zoom: zoom, focusToken: focusToken,
-                                                onApplied: onFocusApplied)
-    }
+    /// Camera changes arrive as remounts — `mapPane` sets `.id(mapFocusToken)`
+    /// so a header-title focus rebuilds the view and `makeUIView` frames it.
+    func updateUIView(_ uiView: MLNMapView, context: Context) {}
 
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
         private weak var map: MLNMapView?
         private var styler: MapStyler?
-        private var lastAppliedFocusToken: Int?
 
         init(onSelect: @escaping (StationItem) -> Void) { self.onSelect = onSelect }
 
-        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double, focusToken: Int?) {
+        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
             self.map = map
-            lastAppliedFocusToken = focusToken  // this mount's camera already reflects it
             styler = MapStyler(map: map, cacheName: "discovery",
                                center: center, zoom: zoom)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
-        }
-
-        /// Moves an already-mounted map's live camera when a NEW focus token
-        /// shows up without a remount (the pin-tap-then-title-tap path — see
-        /// `MapViewRepresentable.focusToken`). A no-op on every ordinary
-        /// re-render: `focusToken == nil` (no focus asserted this render) or
-        /// unchanged from what's already applied.
-        func applyFocusIfNeeded(center: CLLocationCoordinate2D, zoom: Double, focusToken: Int?,
-                                 onApplied: (() -> Void)?) {
-            guard let focusToken, focusToken != lastAppliedFocusToken else { return }
-            lastAppliedFocusToken = focusToken
-            styler?.moveCamera(to: center, zoom: zoom, animated: true)
-            onApplied?()
         }
 
         /// Tap → nearest station dot within a finger-sized box → detail. A

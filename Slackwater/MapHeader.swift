@@ -9,10 +9,6 @@ import SwiftUI
 import UIKit
 import MapLibre
 
-/// Bottom band of map kept below the title pill — the border the name sits
-/// on, not a viewport. The header's height is pill + clearances, so it
-/// scales with Dynamic Type instead of cropping at AX sizes.
-let mapHeaderBottomMargin: CGFloat = 24
 /// Prototype per-station zoom (DATA() z: 12.2–13.2). Not `private`: the
 /// header title tap (issue #32) reuses it as the discovery map's focus zoom
 /// so a jump-to-map lands at the same per-station framing this header shows,
@@ -93,7 +89,7 @@ struct MapHeader: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 62)   // clears the status bar; header ignores the top safe area
-        .padding(.bottom, mapHeaderBottomMargin)
+        .padding(.bottom, 24) // map band below the pill — the border the name sits on
         .frame(maxWidth: .infinity)
         .background {
             StationMapView(latitude: latitude, longitude: longitude)

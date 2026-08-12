@@ -8,22 +8,6 @@ import SwiftUI
 /// thought to check.
 final class HeroChromeTests: XCTestCase {
 
-    private func appSources() throws -> [(name: String, source: String)] {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()   // SlackwaterTests/
-            .deletingLastPathComponent()   // repo root
-            .appendingPathComponent("Slackwater")
-        let files = try XCTUnwrap(
-            FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil),
-            "could not walk \(root.path)")
-        var out: [(String, String)] = []
-        for case let url as URL in files where url.pathExtension == "swift" {
-            out.append((url.lastPathComponent, try String(contentsOf: url, encoding: .utf8)))
-        }
-        XCTAssertGreaterThan(out.count, 10, "expected to scan the app's sources")
-        return out
-    }
-
     func testNoMaterialImitationOfGlass() throws {
         let materials = [".ultraThinMaterial", ".thinMaterial", ".regularMaterial", ".thickMaterial", ".ultraThickMaterial"]
         var offenders: [String] = []

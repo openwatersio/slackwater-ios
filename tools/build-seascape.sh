@@ -44,23 +44,8 @@ pmtiles extract "$ARCHIVE" Slackwater/Resources/seascape.pmtiles \
   --bbox="$BBOX" --maxzoom="$MAXZOOM"
 
 curl -fsS "https://tiles.openwaters.io/seascape/style.json?unit=ft" -o /tmp/seascape-style.json
-python3 - <<'PY'
-import json
-style = json.load(open('/tmp/seascape-style.json'))
-out = []
-for layer in style['layers']:
-    # seascape-vector only: the dem and coverage sources are not bundled, and a
-    # layer pointing at a missing source is a style MapLibre refuses to load.
-    if layer.get('source') != 'seascape-vector':
-        continue
-    for key in ('layout', 'paint'):
-        block = layer.get(key)
-        if block:
-            for k in [k for k in block if k.startswith('text-')]:
-                block.pop(k)
-    out.append(layer)
-json.dump(out, open('Slackwater/Resources/seascape-layers.json', 'w'))
-print(f'{len(out)} seascape layers: ' + ', '.join(l['id'] for l in out))
-PY
+# seascape-vector only: the dem and coverage sources are not bundled, and a
+# layer pointing at a missing source is a style MapLibre refuses to load.
+python3 tools/slice-layers.py /tmp/seascape-style.json seascape-vector Slackwater/Resources/seascape-layers.json
 
 ls -la Slackwater/Resources/seascape.pmtiles Slackwater/Resources/seascape-layers.json

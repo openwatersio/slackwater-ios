@@ -9,7 +9,7 @@
 import Foundation
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
-struct ChsStationInfo: Decodable, Identifiable, Hashable {
+struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String        // registry key, e.g. "chs-victoria"
     let name: String
     let region: String
@@ -18,28 +18,15 @@ struct ChsStationInfo: Decodable, Identifiable, Hashable {
     let longitude: Double
     let timezone: String
 
-    static let victoriaID = "chs-victoria"
-
-    static let all: [ChsStationInfo] = {
-        guard let url = Bundle.main.url(forResource: "chs-stations", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let stations = try? JSONDecoder().decode([ChsStationInfo].self, from: data) else { return [] }
-        return stations.sorted { $0.name < $1.name }
-    }()
-
-    /// Same ranking as TideStationRecord.searchRank (mirrors web search.ts).
-    func searchRank(_ query: String) -> Int? {
-        if name.lowercased().contains(query) { return 0 }
-        if region.lowercased().contains(query) { return 1 }
-        if aliases.contains(where: { $0.contains(query) }) { return 2 }
-        return nil
-    }
+    static let all: [ChsStationInfo] = bundled("chs-stations")
 }
 
-/// A harmonic model fitted on this device from IWLS `wlp` predictions —
-/// the only CHS-derived artifact, and it never leaves the device.
-struct ChsFittedModel: Codable {
-    struct Con: Codable { let name: String; let amplitude: Double; let phase: Double }
+/// A harmonic model fitted on this device from IWLS predictions (`wlp` for a
+/// tide port, `wcsp1`/`wcdp1` for a current gate) — the only CHS-derived
+/// artifact, and it never leaves the device. One shape for both series; the
+/// optionals are nil for a tide port, and stay optional so every model file
+/// either pre-merge shape ever wrote to a device still decodes.
+struct ChsModel: Codable {
     var schemaVersion = 1
     let stationID: String     // registry key
     let iwlsID: String        // resolved at runtime by position (never bundled)
@@ -47,9 +34,18 @@ struct ChsFittedModel: Codable {
     let fittedAt: Date
     let fitStartMs: Double
     let fitEndMs: Double
-    /// Z0: mean level above chart datum, metres.
+    /// Days of data behind a gate fit. Less than the gate's `fitDays` means
+    /// this is the PROVISIONAL fast answer, not the final model. Optional so a
+    /// model stored by build ≤14 (always the full window) still decodes.
+    var fitDays: Double? = nil
+    /// The flood/ebb axis — IWLS station metadata, fetched by this user, kept
+    /// local, never re-served. Gate models only.
+    var floodDirection: Double? = nil
+    var ebbDirection: Double? = nil
+    /// Z0: mean level above chart datum (metres) — for a gate, net mean flow
+    /// along the flood axis (knots, signed).
     let offset: Double
-    /// Fit residual, metres.
+    /// Fit residual: metres for a tide port, knots for a gate.
     let rms: Double
     let constituents: [Con]
 }
@@ -62,17 +58,22 @@ enum ChsModelStore {
         return base.appendingPathComponent("ChsModels", isDirectory: true)
     }()
 
-    static func url(_ stationID: String) -> URL { dir.appendingPathComponent("\(stationID).json") }
-
-    static func load(_ stationID: String) -> ChsFittedModel? {
-        guard let data = try? Data(contentsOf: url(stationID)) else { return nil }
-        return try? JSONDecoder().decode(ChsFittedModel.self, from: data)
+    static func url(_ stationID: String, suffix: String = "") -> URL {
+        dir.appendingPathComponent("\(stationID)\(suffix).json")
     }
 
-    static func save(_ model: ChsFittedModel) throws {
+    static func load<T: Decodable>(_ stationID: String, suffix: String) -> T? {
+        guard let data = try? Data(contentsOf: url(stationID, suffix: suffix)) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    static func save<T: Encodable>(_ value: T, id: String, suffix: String) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(model).write(to: url(model.stationID), options: .atomic)
+        try JSONEncoder().encode(value).write(to: url(id, suffix: suffix), options: .atomic)
     }
+
+    static func load(_ stationID: String) -> ChsModel? { load(stationID, suffix: "") }
+    static func save(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "") }
 
     /// UI-test hook: `-chsResetModels` wipes the store for a clean first run —
     /// including the fetched chunks, or "first run" would silently be a resume.
@@ -86,15 +87,13 @@ enum ChsModelStore {
 extension ChsStationInfo {
     /// A fitted CHS station renders through the exact same record/engine/view
     /// path as a bundled NOAA station — provenance shows only in the footer.
-    func record(with model: ChsFittedModel) -> TideStationRecord {
+    func record(with model: ChsModel) -> TideStationRecord {
         TideStationRecord(
             id: id, name: name, region: region, aliases: aliases,
             latitude: latitude, longitude: longitude, timezone: timezone,
             chartDatum: "Chart",  // heights are above CHS chart datum
             datumOffset: model.offset,
-            constituents: model.constituents.map {
-                TideStationRecord.Con(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
-            })
+            constituents: model.constituents)
     }
 }
 

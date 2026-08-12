@@ -8,8 +8,13 @@
 //   - BASIS + SA/SSA constituent list (in chs-glue.js)
 //   - wlp is 1-min native → decimated to 15-min before bridging; 7-day request
 //     cap; queries by resolved Mongo id, never station code
+import CoreLocation
 import Foundation
 import JavaScriptCore
+
+/// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
+/// stand-in: every IWLS request throws before the socket).
+let networkKillSwitch = CommandLine.arguments.contains("-networkKillSwitch")
 
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.
@@ -54,10 +59,6 @@ final class ChsFitService: ObservableObject {
     /// reloads off this the same way a fitted card re-renders off
     /// `currentRecords` changing.
     @Published private(set) var onlineFetchStamp = 0
-
-    /// True once launched with `-networkKillSwitch` (UI tests' honest
-    /// airplane-mode stand-in: every IWLS request throws before the socket).
-    let networkDisabled = CommandLine.arguments.contains("-networkKillSwitch")
 
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
@@ -261,7 +262,7 @@ final class ChsFitService: ObservableObject {
     }
 
     private func pump() {
-        guard !running, !networkDisabled, queue.nextPending != nil else { return }
+        guard !running, !networkKillSwitch, queue.nextPending != nil else { return }
         running = true
         Task.detached(priority: .utility) { [self] in await run() }
     }
@@ -275,7 +276,7 @@ final class ChsFitService: ObservableObject {
     }
 
     /// The fast answer landed: publish it, keep the job queued (it is not done).
-    private func publishProvisional(_ gate: ChsCurrentGateInfo, _ model: ChsCurrentModel) {
+    private func publishProvisional(_ gate: ChsCurrentGateInfo, _ model: ChsModel) {
         try? ChsModelStore.saveCurrent(model)
         currentRecords[gate.id] = gate.record(with: model)
         provisional.insert(gate.id)
@@ -300,7 +301,7 @@ final class ChsFitService: ObservableObject {
             do {
                 if job.isCurrent {
                     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
-                    else { throw ChsError.noStations }
+                    else { throw ChsError.failed("no bundled gate \(job.id)") }
                     let model = try await fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.saveCurrent(model)
                     await MainActor.run {
@@ -311,7 +312,7 @@ final class ChsFitService: ObservableObject {
                     ChsChunkStore.purge(model.iwlsID)
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
-                    else { throw ChsError.noStations }
+                    else { throw ChsError.failed("no bundled port \(job.id)") }
                     let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.save(model)
                     await MainActor.run {
@@ -338,7 +339,7 @@ final class ChsFitService: ObservableObject {
     nonisolated static let tideFitDays = 60.0
 
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
-                                 fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsFittedModel {
+                                 fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
         let station = try Self.resolve(info, in: list)
         let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
         let plan = Self.chunkPlan(days: Self.tideFitDays, end: end)
@@ -351,12 +352,11 @@ final class ChsFitService: ObservableObject {
         let start = plan.last?.start ?? end
         let fit = try await fitter.fit(samples: samples)
         print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms (interpreted, no JIT), rms \(String(format: "%.1f", fit.rms * 100)) cm")
-        return ChsFittedModel(
+        return ChsModel(
             stationID: info.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
             fitEndMs: end.timeIntervalSince1970 * 1000,
-            offset: fit.offset, rms: fit.rms,
-            constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
+            offset: fit.offset, rms: fit.rms, constituents: fit.constituents)
     }
 
     /// wcsp1+wcdp1 over the gate's OWN validated window, projected onto the CHS
@@ -370,12 +370,12 @@ final class ChsFitService: ObservableObject {
     /// 60-day chunks are the same chunks the 210-day fetch needs: no request is
     /// made twice, and nothing is thrown away.
     private nonisolated func fitCurrent(_ gate: ChsCurrentGateInfo, list: [IwlsStation],
-                                        fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsCurrentModel {
+                                        fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
                                        series: "wcsp1", in: list)
         let meta = try await fetcher.metadata(stationID: station.id)
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-            throw ChsError.noFloodAxis(gate.name)
+            throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
         }
         let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
         let plan = Self.chunkPlan(days: gate.fitDays, end: end)
@@ -407,17 +407,16 @@ final class ChsFitService: ObservableObject {
     private nonisolated static func model(gate: ChsCurrentGateInfo, station: IwlsStation,
                                           flood: Double, ebb: Double, start: Date, end: Date,
                                           fitDays: Double, speeds: [ChsSample], dirs: [ChsSample],
-                                          fitter: ChsFitter) async throws -> ChsCurrentModel {
+                                          fitter: ChsFitter) async throws -> ChsModel {
         let samples = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
         let fit = try await fitter.fit(samples: samples)
         print("CHS current fit \(gate.id) @ \(Int(fitDays)) d: \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
-        return ChsCurrentModel(
+        return ChsModel(
             stationID: gate.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
             fitEndMs: end.timeIntervalSince1970 * 1000, fitDays: fitDays,
             floodDirection: flood, ebbDirection: ebb,
-            offset: fit.offset, rms: fit.rms,
-            constituents: fit.constituents.map { .init(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) })
+            offset: fit.offset, rms: fit.rms, constituents: fit.constituents)
     }
 
     /// 7-day chunks covering at least `days` back from `end`, NEWEST FIRST.
@@ -471,9 +470,11 @@ final class ChsFitService: ObservableObject {
         guard let best = candidates.min(by: {
             distanceKm(latitude, longitude, $0.latitude, $0.longitude) <
             distanceKm(latitude, longitude, $1.latitude, $1.longitude)
-        }) else { throw ChsError.noStations }
+        }) else { throw ChsError.failed("no IWLS station serves \(series)") }
         let km = distanceKm(latitude, longitude, best.latitude, best.longitude)
-        guard km <= resolveToleranceKm else { throw ChsError.noStationWithinTolerance(name, best.officialName, km) }
+        guard km <= resolveToleranceKm else {
+            throw ChsError.failed("\(name): nearest \(series) station \(best.officialName) is \(String(format: "%.1f", km)) km away")
+        }
         return best
     }
 }
@@ -500,7 +501,7 @@ extension ChsFitService {
                                        series: "wcsp1", in: list)
         let meta = try await fetcher.metadata(stationID: station.id)
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-            throw ChsError.noFloodAxis(gate.name)
+            throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
         }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = gate.tz
@@ -523,7 +524,7 @@ extension ChsFitService {
         // start/end below and stick forever — a zero-sample window that
         // still reads as "covers the strip". Fail the fetch instead: the
         // caller already turns any thrown error into the honesty card + retry.
-        guard !projected.isEmpty else { throw ChsError.emptySeries(gate.name) }
+        guard !projected.isEmpty else { throw ChsError.failed("\(gate.name): IWLS returned an empty series") }
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
         // would make `coversStrip` pass on a window with a hole in it and
@@ -554,13 +555,9 @@ enum ChsError: Error {
     /// Stepped aside at a chunk boundary for a station the user opened. Not a
     /// failure: the job goes back to `.pending` with its chunks on disk.
     case yielded
-    case noStations
-    case noStationWithinTolerance(String, String, Double)
-    case noFloodAxis(String)
-    /// IWLS 200'd with zero samples for the requested window.
-    case emptySeries(String)
-    case badResponse(Int)
-    case jsError(String)
+    /// Anything terminal for this job. No catch site reads the string; it is
+    /// for the thrown error's description only.
+    case failed(String)
 }
 
 // MARK: - IWLS client (Swift/URLSession — never JSCore)
@@ -621,7 +618,7 @@ final class IwlsFetcher {
     private let killSwitch: Bool
     private var lastRequest = Date.distantPast
 
-    init(killSwitch: Bool = CommandLine.arguments.contains("-networkKillSwitch")) {
+    init(killSwitch: Bool = networkKillSwitch) {
         self.killSwitch = killSwitch
     }
 
@@ -632,7 +629,7 @@ final class IwlsFetcher {
         lastRequest = .now
         let (data, response) = try await URLSession.shared.data(from: URL(string: Self.base + path)!)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard code == 200 else { throw ChsError.badResponse(code) }
+        guard code == 200 else { throw ChsError.failed("HTTP \(code)") }
         return data
     }
 
@@ -689,12 +686,10 @@ final class IwlsFetcher {
 // MARK: - JSCore fitter
 
 struct ChsFitResult: Decodable {
-    struct Con: Decodable { let name: String; let amplitude: Double; let phase: Double }
     let fitMs: Double
     let offset: Double
     let rms: Double
     let constituents: [Con]
-    let unseparable: [String]
 }
 
 /// Runs chs-bundle.js + chs-glue.js in JavaScriptCore, off the main thread.
@@ -711,10 +706,10 @@ final class ChsFitter {
         ctx.evaluateScript("var console = {log:function(){},warn:function(){},error:function(){},info:function(){},debug:function(){}};")
         for name in ["chs-bundle", "chs-glue"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "js") else {
-                throw ChsError.jsError("\(name).js missing from bundle")
+                throw ChsError.failed("\(name).js missing from bundle")
             }
             ctx.evaluateScript(try String(contentsOf: url, encoding: .utf8))
-            if let e = jsError { throw ChsError.jsError("\(name).js: \(e)") }
+            if let e = jsError { throw ChsError.failed("\(name).js: \(e)") }
         }
         context = ctx
         return ctx
@@ -726,7 +721,7 @@ final class ChsFitter {
         jsError = nil
         guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [json]),
               jsError == nil, let str = out.toString() else {
-            throw ChsError.jsError(jsError ?? "fitTides returned nothing")
+            throw ChsError.failed(jsError ?? "fitTides returned nothing")
         }
         return try JSONDecoder().decode(ChsFitResult.self, from: Data(str.utf8))
     }
@@ -734,9 +729,8 @@ final class ChsFitter {
 
 // MARK: - Geo
 
+/// Great-circle distance in kilometres.
 func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
-    let r = 6371.0, d = Double.pi / 180
-    let dLat = (lat2 - lat1) * d, dLon = (lon2 - lon1) * d
-    let a = sin(dLat / 2) * sin(dLat / 2) + cos(lat1 * d) * cos(lat2 * d) * sin(dLon / 2) * sin(dLon / 2)
-    return 2 * r * atan2(sqrt(a), sqrt(1 - a))
+    CLLocation(latitude: lat1, longitude: lon1)
+        .distance(from: CLLocation(latitude: lat2, longitude: lon2)) / 1000
 }

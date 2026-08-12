@@ -17,11 +17,11 @@ struct SlackwaterApp: App {
         if CommandLine.arguments.contains("-seedGate") {
             UserDefaults.standard.set(true, forKey: seenGateKey)
         }
-        // -seedOnlineWindow <id>: writes a fetched-looking ChsOnlineWindow for
-        // one of the 7 online (fit-reject) gates, so a UI test can land on
-        // OnlineGateDetailView's fetched single-track detail with no network.
-        if let i = CommandLine.arguments.firstIndex(of: "-seedOnlineWindow"),
-           CommandLine.arguments.indices.contains(i + 1) {
+        // -seedOnlineWindow <id> (UserDefaults argument domain): writes a
+        // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
+        // gates, so a UI test can land on OnlineGateDetailView's fetched
+        // single-track detail with no network.
+        if let id = UserDefaults.standard.string(forKey: "seedOnlineWindow") {
             // Trap: ChsFitService.shared's own init calls
             // ChsModelStore.resetIfRequested(), which wipes ChsModelStore.dir
             // — the same directory the seed file below lands in. `shared` is a
@@ -31,7 +31,7 @@ struct SlackwaterApp: App {
             // silently delete it. Touch `.shared` now so the one-time
             // init/reset happens before the write, never after.
             _ = ChsFitService.shared
-            seedOnlineWindow(stationID: CommandLine.arguments[i + 1])
+            seedOnlineWindow(stationID: id)
         }
     }
 
@@ -231,16 +231,14 @@ struct StationListView: View {
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
     /// One-shot: set by the map-header title tap (issue #32), read by
-    /// `mapPane` as a camera override, then cleared — on a fresh mount via
-    /// `.onAppear`, or (review finding: a detail reached via a MAP PIN tap
-    /// leaves `showMap` already `true`, so the map never remounts) via
-    /// `MapViewRepresentable.onFocusApplied` once `updateUIView` actually
-    /// moves an already-live camera. Either way, the next fix landing or
-    /// user pan owns the camera after that, same as the plain discovery map.
+    /// `mapPane` as a camera override, then cleared by `.onAppear`. The next
+    /// fix landing or user pan owns the camera after that.
     @State private var mapFocus: StationItem?
-    /// Bumped on every focus tap — `MapViewRepresentable.focusToken`'s
-    /// "did a NEW focus arrive" signal for `updateUIView`, distinct from the
-    /// coordinate itself so re-focusing the SAME station twice still counts.
+    /// Bumped on every focus tap and used as `mapPane`'s `.id`, so a focus
+    /// always REMOUNTS the map — even on the pin-tap path where `showMap` is
+    /// already true and the map instance would otherwise survive the
+    /// push/pop. Distinct from the coordinate so re-focusing the SAME
+    /// station twice still counts.
     @State private var mapFocusToken = 0
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
@@ -286,9 +284,6 @@ struct StationListView: View {
     /// because it is harmless and the measured behaviour is good; if it ever
     /// needs to go, the honest replacement is the flat base, not a rewrite.
     @ScaledMetric(relativeTo: .body) private var fabClearance: CGFloat = Self.fabClearanceBase
-    /// `unavailableCard`'s icon tile — tracks the `.title3` icon it holds
-    /// (sweep finding, same failure shape as `ProvisionalBadge`/`ChsAmberCard`).
-    @ScaledMetric(relativeTo: .title3) private var deniedIconTileSize: CGFloat = 46
 
     private var regular: Bool { hSize == .regular }
     private var imperial: Bool { units == "imperial" }
@@ -529,14 +524,9 @@ struct StationListView: View {
     private var mapPane: some View {
         // `mapFocus` wins when set (header-title tap, issue #32): centers on
         // that station at its own detail zoom rather than the fix/discovery
-        // camera. Usually `makeUIView` runs fresh here (`if showMap { mapPane
-        // }` is a structural identity change, so this read is a plain
-        // one-shot init) — EXCEPT a detail reached via a map PIN tap leaves
-        // `showMap` already `true`, so the pane never remounts and the same
-        // `MLNMapView` survives the push/pop. `focusToken`/`onFocusApplied`
-        // exist for exactly that case: `updateUIView` (not `makeUIView`)
-        // catches the new focus and moves the live camera (review finding on
-        // the first cut of #32) — see `MapViewRepresentable`'s doc comments.
+        // camera. `.id(mapFocusToken)` forces a remount on every focus, so
+        // `makeUIView` handles the camera even on the pin-tap path where the
+        // pane is already mounted (`showMap` stayed true across the push/pop).
         //
         // A ZStack, not `.overlay` on the map: the map ignores the safe area
         // and an overlay on it inherits that frame, so the pill's offset was
@@ -549,19 +539,16 @@ struct StationListView: View {
                 center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
                     ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
                     ?? SALISH_CENTER,
-                zoom: mapFocus == nil ? discoveryZoom : stationZoom,
-                focusToken: mapFocus == nil ? nil : mapFocusToken,
-                // Only reached on the NO-remount path (see above) — a fresh
-                // mount's `mapFocus` is cleared by `.onAppear` below instead.
-                onFocusApplied: { DispatchQueue.main.async { mapFocus = nil } }
+                zoom: mapFocus == nil ? discoveryZoom : stationZoom
             ) { item in
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
             }
+            .id(mapFocusToken)
             .accessibilityIdentifier("map-canvas")
-            // Consumed once, fresh-mount case: the next appearance of this pane
-            // (fab toggle, a fresh pick) starts from the fix/discovery camera
-            // again, not a stale focus from a station visited an hour ago.
+            // Consumed once: the next appearance of this pane (fab toggle, a
+            // fresh pick) starts from the fix/discovery camera again, not a
+            // stale focus from a station visited an hour ago.
             .onAppear { mapFocus = nil }
             .ignoresSafeArea()
 
@@ -643,7 +630,7 @@ struct StationListView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
         } else if loc.denied {
-            unavailableCard.padding(.horizontal, 16).padding(.top, 14)
+            unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
         }
 
         // Favorites: starred stations, insertion order (spec §9 swipe-to-manage).
@@ -754,23 +741,12 @@ struct StationListView: View {
     @ViewBuilder private func matchingButton(_ item: StationItem, _ places: StationGroups) -> some View {
         let matches = places.matches(item)
         if matches.count > 1 {
-            Button {
+            BranchLink(text: "\(matches.count) matching stations",
+                       id: "matching-stations", chevron: false) {
                 chooser = StationMatches(place: item.name, matches: matches)
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.caption2.weight(.semibold))
-                    Text("\(matches.count) matching stations")
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(SN.leaf)
-                .padding(.horizontal, 18)
-                .padding(.top, 7)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("matching-stations")
+            .padding(.horizontal, 18)
+            .padding(.top, 7)
         }
     }
 
@@ -820,51 +796,18 @@ struct StationListView: View {
         }
     }
 
-    /// Location denied — `SN.amber` card, deep link to the app's iOS Settings.
-    /// The token, not a literal: this card renders in the My Location slot
-    /// directly above Near Me cards whose glyphs draw ebb, and the retired
-    /// golden amber it used to hardcode is the value amber moved away from
-    /// precisely because it read as ebb at that adjacency.
+    /// Location denied — the app's one amber card (ChsAmberCard carries the
+    /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
-        Button {
+        ChsAmberCard(title: "Location unavailable",
+                     headline: "Turn on location for Slackwater to see stations near you.",
+                     action: "Go to Settings",
+                     identifier: "location-denied-card",
+                     icon: "location.slash") {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 UIApplication.shared.open(url)
             }
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 13) {
-                    Image(systemName: "location.slash")
-                        .font(.title3)
-                        .foregroundStyle(SN.amber)
-                        .frame(width: deniedIconTileSize, height: deniedIconTileSize)
-                        .background(SN.amber.opacity(0.16),
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Location unavailable")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(SN.paper)
-                        Text("Turn on location for Slackwater to see stations near you.")
-                            .font(.footnote)
-                            .foregroundStyle(SN.foam.opacity(0.62))
-                    }
-                }
-                HStack(spacing: 4) {
-                    Spacer()
-                    Text("Go to Settings")
-                    Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(SN.amber)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SN.amber.opacity(0.1),
-                        in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -1272,7 +1215,7 @@ struct RecentRowLabel: View {
     }
 
     private var reading: String {
-        if let gate { return phaseWord(gate.phase).lowercased() }
+        if let gate { return gate.phase.word.lowercased() }
         if let current {
             return currentPhase(signed: current.signed) == .slack
                 ? "slack" : "\(formatSpeed(abs(current.signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))"
@@ -1357,25 +1300,32 @@ struct ChsCardView: View {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial, km: km)
         case .fitting:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
-                           message: "Downloading Canadian tidal predictions…")
+            pending(fitting: true)
         case .pending:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
-                           message: chsPendingMessage("tidal", id: info.id))
+            pending()
         case .failed:
-            ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
-                           message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
+            pending(failed: true)
         }
+    }
+
+    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+        ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
+                       message: chsPendingMessage("tidal", id: info.id,
+                                                  fitting: fitting, failed: failed))
     }
 }
 
-/// A station with no model yet. Three honest situations, not one:
+/// A station with no model yet. The honest situations, not one blanket line:
+///   - mid-download or failed-this-run — say which.
 ///   - not in the download set at all (M53 — most of Canada): opening it is
 ///     what downloads it, so say that rather than implying a queue it isn't in.
 ///   - queued and connected: it is in line behind the nearer stations.
 ///   - no signal: nothing is moving at all. The established moment-of-signal
 ///     copy is kept verbatim.
-@MainActor func chsPendingMessage(_ series: String, id: String) -> String {
+@MainActor func chsPendingMessage(_ series: String, id: String,
+                                  fitting: Bool = false, failed: Bool = false) -> String {
+    if fitting { return "Downloading Canadian \(series) predictions…" }
+    if failed { return "Canadian \(series) predictions didn't finish downloading — open it to retry." }
     if !ChsFitService.shared.isQueued(id) {
         return "Open to download — Canadian \(series) predictions download once, then work offline."
     }
@@ -1439,15 +1389,19 @@ struct ChsGateCardView: View {
         case .fitted(let port):
             fittedCard(DerivedGateRecord(gate: gate, port: port))
         case .fitting:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Downloading Canadian tidal predictions…")
+            pending(fitting: true)
         case .pending:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: chsPendingMessage("tidal", id: gate.reference))
+            pending()
         case .failed:
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Canadian tidal predictions didn't finish downloading — open it to retry.")
+            pending(failed: true)
         }
+    }
+
+    /// A derived gate waits on its reference PORT's tidal download.
+    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                       message: chsPendingMessage("tidal", id: gate.reference,
+                                                  fitting: fitting, failed: failed))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -1495,14 +1449,11 @@ struct ChsCurrentGateCardView: View {
                     CurrentCardView(record: record, km: km,
                                     provisional: service.isProvisional(gate.id) ? gate : nil)
                 case .fitting:
-                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                                   message: "Downloading Canadian current predictions…")
+                    pending(fitting: true)
                 case .pending:
-                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                                   message: chsPendingMessage("current", id: gate.id))
+                    pending()
                 case .failed:
-                    ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                                   message: "Canadian current predictions didn't finish downloading — open it to retry.")
+                    pending(failed: true)
                 }
             }
         }
@@ -1523,6 +1474,12 @@ struct ChsCurrentGateCardView: View {
     private func refreshOnlineWindow() {
         guard gate.isOnline else { return }
         onlineWindow = ChsModelStore.loadOnline(gate.id)
+    }
+
+    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+                       message: chsPendingMessage("current", id: gate.id,
+                                                  fitting: fitting, failed: failed))
     }
 
     /// The 7 online gates (online-gates spec §4): a covering fetched window
@@ -1571,7 +1528,7 @@ struct OnlineGateCardView: View {
                 HStack(spacing: 4) {
                     CompassArrow(deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection)
                         .font(.caption2)
-                    Text(phaseWord(currentPhase(signed: state.signed))).font(.caption2)
+                    Text(currentPhase(signed: state.signed).word).font(.caption2)
                 }
                 .foregroundStyle(SN.foam.opacity(0.9))
             }
@@ -1623,7 +1580,7 @@ struct CurrentCardView: View {
         StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state),
                     name: record.name, region: record.region, km: km,
                     detail: state?.next.map { nextLine($0) },
-                    badge: { if provisional != nil { ProvisionalBadge() } }) {
+                    provisional: provisional != nil) {
             if let state {
                 let phase = currentPhase(signed: state.signed)
                 if phase == .slack {
@@ -1642,7 +1599,7 @@ struct CurrentCardView: View {
                         .foregroundStyle(.white)
                     HStack(spacing: 4) {
                         CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
-                        Text(phaseWord(phase)).font(.caption2)
+                        Text(phase.word).font(.caption2)
                     }
                     .foregroundStyle(SN.foam.opacity(0.9))
                 }
