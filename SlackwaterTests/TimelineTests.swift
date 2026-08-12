@@ -39,6 +39,19 @@ final class TimelineTests: XCTestCase {
         XCTAssert(d.tidePoints.allSatisfy { $0.time >= d.start && $0.time <= d.end })
     }
 
+    func testContainsBoundsTheStripWindow() {
+        let today = todayLocal(friday.tz)
+        let now = Date()
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: today)
+        XCTAssert(d.contains(now), "a today-anchored strip contains now")
+
+        let ahead = TimelineData.build(tide: friday, current: nil, now: now,
+                                       anchor: today.addingTimeInterval(34 * 86_400))
+        XCTAssertFalse(ahead.contains(now),
+                       "a September strip must not claim to hold today's now-marker")
+        XCTAssert(ahead.contains(ahead.anchor.addingTimeInterval(3 * 86_400)))
+    }
+
     /// Day chrome must reach far enough that the LAST night on the strip still
     /// finds the following sunrise — `drawDayChrome` reads day+1 to place the moon
     /// mid-night. Window ends at anchor+7.5d, so offset 8 has to exist.

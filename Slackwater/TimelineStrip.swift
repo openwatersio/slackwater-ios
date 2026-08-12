@@ -245,6 +245,10 @@ struct TimelineData {
         anchor...anchor.addingTimeInterval(Timeline.scheduleHours * 3600)
     }
 
+    /// Is `t` inside the drawn window? The guard on anything positioned by
+    /// absolute time rather than by the window itself.
+    func contains(_ t: Date) -> Bool { t >= start && t <= end }
+
     func x(_ t: Date) -> CGFloat {
         CGFloat(t.timeIntervalSince(start) / 3600) * Timeline.pph
     }
@@ -597,7 +601,11 @@ struct TimelineCanvas: View {
         drawDayChrome(ctx)
         if geo.hasTide { drawTide(ctx) }
         if geo.hasCurrent { drawCurrent(ctx) }
-        // Real-now faint marker rides the timeline (prototype 'nowt').
+        // Real-now faint marker rides the timeline (prototype 'nowt') — but
+        // only when now is ON this timeline. An anchored strip a month out has
+        // no "now" to mark, and drawing it anyway pins a dashed line to
+        // whichever edge the clamp lands on, which reads as a real event.
+        guard data.contains(now) else { return }
         var nowLine = Path()
         nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
         nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
