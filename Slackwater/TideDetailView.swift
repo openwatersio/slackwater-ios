@@ -14,6 +14,9 @@ struct TideDetailView: View {
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = appNow()
     @State private var timeline: TimelineData?
+    /// The local midnight the window hangs from. Only `returnToNow` and (in
+    /// Plan B) the range bar move it; everything else reads it.
+    @State private var anchor = Date.distantPast
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -46,7 +49,8 @@ struct TideDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if timeline == nil {
-                timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: todayLocal(tz))
+                anchor = todayLocal(tz)
+                rebuild()
             }
             RecentsStore.shared.record(record.id)
         }
@@ -159,5 +163,16 @@ struct TideDetailView: View {
     private func returnToNow() {
         live = appNow()
         scrubTime = live
+        // The anchor too: return-to-now from a September window has to bring
+        // the whole window back, not just park the centerline at a `now` that
+        // isn't on this strip.
+        anchor = todayLocal(tz)
+        rebuild()
+    }
+
+    /// One place the timeline is rebuilt from, so the anchor and the record
+    /// can never be applied by two different code paths.
+    private func rebuild() {
+        timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
     }
 }

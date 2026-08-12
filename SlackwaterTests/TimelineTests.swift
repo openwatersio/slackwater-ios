@@ -23,6 +23,20 @@ final class TimelineTests: XCTestCase {
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
     }
 
+    /// `now:` used to be a dead parameter — `today` was always derived from the
+    /// real clock (`todayLocal(tz)`) regardless of what was passed in. A caller
+    /// simulating a different day (a test, or a future date-picker caller) must
+    /// get back ITS day, not the device's.
+    func testTodayDerivesFromThePassedNowNotTheRealClock() {
+        let tz = friday.tz
+        let simulatedNow = todayLocal(tz).addingTimeInterval(5 * 86_400 + 3600)  // 5 days ahead, mid-morning
+        let d = TimelineData.build(tide: friday, current: nil, now: simulatedNow, anchor: todayLocal(tz))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        XCTAssertEqual(d.today, cal.startOfDay(for: simulatedNow),
+                       "today must follow the passed `now`, not the real clock")
+    }
+
     /// The anchor drives geometry; `today` stays the real day. A September strip
     /// must be built around September and still know what day it actually is.
     func testFutureAnchorMovesTheWindowButNotToday() {

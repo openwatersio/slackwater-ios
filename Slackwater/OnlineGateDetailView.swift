@@ -16,6 +16,9 @@ struct OnlineGateDetailView: View {
     @State private var live = appNow()
     @State private var scrubTime = appNow()
     @State private var window: ChsOnlineWindow?
+    /// The local midnight the window hangs from. Only `returnToNow` and (in
+    /// Plan B) the range bar move it; everything else reads it.
+    @State private var anchor = Date.distantPast
     @State private var fetching = false
     @State private var fetchFailed = false
 
@@ -40,10 +43,16 @@ struct OnlineGateDetailView: View {
     /// same as no window at all — never a chart with a dead zone in it). Not
     /// cached in `@State`: a few hundred filtered/sorted points is cheap next
     /// to the tide/current harmonic synthesis `CurrentDetailView` caches for.
+    ///
+    /// Computed, not `@State` — unlike the other three details, which store
+    /// their `TimelineData`. It re-reads `window`/`anchor`/`live` on every
+    /// access, so nothing here needs an explicit rebuild when the anchor
+    /// moves; SwiftUI re-evaluates it. Don't add a `rebuild()` seam for
+    /// symmetry with the others — it would have an empty body.
     private var timeline: TimelineData? {
         guard let window, window.coversStrip(now: live) else { return nil }
         return TimelineData.build(onlinePoints: window.points, tz: tz,
-                                  lat: gate.latitude, lon: gate.longitude, now: live, anchor: todayLocal(tz))
+                                  lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
     }
 
     private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }
@@ -98,6 +107,7 @@ struct OnlineGateDetailView: View {
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            anchor = todayLocal(tz)
             if window == nil { window = ChsModelStore.loadOnline(gate.id) }
             RecentsStore.shared.record(gate.id)
             if window?.coversStrip(now: live) != true, net.online { fetchNow() }
@@ -307,5 +317,9 @@ struct OnlineGateDetailView: View {
     private func returnToNow() {
         live = appNow()
         scrubTime = live
+        // The anchor too: return-to-now from a September window has to bring
+        // the whole window back, not just park the centerline at a `now` that
+        // isn't on this strip.
+        anchor = todayLocal(tz)
     }
 }

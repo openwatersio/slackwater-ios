@@ -292,9 +292,10 @@ struct TimelineData {
     }
 
     private static func dayChrome(tz: TimeZone, lat: Double, lon: Double,
-                                  anchor: Date, today: Date) -> DayChrome {
+                                  anchor: Date, now: Date) -> DayChrome {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
+        let today = cal.startOfDay(for: now)   // the caller's clock, not the app's
         let w = Timeline.window(anchor: anchor, today: today)
         // -2 covers the back-pad on the current week; 8 exists so the last
         // visible night (offset 7) can find the following sunrise for its moon.
@@ -327,7 +328,7 @@ struct TimelineData {
     /// clip to the visible window.
     static func build(onlinePoints: [CurrentPoint], tz: TimeZone, lat: Double, lon: Double,
                       now: Date, anchor: Date) -> TimelineData {
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, today: todayLocal(tz))
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, now: now)
         let start = chrome.start, end = chrome.end
 
         let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
@@ -367,7 +368,7 @@ struct TimelineData {
         let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
         let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
         let lon = gate?.gate.longitude ?? current?.longitude ?? tide?.longitude ?? -123.0
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, today: todayLocal(tz))
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, now: now)
         let today = chrome.today, start = chrome.start, end = chrome.end, days = chrome.days
 
         let pad = eventPad
