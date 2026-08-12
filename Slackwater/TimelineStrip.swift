@@ -255,6 +255,26 @@ struct TimelineData {
     /// absolute time rather than by the window itself.
     func contains(_ t: Date) -> Bool { t >= start && t <= end }
 
+    /// The days with any part of them on the strip — the ONE definition of what
+    /// day chrome draws, derived from the window so it can't drift again. It
+    /// already did: a literal `offset <= 5`, correct for the 132h strip it was
+    /// written against, outlived it and left days 6 and 7 with no night bands,
+    /// no daylight tint, no label and no sun dots — while their sun events
+    /// stayed in `snapTimes`, so the magnet parked the centerline on a sunrise
+    /// that was drawn nowhere.
+    ///
+    /// An OVERLAP test, not `contains($0.start)`: on the fall-back DST day two
+    /// calendar days back is 49 hours, so a back-padded `start` lands AFTER
+    /// that day's midnight and a midnight-in-window test would drop 23 visible
+    /// hours of chrome — the same bug, once a year. Don't "simplify" this back
+    /// to a midnight test. `day(of: start)` is the day the window opens inside,
+    /// and it is visible whether its own midnight is or not. `days` runs to offset 8, which is never visible: it exists so the
+    /// last visible night can find the following sunrise for its moon.
+    var visibleDays: [TimelineDay] {
+        let firstStart = day(of: start)?.start ?? .distantPast
+        return days.filter { $0.start >= firstStart && $0.start <= end }
+    }
+
     func x(_ t: Date) -> CGFloat {
         CGFloat(t.timeIntervalSince(start) / 3600) * Timeline.pph
     }
@@ -665,7 +685,7 @@ struct TimelineCanvas: View {
     // Night bands, day tint, day labels, sun markers, per-night moons —
     // continuous across midnight (prototype's per-day rects abut exactly).
     private func drawDayChrome(_ ctx: GraphicsContext) {
-        let visible = data.days.filter { $0.offset <= 5 }
+        let visible = data.visibleDays
         for day in visible {
             let ds = data.x(day.start), de = data.x(day.start.addingTimeInterval(86_400))
             let top = geo.dayY + 4

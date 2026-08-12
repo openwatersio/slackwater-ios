@@ -206,6 +206,47 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(checked, 7)
     }
 
+    /// Day chrome draws every day the strip touches, and nothing else draws a
+    /// snap stop. The filter behind `drawDayChrome` was a literal `offset <= 5`
+    /// left over from the 132h strip: days 6 and 7 of the week drew no night
+    /// band, no tint, no label and no sun dots, while their sun events stayed
+    /// in `snapTimes` — the magnet parked the centerline on a sunrise drawn
+    /// nowhere, silently. So this asserts the RELATIONSHIP to the window, never
+    /// a literal offset range, and it must survive a change to `forwardHours`.
+    func testVisibleDaysFollowTheWindowNotAFixedOffset() {
+        let tz = friday.tz
+        for anchor in [todayLocal(tz), todayLocal(tz).addingTimeInterval(-7 * 86_400)] {
+            let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: anchor)
+            let visible = d.visibleDays
+            let drawn = Set(visible.map(\.offset))
+            XCTAssertFalse(drawn.isEmpty)
+
+            // Drawn ⟺ the day overlaps the window. `days` is contiguous, so a
+            // day ends where the next begins (exact across DST, unlike +86400).
+            for (i, day) in d.days.enumerated() {
+                let dayEnd = i + 1 < d.days.count
+                    ? d.days[i + 1].start : day.start.addingTimeInterval(86_400)
+                let overlaps = day.start <= d.end && dayEnd > d.start
+                XCTAssertEqual(drawn.contains(day.offset), overlaps,
+                               "day \(day.offset) (anchor \(anchor)): overlaps=\(overlaps), drawn=\(drawn.contains(day.offset))")
+            }
+            // No gap at either end: chrome opens on or before the window and
+            // runs past its end.
+            XCTAssert(visible.first!.start <= d.start)
+            XCTAssert(visible.last!.start <= d.end)
+            XCTAssert(visible.last!.start.addingTimeInterval(86_400) >= d.end,
+                      "the last drawn day must reach the end of the strip")
+            // The original failure, stated directly: a day that draws nothing
+            // must contribute no snap stop.
+            for day in d.days where !drawn.contains(day.offset) {
+                for t in [day.sunrise, day.sunset].compactMap({ $0 }) {
+                    XCTAssertFalse(d.snapTimes.contains { abs($0.timeIntervalSince(t)) < 1 },
+                                   "day \(day.offset) draws no chrome, so \(t) must not be a snap stop")
+                }
+            }
+        }
+    }
+
     /// The schedule window (today 00:00 → +54h, prototype tableEl TOP) spans
     /// at least two local days of tide turns — the rolling multi-day list.
     func testScheduleWindowSpansMultipleDays() {
