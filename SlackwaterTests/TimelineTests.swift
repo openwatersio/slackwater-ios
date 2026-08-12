@@ -310,6 +310,21 @@ final class TimelineTests: XCTestCase {
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
     }
 
+    /// A slack outside the sampled series has no window. Events are scanned with a
+    /// ±6h pad beyond the strip and the points are clipped to it, so this case is
+    /// reachable at both edges — and it used to return a window sitting entirely
+    /// before its own slack.
+    func testSlackOutsideTheSeriesHasNoWindow() {
+        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+        let pts = (0...5).map { i in
+            CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600), speed: 0.1)
+        }
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(-3600), threshold: 0.5),
+                     "a slack before the series has no window")
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(6 * 3600), threshold: 0.5),
+                     "a slack after the series must not borrow the trailing run")
+    }
+
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.

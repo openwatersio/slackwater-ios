@@ -79,7 +79,12 @@ func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
 /// brackets the slack.
 func slackWindow(_ points: [CurrentPoint], around slack: Date,
                  threshold: Double) -> (start: Date, end: Date)? {
-    guard !points.isEmpty else { return nil }
+    // A slack outside the sampled series has no measurable window. Events are
+    // scanned with a ±6h pad beyond the strip while `currentPoints` is clipped
+    // to it, so a padded slack can otherwise walk the series' trailing
+    // sub-threshold run and return a window that lies entirely before itself.
+    guard let first = points.first, let last = points.last,
+          slack >= first.time, slack <= last.time else { return nil }
     let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
     let k: Int
     if abs(points[i].speed) < threshold { k = i }
