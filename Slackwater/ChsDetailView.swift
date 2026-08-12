@@ -189,15 +189,16 @@ struct ChsWaitingView: View {
 }
 
 /// The ⚠️ card: the app's one shape for "these numbers aren't what you think".
-/// Shared by the not-yet-downloaded station and the provisional fast answer, on
-/// purpose — a user who has learned to read the amber block once has learned to
-/// read it everywhere.
+/// Shared by the not-yet-downloaded station, the provisional fast answer and
+/// the location-denied card, on purpose — a user who has learned to read the
+/// amber block once has learned to read it everywhere.
 struct ChsAmberCard: View {
     let title: String
     let headline: String
-    let expectation: String
+    var expectation: String? = nil
     let action: String
     let identifier: String
+    var icon = "exclamationmark.triangle.fill"
     let onAction: () -> Void
 
     /// Tracks the icon's own `.title3` so the tile keeps containing the
@@ -209,7 +210,7 @@ struct ChsAmberCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: icon)
                     .font(.title3)
                     .foregroundStyle(SN.amber)
                     .frame(width: iconTileSize, height: iconTileSize)
@@ -227,12 +228,14 @@ struct ChsAmberCard: View {
                 }
             }
 
-            Text(expectation)
-                .font(.footnote)
-                .lineSpacing(3)
-                .foregroundStyle(SN.foam.opacity(0.62))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("chs-waiting-expectation")
+            if let expectation {
+                Text(expectation)
+                    .font(.footnote)
+                    .lineSpacing(3)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("chs-waiting-expectation")
+            }
 
             Button(action: onAction) {
                 HStack(spacing: 4) {

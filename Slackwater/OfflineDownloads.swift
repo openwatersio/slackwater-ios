@@ -34,7 +34,7 @@ final class Connectivity: ObservableObject {
     private init() {
         // The kill switch is the UI tests' airplane mode: stay offline, and
         // don't start a monitor that would immediately contradict it.
-        online = !CommandLine.arguments.contains("-networkKillSwitch")
+        online = !networkKillSwitch
         guard online else { return }
         monitor.pathUpdateHandler = { [weak self] path in
             let up = path.status == .satisfied
@@ -63,7 +63,7 @@ struct OfflineStatusButton: View {
 
     private var state: OfflineIndicatorState {
         let queue = service.queue
-        if net.online, queue.active, !service.networkDisabled {
+        if net.online, queue.active, !networkKillSwitch {
             return .downloading(ready: queue.ready, total: queue.total)
         }
         return net.online ? .online : .offline

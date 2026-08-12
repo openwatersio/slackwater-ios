@@ -8,7 +8,6 @@ import TideEngine
 
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo
-    @AppStorage(unitsKey) private var units = "imperial"
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @ObservedObject private var net = Connectivity.shared
     @Environment(\.openChsRoute) private var openChsRoute
@@ -20,10 +19,6 @@ struct OnlineGateDetailView: View {
     @State private var fetchFailed = false
 
     private var tz: TimeZone { gate.tz }
-    // `TimelineScrubStrip` wants this even though the strip is current-only
-    // here (no tide track, ever) — same dead parameter CurrentDetailView
-    // carries for the same reason.
-    private var imperial: Bool { units == "imperial" }
 
     /// The paired reference port, same lookup `CurrentStationRecord.pairedTide`
     /// does — this gate has no `CurrentStationRecord` of its own to hang it off.
@@ -73,35 +68,48 @@ struct OnlineGateDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Bare gate.id, per PR #31 — left as-is (task-5-brief).
-                MapHeader(name: gate.name, region: gate.region,
-                          latitude: gate.latitude, longitude: gate.longitude, favoriteId: gate.id)
-                if let window, let tl = timeline {
-                    scrubCard(tl, window)
-                    scheduleCard(tl, window)
-                        .padding(.top, 14)
-                    provenance(window)
-                        .padding(.top, 14)
-                } else {
-                    honestyCard
-                        .padding(.top, 14)
-                    nearestGateLink
-                        .padding(.top, 14)
-                }
+        // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
+        ScrubDetailScaffold(name: gate.name, region: gate.region,
+                            latitude: gate.latitude, longitude: gate.longitude,
+                            favoriteId: gate.id, tz: tz,
+                            timeline: timeline,
+                            entries: { tl in
+                                guard let window else { return [] }
+                                return scheduleEntries(tl, floodDeg: window.floodDirection,
+                                                       ebbDeg: window.ebbDirection, speedUnit: speedUnit)
+                            },
+                            live: $live, scrubTime: $scrubTime,
+                            above: { EmptyView() },
+                            card: { tl in
+                                // Strip first, readout under it — the inverse of the
+                                // fitted details' order, kept from the first cut.
+                                if let window {
+                                    TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
+                                                       speedUnit: speedUnit, now: live,
+                                                       floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
+                                                       scrubTime: $scrubTime)
+                                        .padding(.horizontal, -16)  // full-bleed strip
+                                        .padding(.top, 12)
+                                    readout(window)
+                                        .padding(.top, 8)
+                                }
+                            },
+                            links: {
+                                if let port = pairedTide { TideAtPortLink(port: port) }
+                            },
+                            bottom: {
+                                if timeline != nil, let window {
+                                    provenance(window)
+                                } else {
+                                    honestyCard
+                                    nearestGateLink
+                                }
+                            })
+            .onAppear {
+                if window == nil { window = ChsModelStore.loadOnline(gate.id) }
+                RecentsStore.shared.record(gate.id)
+                if window?.coversStrip(now: live) != true, net.online { fetchNow() }
             }
-            .padding(.bottom, 42)
-        }
-        .ignoresSafeArea(edges: .top)
-        .background(SN.page.ignoresSafeArea())
-        .environment(\.timeZone, tz)
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            if window == nil { window = ChsModelStore.loadOnline(gate.id) }
-            RecentsStore.shared.record(gate.id)
-            if window?.coversStrip(now: live) != true, net.online { fetchNow() }
-        }
     }
 
     // MARK: - Fetch
@@ -126,136 +134,66 @@ struct OnlineGateDetailView: View {
         }
     }
 
-    // MARK: - Fetched: scrub card, strip, current readout, tide-at-port link
+    // MARK: - Fetched: readout under the strip
 
     private func setDegrees(_ signed: Double, _ window: ChsOnlineWindow) -> Double {
         signed >= 0 ? window.floodDirection : window.ebbDirection
     }
 
-    private func scrubCard(_ tl: TimelineData, _ window: ChsOnlineWindow) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                               imperial: imperial, speedUnit: speedUnit,
-                               now: live,
-                               floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
-                               scrubTime: $scrubTime)
-                .padding(.horizontal, -16)  // full-bleed strip
-                .padding(.top, 12)
-
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if phase == .slack {
-                        Text("Slack").font(.largeTitle)
-                            .foregroundStyle(CurrentDetailView.phaseColor(phase))
-                        Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
-                    } else {
-                        (Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
-                         + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
-                            .foregroundStyle(.white)
-                        HStack(spacing: 4) {
-                            Text(phaseWord(phase)).font(.footnote)
-                            CompassArrow(deg: setDegrees(scrubSigned, window)).font(.footnote)
-                            Text(compass16(setDegrees(scrubSigned, window))).font(.footnote)
-                        }
+    private func readout(_ window: ChsOnlineWindow) -> some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 4) {
+                if phase == .slack {
+                    Text("Slack").font(.largeTitle)
                         .foregroundStyle(CurrentDetailView.phaseColor(phase))
+                    Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                } else {
+                    (Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
+                     + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
+                        .foregroundStyle(.white)
+                    HStack(spacing: 4) {
+                        Text(phase.word).font(.footnote)
+                        CompassArrow(deg: setDegrees(scrubSigned, window)).font(.footnote)
+                        Text(compass16(setDegrees(scrubSigned, window))).font(.footnote)
                     }
+                    .foregroundStyle(CurrentDetailView.phaseColor(phase))
                 }
-                Spacer()
-                if let slack = nextSlack {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                        Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+            }
+            Spacer()
+            if let slack = nextSlack {
+                VStack(alignment: .trailing, spacing: 1) {
+                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
+                    Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.go)
+                    if let win = slackWin {
+                        // "under 0.5 kn" is restored here for the same reason
+                        // it came back on the current detail: this is the one
+                        // place the threshold earns its space.
+                        Text("under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.go)
-                        if let win = slackWin {
-                            // "under 0.5 kn" is restored here for the same reason
-                            // it came back on the current detail: this is the one
-                            // place the threshold earns its space.
-                            Text("under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(SN.foam.opacity(0.7))
-                                .accessibilityIdentifier("slack-window")
-                        }
-                        if let then = following {
-                            Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                                .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
-                        }
+                            .foregroundStyle(SN.foam.opacity(0.7))
+                            .accessibilityIdentifier("slack-window")
+                    }
+                    if let then = following {
+                        Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                     }
                 }
             }
-            .padding(.top, 8)
-
-            MonoLabel(text: "‹ swipe to scrub ›",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: returnToNow)
-                .padding(.top, 14)
-
-            if let port = pairedTide {
-                TideAtPortLink(port: port)
-                    .padding(.top, 12)
-            }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-        .background(SN.cardFill)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(SN.leaf.opacity(0.22)).frame(height: 0.5)
-        }
-    }
-
-    // MARK: - Fetched: rolling multi-day schedule
-
-    private func scheduleCard(_ tl: TimelineData, _ window: ChsOnlineWindow) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl, window), tz: tz, today: tl.today, days: tl.days,
-                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
-            .background(SN.cardFill)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-            .padding(.horizontal, 16)
-    }
-
-    private func scheduleEntries(_ tl: TimelineData, _ window: ChsOnlineWindow) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
-        let out: [ScheduleEntry] = tl.currentEvents
-            .filter { $0.time >= t0 && $0.time <= t1 }
-            .map { e in
-                switch e.kind {
-                case .slack:
-                    ScheduleEntry(time: e.time, pill: .slack)
-                case .maxFlood:
-                    ScheduleEntry(time: e.time, pill: .flood,
-                                  value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
-                                  arrowDeg: window.floodDirection)
-                case .maxEbb:
-                    ScheduleEntry(time: e.time, pill: .ebb,
-                                  value: "\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
-                                  arrowDeg: window.ebbDirection)
-                }
-            }
-        return out.sorted { $0.time < $1.time }
     }
 
     // MARK: - Fetched: provenance footer (online-gates spec §2, inverse of the fitted footer)
 
     private func provenance(_ window: ChsOnlineWindow) -> some View {
-        VStack(spacing: 6) {
-            MonoLabel(text: "Predictions — not for navigation",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
+        DetailFooter {
             Text("CHS-published predictions · fetched \(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz)) — not computed on this device")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("online-provenance")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
-        .padding(.top, 8)
     }
 
     // MARK: - Unfetched/expired/fetch-failed: the honesty card
@@ -284,29 +222,10 @@ struct OnlineGateDetailView: View {
 
     @ViewBuilder private var nearestGateLink: some View {
         if let nearest = nearestShipped {
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.caption2.weight(.semibold))
-                Text("Try \(nearest.name) instead")
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
+            BranchLink(text: "Try \(nearest.name) instead", id: "nearest-gate-link") {
+                openChsRoute(.currentGate(nearest))
             }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(SN.leaf)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture { openChsRoute(.currentGate(nearest)) }
             .padding(.horizontal, 36)  // lines up with ChsAmberCard's text inset (16 outer + 20 inner)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("nearest-gate-link")
         }
-    }
-
-    // MARK: - Data
-
-    private func returnToNow() {
-        live = appNow()
-        scrubTime = live
     }
 }

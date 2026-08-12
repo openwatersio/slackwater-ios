@@ -15,7 +15,7 @@ import Foundation
 import TideEngine
 
 /// Bundled identity for one validated CHS current gate.
-struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
+struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String        // registry key, e.g. "chs-dodd-narrows"
     let name: String
     let region: String
@@ -62,80 +62,25 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable {
     /// "stay connected about N more minutes"; coarse by design.
     var refineSeconds: Double { ((fitDays - Self.provisionalDays) / 7).rounded(.up) * 2 * 2.5 }
 
-    static let all: [ChsCurrentGateInfo] = {
-        guard let url = Bundle.main.url(forResource: "chs-current-gates", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let gates = try? JSONDecoder().decode([ChsCurrentGateInfo].self, from: data) else { return [] }
-        return gates.sorted { $0.name < $1.name }
-    }()
-
-    /// Same ranking as TideStationRecord.searchRank (mirrors web search.ts).
-    func searchRank(_ query: String) -> Int? {
-        if name.lowercased().contains(query) { return 0 }
-        if region.lowercased().contains(query) { return 1 }
-        if aliases.contains(where: { $0.contains(query) }) { return 2 }
-        return nil
-    }
+    static let all: [ChsCurrentGateInfo] = bundled("chs-current-gates")
 }
 
-/// A current harmonic model fitted on this device from IWLS `wcsp1`/`wcdp1`
-/// predictions — CHS-derived, and it never leaves the device. The flood/ebb
-/// axis is CHS station metadata, stored here for the same reason the
-/// constituents are: fetched by this user, kept local, never re-served.
-struct ChsCurrentModel: Codable {
-    struct Con: Codable { let name: String; let amplitude: Double; let phase: Double }
-    var schemaVersion = 1
-    let stationID: String     // registry key
-    let iwlsID: String        // resolved at runtime by position (never bundled)
-    let iwlsName: String
-    let fittedAt: Date
-    let fitStartMs: Double
-    let fitEndMs: Double
-    /// Days of data behind this fit. Less than the gate's `fitDays` means this
-    /// is the PROVISIONAL fast answer, not the final model. Optional so a model
-    /// stored by build ≤14 (always the full window) still decodes.
-    let fitDays: Double?
-    let floodDirection: Double
-    let ebbDirection: Double
-    /// Z0: net mean flow along the flood axis, knots, signed.
-    let offset: Double
-    /// Fit residual, knots.
-    let rms: Double
-    let constituents: [Con]
-}
+/// The gate model's pre-merge name (see ChsModel) — SlackwaterTests still
+/// spells it.
+typealias ChsCurrentModel = ChsModel
 
 extension ChsModelStore {
-    /// Gate models live beside the port models, suffixed so the two Codable
-    /// shapes never read each other's files.
-    static func currentUrl(_ stationID: String) -> URL {
-        dir.appendingPathComponent("\(stationID)-current.json")
-    }
-
-    static func loadCurrent(_ stationID: String) -> ChsCurrentModel? {
-        guard let data = try? Data(contentsOf: currentUrl(stationID)) else { return nil }
-        return try? JSONDecoder().decode(ChsCurrentModel.self, from: data)
-    }
-
-    static func saveCurrent(_ model: ChsCurrentModel) throws {
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(model).write(to: currentUrl(model.stationID), options: .atomic)
-    }
+    /// Gate models live beside the port models, suffixed so a gate model never
+    /// shadows a port model of the same key.
+    static func currentUrl(_ stationID: String) -> URL { url(stationID, suffix: "-current") }
+    static func loadCurrent(_ stationID: String) -> ChsModel? { load(stationID, suffix: "-current") }
+    static func saveCurrent(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "-current") }
 
     /// The online gate's fetched window lives beside the fitted models, under
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
-    static func onlineUrl(_ stationID: String) -> URL {
-        dir.appendingPathComponent("\(stationID)-online.json")
-    }
-
-    static func loadOnline(_ stationID: String) -> ChsOnlineWindow? {
-        guard let data = try? Data(contentsOf: onlineUrl(stationID)) else { return nil }
-        return try? JSONDecoder().decode(ChsOnlineWindow.self, from: data)
-    }
-
-    static func saveOnline(_ window: ChsOnlineWindow) throws {
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(window).write(to: onlineUrl(window.stationID), options: .atomic)
-    }
+    static func onlineUrl(_ stationID: String) -> URL { url(stationID, suffix: "-online") }
+    static func loadOnline(_ stationID: String) -> ChsOnlineWindow? { load(stationID, suffix: "-online") }
+    static func saveOnline(_ window: ChsOnlineWindow) throws { try save(window, id: window.stationID, suffix: "-online") }
 }
 
 // MARK: - The fetched window (online gates: official CHS predictions, no fit)
@@ -210,19 +155,19 @@ extension ChsCurrentGateInfo {
     }
 
     /// Is this stored model the fast answer rather than the full model?
-    func isProvisional(_ model: ChsCurrentModel) -> Bool { (model.fitDays ?? fitDays) < fitDays }
+    func isProvisional(_ model: ChsModel) -> Bool { (model.fitDays ?? fitDays) < fitDays }
 
     /// A fitted CHS gate renders through the exact same record/engine/view path
     /// as a bundled NOAA current station — provenance shows only in the footer.
-    func record(with model: ChsCurrentModel) -> CurrentStationRecord {
+    func record(with model: ChsModel) -> CurrentStationRecord {
         CurrentStationRecord(
             id: id, name: name, region: region, aliases: aliases,
             latitude: latitude, longitude: longitude, timezone: timezone,
-            floodDirection: model.floodDirection, ebbDirection: model.ebbDirection,
+            // A gate fit always stores the axis; nil is the merged model's
+            // tide-port side, which never reaches here (the store suffixes).
+            floodDirection: model.floodDirection ?? 0, ebbDirection: model.ebbDirection ?? 0,
             meanFlow: model.offset, tideReference: tideReference,
-            constituents: model.constituents.map {
-                CurrentStationRecord.Con(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
-            })
+            constituents: model.constituents)
     }
 }
 
