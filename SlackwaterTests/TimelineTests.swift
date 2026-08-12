@@ -53,6 +53,35 @@ final class TimelineTests: XCTestCase {
                         "the last visible night needs the next day's sunrise for its moon")
     }
 
+    /// "Today" must mean today, on any strip. The old signature took a
+    /// days-from-today offset; once the anchor moves, offset is days-from-ANCHOR
+    /// and passing it here would label a September Monday "Today".
+    func testRelativeDayLabelTracksTodayNotTheAnchor() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        let today = vancouverMidnight(2026, 8, 11)          // a Tuesday
+        let tomorrow = vancouverMidnight(2026, 8, 12)
+        let yesterday = vancouverMidnight(2026, 8, 10)
+        let september = vancouverMidnight(2026, 9, 14)      // a Monday
+
+        XCTAssertEqual(relativeDayLabel(today, tz, today: today), "Today")
+        XCTAssertEqual(relativeDayLabel(tomorrow, tz, today: today), "Tomorrow")
+        XCTAssertEqual(relativeDayLabel(yesterday, tz, today: today), "Yesterday")
+        XCTAssertEqual(relativeDayLabel(september, tz, today: today), "Mon",
+                       "a day 34 days out is a weekday, never Today")
+    }
+
+    /// The first group of a future-anchored schedule is the anchor's own day, and
+    /// it must NOT be called Today.
+    func testFutureAnchorFirstDayIsNotLabelledToday() {
+        let tz = friday.tz
+        let today = todayLocal(tz)
+        let future = today.addingTimeInterval(34 * 86_400)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
+        let firstDay = d.days.first { $0.offset == 0 }!
+        XCTAssertEqual(firstDay.start, future, "offset 0 is the ANCHOR's day")
+        XCTAssertNotEqual(relativeDayLabel(firstDay.start, tz, today: today), "Today")
+    }
+
     // MARK: - The window (spec §1, §2)
 
     private func vancouverMidnight(_ y: Int, _ m: Int, _ d: Int) -> Date {

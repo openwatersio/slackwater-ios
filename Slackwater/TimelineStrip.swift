@@ -691,7 +691,7 @@ struct TimelineCanvas: View {
             }
             // Day label at local noon. Fixed size, not `.caption2` — see the
             // TimelineGeo doc comment: `dayY` is 20 and the sun dot is at 34.
-            ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
+            ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
@@ -927,13 +927,18 @@ struct TimelineCanvas: View {
     }
 }
 
-/// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype dayName).
-func relativeDayLabel(_ offset: Int, _ date: Date, _ tz: TimeZone) -> String {
-    switch offset {
+/// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype
+/// dayName). Takes the day itself and the REAL today, never an offset: on an
+/// anchored strip `TimelineDay.offset` is days-from-anchor, so feeding it here
+/// would label the first day of a September window "Today".
+func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return switch cal.dateComponents([.day], from: today, to: dayStart).day ?? 0 {
     case 0: "Today"
     case 1: "Tomorrow"
     case -1: "Yesterday"
-    default: formatterShortWeekday(date, tz)
+    default: formatterShortWeekday(dayStart, tz)
     }
 }
 
@@ -1219,7 +1224,7 @@ struct MultiDaySchedule: View {
                 }
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(relativeDayLabel(group.offset, group.start, tz))
+                        Text(relativeDayLabel(group.start, tz, today: today))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.9))
                         if let day = days.first(where: { $0.offset == group.offset }) {
