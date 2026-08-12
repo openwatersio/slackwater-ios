@@ -234,6 +234,17 @@ struct TimelineData {
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
 
+    /// The list's window: the anchor's own midnight → +7d. Deliberately
+    /// NARROWER than `start…end` — the strip carries `Timeline.centerPad` more
+    /// so the last listed event can still park under the centerline.
+    ///
+    /// This lives here rather than in the four detail views because all four
+    /// were computing it identically off `today`, and the anchor change would
+    /// otherwise have to land correctly in four places.
+    var scheduleRange: ClosedRange<Date> {
+        anchor...anchor.addingTimeInterval(Timeline.scheduleHours * 3600)
+    }
+
     func x(_ t: Date) -> CGFloat {
         CGFloat(t.timeIntervalSince(start) / 3600) * Timeline.pph
     }
@@ -1194,7 +1205,11 @@ struct ScheduleEntry: Identifiable {
 struct MultiDaySchedule: View {
     let entries: [ScheduleEntry]  // pre-sorted, pre-filtered to the window
     let tz: TimeZone
-    let today: Date               // local midnight
+    /// The window's anchor — day-group offsets are anchor-relative, matching
+    /// `TimelineDay.offset`, because that is what `days` is keyed on below.
+    let anchor: Date
+    /// The real today, for the Today/Tomorrow labels only.
+    let today: Date
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
@@ -1205,7 +1220,7 @@ struct MultiDaySchedule: View {
         cal.timeZone = tz
         for e in entries {
             let d0 = cal.startOfDay(for: e.time)
-            let off = cal.dateComponents([.day], from: today, to: d0).day ?? 0
+            let off = cal.dateComponents([.day], from: anchor, to: d0).day ?? 0
             if out.last?.1 == d0 { out[out.count - 1].2.append(e) }
             else { out.append((off, d0, [e])) }
         }

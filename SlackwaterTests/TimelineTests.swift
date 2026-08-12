@@ -82,6 +82,30 @@ final class TimelineTests: XCTestCase {
         XCTAssertNotEqual(relativeDayLabel(firstDay.start, tz, today: today), "Today")
     }
 
+    /// The list runs the anchor's 00:00 → +7d, and it is strictly inside the strip
+    /// — the centerPad is what lets the last row scrub under the centerline.
+    func testScheduleRangeIsAWeekInsideTheStrip() {
+        let today = todayLocal(friday.tz)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: today)
+        XCTAssertEqual(d.scheduleRange.lowerBound, today)
+        XCTAssertEqual(d.scheduleRange.upperBound, today.addingTimeInterval(168 * 3600))
+        XCTAssertLessThan(d.scheduleRange.upperBound, d.end,
+                          "the strip must outrun the list by the centerPad")
+    }
+
+    /// Seven day-groups, and the first is the anchor's own day.
+    func testFutureAnchorSchedulesSevenDays() {
+        let tz = friday.tz
+        let future = todayLocal(tz).addingTimeInterval(34 * 86_400)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
+        let turns = d.tideExtremes.filter { d.scheduleRange.contains($0.time) }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let days = Set(turns.map { cal.startOfDay(for: $0.time) })
+        XCTAssertEqual(days.count, 7, "a week of tide turns, got \(days.count)")
+        XCTAssertEqual(days.min(), future)
+    }
+
     // MARK: - The window (spec §1, §2)
 
     private func vancouverMidnight(_ y: Int, _ m: Int, _ d: Int) -> Date {

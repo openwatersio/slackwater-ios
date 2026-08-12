@@ -211,7 +211,8 @@ struct CurrentDetailView: View {
     // MARK: - Rolling multi-day schedule (slack/max rows, sun in the day header)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,
+        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, anchor: tl.anchor,
+                         today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -221,10 +222,8 @@ struct CurrentDetailView: View {
     }
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
         let out: [ScheduleEntry] = tl.currentEvents
-            .filter { $0.time >= t0 && $0.time <= t1 }
+            .filter { tl.scheduleRange.contains($0.time) }
             .map { e in
                 switch e.kind {
                 case .slack:

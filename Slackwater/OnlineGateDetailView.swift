@@ -211,7 +211,8 @@ struct OnlineGateDetailView: View {
     // MARK: - Fetched: rolling multi-day schedule
 
     private func scheduleCard(_ tl: TimelineData, _ window: ChsOnlineWindow) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl, window), tz: tz, today: tl.today, days: tl.days,
+        MultiDaySchedule(entries: scheduleEntries(tl, window), tz: tz, anchor: tl.anchor,
+                         today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -221,10 +222,8 @@ struct OnlineGateDetailView: View {
     }
 
     private func scheduleEntries(_ tl: TimelineData, _ window: ChsOnlineWindow) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
         let out: [ScheduleEntry] = tl.currentEvents
-            .filter { $0.time >= t0 && $0.time <= t1 }
+            .filter { tl.scheduleRange.contains($0.time) }
             .map { e in
                 switch e.kind {
                 case .slack:

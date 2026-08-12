@@ -108,7 +108,8 @@ struct TideDetailView: View {
     // MARK: - Rolling multi-day schedule (turns + sun, day-grouped)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,
+        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, anchor: tl.anchor,
+                         today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -118,13 +119,11 @@ struct TideDetailView: View {
     }
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
-        var out: [ScheduleEntry] = tl.tideExtremes
-            .filter { $0.time >= t0 && $0.time <= t1 }
+        tl.tideExtremes
+            .filter { tl.scheduleRange.contains($0.time) }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
                                  value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
-        return out.sorted { $0.time < $1.time }
+            .sorted { $0.time < $1.time }
     }
 
     // The provenance/confidence marking (chs-online spec §2d, §7d — simplified

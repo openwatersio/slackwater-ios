@@ -130,7 +130,8 @@ struct DerivedGateDetailView: View {
     // MARK: - Rolling multi-day schedule (slack rows, sun in the day header)
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, today: tl.today, days: tl.days,
+        MultiDaySchedule(entries: scheduleEntries(tl), tz: tz, anchor: tl.anchor,
+                         today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -140,13 +141,11 @@ struct DerivedGateDetailView: View {
     }
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
         // Slack rows carry no value — "—", like the web's derived rows.
-        let out: [ScheduleEntry] = tl.currentEvents
-            .filter { $0.time >= t0 && $0.time <= t1 }
+        tl.currentEvents
+            .filter { tl.scheduleRange.contains($0.time) }
             .map { ScheduleEntry(time: $0.time, pill: .slack) }
-        return out.sorted { $0.time < $1.time }
+            .sorted { $0.time < $1.time }
     }
 
     // The provenance footer (web App.tsx derived footer, in the app's CHS
