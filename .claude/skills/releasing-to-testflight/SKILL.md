@@ -43,7 +43,8 @@ rejected upload.** Nothing renumbers it for you.
    the live-IWLS and on-device-fit tests the fast plan skips.
 4. Open the release PR. Nothing reaches App Store Connect before it merges, and
    you never merge your own PR (`CONTRIBUTING.md`).
-5. After the merge, from `main`: `./scripts/testflight.sh`.
+5. After the merge, from `main`: `./scripts/testflight.sh --family` for a release,
+   plain `./scripts/testflight.sh` for a build only Nightly needs.
 6. `node scripts/asc.mjs builds` again. Confirm the top row reads the version and
    build you intended, `VALID`, in the beta groups you expect.
 
@@ -58,7 +59,8 @@ Settled, so they don't get re-litigated:
 |---|---|
 | Does ASC accept a *lower* pre-release train? | Yes. Build 22 went up as 0.6.0 after 21 builds at 1.0, VALID. |
 | Why do builds 1–21 sit under a `1.0` train? | They shipped the plist literal. The eventual real 1.0 needs a build number above 21. |
-| A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. New builds land in Nightly; Friends & Family is promoted by hand in the ASC UI. |
+| A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
+| Why does Friends & Family need a flag when Nightly doesn't? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **Friends & Family is external, behind a public link**, so a build reaches it only after Apple beta review. `asc.mjs promote` does both steps; `externalState` goes `READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_TESTING`. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |
 | Every UI test reports `Test crashed with signal kill`, zero assertion failures | Two test runs overlapping on this machine, not a code failure. See `docs/testflight.md`. |
 

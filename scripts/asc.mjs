@@ -67,6 +67,48 @@ if (cmd === 'whoami') {
     const groups = (b.relationships?.betaGroups?.data ?? []).map((g) => inc(g.id)?.attributes?.name ?? g.id);
     console.log(`${v} (${b.attributes.version})  ${b.attributes.processingState}  ${b.attributes.uploadedDate}  [${groups.join(', ')}]`);
   }
+} else if (cmd === 'promote') {
+  // Put a build in front of the external testers. Two steps, because
+  // "Friends & Family" is an EXTERNAL group behind a public link: adding the
+  // build to the group is not enough, Apple has to beta-review it first. The
+  // internal "Nightly" group needs none of this — it has hasAccessToAllBuilds
+  // and every upload lands there on its own, which is why this command exists
+  // only for the external side.
+  const group = args[1] ?? 'Friends & Family';
+  const groups = await api('GET', '/v1/betaGroups?limit=20');
+  const g = groups.data.find((x) => x.attributes.name === group);
+  if (!g) throw new Error(`no beta group named "${group}"`);
+
+  // A build is not addable until processing finishes, and processing outlives
+  // the upload by 5-15 min — so wait rather than fail on a race the caller
+  // cannot see.
+  let build;
+  for (let i = 0; i < 60; i++) {
+    const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate');
+    build = args[0] ? r.data.find((b) => b.attributes.version === args[0]) : r.data[0];
+    if (!build) throw new Error(`no build ${args[0]} in the last 10 uploads`);
+    if (build.attributes.processingState === 'VALID') break;
+    console.log(`build ${build.attributes.version}: ${build.attributes.processingState}, waiting…`);
+    await new Promise((r) => setTimeout(r, 30_000));
+  }
+  if (build.attributes.processingState !== 'VALID') {
+    throw new Error(`build ${build.attributes.version} still ${build.attributes.processingState} after 30 min`);
+  }
+
+  await api('POST', `/v1/betaGroups/${g.id}/relationships/builds`, {
+    data: [{ type: 'builds', id: build.id }],
+  });
+  console.log(`build ${build.attributes.version} -> ${group}`);
+
+  if (!g.attributes.isInternalGroup) {
+    await api('POST', '/v1/betaAppReviewSubmissions', {
+      data: {
+        type: 'betaAppReviewSubmissions',
+        relationships: { build: { data: { type: 'builds', id: build.id } } },
+      },
+    });
+    console.log('submitted for Apple beta review — testers get it once approved');
+  }
 } else if (cmd === 'create-profile') {
   const [bundleIdRes, certId, outPath] = args;
   const b = await api('GET', `/v1/bundleIds?filter[identifier]=${bundleIdRes}`);
@@ -87,5 +129,5 @@ if (cmd === 'whoami') {
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
 } else {
-  console.log('usage: asc.mjs whoami | builds | register-bundle <id> | create-cert <csr> <out.cer> | list-certs | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
+  console.log('usage: asc.mjs whoami | builds | promote [buildNumber] [groupName] | register-bundle <id> | create-cert <csr> <out.cer> | list-certs | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
 }

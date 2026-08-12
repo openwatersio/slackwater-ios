@@ -7,6 +7,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# --family also promotes the finished build to the external Friends & Family
+# group. Opt-in rather than the default because that group sits behind a public
+# link and every promotion submits the build to Apple's beta review — a real
+# release, not another nightly. The internal Nightly group needs no flag; it
+# takes every upload on its own.
+FAMILY=no
+[[ "${1:-}" == "--family" ]] && FAMILY=yes
+
 KEY_ID=VM6W5HP585
 ISSUER=69a6de81-5896-47e3-e053-5b8c7c11a4d1
 KC=~/Library/Keychains/slackwater-ci.keychain-db
@@ -57,3 +65,12 @@ xcodebuild -exportArchive -archivePath build/Slackwater.xcarchive \
   -authenticationKeyID $KEY_ID -authenticationKeyIssuerID $ISSUER
 
 echo "Uploaded. Build appears in App Store Connect → TestFlight in ~5–15 min (processing)."
+
+if [[ $FAMILY == yes ]]; then
+  # Waits out processing itself, so this blocks for as long as Apple takes.
+  node scripts/asc.mjs promote
+else
+  echo "Nightly has it. For Friends & Family: node scripts/asc.mjs promote"
+fi
+
+node scripts/asc.mjs builds
