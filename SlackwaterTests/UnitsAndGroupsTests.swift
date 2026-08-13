@@ -144,16 +144,39 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertEqual(byId["chs-active-pass"]?.kindLabel, "Current · CHS")
     }
 
+    // MARK: - RecentsStore auto-select skip (M52 handshake, #3)
+
+    /// The skip is scoped to the station auto-select opened. An unfitted CHS
+    /// station's waiting view records nothing, so a bare flag would survive it
+    /// and silently drop the next station the user genuinely opens (#3).
+    @MainActor
+    func testAutoSelectSkipDoesNotLeakToNextStation() {
+        let store = RecentsStore.shared
+        let auto = "auto-\(UUID().uuidString)"
+        let opened = "opened-\(UUID().uuidString)"
+        // Auto-select lands on an unfitted CHS station: skip armed, nothing
+        // ever recorded for it. The user then opens another station.
+        store.skipNextRecordID = auto
+        store.record(opened)
+        XCTAssertTrue(store.ids.contains(opened),
+                      "a genuinely opened station must not be eaten by a stale auto-select skip")
+        XCTAssertNil(store.skipNextRecordID, "any record attempt disarms the skip")
+        // The normal handshake still holds: the auto-opened detail itself is
+        // skipped once, then counts as viewed on a real revisit.
+        store.skipNextRecordID = auto
+        store.record(auto)
+        XCTAssertFalse(store.ids.contains(auto), "the auto-opened detail is not the user viewing a station")
+        store.record(auto)
+        XCTAssertTrue(store.ids.contains(auto), "a later genuine open must record")
+        store.remove(opened)
+        store.remove(auto)
+    }
+
     // MARK: - FavoritesStore round trip (ends clean — shared UserDefaults)
 
     @MainActor
     func testFavoriteToggleRoundTrip() {
         let store = FavoritesStore.shared
-        // The regular-width auto-selection arms `skipNextRecord` and the detail
-        // it opens consumes it — unless that detail is a CHS station with no
-        // model yet, which records nothing. The flag then leaks into whatever
-        // records next, which on an iPad host is this test (M53).
-        RecentsStore.shared.skipNextRecord = false
         let id = "test-station-\(UUID().uuidString)"
         XCTAssertFalse(store.contains(id))
         store.toggle(id)
