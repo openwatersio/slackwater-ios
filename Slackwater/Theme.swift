@@ -241,17 +241,12 @@ func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
     cal.timeZone = tz
     let last = cal.date(byAdding: .day, value: Int(Timeline.scheduleDays) - 1, to: anchor)!
 
-    let f = DateFormatter()
-    f.timeZone = tz
-    f.locale = Locale(identifier: "en_US_POSIX")
-
-    f.dateFormat = "MMM d"
-    let head = f.string(from: anchor)
+    let head = formatter("MMM d", tz).string(from: anchor)
 
     let sameMonth = cal.isDate(anchor, equalTo: last, toGranularity: .month)
     let sameYear = cal.isDate(anchor, equalTo: last, toGranularity: .year)
-    f.dateFormat = sameYear ? (sameMonth ? "d" : "MMM d") : "MMM d, yyyy"
-    return "\(head) – \(f.string(from: last))"
+    let tailPattern = sameYear ? (sameMonth ? "d" : "MMM d") : "MMM d, yyyy"
+    return "\(head) – \(formatter(tailPattern, tz).string(from: last))"
 }
 
 /// The *when* of a scrub reading — clock time stacked over the date, the
