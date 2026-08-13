@@ -169,6 +169,107 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
     }
 
+    /// The range bar heads the schedule card on every scrubable detail, and it
+    /// says what span the list below it covers.
+    func testWeekRangeBarHeadsTheSchedule() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.waitForExistence(timeout: 10), "no range bar above the schedule")
+        XCTAssert(bar.label.contains("–"), "the bar states a span, got '\(bar.label)'")
+    }
+
+    /// Tapping the bar opens the picker; picking a date moves the window and the
+    /// bar says so.
+    func testPickingADateMovesTheWindow() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.waitForExistence(timeout: 10))
+        let before = bar.label
+
+        bar.tap()
+        let picker = app.descendants(matching: .any)["week-picker"].firstMatch
+        XCTAssert(picker.waitForExistence(timeout: 5))
+
+        // The graphical DatePicker's forward-month button, then a day cell.
+        app.buttons["Next Month"].firstMatch.tap()
+        app.collectionViews.buttons.element(boundBy: 10).tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+
+        XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
+        XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 5))
+
+        // The centerline has to move WITH the window. It does not follow on its
+        // own — the strip's x/time conversions are exact inverses, so a
+        // programmatic scroll to an off-window `scrubTime` reads straight back
+        // as the same off-window time and the strip draws blank. The
+        // observable proof is this button: parking the centerline on the picked
+        // week puts `scrubTime` far from now, and return-to-now is what shows
+        // when it is. Without it there is no way back to today at all — the
+        // range bar's "not this week" is a label, not a control.
+        XCTAssert(app.buttons["detail-return-now"].firstMatch.waitForExistence(timeout: 5),
+                  "picking a future week left the centerline on today: no return-to-now")
+
+        // And the chart has to actually DRAW. The assertion above passes on a
+        // blank strip — it did, for a whole review round: every readout, label
+        // and schedule row was right for the picked week while the canvas
+        // rendered nothing, because the window narrows when the anchor leaves
+        // today and the scroll view kept its old width. Nothing inside the
+        // strip is an accessibility element (it is all one `Canvas`), so ink
+        // coverage is what a test can see.
+        let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
+        XCTAssert(ink > 0.05, "the strip drew nothing after the pick — ink \(ink)")
+        save(app, "picker-week-moved.png")
+
+        // Back the other way, which is the same resize in reverse: today's
+        // window is the WIDER one (it alone carries the 48h look-back), so a
+        // fix that only handled the shrink would blank the strip on the way
+        // home. "Today" is in the schedule's day column only when the anchor is
+        // today — it is absent for the whole September week above.
+        app.buttons["detail-return-now"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+                  "return-to-now did not bring the window back to today")
+        let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
+        XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
+    }
+
+    /// The share of an element's pixels that differ from its most common
+    /// colour — "is anything drawn here". Measured on this strip: 0.008 blank
+    /// (centerline, riding dot and the ft axis, all SwiftUI overlay ON TOP of
+    /// the canvas), 0.13 drawn. The 0.05 threshold sits in the order of
+    /// magnitude between them, so it needs no per-device tuning.
+    private func inkFraction(_ element: XCUIElement) -> Double {
+        guard let cg = element.screenshot().image.cgImage else { return 0 }
+        let w = cg.width, h = cg.height
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return 0 }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var counts: [UInt32: Int] = [:]
+        for i in stride(from: 0, to: px.count, by: 4) {
+            counts[UInt32(px[i]) << 16 | UInt32(px[i + 1]) << 8 | UInt32(px[i + 2]), default: 0] += 1
+        }
+        guard let bg = counts.max(by: { $0.value < $1.value })?.key else { return 0 }
+        let r = Int(bg >> 16), g = Int((bg >> 8) & 0xFF), b = Int(bg & 0xFF)
+        var ink = 0
+        for i in stride(from: 0, to: px.count, by: 4)
+        where max(abs(Int(px[i]) - r), abs(Int(px[i + 1]) - g), abs(Int(px[i + 2]) - b)) > 24 {
+            ink += 1
+        }
+        return Double(ink) / Double(w * h)
+    }
+
     // M2: current stations join the list; walk into Deception Pass and scrub
     // the signed velocity curve.
     func testM2Currents() throws {
@@ -2128,7 +2229,13 @@ final class ScreenshotTests: XCTestCase {
     /// to mark (`ChsCurrentGateInfo.isOnline`'s exclusion from
     /// `ChsFitService.candidates`).
     func testOnlineGateFetchedRendersDetail() throws {
-        let app = launch("-seedGate", "-seedOnlineWindow", "chs-sechelt-rapids",
+        // `-chsResetModels` so the seed is the ONLY window on disk: it writes
+        // through the merging `saveOnline`, and the live-fetch test leaves a
+        // real window for this same gate. Passing by test ordering is not
+        // passing. (The reset runs first — SlackwaterApp.init touches
+        // ChsFitService.shared before seeding, precisely for this.)
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-seedOnlineWindow", "chs-sechelt-rapids",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
@@ -2158,6 +2265,39 @@ final class ScreenshotTests: XCTestCase {
                        "an online gate can never show a fitted-station fast-answer amber reading")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
                        "a covering window must render the real detail, not the honesty card")
+    }
+
+    /// Paging an online gate to a week nobody has downloaded, with no network,
+    /// must SAY so — not render an empty strip that reads as slack water all
+    /// week. Same picker choreography as `testPickingADateMovesTheWindow`, two
+    /// months out so no 30-day window could cover it.
+    func testOnlineGatePagedBeyondItsWindowOffline() throws {
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-seedOnlineWindow", "chs-sechelt-rapids",
+                         "-networkKillSwitch",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "the seeded window should render before we page off it")
+
+        app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch
+            .waitForExistence(timeout: 5))
+        app.buttons["Next Month"].firstMatch.tap()
+        app.buttons["Next Month"].firstMatch.tap()   // two months out — past the 30-day window
+        app.collectionViews.buttons.element(boundBy: 10).tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+
+        XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch
+            .waitForExistence(timeout: 5),
+                  "an uncovered week offline must show the honesty card, never a dead strip")
+        XCTAssertFalse(app.otherElements["timeline-strip"].exists,
+                       "the strip must be GONE, not drawn flat over data nobody has")
     }
 
     /// Full-plan only (`skipUnlessFull` — run via ./scripts/test.sh --full):

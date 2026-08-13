@@ -85,6 +85,8 @@ struct CurrentDetailView: View {
                                                        ebbDeg: record.ebbDirection, speedUnit: speedUnit) },
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
+                            anchor: $anchor,
+                            onPicked: { _ in rebuild() },
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,

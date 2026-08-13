@@ -108,6 +108,9 @@ struct OnlineGateDetailView: View {
                             },
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
+                            anchor: $anchor,
+                            onPickerOpen: prefetchNextBlock,
+                            onPicked: { _ in applyAnchor() },
                             above: { EmptyView() },
                             card: { tl in
                                 // Strip first, readout under it — the inverse of the
@@ -143,13 +146,67 @@ struct OnlineGateDetailView: View {
                 if anchor == .distantPast { anchor = today }
                 if window == nil { window = ChsModelStore.loadOnline(gate.id) }
                 RecentsStore.shared.record(gate.id)
-                if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow() }
+                if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow(from: anchor) }
+            }
+            // A fetch this view did not start — the picker's prefetch — has to
+            // reach it. `fetchOnlineWindow` saves and bumps the stamp; that is
+            // exactly the "something changed, reload" signal the list's online
+            // card already reloads on (SlackwaterApp's `onlineCard`). Without
+            // it the speculatively fetched block sits on disk unseen and the
+            // first pick into it refetches a month the app already has, which
+            // is the entire prefetch, wasted. Subscribing to the one publisher
+            // rather than @ObservedObject-ing the service keeps the fit
+            // queue's churn from re-rendering a scrubbing strip.
+            .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
+                window = ChsModelStore.loadOnline(gate.id) ?? window
             }
     }
 
     // MARK: - Fetch
 
-    private func fetchNow() {
+    /// Fired when the picker OPENS, not when a date is chosen: the assumption
+    /// is that someone opening a calendar is heading forward, and giving the
+    /// round trip the whole browsing interaction is the difference between a
+    /// spinner and no spinner.
+    ///
+    /// Nothing here touches this view's state directly. `fetchOnlineWindow`
+    /// merges, saves, and bumps `ChsFitService.onlineFetchStamp`, which the
+    /// `.onReceive` above reloads on — the fetch lands and the window updates
+    /// itself. A failure is silent BY DESIGN: the user has not asked
+    /// for that week yet, so there is nothing to apologise for. If they do
+    /// land there and it is missing, `applyAnchor` below says so properly.
+    private func prefetchNextBlock() {
+        guard let window, net.online, !fetching else { return }
+        let from = prefetchAnchor(after: window, tz: tz)
+        Task { try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
+    }
+
+    /// The anchor moved. If the window covers it we are done; if not, this is
+    /// the same situation `.onAppear` already handles — fetch when online, and
+    /// when offline say nothing, because the honesty card `timeline == nil`
+    /// already puts on screen says it better than a flag would.
+    ///
+    /// `timeline == nil` IS the coverage question, asked once: it is
+    /// `window.covers(anchor:today:)` against the `today` the strip itself was
+    /// built from. Re-asking with a fresh `todayLocal(tz)` would be a second
+    /// clock on one decision — the defect this file's `timeline` comment
+    /// documents at length.
+    ///
+    /// No `rebuild()` call, and deliberately: this view's `timeline` is a
+    /// COMPUTED property (unlike the other three details, which store theirs in
+    /// `@State`), so setting `anchor` is already enough — SwiftUI re-evaluates
+    /// it on the next render.
+    private func applyAnchor() {
+        if timeline == nil, net.online { fetchNow(from: anchor) }
+    }
+
+    /// Always fetches the block the WINDOW is parked on — no default, so no
+    /// caller can quietly ask for today's block while the user is looking at
+    /// September. That is what "Try again" used to do from the honesty card:
+    /// fetch today's 30 days, fail the same coverage check, and redraw the
+    /// identical card, with no way out but the back button. (Named `from`, not
+    /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
+    private func fetchNow(from: Date) {
         guard !fetching else { return }
         fetching = true
         fetchFailed = false
@@ -159,7 +216,12 @@ struct OnlineGateDetailView: View {
                 // success — this view's own `window` update below is for its
                 // OWN redraw; the stamp is what tells any other still-mounted
                 // card/detail for this gate to reload the disk copy too.
-                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate)
+                //
+                // What comes back is the MERGED window, not just the block
+                // that was fetched, so assigning it never narrows what this
+                // view knows it has. `timeline` is computed off it, so there is
+                // no stored data to rebuild.
+                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: from)
                 window = fresh
                 fetching = false
             } catch {
@@ -242,7 +304,7 @@ struct OnlineGateDetailView: View {
         // three, and nobody has timed the new one.)
         ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
                      expectation: expectation, action: fetching ? "Fetching…" : "Try again",
-                     identifier: "online-honesty-card") { fetchNow() }
+                     identifier: "online-honesty-card") { fetchNow(from: anchor) }
     }
 
     private var expectation: String {
@@ -280,5 +342,12 @@ struct OnlineGateDetailView: View {
         // the whole window back, not just park the centerline at a `now` that
         // isn't on this strip.
         anchor = todayLocal(tz)
+        // And the same coverage check every other anchor move gets. A
+        // far-forward pick's fetch can have discarded today's block (disjoint
+        // blocks: the incoming one wins), so coming back can land on a month
+        // this gate no longer holds — honesty card with no fetch attempted,
+        // online or not. `applyAnchor` asks `timeline`, which is computed off
+        // the `anchor`/`live` just set here, and fetches when it says nil.
+        applyAnchor()
     }
 }

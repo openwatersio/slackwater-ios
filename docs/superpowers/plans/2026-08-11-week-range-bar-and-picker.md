@@ -33,7 +33,7 @@ Two more, cheap and worth doing while you are in these files: the **UI-test seed
 - **Never commit to `main` in this repo.** Branch, push, PR, never merge your own.
 - **`pph` is not to be touched.**
 - **Chart labels stay fixed-size.** The range bar is chrome *outside* the canvas, so it uses Dynamic Type fonts normally (`.caption`, `.subheadline`) — the fixed-size rule applies only to labels drawn inside `TimelineCanvas`.
-- **Minimum font size 14px** except `.eyebrow` at 12 — mirrors the web's `tokens.test.ts` rule. `MonoLabel` already complies.
+- ~~**Minimum font size 14px** except `.eyebrow` at 12 — mirrors the web's `tokens.test.ts` rule.~~ **Struck 2026-08-13: this constraint does not exist in this repo.** It is `slackwater-web`'s rule (`src/tokens.test.ts`), transplanted here in error when this plan was written. iOS `TypeScaleTests.swift` enforces no minimum size, `.eyebrow` is not a token in the iOS app, and `.caption2` is already used in 20+ places for exactly the kind of secondary annotation the range bar needs. Follow the surrounding code, not this line.
 - **Colour is state, form is kind.** The range bar carries no direction colour.
 - **Run tests with `./scripts/test.sh`.** Never run a bare `xcodebuild` while tests are in flight.
 - Commit after every task.
@@ -143,29 +143,32 @@ git commit -m "feat: the week range label"
 
 ---
 
-### Task 2: `ScheduleCard` — one card container, four callers
+### Task 2: `WeekRangeBar`, inside the scaffold's schedule card
 
-All four detail views wrap `MultiDaySchedule` in an identical `.background` / `.clipShape` / `.overlay` / `.padding` stack. The bar goes inside that card, so the container becomes shared first — otherwise the bar gets pasted four times.
+> **Amended 2026-08-13.** This task originally created a `ScheduleCard` container by extracting identical card chrome from four detail views. **PR #60 ("ponytail-cuts") already did that** — `ScrubDetailScaffold.scheduleCard` in `Theme.swift` is the shared container and there is exactly one `MultiDaySchedule` call site. What remains is adding the bar to it, in one place. Task 3 is amended alongside: the scaffold owns the bar *and* the picker sheet, taking `@Binding var anchor` plus an `onPick` closure — mirroring how PR #60 already handles `onReturn`, which is caller-owned precisely because only the view can reset the anchor.
+
+The bar heads the schedule card: above the first day group, below the scrub card. It names the span the list covers and, tapped, presents the picker.
+
+That position is deliberate. Putting it *inside* the scrub card would land it below the swipe hint, `ScrubWhen` and the tide-at-port link — further down the page than "just under the scrubber" suggests — and would reopen `2026-08-03-detail-hero-and-scrub-order-design.md`'s rule that the `when` row is always last in that card. The bar is semantically the *list's* range, so it belongs to the list's card.
 
 **Files:**
-- Create: `Slackwater/ScheduleCard.swift`
-- Modify: `Slackwater/TideDetailView.swift`, `Slackwater/CurrentDetailView.swift`, `Slackwater/DerivedGateDetailView.swift`, `Slackwater/OnlineGateDetailView.swift` (each `scheduleCard`)
-- Modify: `project.yml` is **not** touched — XcodeGen globs `Slackwater/**`, so a new file in that directory is picked up by `xcodegen generate`, which `scripts/test.sh` runs.
+- Modify: `Slackwater/Theme.swift` — add `WeekRangeBar`, and render it at the top of `ScrubDetailScaffold.scheduleCard`
+- No new file, and no detail-view changes in this task. The four views gain their `@State showPicker` / `$anchor` wiring in Task 3.
 
 **Interfaces:**
-- Consumes: `MultiDaySchedule`, `ScheduleEntry`, `TimelineDay`, `TimelineData`
+- Consumes: `weekRangeLabel(anchor:tz:)` (Task 1), `TimelineData.anchor`, `TimelineData.today`
 - Produces:
 
 ```swift
-struct ScheduleCard: View {
-    let entries: [ScheduleEntry]
-    let data: TimelineData
+struct WeekRangeBar: View {
+    let anchor: Date
+    let today: Date
     let tz: TimeZone
-    let scrubTime: Date
-    let onTap: (Date) -> Void
-    let onPickDate: () -> Void
+    let onTap: () -> Void
 }
 ```
+
+`ScrubDetailScaffold` gains `let onPickDate: () -> Void`, passed straight through to the bar's `onTap`. Task 3 replaces that with the sheet the scaffold presents itself; keeping it a plain closure here means Task 2 ships a visible, testable bar without the picker existing yet.
 
 - [ ] **Step 1: Write the failing UI test**
 
@@ -197,30 +200,20 @@ Note `openFridayHarbor` already asserts `app.staticTexts["Today"]` appears — t
 
 Expected: FAIL — `week-range-bar` never exists.
 
-- [ ] **Step 3: Create `ScheduleCard`**
+- [ ] **Step 3: Render the bar in the scaffold's existing schedule card**
+
+In `Slackwater/Theme.swift`, `ScrubDetailScaffold.scheduleCard(_:)` already wraps `MultiDaySchedule` in the card chrome. Put the bar above it, inside the same card:
 
 ```swift
-// Slackwater — GPL v3. The schedule card: a range bar naming the span, and the
-// day-grouped event list under it. Extracted from the four detail views, which
-// each carried a byte-identical copy of the card chrome — the bar had to land
-// in one place, not four.
-import SwiftUI
-
-struct ScheduleCard: View {
-    let entries: [ScheduleEntry]
-    let data: TimelineData
-    let tz: TimeZone
-    let scrubTime: Date
-    let onTap: (Date) -> Void
-    let onPickDate: () -> Void
-
-    var body: some View {
+    private func scheduleCard(_ tl: TimelineData) -> some View {
         VStack(spacing: 0) {
-            WeekRangeBar(anchor: data.anchor, today: data.today, tz: tz, onTap: onPickDate)
+            WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: onPickDate)
             Divider().overlay(Color.white.opacity(0.08))
-            MultiDaySchedule(entries: entries, tz: tz, anchor: data.anchor,
-                             today: data.today, days: data.days,
-                             scrubTime: scrubTime, onTap: onTap)
+            // Both dates, never one: `anchor` keys the day groups (it is what
+            // `days` offsets are relative to), `today` only says Today/Tomorrow.
+            MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+                             today: tl.today, days: tl.days,
+                             scrubTime: scrubTime, onTap: { scrubTime = $0 })
         }
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -228,8 +221,19 @@ struct ScheduleCard: View {
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
     }
-}
+```
 
+and add the closure to the scaffold's stored properties, beside `onReturn`:
+
+```swift
+    /// Tapping the range bar. Caller-owned for the same reason `onReturn` is:
+    /// the anchor lives in the detail view, not here.
+    let onPickDate: () -> Void
+```
+
+Then `WeekRangeBar` itself, in the same file below the scaffold:
+
+```swift
 /// The span on screen, and the way to change it.
 ///
 /// It heads the SCHEDULE card rather than sitting in the scrub card: it names
@@ -275,20 +279,17 @@ struct WeekRangeBar: View {
 }
 ```
 
-- [ ] **Step 4: Collapse the four `scheduleCard` bodies onto it**
+- [ ] **Step 4: Give the four views a `showPicker` flag to pass in**
 
-`CurrentDetailView` (and the same shape in the other three, each with its own `scheduleEntries` call and, in `OnlineGateDetailView`, its extra `window` argument):
+Each of `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView` and `OnlineGateDetailView` already constructs `ScrubDetailScaffold(…)`. Add one argument to each call, beside the existing `onReturn:`:
 
 ```swift
-    private func scheduleCard(_ tl: TimelineData) -> some View {
-        ScheduleCard(entries: scheduleEntries(tl), data: tl, tz: tz,
-                     scrubTime: scrubTime,
-                     onTap: { scrubTime = $0 },
-                     onPickDate: { showPicker = true })
-    }
+                            onPickDate: { showPicker = true },
 ```
 
-Add `@State private var showPicker = false` to each of the four views. The sheet itself lands in Task 3 — for now the flag is set and nothing reads it.
+and `@State private var showPicker = false` to each view. The sheet lands in Task 3 — for now the flag is set and nothing reads it, which is deliberate: it lets this task ship a real, tappable, screenshot-testable bar without the picker existing.
+
+Do **not** otherwise touch the views' bodies. PR #60 factored their card content into the scaffold's `card:`/`links:`/`bottom:` builders; this task adds one argument and one `@State`, nothing more.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -301,7 +302,7 @@ Expected: PASS. Screenshot tests that capture a detail view will show the new ba
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Slackwater/ScheduleCard.swift Slackwater/TideDetailView.swift \
+git add Slackwater/Theme.swift Slackwater/TideDetailView.swift \
         Slackwater/CurrentDetailView.swift Slackwater/DerivedGateDetailView.swift \
         Slackwater/OnlineGateDetailView.swift SlackwaterUITests/ScreenshotTests.swift
 git commit -m "feat: a range bar heads the schedule card"
@@ -312,7 +313,7 @@ git commit -m "feat: a range bar heads the schedule card"
 ### Task 3: The picker sheet
 
 **Files:**
-- Modify: `Slackwater/ScheduleCard.swift` (add `WeekPickerSheet`)
+- Modify: `Slackwater/Theme.swift` (add `WeekPickerSheet`; the scaffold gains `@Binding anchor`, `onPickerOpen`, `onPicked`, and owns `showPicker` + the `.sheet`)
 - Modify: the four detail views (present the sheet, apply the anchor)
 - Test: `SlackwaterUITests/ScreenshotTests.swift`
 
@@ -369,7 +370,7 @@ Expected: FAIL — `week-picker` never exists.
 
 - [ ] **Step 3: Add `WeekPickerSheet`**
 
-In `Slackwater/ScheduleCard.swift`:
+In `Slackwater/Theme.swift`, below `WeekRangeBar`:
 
 ```swift
 /// A native graphical `DatePicker`, in a sheet.
@@ -433,27 +434,44 @@ struct WeekPickerSheet: View {
 }
 ```
 
-- [ ] **Step 4: Present it from the four views**
+- [ ] **Step 4: The scaffold presents it; the views supply the anchor and the consequences**
 
-In each, alongside the existing sheets:
+> **Amended 2026-08-13.** Originally each of the four views presented its own sheet. Since PR #60 the scaffold owns the schedule card and the bar, so it owns the sheet too — one `.sheet`, one `showPicker`, one binding. The views keep exactly what only they can know: the anchor itself, and what must happen when it moves.
 
-```swift
-        .sheet(isPresented: $showPicker) {
-            WeekPickerSheet(anchor: $anchor, tz: tz,
-                            onOpen: prefetchNextBlock,
-                            onPick: { _ in rebuild() })
-        }
-```
-
-**`OnlineGateDetailView` is the exception**: it has no `rebuild()` (its `timeline` is computed, not `@State`), so its `onPick` closure is `{ _ in }` here — Task 4 replaces it with `applyAnchor()` anyway.
-
-For the three non-online views, `prefetchNextBlock` is a no-op — add it as such so the four call sites read identically:
+`ScrubDetailScaffold` replaces Task 2's `onPickDate: () -> Void` with:
 
 ```swift
-    /// Bundled and fitted stations are constituents: every date is already
-    /// local. Only an online gate has anything to fetch.
-    private func prefetchNextBlock() {}
+    /// The window's anchor. The scaffold moves it (via the picker) but does not
+    /// own it — it lives in the detail view, which is also what makes
+    /// `onReturn` caller-owned.
+    @Binding var anchor: Date
+    /// Fired when the picker OPENS, before a date is chosen. Only an online
+    /// gate has anything to do here (speculatively fetch the next block); the
+    /// other three are constituents and pass a no-op.
+    var onPickerOpen: () -> Void = {}
+    /// Fired after the anchor moves, with the picked date. The three
+    /// `@State`-backed views rebuild here; the online gate re-checks coverage.
+    var onPicked: (Date) -> Void = { _ in }
 ```
+
+and holds the sheet itself:
+
+```swift
+    @State private var showPicker = false
+```
+
+with `.sheet(isPresented: $showPicker) { WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: onPicked) }` on its body, and the bar's `onTap` set to `{ showPicker = true }`.
+
+Task 2's `showPicker` in the four views is removed — it was scaffolding for a bar that had no sheet yet, and now it has one.
+
+Each view then passes `anchor: $anchor` plus its own consequence:
+
+| view | `onPicked` |
+|---|---|
+| `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView` | `{ _ in rebuild() }` — they store `timeline` in `@State` |
+| `OnlineGateDetailView` | `{ _ in }` here; Task 4 replaces it with `applyAnchor()` |
+
+`onPickerOpen` is omitted by the three constituent views (it defaults to a no-op) and supplied only by `OnlineGateDetailView` in Task 4. That is the difference from the original plan's no-op-in-every-view approach: a defaulted parameter says "most callers have nothing to do here" once, rather than four identical empty functions saying it four times.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -466,7 +484,7 @@ Expected: PASS. If the `Next Month` button's accessibility label differs on the 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Slackwater/ScheduleCard.swift Slackwater/TideDetailView.swift \
+git add Slackwater/Theme.swift Slackwater/TideDetailView.swift \
         Slackwater/CurrentDetailView.swift Slackwater/DerivedGateDetailView.swift \
         Slackwater/OnlineGateDetailView.swift SlackwaterUITests/ScreenshotTests.swift
 git commit -m "feat: the date picker moves the window anchor"
@@ -551,15 +569,16 @@ Replace the no-op `prefetchNextBlock` stub from Task 3 Step 4 in this view only:
 
 - [ ] **Step 5: Refetch when the anchor lands outside the merged window**
 
-Change this view's `onPick` closure to route through a new method rather than a bare `rebuild()`:
+> **Amended 2026-08-13.** The sheet lives in `ScrubDetailScaffold` now (Task 3), not in this view. So this is two arguments on the existing `ScrubDetailScaffold(…)` call rather than a `.sheet` modifier.
+
+Supply both hooks where this view constructs the scaffold:
 
 ```swift
-        .sheet(isPresented: $showPicker) {
-            WeekPickerSheet(anchor: $anchor, tz: tz,
-                            onOpen: prefetchNextBlock,
-                            onPick: { _ in applyAnchor() })
-        }
+                            onPickerOpen: prefetchNextBlock,
+                            onPicked: { _ in applyAnchor() },
 ```
+
+`OnlineGateDetailView` is the only view that passes `onPickerOpen` — the other three are constituents with nothing to fetch and take its default no-op.
 
 and add:
 

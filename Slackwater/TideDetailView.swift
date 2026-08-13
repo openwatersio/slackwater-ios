@@ -36,6 +36,8 @@ struct TideDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
+                            anchor: $anchor,
+                            onPicked: { _ in rebuild() },
                             above: { EmptyView() },
                             card: { tl in
                                 readout

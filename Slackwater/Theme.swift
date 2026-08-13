@@ -224,6 +224,31 @@ func monthDay(_ date: Date, _ tz: TimeZone) -> String {
     formatter("MMM d", tz).string(from: date)
 }
 
+/// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
+/// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
+///
+/// The second date is the LAST DAY SHOWN — `anchor + 6` — not the exclusive
+/// `scheduleRange` upper bound. The window is rolling rather than a calendar
+/// week, so this bar is the only thing on screen that says what span you are
+/// looking at; naming a day that is not in the list below it would be the
+/// same defect as calling a Tue→Mon window "Week of Aug 9 – 16".
+///
+/// The month repeats only when it changes, and the year appears only when the
+/// range crosses one — a bar that printed "2026" every week would be teaching
+/// the user to stop reading it.
+func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    let last = cal.date(byAdding: .day, value: Int(Timeline.scheduleDays) - 1, to: anchor)!
+
+    let head = formatter("MMM d", tz).string(from: anchor)
+
+    let sameMonth = cal.isDate(anchor, equalTo: last, toGranularity: .month)
+    let sameYear = cal.isDate(anchor, equalTo: last, toGranularity: .year)
+    let tailPattern = sameYear ? (sameMonth ? "d" : "MMM d") : "MMM d, yyyy"
+    return "\(head) – \(formatter(tailPattern, tz).string(from: last))"
+}
+
 /// The *when* of a scrub reading — clock time stacked over the date, the
 /// return-to-now slot directly beside them, moon trailing. The LAST row of
 /// every scrub card: it is the calendar of the reading, secondary to what the
@@ -307,6 +332,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// isn't on a September strip would be the half of the job the scaffold can
     /// see and the wrong half to do alone.
     let onReturn: () -> Void
+    /// The window's anchor. The scaffold moves it (via the picker) but does not
+    /// own it — it lives in the detail view, which is also what makes
+    /// `onReturn` caller-owned.
+    @Binding var anchor: Date
+    /// Fired when the picker OPENS, before a date is chosen. Only an online
+    /// gate has anything to do here (speculatively fetch the next block); the
+    /// other three are constituents and pass a no-op.
+    var onPickerOpen: () -> Void = {}
+    /// Fired after the anchor moves, with the picked date. The three
+    /// `@State`-backed views rebuild here; the online gate re-checks coverage.
+    var onPicked: (Date) -> Void = { _ in }
+    @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -338,6 +375,39 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showPicker) {
+            WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
+                // Park the centerline on the picked week when it isn't already
+                // there. The strip does NOT self-correct: `data.x(_:)` and
+                // `data.time(atX:)` are exact inverses, so the programmatic
+                // scroll to `scrubTime` and the scroll callback that reads it
+                // back are a fixed point, and `contentSize` is set once in
+                // `makeUIView` — nothing re-clamps an off-window offset. Left
+                // alone, picking a month out draws a blank strip under a
+                // readout frozen on the first sample, with the return-to-now
+                // button hidden because `scrubTime` is still `live`.
+                //
+                // `Timeline.window` asks the question, not hand-rolled hours:
+                // it is the span the strip actually draws. A pick that lands
+                // on today leaves an in-window `scrubTime` alone, so it stays
+                // live and the return-to-now slot stays correctly empty.
+                //
+                // NOON of the picked day, not its midnight. Midnight is the
+                // window's first instant, so `x(scrubTime) - width/2` is
+                // negative and the strip opens on half a viewport of dead space
+                // before the curve starts — and the readout reads "12:00 AM",
+                // which looks like a boundary artefact rather than a reading.
+                // Noon is 216pt in, past half a phone viewport, and it is the
+                // middle of the day that was actually asked for: a full day's
+                // curve either side of the centerline, sun up, the day's
+                // extremes both in view.
+                let week = Timeline.window(anchor: picked, today: timeline?.today ?? picked)
+                if scrubTime < week.start || scrubTime > week.end {
+                    scrubTime = picked.addingTimeInterval(12 * 3600)
+                }
+                onPicked(picked)
+            })
+        }
     }
 
     private func scrubCard(_ tl: TimelineData) -> some View {
@@ -365,16 +435,124 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        // Both dates, never one: `anchor` keys the day groups (it is what
-        // `days` offsets are relative to), `today` only says Today/Tomorrow.
-        MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
-                         today: tl.today, days: tl.days,
-                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
-            .background(SN.cardFill)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-            .padding(.horizontal, 16)
+        VStack(spacing: 0) {
+            WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: { showPicker = true })
+            Divider().overlay(Color.white.opacity(0.08))
+            // Both dates, never one: `anchor` keys the day groups (it is what
+            // `days` offsets are relative to), `today` only says Today/Tomorrow.
+            MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+                             today: tl.today, days: tl.days,
+                             scrubTime: scrubTime, onTap: { scrubTime = $0 })
+        }
+        .background(SN.cardFill)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+        .padding(.horizontal, 16)
+    }
+}
+
+/// The span on screen, and the way to change it.
+///
+/// It heads the SCHEDULE card rather than sitting in the scrub card: it names
+/// the list's range, and putting it in the scrub card would land it below the
+/// swipe hint, the readout and the tide-at-port link — much further down the
+/// page than "just under the scrubber" suggests — while reopening the
+/// 2026-08-03 rule that the `when` row is always last in that card.
+struct WeekRangeBar: View {
+    let anchor: Date
+    let today: Date
+    let tz: TimeZone
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.7))
+                Text(weekRangeLabel(anchor: anchor, tz: tz))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                if anchor != today {
+                    // The bar is the clearest statement on screen that you are
+                    // not looking at this week, so it carries the way back.
+                    Text("not this week")
+                        .font(.caption2)
+                        .foregroundStyle(SN.amber)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SN.foam.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("week-range-bar")
+        .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
+    }
+}
+
+/// A native graphical `DatePicker`, in a sheet.
+///
+/// Native rather than a hand-rolled month grid: Dynamic Type, VoiceOver, and
+/// localization arrive for nothing, and this app adds no dependency it can
+/// avoid. Unbounded in both directions — the engine is deterministic, so last
+/// Saturday costs exactly what next March costs. Online gates get the SAME
+/// unbounded picker rather than a greyed-out range: two classes of station that
+/// visibly disagree about how far the future goes would leave the user to work
+/// out why, where an honest failure at the moment of asking says it in words.
+struct WeekPickerSheet: View {
+    @Binding var anchor: Date
+    let tz: TimeZone
+    let onOpen: () -> Void
+    let onPick: (Date) -> Void
+
+    @State private var draft = Date()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                DatePicker("Week starting", selection: $draft,
+                           displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(SN.go)
+                    .padding(.horizontal, 8)
+                    .accessibilityIdentifier("week-picker")
+                Spacer()
+            }
+            .background(SN.page.ignoresSafeArea())
+            .navigationTitle("Choose a date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Show") {
+                        var cal = Calendar(identifier: .gregorian)
+                        cal.timeZone = tz
+                        let picked = cal.startOfDay(for: draft)
+                        anchor = picked
+                        onPick(picked)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("week-picker-done")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .onAppear {
+            draft = anchor
+            // Fire the speculative fetch as the sheet appears, not when a date
+            // is chosen: by the time the user has picked, the round trip has
+            // had the whole browsing interaction to land.
+            onOpen()
+        }
     }
 }
 

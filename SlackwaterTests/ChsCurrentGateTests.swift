@@ -304,7 +304,13 @@ final class ChsCurrentGateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         try ChsModelStore.saveOnline(onlineWindow([t0, t0 + 900, t0 + 1800], [1, 2, 3]))
-        try ChsModelStore.saveOnline(onlineWindow([t0 + 1800, t0 + 2700], [3, 4]))
+        // The saver returns what it WROTE, not the block handed in: the fetch
+        // passes that straight back to its caller, and a view holding the
+        // narrower just-fetched block would answer `covers` false for a week
+        // the app has on disk.
+        let saved = try ChsModelStore.saveOnline(onlineWindow([t0 + 1800, t0 + 2700], [3, 4]))
+        XCTAssertEqual(saved.times, [t0, t0 + 900, t0 + 1800, t0 + 2700],
+                       "saveOnline returns the merged window, not its argument")
 
         let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
         XCTAssertEqual(loaded.times, [t0, t0 + 900, t0 + 1800, t0 + 2700])
@@ -348,6 +354,21 @@ final class ChsCurrentGateTests: XCTestCase {
             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
         XCTAssert(fetched.covers(anchor: ahead, today: today),
                   "a fetch from an anchor must cover that anchor's own strip")
+    }
+
+    /// The prefetch aims at the block AFTER what is stored — the point is that a
+    /// user paging forward lands in cache, so re-fetching the stored range would
+    /// be pure waste.
+    func testPrefetchAnchorIsTheStoredWindowsEdge() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: Date())
+        let end = today.addingTimeInterval(30 * 86_400)
+        let w = ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+                                fetchedAt: Date(), start: today, end: end,
+                                floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+        XCTAssertEqual(prefetchAnchor(after: w, tz: tz), cal.startOfDay(for: end))
     }
 
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)

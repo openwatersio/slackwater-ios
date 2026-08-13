@@ -75,7 +75,9 @@ private func seedOnlineWindow(stationID: String) {
         stationID: gate.id, iwlsName: "\(gate.name) (seeded)", timezone: gate.timezone,
         fetchedAt: appNow(), start: start, end: end,
         floodDirection: 0, ebbDirection: 180, times: times, speeds: speeds)
-    try? ChsModelStore.saveOnline(window)
+    // `_ =` because `try?` re-wraps the merged window `saveOnline` now returns,
+    // and @discardableResult doesn't survive the Optional.
+    _ = try? ChsModelStore.saveOnline(window)
 }
 
 /// Gate until a choice is made (prototype phase machine); list ever after.

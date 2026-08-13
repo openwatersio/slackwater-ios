@@ -60,6 +60,14 @@ final class ChsFitService: ObservableObject {
     /// `currentRecords` changing.
     @Published private(set) var onlineFetchStamp = 0
 
+    /// The online fetch in flight for each gate, so a gate never has two.
+    /// Keyed by gate id rather than one global handle: two gates' fetches are
+    /// independent — different station, different file, different returned
+    /// window — and a single handle would both serialise them and hand gate B's
+    /// caller gate A's window. Read and written only on the main actor, which
+    /// is what makes the check-and-set atomic. See `fetchOnlineWindow`.
+    private var onlineFetches: [String: Task<ChsOnlineWindow, Error>] = [:]
+
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
     private static let fitOnly: Set<String>? = {
@@ -509,8 +517,49 @@ extension ChsFitService {
     /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
     /// so every caller, today's and any future one, gets the same
     /// "the fetch landed" signal without re-deriving it.
+    ///
+    /// Returns the window as SAVED — the union of this block with whatever was
+    /// already stored — so the caller's copy is never narrower than the disk's.
+    /// Only a failed disk write falls back to the bare fetched block.
+    ///
+    /// ONE fetch per gate at a time. The picker's speculative prefetch and the
+    /// user's own fetch of the week they landed on are both fetches of the same
+    /// file, and run concurrently they interleave a read-modify-write: disjoint
+    /// blocks make `merging` return the incoming one outright, so whichever
+    /// saves LAST wins the whole file — the prefetch landing second discards the
+    /// block the user is looking at and swaps the strip for the honesty card
+    /// seconds after it appeared. A second caller joins the fetch already
+    /// running instead of starting its own, which also spares the duplicate
+    /// 30-day round trip.
+    ///
+    /// ponytail: coalescing is by gate, NOT by gate+span — a joiner gets the
+    /// span the in-flight fetch asked for, which may not cover it. That path
+    /// ends on the honesty card whose "Try again" fetches the parked anchor,
+    /// so it is recoverable; key the span in too if that ever reads as a bug.
     nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
-                                             from anchor: Date? = nil) async throws -> ChsOnlineWindow {
+                                             from anchor: Date?) async throws -> ChsOnlineWindow {
+        try await MainActor.run { shared.onlineFetchTask(for: gate, from: anchor) }.value
+    }
+
+    /// The check-and-set, on the main actor so it is atomic: an existing handle
+    /// is joined, otherwise one is registered before this returns. The task
+    /// clears its own entry on the way out — success, failure or throw.
+    @MainActor
+    private func onlineFetchTask(for gate: ChsCurrentGateInfo,
+                                 from anchor: Date?) -> Task<ChsOnlineWindow, Error> {
+        if let existing = onlineFetches[gate.id] { return existing }
+        let task = Task { @MainActor in
+            defer { ChsFitService.shared.onlineFetches[gate.id] = nil }
+            return try await ChsFitService.runOnlineFetch(for: gate, from: anchor)
+        }
+        onlineFetches[gate.id] = task
+        return task
+    }
+
+    /// The fetch itself. Private: everything goes through `fetchOnlineWindow`,
+    /// which is where the one-per-gate rule lives.
+    private nonisolated static func runOnlineFetch(for gate: ChsCurrentGateInfo,
+                                                  from anchor: Date?) async throws -> ChsOnlineWindow {
         let fetcher = IwlsFetcher()
         let list = try await fetcher.stationList()
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
@@ -550,8 +599,13 @@ extension ChsFitService {
             floodDirection: flood, ebbDirection: ebb,
             times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
         do {
-            try ChsModelStore.saveOnline(window)
+            // The MERGED window goes back to the caller, not `window`: the
+            // fetched block is only the part that was missing, and a caller
+            // rendering it alone would have less on screen than it has on disk
+            // (`saveOnline`'s doc comment).
+            let merged = try ChsModelStore.saveOnline(window)
             await MainActor.run { shared.onlineFetchStamp += 1 }
+            return merged
         } catch {
             // ponytail: a local disk-write failure on an already-fetched
             // window isn't worth failing the whole fetch over — the caller
