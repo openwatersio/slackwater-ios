@@ -224,6 +224,36 @@ func monthDay(_ date: Date, _ tz: TimeZone) -> String {
     formatter("MMM d", tz).string(from: date)
 }
 
+/// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
+/// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
+///
+/// The second date is the LAST DAY SHOWN — `anchor + 6` — not the exclusive
+/// `scheduleRange` upper bound. The window is rolling rather than a calendar
+/// week, so this bar is the only thing on screen that says what span you are
+/// looking at; naming a day that is not in the list below it would be the
+/// same defect as calling a Tue→Mon window "Week of Aug 9 – 16".
+///
+/// The month repeats only when it changes, and the year appears only when the
+/// range crosses one — a bar that printed "2026" every week would be teaching
+/// the user to stop reading it.
+func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    let last = cal.date(byAdding: .day, value: Int(Timeline.scheduleDays) - 1, to: anchor)!
+
+    let f = DateFormatter()
+    f.timeZone = tz
+    f.locale = Locale(identifier: "en_US_POSIX")
+
+    f.dateFormat = "MMM d"
+    let head = f.string(from: anchor)
+
+    let sameMonth = cal.isDate(anchor, equalTo: last, toGranularity: .month)
+    let sameYear = cal.isDate(anchor, equalTo: last, toGranularity: .year)
+    f.dateFormat = sameYear ? (sameMonth ? "d" : "MMM d") : "MMM d, yyyy"
+    return "\(head) – \(f.string(from: last))"
+}
+
 /// The *when* of a scrub reading — clock time stacked over the date, the
 /// return-to-now slot directly beside them, moon trailing. The LAST row of
 /// every scrub card: it is the calendar of the reading, secondary to what the

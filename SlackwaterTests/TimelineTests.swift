@@ -702,4 +702,28 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
         XCTAssertEqual(events.filter { $0.kind == .maxEbb }.count, 1)
     }
+
+    // MARK: - The range bar label (spec §5)
+
+    func testWeekRangeLabelNamesTheLastDayShown() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        // Anchor Aug 11 → groups Aug 11…Aug 17. The label names Aug 17, the last
+        // day ON SCREEN, never the exclusive Aug 18 boundary.
+        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 8, 11), tz: tz),
+                       "Aug 11 – 17")
+    }
+
+    func testWeekRangeLabelSpellsTheMonthWhenItChanges() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 8, 28), tz: tz),
+                       "Aug 28 – Sep 3")
+    }
+
+    func testWeekRangeLabelShowsTheYearOnlyWhenItChanges() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 12, 29), tz: tz),
+                       "Dec 29 – Jan 4, 2027")
+        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 6, 1), tz: tz),
+                       "Jun 1 – 7", "a same-year range never prints a year")
+    }
 }
