@@ -146,7 +146,7 @@ struct OnlineGateDetailView: View {
                 if anchor == .distantPast { anchor = today }
                 if window == nil { window = ChsModelStore.loadOnline(gate.id) }
                 RecentsStore.shared.record(gate.id)
-                if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow() }
+                if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow(from: anchor) }
             }
             // A fetch this view did not start — the picker's prefetch — has to
             // reach it. `fetchOnlineWindow` saves and bumps the stamp; that is
@@ -200,10 +200,13 @@ struct OnlineGateDetailView: View {
         if timeline == nil, net.online { fetchNow(from: anchor) }
     }
 
-    /// `from` defaults to nil, meaning today — what `.onAppear` wants. The
-    /// picker passes the anchor it just landed on. (Named `from`, not
+    /// Always fetches the block the WINDOW is parked on — no default, so no
+    /// caller can quietly ask for today's block while the user is looking at
+    /// September. That is what "Try again" used to do from the honesty card:
+    /// fetch today's 30 days, fail the same coverage check, and redraw the
+    /// identical card, with no way out but the back button. (Named `from`, not
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
-    private func fetchNow(from: Date? = nil) {
+    private func fetchNow(from: Date) {
         guard !fetching else { return }
         fetching = true
         fetchFailed = false
@@ -301,7 +304,7 @@ struct OnlineGateDetailView: View {
         // three, and nobody has timed the new one.)
         ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
                      expectation: expectation, action: fetching ? "Fetching…" : "Try again",
-                     identifier: "online-honesty-card") { fetchNow() }
+                     identifier: "online-honesty-card") { fetchNow(from: anchor) }
     }
 
     private var expectation: String {
@@ -339,5 +342,12 @@ struct OnlineGateDetailView: View {
         // the whole window back, not just park the centerline at a `now` that
         // isn't on this strip.
         anchor = todayLocal(tz)
+        // And the same coverage check every other anchor move gets. A
+        // far-forward pick's fetch can have discarded today's block (disjoint
+        // blocks: the incoming one wins), so coming back can land on a month
+        // this gate no longer holds — honesty card with no fetch attempted,
+        // online or not. `applyAnchor` asks `timeline`, which is computed off
+        // the `anchor`/`live` just set here, and fetches when it says nil.
+        applyAnchor()
     }
 }
