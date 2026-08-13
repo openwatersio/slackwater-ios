@@ -332,6 +332,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// isn't on a September strip would be the half of the job the scaffold can
     /// see and the wrong half to do alone.
     let onReturn: () -> Void
+    /// Tapping the range bar. Caller-owned for the same reason `onReturn` is:
+    /// the anchor lives in the detail view, not here.
+    let onPickDate: () -> Void
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -390,16 +393,64 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        // Both dates, never one: `anchor` keys the day groups (it is what
-        // `days` offsets are relative to), `today` only says Today/Tomorrow.
-        MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
-                         today: tl.today, days: tl.days,
-                         scrubTime: scrubTime, onTap: { scrubTime = $0 })
-            .background(SN.cardFill)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-            .padding(.horizontal, 16)
+        VStack(spacing: 0) {
+            WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: onPickDate)
+            Divider().overlay(Color.white.opacity(0.08))
+            // Both dates, never one: `anchor` keys the day groups (it is what
+            // `days` offsets are relative to), `today` only says Today/Tomorrow.
+            MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+                             today: tl.today, days: tl.days,
+                             scrubTime: scrubTime, onTap: { scrubTime = $0 })
+        }
+        .background(SN.cardFill)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+        .padding(.horizontal, 16)
+    }
+}
+
+/// The span on screen, and the way to change it.
+///
+/// It heads the SCHEDULE card rather than sitting in the scrub card: it names
+/// the list's range, and putting it in the scrub card would land it below the
+/// swipe hint, the readout and the tide-at-port link — much further down the
+/// page than "just under the scrubber" suggests — while reopening the
+/// 2026-08-03 rule that the `when` row is always last in that card.
+struct WeekRangeBar: View {
+    let anchor: Date
+    let today: Date
+    let tz: TimeZone
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar")
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.7))
+                Text(weekRangeLabel(anchor: anchor, tz: tz))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                if anchor != today {
+                    // The bar is the clearest statement on screen that you are
+                    // not looking at this week, so it carries the way back.
+                    Text("not this week")
+                        .font(.caption2)
+                        .foregroundStyle(SN.amber)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SN.foam.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("week-range-bar")
+        .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
     }
 }
 

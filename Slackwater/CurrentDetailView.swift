@@ -42,6 +42,8 @@ struct CurrentDetailView: View {
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
+    /// Set by the range bar; read by Task 3's picker sheet.
+    @State private var showPicker = false
     @State private var showDownloads = false
     // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
     // custom `@Environment` key set above the presenting view on its own
@@ -85,6 +87,7 @@ struct CurrentDetailView: View {
                                                        ebbDeg: record.ebbDirection, speedUnit: speedUnit) },
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
+                            onPickDate: { showPicker = true },
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,

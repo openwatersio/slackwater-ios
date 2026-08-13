@@ -169,6 +169,20 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
     }
 
+    /// The range bar heads the schedule card on every scrubable detail, and it
+    /// says what span the list below it covers.
+    func testWeekRangeBarHeadsTheSchedule() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.waitForExistence(timeout: 10), "no range bar above the schedule")
+        XCTAssert(bar.label.contains("–"), "the bar states a span, got '\(bar.label)'")
+    }
+
     // M2: current stations join the list; walk into Deception Pass and scrub
     // the signed velocity curve.
     func testM2Currents() throws {
