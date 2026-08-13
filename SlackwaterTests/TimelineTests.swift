@@ -505,6 +505,29 @@ final class TimelineTests: XCTestCase {
         }
     }
 
+    /// Adjacent slack windows that touch or overlap merge into one green
+    /// column, so only the first slack of the run labels itself (#56 —
+    /// Race Rocks Aug 11, a 0.1 kn blip between two slacks).
+    func testTouchingSlackWindowsLabelOnlyTheFirst() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
+        // overlapping, touching (end == start), then a clear gap
+        let windows = [(slack: s(76), start: s(50), end: s(120)),
+                       (slack: s(188), start: s(110), end: s(220)),
+                       (slack: s(300), start: s(220), end: s(340)),
+                       (slack: s(600), start: s(500), end: s(700))]
+        XCTAssertFalse(suppressesSlackLabel(windows, at: s(76)),
+                       "the first slack of a merged run keeps its label")
+        XCTAssert(suppressesSlackLabel(windows, at: s(188)),
+                  "overlap with the previous window suppresses the label")
+        XCTAssert(suppressesSlackLabel(windows, at: s(300)),
+                  "touching (end == start) reads as one column too")
+        XCTAssertFalse(suppressesSlackLabel(windows, at: s(600)),
+                       "a gap breaks the run — this slack labels itself")
+        XCTAssertFalse(suppressesSlackLabel(windows, at: s(999)),
+                       "a slack with no window (hairline case) is never suppressed")
+    }
+
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a
     /// 0.5 kn window measured off it would be fiction (gutter spec §3). Its
     /// slacks fall back to a plain dropline instead.
