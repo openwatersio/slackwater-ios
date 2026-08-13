@@ -2168,7 +2168,13 @@ final class ScreenshotTests: XCTestCase {
     /// to mark (`ChsCurrentGateInfo.isOnline`'s exclusion from
     /// `ChsFitService.candidates`).
     func testOnlineGateFetchedRendersDetail() throws {
-        let app = launch("-seedGate", "-seedOnlineWindow", "chs-sechelt-rapids",
+        // `-chsResetModels` so the seed is the ONLY window on disk: it writes
+        // through the merging `saveOnline`, and the live-fetch test leaves a
+        // real window for this same gate. Passing by test ordering is not
+        // passing. (The reset runs first — SlackwaterApp.init touches
+        // ChsFitService.shared before seeding, precisely for this.)
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-seedOnlineWindow", "chs-sechelt-rapids",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
