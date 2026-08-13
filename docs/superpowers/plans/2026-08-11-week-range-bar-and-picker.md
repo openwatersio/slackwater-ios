@@ -12,6 +12,22 @@
 
 **Depends on:** Plan A (`2026-08-11-week-window-anchor.md`) — complete and merged. This plan assumes `TimelineData.anchor`, `Timeline.window`, `TimelineData.scheduleRange`, `ChsOnlineWindow.covers(anchor:today:)`, `merging(_:prunedBefore:)`, `fetchOnlineWindow(for:from:)`, and each detail view's `@State anchor` all exist. Note `rebuild()` exists on **three** of the four views — `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView`, which store `timeline` in `@State`. `OnlineGateDetailView` computes its `timeline`, so it has no `rebuild()` and needs none; setting `anchor` is sufficient there.
 
+## Known before you start
+
+Plan A shipped with `anchor = today` on every path, so a whole class of bug is currently unreachable. These five were found by Plan A's reviews and deliberately left, because the anchor never moves until *this* plan moves it. Each becomes live the day the picker lands. None is speculative — every one has a named site.
+
+1. **`fetchOnlineWindow` returns the freshly-fetched block, not the merged-on-disk window.** `saveOnline` merges and persists the union, but the function hands its caller only what it just fetched, and `OnlineGateDetailView.fetchNow` assigns that to `@State`. So immediately after a fetch the view holds a *narrower* window than the one on disk, and `covers` can answer false for a week the app actually has. One line to fix — return the merged window, or reload it — but decide it deliberately.
+
+2. **"Newest fetch wins" when two blocks are disjoint.** `merging` discards the stored block and keeps the incoming one, because `ChsOnlineWindow` carries a single `start`/`end` and cannot represent a hole. On a far-forward page that discards *today's* block — the one the user is most likely to page back to — so returning refetches ~30 days. Whether that is the right survivor is this plan's decision, not Plan A's.
+
+3. **The strip does not re-center when the anchor moves.** `TimelineScrubber.Coordinator.didInitialCenter` is one-shot. On an anchor change, `updateUIView` sets `contentOffset` from a `scrubTime` that is off the new window, UIScrollView clamps to 0, and `scrollViewDidScroll` overwrites `scrubTime` with the left-edge time. It self-corrects to something sane rather than breaking, but "the picker sets `scrubTime` too" is a decision this plan owns and does not currently state.
+
+4. **`scheduleRange` counts 168 *absolute* hours**, so a week containing a spring-forward ends at 01:00 of day 7 and the schedule renders an **8th partial day-group**. That breaks the "seven days" promise twice a year, and it will be more visible once a picker lets someone land on such a week deliberately. Making it calendar-correct ripples through the range's semantics, four view filters and two tests — which is why Plan A left it, not because it is fine.
+
+5. **A past anchor still refetches on a return visit.** `saveOnline`'s prune cut is `min(Timeline.window(anchor: today, today: today).start, window.start)`, which protects the window being saved but not one saved earlier. Page back → today → back again, and the first past block has been pruned. Bounded backward retention is the fix, and Plan A's own `ponytail:` note declined to bound it forward, so the decision is open in both directions.
+
+Two more, cheap and worth doing while you are in these files: the **UI-test seed is no longer hermetic** (`seedOnlineWindow` writes through the now-merging `saveOnline`, and the seeded test launches without `-chsResetModels` while the live-fetch test leaves a real window for the same gate — passing today by test ordering, not by design), and **`OnlineGateDetailView.onAppear` still reads a second clock** for its fetch-or-not question while `timeline` uses `tl.today`; different question, worst case is an honesty card rather than a hole, but it is the last split clock in the file.
+
 ## Global Constraints
 
 - **Never commit to `main` in this repo.** Branch, push, PR, never merge your own.
