@@ -165,17 +165,49 @@ final class NationalScaleTests: XCTestCase {
     /// samples out of 5,700; 0.00033 → 0; shipped at 0.0004 for margin above
     /// that empirical floor (7.4% fall back to the exact search, versus 15%
     /// for the amplitude-only version of this same idea).
+    ///
+    /// Issue #15: one reference date leaves the ~27-day lunar declination
+    /// cycle unsampled, and four probes 6h apart all share one alignment on
+    /// the sampler's 30-min epoch grid. So: five day-starts spanning a lunar
+    /// month, each day's four times shifted by a different odd-minute offset
+    /// so no two dates land on the same grid phase.
+    ///
+    /// What the wider sweep taught (and the single date could not): the
+    /// cheap pair snaps to the absolute 30-min grid and *straddles* `now`
+    /// (the GOTCHA on `tidePinRisingHybrid`), so its answer is the window's
+    /// net motion. When a turn falls inside that window the hybrid can
+    /// honestly disagree with the exact-at-`now` baseline — a timing lag
+    /// bounded by the window, self-correcting on the next style build, with
+    /// the detail view authoritative. The original probes all sat 20 min
+    /// into their window, the one grid phase where that band is narrowest
+    /// (~0.5% of samples land in it at other phases). So the assertion that
+    /// closes #15 is split to match the design: mismatches AWAY from a turn
+    /// — the threshold trusting sampling noise, the failure the sweep was
+    /// hunting — must be zero; near-turn straddle lag gets a rate bound.
     func testHybridDirectionHasFullCoverageAndMatchesBaseline() {
-        let dayStart = Date(timeIntervalSince1970: 1_785_000_000)
-        let checkTimes = [0.0, 6.0, 12.0, 18.0].map { dayStart.addingTimeInterval($0 * 3600) }
+        let base = Date(timeIntervalSince1970: 1_785_000_000)
+        var checkTimes: [Date] = []
+        for (day, shiftMinutes) in [(0, 0.0), (7, 11.0), (13, 23.0), (20, 37.0), (27, 49.0)] {
+            let dayStart = base.addingTimeInterval(Double(day) * 86_400)
+            for hour in [0.0, 6.0, 12.0, 18.0] {
+                checkTimes.append(dayStart.addingTimeInterval(hour * 3600 + shiftMinutes * 60))
+            }
+        }
         var resolved = 0
+        var nearTurnLags = 0
         var mismatches: [String] = []
         for record in TideStationRecord.all {
             for now in checkTimes {
                 let baseline = record.cardState(at: now).rising
                 guard let hybrid = tidePinRisingHybrid(record, at: now) else { continue }
                 resolved += 1
-                if hybrid != baseline {
+                guard hybrid != baseline else { continue }
+                let turnNearby = !record.engineStation.extremes(
+                    from: now.addingTimeInterval(-PIN_TIDE_DIFF_DT),
+                    to: now.addingTimeInterval(PIN_TIDE_DIFF_DT)).isEmpty
+                if turnNearby {
+                    nearTurnLags += 1
+                } else {
                     mismatches.append("\(record.id) at \(now): hybrid=\(hybrid) baseline=\(baseline)")
                 }
             }
@@ -183,10 +215,13 @@ final class NationalScaleTests: XCTestCase {
         let checked = TideStationRecord.all.count * checkTimes.count
         let coveragePct = Double(resolved) / Double(checked) * 100
         print(String(format: "Hybrid direction: %d/%d resolved a tone (%.1f%% coverage), "
-                     + "%d disagreed with the 30h baseline", resolved, checked, coveragePct, mismatches.count))
+                     + "%d lagged within one window of a turn, %d disagreed away from one",
+                     resolved, checked, coveragePct, nearTurnLags, mismatches.count))
         XCTAssertGreaterThan(coveragePct, 99.0, "the hybrid must not quietly fall back to mostly-neutral again")
         XCTAssertTrue(mismatches.isEmpty,
-                      "hybrid direction disagreed with the 30h baseline: \(mismatches.prefix(10))")
+                      "hybrid trusted a wrong-signed sample with no turn within its window: \(mismatches.prefix(10))")
+        XCTAssertLessThan(Double(nearTurnLags) / Double(resolved), 0.01,
+                          "near-turn straddle lag should stay a rare, bounded timing artifact")
     }
 
     /// Clustering is what makes 3,125 pins a map rather than a smear — and the
