@@ -356,6 +356,21 @@ final class ChsCurrentGateTests: XCTestCase {
                   "a fetch from an anchor must cover that anchor's own strip")
     }
 
+    /// The prefetch aims at the block AFTER what is stored — the point is that a
+    /// user paging forward lands in cache, so re-fetching the stored range would
+    /// be pure waste.
+    func testPrefetchAnchorIsTheStoredWindowsEdge() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: Date())
+        let end = today.addingTimeInterval(30 * 86_400)
+        let w = ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+                                fetchedAt: Date(), start: today, end: end,
+                                floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+        XCTAssertEqual(prefetchAnchor(after: w, tz: tz), cal.startOfDay(for: end))
+    }
+
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)
 
     /// The 7 validation rejects ship as online: true identities — findable,

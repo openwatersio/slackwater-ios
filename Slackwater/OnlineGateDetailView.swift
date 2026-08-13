@@ -109,7 +109,8 @@ struct OnlineGateDetailView: View {
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
                             anchor: $anchor,
-                            onPicked: { _ in },
+                            onPickerOpen: prefetchNextBlock,
+                            onPicked: { _ in applyAnchor() },
                             above: { EmptyView() },
                             card: { tl in
                                 // Strip first, readout under it — the inverse of the
@@ -147,11 +148,62 @@ struct OnlineGateDetailView: View {
                 RecentsStore.shared.record(gate.id)
                 if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow() }
             }
+            // A fetch this view did not start — the picker's prefetch — has to
+            // reach it. `fetchOnlineWindow` saves and bumps the stamp; that is
+            // exactly the "something changed, reload" signal the list's online
+            // card already reloads on (SlackwaterApp's `onlineCard`). Without
+            // it the speculatively fetched block sits on disk unseen and the
+            // first pick into it refetches a month the app already has, which
+            // is the entire prefetch, wasted. Subscribing to the one publisher
+            // rather than @ObservedObject-ing the service keeps the fit
+            // queue's churn from re-rendering a scrubbing strip.
+            .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
+                window = ChsModelStore.loadOnline(gate.id) ?? window
+            }
     }
 
     // MARK: - Fetch
 
-    private func fetchNow() {
+    /// Fired when the picker OPENS, not when a date is chosen: the assumption
+    /// is that someone opening a calendar is heading forward, and giving the
+    /// round trip the whole browsing interaction is the difference between a
+    /// spinner and no spinner.
+    ///
+    /// Nothing here touches this view's state directly. `fetchOnlineWindow`
+    /// merges, saves, and bumps `ChsFitService.onlineFetchStamp`, which the
+    /// `.onReceive` above reloads on — the fetch lands and the window updates
+    /// itself. A failure is silent BY DESIGN: the user has not asked
+    /// for that week yet, so there is nothing to apologise for. If they do
+    /// land there and it is missing, `applyAnchor` below says so properly.
+    private func prefetchNextBlock() {
+        guard let window, net.online, !fetching else { return }
+        let from = prefetchAnchor(after: window, tz: tz)
+        Task { try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
+    }
+
+    /// The anchor moved. If the window covers it we are done; if not, this is
+    /// the same situation `.onAppear` already handles — fetch when online, and
+    /// when offline say nothing, because the honesty card `timeline == nil`
+    /// already puts on screen says it better than a flag would.
+    ///
+    /// `timeline == nil` IS the coverage question, asked once: it is
+    /// `window.covers(anchor:today:)` against the `today` the strip itself was
+    /// built from. Re-asking with a fresh `todayLocal(tz)` would be a second
+    /// clock on one decision — the defect this file's `timeline` comment
+    /// documents at length.
+    ///
+    /// No `rebuild()` call, and deliberately: this view's `timeline` is a
+    /// COMPUTED property (unlike the other three details, which store theirs in
+    /// `@State`), so setting `anchor` is already enough — SwiftUI re-evaluates
+    /// it on the next render.
+    private func applyAnchor() {
+        if timeline == nil, net.online { fetchNow(from: anchor) }
+    }
+
+    /// `from` defaults to nil, meaning today — what `.onAppear` wants. The
+    /// picker passes the anchor it just landed on. (Named `from`, not
+    /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
+    private func fetchNow(from: Date? = nil) {
         guard !fetching else { return }
         fetching = true
         fetchFailed = false
@@ -161,7 +213,12 @@ struct OnlineGateDetailView: View {
                 // success — this view's own `window` update below is for its
                 // OWN redraw; the stamp is what tells any other still-mounted
                 // card/detail for this gate to reload the disk copy too.
-                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate)
+                //
+                // What comes back is the MERGED window, not just the block
+                // that was fetched, so assigning it never narrows what this
+                // view knows it has. `timeline` is computed off it, so there is
+                // no stored data to rebuild.
+                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: from)
                 window = fresh
                 fetching = false
             } catch {

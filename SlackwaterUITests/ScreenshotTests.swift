@@ -2200,6 +2200,39 @@ final class ScreenshotTests: XCTestCase {
                        "a covering window must render the real detail, not the honesty card")
     }
 
+    /// Paging an online gate to a week nobody has downloaded, with no network,
+    /// must SAY so — not render an empty strip that reads as slack water all
+    /// week. Same picker choreography as `testPickingADateMovesTheWindow`, two
+    /// months out so no 30-day window could cover it.
+    func testOnlineGatePagedBeyondItsWindowOffline() throws {
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-seedOnlineWindow", "chs-sechelt-rapids",
+                         "-networkKillSwitch",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5),
+                  "search did not find Sechelt Rapids by its alias")
+        result.tap()
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "the seeded window should render before we page off it")
+
+        app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch
+            .waitForExistence(timeout: 5))
+        app.buttons["Next Month"].firstMatch.tap()
+        app.buttons["Next Month"].firstMatch.tap()   // two months out — past the 30-day window
+        app.collectionViews.buttons.element(boundBy: 10).tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+
+        XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch
+            .waitForExistence(timeout: 5),
+                  "an uncovered week offline must show the honesty card, never a dead strip")
+        XCTAssertFalse(app.otherElements["timeline-strip"].exists,
+                       "the strip must be GONE, not drawn flat over data nobody has")
+    }
+
     /// Full-plan only (`skipUnlessFull` — run via ./scripts/test.sh --full):
     /// the spec's open item, verified against REAL IWLS rather than a seeded window.
     /// Sechelt Rapids is one of the 7 fit-reject gates (ChsCurrentGate.swift) — this

@@ -115,6 +115,15 @@ extension ChsModelStore {
     }
 }
 
+/// Where the next speculative fetch starts: the local midnight at the stored
+/// window's far edge. Blocks land on `chunkPlan`'s absolute 7-day grid, so the
+/// overlap this creates costs nothing and the seam can never leave a gap.
+func prefetchAnchor(after window: ChsOnlineWindow, tz: TimeZone) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return cal.startOfDay(for: window.end)
+}
+
 // MARK: - The fetched window (online gates: official CHS predictions, no fit)
 
 /// A window of official CHS current predictions for one online (fit-reject)
