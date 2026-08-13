@@ -102,12 +102,18 @@ own. Full policy, including why the macOS CI lane is self-hosted, in `CONTRIBUTI
 
 ## Testing (agents: read this)
 
-Two checked-in test plans, run on both reference simulators by `scripts/test.sh`:
+One checked-in test plan (`TestPlans/Slackwater.xctestplan`), run on both reference
+simulators by `scripts/test.sh`. `--full` does not switch plans — it exports
+`TEST_RUNNER_SLACKWATER_FULL`, and the live-IWLS tests skip themselves without it:
 
 ```sh
-./scripts/test.sh          # FAST (default) — ~9 min/sim. Use this while iterating.
-./scripts/test.sh --full   # FULL — ~21 min/sim, and variable. Before every upload.
+./scripts/test.sh          # FAST (default) — ~9 min/sim idle. Use this while iterating.
+./scripts/test.sh --full   # FULL — ~21 min/sim idle, and variable. Before every upload.
 ```
+
+Those are idle-machine figures. With the self-hosted CI runner competing for the same
+Mac, fast has been observed at ~14–16 min/sim and full at ~27–37 — budget accordingly,
+and see `CLAUDE.md` for what contention does to live-network tests.
 
 Fast is everything that runs on stored or mocked state. Full adds the nine UI tests that
 fetch live from CHS IWLS and fit harmonics on-device — that is the entire difference, it
