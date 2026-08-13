@@ -33,7 +33,7 @@ Two more, cheap and worth doing while you are in these files: the **UI-test seed
 - **Never commit to `main` in this repo.** Branch, push, PR, never merge your own.
 - **`pph` is not to be touched.**
 - **Chart labels stay fixed-size.** The range bar is chrome *outside* the canvas, so it uses Dynamic Type fonts normally (`.caption`, `.subheadline`) — the fixed-size rule applies only to labels drawn inside `TimelineCanvas`.
-- **Minimum font size 14px** except `.eyebrow` at 12 — mirrors the web's `tokens.test.ts` rule. `MonoLabel` already complies.
+- ~~**Minimum font size 14px** except `.eyebrow` at 12 — mirrors the web's `tokens.test.ts` rule.~~ **Struck 2026-08-13: this constraint does not exist in this repo.** It is `slackwater-web`'s rule (`src/tokens.test.ts`), transplanted here in error when this plan was written. iOS `TypeScaleTests.swift` enforces no minimum size, `.eyebrow` is not a token in the iOS app, and `.caption2` is already used in 20+ places for exactly the kind of secondary annotation the range bar needs. Follow the surrounding code, not this line.
 - **Colour is state, form is kind.** The range bar carries no direction colour.
 - **Run tests with `./scripts/test.sh`.** Never run a bare `xcodebuild` while tests are in flight.
 - Commit after every task.
