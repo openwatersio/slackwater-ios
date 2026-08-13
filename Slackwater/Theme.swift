@@ -698,11 +698,14 @@ final class RecentsStore: ObservableObject {
 
     @Published private(set) var ids: [String]
 
-    /// Set by the regular-width auto-selection (M52) for exactly the detail it
-    /// opens. The pane opening itself is not the user viewing a station, and
-    /// counting it would evict a real entry from the 6-slot history on every
-    /// single launch.
-    var skipNextRecord = false
+    /// Armed by the regular-width auto-selection (M52) with the id of exactly
+    /// the detail it opens. The pane opening itself is not the user viewing a
+    /// station, and counting it would evict a real entry from the 6-slot
+    /// history on every single launch. Scoped to the id — an unfitted CHS
+    /// station's waiting view records nothing at all, so a bare flag would
+    /// survive it and swallow the next genuinely opened station (#3). Any
+    /// record attempt disarms it.
+    var skipNextRecordID: String?
 
     private init() {
         // UI-test hook, like -resetGate: a clean no-recents first run.
@@ -713,7 +716,9 @@ final class RecentsStore: ObservableObject {
     }
 
     func record(_ id: String) {
-        if skipNextRecord { skipNextRecord = false; return }
+        let skip = id == skipNextRecordID
+        skipNextRecordID = nil
+        if skip { return }
         var next = ids.filter { $0 != id }
         next.insert(id, at: 0)
         next = Array(next.prefix(6))

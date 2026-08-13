@@ -450,7 +450,7 @@ struct StationListView: View {
                 guard !didAutoSelect else { return }
                 didAutoSelect = true
                 guard path.isEmpty, !showMap, let first = firstListItem else { return }
-                RecentsStore.shared.skipNextRecord = true
+                RecentsStore.shared.skipNextRecordID = first.id
                 open(first)
             }
         }
