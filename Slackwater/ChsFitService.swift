@@ -482,9 +482,24 @@ final class ChsFitService: ObservableObject {
 // MARK: - Online gates: fetched, never fitted
 
 extension ChsFitService {
+    /// The span one fetch covers: `Timeline.window`'s start for the anchor —
+    /// back-padded only when the anchor IS today, never re-derived here — and
+    /// `Timeline.onlineFetchDays` forward of it, four strips' worth, so ordinary
+    /// paging lands in cache instead of on the network.
+    ///
+    /// Split out of `fetchOnlineWindow` only so it can be tested: everything
+    /// around it in that function needs IWLS, which would leave the anchored
+    /// branch — the one a date picker will use — shipping unexercised.
+    nonisolated static func onlineFetchSpan(anchor: Date?, today: Date) -> (start: Date, end: Date) {
+        let from = anchor ?? today
+        return (Timeline.window(anchor: from, today: today).start,
+                from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
+    }
+
     /// The 7 fit-reject gates (online-gates spec §1) get no on-device fit —
-    /// only the current `Timeline` strip's official wcsp1/wcdp1 predictions,
-    /// resolved/projected exactly like `fitCurrent` (:345-363) but served as
+    /// only official wcsp1/wcdp1 predictions, `Timeline.onlineFetchDays` forward
+    /// of `anchor` (today unless a caller says otherwise) and back-padded like
+    /// the strip, resolved/projected exactly like `fitCurrent` (:345-363) but served as
     /// fetched samples rather than harmonic constituents. No queue, no yield
     /// point: these gates never join the fit queue, so there is nothing to
     /// step aside for — a throw here is the whole story, and Task 5's caller
@@ -494,7 +509,8 @@ extension ChsFitService {
     /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
     /// so every caller, today's and any future one, gets the same
     /// "the fetch landed" signal without re-deriving it.
-    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo) async throws -> ChsOnlineWindow {
+    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
+                                             from anchor: Date? = nil) async throws -> ChsOnlineWindow {
         let fetcher = IwlsFetcher()
         let list = try await fetcher.stationList()
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
@@ -503,16 +519,12 @@ extension ChsFitService {
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
             throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
         }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = gate.tz
-        let today = cal.startOfDay(for: .now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        let (start, end) = Self.onlineFetchSpan(anchor: anchor, today: todayLocal(gate.tz))
         // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
-        // strip's total span in days, ending at the strip's own end, gives
-        // exactly the chunk set covering start…end (up to 7 days of slop at
-        // the grid boundary, same tradeoff the fit path already makes).
-        let plan = Self.chunkPlan(days: (Timeline.backHours + Timeline.forwardHours) / 24, end: end)
+        // fetched span in days, ending at its own end, gives exactly the chunk
+        // set covering start…end (up to 7 days of slop at the grid boundary,
+        // same tradeoff the fit path already makes).
+        let plan = Self.chunkPlan(days: end.timeIntervalSince(start) / 86_400, end: end)
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []
         for chunk in plan {
             speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
@@ -527,7 +539,7 @@ extension ChsFitService {
         guard !projected.isEmpty else { throw ChsError.failed("\(gate.name): IWLS returned an empty series") }
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
-        // would make `coversStrip` pass on a window with a hole in it and
+        // would make `covers` pass on a window with a hole in it and
         // render a strip with a dead zone. Clamp to what actually came back,
         // symmetrically, so a truncated fetch honestly fails coverage instead.
         let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start

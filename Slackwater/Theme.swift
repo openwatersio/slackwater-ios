@@ -87,6 +87,14 @@ private let appNowOffset: TimeInterval =
 
 func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
 
+/// Today's local midnight in `tz`, on the app clock. The anchor every detail
+/// view starts on, and the `today` half of every `Timeline.window` call.
+func todayLocal(_ tz: TimeZone) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return cal.startOfDay(for: appNow())
+}
+
 // MARK: - Units (mirrors slackwater-web src/units.ts)
 
 let unitsKey = "slackwater.units"  // "imperial" | "metric", same values as the web
@@ -294,6 +302,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     let entries: (TimelineData) -> [ScheduleEntry]
     @Binding var live: Date
     @Binding var scrubTime: Date
+    /// Return-to-now, owned by the caller: it resets the window's `anchor` too,
+    /// which only the detail view holds. Parking the centerline at a `now` that
+    /// isn't on a September strip would be the half of the job the scaffold can
+    /// see and the wrong half to do alone.
+    let onReturn: () -> Void
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -336,11 +349,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
 
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz) {
-                live = appNow()
-                scrubTime = live
-            }
-            .padding(.top, 14)
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn)
+                .padding(.top, 14)
 
             links()
                 .padding(.top, 12)
@@ -355,7 +365,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
-        MultiDaySchedule(entries: entries(tl), tz: tz, today: tl.today, days: tl.days,
+        // Both dates, never one: `anchor` keys the day groups (it is what
+        // `days` offsets are relative to), `today` only says Today/Tomorrow.
+        MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+                         today: tl.today, days: tl.days,
                          scrubTime: scrubTime, onTap: { scrubTime = $0 })
             .background(SN.cardFill)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

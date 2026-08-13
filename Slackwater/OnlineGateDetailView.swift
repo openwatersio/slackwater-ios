@@ -15,6 +15,9 @@ struct OnlineGateDetailView: View {
     @State private var live = appNow()
     @State private var scrubTime = appNow()
     @State private var window: ChsOnlineWindow?
+    /// The local midnight the window hangs from. Only `returnToNow` and (in
+    /// Plan B) the range bar move it; everything else reads it.
+    @State private var anchor = Date.distantPast
     @State private var fetching = false
     @State private var fetchFailed = false
 
@@ -33,12 +36,37 @@ struct OnlineGateDetailView: View {
     /// Fetched view only when the stored window still covers the full strip
     /// (online-gates spec §3: an expired window is the honesty card's job,
     /// same as no window at all — never a chart with a dead zone in it). Not
-    /// cached in `@State`: a few hundred filtered/sorted points is cheap next
+    /// cached in `@State`: filtering and sorting the stored series is cheap next
     /// to the tide/current harmonic synthesis `CurrentDetailView` caches for.
+    /// The magnitude has moved, though — the 30-day fetch
+    /// (`Timeline.onlineFetchDays`) made that series ~2,900 samples, roughly 4×
+    /// the strip it draws, and this rebuilds on every body evaluation including
+    /// scrub frames. Nobody has measured a regression; measure before caching.
+    ///
+    /// Computed, not `@State` — unlike the other three details, which store
+    /// their `TimelineData`. It re-reads `window`/`anchor`/`live` on every
+    /// access, so nothing here needs an explicit rebuild when the anchor
+    /// moves; SwiftUI re-evaluates it. Don't add a `rebuild()` seam for
+    /// symmetry with the others — it would have an empty body.
+    ///
+    /// Built FIRST, then asked to cover its own `today` — not a fresh
+    /// `todayLocal(tz)`. `build` derives `today` from `live`, a `@State`
+    /// snapshot only `returnToNow` moves, and `Timeline.window` back-pads on
+    /// exact `anchor == today` equality: two clocks answering one question can
+    /// disagree over whether the 48h look-back is in the window, so a fresh
+    /// read here could validate the UNPADDED span while the strip below drew
+    /// the padded one — coverage passing on a strip with a 48h hole at its left
+    /// end. One snapshot, used for both the decision and the thing it guards.
+    /// (Same defect commit 3fe1f44 fixed twice, four lines down.)
+    ///
+    /// The uncovered path pays for a build it discards. That path renders the
+    /// honesty card, which nobody scrubs, and the alternative is a second
+    /// derivation of `today` — which is the bug.
     private var timeline: TimelineData? {
-        guard let window, window.coversStrip(now: live) else { return nil }
-        return TimelineData.build(onlinePoints: window.points, tz: tz,
-                                  lat: gate.latitude, lon: gate.longitude, now: live)
+        guard let window else { return nil }
+        let tl = TimelineData.build(onlinePoints: window.points, tz: tz,
+                                    lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
+        return window.covers(anchor: anchor, today: tl.today) ? tl : nil
     }
 
     private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }
@@ -79,6 +107,7 @@ struct OnlineGateDetailView: View {
                                                        ebbDeg: window.ebbDirection, speedUnit: speedUnit)
                             },
                             live: $live, scrubTime: $scrubTime,
+                            onReturn: returnToNow,
                             above: { EmptyView() },
                             card: { tl in
                                 // Strip first, readout under it — the inverse of the
@@ -106,9 +135,15 @@ struct OnlineGateDetailView: View {
                                 }
                             })
             .onAppear {
+                // ONE snapshot of today: the anchor set here is compared against it
+                // two lines down, and `Timeline.window` back-pads only on exact
+                // equality — a midnight between two `todayLocal` calls would drop
+                // the 48h look-back from the coverage question silently.
+                let today = todayLocal(tz)
+                if anchor == .distantPast { anchor = today }
                 if window == nil { window = ChsModelStore.loadOnline(gate.id) }
                 RecentsStore.shared.record(gate.id)
-                if window?.coversStrip(now: live) != true, net.online { fetchNow() }
+                if window?.covers(anchor: anchor, today: today) != true, net.online { fetchNow() }
             }
     }
 
@@ -199,18 +234,25 @@ struct OnlineGateDetailView: View {
     // MARK: - Unfetched/expired/fetch-failed: the honesty card
 
     private var honestyCard: some View {
-        // `fetching` already makes a tap during the ~30s auto-fetch a no-op
+        // `fetching` already makes a tap during the auto-fetch a no-op
         // (fetchNow's own `guard !fetching`) — but "Try again" during that
-        // window reads as broken, not busy. Smallest fix: say so.
+        // window reads as broken, not busy. Smallest fix: say so. (No
+        // wall-clock figure here on purpose: the 30-day fetch is five or six
+        // weekly chunks × two series, up from the old 7.5-day window's two or
+        // three, and nobody has timed the new one.)
         ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
                      expectation: expectation, action: fetching ? "Fetching…" : "Try again",
                      identifier: "online-honesty-card") { fetchNow() }
     }
 
     private var expectation: String {
+        // "About a month", not "about a week": one fetch is
+        // `Timeline.onlineFetchDays` forward of the anchor. The footer two
+        // views up prints the real covers-to date, and the two lines sat on
+        // one screen contradicting each other.
         var text = net.online
-            ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a week."
-            : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a week."
+            ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a month ahead."
+            : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a month ahead."
         if let window {
             text += " Last fetch covered to \(monthDay(window.end, tz))."
         }
@@ -227,5 +269,16 @@ struct OnlineGateDetailView: View {
             }
             .padding(.horizontal, 36)  // lines up with ChsAmberCard's text inset (16 outer + 20 inner)
         }
+    }
+
+    // MARK: - Data
+
+    private func returnToNow() {
+        live = appNow()
+        scrubTime = live
+        // The anchor too: return-to-now from a September window has to bring
+        // the whole window back, not just park the centerline at a `now` that
+        // isn't on this strip.
+        anchor = todayLocal(tz)
     }
 }

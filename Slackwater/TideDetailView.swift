@@ -2,7 +2,9 @@
 // TidesApp.dc.html, not the web's): a FIXED reading line at the center of the
 // strip, the continuous multi-day curve panning underneath it. No day pager —
 // free panning plus the map header's return-to-now. The schedule below is a
-// rolling multi-day list (today → +54h) with day headers; rows scrub, cross-day.
+// rolling list over `Timeline.scheduleRange` — the week hanging off the
+// anchor, and the strip is `Timeline.window` over the same anchor — with day
+// headers; rows scrub, cross-day.
 import SwiftUI
 import TideEngine
 
@@ -14,6 +16,9 @@ struct TideDetailView: View {
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = appNow()
     @State private var timeline: TimelineData?
+    /// The local midnight the window hangs from. Only `returnToNow` and (in
+    /// Plan B) the range bar move it; everything else reads it.
+    @State private var anchor = Date.distantPast
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -30,6 +35,7 @@ struct TideDetailView: View {
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
                             live: $live, scrubTime: $scrubTime,
+                            onReturn: returnToNow,
                             above: { EmptyView() },
                             card: { tl in
                                 readout
@@ -42,7 +48,8 @@ struct TideDetailView: View {
                             bottom: { footer })
             .onAppear {
                 if timeline == nil {
-                    timeline = TimelineData.build(tide: record, current: nil, now: live)
+                    anchor = todayLocal(tz)
+                    rebuild()
                 }
                 RecentsStore.shared.record(record.id)
             }
@@ -80,13 +87,11 @@ struct TideDetailView: View {
     // MARK: - Rolling multi-day schedule (turns, day-grouped)
 
     private func scheduleEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-        let t0 = tl.today
-        let t1 = t0.addingTimeInterval(Timeline.scheduleHours * 3600)
-        let out: [ScheduleEntry] = tl.tideExtremes
-            .filter { $0.time >= t0 && $0.time <= t1 }
+        tl.tideExtremes
+            .filter { tl.scheduleRange.contains($0.time) }
             .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low,
                                  value: "\(formatHeight($0.height, imperial: imperial)) \(unit)") }
-        return out.sorted { $0.time < $1.time }
+            .sorted { $0.time < $1.time }
     }
 
     // The provenance/confidence marking (chs-online spec §2d, §7d — simplified
@@ -112,5 +117,21 @@ struct TideDetailView: View {
     /// made, so the now-readout is unchanged by the scrub rework.
     private func exactHeight(at t: Date) -> Double {
         record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+    }
+
+    private func returnToNow() {
+        live = appNow()
+        scrubTime = live
+        // The anchor too: return-to-now from a September window has to bring
+        // the whole window back, not just park the centerline at a `now` that
+        // isn't on this strip.
+        anchor = todayLocal(tz)
+        rebuild()
+    }
+
+    /// One place the timeline is rebuilt from, so the anchor and the record
+    /// can never be applied by two different code paths.
+    private func rebuild() {
+        timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
     }
 }

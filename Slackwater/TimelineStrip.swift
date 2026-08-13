@@ -1,8 +1,8 @@
 // Slackwater — GPL v3. The continuous pan-under-centerline scrubber, the iOS
 // model from prototype/TidesApp.dc.html (DCLogic innerChart / chartEl /
 // onTideScroll / magnet / tableEl). The reading line is FIXED at the viewport
-// center; dragging pans a fixed multi-day timeline strip (-48h…+132h around
-// today's local midnight, 12pt per hour) underneath it, so nights bleed across
+// center; dragging pans a fixed multi-day timeline strip (-48h on the current
+// week only, always +180h, 18pt per hour) underneath it, so nights bleed across
 // day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
@@ -21,10 +21,28 @@ enum Timeline {
     /// is ~4h, which is 72pt here against a ~45pt label; at 12 it was 48pt and
     /// overprinted. A phone still shows ~22h at a glance.
     static let pph: CGFloat = 18          // points per hour
-    static let backHours = 48.0           // TMIN
-    static let forwardHours = 132.0       // TMAX
-    static let scheduleHours = 54.0       // tableEl TOP: list runs today 00:00 → +54h
+    /// The look-back, and it applies ONLY to the current week — see `window`.
+    static let backHours = 48.0
+    /// A week in the list. The product decision this whole spec is about; the
+    /// 54 it replaced was the HTML prototype's `tableEl` TOP, never a decision.
+    static let scheduleDays = 7.0
+    static let scheduleHours = scheduleDays * 24          // 168
+    /// Half a viewport, so the LAST listed event can still sit under the
+    /// centerline instead of jamming against UIScrollView's contentOffset
+    /// clamp. Tapping a schedule row scrubs the strip, and a row exactly at
+    /// the strip's edge would park the centerline short of the event it names
+    /// — the readout disagreeing with the row you just tapped. The old
+    /// 132-vs-54 mismatch kept this property by accident; this keeps it on
+    /// purpose, at the smallest width that still clears half a phone.
+    static let centerPad = 12.0
+    static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+
+    /// How much an online gate fetches in one go. Four times the strip it
+    /// needs, so ordinary paging lands in cache instead of on the network —
+    /// the gates people plan a passage around are exactly the ones that must
+    /// not need a signal to look at next month.
+    static let onlineFetchDays = 30.0
 
     /// The "weak current" convention: under half a knot a small boat transits.
     /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
@@ -38,6 +56,20 @@ enum Timeline {
     /// A whole point is the smallest honest answer: below it, the centerline
     /// has not visibly moved.
     static let scrubbedSeconds = 3600.0 / Double(pph)
+
+    /// THE window definition. Four sites used to re-derive `today ± hours`
+    /// independently — day chrome, the online-gate coverage check, the
+    /// UI-test seed, and the online fetch — and with a conditional back-pad
+    /// they would drift. The failure mode is a coverage check that passes on
+    /// a window with a hole in it, which renders as a strip with a dead zone.
+    ///
+    /// The back-pad is the whole reason this takes two dates: it answers a
+    /// question about NOW, so it exists only when the anchor IS now.
+    static func window(anchor: Date, today: Date) -> (start: Date, end: Date) {
+        let back = anchor == today ? backHours : 0
+        return (anchor.addingTimeInterval(-back * 3600),
+                anchor.addingTimeInterval(forwardHours * 3600))
+    }
 }
 
 /// Is the strip parked somewhere other than now? The one definition, shared by
@@ -53,7 +85,12 @@ func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
 /// brackets the slack.
 func slackWindow(_ points: [CurrentPoint], around slack: Date,
                  threshold: Double) -> (start: Date, end: Date)? {
-    guard !points.isEmpty else { return nil }
+    // A slack outside the sampled series has no measurable window. Events are
+    // scanned with a ±6h pad beyond the strip while `currentPoints` is clipped
+    // to it, so a padded slack can otherwise walk the series' trailing
+    // sub-threshold run and return a window that lies entirely before itself.
+    guard let first = points.first, let last = points.last,
+          slack >= first.time, slack <= last.time else { return nil }
     let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
     let k: Int
     if abs(points[i].speed) < threshold { k = i }
@@ -176,10 +213,14 @@ struct TimelineDay {
 
 struct TimelineData {
     let tz: TimeZone
-    let today: Date          // today's local midnight
-    let start: Date          // today - 48h
-    let end: Date            // today + 132h
-    let days: [TimelineDay]  // offsets -2…6 (6 exists for the last night's moon)
+    /// The local midnight this window is built around. Geometry only.
+    let anchor: Date
+    /// The REAL local midnight. Language and liveness only — the
+    /// Today/Tomorrow labels, the now-marker, return-to-now. Never geometry.
+    let today: Date
+    let start: Date          // anchor - 48h, and only when the anchor is today
+    let end: Date            // anchor + 180h
+    let days: [TimelineDay]  // offsets -3…8 (the ends are DST/moon slack, see dayChrome)
     let tidePoints: [TidePoint]        // empty when current-only
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
@@ -198,6 +239,41 @@ struct TimelineData {
     var hasTide: Bool { !tidePoints.isEmpty }
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
+
+    /// The list's window: the anchor's own midnight → +7d. Deliberately
+    /// NARROWER than `start…end` — the strip carries `Timeline.centerPad` more
+    /// so the last listed event can still park under the centerline.
+    ///
+    /// This lives here rather than in the four detail views because all four
+    /// were computing it identically off `today`, and the anchor change would
+    /// otherwise have to land correctly in four places.
+    var scheduleRange: ClosedRange<Date> {
+        anchor...anchor.addingTimeInterval(Timeline.scheduleHours * 3600)
+    }
+
+    /// Is `t` inside the drawn window? The guard on anything positioned by
+    /// absolute time rather than by the window itself.
+    func contains(_ t: Date) -> Bool { t >= start && t <= end }
+
+    /// The days with any part of them on the strip — the ONE definition of what
+    /// day chrome draws, derived from the window so it can't drift again. It
+    /// already did: a literal `offset <= 5`, correct for the 132h strip it was
+    /// written against, outlived it and left days 6 and 7 with no night bands,
+    /// no daylight tint, no label and no sun dots — while their sun events
+    /// stayed in `snapTimes`, so the magnet parked the centerline on a sunrise
+    /// that was drawn nowhere.
+    ///
+    /// An OVERLAP test, not `contains($0.start)`: on the fall-back DST day two
+    /// calendar days back is 49 hours, so a back-padded `start` lands AFTER
+    /// that day's midnight and a midnight-in-window test would drop 23 visible
+    /// hours of chrome — the same bug, once a year. Don't "simplify" this back
+    /// to a midnight test. `day(of: start)` is the day the window opens inside,
+    /// and it is visible whether its own midnight is or not. `days` runs to offset 8, which is never visible: it exists so the
+    /// last visible night can find the following sunrise for its moon.
+    var visibleDays: [TimelineDay] {
+        let firstStart = day(of: start)?.start ?? .distantPast
+        return days.filter { $0.start >= firstStart && $0.start <= end }
+    }
 
     func x(_ t: Date) -> CGFloat {
         CGFloat(t.timeIntervalSince(start) / 3600) * Timeline.pph
@@ -234,26 +310,41 @@ struct TimelineData {
     /// times are computed.
     private struct DayChrome {
         let tz: TimeZone
+        let anchor: Date
         let today: Date
         let start: Date
         let end: Date
         let days: [TimelineDay]
     }
 
-    private static func dayChrome(tz: TimeZone, lat: Double, lon: Double, now: Date) -> DayChrome {
+    private static func dayChrome(tz: TimeZone, lat: Double, lon: Double,
+                                  anchor: Date, now: Date) -> DayChrome {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
-        let today = cal.startOfDay(for: now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
-        let days: [TimelineDay] = (-2...6).map { off in
-            let d0 = cal.date(byAdding: .day, value: off, to: today)!
+        let today = cal.startOfDay(for: now)   // the caller's clock, not the app's
+        let w = Timeline.window(anchor: anchor, today: today)
+        // -3, not the -2 the 48h back-pad suggests: the look-back spans THREE
+        // calendar days whenever a spring-forward falls inside it. The day
+        // after that transition is 23 hours long, so `anchor - 48h` lands an
+        // hour BEFORE the second day back began — in Pacific, the two anchors
+        // following each March change (e.g. 2026-03-09 and -10, start
+        // 2026-03-06 23:00). A day the window reaches but `days` never built
+        // draws no chrome at all, which is the 36-hour gap this branch already
+        // fixed once, one hour wide and twice a year.
+        //
+        // Costs one `sunEvents` call per build; `visibleDays` picks -3 up only
+        // when the window actually reaches it, so nothing else changes. 8 is
+        // the other end: never visible, it exists so the last visible night
+        // (offset 7) can find the following sunrise for its moon.
+        let days: [TimelineDay] = (-3...8).map { off in
+            let d0 = cal.date(byAdding: .day, value: off, to: anchor)!
             let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .sunrise }?.time,
                                sunset: sun.first { $0.kind == .sunset }?.time)
         }
-        return DayChrome(tz: tz, today: today, start: start, end: end, days: days)
+        return DayChrome(tz: tz, anchor: anchor, today: today,
+                         start: w.start, end: w.end, days: days)
     }
 
     // Widen the event scans a touch so nothing at the edges is clipped.
@@ -262,8 +353,8 @@ struct TimelineData {
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
     /// reads it), never a drawn track (split-scrubbers spec §3).
-    static func build(gate: DerivedGateRecord, now: Date) -> TimelineData {
-        build(tide: nil, current: nil, now: now, gate: gate)
+    static func build(gate: DerivedGateRecord, now: Date, anchor: Date) -> TimelineData {
+        build(tide: nil, current: nil, now: now, anchor: anchor, gate: gate)
     }
 
     /// The online-gate path: current-only strip drawn from fetched CHS/NOAA
@@ -273,8 +364,8 @@ struct TimelineData {
     /// counts if it lands within the pad; only `currentPoints`/`snapTimes`
     /// clip to the visible window.
     static func build(onlinePoints: [CurrentPoint], tz: TimeZone, lat: Double, lon: Double,
-                      now: Date) -> TimelineData {
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+                      now: Date, anchor: Date) -> TimelineData {
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, now: now)
         let start = chrome.start, end = chrome.end
 
         let currentPoints = onlinePoints.filter { $0.time >= start && $0.time <= end }
@@ -295,25 +386,26 @@ struct TimelineData {
                 .map { (slack: e.time, start: $0.start, end: $0.end) }
         }
 
-        let sunTimes = chrome.days.filter { $0.offset <= 5 }
+        let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = (currentEvents.map(\.time) + sunTimes)
             .filter { $0 >= start && $0 <= end }
             .sorted()
 
-        return TimelineData(tz: chrome.tz, today: chrome.today, start: start, end: end, days: chrome.days,
+        return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
+                            start: start, end: end, days: chrome.days,
                             tidePoints: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
-                      now: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
+                      now: Date, anchor: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
         // The primary station names the timezone and the sky position.
         let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
         let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
         let lon = gate?.gate.longitude ?? current?.longitude ?? tide?.longitude ?? -123.0
-        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, now: now)
+        let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, now: now)
         let today = chrome.today, start = chrome.start, end = chrome.end, days = chrome.days
 
         let pad = eventPad
@@ -355,13 +447,13 @@ struct TimelineData {
             }
         }
 
-        let sunTimes = days.filter { $0.offset <= 5 }
+        let sunTimes = days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = (tideExtremes.map(\.time) + currentEvents.map(\.time) + sunTimes)
             .filter { $0 >= start && $0 <= end }
             .sorted()
 
-        return TimelineData(tz: tz, today: today, start: start, end: end, days: days,
+        return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows)
@@ -481,19 +573,21 @@ struct TimelineCanvas: View {
     var ebbDeg: Double? = nil
 
     /// A `Canvas` renders into ONE backing texture and Metal caps that at
-    /// 8192px on a side. The 180-hour strip is `180 * pph` points wide, tripled
-    /// on a 3× phone: at 12pt/hour that was 6480px and fit, at 18 it is 9720px
-    /// and the entire chart renders EMPTY — no curve, no day chrome, no labels,
-    /// and no error. (Caught on the NEAPS pass: the left axis kept drawing,
+    /// 8192px on a side. The 228-hour strip is `228 * pph` = 4104pt wide,
+    /// tripled on a 3× phone: 12312px, half again past the cap, and the entire
+    /// chart would render EMPTY — no curve, no day chrome, no labels, and no
+    /// error. (Caught on the NEAPS pass, at 180h × 18 = 9720px, when 180h × 12
+    /// = 6480px had fit; the week widened it further. The left axis kept drawing,
     /// because it's a separate SwiftUI overlay, which is exactly what made the
     /// blank canvas look like a layout bug rather than a texture limit.)
     ///
     /// Slicing the strip into tiles gives each its own layer, so the cap now
     /// applies per tile instead of to the whole timeline and `pph` is free to
-    /// move again. Every tile runs the same drawing code translated into strip
-    /// coordinates and clipped to its own slice — the clip is what makes this
-    /// safe, since the translucent night bands and area fills would otherwise
-    /// stack on each other wherever two tiles overdrew.
+    /// move again — five tiles at today's width. Every tile runs the same
+    /// drawing code translated into strip coordinates and clipped to its own
+    /// slice — the clip is what makes this safe, since the translucent night
+    /// bands and area fills would otherwise stack on each other wherever two
+    /// tiles overdrew.
     static let tileWidth: CGFloat = 900
 
     var body: some View {
@@ -517,7 +611,11 @@ struct TimelineCanvas: View {
         drawDayChrome(ctx)
         if geo.hasTide { drawTide(ctx) }
         if geo.hasCurrent { drawCurrent(ctx) }
-        // Real-now faint marker rides the timeline (prototype 'nowt').
+        // Real-now faint marker rides the timeline (prototype 'nowt') — but
+        // only when now is ON this timeline. An anchored strip a month out has
+        // no "now" to mark, and drawing it anyway pins a dashed line to
+        // whichever edge the clamp lands on, which reads as a real event.
+        guard data.contains(now) else { return }
         var nowLine = Path()
         nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
         nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
@@ -560,7 +658,7 @@ struct TimelineCanvas: View {
     // Night bands, day tint, day labels, sun markers, per-night moons —
     // continuous across midnight (prototype's per-day rects abut exactly).
     private func drawDayChrome(_ ctx: GraphicsContext) {
-        let visible = data.days.filter { $0.offset <= 5 }
+        let visible = data.visibleDays
         for day in visible {
             let ds = data.x(day.start), de = data.x(day.start.addingTimeInterval(86_400))
             let top = geo.dayY + 4
@@ -611,7 +709,7 @@ struct TimelineCanvas: View {
             }
             // Day label at local noon. Fixed size, not `.caption2` — see the
             // TimelineGeo doc comment: `dayY` is 20 and the sun dot is at 34.
-            ctx.draw(Text(relativeDayLabel(day.offset, day.start, data.tz))
+            ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
@@ -804,13 +902,18 @@ struct TimelineCanvas: View {
     }
 }
 
-/// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype dayName).
-func relativeDayLabel(_ offset: Int, _ date: Date, _ tz: TimeZone) -> String {
-    switch offset {
+/// "Today" / "Tomorrow" / "Yesterday", short weekday otherwise (prototype
+/// dayName). Takes the day itself and the caller's today, never an offset: on an
+/// anchored strip `TimelineDay.offset` is days-from-anchor, so feeding it here
+/// would label the first day of a September window "Today".
+func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return switch cal.dateComponents([.day], from: today, to: dayStart).day ?? 0 {
     case 0: "Today"
     case 1: "Tomorrow"
     case -1: "Yesterday"
-    default: shortWeekday(date, tz)
+    default: shortWeekday(dayStart, tz)
     }
 }
 
@@ -1039,14 +1142,21 @@ struct ScheduleEntry: Identifiable {
     }
 }
 
-/// Day-grouped events list, today 00:00 → +54h (prototype tableEl TOP): day
-/// name in a left column, rows scrub on tap, the row nearest the centerline
-/// time is highlighted. The prototype dims nothing for the past — the nearest-
-/// row highlight is the time cue.
+/// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
+/// `anchor`, which is why this takes the anchor and `today` separately: day
+/// groups key on the first, labels read the second. Day name in a left column,
+/// rows scrub on tap, the row nearest the centerline time is highlighted. The
+/// prototype dims nothing for the past — the nearest-row highlight is the time
+/// cue. (The prototype's `tableEl` TOP, a flat today+54h, is what
+/// `scheduleRange` replaced.)
 struct MultiDaySchedule: View {
     let entries: [ScheduleEntry]  // pre-sorted, pre-filtered to the window
     let tz: TimeZone
-    let today: Date               // local midnight
+    /// The window's anchor — day-group offsets are anchor-relative, matching
+    /// `TimelineDay.offset`, because that is what `days` is keyed on below.
+    let anchor: Date
+    /// The caller's today, for the Today/Tomorrow labels only.
+    let today: Date
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
@@ -1057,7 +1167,7 @@ struct MultiDaySchedule: View {
         cal.timeZone = tz
         for e in entries {
             let d0 = cal.startOfDay(for: e.time)
-            let off = cal.dateComponents([.day], from: today, to: d0).day ?? 0
+            let off = cal.dateComponents([.day], from: anchor, to: d0).day ?? 0
             if out.last?.1 == d0 { out[out.count - 1].2.append(e) }
             else { out.append((off, d0, [e])) }
         }
@@ -1076,7 +1186,7 @@ struct MultiDaySchedule: View {
                 }
                 HStack(alignment: .top, spacing: 0) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(relativeDayLabel(group.offset, group.start, tz))
+                        Text(relativeDayLabel(group.start, tz, today: today))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.9))
                         if let day = days.first(where: { $0.offset == group.offset }) {

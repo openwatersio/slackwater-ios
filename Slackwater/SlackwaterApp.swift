@@ -44,10 +44,10 @@ struct SlackwaterApp: App {
 }
 
 /// UI-test hook (SlackwaterApp.init's `-seedOnlineWindow <id>`): writes a
-/// synthetic `ChsOnlineWindow` covering exactly the strip `Timeline` builds
-/// right now — the same -48h/+132h-around-today's-local-midnight math
-/// `ChsFitService.fetchOnlineWindow` uses for a real fetch (`coversStrip`'s
-/// neighborhood, ChsCurrentGate.swift) — so `OnlineGateDetailView` reads it as
+/// synthetic `ChsOnlineWindow` covering exactly `Timeline.window(anchor:today:)`'s
+/// span for today — the same definition `ChsFitService.fetchOnlineWindow` uses
+/// for a real fetch (`covers`'s neighborhood, ChsCurrentGate.swift) — so
+/// `OnlineGateDetailView` reads it as
 /// current and renders the fetched detail on first launch, no network
 /// involved. An M2-ish sine (12.42h period, ~2 kn amplitude) at 15-min samples
 /// gives the strip real slacks and maxima to assert against, not a flat line.
@@ -58,11 +58,9 @@ struct SlackwaterApp: App {
 /// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
 private func seedOnlineWindow(stationID: String) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = gate.tz
-    let today = cal.startOfDay(for: appNow())
-    let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-    let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+    let today = todayLocal(gate.tz)
+    let w = Timeline.window(anchor: today, today: today)
+    let start = w.start, end = w.end
     let period = 12.42 * 3600.0   // M2 tidal period, seconds
     let amplitude = 2.0           // kn
     var times: [Double] = []
@@ -1487,7 +1485,12 @@ struct ChsCurrentGateCardView: View {
     /// carries the honest "fetched when connected" line instead of a queue
     /// status this gate never has.
     @ViewBuilder private var onlineCard: some View {
-        if let onlineWindow, onlineWindow.coversStrip(now: appNow()) {
+        // ONE snapshot of today, not two calls: `Timeline.window` back-pads only
+        // when `anchor == today` by exact equality, so a local midnight landing
+        // between two evaluations would silently drop the 48h look-back and let
+        // `covers` pass on a window with a hole in it.
+        let today = todayLocal(gate.tz)
+        if let onlineWindow, onlineWindow.covers(anchor: today, today: today) {
             OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
         } else {
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,

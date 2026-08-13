@@ -9,18 +9,215 @@ import TideEngine
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
+    /// Calendar days, never `n * 86_400`. Only durations belong in
+    /// `addingTimeInterval`: across a DST transition a 34×86,400-second offset
+    /// from a local midnight lands at 01:00 or 23:00, and an anchor that isn't
+    /// a midnight fails every assertion that compares one. Measured over 2026
+    /// in Pacific, 68 of 365 start dates land off midnight — the suite was
+    /// green today and red for roughly two months of the year.
+    ///
+    /// The calendar carries the STATION's zone, not the device's: a
+    /// calendar-day add is only correct in the zone the dates belong to.
+    private func addingDays(_ n: Int, to date: Date, in tz: TimeZone) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal.date(byAdding: .day, value: n, to: date)!
+    }
+
     func testWindowAndMapping() {
         let now = Date()
-        let d = TimelineData.build(tide: friday, current: nil, now: now)
-        // -48h … +132h around today's local midnight (prototype TMIN/TMAX).
-        XCTAssertEqual(d.end.timeIntervalSince(d.start), 180 * 3600, accuracy: 3601)
-        XCTAssertEqual(d.totalWidth, 180 * Timeline.pph, accuracy: 13)
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
+        // -48h … +180h around today's local midnight (spec §2).
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), 228 * 3600, accuracy: 3601)
+        XCTAssertEqual(d.totalWidth, 228 * Timeline.pph, accuracy: 13)
         XCTAssert(d.start <= now && now <= d.end)
         // x ↔ time round trip under the centerline.
         XCTAssertEqual(d.time(atX: d.x(now)).timeIntervalSince(now), 0, accuracy: 1)
         // Snap stops exist across the whole window (turns + sun events).
         XCTAssert(d.snapTimes.count > 20, "expected a full week of stops, got \(d.snapTimes.count)")
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
+    }
+
+    /// `now:` used to be a dead parameter — `today` was always derived from the
+    /// real clock (`todayLocal(tz)`) regardless of what was passed in. A caller
+    /// simulating a different day (a test, or a future date-picker caller) must
+    /// get back ITS day, not the device's.
+    func testTodayDerivesFromThePassedNowNotTheRealClock() {
+        let tz = friday.tz
+        let simulatedNow = todayLocal(tz).addingTimeInterval(5 * 86_400 + 3600)  // 5 days ahead, mid-morning
+        let d = TimelineData.build(tide: friday, current: nil, now: simulatedNow, anchor: todayLocal(tz))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        XCTAssertEqual(d.today, cal.startOfDay(for: simulatedNow),
+                       "today must follow the passed `now`, not the real clock")
+    }
+
+    /// The anchor drives geometry; `today` stays the real day. A September strip
+    /// must be built around September and still know what day it actually is.
+    func testFutureAnchorMovesTheWindowButNotToday() {
+        let now = Date()
+        let tz = friday.tz
+        let today = todayLocal(tz)
+        let future = addingDays(34, to: today, in: tz)
+
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: future)
+        XCTAssertEqual(d.anchor, future)
+        XCTAssertEqual(d.today, today, "today is the real day, not the anchor")
+        XCTAssertEqual(d.start, future, "no back-pad off the current week")
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), 180 * 3600, accuracy: 3601)
+        XCTAssert(d.tidePoints.allSatisfy { $0.time >= d.start && $0.time <= d.end })
+    }
+
+    func testContainsBoundsTheStripWindow() {
+        let tz = friday.tz
+        let today = todayLocal(tz)
+        let now = Date()
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: today)
+        XCTAssert(d.contains(now), "a today-anchored strip contains now")
+
+        let ahead = TimelineData.build(tide: friday, current: nil, now: now,
+                                       anchor: addingDays(34, to: today, in: tz))
+        XCTAssertFalse(ahead.contains(now),
+                       "a September strip must not claim to hold today's now-marker")
+        XCTAssert(ahead.contains(ahead.anchor.addingTimeInterval(3 * 86_400)))
+    }
+
+    /// `days` must reach one day PAST the last visible night — `drawDayChrome`
+    /// reads day+1's sunrise to place the moon mid-night — and far enough BACK
+    /// that the day containing `start` was built, which is what `visibleDays`
+    /// needs to decide what draws.
+    ///
+    /// Both stated against the window, never against the literal range. This
+    /// test used to pin `days.first?.offset == -2` and `.last?.offset == 8`,
+    /// and the -2 went red the moment the range legitimately widened to -3: a
+    /// bound of `dayChrome`'s own array is an implementation detail, not a
+    /// property anything depends on. What IS depended on is that the array
+    /// covers the window at both ends.
+    ///
+    /// The March pair keeps the backward half honest year-round. On the two
+    /// anchors following a spring-forward the 48h look-back reaches an hour
+    /// into the THIRD calendar day back, because the day between them is only
+    /// 23 hours long — narrow the range to -2 again and this fails on any day
+    /// of the year, not just in March. It carries its own `now` because the
+    /// back-pad exists only when the anchor IS today, so a March anchor with a
+    /// real `now` would be a past anchor and exercise nothing.
+    func testDayChromeCoversTheLastNightsMoon() {
+        let springForwardPlusOne = vancouverMidnight(2026, 3, 9)
+        for (anchor, now) in [(todayLocal(friday.tz), Date()),
+                              (springForwardPlusOne, springForwardPlusOne.addingTimeInterval(9 * 3600))] {
+            let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: anchor)
+
+            XCTAssertNotNil(d.day(of: d.start),
+                            "no built day contains the strip's start (anchor \(anchor))")
+
+            let lastNight = d.visibleDays.last!
+            let nextDay = d.days.first { $0.offset == lastNight.offset + 1 }
+            XCTAssertNotNil(nextDay,
+                            "the last visible night has no following day (anchor \(anchor))")
+            XCTAssertNotNil(lastNight.sunset)
+            XCTAssertNotNil(nextDay?.sunrise,
+                            "the last visible night needs the next day's sunrise for its moon")
+        }
+    }
+
+    /// "Today" must mean today, on any strip. The old signature took a
+    /// days-from-today offset; once the anchor moves, offset is days-from-ANCHOR
+    /// and passing it here would label a September Monday "Today".
+    func testRelativeDayLabelTracksTodayNotTheAnchor() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        let today = vancouverMidnight(2026, 8, 11)          // a Tuesday
+        let tomorrow = vancouverMidnight(2026, 8, 12)
+        let yesterday = vancouverMidnight(2026, 8, 10)
+        let september = vancouverMidnight(2026, 9, 14)      // a Monday
+
+        XCTAssertEqual(relativeDayLabel(today, tz, today: today), "Today")
+        XCTAssertEqual(relativeDayLabel(tomorrow, tz, today: today), "Tomorrow")
+        XCTAssertEqual(relativeDayLabel(yesterday, tz, today: today), "Yesterday")
+        XCTAssertEqual(relativeDayLabel(september, tz, today: today), "Mon",
+                       "a day 34 days out is a weekday, never Today")
+    }
+
+    /// The first group of a future-anchored schedule is the anchor's own day, and
+    /// it must NOT be called Today.
+    func testFutureAnchorFirstDayIsNotLabelledToday() {
+        let tz = friday.tz
+        let today = todayLocal(tz)
+        let future = addingDays(34, to: today, in: tz)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
+        let firstDay = d.days.first { $0.offset == 0 }!
+        XCTAssertEqual(firstDay.start, future, "offset 0 is the ANCHOR's day")
+        XCTAssertNotEqual(relativeDayLabel(firstDay.start, tz, today: today), "Today")
+    }
+
+    /// The list runs the anchor's 00:00 → +7d, and it is strictly inside the strip
+    /// — the centerPad is what lets the last row scrub under the centerline.
+    func testScheduleRangeIsAWeekInsideTheStrip() {
+        let today = todayLocal(friday.tz)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: today)
+        XCTAssertEqual(d.scheduleRange.lowerBound, today)
+        XCTAssertEqual(d.scheduleRange.upperBound, today.addingTimeInterval(168 * 3600))
+        XCTAssertLessThan(d.scheduleRange.upperBound, d.end,
+                          "the strip must outrun the list by the centerPad")
+    }
+
+    /// Seven day-groups, and the first is the anchor's own day.
+    func testFutureAnchorSchedulesSevenDays() {
+        let tz = friday.tz
+        let future = addingDays(34, to: todayLocal(tz), in: tz)
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: future)
+        let turns = d.tideExtremes.filter { d.scheduleRange.contains($0.time) }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let days = Set(turns.map { cal.startOfDay(for: $0.time) })
+        XCTAssertEqual(days.count, 7, "a week of tide turns, got \(days.count)")
+        XCTAssertEqual(days.min(), future)
+    }
+
+    // MARK: - The window (spec §1, §2)
+
+    private func vancouverMidnight(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Vancouver")!
+        return cal.date(from: DateComponents(year: y, month: m, day: d))!
+    }
+
+    /// The 48h look-back exists to answer "what did the water just do", which is a
+    /// question about NOW. On a Tuesday in September it is two days of the previous
+    /// week scrolled in behind you for no reason.
+    func testWindowBackPadOnlyOnTheCurrentWeek() {
+        let today = vancouverMidnight(2026, 8, 11)
+
+        let current = Timeline.window(anchor: today, today: today)
+        XCTAssertEqual(current.start, today.addingTimeInterval(-48 * 3600))
+        XCTAssertEqual(current.end, today.addingTimeInterval(180 * 3600))
+
+        let future = vancouverMidnight(2026, 9, 14)
+        let ahead = Timeline.window(anchor: future, today: today)
+        XCTAssertEqual(ahead.start, future, "a future week starts clean at its own midnight")
+        XCTAssertEqual(ahead.end, future.addingTimeInterval(180 * 3600))
+
+        let past = vancouverMidnight(2026, 7, 6)
+        let behind = Timeline.window(anchor: past, today: today)
+        XCTAssertEqual(behind.start, past, "a past week gets no pad either")
+    }
+
+    /// The strip must stay WIDER than the list, or tapping the last schedule row
+    /// lands the centerline short of the event it names (UIScrollView clamps
+    /// contentOffset). The pad is what guarantees it.
+    func testStripOutrunsTheScheduleByTheCenterPad() {
+        XCTAssertEqual(Timeline.scheduleHours, 168, "a week in the list")
+        XCTAssertEqual(Timeline.forwardHours, Timeline.scheduleHours + Timeline.centerPad)
+        XCTAssertGreaterThan(Timeline.centerPad * Timeline.pph, 200,
+                             "the pad must exceed half a phone's width in points")
+    }
+
+    func testTodayLocalIsMidnightInTheGivenZone() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let t = todayLocal(tz)
+        XCTAssertEqual(t, cal.startOfDay(for: appNow()))
+        XCTAssertEqual(cal.component(.hour, from: t), 0)
     }
 
     /// The centerline readout at "now" must equal the old model's now-readout:
@@ -30,7 +227,7 @@ final class TimelineTests: XCTestCase {
         let now = Date()
         let engine = friday.engineStation
             .heights(from: now, to: now.addingTimeInterval(1), step: 1).first!.height
-        let d = TimelineData.build(tide: friday, current: nil, now: now)
+        let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
         XCTAssertEqual(d.heightAt(now), engine, accuracy: 0.02)
         print("NOW-READOUT Friday Harbor @ \(now): engine=\(engine) m, strip=\(d.heightAt(now)) m")
     }
@@ -38,7 +235,7 @@ final class TimelineTests: XCTestCase {
     /// Days bleed into each other: every night band runs sunset → next
     /// sunrise, straddling the midnight between them.
     func testNightContinuityAcrossMidnight() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         var checked = 0
         for (a, b) in zip(d.days, d.days.dropFirst()) {
             guard let set = a.sunset, let rise = b.sunrise else { continue }
@@ -49,12 +246,55 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(checked, 7)
     }
 
-    /// The schedule window (today 00:00 → +54h, prototype tableEl TOP) spans
-    /// at least two local days of tide turns — the rolling multi-day list.
+    /// Day chrome draws every day the strip touches, and nothing else draws a
+    /// snap stop. The filter behind `drawDayChrome` was a literal `offset <= 5`
+    /// left over from the 132h strip: days 6 and 7 of the week drew no night
+    /// band, no tint, no label and no sun dots, while their sun events stayed
+    /// in `snapTimes` — the magnet parked the centerline on a sunrise drawn
+    /// nowhere, silently. So this asserts the RELATIONSHIP to the window, never
+    /// a literal offset range, and it must survive a change to `forwardHours`.
+    func testVisibleDaysFollowTheWindowNotAFixedOffset() {
+        let tz = friday.tz
+        for anchor in [todayLocal(tz), addingDays(-7, to: todayLocal(tz), in: tz)] {
+            let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: anchor)
+            let visible = d.visibleDays
+            let drawn = Set(visible.map(\.offset))
+            XCTAssertFalse(drawn.isEmpty)
+
+            // Drawn ⟺ the day overlaps the window. `days` is contiguous, so a
+            // day ends where the next begins (exact across DST, unlike +86400).
+            for (i, day) in d.days.enumerated() {
+                let dayEnd = i + 1 < d.days.count
+                    ? d.days[i + 1].start : day.start.addingTimeInterval(86_400)
+                let overlaps = day.start <= d.end && dayEnd > d.start
+                XCTAssertEqual(drawn.contains(day.offset), overlaps,
+                               "day \(day.offset) (anchor \(anchor)): overlaps=\(overlaps), drawn=\(drawn.contains(day.offset))")
+            }
+            // No gap at either end: chrome opens on or before the window and
+            // runs past its end.
+            XCTAssert(visible.first!.start <= d.start)
+            XCTAssert(visible.last!.start <= d.end)
+            XCTAssert(visible.last!.start.addingTimeInterval(86_400) >= d.end,
+                      "the last drawn day must reach the end of the strip")
+            // The original failure, stated directly: a day that draws nothing
+            // must contribute no snap stop.
+            for day in d.days where !drawn.contains(day.offset) {
+                for t in [day.sunrise, day.sunset].compactMap({ $0 }) {
+                    XCTAssertFalse(d.snapTimes.contains { abs($0.timeIntervalSince(t)) < 1 },
+                                   "day \(day.offset) draws no chrome, so \(t) must not be a snap stop")
+                }
+            }
+        }
+    }
+
+    /// The schedule window (the anchor's midnight → +7d) spans at least two
+    /// local days of tide turns — the rolling multi-day list. Asked of
+    /// `scheduleRange`, the one definition the list itself filters on; the
+    /// hand-built `today ± hours` version here only agreed by accident of
+    /// `anchor == today`.
     func testScheduleWindowSpansMultipleDays() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
-        let t1 = d.today.addingTimeInterval(Timeline.scheduleHours * 3600)
-        let turns = d.tideExtremes.filter { $0.time >= d.today && $0.time <= t1 }
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
+        let turns = d.tideExtremes.filter { d.scheduleRange.contains($0.time) }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = d.tz
         let days = Set(turns.map { cal.startOfDay(for: $0.time) })
@@ -117,7 +357,7 @@ final class TimelineTests: XCTestCase {
     /// re-labelling with one would fail here rather than pass by coincidence.
     func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
         let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
-        let d = TimelineData.build(tide: nil, current: victoria, now: Date())
+        let d = TimelineData.build(tide: nil, current: victoria, now: Date(), anchor: todayLocal(victoria.tz))
         let stops = Set(d.snapTimes)
         XCTAssertFalse(stops.isEmpty, "no snap stops — the rest of this proves nothing")
 
@@ -144,7 +384,7 @@ final class TimelineTests: XCTestCase {
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
     func testSingleTrackGeometries() {
-        let tideData = TimelineData.build(tide: friday, current: nil, now: Date())
+        let tideData = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
         XCTAssertEqual(tide.height, 328, "NEAPS bands above and below the track, no gutter")
@@ -158,7 +398,7 @@ final class TimelineTests: XCTestCase {
         // on which point arrays are non-empty.
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let cur = TimelineGeo(data: TimelineData(
-            tz: .current, today: t0, start: t0, end: t0.addingTimeInterval(3600),
+            tz: .current, anchor: t0, today: t0, start: t0, end: t0.addingTimeInterval(3600),
             days: [], tidePoints: [], tideExtremes: [],
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
@@ -190,7 +430,7 @@ final class TimelineTests: XCTestCase {
         // TideEngine, so the tide side is real data borrowed from the tide-only
         // build above; only the current side is synthesized.
         let both = TimelineGeo(data: TimelineData(
-            tz: tideData.tz, today: tideData.today, start: tideData.start, end: tideData.end,
+            tz: tideData.tz, anchor: tideData.anchor, today: tideData.today, start: tideData.start, end: tideData.end,
             days: tideData.days, tidePoints: tideData.tidePoints, tideExtremes: tideData.tideExtremes,
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
@@ -233,12 +473,27 @@ final class TimelineTests: XCTestCase {
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(900), threshold: 0.5))
     }
 
+    /// A slack outside the sampled series has no window. Events are scanned with a
+    /// ±6h pad beyond the strip and the points are clipped to it, so this case is
+    /// reachable at both edges — and it used to return a window sitting entirely
+    /// before its own slack.
+    func testSlackOutsideTheSeriesHasNoWindow() {
+        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+        let pts = (0...5).map { i in
+            CurrentPoint(time: t0.addingTimeInterval(Double(i) * 600), speed: 0.1)
+        }
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(-3600), threshold: 0.5),
+                     "a slack before the series has no window")
+        XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(6 * 3600), threshold: 0.5),
+                     "a slack after the series must not borrow the trailing run")
+    }
+
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.
     func testSlackWindowsBracketTheirSlacks() throws {
         let station = try XCTUnwrap(CurrentStationRecord.all.first)
-        let d = TimelineData.build(tide: nil, current: station, now: Date())
+        let d = TimelineData.build(tide: nil, current: station, now: Date(), anchor: todayLocal(station.tz))
         let slacks = d.currentEvents.filter { $0.kind == .slack }
         XCTAssertGreaterThan(slacks.count, 10, "a week of slacks must exist to window")
         XCTAssertFalse(d.slackWindows.isEmpty)
@@ -261,7 +516,7 @@ final class TimelineTests: XCTestCase {
             constituents: [.init(name: "M2", amplitude: 1.5, phase: 0)])
         let gate = DerivedGateRecord(gate: ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }!,
                                      port: port)
-        let d = TimelineData.build(gate: gate, now: Date())
+        let d = TimelineData.build(gate: gate, now: Date(), anchor: todayLocal(gate.gate.tz))
         XCTAssert(d.hasCurrent, "the schematic track exists")
         XCTAssertFalse(d.currentEvents.isEmpty, "the gate has slack events")
         XCTAssert(d.slackWindows.isEmpty, "but no windows — the curve is a shape (gutter spec §3)")
@@ -274,7 +529,7 @@ final class TimelineTests: XCTestCase {
     /// (9720px) and blanked every tide detail; the tiles exist to keep each
     /// layer under the cap, so the assertion is on a tile, not on the strip.
     func testCanvasTilesStayUnderTheTextureCap() {
-        let d = TimelineData.build(tide: friday, current: nil, now: Date())
+        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let cap: CGFloat = 8192
         let scale: CGFloat = 3        // the densest screen this ships to
 
@@ -396,8 +651,9 @@ final class TimelineTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)
-        let start = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let end = today.addingTimeInterval(Timeline.forwardHours * 3600)
+        // The shared definition, not a second derivation of it — this test only
+        // passed by hand because `anchor == today` here.
+        let (start, end) = Timeline.window(anchor: today, today: today)
 
         // 15-min samples spanning the whole strip window, oscillating with a
         // ~12h period so slack/max events recur across it (real semidiurnal shape).
@@ -409,7 +665,7 @@ final class TimelineTests: XCTestCase {
             t = t.addingTimeInterval(900)
         }
 
-        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now)
+        let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now, anchor: today)
 
         XCTAssert(d.hasCurrent && !d.hasTide)
         // 312: the current strip's own height since its rows collapsed to one

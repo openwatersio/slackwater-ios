@@ -80,28 +80,52 @@ extension ChsModelStore {
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
     static func onlineUrl(_ stationID: String) -> URL { url(stationID, suffix: "-online") }
     static func loadOnline(_ stationID: String) -> ChsOnlineWindow? { load(stationID, suffix: "-online") }
-    static func saveOnline(_ window: ChsOnlineWindow) throws { try save(window, id: window.stationID, suffix: "-online") }
+
+    /// Merges into whatever is already on disk rather than replacing it.
+    /// Replacing would make a prefetch destructive: fetching the next block
+    /// would discard the current one, and paging back would refetch what the
+    /// user just had.
+    ///
+    /// The prune cut is the start of TODAY's strip — `Timeline.window`'s own
+    /// answer, never re-derived here, for the reason its doc comment gives —
+    /// or the incoming window's own start, whichever is earlier. The cut never
+    /// discards data the incoming window itself covers: a fetch anchored in the
+    /// past (the picker is unbounded in both directions, spec §5) starts before
+    /// today's strip does, and a fixed `today − 48h` cut would delete the block
+    /// that fetch just paid for, fail `covers` for that anchor, and refetch it
+    /// on every visit forever.
+    ///
+    // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
+    // someone who pages a year out accumulates ~1MB on a gate they evidently
+    // care about, and -chsResetModels already clears it. Add a cap when a real
+    // file gets big.
+    static func saveOnline(_ window: ChsOnlineWindow) throws {
+        let today = todayLocal(TimeZone(identifier: window.timezone) ?? .current)
+        let cut = min(Timeline.window(anchor: today, today: today).start, window.start)
+        let merged = loadOnline(window.stationID)?.merging(window, prunedBefore: cut) ?? window
+        try save(merged, id: window.stationID, suffix: "-online")
+    }
 }
 
 // MARK: - The fetched window (online gates: official CHS predictions, no fit)
 
 /// A window of official CHS current predictions for one online (fit-reject)
 /// gate — fetched on demand, never fitted, kept local like the fitted models.
-/// The strip span (`start`/`end`) is `Timeline`'s ‑48h…+132h around today's
-/// local midnight AT FETCH TIME, so a stale window is a coverage question,
-/// not a staleness heuristic — see `coversStrip`.
+/// `start`/`end` is the span the samples actually cover — 30 days forward of
+/// the fetch's anchor, `Timeline.window`'s back-pad behind it — and it grows
+/// as later fetches merge in (`merging`). So a stale window is a coverage
+/// question, not a staleness heuristic — see `covers`.
 struct ChsOnlineWindow: Codable {
     var schemaVersion = 1
     let stationID: String
     let iwlsName: String
-    /// The gate's own timezone (added beyond the brief's shape): `coversStrip`
-    /// has to rebuild "today's local midnight" the same way `TimelineData`
-    /// does, and a window has to carry that alongside its dates to do it
-    /// without reaching back into the bundled gate identity.
+    /// The gate's own timezone (added beyond the brief's shape), carried
+    /// alongside the window's dates without reaching back into the bundled
+    /// gate identity.
     let timezone: String
     let fetchedAt: Date
-    let start: Date            // today −48h at fetch, the Timeline window
-    let end: Date              // today +132h at fetch
+    let start: Date            // Timeline.window(anchor:today:).start at fetch, pruned forward
+    let end: Date              // anchor + Timeline.onlineFetchDays, clamped to the samples
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
     let times: [Double]        // epoch seconds, 15-min official samples
@@ -111,16 +135,53 @@ struct ChsOnlineWindow: Codable {
         zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
     }
 
-    /// Does the stored window still cover the FULL strip `Timeline` would
-    /// build right now? True iff it reaches at least `now`'s local
-    /// −48h…+132h — the exact rule Task 5 refetches against.
-    func coversStrip(now: Date) -> Bool {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: timezone) ?? .current
-        let today = cal.startOfDay(for: now)
-        let neededStart = today.addingTimeInterval(-Timeline.backHours * 3600)
-        let neededEnd = today.addingTimeInterval(Timeline.forwardHours * 3600)
-        return start <= neededStart && end >= neededEnd
+    /// Does the stored window cover the FULL strip `Timeline` would build for
+    /// `anchor`? The window is computed by `Timeline.window`, never re-derived
+    /// here — with a conditional back-pad, a second derivation drifts, and the
+    /// failure mode is this returning true for a window with a hole in it,
+    /// which renders as a strip with a dead zone.
+    func covers(anchor: Date, today: Date) -> Bool {
+        let need = Timeline.window(anchor: anchor, today: today)
+        return start <= need.start && end >= need.end
+    }
+
+    /// IWLS's last returned sample routinely lands one 15-min interval short of
+    /// the requested end, and `fetchOnlineWindow` clamps `end` down to it — so
+    /// two blocks that ought to abut can arrive one sample apart. `merging`
+    /// tolerates exactly that much at the seam and no more: a wider gap means a
+    /// sample is genuinely missing, which is a hole, and a hole must stay
+    /// disjoint rather than be papered over.
+    static let sampleInterval = 900.0
+
+    /// Union `other`'s samples into this window by timestamp and widen the
+    /// bounds, dropping everything before `prunedBefore`.
+    ///
+    /// Union, not append: the fetch chunks land on an absolute 7-day grid, so
+    /// a refetch routinely overlaps what is already stored, and appending
+    /// would hand `sampleEvents` a series with every overlapped sample twice.
+    ///
+    /// `start` follows the prune. If it did not, `covers` would keep claiming
+    /// a range whose samples had just been deleted.
+    func merging(_ other: ChsOnlineWindow, prunedBefore: Date) -> ChsOnlineWindow {
+        // Two blocks separated by more than a sample have no samples between
+        // them, and a window spanning both would answer `covers` true for an
+        // anchor in the gap — the same lie as an unpruned `start`, from the
+        // other end. The newer block wins outright, prune and all: it is a
+        // fresh fetch, whose own start is never earlier than the cut.
+        let slack = Self.sampleInterval
+        guard start <= other.end.addingTimeInterval(slack),
+              other.start <= end.addingTimeInterval(slack) else { return other }
+        let cut = prunedBefore.timeIntervalSince1970
+        var byTime = Dictionary(zip(times, speeds), uniquingKeysWith: { _, b in b })
+        for (t, v) in zip(other.times, other.speeds) { byTime[t] = v }
+        let kept = byTime.filter { $0.key >= cut }.sorted { $0.key < $1.key }
+        return ChsOnlineWindow(
+            stationID: stationID, iwlsName: other.iwlsName, timezone: timezone,
+            fetchedAt: other.fetchedAt,
+            start: max(min(start, other.start), prunedBefore),
+            end: max(end, other.end),
+            floodDirection: other.floodDirection, ebbDirection: other.ebbDirection,
+            times: kept.map(\.key), speeds: kept.map(\.value))
     }
 
     /// The list/search card's reading: nearest 15-min sample to `now` (a card
