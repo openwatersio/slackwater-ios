@@ -71,8 +71,11 @@ struct DerivedGateDetailView: View {
     private var readout: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(phase.word)
-                    .font(.largeTitle)
+                // The bare phase word was the app's worst jargon moment — no
+                // number, no arrow, just "Ebbing" (#59). The gloss rides the
+                // big line the way speed heroes carry their unit.
+                (Text(phase.word).font(.largeTitle)
+                 + Text(phase.gloss.map { " · \($0)" } ?? "").font(.footnote))
                     .foregroundStyle(Self.phaseColor(phase))
                 Text("speeds not predicted for this pass")
                     .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))

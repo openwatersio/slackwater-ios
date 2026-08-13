@@ -250,7 +250,10 @@ struct OnlineGateDetailView: View {
                      + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
                         .foregroundStyle(.white)
                     HStack(spacing: 4) {
-                        Text(phase.word).font(.footnote)
+                        // The plain-word gloss for non-sailors (#59) — this
+                        // hero has the room; list cards lead with direction.
+                        Text(phase.gloss.map { "\(phase.word) · \($0)" } ?? phase.word)
+                            .font(.footnote)
                         CompassArrow(deg: setDegrees(scrubSigned, window)).font(.footnote)
                         Text(compass16(setDegrees(scrubSigned, window))).font(.footnote)
                     }

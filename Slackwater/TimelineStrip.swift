@@ -1239,7 +1239,9 @@ struct MultiDaySchedule: View {
                                     .font(.subheadline.weight(.semibold).monospacedDigit())
                                     .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                 pillView(e)
-                                    .frame(width: 84, alignment: .trailing)
+                                    // 100, not 84: room for the widest
+                                    // direction-first pill ("WSW FLOOD").
+                                    .frame(width: 100, alignment: .trailing)
                             }
                             .padding(.vertical, 9)
                             .padding(.trailing, 14)
@@ -1283,9 +1285,15 @@ struct MultiDaySchedule: View {
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.falling, in: Capsule())
         case .flood, .ebb:
+            // Direction-first (#59): arrow + cardinal lead, the flood/ebb
+            // word demotes to a dimmer label for those who want it.
             HStack(spacing: 3) {
-                if let deg = e.arrowDeg { CompassArrow(deg: deg) }
+                if let deg = e.arrowDeg {
+                    CompassArrow(deg: deg)
+                    Text(compass16(deg))
+                }
                 Text(e.pill == .flood ? "FLOOD" : "EBB")
+                    .opacity(0.7)
             }
             .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(SN.navyDeep)
