@@ -263,6 +263,27 @@ struct ScrubWhen: View {
 
     var body: some View {
         let moon = SunMoon.moonIllumination(date: scrubTime)
+        // Wrap, never truncate (the StationCard rule): the one-line row is
+        // tier 1, and when the .title time, the fixed 44pt slot and the
+        // phase name outgrow the width — AX3 and up on a phone — the moon
+        // drops to its own line instead of the phase clipping to "…".
+        // Which tier wins is verified by geometry in ScrubWhenTests, not
+        // asked directly — ViewThatFits exposes no way to ask.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) {
+                timeAndSlot
+                Spacer()
+                moonPhase(moon)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                timeAndSlot
+                moonPhase(moon)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var timeAndSlot: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(cardTime(scrubTime, tz))
@@ -272,14 +293,17 @@ struct ScrubWhen: View {
                 MonoLabel(text: monthDay(scrubTime, tz))
             }
             ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: onReturn)
-            Spacer()
+        }
+    }
+
+    private func moonPhase(_ moon: SunMoon.MoonIllumination) -> some View {
+        HStack(spacing: 14) {
             MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
             Text(SunMoon.phaseName(phase: moon.phase))
                 .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.6))
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .accessibilityElement(children: .contain)
     }
 }
 
