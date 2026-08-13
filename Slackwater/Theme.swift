@@ -332,9 +332,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// isn't on a September strip would be the half of the job the scaffold can
     /// see and the wrong half to do alone.
     let onReturn: () -> Void
-    /// Tapping the range bar. Caller-owned for the same reason `onReturn` is:
-    /// the anchor lives in the detail view, not here.
-    let onPickDate: () -> Void
+    /// The window's anchor. The scaffold moves it (via the picker) but does not
+    /// own it — it lives in the detail view, which is also what makes
+    /// `onReturn` caller-owned.
+    @Binding var anchor: Date
+    /// Fired when the picker OPENS, before a date is chosen. Only an online
+    /// gate has anything to do here (speculatively fetch the next block); the
+    /// other three are constituents and pass a no-op.
+    var onPickerOpen: () -> Void = {}
+    /// Fired after the anchor moves, with the picked date. The three
+    /// `@State`-backed views rebuild here; the online gate re-checks coverage.
+    var onPicked: (Date) -> Void = { _ in }
+    @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -366,6 +375,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         .background(SN.page.ignoresSafeArea())
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showPicker) {
+            WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: onPicked)
+        }
     }
 
     private func scrubCard(_ tl: TimelineData) -> some View {
@@ -394,7 +406,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
         VStack(spacing: 0) {
-            WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: onPickDate)
+            WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: { showPicker = true })
             Divider().overlay(Color.white.opacity(0.08))
             // Both dates, never one: `anchor` keys the day groups (it is what
             // `days` offsets are relative to), `today` only says Today/Tomorrow.
@@ -451,6 +463,66 @@ struct WeekRangeBar: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("week-range-bar")
         .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
+    }
+}
+
+/// A native graphical `DatePicker`, in a sheet.
+///
+/// Native rather than a hand-rolled month grid: Dynamic Type, VoiceOver, and
+/// localization arrive for nothing, and this app adds no dependency it can
+/// avoid. Unbounded in both directions — the engine is deterministic, so last
+/// Saturday costs exactly what next March costs. Online gates get the SAME
+/// unbounded picker rather than a greyed-out range: two classes of station that
+/// visibly disagree about how far the future goes would leave the user to work
+/// out why, where an honest failure at the moment of asking says it in words.
+struct WeekPickerSheet: View {
+    @Binding var anchor: Date
+    let tz: TimeZone
+    let onOpen: () -> Void
+    let onPick: (Date) -> Void
+
+    @State private var draft = Date()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                DatePicker("Week starting", selection: $draft,
+                           displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(SN.go)
+                    .padding(.horizontal, 8)
+                    .accessibilityIdentifier("week-picker")
+                Spacer()
+            }
+            .background(SN.page.ignoresSafeArea())
+            .navigationTitle("Choose a date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Show") {
+                        var cal = Calendar(identifier: .gregorian)
+                        cal.timeZone = tz
+                        let picked = cal.startOfDay(for: draft)
+                        anchor = picked
+                        onPick(picked)
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("week-picker-done")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .onAppear {
+            draft = anchor
+            // Fire the speculative fetch as the sheet appears, not when a date
+            // is chosen: by the time the user has picked, the round trip has
+            // had the whole browsing interaction to land.
+            onOpen()
+        }
     }
 }
 

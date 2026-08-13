@@ -183,6 +183,32 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(bar.label.contains("–"), "the bar states a span, got '\(bar.label)'")
     }
 
+    /// Tapping the bar opens the picker; picking a date moves the window and the
+    /// bar says so.
+    func testPickingADateMovesTheWindow() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.waitForExistence(timeout: 10))
+        let before = bar.label
+
+        bar.tap()
+        let picker = app.descendants(matching: .any)["week-picker"].firstMatch
+        XCTAssert(picker.waitForExistence(timeout: 5))
+
+        // The graphical DatePicker's forward-month button, then a day cell.
+        app.buttons["Next Month"].firstMatch.tap()
+        app.collectionViews.buttons.element(boundBy: 10).tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+
+        XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
+        XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 5))
+    }
+
     // M2: current stations join the list; walk into Deception Pass and scrub
     // the signed velocity curve.
     func testM2Currents() throws {

@@ -17,8 +17,6 @@ struct DerivedGateDetailView: View {
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
-    /// Set by the range bar; read by Task 3's picker sheet.
-    @State private var showPicker = false
     /// The strip window's slacks with their HW/LW origin (the phase call needs
     /// the flags; timeline.currentEvents carries only times).
     @State private var slacks: [DerivedSlackEvent] = []
@@ -36,7 +34,8 @@ struct DerivedGateDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
-                            onPickDate: { showPicker = true },
+                            anchor: $anchor,
+                            onPicked: { _ in rebuild() },
                             above: { EmptyView() },
                             card: { tl in
                                 readout
