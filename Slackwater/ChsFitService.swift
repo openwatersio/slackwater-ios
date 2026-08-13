@@ -509,6 +509,10 @@ extension ChsFitService {
     /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
     /// so every caller, today's and any future one, gets the same
     /// "the fetch landed" signal without re-deriving it.
+    ///
+    /// Returns the window as SAVED — the union of this block with whatever was
+    /// already stored — so the caller's copy is never narrower than the disk's.
+    /// Only a failed disk write falls back to the bare fetched block.
     nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
                                              from anchor: Date? = nil) async throws -> ChsOnlineWindow {
         let fetcher = IwlsFetcher()
@@ -550,8 +554,13 @@ extension ChsFitService {
             floodDirection: flood, ebbDirection: ebb,
             times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
         do {
-            try ChsModelStore.saveOnline(window)
+            // The MERGED window goes back to the caller, not `window`: the
+            // fetched block is only the part that was missing, and a caller
+            // rendering it alone would have less on screen than it has on disk
+            // (`saveOnline`'s doc comment).
+            let merged = try ChsModelStore.saveOnline(window)
             await MainActor.run { shared.onlineFetchStamp += 1 }
+            return merged
         } catch {
             // ponytail: a local disk-write failure on an already-fetched
             // window isn't worth failing the whole fetch over — the caller

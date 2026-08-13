@@ -304,7 +304,13 @@ final class ChsCurrentGateTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         try ChsModelStore.saveOnline(onlineWindow([t0, t0 + 900, t0 + 1800], [1, 2, 3]))
-        try ChsModelStore.saveOnline(onlineWindow([t0 + 1800, t0 + 2700], [3, 4]))
+        // The saver returns what it WROTE, not the block handed in: the fetch
+        // passes that straight back to its caller, and a view holding the
+        // narrower just-fetched block would answer `covers` false for a week
+        // the app has on disk.
+        let saved = try ChsModelStore.saveOnline(onlineWindow([t0 + 1800, t0 + 2700], [3, 4]))
+        XCTAssertEqual(saved.times, [t0, t0 + 900, t0 + 1800, t0 + 2700],
+                       "saveOnline returns the merged window, not its argument")
 
         let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
         XCTAssertEqual(loaded.times, [t0, t0 + 900, t0 + 1800, t0 + 2700])
