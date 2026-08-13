@@ -376,7 +376,37 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         .environment(\.timeZone, tz)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showPicker) {
-            WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: onPicked)
+            WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
+                // Park the centerline on the picked week when it isn't already
+                // there. The strip does NOT self-correct: `data.x(_:)` and
+                // `data.time(atX:)` are exact inverses, so the programmatic
+                // scroll to `scrubTime` and the scroll callback that reads it
+                // back are a fixed point, and `contentSize` is set once in
+                // `makeUIView` — nothing re-clamps an off-window offset. Left
+                // alone, picking a month out draws a blank strip under a
+                // readout frozen on the first sample, with the return-to-now
+                // button hidden because `scrubTime` is still `live`.
+                //
+                // `Timeline.window` asks the question, not hand-rolled hours:
+                // it is the span the strip actually draws. A pick that lands
+                // on today leaves an in-window `scrubTime` alone, so it stays
+                // live and the return-to-now slot stays correctly empty.
+                //
+                // NOON of the picked day, not its midnight. Midnight is the
+                // window's first instant, so `x(scrubTime) - width/2` is
+                // negative and the strip opens on half a viewport of dead space
+                // before the curve starts — and the readout reads "12:00 AM",
+                // which looks like a boundary artefact rather than a reading.
+                // Noon is 216pt in, past half a phone viewport, and it is the
+                // middle of the day that was actually asked for: a full day's
+                // curve either side of the centerline, sun up, the day's
+                // extremes both in view.
+                let week = Timeline.window(anchor: picked, today: timeline?.today ?? picked)
+                if scrubTime < week.start || scrubTime > week.end {
+                    scrubTime = picked.addingTimeInterval(12 * 3600)
+                }
+                onPicked(picked)
+            })
         }
     }
 

@@ -969,6 +969,23 @@ struct TimelineScrubber: UIViewRepresentable {
         co.parent = self
         co.host?.rootView = canvas
         guard sv.bounds.width > 0 else { return }
+        // The canvas is not a fixed width. `Timeline.window` back-pads 48h ONLY
+        // when the anchor is today, so the first pick takes the window from
+        // 228h to 180h and `totalWidth` from 4104pt to 3240pt. Both the host
+        // frame and `contentSize` were set once in `makeUIView` and never
+        // again: the narrower canvas then laid itself out CENTRED inside the
+        // stale wider host view — ~432pt right of where the offset arithmetic
+        // below assumes the window starts — and the viewport landed on empty
+        // space. A blank strip under a perfectly correct readout, which is
+        // exactly what shipping this fix's first attempt produced.
+        //
+        // Resize BEFORE the offset: the offset is set against these bounds, and
+        // shrinking `contentSize` afterwards lets UIKit clamp it out from under
+        // us.
+        if abs(sv.contentSize.width - data.totalWidth) > 0.5 {
+            co.host?.view.frame = CGRect(x: 0, y: 0, width: data.totalWidth, height: geo.height)
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        }
         if !co.didInitialCenter {
             co.centerIfNeeded(sv)
             return
