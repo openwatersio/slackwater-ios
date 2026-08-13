@@ -130,7 +130,12 @@ struct ChsWaitingView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            // spacing 0: the hero→card seam is flush (2026-08-03 spec §2
+            // "Flush"), same as the four scrubbable details' scaffold. The
+            // amber card's own interior `.padding(.vertical, 18)` is the
+            // inset the pill sits on — inside the tinted card, like the
+            // scrub card's interior 14 — so the seam doesn't double up.
+            VStack(spacing: 0) {
                 MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
                           favoriteId: favoriteId)
                 warningCard
@@ -184,7 +189,9 @@ struct ChsWaitingView: View {
         MonoLabel(text: "Predictions — not for navigation",
                   color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
-            .padding(.top, 8)
+            // 14, matching the scaffold's standard below-card gap — spacing 0
+            // above means this padding is the whole card→footer gap now.
+            .padding(.top, 14)
     }
 }
 
