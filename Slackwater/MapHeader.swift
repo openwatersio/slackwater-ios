@@ -22,6 +22,13 @@ struct MapHeader: View {
     let longitude: Double
     /// StationItem id this detail shows — the favorite star toggles it.
     let favoriteId: String
+    /// The real top safe-area inset, read by the caller's GeometryReader.
+    /// Every detail puts `.ignoresSafeArea(edges: .top)` on its ScrollView so
+    /// the map bleeds under the status bar, which also strips the implicit
+    /// system padding — the header supplies its own clearance, and it must be
+    /// the device's actual inset (issue #50: a Dynamic Island literal floated
+    /// the pill low on SE-class phones and iPad split-view panes).
+    let topSafeInset: CGFloat
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -88,7 +95,10 @@ struct MapHeader: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 62)   // clears the status bar; header ignores the top safe area
+        // Height = "top safe-area clearance + title pill + bottom margin"
+        // (2026-08-03 design §1) — the clearance is the inset itself, no extra
+        // top margin term; the 24 below is the spec's bottom margin.
+        .padding(.top, topSafeInset)
         .padding(.bottom, 24) // map band below the pill — the border the name sits on
         .frame(maxWidth: .infinity)
         .background {
