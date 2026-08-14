@@ -19,12 +19,11 @@
 # answer questions about. z14 nearly triples the bundle for that.
 #
 # The layer slice is a VERBATIM copy of the seamap-source layers from the
-# published style.json, minus every `text-*` key: labels need glyphs, glyphs
-# are a remote versatiles URL, and an offline chart cannot fetch them. Bundling
-# a fontstack is the open follow-on. Which layers the app then declines to draw
-# is MapScreen's `SEAMAP_OMIT`, not this script's business — keeping that
-# decision in code and this artifact upstream-faithful means changing our mind
-# about TSS is a one-line edit, not a rebuild.
+# published style.json, text-* included: the glyph PBFs the labels need are
+# bundled below. Which layers the app then declines to draw is MapScreen's
+# `SEAMAP_OMIT`, not this script's business — keeping that decision in code
+# and this artifact upstream-faithful means changing our mind about TSS is a
+# one-line edit, not a rebuild.
 #
 # Requires: pmtiles, python3, curl. `brew install pmtiles`.
 set -euo pipefail
@@ -52,4 +51,22 @@ done
 curl -fsS "$BASE/style.json" -o /tmp/seamap-style.json
 python3 tools/slice-layers.py /tmp/seamap-style.json seamap Slackwater/Resources/seamap-layers.json
 
-ls -la Slackwater/Resources/seamap.pmtiles Slackwater/Resources/seamap-layers.json
+# Glyphs (#29). The slice's labels reference two versatiles stacks —
+# noto_sans_regular everywhere, open_sans_regular_italic for hazard depths,
+# racon and light characteristics — so bundle those, latin ranges only: a
+# Salish Sea chart carries no CJK. 7680-7935 is Latin Extended Additional
+# (the ḵ in BC Indigenous place names), 8192-8447 general punctuation; the
+# italic stack labels digits and ASCII light characteristics, so it skips
+# both. Both fonts are OFL — licence bundled as glyphs-OFL.txt.
+GLYPHS="https://tiles.versatiles.org/assets/glyphs"
+for range in 0-255 256-511 7680-7935 8192-8447; do
+  curl -fsS "$GLYPHS/noto_sans_regular/$range.pbf" \
+    -o "Slackwater/Resources/noto_sans_regular-$range.pbf"
+done
+for range in 0-255 256-511; do
+  curl -fsS "$GLYPHS/open_sans_regular_italic/$range.pbf" \
+    -o "Slackwater/Resources/open_sans_regular_italic-$range.pbf"
+done
+
+ls -la Slackwater/Resources/seamap.pmtiles Slackwater/Resources/seamap-layers.json \
+       Slackwater/Resources/*.pbf

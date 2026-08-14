@@ -17,16 +17,18 @@
 #
 # WHAT YOU GET OFFLINE, AND WHAT YOU DON'T: of the four seascape-vector layers,
 # `depth-areas` (fill) and `contour-lines` (line) draw. `soundings` and
-# `contour-labels` are symbol layers whose only content is text, and text needs
-# glyphs, and glyphs are a remote URL an offline chart cannot fetch — so they
-# are bundled and inert. Depth shading is separate again: it lives on the
-# seascape-dem raster source as a `color-relief` layer MapLibre Native will not
-# render, so it is no loss here that it isn't bundled. Bundling a fontstack is
-# the open follow-on, and it lights up seamap's labels in the same stroke.
+# `contour-labels` are symbol layers whose only content is text, stripped
+# below — bundled and inert, for the unit reason explained at the strip. Depth
+# shading is separate again: it lives on the seascape-dem raster source as a
+# `color-relief` layer MapLibre Native will not render, so it is no loss here
+# that it isn't bundled.
 #
 # The unit query param only ever reaches text fields, which this strips — so
-# the slice is unit-agnostic and ?unit=ft is arbitrary. That stops being true
-# the day glyphs ship.
+# the slice is unit-agnostic and ?unit=ft is arbitrary. Glyphs shipped for
+# seamap (#29), but this slice KEEPS stripping: un-stripping would bake one
+# unit into an offline artifact the app's unit setting can't reach. Lighting
+# up soundings offline means two slices or a load-time rewrite — a separate
+# decision.
 #
 # Requires: pmtiles, python3, curl. `brew install pmtiles`.
 set -euo pipefail
@@ -46,6 +48,6 @@ pmtiles extract "$ARCHIVE" Slackwater/Resources/seascape.pmtiles \
 curl -fsS "https://tiles.openwaters.io/seascape/style.json?unit=ft" -o /tmp/seascape-style.json
 # seascape-vector only: the dem and coverage sources are not bundled, and a
 # layer pointing at a missing source is a style MapLibre refuses to load.
-python3 tools/slice-layers.py /tmp/seascape-style.json seascape-vector Slackwater/Resources/seascape-layers.json
+python3 tools/slice-layers.py /tmp/seascape-style.json seascape-vector Slackwater/Resources/seascape-layers.json --strip-text
 
 ls -la Slackwater/Resources/seascape.pmtiles Slackwater/Resources/seascape-layers.json
