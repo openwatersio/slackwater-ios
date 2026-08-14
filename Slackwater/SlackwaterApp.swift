@@ -21,6 +21,15 @@ struct SlackwaterApp: App {
         // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
         // gates, so a UI test can land on OnlineGateDetailView's fetched
         // single-track detail with no network.
+        // SPIKE #57: -seedGateModels writes a synthetic fitted model for each
+        // of the 11 offline CHS gates, so the particle-field spike has water
+        // to draw on a simulator that has never fitted anything. Same
+        // reset-ordering trap as -seedOnlineWindow below; -chsResetModels
+        // clears these files like any other.
+        if CommandLine.arguments.contains("-seedGateModels") {
+            _ = ChsFitService.shared
+            seedGateModels()
+        }
         if let id = UserDefaults.standard.string(forKey: "seedOnlineWindow") {
             // Trap: ChsFitService.shared's own init calls
             // ChsModelStore.resetIfRequested(), which wipes ChsModelStore.dir
@@ -78,6 +87,37 @@ private func seedOnlineWindow(stationID: String) {
     // `_ =` because `try?` re-wraps the merged window `saveOnline` now returns,
     // and @discardableResult doesn't survive the Optional.
     _ = try? ChsModelStore.saveOnline(window)
+}
+
+/// SPIKE #57 (`-seedGateModels`): approximate channel bearings for the demo
+/// only — the real flood axis arrives from IWLS metadata at fit time and is
+/// never bundled. Wrong-ish by a few degrees on purpose-built charts; good
+/// enough to judge whether particles read as water through a pass.
+private let seedFloodAxes: [String: Double] = [
+    "chs-active-pass": 40, "chs-blackney-passage": 130, "chs-dodd-narrows": 140,
+    "chs-first-narrows": 90, "chs-gillard-passage": 70, "chs-hole-in-the-wall": 250,
+    "chs-johnstone-strait-central": 125, "chs-porlier-pass": 45, "chs-race-passage": 65,
+    "chs-seymour-narrows": 170, "chs-weynton-passage": 130,
+]
+
+/// SPIKE #57 hook: a plausible M2+K1 model per offline gate, phases staggered
+/// so at any demo moment some gates flood, some ebb, some sit near slack —
+/// the three states the recording has to show.
+private func seedGateModels() {
+    for (i, gate) in ChsCurrentGateInfo.all.filter({ !$0.isOnline }).enumerated() {
+        let flood = seedFloodAxes[gate.id] ?? 0
+        let model = ChsModel(
+            stationID: gate.id, iwlsID: "seeded", iwlsName: "\(gate.name) (seeded)",
+            fittedAt: appNow(), fitStartMs: 0, fitEndMs: 0, fitDays: gate.fitDays,
+            floodDirection: flood,
+            ebbDirection: (flood + 180).truncatingRemainder(dividingBy: 360),
+            offset: 0, rms: 0,
+            constituents: [
+                Con(name: "M2", amplitude: 2.4, phase: Double((i * 97) % 360)),
+                Con(name: "K1", amplitude: 0.6, phase: Double((i * 53) % 360)),
+            ])
+        try? ChsModelStore.saveCurrent(model)
+    }
 }
 
 /// Gate until a choice is made (prototype phase machine); list ever after.

@@ -352,6 +352,7 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
         style["sprite"] = [["id": "freenauticalchart", "url": spriteUrl]]
         insertAboveLand(seamap.layers)
     }
+    if currentParticlesEnabled { addParticleStyle(&style) }   // SPIKE #57
     return style
 }
 
@@ -392,6 +393,7 @@ func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -
     let font = (sample?["layout"] as? [String: Any])?["text-font"] as? [String]
         ?? ["Open Sans Regular", "Arial Unicode MS Regular"]
     style["layers"] = layers + pinLayers(hasGlyphs: hasGlyphs, labelFont: font)
+    if currentParticlesEnabled { addParticleStyle(&style) }   // SPIKE #57
     return style
 }
 
@@ -480,7 +482,13 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // tide-pin icon must be re-registered each time or the swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
+        // SPIKE #57: re-attach on every load too — the particle source object
+        // belongs to the style that declared it.
+        if currentParticlesEnabled { particles.attach(to: style, map: mapView) }
     }
+
+    /// SPIKE #57 animator — inert (never created) with the flag off.
+    private lazy var particles = CurrentParticleAnimator()
 }
 
 // MARK: - The map view
