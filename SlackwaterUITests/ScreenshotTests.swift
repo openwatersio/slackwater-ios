@@ -1704,10 +1704,15 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
 
         // Within one chunk (2.5 s of pacing, plus the round trip), the gate has
-        // stepped aside and the station you opened is downloading.
+        // stepped aside and the station you opened is downloading. Idle that is
+        // seconds, but the second-simulator leg of a full run starts ~30 min in
+        // on the machine that also hosts the CI runner — a fixed 30 s here
+        // failed ~2 of 3 full runs under that load (#65), so poll to the same
+        // 300 s deadline the surrounding loops use. The print below still
+        // reports the time it actually took.
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         var waited = 0
-        while !tofino.label.contains("Downloading"), waited < 30 { sleep(1); waited += 1 }
+        while !tofino.label.contains("Downloading"), waited < 300 { sleep(1); waited += 1 }
         XCTAssert(tofino.label.contains("Downloading"),
                   "opening a station did not interrupt the gate in flight (waited \(waited) s)")
         XCTAssert(app.descendants(matching: .any)["download-row-chs-dodd-narrows"]
@@ -1716,8 +1721,10 @@ final class ScreenshotTests: XCTestCase {
 
         // And it resumes: once the promoted port is done the gate carries on
         // from its cached chunks (never re-fetching them — ChsProvisionalTests).
+        // Same deadline as above: this clock covers Tofino's whole download,
+        // which load stretches just as much as the yield (#65).
         waited = 0
-        while !dodd.label.contains("Downloading"), waited < 120 { sleep(2); waited += 2 }
+        while !dodd.label.contains("Downloading"), waited < 300 { sleep(2); waited += 2 }
         XCTAssert(dodd.label.contains("Downloading"), "the yielded gate never resumed")
         app.buttons["Done"].tap()
     }
