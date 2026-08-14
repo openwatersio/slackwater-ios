@@ -576,7 +576,8 @@ struct StationListView: View {
         // FAB row does and lands on that row, clear of the home indicator.
         ZStack(alignment: .bottom) {
             MapViewRepresentable(
-                center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                center: mapCenterOverride
+                    ?? mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
                     ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
                     ?? SALISH_CENTER,
                 zoom: mapFocus == nil ? discoveryZoom : stationZoom
