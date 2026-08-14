@@ -44,7 +44,9 @@ final class ChsFitService: ObservableObject {
     /// place a station's state can disagree with itself: none.
     @Published private(set) var queue = ChsQueue()
 
-    private var tideRecords: [String: TideStationRecord] = [:]
+    /// Readable (the map's pin-tone resolve reads it beside `currentRecords`);
+    /// written only by the fit run.
+    private(set) var tideRecords: [String: TideStationRecord] = [:]
     /// Published: a gate's record is REPLACED in place when the provisional fit
     /// refines to the final one, and any open detail has to follow it.
     @Published private(set) var currentRecords: [String: CurrentStationRecord] = [:]

@@ -131,34 +131,72 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     return delta > 0
 }
 
+/// A fitted tide record's tone. Not `cardState(at:)` — that computes 30h
+/// searches the pin discards; the hybrid is the load-bearing shortcut
+/// (`testPinLayerBuildsInsideAFrame` budgets the whole source build at 0.3s).
+func tidePinTone(_ record: TideStationRecord, at now: Date) -> String {
+    guard let rising = tidePinRisingHybrid(record, at: now) else { return "unknown" }
+    return rising ? "rising" : "falling"
+}
+
+/// A current record's tone. Exact PIN_STATE_COLOUR match keys —
+/// CurrentPhase.word ("Flooding") is the pill's word, not these.
+func currentPinTone(_ station: CurrentStationRecord, at now: Date) -> String {
+    let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
+        .first?.speed ?? 0
+    let phase = currentPhase(signed: signed)
+    return phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
+}
+
 /// A station's state as a tone name, for the pin's colour.
 ///
 /// Synchronous only: every CHS-provenance item resolves through
-/// `ChsFitService`'s async fit cache, so all three report "unknown" and draw
-/// neutral — an honest admission, not a guess (wiring the async cache in is
-/// a deliberate follow-on). Neither bundled case calls `cardState(at:)`: it
-/// computes 30h searches the pin discards, and `pinFeatures()` runs this for
-/// all ~3,125 stations per style build (`testPinLayerBuildsInsideAFrame`
-/// budgets 0.3s), so the shortcuts here are load-bearing.
-private func pinTone(_ item: StationItem, at now: Date) -> String {
+/// `ChsFitService`'s async fit cache, so at style-build time all three read
+/// from `chsTones` — the tones `chsPinTones` resolved from what the offline
+/// sync has already stored, pushed in after paint (`MapStyler.applyChsTones`).
+/// Absent means unsynced, and the pin honestly draws neutral.
+private func pinTone(_ item: StationItem, at now: Date, chsTones: [String: String]) -> String {
     switch item {
     case .tide(let record):
-        guard let rising = tidePinRisingHybrid(record, at: now) else { return "unknown" }
-        return rising ? "rising" : "falling"
+        return tidePinTone(record, at: now)
     case .current(let station):
-        let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
-            .first?.speed ?? 0
-        // Exact PIN_STATE_COLOUR match keys — CurrentPhase.word ("Flooding")
-        // is the pill's word, not these.
-        let phase = currentPhase(signed: signed)
-        return phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
+        return currentPinTone(station, at: now)
     case .chs, .chsGate, .chsCurrent:
-        return "unknown"   // async CHS fit cache — see the doc comment above
+        return chsTones[item.id] ?? "unknown"
     }
 }
 
+/// CHS tones from what the offline sync has ALREADY stored. The caller hands
+/// in the fitted records as plain dictionaries, so this cannot fetch — a
+/// station the sync has not reached is simply absent and stays neutral
+/// (issue #12; the web port learned the fetch-on-open version is a request
+/// storm against IWLS). A derived gate has no model of its own: it resolves
+/// exactly when its reference port — itself a CHS port — is fitted.
+func chsPinTones(at now: Date,
+                 tideRecords: [String: TideStationRecord],
+                 currentRecords: [String: CurrentStationRecord]) -> [String: String] {
+    var tones: [String: String] = [:]
+    for item in StationItem.all {
+        switch item {
+        case .tide, .current:
+            continue
+        case .chs(let info):
+            guard let record = tideRecords[info.id] else { continue }
+            tones[item.id] = tidePinTone(record, at: now)
+        case .chsCurrent(let gate):
+            guard let record = currentRecords[gate.id] else { continue }
+            tones[item.id] = currentPinTone(record, at: now)
+        case .chsGate(let gate):
+            guard let port = tideRecords[gate.reference] else { continue }
+            let phase = DerivedGateRecord(gate: gate, port: port).cardState(at: now).phase
+            tones[item.id] = phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
+        }
+    }
+    return tones
+}
+
 /// Every bundled station as a GeoJSON pin. Identity only — no readings.
-private func pinFeatures() -> [String: Any] {
+private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
     [
         "type": "FeatureCollection",
         "features": StationItem.all.map { s in
@@ -166,7 +204,7 @@ private func pinFeatures() -> [String: Any] {
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
                 "properties": ["id": s.id, "name": s.name, "kind": s.pinKind,
-                               "state": pinTone(s, at: appNow())],
+                               "state": pinTone(s, at: appNow(), chsTones: chsTones)],
             ] as [String: Any]
         },
     ]
@@ -499,6 +537,33 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // tide-pin icon must be re-registered each time or the swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
+        applyChsTones(to: style)
+    }
+
+    /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
+    /// stored. Runs here, per style load, because that is the only place it
+    /// can survive: setting a style rebuilds every source, discarding anything
+    /// pushed into the old one — and this map styles twice (fallback, then
+    /// Seascape). After paint by construction, so the style-construction path
+    /// `testPinLayerBuildsInsideAFrame` budgets pays nothing; the 3,125-pin
+    /// source rebuild runs off the main thread. Cache only, never a fetch —
+    /// `chsPinTones` takes the stored records and nothing else.
+    private func applyChsTones(to style: MLNStyle) {
+        Task { @MainActor [weak style] in
+            let service = ChsFitService.shared
+            let tides = service.tideRecords
+            let currents = service.currentRecords
+            let geojson = await Task.detached(priority: .utility) { () -> Data? in
+                let tones = chsPinTones(at: appNow(), tideRecords: tides, currentRecords: currents)
+                guard !tones.isEmpty else { return nil }   // nothing synced — neutral is honest
+                return try? JSONSerialization.data(withJSONObject: pinFeatures(chsTones: tones))
+            }.value
+            guard let geojson, let style,
+                  let source = style.source(withIdentifier: "stations") as? MLNShapeSource,
+                  let shape = try? MLNShape(data: geojson, encoding: String.Encoding.utf8.rawValue)
+            else { return }
+            source.shape = shape
+        }
     }
 }
 
