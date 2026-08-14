@@ -116,6 +116,18 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     return (start, end)
 }
 
+/// Adjacent slack windows that touch or overlap render as one continuous
+/// green column (Race Rocks Aug 11: a 0.1 kn blip between two slacks), so
+/// only the FIRST slack in the run gets a time label — a second time drawn
+/// on top of the first is unreadable. Windows are chronological by
+/// construction (built from the sorted event list in TimelineData.build).
+func suppressesSlackLabel(_ windows: [(slack: Date, start: Date, end: Date)],
+                          at slack: Date) -> Bool {
+    guard let i = windows.firstIndex(where: { $0.slack == slack }), i > 0
+    else { return false }
+    return windows[i - 1].end >= windows[i].start
+}
+
 /// Round tick values for the tide track's fixed left axis, in DISPLAY units
 /// (feet when imperial, metres otherwise) — the NEAPS "4 m / 3 m / 2 m" column.
 /// `lo`/`hi` come in as metres, the units the geometry works in.
@@ -855,10 +867,12 @@ struct TimelineCanvas: View {
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
                 }
-                ctx.draw(Text(chartTime(e.time, data.tz))
-                            .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(SN.go),
-                         at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
+                if !suppressesSlackLabel(data.slackWindows, at: e.time) {
+                    ctx.draw(Text(chartTime(e.time, data.tz))
+                                .font(.system(size: 18, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(SN.go),
+                             at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
+                }
             case .maxFlood, .maxEbb:
                 let flood = e.kind == .maxFlood
                 let tint = flood ? SN.floodLabel : SN.ebbLabel
