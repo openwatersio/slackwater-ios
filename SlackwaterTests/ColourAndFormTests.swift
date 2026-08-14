@@ -185,7 +185,10 @@ final class ColourAndFormTests: XCTestCase {
         while i + 1 < PIN_STATE_COLOUR.count {
             let state = try XCTUnwrap(PIN_STATE_COLOUR[i] as? String)
             let hex = try XCTUnwrap(PIN_STATE_COLOUR[i + 1] as? String)
-            XCTAssertEqual(hex, mapHex(try XCTUnwrap(expected[state], "unexpected pin state \(state)")),
+            // Darkened by the map's one land-contrast factor (issue #13), but
+            // still FROM the token — retarget SN.flood and the map follows.
+            XCTAssertEqual(hex, mapHex(try XCTUnwrap(expected[state], "unexpected pin state \(state)"),
+                                       darkenedBy: PIN_STATE_DARKEN),
                            "map pin colour for \(state)")
             seen.insert(state)
             i += 2
@@ -269,5 +272,38 @@ final class ColourAndFormTests: XCTestCase {
                         "the tide square lost its ink backing plate")
         XCTAssertTrue(source.contains("pin-square-plate"),
                       "the backing-plate image must be registered, or the plate layer draws nothing")
+    }
+
+    /// Issue #13: a pin FILL must clear WCAG 1.4.11's 3:1 over the cream land
+    /// polygons on its own. The outline test above covers pale water, where
+    /// the fills legitimately lean on the ink stroke — but over land the fill
+    /// is what says the state, and the raw tokens washed out there (flood
+    /// 2.47, ebb 1.83, go 1.96). Walks the actual match expression rather
+    /// than a list of expected colours, so a new state cannot ship an
+    /// unmeasured fill.
+    func testEveryPinStateFillClearsTheContrastFloorOnLand() throws {
+        let source = try repoSource("Slackwater/MapScreen.swift")
+        let match = try XCTUnwrap(
+            source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
+            "LAND_TONE must stay a plain hex literal this test can read")
+        let land = String(source[match].suffix(8).prefix(7))
+
+        var fills: [String: String] = ["unknown": try XCTUnwrap(PIN_STATE_COLOUR.last as? String)]
+        var i = 2   // past "match" and ["get", "state"]
+        while i + 1 < PIN_STATE_COLOUR.count {
+            fills[try XCTUnwrap(PIN_STATE_COLOUR[i] as? String)] =
+                try XCTUnwrap(PIN_STATE_COLOUR[i + 1] as? String)
+            i += 2
+        }
+        for (state, hex) in fills {
+            XCTAssertGreaterThanOrEqual(
+                contrast(hex, land), 3.0,
+                "the \(state) pin fill \(hex) is under 3:1 on the land tone \(land)")
+        }
+        // Darkening must not collapse the hues: the two direction ends, slack
+        // and the neutral must stay four tellable-apart fills, not just four
+        // fills that each clear the floor.
+        XCTAssertEqual(Set(fills.values).count, 4,
+                       "the pin palette must keep four distinct fills: \(fills)")
     }
 }
