@@ -135,5 +135,6 @@ Full draft:
 
 - Screenshots (6.9" and 6.5" sets) — can be produced from the UI-test
   screenshot walk once copy is settled.
-- Support URL (suggest slackwater.sailingnaturali.com or the GitHub org page)
-  and marketing URL — Bryan to confirm.
+- Support URL: `https://github.com/openwatersio` — decided in #5 (brand-neutral;
+  App Store Connect allows changing it later if a dedicated page appears under
+  the publishing brand). Marketing URL: leave blank.
