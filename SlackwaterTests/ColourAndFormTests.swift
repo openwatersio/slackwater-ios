@@ -168,6 +168,34 @@ final class ColourAndFormTests: XCTestCase {
             CurrentCardState(signed: 0, next: nil))), SN.go, "a gate at slack draws go")
     }
 
+    /// A station's glyph kind is fixed by the item, never inferred from
+    /// whether a reading has arrived (issue #14 — that bug shipped once on
+    /// the web side). Cross-checked against `pinKind`, the map's own
+    /// kind-of-station binding, so the two can't drift apart.
+    func testStationItemGlyphKindIsFixedByItem() {
+        for item in StationItem.all {
+            XCTAssertEqual(item.glyphKind,
+                           item.pinKind == "current" ? .current : .tide,
+                           item.id)
+        }
+    }
+
+    /// Issue #14: no sheet row may still render the flat empty 38pt square
+    /// left over from the gradient deletion — those chips carry a
+    /// `StationGlyph` now, like `RecentRowLabel`.
+    func testNoFlatCardFillChipRemains() throws {
+        var offenders: [String] = []
+        for (name, source) in try appSources() {
+            let flat = source.replacingOccurrences(
+                of: "\\s+", with: " ", options: .regularExpression)
+            if flat.contains(".fill(SN.cardFill) .frame(width: 38, height: 38)") {
+                offenders.append(name)
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+                      "flat 38pt cardFill chip still drawn in: \(offenders)")
+    }
+
     /// The map's palette must BE the tokens. Its colours are hex strings
     /// (MapLibre style dicts cannot hold a Swift `Color`), and while they were
     /// hand-maintained nothing tied them to `Theme.swift`: retarget `SN.flood`
