@@ -129,19 +129,29 @@ struct ChsWaitingView: View {
     private var series: String { isCurrent ? "current" : "tidal" }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
-                          favoriteId: favoriteId)
-                warningCard
-                footer
+        // GeometryReader reads the real top inset for MapHeader (only the
+        // ScrollView below ignores the safe area) — the scaffold in
+        // Theme.swift does the same.
+        GeometryReader { geo in
+            ScrollView {
+                // spacing 0: the hero→card seam is flush (2026-08-03 spec §2
+                // "Flush"), same as the four scrubbable details' scaffold. The
+                // amber card's own interior `.padding(.vertical, 18)` is the
+                // inset the pill sits on — inside the tinted card, like the
+                // scrub card's interior 14 — so the seam doesn't double up.
+                VStack(spacing: 0) {
+                    MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
+                              favoriteId: favoriteId, topSafeInset: geo.safeAreaInsets.top)
+                    warningCard
+                    footer
+                }
+                .padding(.bottom, 42)
             }
-            .padding(.bottom, 42)
+            .ignoresSafeArea(edges: .top)
+            .background(SN.page.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         }
-        .ignoresSafeArea(edges: .top)
-        .background(SN.page.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
     }
 
     private var warningCard: some View {
@@ -184,7 +194,9 @@ struct ChsWaitingView: View {
         MonoLabel(text: "Predictions — not for navigation",
                   color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
-            .padding(.top, 8)
+            // 14, matching the scaffold's standard below-card gap — spacing 0
+            // above means this padding is the whole card→footer gap now.
+            .padding(.top, 14)
     }
 }
 

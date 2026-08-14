@@ -31,7 +31,8 @@ final class HeroChromeTests: XCTestCase {
         func height(at size: DynamicTypeSize) -> CGFloat {
             let host = UIHostingController(rootView:
                 MapHeader(name: "Sesuit Harbor", region: "EAST DENNIS",
-                          latitude: 41.75, longitude: -70.15, favoriteId: "test")
+                          latitude: 41.75, longitude: -70.15, favoriteId: "test",
+                          topSafeInset: 62)
                     .environment(\.dynamicTypeSize, size))
             return host.sizeThatFits(in: CGSize(width: 393, height: CGFloat.greatestFiniteMagnitude)).height
         }
@@ -40,5 +41,22 @@ final class HeroChromeTests: XCTestCase {
         XCTAssertGreaterThan(base, 100, "hero must still clear the status bar + pill")
         XCTAssertGreaterThan(height(at: .accessibility5), base,
                              "the hero grows with type — it never crops the pill")
+    }
+
+    /// Issue #50: the status-bar clearance was a Dynamic Island literal (62),
+    /// wrong on SE-class phones and iPad split-view panes. Derived-not-literal,
+    /// executable: render at two safe-area insets and the height must track
+    /// their difference exactly — a constant can't.
+    @MainActor
+    func testHeaderClearanceTracksSafeAreaInset() {
+        func height(inset: CGFloat) -> CGFloat {
+            let host = UIHostingController(rootView:
+                MapHeader(name: "Sesuit Harbor", region: "EAST DENNIS",
+                          latitude: 41.75, longitude: -70.15, favoriteId: "test",
+                          topSafeInset: inset))
+            return host.sizeThatFits(in: CGSize(width: 393, height: CGFloat.greatestFiniteMagnitude)).height
+        }
+        XCTAssertEqual(height(inset: 62) - height(inset: 20), 42, accuracy: 0.5,
+                       "clearance derives from the real safe-area inset, not a Dynamic Island literal")
     }
 }
