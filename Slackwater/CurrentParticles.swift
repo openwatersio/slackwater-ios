@@ -103,9 +103,13 @@ final class CurrentParticleAnimator {
 
     private var gates: [Gate] = []
     private weak var map: MLNMapView?
-    private weak var source: MLNShapeSource?
+    /// Strong on purpose: a source looked up out of a JSON-declared style is
+    /// a fresh wrapper the style does NOT retain — held weakly it is gone
+    /// before the first tick, and the field silently never draws.
+    private var source: MLNShapeSource?
     private var timer: Timer?
     private var last = Date()
+    private var loggedFirstTick = false
 
     deinit { timer?.invalidate() }
 
@@ -128,6 +132,7 @@ final class CurrentParticleAnimator {
                             offsets: offsets)
             }
         }
+        print("[particles] attach: source=\(source != nil) gates=\(gates.count)")
         guard timer == nil, !gates.isEmpty else { return }
         let t = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in self?.tick() }
         // .common, or the timer stalls for the whole duration of a pan gesture.
@@ -165,6 +170,11 @@ final class CurrentParticleAnimator {
             features += particleFeatures(gates[i])
         }
         source.shape = MLNShapeCollectionFeature(shapes: features)
+        if !loggedFirstTick {
+            loggedFirstTick = true
+            print("[particles] first tick: zoom=\(map.zoomLevel) features=\(features.count) "
+                + "signed=\(gates.map { String(format: "%.1f", $0.signed) })")
+        }
     }
 
     private func particleFeatures(_ gate: Gate) -> [MLNPointFeature] {
