@@ -444,11 +444,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         VStack(alignment: .leading, spacing: 0) {
             card(tl)
 
-            MonoLabel(text: "‹ swipe to scrub ›",
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-
+            // No "‹ swipe to scrub ›" label here, and none is coming back
+            // (#58): "scrubber" is audio-editing jargon, and testers who read
+            // the label still didn't find the horizontal scroll. The strip's
+            // own opening slide-into-place is the affordance now —
+            // `TimelineScrubber.centerIfNeeded`.
             ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn)
                 .padding(.top, 14)
 
