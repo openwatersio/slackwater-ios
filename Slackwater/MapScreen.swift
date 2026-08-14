@@ -43,6 +43,23 @@ private let CHART_INK = "#0b1a2b"
 /// silent drift no test catches).
 func mapHex(_ hex: UInt32) -> String { String(format: "#%06x", hex) }
 
+/// Map-only darker variants of the three state colours (issue #13): the raw
+/// tokens fall below WCAG 1.4.11's 3:1 over the cream land polygons (flood
+/// 2.47, ebb 1.83, go 1.96), washing the fill out exactly where a pin sits
+/// on land. Derived from the `SN` hexes by one factor — the blend-toward-
+/// black mirror of `Color.hex(_:lightenedBy:)` — never hand-picked:
+/// hand-picked variants are how the chart labels ended up inverted. 0.28 is
+/// the smallest even step that puts the worst state (ebb, 3.4:1) over the
+/// floor with margin while keeping the three hues apart; the floor is pinned
+/// by `testEveryPinStateFillClearsTheContrastFloorOnLand`. `SN.steel`
+/// already clears it (3.25:1) and stays undarkened, token-equal to the card
+/// glyph's unknown.
+let PIN_STATE_DARKEN = 0.28
+func mapHex(_ hex: UInt32, darkenedBy t: Double) -> String {
+    let d = { (c: UInt32) -> UInt32 in UInt32((Double(c) * (1 - t)).rounded()) }
+    return mapHex(d((hex >> 16) & 0xFF) << 16 | d((hex >> 8) & 0xFF) << 8 | d(hex & 0xFF))
+}
+
 /// The unknown-state pin: `SN.steel`, the same token the card glyph draws for
 /// `.unknown` — one meaning, one value.
 let PIN_NEUTRAL = mapHex(SN.steelHex)
@@ -59,10 +76,12 @@ private let PIN_HALO: Double = 1.5
 // (Task 5), so kind (which layer a pin lands in) cannot influence colour.
 let PIN_STATE_COLOUR: [Any] = [
     "match", ["get", "state"],
-    "rising", mapHex(SN.floodHex), "flood", mapHex(SN.floodHex),
-    "falling", mapHex(SN.ebbHex), "ebb", mapHex(SN.ebbHex),
-    "slack", mapHex(SN.goHex),
-    PIN_NEUTRAL,   // unknown
+    "rising", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
+    "flood", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
+    "falling", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
+    "ebb", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
+    "slack", mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
+    PIN_NEUTRAL,   // unknown — SN.steel, already 3.25:1 on land
 ]
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
