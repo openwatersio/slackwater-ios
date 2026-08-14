@@ -22,6 +22,15 @@ let discoveryZoom: Double = {
     return zoom == 0 ? SALISH_ZOOM : zoom
 }()
 
+/// `-mapCenter 48.86,-123.31` (UserDefaults argument domain): opens the
+/// discovery map centered there — same reasoning as `-mapZoom`, added for the
+/// #57 spike recording, which has to frame a named gate deterministically.
+let mapCenterOverride: CLLocationCoordinate2D? = {
+    let parts = (UserDefaults.standard.string(forKey: "mapCenter") ?? "").split(separator: ",")
+    guard parts.count == 2, let lat = Double(parts[0]), let lon = Double(parts[1]) else { return nil }
+    return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+}()
+
 // The MapScreen full-screen-cover wrapper (header + X) is gone — M4.5 shows
 // the map in place behind the list ⇄ map toggle FAB (StationListView.mapPane).
 
