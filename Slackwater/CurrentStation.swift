@@ -100,6 +100,18 @@ enum CurrentPhase {
         case .slack: "Slack"
         }
     }
+
+    /// Plain-word companion for non-sailors ("Flooding · incoming", #59).
+    /// Rendered only where there's room — the detail heroes; tight surfaces
+    /// lead with direction instead. Slack is nil: it is always glossed by
+    /// "under 0.5 kn" at its render sites.
+    var gloss: String? {
+        switch self {
+        case .flood: "incoming"
+        case .ebb: "outgoing"
+        case .slack: nil
+        }
+    }
 }
 
 func currentPhase(signed: Double) -> CurrentPhase {

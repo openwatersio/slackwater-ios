@@ -69,5 +69,15 @@ extension DerivedPhase {
         case .slack: "Slack"
         }
     }
+
+    /// Plain-word companion for non-sailors — same words as
+    /// `CurrentPhase.gloss`, see the rationale there (#59).
+    var gloss: String? {
+        switch self {
+        case .flood: "incoming"
+        case .ebb: "outgoing"
+        case .slack: nil
+        }
+    }
 }
 

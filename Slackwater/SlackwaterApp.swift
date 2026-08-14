@@ -1530,10 +1530,15 @@ struct OnlineGateCardView: View {
                  + Text(" \(speedUnitLabel(speedUnit))")
                     .font(.body))
                     .foregroundStyle(.white)
+                // Direction-first (#59): a novice reads the arrow + cardinal;
+                // the flood/ebb word demotes to a dimmer label. Kept as its
+                // own Text — the screenshot tests match its exact label.
+                let deg = state.signed >= 0 ? window.floodDirection : window.ebbDirection
                 HStack(spacing: 4) {
-                    CompassArrow(deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection)
-                        .font(.caption2)
+                    CompassArrow(deg: deg).font(.caption2)
+                    Text(compass16(deg)).font(.caption2)
                     Text(currentPhase(signed: state.signed).word).font(.caption2)
+                        .foregroundStyle(SN.foam.opacity(0.6))
                 }
                 .foregroundStyle(SN.foam.opacity(0.9))
             }
@@ -1602,9 +1607,14 @@ struct CurrentCardView: View {
                      + Text(" \(speedUnitLabel(speedUnit))")
                         .font(.body))
                         .foregroundStyle(.white)
+                    // Direction-first (#59) — same treatment as
+                    // OnlineGateCardView's, see the comment there.
+                    let deg = record.setDegrees(signed: state.signed)
                     HStack(spacing: 4) {
-                        CompassArrow(deg: record.setDegrees(signed: state.signed)).font(.caption2)
+                        CompassArrow(deg: deg).font(.caption2)
+                        Text(compass16(deg)).font(.caption2)
                         Text(phase.word).font(.caption2)
+                            .foregroundStyle(SN.foam.opacity(0.6))
                     }
                     .foregroundStyle(SN.foam.opacity(0.9))
                 }
