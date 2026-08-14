@@ -101,6 +101,11 @@ in the same commit: half-converted chrome is worse than either state.
 `SN.cardFill` surfaces — glass is for chrome floating over content, not for
 content cards. Nothing else converts.
 
+Editable inputs are content, not chrome: the search *field*'s flat capsule
+stays flat, deliberately, even beside the glass close button (decided in #52).
+An input is a thing you touch and type into, like a card — glass stays for the
+actionable chrome floating around it.
+
 **The station pin goes** (`MapHeader.swift:31-37`). It is centered, and at this
 crop the center is behind the title pill. At a third of the height the map is no
 longer answering "where is this" — the name is.
