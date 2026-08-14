@@ -17,6 +17,18 @@ struct SlackwaterApp: App {
         if CommandLine.arguments.contains("-seedGate") {
             UserDefaults.standard.set(true, forKey: seenGateKey)
         }
+        // -seedTideModel <id> (UserDefaults argument domain): writes a
+        // synthetic fitted model for one bundled CHS tide port, so a derived
+        // gate whose reference it is (Malibu Rapids ← Point Atkinson) renders
+        // its detail offline in the fast plan. Opposite ordering trap to
+        // -seedOnlineWindow below: ChsFitService.shared's init reads the model
+        // directory ONCE into `tideRecords`, so this seed must be on disk
+        // BEFORE anything touches `.shared` — and never combined with
+        // -chsResetModels, whose wipe runs inside that same later init and
+        // would delete the seed. The hook wipes the store itself instead.
+        if let id = UserDefaults.standard.string(forKey: "seedTideModel") {
+            seedTideModel(stationID: id)
+        }
         // -seedOnlineWindow <id> (UserDefaults argument domain): writes a
         // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
         // gates, so a UI test can land on OnlineGateDetailView's fetched
@@ -41,6 +53,29 @@ struct SlackwaterApp: App {
                 .preferredColorScheme(.dark)
         }
     }
+}
+
+/// UI-test hook (SlackwaterApp.init's `-seedTideModel <id>`): a plausible
+/// M2+K1 harmonic model for one bundled CHS tide port, stored as if fitted on
+/// this device — the reference-port fit a derived gate's slacks derive from,
+/// with no network (issue #38; the synthetic-constituents idea is PR #77's
+/// `-seedGateModels`). Amplitudes/offset are Point-Atkinson-ish metres; any
+/// plausible shape gives TideEngine real highs and lows to lag into slacks.
+/// Wipes the model store first so the seed is the WHOLE state
+/// `ChsFitService.init` finds — determinism without `-chsResetModels`, which
+/// this hook must never be combined with (see the init comment).
+private func seedTideModel(stationID: String) {
+    guard ChsStationInfo.all.contains(where: { $0.id == stationID }) else { return }
+    try? FileManager.default.removeItem(at: ChsModelStore.dir)
+    let now = appNow()
+    let model = ChsModel(
+        stationID: stationID, iwlsID: "seeded", iwlsName: "\(stationID) (seeded)",
+        fittedAt: now, fitStartMs: (now.timeIntervalSince1970 - 60 * 86_400) * 1000,
+        fitEndMs: now.timeIntervalSince1970 * 1000,
+        offset: 3.0, rms: 0.05,
+        constituents: [Con(name: "M2", amplitude: 1.5, phase: 0),
+                       Con(name: "K1", amplitude: 0.9, phase: 90)])
+    try? ChsModelStore.save(model)
 }
 
 /// UI-test hook (SlackwaterApp.init's `-seedOnlineWindow <id>`): writes a

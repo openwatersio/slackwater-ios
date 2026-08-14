@@ -1057,6 +1057,50 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m46-malibu-map.png")
     }
 
+    // #38: the derived-gate strip, offline, in the FAST plan. A derived gate
+    // is the one path where EVERY slack takes the windowless branch — no
+    // `slackWindows` by design, so every gate event draws a dropline + gutter
+    // time and never a band — and testM46MalibuDerivedGate (the only other
+    // render of it) needs a live IWLS fit, so a normal run rendered it
+    // nowhere. `-seedTideModel` stores a synthetic fit for the reference port
+    // (Point Atkinson) before ChsFitService's one-time directory read, so the
+    // same detail renders with no network; `-networkKillSwitch` keeps it
+    // honest. No `-chsResetModels`: the seed hook wipes the store itself
+    // (combining them would delete the seed — SlackwaterApp.init's comment).
+    func testM46MalibuDerivedGateSeededOffline() throws {
+        let app = launch("-seedGate", "-networkKillSwitch",
+                         "-seedTideModel", "chs-point-atkinson")
+
+        openSearch(app, "malibu")
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+                  "search did not find Malibu Rapids")
+        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+
+        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10),
+                  "seeded reference fit did not render the derived-gate detail")
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
+                  "slack rows missing from the schedule")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'speeds are not predicted'")).firstMatch.exists,
+                  "the shape-only note is missing")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
+            .waitForExistence(timeout: 5),
+                  "derived provenance footer missing")
+
+        // The strip must actually DRAW its schematic curve, droplines and
+        // gutter times — nothing inside the Canvas is an accessibility
+        // element, so ink coverage is what a test can see (the
+        // testPickingADateMovesTheWindow precedent).
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 5), "derived-gate strip missing")
+        let ink = inkFraction(strip)
+        XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
+        sleep(1)
+        save(app, "m46-derived-gate-seeded.png")
+    }
+
     // M48: the offline-downloads system — the indicator beside the gear, the
     // manager it opens, the proximity-ordered queue, and the fix for the dead
     // tap: an unfitted station opens its detail with the ⚠️ explanation and
@@ -2265,6 +2309,15 @@ final class ScreenshotTests: XCTestCase {
                        "an online gate can never show a fitted-station fast-answer amber reading")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
                        "a covering window must render the real detail, not the honesty card")
+
+        // #38: the fetched strip (slack BANDS, unlike the derived gate's
+        // droplines) must actually draw, and a normal run should leave a
+        // screenshot of it — this was the only offline render of the online
+        // strip and nothing ever looked at it.
+        let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
+        XCTAssert(ink > 0.05, "the online-gate strip drew nothing — ink \(ink)")
+        sleep(1)
+        save(app, "online-gate-seeded.png")
     }
 
     /// Paging an online gate to a week nobody has downloaded, with no network,
