@@ -228,8 +228,12 @@ extension ChsCurrentGateInfo {
         "Fitted from the last \(Int(Self.provisionalDays)) days — slack at \(name) can be off by up to ~\(provisionalSlackMinutes ?? 0) min."
     }
 
-    var provisionalExpectation: String {
-        "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
+    /// Offline, "stay connected" is advice you can't act on — say what's true
+    /// instead, without implying a wait in progress.
+    func provisionalExpectation(online: Bool) -> String {
+        online
+            ? "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
+            : "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full \(Int(fitDays))-day model — nothing to tap."
     }
 
     /// Is this stored model the fast answer rather than the full model?

@@ -79,8 +79,12 @@ final class ChsProvisionalTests: XCTestCase {
         let dodd = gate("chs-dodd-narrows")
         XCTAssertEqual(dodd.provisionalHeadline,
                        "Fitted from the last 60 days — slack at Dodd Narrows can be off by up to ~35 min.")
-        XCTAssertEqual(dodd.provisionalExpectation,
+        XCTAssertEqual(dodd.provisionalExpectation(online: true),
                        "Stay connected for about 2 minutes more and Slackwater refines it to the full 210-day model, in place — nothing to tap.")
+        // Offline, "stay connected" is advice you can't act on: say what's
+        // true instead, without implying a wait in progress.
+        XCTAssertEqual(dodd.provisionalExpectation(online: false),
+                       "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full 210-day model — nothing to tap.")
         XCTAssertEqual(dodd.provisionalTolerance, "±35 min")
         // Gillard is a different pass with a different error: different copy.
         XCTAssert(gate("chs-gillard-passage").provisionalHeadline.contains("~20 min"))

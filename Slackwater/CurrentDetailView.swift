@@ -35,6 +35,7 @@ struct CurrentDetailView: View {
     let record: CurrentStationRecord
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @ObservedObject private var service = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
@@ -90,7 +91,7 @@ struct CurrentDetailView: View {
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
-                                                 expectation: gate.provisionalExpectation,
+                                                 expectation: gate.provisionalExpectation(online: net.online),
                                                  action: "See all downloads",
                                                  identifier: "chs-provisional-warning") { showDownloads = true }
                                         .padding(.top, 14)
