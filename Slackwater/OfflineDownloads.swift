@@ -155,6 +155,10 @@ struct OfflineManagerList: View {
     @ObservedObject private var net = Connectivity.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openChsRoute) private var openChsRoute
+    // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
+    // scales with type, the slot scales with it so it can't overflow the row.
+    @ScaledMetric(relativeTo: .callout) private var glyphSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .callout) private var glyphSlot: CGFloat = 38
 
     private var queue: ChsQueue { service.queue }
 
@@ -266,6 +270,15 @@ struct OfflineManagerList: View {
         return ChsStationInfo.all.first { $0.id == job.id }.map { .port($0) }
     }
 
+    /// The job as a `StationItem`, for the row glyph's tone binding.
+    private func item(for job: ChsJob) -> StationItem? {
+        switch route(for: job) {
+        case .currentGate(let gate): .chsCurrent(gate)
+        case .port(let port): .chs(port)
+        case .derivedGate, nil: nil  // derived gates never hold a job
+        }
+    }
+
     /// A tap opens the station's own detail — closes Downloads first, then
     /// pushes: `openChsRoute` always appends to the ROOT stack's path, so this
     /// works identically whether Downloads was reached from the list's status
@@ -275,9 +288,13 @@ struct OfflineManagerList: View {
     /// not something to special-case per presenting context.
     private func row(_ job: ChsJob) -> some View {
         HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(SN.cardFill)
-                .frame(width: 38, height: 38)
+            // Kind from the job's identity (a job IS a tide port or a current
+            // gate), tone from the fitted state — .unknown until the fit
+            // lands, which is exactly what an unfinished download is.
+            StationGlyph(kind: job.isCurrent ? .current : .tide,
+                         tone: item(for: job)?.glyphTone(at: appNow()) ?? .unknown,
+                         size: glyphSize)
+                .frame(width: glyphSlot, height: glyphSlot)
                 // Provisional sits between the two: usable, not finished.
                 .opacity(job.status == .ready ? 1 : service.isProvisional(job.id) ? 0.75 : 0.45)
             VStack(alignment: .leading, spacing: 3) {

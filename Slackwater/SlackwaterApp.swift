@@ -1054,6 +1054,10 @@ struct StationChooserSheet: View {
     let anchor: (lat: Double, lon: Double)
     let onPick: (StationItem) -> Void
     @Environment(\.dismiss) private var dismiss
+    // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
+    // scales with type, the slot scales with it so it can't overflow the row.
+    @ScaledMetric(relativeTo: .callout) private var glyphSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .callout) private var glyphSlot: CGFloat = 38
 
     var body: some View {
         ZStack {
@@ -1105,9 +1109,9 @@ struct StationChooserSheet: View {
             dismiss()
         } label: {
             HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(SN.cardFill)
-                    .frame(width: 38, height: 38)
+                StationGlyph(kind: item.glyphKind, tone: item.glyphTone(at: appNow()),
+                             size: glyphSize)
+                    .frame(width: glyphSlot, height: glyphSlot)
                 VStack(alignment: .leading, spacing: 3) {
                     // The name is the same on every row — the qualifier is the
                     // whole point, so it leads.
@@ -1159,13 +1163,6 @@ struct RecentRowLabel: View {
     /// overflowed the slot into the row's name/reading text beside it).
     @ScaledMetric(relativeTo: .callout) private var tileGlyphSlot: CGFloat = 38
 
-    private var glyphKind: StationGlyph.GlyphKind {
-        switch item {
-        case .tide, .chs: .tide
-        case .current, .chsGate, .chsCurrent: .current
-        }
-    }
-
     /// Reuses the cards' own bindings so a row and its card can never disagree.
     private var glyphTone: StationGlyph.Tone {
         switch item {
@@ -1177,7 +1174,7 @@ struct RecentRowLabel: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            StationGlyph(kind: glyphKind, tone: glyphTone, size: tileGlyphSize)
+            StationGlyph(kind: item.glyphKind, tone: glyphTone, size: tileGlyphSize)
                 .frame(width: tileGlyphSlot, height: tileGlyphSlot)
             // The name owns the full row width (M50). It used to share the
             // line with the reading, which in the 320pt iPad sidebar left it

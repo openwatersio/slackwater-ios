@@ -60,3 +60,38 @@ struct StationGlyph: View {
         .accessibilityLabel(kind == .current ? "Current station" : "Tide station")
     }
 }
+
+extension StationItem {
+    /// Kind is fixed by the item — NEVER inferred from whether a reading has
+    /// arrived (issue #14; that inference shipped once on the web side and
+    /// took a review to catch).
+    var glyphKind: StationGlyph.GlyphKind {
+        switch self {
+        case .tide, .chs: .tide
+        case .current, .chsGate, .chsCurrent: .current
+        }
+    }
+
+    /// Tone at `now`, through the cards' own state→tone bindings so a sheet
+    /// row and its card can never disagree — `.unknown` where no reading has
+    /// loaded (a CHS station whose model isn't fitted yet).
+    /// `@MainActor` because `ChsFitService.shared` is; every caller is a view.
+    @MainActor
+    func glyphTone(at now: Date) -> StationGlyph.Tone {
+        switch self {
+        case .tide(let s):
+            return StationCardView.glyphTone(s.cardState(at: now))
+        case .current(let s):
+            return CurrentCardView.glyphTone(s.cardState(at: now))
+        case .chs(let info):
+            guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return .unknown }
+            return StationCardView.glyphTone(record.cardState(at: now))
+        case .chsGate(let info):
+            guard case .fitted(let port) = ChsFitService.shared.state(info.reference) else { return .unknown }
+            return ChsGateCardView.glyphTone(DerivedGateRecord(gate: info, port: port).cardState(at: now).phase)
+        case .chsCurrent(let info):
+            guard case .fitted(let record) = ChsFitService.shared.currentState(info.id) else { return .unknown }
+            return CurrentCardView.glyphTone(record.cardState(at: now))
+        }
+    }
+}
