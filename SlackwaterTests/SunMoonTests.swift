@@ -114,8 +114,9 @@ final class SunMoonTests: XCTestCase {
         let events = SunMoon.sunEvents(lat: 48.545, lon: -123.0125, tz: tz, day: evening)
         XCTAssertEqual(events.count, 2)
         let dayStart = cal.startOfDay(for: evening)
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!  // exact across DST, unlike +86400
         for e in events {
-            XCTAssert(e.time >= dayStart && e.time < dayStart.addingTimeInterval(86_400),
+            XCTAssert(e.time >= dayStart && e.time < dayEnd,
                       "event \(e.time) outside the local day")
         }
         XCTAssertEqual(events[0].kind, .sunrise)

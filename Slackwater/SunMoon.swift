@@ -107,10 +107,12 @@ enum SunMoon {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let start = cal.startOfDay(for: day)
-        let end = start.addingTimeInterval(86_400)
+        // Calendar-day bounds, not +86_400: a DST-transition day is 23 or 25
+        // hours, and the duration bound drops or admits events in the skewed hour.
+        let end = cal.date(byAdding: .day, value: 1, to: start)!
         var events: [SunEvent] = []
-        for offset in [-1.0, 0, 1] {
-            let t = sunTimes(date: day.addingTimeInterval(offset * 86_400), lat: lat, lon: lon)
+        for offset in [-1, 0, 1] {
+            let t = sunTimes(date: cal.date(byAdding: .day, value: offset, to: day)!, lat: lat, lon: lon)
             if let rise = t.sunrise, rise >= start, rise < end { events.append(SunEvent(time: rise, kind: .sunrise)) }
             if let set = t.sunset, set >= start, set < end { events.append(SunEvent(time: set, kind: .sunset)) }
         }

@@ -296,6 +296,16 @@ struct TimelineData {
     func day(of t: Date) -> TimelineDay? {
         days.last { $0.start <= t }
     }
+    /// A day's real end — the next day's start. `days` is contiguous and built
+    /// by calendar-day adds, so this is exact across DST, where a local day is
+    /// 23 or 25 hours and `start + 86_400` misses midnight by an hour. The
+    /// fallback only exists for the final offset-8 day, which is never visible.
+    func dayEnd(_ day: TimelineDay) -> Date {
+        if let next = days.first(where: { $0.start > day.start }) { return next.start }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal.date(byAdding: .day, value: 1, to: day.start)!
+    }
 
     /// Linear interpolation over the drawn 10-min samples — the centerline dots
     /// must ride the curve as rendered (prototype _ser reads the same series).
@@ -672,7 +682,7 @@ struct TimelineCanvas: View {
     private func drawDayChrome(_ ctx: GraphicsContext) {
         let visible = data.visibleDays
         for day in visible {
-            let ds = data.x(day.start), de = data.x(day.start.addingTimeInterval(86_400))
+            let ds = data.x(day.start), de = data.x(data.dayEnd(day))
             let top = geo.dayY + 4
             if let rise = day.sunrise {
                 ctx.fill(Path(CGRect(x: ds, y: top, width: data.x(rise) - ds,

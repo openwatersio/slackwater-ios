@@ -252,6 +252,23 @@ final class TimelineTests: XCTestCase {
     /// band, no tint, no label and no sun dots, while their sun events stayed
     /// in `snapTimes` — the magnet parked the centerline on a sunrise drawn
     /// nowhere, silently. So this asserts the RELATIONSHIP to the window, never
+    /// The day band's edge is the next local midnight, not start + 86,400: on a
+    /// DST transition the local day is 25 h (fall back) or 23 h (spring forward)
+    /// and the duration bound misdraws the band by an hour (#62).
+    func testDayEndIsExactAcrossDSTTransitions() {
+        let tz = friday.tz  // America/Los_Angeles — both 2026 transitions
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        for (ymd, hours) in [((2026, 11, 1), 25.0), ((2026, 3, 8), 23.0)] {
+            let anchor = cal.date(from: DateComponents(year: ymd.0, month: ymd.1, day: ymd.2))!
+            let d = TimelineData.build(tide: friday, current: nil, now: anchor, anchor: anchor)
+            let day = d.day(of: anchor)!
+            XCTAssertEqual(day.start, anchor, "anchor must be the transition day's midnight")
+            XCTAssertEqual(d.dayEnd(day).timeIntervalSince(day.start), hours * 3600,
+                           "the \(ymd) local day is \(hours) hours")
+        }
+    }
+
     /// a literal offset range, and it must survive a change to `forwardHours`.
     func testVisibleDaysFollowTheWindowNotAFixedOffset() {
         let tz = friday.tz
@@ -263,10 +280,8 @@ final class TimelineTests: XCTestCase {
 
             // Drawn ⟺ the day overlaps the window. `days` is contiguous, so a
             // day ends where the next begins (exact across DST, unlike +86400).
-            for (i, day) in d.days.enumerated() {
-                let dayEnd = i + 1 < d.days.count
-                    ? d.days[i + 1].start : day.start.addingTimeInterval(86_400)
-                let overlaps = day.start <= d.end && dayEnd > d.start
+            for day in d.days {
+                let overlaps = day.start <= d.end && d.dayEnd(day) > d.start
                 XCTAssertEqual(drawn.contains(day.offset), overlaps,
                                "day \(day.offset) (anchor \(anchor)): overlaps=\(overlaps), drawn=\(drawn.contains(day.offset))")
             }
@@ -274,7 +289,7 @@ final class TimelineTests: XCTestCase {
             // runs past its end.
             XCTAssert(visible.first!.start <= d.start)
             XCTAssert(visible.last!.start <= d.end)
-            XCTAssert(visible.last!.start.addingTimeInterval(86_400) >= d.end,
+            XCTAssert(d.dayEnd(visible.last!) >= d.end,
                       "the last drawn day must reach the end of the strip")
             // The original failure, stated directly: a day that draws nothing
             // must contribute no snap stop.
