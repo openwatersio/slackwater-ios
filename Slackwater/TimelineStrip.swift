@@ -37,6 +37,12 @@ enum Timeline {
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+    /// The discoverability nudge (#58). The strip opens this far off-centre
+    /// and animates in, so the first thing you see it do is move sideways —
+    /// which is the whole affordance now that the `‹ swipe to scrub ›` label
+    /// is gone. Well inside `magnetPts`, so the settle never lands somewhere
+    /// the magnet would then drag it away from.
+    static let nudgePts: CGFloat = 28
 
     /// How much an online gate fetches in one go. Four times the strip it
     /// needs, so ordinary paging lands in cache instead of on the network —
@@ -1017,9 +1023,13 @@ struct TimelineScrubber: UIViewRepresentable {
         // External scrub (event tap, return-to-now): jump the strip so the
         // requested time sits under the centerline (prototype scrubTo/centerNow
         // are instant). User-driven scrolling round-trips within a point.
+        // `!co.nudging` for the opening slide: it suppresses scrubTime writes,
+        // so `desired` sits at the nudge's destination while the offset is
+        // still travelling — without the guard the first re-render jumps
+        // straight there and the hint never plays.
         let desired = data.x(scrubTime) - sv.bounds.width / 2
         if abs(desired - sv.contentOffset.x) > 1,
-           !sv.isDragging, !sv.isDecelerating, !co.magneting {
+           !sv.isDragging, !sv.isDecelerating, !co.magneting, !co.nudging {
             sv.contentOffset = CGPoint(x: desired, y: 0)
         }
     }
@@ -1034,6 +1044,14 @@ struct TimelineScrubber: UIViewRepresentable {
         var host: UIHostingController<TimelineCanvas>?
         var didInitialCenter = false
         var magneting = false
+        /// The opening nudge is animating. Suppresses the `scrubTime` writes
+        /// `scrollViewDidScroll` would otherwise make from a scroll nobody
+        /// asked for — a hint must not move the reading — and keeps
+        /// `updateUIView`'s external-scrub branch from snapping the offset
+        /// back mid-animation, which would cancel the nudge on its first
+        /// re-render (#66: scroll-callback writes during a view update are
+        /// the hazard zone here).
+        var nudging = false
         private var magnetTarget: Date?
 
         init(_ parent: TimelineScrubber) { self.parent = parent }
@@ -1042,22 +1060,52 @@ struct TimelineScrubber: UIViewRepresentable {
         /// (also reachable from updateUIView, whichever lands first). After
         /// this, scrollViewDidScroll drives scrubTime — including the very
         /// first drag.
+        ///
+        /// It arrives from `Timeline.nudgePts` off-centre and animates into
+        /// place: that sideways motion is the scrubber's affordance now that
+        /// the label is gone (#58). Once per appearance — `didInitialCenter`
+        /// already makes this one-shot — and never on a scrub. Under Reduce
+        /// Motion it lands directly, with no static hint standing in: the
+        /// label it replaced is gone for everyone.
         func centerIfNeeded(_ sv: UIScrollView) {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
             didInitialCenter = true
-            sv.contentOffset = CGPoint(x: parent.data.x(parent.scrubTime) - sv.bounds.width / 2, y: 0)
+            let x = parent.data.x(parent.scrubTime) - sv.bounds.width / 2
+            guard !UIAccessibility.isReduceMotionEnabled else {
+                sv.contentOffset = CGPoint(x: x, y: 0)
+                return
+            }
+            // Set true BEFORE the offset: assigning contentOffset calls
+            // scrollViewDidScroll synchronously, and that off-centre offset
+            // is not a reading.
+            nudging = true
+            sv.contentOffset = CGPoint(x: x + Timeline.nudgePts, y: 0)
+            // UIKit clamps that to contentSize, so at the strip's right edge
+            // the nudge has nowhere to go — and `setContentOffset(animated:)`
+            // over a zero-length move is not guaranteed to call
+            // `didEndScrollingAnimation`, which would latch `nudging` on and
+            // leave the strip permanently unable to write `scrubTime`. Ask
+            // the scroll view where it actually landed, not where we put it.
+            guard abs(sv.contentOffset.x - x) > 0.5 else { nudging = false; return }
+            sv.setContentOffset(CGPoint(x: x, y: 0), animated: true)
         }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
-            guard sv.bounds.width > 0, didInitialCenter else { return }
+            guard sv.bounds.width > 0, didInitialCenter, !nudging else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
+        /// A touch during the opening nudge ends it — the user is scrubbing
+        /// now, and their offset has to reach `scrubTime`. Needed on its own
+        /// because a touch cancels the animation without
+        /// `didEndScrollingAnimation` ever firing.
+        func scrollViewWillBeginDragging(_ sv: UIScrollView) { nudging = false }
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate: Bool) {
             if !willDecelerate { magnet(sv) }
         }
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) { magnet(sv) }
         func scrollViewDidEndScrollingAnimation(_ sv: UIScrollView) {
             magneting = false
+            nudging = false
             // Park exactly on the stop, so readouts show the event's own time.
             if let t = magnetTarget { magnetTarget = nil; parent.scrubTime = t }
         }

@@ -74,12 +74,6 @@ struct OnlineGateDetailView: View {
     private var nextSlack: CurrentEvent? {
         timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
     }
-    /// The peak after the next slack — "then Max ebb 3.1 kn" (web `following`).
-    private var following: CurrentEvent? {
-        nextSlack.flatMap { slack in
-            timeline?.currentEvents.first { $0.kind != .slack && $0.time > slack.time }
-        }
-    }
     private var slackWin: (start: Date, end: Date)? {
         guard let slack = nextSlack, let tl = timeline else { return nil }
         return slackWindow(tl.currentPoints, around: slack.time,
@@ -113,17 +107,14 @@ struct OnlineGateDetailView: View {
                             onPicked: { _ in applyAnchor() },
                             above: { EmptyView() },
                             card: { tl in
-                                // Strip first, readout under it — the inverse of the
-                                // fitted details' order, kept from the first cut.
                                 if let window {
+                                    readout(window)
                                     TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                        speedUnit: speedUnit, now: live,
                                                        floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
                                                        scrubTime: $scrubTime)
                                         .padding(.horizontal, -16)  // full-bleed strip
                                         .padding(.top, 12)
-                                    readout(window)
-                                        .padding(.top, 8)
                                 }
                             },
                             links: {
@@ -231,7 +222,7 @@ struct OnlineGateDetailView: View {
         }
     }
 
-    // MARK: - Fetched: readout under the strip
+    // MARK: - Fetched: readout above the strip
 
     private func setDegrees(_ signed: Double, _ window: ChsOnlineWindow) -> Double {
         signed >= 0 ? window.floodDirection : window.ebbDirection
@@ -262,23 +253,34 @@ struct OnlineGateDetailView: View {
             }
             Spacer()
             if let slack = nextSlack {
+                // Same two-line window form as CurrentDetailView, minus its
+                // tilde/amber provisional treatment — an online gate is never
+                // provisional, the published numbers are all there is (#55).
                 VStack(alignment: .trailing, spacing: 1) {
                     MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    Text("in \(countdown(from: scrubTime, to: slack.time)) · \(cardTime(slack.time, tz))")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(SN.go)
                     if let win = slackWin {
-                        // "under 0.5 kn" is restored here for the same reason
-                        // it came back on the current detail: this is the one
-                        // place the threshold earns its space.
-                        Text("under \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(cardTime(win.start, tz))–\(cardTime(win.end, tz)) · \(countdown(from: win.start, to: win.end))")
+                        // Counts to the window OPENING, not the slack instant:
+                        // this readout answers "when can I be there", and the
+                        // window is when the pass is transitable. The window
+                        // brackets the slack, so it is often already open —
+                        // then it says `now` (gutter spec §5).
+                        Text(win.start > scrubTime
+                             ? "in \(countdown(from: scrubTime, to: win.start))"
+                             : "now")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(SN.go)
+                        // Time REMAINING, not the window's original length —
+                        // an already-open window must not claim its full run.
+                        // The threshold prints HERE, once, and not on the
+                        // strip.
+                        Text("for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                             .accessibilityIdentifier("slack-window")
-                    }
-                    if let then = following {
-                        Text("then \(then.turnLabel.lowercased()) \(formatSpeed(abs(then.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.caption.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                    } else {
+                        Text("in \(countdown(from: scrubTime, to: slack.time))")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(SN.go)
                     }
                 }
             }
