@@ -278,6 +278,37 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(contours, pins, "station pins must stay on top")
     }
 
+    /// #29: the offline chart carries its own fontstack, so seamap labels and
+    /// station names render with no network at all. The invariant that earns
+    /// its keep is the last loop: every fontstack any offline layer references
+    /// must have its glyph PBFs in the bundle — a slice regenerated with a new
+    /// font, or a deleted PBF, fails here instead of shipping silent blank
+    /// labels.
+    func testFallbackStyleBundlesGlyphsForItsLabels() throws {
+        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
+        let glyphs = try XCTUnwrap(style["glyphs"] as? String,
+                                   "no bundled fontstack: run tools/build-seamap.sh")
+        XCTAssertTrue(glyphs.hasPrefix("file://"),
+                      "offline glyphs must read the bundle, not the network")
+        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
+        XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-labels" },
+                      "with glyphs bundled, station-name labels must be on")
+        XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-cluster-count" },
+                      "with glyphs bundled, clusters must carry their count")
+        let seamarkLabel = try XCTUnwrap(layers.first { ($0["id"] as? String) == "seamark-label" },
+                                         "the seamap slice is missing its label layer")
+        XCTAssertNotNil((seamarkLabel["layout"] as? [String: Any])?["text-field"],
+                        "the slice must keep text-* now that glyphs ship")
+        for layer in layers {
+            guard let font = (layer["layout"] as? [String: Any])?["text-font"] as? [String]
+            else { continue }
+            for stack in font {
+                XCTAssertNotNil(Bundle.main.url(forResource: "\(stack)-0-255", withExtension: "pbf"),
+                                "\(layer["id"] ?? "?") wants \(stack) but its glyphs are not bundled")
+            }
+        }
+    }
+
     // MARK: - Canada on demand
 
     /// The download set is the nearest few, not the country — it budgets the

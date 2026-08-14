@@ -295,9 +295,10 @@ private func SEAMAP_OMIT(_ id: String) -> Bool {
 /// offline PMTiles layer-set — "seamap" (Open Waters Seamap chart marks +
 /// freenauticalchart sprite) or "seascape" (bathymetry). `<name>.pmtiles` is a
 /// `pmtiles extract` clipped to the Salish box; `<name>-layers.json` is a
-/// verbatim slice of the published style.json with every `text-*` key
-/// stripped (no bundled glyphs yet — text-only layers ship inert and light up
-/// the day a fontstack does). Returns nil when the resources aren't in the
+/// verbatim slice of the published style.json. The seamap slice keeps its
+/// `text-*` keys and draws them with the bundled glyphs (#29); the seascape
+/// slice still ships text-stripped (its text bakes in a unit — see
+/// tools/build-seascape.sh). Returns nil when the resources aren't in the
 /// bundle, so main stays on the land-only fallback.
 func offlineLayers(_ name: String, sprite: String? = nil, attribution: String)
         -> (sprite: String?, layers: [[String: Any]], source: [String: Any])? {
@@ -319,17 +320,36 @@ func offlineLayers(_ name: String, sprite: String? = nil, attribution: String)
              "attribution": attribution])
 }
 
+/// The fontstack the offline style's own labels use — the same one most of
+/// the seamap slice asks for, so one set of bundled PBFs serves both.
+private let OFFLINE_LABEL_FONT = ["noto_sans_regular"]
+
+/// #29: glyphs from the bundle. tools/build-seamap.sh downloads the latin
+/// ranges of the two stacks the seamap slice references, flat-named
+/// `<fontstack>-<range>.pbf` (a folder reference would need project.yml
+/// surgery; the template tokens don't care). nil when they aren't bundled —
+/// the style then declares no glyphs and keeps the old label-free shape.
+private func bundledGlyphs() -> String? {
+    guard let probe = Bundle.main.url(forResource: "\(OFFLINE_LABEL_FONT[0])-0-255",
+                                      withExtension: "pbf")
+    else { return nil }
+    return probe.deletingLastPathComponent().absoluteString + "{fontstack}-{range}.pbf"
+}
+
 /// Offline / style-fetch-failed: land + pins, honestly bare (web localFallbackStyle).
 func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
     var sources = landSources(landUrl, uscaUrl)
     sources["stations"] = stationSource()
+    let glyphs = bundledGlyphs()
     var style: [String: Any] = [
         "version": 8,
         "sources": sources,
         "layers": [
             ["id": "land-bg", "type": "background", "paint": ["background-color": WATER_TONE]],
-        ] + landLayers + pinLayers(hasGlyphs: false, labelFont: []),
+        ] + landLayers + pinLayers(hasGlyphs: glyphs != nil,
+                                   labelFont: glyphs != nil ? OFFLINE_LABEL_FONT : []),
     ]
+    if let glyphs { style["glyphs"] = glyphs }
     // Everything slots in above the land floor and below the pins, and depth
     // goes in before the chart marks so the marks draw over it — a buoy behind
     // a depth-area fill is a chart that lies about what is there.
