@@ -41,21 +41,64 @@ All of these are point series at a gauge. None is a field.
 
 ---
 
-## 3. Licensing posture, and why it shapes the architecture
+## 3. The licence architecture — the load-bearing section
 
-CHS data is used under DFO's licence (clause 10) and is **not to be used for
-navigation**. The app's response to that is structural, not cosmetic:
+This is why the app is shaped the way it is. The canonical statement is
+`chs-online-design` §2, in the private planning repo
+(`sailingnaturali/slackwater` → `docs/superpowers/specs/2026-07-21-chs-online-design.md`),
+cited by bare name from `ChsStation.swift`, `tools/gen-chs-stations.mjs`,
+`tools/FitValidation/.../main.swift` and `spikes/chs-currents-fit/README.md`.
+The reasoning is reproduced here so that it is readable without access to that
+repo.
+
+Three CHS clauses interact: **clause 3** bars anyone from handing us a finished
+bundle, **clause 4** bars commercial derivatives, and **clause 10** permits the
+user's own derivation. That yields three options, of which only one works:
+
+| Approach | Who holds the data | Redistributed by us | Offline |
+|---|---|---|---|
+| Bundle CHS predictions | us, then everyone | yes — **violates clause 3** | yes |
+| Derive via `chs-constituents` | the user, from their own fit | no — clause 10 | yes |
+| **Fetch CHS predictions** | the user, from CHS directly | no — nothing is derived | cached only |
+
+> "The third row is not a loophole. It is the ordinary case the licence
+> contemplates: a person requesting Canadian tide predictions from the Canadian
+> agency that publishes them. We ship a *client*."
+
+So, structurally:
 
 - **Identity only is bundled.** `Resources/chs-stations.json` (1,086 stations)
   and `Resources/chs-current-gates.json` (18 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
 - **Models are fitted per user, on that user's device**, from predictions that
   user fetched. A fitted `ChsModel` is written to Application Support and never
-  re-served to anyone (`ChsStation.swift`).
-- The app states this in Settings, and marks *"Predictions — not for
-  navigation"* on every detail footer.
+  re-served — `ChsStation.swift` says it in code: *"fetched by this user, kept
+  local, never re-served."*
+- CHS data is **not to be used for navigation**; the app says so in Settings and
+  marks *"Predictions — not for navigation"* on every detail footer.
 
-Contrast the other two sources, which is why they behave differently:
+### This pattern does NOT generalise — the rule, and why
+
+Fetch-don't-bundle looks like a general answer to any restrictively licensed
+dataset. It is not, and the reason is precise:
+
+> **It works because DFO operates IWLS as a public service the device can query
+> directly. It is available for _services_, never for _static datasets_.**
+
+A bulk file — a WebTide mesh, an ADCIRC tarball, a registration-gated TPXO
+download — has no equivalent endpoint. Getting it onto devices means *we* host
+it, which is exactly the distribution the licence covers. #99 investigated the
+field question and hit this wall; see §6.
+
+### The commercial-use gate is already enforced in the build
+
+`tools/gen-tides.mjs` filters on `license?.commercial_use === true` and
+re-asserts it on output, because this app's licence is *"a copyleft structure
+that holds together with paid distribution"* (Settings). **Non-commercial terms
+are a hard stop by a rule that already ships**, not a judgement call. Unknown
+terms are worse than "no" — silence is not permission.
+
+### The other two sources, and why they behave differently
 
 - **NOAA** — public domain. 1,425 tide stations and 842 current stations ship
   with full constituents, offline from first launch.
@@ -146,13 +189,56 @@ wrong, and wrong asymmetrically:
   which tells someone an unmodelled pass is safe. That is the dangerous
   direction, and it is the same guess the app already refuses to make at Sechelt.
 
-A real field would need a different **data product** — one storing harmonic
+### The gridded-model option was investigated and is closed (#99)
+
+The obvious next thought is a different **data product** — one storing harmonic
 constants per mesh node, which the engine could evaluate offline the way it
-already evaluates TICON constants. Whether such a product exists at usable
-resolution and under a usable licence is an open investigation, not an
-established fact. Resolution is a correctness question there, not a nicety: a
-2–4 km global product cannot resolve Dodd Narrows and would render *slow* water
-in a fast pass, which is worse than drawing nothing.
+already evaluates TICON constants. #99 went looking. **No viable dataset exists,
+and the reason is not licence or size — it is resolution, failing in the
+dangerous direction.**
+
+The mechanism was fine. WebTide really does store per-node velocity harmonics;
+the NE Pacific mesh `ne_pac4` is 51,330 nodes and **12.6 MB**, smaller than the
+sprites. It fails on everything after that:
+
+| Measured | Value |
+|---|---|
+| `ne_pac4` node spacing, Active Pass | **492 m** (pass is ~500 m wide) |
+| `ne_pac4` node spacing, Dodd Narrows | **493 m** (throat is ~60–80 m) |
+| Dodd Narrows, sampled at the charted throat | **2.62 kn** |
+| Dodd Narrows, CHS Tide & Current Tables Vol 5 | **9.5 kn** |
+| Our own peak-speed bar (§5) | ≤ 0.5 kn median error |
+
+The most defensible sampling method gives the worst answer, and the error is
+**4–14× the bar we already enforce** — at a gate that currently *passes* at
+0.16 kn peak-speed error and ships offline. Three of four passes returned
+"outside mesh" entirely, because CHS coordinates rounded to whole arc-minutes
+are coarser than the mesh's wet/dry structure.
+
+Two more, independent of resolution: `ne_pac4` carries 8 astronomical
+constituents and **no M4/M6 overtides** — precisely the shallow-water harmonics
+that create narrow-pass flood/ebb asymmetry, where our fitter uses a
+23-constituent basis. And it truncates at **49.686 °N**, leaving 6 of our 11
+validated gates outside it — Seymour Narrows, our best-validated gate, by 74 km.
+
+Licence closes what resolution leaves: WebTide's data carries no licence at all
+and its software is non-commercial; TPXO and FES2022 are non-commercial; ADCIRC
+publishes no terms, which §3 says is worse than "no". The pattern is that the
+licences permitting commercial bundling are attached to the datasets that cannot
+resolve.
+
+**The finding worth keeping:** every gridded model converges on roughly 500 m in
+the Gulf Islands, which is about the width of Active Pass and eight times the
+width of Dodd Narrows. **The passes are a station problem, not a mesh problem** —
+almost certainly why CHS and NOAA both publish *station* current predictions for
+these gates rather than a grid. It is what the physics permits, not an oversight.
+
+Which makes the ruling above right for a better reason than it first gave:
+sampling a model field is wrong for the same reason interpolating between our
+stations is wrong. The model has our problem too; it just hides it behind a
+continuous surface.
+
+Route coverage work to more validated gates (#9), not to a field.
 
 ---
 
@@ -177,6 +263,12 @@ The practical list. Each of these has cost someone time.
   staleness heuristic.
 - **Canada is roughly 4.4 hours of politely paced IWLS requests** if you fetch
   everything; the request budget is scarce and shared (`ChsFitService.swift`).
+- **Fetch-don't-bundle is not a general licence workaround.** It applies to
+  queryable services, never to static datasets (§3). This has already been
+  mistaken for a generalisable pattern once, in #99.
+- **An absent gate is honest; a wrong one isn't** (#9). Any future data source is
+  a backdrop that yields to validated stations, never a source competing with
+  them — and absence renders as *neutral*, never as calm (`MapScreen.swift`).
 
 ---
 
