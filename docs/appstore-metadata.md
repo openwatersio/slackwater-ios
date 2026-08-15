@@ -17,7 +17,7 @@ privacy answers and review notes were already national and stand unchanged.
 | **Subtitle** | `Offline currents, US & Canada` | 30 (29 used) |
 
 Both still fit national coverage — "US & Canada" was always in the subtitle. The gtm.md
-alternate `Salish Sea slack & tide timing` is now **retired**: it describes 11 of 3,125
+alternate `Salish Sea slack & tide timing` is now **retired**: it describes 13 of 3,125
 stations.
 
 ## Keywords (≤100 chars, name/subtitle words omitted)
@@ -96,8 +96,8 @@ Full draft:
 > download. Canadian (CHS) tide stations fit a harmonic model on your device
 > from CHS predictions, then work offline for good; the ones nearest you fit
 > automatically, and any other fits the moment you open it. Canadian current
-> passes cover the Salish Sea, each one checked against published predictions
-> before it ships.
+> passes run from the Salish Sea to Haida Gwaii and Cape Breton, each one
+> checked against published predictions before it ships.
 >
 > A MAP THAT WORKS OFFLINE
 > Every station on a pin map with coastline that renders with zero bars. Depth

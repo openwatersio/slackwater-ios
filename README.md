@@ -15,9 +15,11 @@ first launch. That is NOAA's public-domain network plus the cc-by-4.0 half of TI
 non-commercial half can never ship. Canada is 1,086 CHS tide stations whose *identity* is
 bundled (visible and searchable everywhere) and whose predictions are fetched per user and
 fitted on the device; the nearest few download on their own, anything you open downloads on
-the spot — plus 49 bundled TICON stations in water CHS does not gauge. Canadian **currents** stay
-the 11 Salish gates whose on-device fit passed validation — coverage stops where we can still
-tell when the numbers are wrong. The path to accurate-worldwide is open source: people who sail
+the spot — plus 49 bundled TICON stations in water CHS does not gauge. Canadian **currents** are every
+pass CHS predicts a current for that a mariner actually times on slack: 22 of them, from Race
+Passage to Great Bras d'Or in Cape Breton. Thirteen fit on the device; the nine the fit cannot
+honestly describe are still findable, and fetch CHS's own predictions instead of guessing —
+coverage stops where we can still tell when the numbers are wrong. The path to accurate-worldwide is open source: people who sail
 their own waters fixing the data.
 
 ## The family

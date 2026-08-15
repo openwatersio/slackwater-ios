@@ -37,19 +37,35 @@ let iso = ISO8601DateFormatter()
 func cachedGet(_ path: String, key: String) throws -> Data {
     let file = cacheDir.appendingPathComponent(key)
     if let data = try? Data(contentsOf: file) { return data }
-    let sem = DispatchSemaphore(value: 0)
-    var result: Data?
-    var status = 0
-    URLSession.shared.dataTask(with: URL(string: base + path)!) { data, resp, _ in
-        result = data
-        status = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        sem.signal()
-    }.resume()
-    sem.wait()
-    guard status == 200, let data = result else { fatalError("IWLS \(status) for \(path)") }
-    try data.write(to: file)
-    Thread.sleep(forTimeInterval: 2.5)  // polite: same spacing as the app
-    return data
+    // A 210-day gate is 60+ requests, and IWLS rate-limits a long run partway
+    // through. That used to be fatal at whatever chunk it hit, throwing away the
+    // gate — two of ten died that way on the first national pass. Back off and
+    // carry on instead; the cache means a retry only ever refetches the one
+    // chunk that failed.
+    for attempt in 0..<6 {
+        let sem = DispatchSemaphore(value: 0)
+        var result: Data?
+        var status = 0
+        URLSession.shared.dataTask(with: URL(string: base + path)!) { data, resp, _ in
+            result = data
+            status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            sem.signal()
+        }.resume()
+        sem.wait()
+        if status == 200, let data = result {
+            try data.write(to: file)
+            Thread.sleep(forTimeInterval: 2.5)  // polite: same spacing as the app
+            return data
+        }
+        guard status == 429 || status >= 500 || status == 0 else {
+            fatalError("IWLS \(status) for \(path)")
+        }
+        let backoff = pow(2.0, Double(attempt)) * 5  // 5, 10, 20, 40, 80, 160 s
+        FileHandle.standardError.write(
+            Data("IWLS \(status), retrying in \(Int(backoff))s: \(path)\n".utf8))
+        Thread.sleep(forTimeInterval: backoff)
+    }
+    fatalError("IWLS still failing after 6 attempts for \(path)")
 }
 
 // --- resolve by position (never name), nearest wlp station within 3 km ---

@@ -27,10 +27,10 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(tides, 1_100, "NOAA tide stations")
         XCTAssertGreaterThanOrEqual(currents, 800, "NOAA current stations")
         XCTAssertGreaterThanOrEqual(chs, 1_000, "CHS tide station identities")
-        // +7 online fit-reject identities (online-gates task 1) — count moved
-        // by exactly the 7 new entries, so this floor is bumped, not broken.
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 18,
-                       "the 11 validated Salish gates (M47/M53) plus the 7 online fit-rejects")
+        // 13 fitted + 9 online. M55 took the gates national: Great Bras d'Or
+        // and Quatsino fit, Nakwakto and Masset Sound ship online.
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 22,
+                       "the 13 validated gates (M47/M53/M55) plus the 9 online fit-rejects")
         XCTAssertEqual(Set(StationItem.all.map(\.id)).count, StationItem.all.count,
                        "two stations sharing an id is a duplicate row, pin and model file")
     }
@@ -329,8 +329,13 @@ final class NationalScaleTests: XCTestCase {
                          place, set.filter { !$0.isCurrent }.count, set.filter(\.isCurrent).count,
                          seconds / 60, far))
             XCTAssertEqual(set.filter { !$0.isCurrent }.count, ChsFitService.autoFitPorts)
+            // Halifax is still 0, and now for the honest reason rather than the
+            // accidental one: since M55 there IS a CHS gate on the Atlantic
+            // (Great Bras d'Or), it is simply ~305 km away and the auto-fit
+            // radius is 150 km. Distance decides this, not an ocean the bundle
+            // happens not to reach.
             XCTAssertEqual(set.filter(\.isCurrent).count, gates,
-                           "\(place) must not download passes on the wrong ocean")
+                           "\(place) auto-fits only the passes within reach of the fix")
             XCTAssertLessThan(seconds, 10 * 60, "\(place)'s first run must not be an afternoon")
         }
     }

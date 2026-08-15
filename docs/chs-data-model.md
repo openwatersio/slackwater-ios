@@ -68,7 +68,7 @@ user's own derivation. That yields three options, of which only one works:
 So, structurally:
 
 - **Identity only is bundled.** `Resources/chs-stations.json` (1,086 stations)
-  and `Resources/chs-current-gates.json` (18 gates) carry name, region, aliases,
+  and `Resources/chs-current-gates.json` (22 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
 - **Models are fitted per user, on that user's device**, from predictions that
   user fetched. A fitted `ChsModel` is written to Application Support and never
@@ -250,7 +250,7 @@ The practical list. Each of these has cost someone time.
   constants until a model is fitted, so a sweep over the bundled data is a sweep
   over NOAA and TICON only. `tools/ramp-domain.mjs` reports a maximum current of
   ~10 kn; Sechelt Rapids runs ~16 and is simply not in the sample.
-- **Zero of the 18 gates carry a flow axis in the registry.** It arrives with the
+- **Zero of the 22 gates carry a flow axis in the registry.** It arrives with the
   fit or the fetched window. Anything drawing direction has staged availability
   and must degrade honestly — `chsPinTones` (`MapScreen.swift`) already models
   this: a station the sync has not reached is absent and draws neutral.
@@ -277,7 +277,7 @@ The practical list. Each of these has cost someone time.
 | Thing | File |
 |---|---|
 | CHS station identity (1,086) | `Slackwater/Resources/chs-stations.json` |
-| CHS current gates (18: 11 fitted, 7 online) | `Slackwater/Resources/chs-current-gates.json` |
+| CHS current gates (22: 13 fitted, 9 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | NOAA tide stations (1,425) | `Slackwater/Resources/stations.json` |
 | NOAA current stations (842) | `Slackwater/Resources/currents.json` |

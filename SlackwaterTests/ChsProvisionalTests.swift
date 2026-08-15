@@ -23,17 +23,18 @@ final class ChsProvisionalTests: XCTestCase {
     // MARK: - The bundled per-gate windows
 
     func testEveryBundledGateCarriesItsOwnValidatedWindow() {
-        // +7 online fit-reject identities (online-gates task 1): fitDays 0 is
+        // +9 online fit-reject identities (online-gates task 1): fitDays 0 is
         // their documented never-fitted sentinel, so the window check below
         // is scoped to the fitted (offline) gates.
-        XCTAssertEqual(ChsCurrentGateInfo.all.count, 18)
+        XCTAssertEqual(ChsCurrentGateInfo.all.count, 22)
         for g in ChsCurrentGateInfo.all where !g.isOnline {
             XCTAssert(g.fitDays == 60 || g.fitDays == 210, "\(g.id): unexpected window \(g.fitDays)")
         }
         let fast = ChsCurrentGateInfo.all.filter { $0.fitDays == 60 }.map(\.id).sorted()
         XCTAssertEqual(fast, ["chs-active-pass", "chs-first-narrows",
-                              "chs-johnstone-strait-central", "chs-seymour-narrows"],
-                       "the 60-day passers are exactly the four the M47 harness scored as PASS at 60 d")
+                              "chs-great-bras-dor", "chs-johnstone-strait-central",
+                              "chs-seymour-narrows"],
+                       "the 60-day passers are exactly the gates the harness scored as PASS at 60 d")
     }
 
     /// A gate final at 60 d has nothing provisional to show: it goes straight
@@ -64,8 +65,8 @@ final class ChsProvisionalTests: XCTestCase {
     func testTheShippedTolerancesAreTheMeasuredOnes() {
         let expected = ["chs-blackney-passage": 35, "chs-dodd-narrows": 35,
                         "chs-gillard-passage": 20, "chs-hole-in-the-wall": 20,
-                        "chs-porlier-pass": 35, "chs-race-passage": 30,
-                        "chs-weynton-passage": 35]
+                        "chs-porlier-pass": 35, "chs-quatsino-narrows": 25,
+                        "chs-race-passage": 30, "chs-weynton-passage": 35]
         for (id, minutes) in expected {
             XCTAssertEqual(gate(id).provisionalSlackMinutes, minutes, id)
         }
