@@ -64,16 +64,24 @@ if (cmd === 'create-cert') {
 
   // A build is not addable until processing finishes, and processing outlives
   // the upload by 5-15 min — so wait rather than fail on a race the caller
-  // cannot see.
+  // cannot see. A named build is not even LISTED for the first few minutes,
+  // which is a wait too: throwing there is what made testflight.sh pass no
+  // build number, and a bare promote then grabs whatever build is newest.
   let build;
   for (let i = 0; i < 60; i++) {
     const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate');
     build = args[0] ? r.data.find((b) => b.attributes.version === args[0]) : r.data[0];
-    if (!build) throw new Error(`no build ${args[0]} in the last 10 uploads`);
+    if (!build && !args[0]) throw new Error('no builds on App Store Connect');
+    if (!build) {
+      console.log(`build ${args[0]}: not listed yet, waiting…`);
+      await new Promise((r) => setTimeout(r, 30_000));
+      continue;
+    }
     if (build.attributes.processingState === 'VALID') break;
     console.log(`build ${build.attributes.version}: ${build.attributes.processingState}, waiting…`);
     await new Promise((r) => setTimeout(r, 30_000));
   }
+  if (!build) throw new Error(`build ${args[0]} never appeared on App Store Connect (30 min)`);
   if (build.attributes.processingState !== 'VALID') {
     throw new Error(`build ${build.attributes.version} still ${build.attributes.processingState} after 30 min`);
   }

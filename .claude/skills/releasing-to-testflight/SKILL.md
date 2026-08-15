@@ -62,6 +62,7 @@ Settled, so they don't get re-litigated:
 | A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
 | Why does Friends & Family need a flag when Nightly doesn't? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **Friends & Family is external, behind a public link**, so a build reaches it only after Apple beta review. `asc.mjs promote` does both steps; `externalState` goes `READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_TESTING`. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |
+| `promote` 422s `INVALID_QC_STATE` seconds after an upload | It promoted the *previous* build. ASC doesn't list a fresh upload for several minutes, and a bare `promote` takes the newest build it lists — build 23's release hit build 22, already reviewed. Since PR #88 `testflight.sh` passes the archive's own build number and `promote` waits for that build to appear. |
 | Every UI test reports `Test crashed with signal kill`, zero assertion failures | Two test runs overlapping on this machine, not a code failure. See `docs/testflight.md`. |
 
 ## Common mistakes

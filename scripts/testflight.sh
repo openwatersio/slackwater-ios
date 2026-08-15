@@ -66,11 +66,17 @@ xcodebuild -exportArchive -archivePath build/Slackwater.xcarchive \
 
 echo "Uploaded. Build appears in App Store Connect → TestFlight in ~5–15 min (processing)."
 
+# Name the build we just uploaded. Bare `promote` takes the newest build ASC
+# LISTS, and a fresh upload takes minutes to be listed at all — build 23's
+# promote landed on build 22 that way, then 422'd on its already-reviewed state.
+BUILD=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' \
+  build/Slackwater.xcarchive/Info.plist)
+
 if [[ $FAMILY == yes ]]; then
   # Waits out processing itself, so this blocks for as long as Apple takes.
-  node scripts/asc.mjs promote
+  node scripts/asc.mjs promote "$BUILD"
 else
-  echo "Nightly has it. For Friends & Family: node scripts/asc.mjs promote"
+  echo "Nightly has it. For Friends & Family: node scripts/asc.mjs promote $BUILD"
 fi
 
 node scripts/asc.mjs builds
