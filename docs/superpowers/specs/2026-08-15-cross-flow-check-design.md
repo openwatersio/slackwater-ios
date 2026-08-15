@@ -83,14 +83,15 @@ Measured across the 850 primary-bin type-H stations today:
 |---|---|---|---|---|
 | | 0.018 | 0.066 | 0.136 | **0.241** (`BOS1130`) |
 
-Re-checked across **all 2,800 harmonic bin-records** — not just primary bins,
-since the bundle carries `@bin` entries too — the worst ratio is unchanged at
-0.241 (`BOS1130`). Worst absolute rises slightly, to 0.82 kn at `PUG1619@32`.
+Re-checked against **every one of the 2,800 bin-records NOAA publishes** — a
+superset of the ~856 a bundle actually stores — the worst ratio is unchanged at
+0.241 (`BOS1130`). So the bound holds not just for what we extract but for
+anything NOAA could hand us at a bin we don't currently take.
 
-**Bound: `ratio ≤ 0.5`** — 2.08× headroom over today's worst across every
-record the bundle contains. It rejects nothing now and is a regression guard,
-which is the intent. No absolute knob is carried, because two knobs is one more
-than the failure needs.
+**Bound: `ratio ≤ 0.5`** — 2.08× headroom over the worst value anywhere in the
+source. It rejects nothing now and is a regression guard, which is the intent.
+No absolute knob is carried, because two knobs is one more than the failure
+needs.
 
 ## §3 Where it lives
 
@@ -106,11 +107,11 @@ network) and record onto the bundle beside the existing `note` / `generated`:
   "generated": "2026-08-15T…",
   "crossFlow": {
     "measured": "NOAA minorMeanSpeed — flow perpendicular to the flood axis, present at all times including slack",
-    "records": 2800,
-    "gte0_25kn": 170,
-    "gte0_50kn": 24,
-    "worstRatio": { "id": "BOS1130", "crossFlow": 0.18, "alongAxisPeak": 0.74, "ratio": 0.241 },
-    "worstAbsolute": { "id": "PUG1619@32", "crossFlow": 0.82 }
+    "records": 856,
+    "gte0_25kn": 61,
+    "gte0_50kn": 12,
+    "worstRatio": { "id": "BOS1130", "crossFlow": 0.178, "alongAxisPeak": 0.74, "ratio": 0.241 },
+    "worstAbsolute": { "id": "PUG1619", "crossFlow": 0.8 }
   },
   "stations": [ … ]
 }
@@ -118,11 +119,13 @@ network) and record onto the bundle beside the existing `note` / `generated`:
 
 ~200 bytes of bundle metadata. **No per-station field.**
 
-Counts cover **every harmonic record in the bundle**, `@bin` entries included —
-2,800 records, not the 841 primary-bin stations `slackwater-ios` ends up
-shipping. The figures above are today's measured values and are what a first
-extract should reproduce; treat a material divergence as a finding, not a
-rounding difference.
+Counts cover **every harmonic record the bundle holds** — today 856, being 850
+primary-bin stations plus 14 `@bin` entries pulled in by subordinate references.
+Not the 2,800 bin-records NOAA publishes (the extractor never fetches most of
+them), and not the 842 stations `slackwater-ios` ships after its own filters.
+The figures above are today's measured values and are what a first extract
+should reproduce; treat a material divergence as a finding, not a rounding
+difference.
 
 **`src/validate.js`** — `validateBundle` asserts `worstRatio.ratio ≤ 0.5`. This
 is the load-bearing reason the census is stored rather than printed: the check
