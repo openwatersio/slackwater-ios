@@ -343,9 +343,17 @@ private func pinLayers(hasGlyphs: Bool, labelFont: [String]) -> [[String: Any]] 
 /// `radio_station` ring dominate the chart and answer questions Slackwater is
 /// not in). A filter, not a pruned artifact, so `seamap-layers.json` stays a
 /// verbatim slice of style.json — to put either back, delete its line.
+///
+/// The two `land` layers go for a different reason: the app draws land from its
+/// own two tilesets, `land.pmtiles` covering the same water as seamap at z0-14
+/// against seamap's z12. Seamap's copy was a second, coarser one painted on top
+/// in a slightly different cream (#f5e6bd over LAND_TONE's #f5ecd7). Neither
+/// seamap artifact carries the `land` source-layer now (tools/build-seamap.sh),
+/// so these would draw nothing anyway.
 private func SEAMAP_OMIT(_ id: String) -> Bool {
     id.hasPrefix("TSS-")
         || id == "radio_station"
+        || id == "land_area" || id == "land_outline"
 }
 
 /// SPIKE (research/seamap-offline, openwatersio/seascape#121): a bundled
@@ -381,18 +389,14 @@ func offlineLayers(_ name: String, slice: String? = nil, sprite: String? = nil, 
              "attribution": attribution])
 }
 
-/// The seamap slice aimed at the national tileset (#30): same layers, each id
-/// suffixed and each `source` repointed so both sets can live in one style.
-///
-/// The `land` layers go. `seamap-natl.pmtiles` carries no `land` source-layer —
-/// nationally it was 92% of the extract, and `land-usca` is already the floor
-/// out there — so those two would draw nothing anyway.
-private func nationalSeamap(_ layers: [[String: Any]]) -> [[String: Any]] {
-    layers.compactMap { layer in
-        guard (layer["source-layer"] as? String) != "land" else { return nil }
+/// A slice aimed at its national tileset (#30): same layers, each id suffixed
+/// and each `source` repointed, so the coarse wide set and the detailed home
+/// one can live in the same style.
+private func national(_ layers: [[String: Any]], source: String) -> [[String: Any]] {
+    layers.map { layer in
         var natl = layer
         natl["id"] = "\(layer["id"] as? String ?? "")-natl"
-        natl["source"] = "seamap-natl"
+        natl["source"] = source
         return natl
     }
 }
@@ -436,6 +440,17 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
         layers.insert(contentsOf: slice, at: anchor)
         style["layers"] = layers
     }
+    // Bathymetry, national first and Salish over it — the same two-tileset shape
+    // as the chart below, and the same reason (#30). The national cut stops at
+    // z6 where the chart's stops at z9: `depth-areas` IS that archive, so there
+    // is no undrawn layer to strip and the curve runs 13 MB at z6 to 276 at z8.
+    // Shaded water under a station anywhere, not contours you would navigate on.
+    if let natl = offlineLayers("seascape-natl", slice: "seascape",
+                                attribution: "© Open Waters: Seascape") {
+        sources["seascape-natl"] = natl.source
+        style["sources"] = sources
+        insertAboveLand(national(natl.layers, source: "seascape-natl"))
+    }
     if let seascape = offlineLayers("seascape", attribution: "© Open Waters: Seascape") {
         sources["seascape-vector"] = seascape.source
         style["sources"] = sources
@@ -451,7 +466,7 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
                                 attribution: "© Open Waters: Seamap © OpenStreetMap contributors") {
         sources["seamap-natl"] = natl.source
         style["sources"] = sources
-        insertAboveLand(nationalSeamap(natl.layers))
+        insertAboveLand(national(natl.layers, source: "seamap-natl"))
     }
     if let seamap = offlineLayers("seamap", sprite: "freenauticalchart",
                                   attribution: "© Open Waters: Seamap © OpenStreetMap contributors"),

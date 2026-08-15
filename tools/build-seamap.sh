@@ -83,8 +83,16 @@ done
 # Every source-layer the slice actually reads, asked of the slice rather than
 # listed here — an upstream style that starts drawing `water` then keeps `water`,
 # instead of shipping a chart with a hole in it.
+#
+# Minus `land`, which the app draws from its own tilesets instead (MapScreen's
+# SEAMAP_OMIT drops the two layers that read it). Nationally it is 92% of the
+# extract — 468 MB against 28.8 for everything else — and in the Salish box it is
+# a second, coarser copy of `land.pmtiles`, which covers the same water at z0-14
+# against seamap's z12.
 LAYERS=()
-while IFS= read -r layer; do LAYERS+=("$layer"); done < <(python3 -c '
+while IFS= read -r layer; do
+  [ "$layer" = land ] || LAYERS+=("$layer")
+done < <(python3 -c '
 import json, sys
 print("\n".join(sorted({l["source-layer"] for l in json.load(open(sys.argv[1])) if "source-layer" in l})))
 ' Slackwater/Resources/seamap-layers.json)
@@ -112,13 +120,7 @@ cut() {
 }
 
 cut "$BBOX" "$MAXZOOM" Slackwater/Resources/seamap.pmtiles "${LAYERS[@]}"
-
-# The national cut drops `land` on top of the strip: nationally it is 92% of the
-# extract (468 MB against 28.8 for the rest), and `land-usca` is the floor out
-# there already. Everything else the slice draws, it draws.
-NATL_LAYERS=()
-for layer in "${LAYERS[@]}"; do [ "$layer" = land ] || NATL_LAYERS+=("$layer"); done
-cut "$NATL_BBOX" "$NATL_MAXZOOM" Slackwater/Resources/seamap-natl.pmtiles "${NATL_LAYERS[@]}"
+cut "$NATL_BBOX" "$NATL_MAXZOOM" Slackwater/Resources/seamap-natl.pmtiles "${LAYERS[@]}"
 
 # Glyphs (#29). The slice's labels reference two versatiles stacks —
 # noto_sans_regular everywhere, open_sans_regular_italic for hazard depths,
