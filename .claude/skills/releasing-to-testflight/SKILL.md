@@ -38,18 +38,29 @@ rejected upload.** Nothing renumbers it for you.
 
 1. `node scripts/asc.mjs builds` — read the highest build number already on ASC.
 2. Bump in `project.yml`: `CURRENT_PROJECT_VERSION` above that number,
-   `MARKETING_VERSION` if the release warrants it.
-3. `./scripts/test.sh --full` — both reference simulators. The full plan covers
-   the live-IWLS and on-device-fit tests the fast plan skips.
-4. Open the release PR. Nothing reaches App Store Connect before it merges, and
+   `MARKETING_VERSION` if the release warrants it — and **above 1.0 always**,
+   see the train answer below.
+3. Write `docs/release-notes/<MARKETING_VERSION>.md` — what testers see as
+   "What to Test". `testflight.sh` posts it to the build it just uploaded; with
+   no such file it says so and the build ships with none.
+4. `./scripts/test.sh --full` — both reference simulators. The full plan covers
+   the live-IWLS and on-device-fit tests the fast plan skips. A re-upload that
+   changes nothing but the version numbers can reuse the previous release's run;
+   say so in the PR, and check `git diff` really is version-only.
+5. Open the release PR. Nothing reaches App Store Connect before it merges, and
    you never merge your own PR (`CONTRIBUTING.md`).
-5. After the merge, from `main`: `./scripts/testflight.sh --family` for a release,
-   plain `./scripts/testflight.sh` for a build only Nightly needs.
-6. `node scripts/asc.mjs builds` again. Confirm the top row reads the version and
+6. After the merge, from `main`: `./scripts/testflight.sh --family` for a release,
+   plain `./scripts/testflight.sh` for a build only Nightly needs. **The script
+   archives the working tree, not `HEAD`** — if `git status` isn't clean, build
+   from a throwaway worktree (`git worktree add <dir> origin/main`) rather than
+   stashing someone else's work. Build 24 was cut that way.
+7. `node scripts/asc.mjs builds` again. Confirm the top row reads the version and
    build you intended, `VALID`, in the beta groups you expect.
 
-Step 6 is not optional. It is the only place the intent in `project.yml` can be
-checked against what testers will actually install.
+Step 7 is not optional. It is the only place the intent in `project.yml` can be
+checked against what testers will actually install — and even it only proves the
+upload. Whether TestFlight *offers* the build is a separate question the version
+train decides.
 
 ## Known answers
 

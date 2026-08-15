@@ -71,6 +71,18 @@ echo "Uploaded. Build appears in App Store Connect → TestFlight in ~5–15 min
 # promote landed on build 22 that way, then 422'd on its already-reviewed state.
 BUILD=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' \
   build/Slackwater.xcarchive/Info.plist)
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShortVersionString' \
+  build/Slackwater.xcarchive/Info.plist)
+
+# What to Test, from the repo rather than the ASC UI — typed by hand it lands on
+# whatever build is selected, which is how builds 22 and 23 shipped with none and
+# build 21 ended up carrying 0.6.0's. Waits out processing, like promote does.
+NOTES=docs/release-notes/$VERSION.md
+if [[ -f $NOTES ]]; then
+  node scripts/asc.mjs notes "$BUILD" "$NOTES"
+else
+  echo "no $NOTES — build $BUILD ships with no release notes"
+fi
 
 if [[ $FAMILY == yes ]]; then
   # Waits out processing itself, so this blocks for as long as Apple takes.
