@@ -1,22 +1,39 @@
 #!/usr/bin/env bash
-# Build Resources/seamap.pmtiles + the sprite and layer slice that go with it —
-# the OFFLINE CHART: buoys, beacons, lights, rocks, wrecks, obstructions,
-# restricted areas and seamap's own land, from Open Waters Seamap.
+# Build Resources/seamap.pmtiles and Resources/seamap-natl.pmtiles + the sprite
+# and layer slice that go with them — the OFFLINE CHART: buoys, beacons, lights,
+# rocks, wrecks, obstructions, restricted areas and seamap's own land, from Open
+# Waters Seamap.
 #
 # Companion to build-land.sh. That one builds the land SILHOUETTE (and still
 # does — seamap's own land layer stops at its bbox, and the app needs a
 # continental floor outside it). This one builds what floats on the water.
 #
-# The planet archive is 24.9 GB and we take ~8.5 MB of it. That is not a 24.9 GB
+# TWO ARTIFACTS, the same split as the two land tilesets and for the same reason
+# (#30). One clip cannot do both jobs:
+#
+#   seamap.pmtiles       Salish Sea, z0-12, 8.5 MB — home water, where a station
+#                        hero at z12.5 has to look right.
+#   seamap-natl.pmtiles  US + Canada east of the antimeridian, z0-9, 28.8 MB —
+#                        everywhere else: coarse past z9, never bare.
+#
+# The planet archive is 24.9 GB and we take ~37 MB of it. That is not a 24.9 GB
 # download: PMTiles is range-addressable and the CDN sends `accept-ranges`, so
 # `pmtiles extract` fetches only the directory pages and the tiles inside the
-# bbox — 103 requests, ~15 seconds. No local copy of the planet is ever made.
+# bbox. No local copy of the planet is ever made.
 #
-# Why z12 and not z14 (sizes before the strip below):
+# Why z12 in home water and not z14 (sizes before the strip below):
 #   z11 13 MB   z12 25 MB   z13 42 MB   z14 71 MB
 # The chart's job here is to tell you what is around a station, and past z12
 # the added detail is soundings-and-berths territory that a tides app does not
 # answer questions about. z14 nearly triples the bundle for that.
+#
+# Why z9 nationally, and why not z9 EVERYWHERE — after the strip, national costs
+# z8 15.4 MB · z9 28.8 MB · z10 49.2 MB. The point marks survive the coarser cut
+# almost intact (over one Boundary Pass tile, z9 against its 64 z12 children:
+# buoys 15/14, light_major 9/10, light_minor 45/43, landmarks 109/113). What z12
+# actually buys is rocks — 17 against 61 — plus weed, finer line geometry, and
+# 13 m of coordinate precision instead of z9's. Rocks are not a detail you drop
+# from home water, which is why the Salish cut stays.
 #
 # THE STRIP: `pmtiles extract` is bbox-and-zoom only, so the extract arrives with
 # all six of seamap's source-layers — `land`, `light`, `seamark`, `water`,
@@ -40,6 +57,12 @@ cd "$(dirname "$0")/.."
 # land.pmtiles — home water, and the two artifacts must agree on where that is.
 BBOX=${SEAMAP_BBOX:--125.5,47.0,-122.0,50.5}
 MAXZOOM=${SEAMAP_MAXZOOM:-12}
+# And the national box, the second artifact — CONUS, Alaska east of the
+# antimeridian, and Hawaii. `pmtiles extract` takes one bbox, so the western
+# Aleutians and the Pacific territories are not in it; the bundled stations
+# there still open onto `land-usca`, which is what they get today.
+NATL_BBOX=${SEAMAP_NATL_BBOX:--180,15,-52,72}
+NATL_MAXZOOM=${SEAMAP_NATL_MAXZOOM:-9}
 # Each build is a dated immutable archive; there is no "latest" alias, so the
 # date is a pin. Bump it to re-cut against a newer OSM snapshot.
 BUILD=${SEAMAP_BUILD:-2026-08-03}
@@ -57,32 +80,45 @@ for f in freenauticalchart.json freenauticalchart.png \
   curl -fsS "$BASE/sprites/$f" -o "Slackwater/Resources/$f"
 done
 
-RAW=$(mktemp -d)/seamap-raw.pmtiles
-pmtiles extract "$BASE/$BUILD.pmtiles" "$RAW" --bbox="$BBOX" --maxzoom="$MAXZOOM"
-
 # Every source-layer the slice actually reads, asked of the slice rather than
 # listed here — an upstream style that starts drawing `water` then keeps `water`,
 # instead of shipping a chart with a hole in it.
-KEEP=()
-while IFS= read -r layer; do KEEP+=(-l "$layer"); done < <(python3 -c '
+LAYERS=()
+while IFS= read -r layer; do LAYERS+=("$layer"); done < <(python3 -c '
 import json, sys
 print("\n".join(sorted({l["source-layer"] for l in json.load(open(sys.argv[1])) if "source-layer" in l})))
 ' Slackwater/Resources/seamap-layers.json)
-echo "keeping source-layers:${KEEP[*]//-l/}"
 
-# -pk: tile-join's default 500 KB ceiling DROPS features to stay under it, and
-# silently. Nothing here is near it (with and without the flag the output differs
-# by the six bytes the flag adds to the metadata), but a strip that quietly loses
-# buoys is the one failure this step could have.
-tile-join -pk -f "${KEEP[@]}" -o Slackwater/Resources/seamap.pmtiles "$RAW"
+# extract the box, strip to the named source-layers, put the bounds back.
+cut() {
+  local bbox=$1 maxzoom=$2 out=$3; shift 3
+  local flags=() layer raw
+  for layer in "$@"; do flags+=(-l "$layer"); done
+  raw=$(mktemp -d)/cut.pmtiles
+  echo "==> $out — bbox $bbox, z0-$maxzoom, keeping: $*"
+  pmtiles extract "$BASE/$BUILD.pmtiles" "$raw" --bbox="$bbox" --maxzoom="$maxzoom"
+  # -pk: tile-join's default 500 KB ceiling DROPS features to stay under it, and
+  # silently. Nothing here is near it (with and without the flag the output
+  # differs by the six bytes the flag adds to the metadata), but a strip that
+  # quietly loses buoys is the one failure this step could have.
+  tile-join -pk -f "${flags[@]}" -o "$out" "$raw"
+  # tile-join rewrites the header bounds to the whole planet — the tiles are
+  # still only the box, but MapLibre builds its TileJSON from this header and
+  # would ask for tiles that cannot exist. The extract already carries the right
+  # bounds, so copy its header over rather than recomputing one.
+  pmtiles show --header-json "$raw" > "$raw.header"
+  pmtiles edit "$out" --header-json="$raw.header"
+  rm -f "$raw" "$raw.header"
+}
 
-# tile-join rewrites the header bounds to the whole planet — the tiles are still
-# only the box, but MapLibre builds its TileJSON from this header and would ask
-# for tiles that cannot exist. The extract already carries the right bounds, so
-# copy its header over rather than recomputing one.
-pmtiles show --header-json "$RAW" > "$RAW.header"
-pmtiles edit Slackwater/Resources/seamap.pmtiles --header-json="$RAW.header"
-rm -f "$RAW" "$RAW.header"
+cut "$BBOX" "$MAXZOOM" Slackwater/Resources/seamap.pmtiles "${LAYERS[@]}"
+
+# The national cut drops `land` on top of the strip: nationally it is 92% of the
+# extract (468 MB against 28.8 for the rest), and `land-usca` is the floor out
+# there already. Everything else the slice draws, it draws.
+NATL_LAYERS=()
+for layer in "${LAYERS[@]}"; do [ "$layer" = land ] || NATL_LAYERS+=("$layer"); done
+cut "$NATL_BBOX" "$NATL_MAXZOOM" Slackwater/Resources/seamap-natl.pmtiles "${NATL_LAYERS[@]}"
 
 # Glyphs (#29). The slice's labels reference two versatiles stacks —
 # noto_sans_regular everywhere, open_sans_regular_italic for hazard depths,

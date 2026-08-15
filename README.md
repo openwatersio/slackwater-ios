@@ -65,11 +65,20 @@ where a station hero has to look right) and `land-usca.pmtiles` is the US and Ca
 
 The chart on top of that land is [Open Waters Seamap](https://github.com/openwatersio/seamap),
 bundled by `tools/build-seamap.sh` — buoys, beacons, lights, rocks, wrecks, obstructions and
-restricted areas, offline, in 8.5 MB. It is a `pmtiles extract` of the 24.9 GB weekly planet
-archive clipped to the Salish box: PMTiles is range-addressable, so that costs ~60 HTTP
-requests and about ten seconds, not a planet download. The extract arrives at 25.9 MB with
-all six of seamap's source-layers and a `tile-join` drops the three the style never
-references (`water`, `waterway`, `wetland`) — 17.4 MB that used to ship undrawn. Traffic
+restricted areas, offline. It is a `pmtiles extract` of the 24.9 GB weekly planet
+archive: PMTiles is range-addressable, so that costs ~60 HTTP
+requests and about ten seconds, not a planet download. The extract arrives with
+all six of seamap's source-layers and a `tile-join` drops the ones the style never
+references (`water`, `waterway`, `wetland`) — 17.4 MB that used to ship undrawn on the
+Salish artifact alone.
+
+Two seamap tilesets ship, the same split as the two land ones and for the same reason
+([#30](https://github.com/openwatersio/slackwater-ios/issues/30)) — `seamap.pmtiles` is the
+Salish Sea at z0-12 in 8.5 MB, `seamap-natl.pmtiles` the US and Canada east of the
+antimeridian at z0-9 in 28.8 MB, drawn under it. What z12 buys over z9 is rocks (17 against
+61 over one Boundary Pass tile), weed, finer line geometry and 13 m of coordinate precision;
+the buoys, lights and landmarks are all in the coarse cut already, which is why the country
+gets a real chart for 28.8 MB and home water keeps its detail. Traffic
 separation schemes are cut
 (`SEAMAP_OMIT` in `MapScreen.swift`) — routeing instruction is not this app's question, and
 the lanes dominated everything else on screen. Labels are not bundled yet: they need glyphs,

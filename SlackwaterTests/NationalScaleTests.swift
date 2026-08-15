@@ -309,6 +309,43 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
+    /// #30: the chart used to stop at the Salish box, so a station in Puget
+    /// Sound opened onto seamarks and one in San Francisco onto bare land. Two
+    /// seamap tilesets now, the same shape as the two land ones — national z9
+    /// under Salish z12.
+    ///
+    /// The assertion that earns its keep is the draw order. Both sources carry
+    /// home water, and the detailed one has to be on top, or the Salish Sea gets
+    /// its chart marks from the coarse tileset and loses two thirds of its rocks
+    /// with nothing on screen to say so.
+    func testFallbackStyleCarriesTheChartPastTheSalishBox() throws {
+        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
+        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
+        let natl = try XCTUnwrap(sources["seamap-natl"] as? [String: Any],
+                                 "no national chart: run tools/build-seamap.sh")
+        XCTAssertTrue((natl["url"] as? String)?.hasPrefix("pmtiles://") == true,
+                      "the national chart must read the bundle, not the network")
+
+        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
+        let drawn = { (source: String) in
+            layers.indices.filter { (layers[$0]["source"] as? String) == source }
+        }
+        let national = drawn("seamap-natl"), salish = drawn("seamap")
+        let lastNational = try XCTUnwrap(national.max(), "the national slice draws nothing")
+        let firstSalish = try XCTUnwrap(salish.min(), "the Salish slice draws nothing")
+        XCTAssertLessThan(lastNational, firstSalish,
+                          "home water must take its marks from the z12 tileset, not the z9 one")
+
+        // seamap-natl.pmtiles carries no `land` source-layer — nationally it was
+        // 92% of the extract, and land-usca is the floor out there.
+        for i in national {
+            XCTAssertNotEqual(layers[i]["source-layer"] as? String, "land",
+                              "\(layers[i]["id"] ?? "?") reads a source-layer the national extract does not have")
+        }
+        let floor = try XCTUnwrap(layers.firstIndex { ($0["id"] as? String) == "land-usca" })
+        XCTAssertLessThan(floor, lastNational, "the chart must draw over the land floor")
+    }
+
     // MARK: - Canada on demand
 
     /// The download set is the nearest few, not the country — it budgets the

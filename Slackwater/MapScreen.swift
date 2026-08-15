@@ -351,16 +351,20 @@ private func SEAMAP_OMIT(_ id: String) -> Bool {
 /// SPIKE (research/seamap-offline, openwatersio/seascape#121): a bundled
 /// offline PMTiles layer-set — "seamap" (Open Waters Seamap chart marks +
 /// freenauticalchart sprite) or "seascape" (bathymetry). `<name>.pmtiles` is a
-/// `pmtiles extract` clipped to the Salish box; `<name>-layers.json` is a
-/// verbatim slice of the published style.json. The seamap slice keeps its
+/// `pmtiles extract` clipped to the Salish box; `<slice ?? name>-layers.json` is
+/// a verbatim slice of the published style.json. The seamap slice keeps its
 /// `text-*` keys and draws them with the bundled glyphs (#29); the seascape
 /// slice still ships text-stripped (its text bakes in a unit — see
 /// tools/build-seascape.sh). Returns nil when the resources aren't in the
 /// bundle, so main stays on the land-only fallback.
-func offlineLayers(_ name: String, sprite: String? = nil, attribution: String)
+///
+/// `slice` names a slice belonging to a different tileset: `seamap-natl` is the
+/// same chart at national scale, so it reads `seamap`'s slice rather than
+/// bundling a byte-identical second copy of it.
+func offlineLayers(_ name: String, slice: String? = nil, sprite: String? = nil, attribution: String)
         -> (sprite: String?, layers: [[String: Any]], source: [String: Any])? {
     guard let tiles = Bundle.main.url(forResource: name, withExtension: "pmtiles"),
-          let layersUrl = Bundle.main.url(forResource: "\(name)-layers", withExtension: "json"),
+          let layersUrl = Bundle.main.url(forResource: "\(slice ?? name)-layers", withExtension: "json"),
           let data = try? Data(contentsOf: layersUrl),
           let layers = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
     else { return nil }
@@ -375,6 +379,22 @@ func offlineLayers(_ name: String, sprite: String? = nil, attribution: String)
                   .filter { !SEAMAP_OMIT(($0["id"] as? String) ?? "") },
             ["type": "vector", "url": "pmtiles://\(tiles.absoluteString)",
              "attribution": attribution])
+}
+
+/// The seamap slice aimed at the national tileset (#30): same layers, each id
+/// suffixed and each `source` repointed so both sets can live in one style.
+///
+/// The `land` layers go. `seamap-natl.pmtiles` carries no `land` source-layer —
+/// nationally it was 92% of the extract, and `land-usca` is already the floor
+/// out there — so those two would draw nothing anyway.
+private func nationalSeamap(_ layers: [[String: Any]]) -> [[String: Any]] {
+    layers.compactMap { layer in
+        guard (layer["source-layer"] as? String) != "land" else { return nil }
+        var natl = layer
+        natl["id"] = "\(layer["id"] as? String ?? "")-natl"
+        natl["source"] = "seamap-natl"
+        return natl
+    }
 }
 
 /// The fontstack the offline style's own labels use — the same one most of
@@ -420,6 +440,18 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
         sources["seascape-vector"] = seascape.source
         style["sources"] = sources
         insertAboveLand(seascape.layers)
+    }
+    // #30, and the same split as the two land tilesets: `seamap-natl` is the
+    // whole country at z9, `seamap` the Salish Sea at z12 drawn OVER it. Open a
+    // station in San Francisco and the chart marks are there; home water keeps
+    // the detail. Inside the Salish box both sources have the mark, and the
+    // detailed one wins the collision because it is inserted last.
+    if let natl = offlineLayers("seamap-natl",
+                                slice: "seamap",
+                                attribution: "© Open Waters: Seamap © OpenStreetMap contributors") {
+        sources["seamap-natl"] = natl.source
+        style["sources"] = sources
+        insertAboveLand(nationalSeamap(natl.layers))
     }
     if let seamap = offlineLayers("seamap", sprite: "freenauticalchart",
                                   attribution: "© Open Waters: Seamap © OpenStreetMap contributors"),
