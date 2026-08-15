@@ -31,6 +31,30 @@ async function api(method, path, body) {
   return json;
 }
 
+// A build is not addable — or annotatable — until processing finishes, and
+// processing outlives the upload by 5-15 min. A named build is not even LISTED
+// for the first few minutes, which is a wait too: throwing there is what made
+// testflight.sh pass no build number, and a bare promote then grabbed whatever
+// build was newest (build 23's release promoted build 22 that way).
+async function waitForBuild(version) {
+  let build;
+  for (let i = 0; i < 60; i++) {
+    const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate');
+    build = version ? r.data.find((b) => b.attributes.version === version) : r.data[0];
+    if (!build && !version) throw new Error('no builds on App Store Connect');
+    if (!build) {
+      console.log(`build ${version}: not listed yet, waiting…`);
+    } else if (build.attributes.processingState === 'VALID') {
+      return build;
+    } else {
+      console.log(`build ${build.attributes.version}: ${build.attributes.processingState}, waiting…`);
+    }
+    await new Promise((r) => setTimeout(r, 30_000));
+  }
+  if (!build) throw new Error(`build ${version} never appeared on App Store Connect (30 min)`);
+  throw new Error(`build ${build.attributes.version} still ${build.attributes.processingState} after 30 min`);
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 
 if (cmd === 'create-cert') {
@@ -62,29 +86,7 @@ if (cmd === 'create-cert') {
   const g = groups.data.find((x) => x.attributes.name === group);
   if (!g) throw new Error(`no beta group named "${group}"`);
 
-  // A build is not addable until processing finishes, and processing outlives
-  // the upload by 5-15 min — so wait rather than fail on a race the caller
-  // cannot see. A named build is not even LISTED for the first few minutes,
-  // which is a wait too: throwing there is what made testflight.sh pass no
-  // build number, and a bare promote then grabs whatever build is newest.
-  let build;
-  for (let i = 0; i < 60; i++) {
-    const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate');
-    build = args[0] ? r.data.find((b) => b.attributes.version === args[0]) : r.data[0];
-    if (!build && !args[0]) throw new Error('no builds on App Store Connect');
-    if (!build) {
-      console.log(`build ${args[0]}: not listed yet, waiting…`);
-      await new Promise((r) => setTimeout(r, 30_000));
-      continue;
-    }
-    if (build.attributes.processingState === 'VALID') break;
-    console.log(`build ${build.attributes.version}: ${build.attributes.processingState}, waiting…`);
-    await new Promise((r) => setTimeout(r, 30_000));
-  }
-  if (!build) throw new Error(`build ${args[0]} never appeared on App Store Connect (30 min)`);
-  if (build.attributes.processingState !== 'VALID') {
-    throw new Error(`build ${build.attributes.version} still ${build.attributes.processingState} after 30 min`);
-  }
+  const build = await waitForBuild(args[0]);
 
   await api('POST', `/v1/betaGroups/${g.id}/relationships/builds`, {
     data: [{ type: 'builds', id: build.id }],
@@ -99,6 +101,19 @@ if (cmd === 'create-cert') {
       },
     });
     console.log('submitted for Apple beta review — testers get it once approved');
+  }
+} else if (cmd === 'notes') {
+  // "What to Test", per build. The localizations are created with the build and
+  // start empty — so this PATCHes them, it never POSTs a second one. Every
+  // locale gets the same text; the app is English-only.
+  const build = await waitForBuild(args[0]);
+  const whatsNew = fs.readFileSync(args[1], 'utf8');
+  const locs = await api('GET', `/v1/builds/${build.id}/betaBuildLocalizations`);
+  for (const l of locs.data) {
+    await api('PATCH', `/v1/betaBuildLocalizations/${l.id}`, {
+      data: { type: 'betaBuildLocalizations', id: l.id, attributes: { whatsNew } },
+    });
+    console.log(`build ${build.attributes.version} notes -> ${l.attributes.locale}`);
   }
 } else if (cmd === 'create-profile') {
   const [bundleIdRes, certId, outPath] = args;
@@ -120,5 +135,5 @@ if (cmd === 'create-cert') {
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
 } else {
-  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName] | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
+  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
 }
