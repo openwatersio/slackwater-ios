@@ -7,6 +7,7 @@ Two kinds of documents live here, split by shelf life:
 | Doc | What |
 |---|---|
 | [`product-landscape.md`](product-landscape.md) | The full stack — every product, the four layers, how they connect, rollout order (M1–M6). Start here |
+| [`chs-data-model.md`](chs-data-model.md) | What Canada gives us and what it doesn't — IWLS series, the licensing posture that shapes the architecture, the four tiers of current coverage, what "validated" means, why there is no current field. Standalone: read it before scoping anything touching Canadian coverage |
 | [`gtm.md`](gtm.md) | Slackwater go-to-market — channels ranked by leverage, drafted assets. Private; nothing in it goes in public posts |
 
 **Research snapshots** ([`research/`](research/)) — dated, point-in-time; superseded by newer
@@ -34,3 +35,9 @@ Cited by `Slackwater/ChsStation.swift:6`, `tools/gen-chs-stations.mjs:5`,
 this app stores, ships, or re-serves — see #99 for what happens when that architecture is
 mistaken for a loophole that generalises to other datasets (it does not; it works only because
 DFO runs IWLS as a service the device can query directly).
+
+**That argument is now reproduced in [`chs-data-model.md`](chs-data-model.md) §3**, in full and
+with the three-option table, so it can be read without access to the private repo — which is
+the point of the row above it. A pointer resolves a citation; it does not let most readers
+follow the reasoning. Reasoning that work in *this* repo depends on should not live only
+there, and `chs-data-model.md` is the pattern to follow.
