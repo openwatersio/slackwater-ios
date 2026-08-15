@@ -336,6 +336,10 @@ final class ChsFitService: ObservableObject {
                 // fetched is on disk, so resuming costs only what is missing.
                 await MainActor.run { self.queue.set(job.id, .pending) }
             } catch {
+                // Printed, not swallowed: the row only ever says "Failed", so
+                // without this the reason is gone and diagnosing one station
+                // means re-deriving it from the IWLS API by hand.
+                print("CHS fit FAILED \(job.id): \(error)")
                 // ponytail: no retry ladder — the manager's retry and the next
                 // connected launch are the retries.
                 await MainActor.run { self.queue.set(job.id, .failed) }
@@ -359,6 +363,12 @@ final class ChsFitService: ObservableObject {
             if await MainActor.run(body: { self.queue.shouldYield(running: info.id) }) { throw ChsError.yielded }
         }
         samples.sort { $0.t < $1.t }
+        // IWLS advertises wlp on stations it serves no water for, and can retire
+        // one after this build's bundle was minted. Say so, rather than handing
+        // the fitter nothing and reporting whatever JSCore makes of it.
+        guard !samples.isEmpty else {
+            throw ChsError.failed("\(info.name): IWLS served no wlp samples over \(Int(Self.tideFitDays)) d")
+        }
         let start = plan.last?.start ?? end
         let fit = try await fitter.fit(samples: samples)
         print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms (interpreted, no JIT), rms \(String(format: "%.1f", fit.rms * 100)) cm")
@@ -419,6 +429,9 @@ final class ChsFitService: ObservableObject {
                                           fitDays: Double, speeds: [ChsSample], dirs: [ChsSample],
                                           fitter: ChsFitter) async throws -> ChsModel {
         let samples = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
+        guard !samples.isEmpty else {
+            throw ChsError.failed("\(gate.name): IWLS served no wcsp1/wcdp1 samples over \(Int(fitDays)) d")
+        }
         let fit = try await fitter.fit(samples: samples)
         print("CHS current fit \(gate.id) @ \(Int(fitDays)) d: \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
         return ChsModel(

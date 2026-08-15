@@ -204,15 +204,28 @@ const resolve = placesResolver();
  * escaping and no risk of eating a place called "Santa Rita" — and the word
  * form only strips when it EXPANDS that same code, which is what keeps
  * "Kewaunee Lake Michigan · WI" intact.
+ *
+ * Several codes are tried, because the row's OWN code is not always the
+ * province the card ends up showing. Upstream reads these Ontario gauges as
+ * Michigan ("Tecumseh Ontario" and "La Salle Ontario" both arrive `region:
+ * "MI"`, being across the river) or as a bare GeoNames number, so keying on it
+ * alone looks for "Michigan", finds none, and ships the duplication the region
+ * line then contradicts: "Tecumseh Ontario · ON".
  */
-const untrail = (name, region) => {
-  if (!/^[A-Z]{2}$/.test(region)) return name;
-  const word = REGION_WORD[region];
-  const trimmed = name
-    .replace(new RegExp(`\\s+(${region}${word ? `|${word}` : ""})$`, "i"), "")
-    .trim();
-  return trimmed || name;
+const untrail = (name, ...regions) => {
+  for (const region of regions) {
+    if (!/^[A-Z]{2}$/.test(region ?? "")) continue;
+    const word = REGION_WORD[region];
+    const trimmed = name
+      .replace(new RegExp(`\\s+(${region}${word ? `|${word}` : ""})$`, "i"), "")
+      .trim();
+    if (trimmed) name = trimmed;
+  }
+  return name;
 };
+
+/** The state/province code a region line ends in — "~LaSalle, ON" -> "ON". */
+const trailingCode = (region) => region.match(/\b([A-Z]{2})$/)?.[1];
 
 const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
 const regionOf = (s) => {
@@ -318,7 +331,7 @@ const stations = shippable
       // parted company when a derived context started winning: "Abercorn Creek
       // near Savannah Ga" reads beside "~Savannah, GA", and passing the label
       // here would stop stripping the "Ga" on 571 cards.
-      name: untrail(r.name, code),
+      name: untrail(r.name, code, trailingCode(region)),
       region,
       aliases: r.aliases ?? [],
       latitude: s.latitude,
