@@ -38,10 +38,13 @@ targets:
         # Same omission, other half: builds 1–21 all shipped XcodeGen's literal
         # "1.0", so every TestFlight build so far reads 1.0 to testers and
         # 0.3.0/0.5.0/0.6.0 exist only in git. `manageAppVersionAndBuildNumber`
-        # only ever managed the build number, never this. Build 22 took
-        # TestFlight BACKWARDS, 1.0 → 0.6.0, and App Store Connect accepted the
-        # lower pre-release train — VALID, in both groups. The eventual real 1.0
-        # still needs a build number above 21.
+        # only ever managed the build number, never this. Builds 22 and 23 then
+        # took TestFlight BACKWARDS, 1.0 → 0.6.0 → 0.7.0. App Store Connect
+        # accepted the lower pre-release train — VALID, in both groups — and no
+        # tester could install either one: the TestFlight app offers the highest
+        # version train it has, which stayed 1.0 (21), and the sub-1.0 trains are
+        # not even listed under Previous Builds. So VALID is not "shipped", and
+        # this line must stay above 1.0 until the accidental train is retired.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSLocationWhenInUseUsageDescription: >-
           Your location is used on this device to find the nearest tide and
@@ -58,8 +61,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
-        MARKETING_VERSION: 0.7.0
-        CURRENT_PROJECT_VERSION: 23
+        MARKETING_VERSION: 1.1.0
+        CURRENT_PROJECT_VERSION: 24
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
