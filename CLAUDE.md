@@ -61,6 +61,28 @@ annotation. A plan asserted the web rule as iOS law; an implementer read all 267
 
 Before enforcing a "rule", find it in *this* repo's tests or code.
 
+## Editing `chs-stations.json` changes `stations.json` too
+
+The generators are not independent. `gen-tides.mjs` reads the **committed**
+`chs-stations.json` and cedes Canadian water to CHS within `CHS_COVERAGE_KM`, so a
+TICON gap-fill only ships where CHS has nothing nearby. Add or remove a CHS station
+and the set of TICON stations that survive changes with it.
+
+So **any change to `chs-stations.json` needs `node gen-tides.mjs` re-run and its
+artefact committed in the same PR.** The CI data job regenerates and
+`git diff --exit-code`s exactly this, which is how a PR that dropped 28 dead CHS
+stations went red after a green local `node --test` — the tests assert on the
+committed artefact, and nothing local had regenerated it.
+
+Worth knowing when it happens: the un-suppressed TICON rows are real stations, and
+the result was five Great Lakes and St. Lawrence gauges going from unusable to
+usable. Read the regenerated diff before assuming it is noise.
+
+The same trap in miniature: `untrail()` keys on the row's own state code, and
+upstream mislabels several Ontario gauges as `MI` or a bare GeoNames number, so a
+newly-surfaced station can ship "Tecumseh Ontario · ON" and trip the name invariant.
+It now also tries the code the region line ends in.
+
 ## Calendar days are not 86,400 seconds
 
 `addingTimeInterval` is for durations. Anything meaning *a day* goes through `Calendar`
