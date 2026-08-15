@@ -61,12 +61,17 @@ struct SlackwaterApp: App {
 /// with no network (issue #38; the synthetic-constituents idea is PR #77's
 /// `-seedGateModels`). Amplitudes/offset are Point-Atkinson-ish metres; any
 /// plausible shape gives TideEngine real highs and lows to lag into slacks.
-/// Wipes the model store first so the seed is the WHOLE state
-/// `ChsFitService.init` finds — determinism without `-chsResetModels`, which
-/// this hook must never be combined with (see the init comment).
+/// Wipes the model store AND the chunk store first, so the seed is the WHOLE
+/// state `ChsFitService.init` finds — determinism without `-chsResetModels`,
+/// which this hook must never be combined with (see the init comment). The
+/// chunk store matters as much as the model one: a leftover chunk from a
+/// full-plan run lets the derived gate render off cached CHS predictions
+/// instead of this fit, and the test then passes without exercising what it
+/// names.
 private func seedTideModel(stationID: String) {
     guard ChsStationInfo.all.contains(where: { $0.id == stationID }) else { return }
     try? FileManager.default.removeItem(at: ChsModelStore.dir)
+    try? FileManager.default.removeItem(at: ChsChunkStore.dir)
     let now = appNow()
     let model = ChsModel(
         stationID: stationID, iwlsID: "seeded", iwlsName: "\(stationID) (seeded)",

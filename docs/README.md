@@ -21,5 +21,23 @@ snapshots rather than edited:
 
 Deeper background (specs, superpowers plans) lives in the Slackwater planning repo
 (`sailingnaturali/slackwater`, private) — ask if you want anything from there surfaced here.
-Reasoning that work in *this* repo depends on should not live only there:
-`chs-data-model.md` is the first doc written to close that gap, and the pattern to follow.
+
+**One spec there is cited from this repo by bare name and is worth naming here**, because four
+files reference it and none of them says where it is:
+
+| Cited as | Lives at | What it settles |
+|---|---|---|
+| `chs-online-design` | `sailingnaturali/slackwater` → `docs/superpowers/specs/2026-07-21-chs-online-design.md` | **§2 is the CHS licence architecture** — why Canadian predictions are *fetched per user* and never bundled (clause 3 bars redistribution, clause 10 permits the user's own derivation; we ship a client, so nothing is redistributed). **§6a** is where the ±20-min maxima bar comes from |
+
+Cited by `Slackwater/ChsStation.swift:6`, `tools/gen-chs-stations.mjs:5`,
+`tools/FitValidation/Sources/fit-validation/main.swift:114`, and
+`spikes/chs-currents-fit/README.md:32`. Read §2 before changing anything about what CHS data
+this app stores, ships, or re-serves — see #99 for what happens when that architecture is
+mistaken for a loophole that generalises to other datasets (it does not; it works only because
+DFO runs IWLS as a service the device can query directly).
+
+**That argument is now reproduced in [`chs-data-model.md`](chs-data-model.md) §3**, in full and
+with the three-option table, so it can be read without access to the private repo — which is
+the point of the row above it. A pointer resolves a citation; it does not let most readers
+follow the reasoning. Reasoning that work in *this* repo depends on should not live only
+there, and `chs-data-model.md` is the pattern to follow.
