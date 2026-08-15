@@ -110,6 +110,54 @@ const iwls = (await response.json())
   // Station code, not name: the collision suffixes below have to be stable.
   .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
 
+/**
+ * The `wlp` claim above is metadata, and IWLS publishes it for stations it
+ * serves no predictions for. Ogdensburg and Peace Bridge Below advertise the
+ * series and return `[]` for every window and every series, permanently.
+ *
+ * Nothing else in the record separates them from a good station: both read
+ * `operating: false` with type DISCONTINUED/TEMPORARY — and so do Joggins and
+ * Ile Haute, which answer fine. `operating` marks a live gauge, not a
+ * predictable port, and it is false on 991 of these 1086. The only signal that
+ * works is asking for water and seeing whether any arrives.
+ *
+ * The cost of shipping one is a station the user can find, tap, and queue,
+ * that then sits in Downloads as a permanent "Failed" behind a Retry button
+ * that cannot ever succeed — and burns ten paced requests on every press.
+ *
+ * Probed AFTER the ids are assigned, never before: the `-2` collision suffixes
+ * are positional, so dropping a station ahead of that loop renumbers the ones
+ * behind it and orphans every model already stored under the old id.
+ */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// IWLS 429s well inside the app's own 2.5 s pacing, so probe politely and back
+// off; 1086 stations at this spacing is a ~20 min generator run, once.
+const PROBE_SPACING_MS = 1200;
+
+async function servesPredictions({ id }, from, to) {
+  const url = `${IWLS}/${id}/data?time-series-code=wlp&from=${from}&to=${to}`;
+  for (let attempt = 0; ; attempt += 1) {
+    const r = await fetch(url);
+    if (r.ok) return (await r.json()).length > 0;
+    if (attempt === 4) throw new Error(`IWLS probe ${id}: HTTP ${r.status}`);
+    await sleep(2000 * 2 ** attempt);
+  }
+}
+
+// One hour, yesterday: the smallest window that answers the question, on a day
+// every real station has both predictions and history for.
+const probeDay = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+const [probeFrom, probeTo] = [`${probeDay}T00:00:00Z`, `${probeDay}T01:00:00Z`];
+
+const served = new Set();
+for (const [n, s] of iwls.entries()) {
+  if (await servesPredictions(s, probeFrom, probeTo)) served.add(s.id);
+  if (n % 100 === 0) console.log(`  probing wlp… ${n}/${iwls.length}, ${served.size} serving`);
+  await sleep(PROBE_SPACING_MS);
+}
+const dead = [];
+
 const ports = Object.entries(registry).filter(([, e]) => e.provider === "chs" && e.kind === "tide");
 const claimed = new Set();
 // Every registry key is reserved up front, not just the tide ports: IWLS has
@@ -127,6 +175,12 @@ for (const s of iwls) {
     const [id, e] = match;
     claimed.add(id);
     taken.add(id);
+    // A curated port is pointed at by gen-chs-gates.mjs and by stored models,
+    // so a dead one is a registry problem to fix, not a station to quietly drop.
+    if (!served.has(s.id)) {
+      throw new Error(`registry tide port ${id} (${e.name}) serves no wlp data — ` +
+        `IWLS returns [] for it; correct or remove it in station-corrections`);
+    }
     stations.push({
       id, name: e.name, region: e.context, aliases: e.aliases ?? [],
       // The registry's curated position, not the published one: it is the
@@ -143,6 +197,7 @@ for (const s of iwls) {
   // exactly what someone might type, which is what aliases are for.
   const aliases = [...new Set((s.alternativeName ?? "").split(",")
     .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== s.officialName.toLowerCase()))];
+  if (!served.has(s.id)) { dead.push(`${id} (${s.officialName.trim()})`); continue; }
   stations.push({
     id, name: s.officialName,
     region: contextOf(id, s.officialName, s.latitude, s.longitude), aliases,
@@ -163,5 +218,6 @@ const size = writeBundle(out, stations);
 const census = {};
 for (const s of stations) census[s.region] = (census[s.region] ?? 0) + 1;
 console.log(`${stations.length} CHS tide stations (${claimed.size} registry-curated), ${size}`);
+console.log(`${dead.length} dropped — advertise wlp, serve none:\n${dead.map((d) => `  ${d}`).join("\n")}`);
 console.log(Object.entries(census).sort((a, b) => b[1] - a[1])
   .map(([k, n]) => `  ${String(n).padStart(4)}  ${k}`).join("\n"));
