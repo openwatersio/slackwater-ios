@@ -83,6 +83,31 @@ upstream mislabels several Ontario gauges as `MI` or a bare GeoNames number, so 
 newly-surfaced station can ship "Tecumseh Ontario · ON" and trip the name invariant.
 It now also tries the code the region line ends in.
 
+## `tile-join` drops features and widens bounds, both silently
+
+`pmtiles extract` clips by bbox and zoom only, so cutting a tileset down to the source-layers
+a style actually reads needs a `tile-join` pass. #107 took `seamap.pmtiles` from 25.9 MB to
+4.1 that way — two thirds of the artifact was layers nothing drew. Two traps in that one
+command, and neither says anything when it bites:
+
+- **The default 500 KB tile ceiling DROPS features to stay under it.** `-pk` disables it.
+  Nothing in the seamap cuts is near the limit — with and without the flag the output differs
+  by exactly the six bytes the flag adds to the metadata, which is the cheap way to re-check
+  it — but the failure mode is a chart quietly missing buoys behind a green build.
+- **The output header's bounds become the whole planet**, whatever the input's were.
+  MapLibre builds its TileJSON from that header, so a Salish-only artifact starts advertising
+  global coverage and gets asked for tiles that cannot exist. `pmtiles show --header-json` on
+  the extract, `pmtiles edit --header-json` onto the result — copy the real header back rather
+  than recomputing one from the bbox.
+
+Both are handled in `tools/build-seamap.sh`. The note is here because the next tileset that
+wants stripping will not be built by reading that file first.
+
+Third, smaller: **`tile-join` output is not byte-deterministic.** The same inputs give
+archives differing by a few bytes (8,505,255 / …256 / …260 across three runs of the same
+script), so a rebuild always shows a diff on the artifact. That is not content drift, and a
+rebuild that changes nothing else does not need committing.
+
 ## Calendar days are not 86,400 seconds
 
 `addingTimeInterval` is for durations. Anything meaning *a day* goes through `Calendar`
