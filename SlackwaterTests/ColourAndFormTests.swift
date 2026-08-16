@@ -71,18 +71,96 @@ final class ColourAndFormTests: XCTestCase {
             // "Rectangle().fill(" is paired with hex only, not SN.leaf — that
             // pairing legitimately appears elsewhere (the schedule row's
             // highlight bar), and would false-positive if included here.
-            let hexOffender = line.contains("Color(hex:") &&
+            // The `l.fill(area,` triggers that used to live here are gone with
+            // the two clipped direction fills (#97) — the current track's
+            // colour is now guarded by function scope in the test below,
+            // which is stronger than a line pairing.
+            return line.contains("Color(hex:") &&
                 (line.contains("maxFlood") || line.contains("maxEbb") ||
                  line.contains("\"FLOOD\"") || line.contains("\"EBB\"") ||
-                 line.contains("l.fill(area,") ||       // the flood/ebb area fill
                  line.contains("Rectangle().fill("))    // the legend reference-line fill
-            // SN.leaf (the slack-only green) standing in for a direction
-            // colour — only checked against the area fill, the one place
-            // this specific regression actually happened.
-            let leafOffender = line.contains("SN.leaf") && line.contains("l.fill(area,")
-            return hexOffender || leafOffender
         }
         XCTAssertTrue(offenders.isEmpty, "hardcoded direction colour in TimelineStrip.swift: \(offenders)")
+    }
+
+    // MARK: - The speed ramp (#97)
+
+    /// Hue on the current track means speed now, not direction. The fills were
+    /// clipped to the zero line, so blue could only ever render above it and
+    /// amber below — hue was restating position while magnitude had no channel
+    /// at all. Direction keeps its two novice-legible carriers here (position
+    /// about the zero line, and the rotated set arrow); this asserts nothing
+    /// quietly puts it back on colour.
+    ///
+    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide`
+    /// legitimately keeps `SN.rising`/`SN.falling`, which is #95's question,
+    /// not this one's.
+    func testCurrentTrackDoesNotSpeakDirectionInColour() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = source.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func drawCurrent(") }),
+              let offset = lines[(start + 1)...].firstIndex(where: { $0 == "    }" })
+        else { return XCTFail("drawCurrent's body not found — this tripwire needs retargeting") }
+        let body = lines[start...offset]
+        // `SN.flood`/`SN.ebb` catch their `…Label` variants as substrings.
+        // `SN.leaf` is the slack-only green, which once stood in for the flood
+        // fill; it has no business in this function under any name.
+        let banned = ["SN.flood", "SN.ebb", "SN.rising", "SN.falling", "SN.leaf"]
+        let offenders = body.filter { line in banned.contains(where: line.contains) }
+        XCTAssertTrue(offenders.isEmpty,
+                      "direction colour inside drawCurrent: \(offenders)")
+        XCTAssertGreaterThan(body.count, 40, "body extraction looks wrong — check the guard above")
+    }
+
+    /// Rank order has to survive greyscale, which is also Reduce Motion: with
+    /// nothing allowed to animate, luminance is the whole signal. A Windy-style
+    /// rainbow fails exactly here — its mid speeds read brighter than its top,
+    /// so the ramp misstates which water is faster.
+    func testSpeedRampLuminanceIsMonotonic() {
+        var previous = -1.0
+        for i in 0...40 {
+            let t = Double(i) / 40
+            let l = luminance(rampHex(t))
+            XCTAssertGreaterThan(l, previous, "ramp luminance must climb at t=\(t)")
+            previous = l
+        }
+    }
+
+    /// Green means slack and only slack. A ramp that passes through green puts
+    /// a second, opposite meaning a few hundred points from the column that
+    /// means *go* — which is the specific reason this is not a rainbow.
+    func testSpeedRampContainsNoGreen() {
+        for i in 0...40 {
+            let t = Double(i) / 40
+            let c = SN.speedRGB(t)
+            XCTAssertFalse(c.g > c.r && c.g > c.b,
+                           "the ramp is green-dominant at t=\(t); green is reserved for slack")
+        }
+    }
+
+    /// A label sitting on the fill has to be readable at both ends of a ramp
+    /// that runs dark to bright. Before #97 the inside ink was a fixed white,
+    /// which was fine on a flat 0.32 fill and fails on `#F5C96B`.
+    ///
+    /// The applicable floor is WCAG's 3:1 — the mark is a 14pt semibold speed,
+    /// which is large text. 4:1 is asserted instead because that is what the
+    /// ramp actually delivers at its worst point (the white↔ink crossover at
+    /// t ≈ 0.68, where both options measure 4.47:1). A stop edit that pushes
+    /// it below 4 has changed something worth looking at.
+    func testSpeedInkStaysReadableOnItsOwnFill() {
+        for i in 0...40 {
+            let t = Double(i) / 40
+            let ink = rgb(SN.speedInk(t)) == rgb(.white) ? "FFFFFF" : "00121F"
+            XCTAssertGreaterThan(contrast(ink, rampHex(t)), 4,
+                                 "label ink is unreadable on the fill at t=\(t)")
+        }
+    }
+
+    /// The ramp at `t` as a hex string, for the luminance/contrast helpers.
+    private func rampHex(_ t: Double) -> String {
+        let c = SN.speedRGB(t)
+        return String(format: "%02X%02X%02X",
+                      Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
     }
 
     func testGlyphColourTracksStateAndNeverKind() {

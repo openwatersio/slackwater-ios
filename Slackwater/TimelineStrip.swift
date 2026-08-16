@@ -54,6 +54,52 @@ enum Timeline {
     /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
     static let slackThresholdKn = 0.5
 
+    /// The absolute domain of the speed ramp (#97), spaced equally across it.
+    /// Anchored to **capability** rather than to quantiles — the move Beaufort
+    /// makes, and the reason Windy's ramp reads well: the colour says what you
+    /// can still do about the water, not what percentile the station is in.
+    ///
+    ///   0.5 kn — `slackThresholdKn`; a small boat transits
+    ///     3 kn — around where a paddled craft can no longer make way against it
+    ///     6 kn — around where a small displacement craft can no longer stem it
+    ///    16 kn — Sechelt Rapids; the overfall regime, timed rather than transited
+    ///
+    /// Across the 842 bundled NOAA current stations that puts the median at
+    /// 23% of the ramp and p90 at 56%. A linear 0→16 puts them at 14% and 31%,
+    /// compressing ninety percent of stations into the bottom third — this
+    /// issue's own defect, re-entering through the transfer function. A ceiling
+    /// of 6 makes Sechelt and Seymour Narrows identical again, which is the
+    /// failure PredictWind's 6-kt tidal layer ships today.
+    ///
+    /// **Hard-coded, and never derived from the stations on the device**: a
+    /// runtime ceiling would make the same colour mean different speeds on
+    /// different phones, which is the absolute scale gone.
+    ///
+    /// The middle two are estimates and want a source — Sailing Directions or
+    /// small-craft guidance. They ship flagged because the ramp is an encoding
+    /// rather than a computed hazard call: an anchor wrong by half a knot moves
+    /// a colour, not a decision.
+    ///
+    /// This array is also where a per-vessel limit lands when it arrives — a
+    /// powerboat's thresholds sit higher than a paddled craft's, keyed off the
+    /// boat's own identity. One anchors array keeps that door open without any
+    /// settings plumbing today.
+    static let speedRampAnchorsKn: [Double] = [0.5, 3, 6, 16]
+
+    /// Position on the speed ramp for `kn`, piecewise-linear between the
+    /// anchors and clamped at both ends. Above the ceiling everything is the
+    /// top colour — "beyond the top of the scale" is not a distinction worth
+    /// resolving.
+    static func rampT(forSpeedKn kn: Double) -> Double {
+        let a = speedRampAnchorsKn
+        let step = 1.0 / Double(a.count - 1)
+        if kn <= a[0] { return 0 }
+        for i in 0..<(a.count - 1) where kn <= a[i + 1] {
+            return (Double(i) + (kn - a[i]) / (a[i + 1] - a[i])) * step
+        }
+        return 1
+    }
+
     /// One point of strip = 5 minutes, and UIScrollView snaps `contentOffset`
     /// to the pixel grid — so the centered-on-now strip round-trips through
     /// `scrubTime` up to ~2.5 min off before anyone has touched it. That was
@@ -170,6 +216,46 @@ func axisTickLabel(_ tick: Double) -> String {
 /// largest |sample| as a signed maximum. 15-min official samples make
 /// interpolated slacks exact to a few minutes — the same series CHS's own
 /// tables are printed from.
+/// The current track's area fill, as one gradient stop per sample coloured by
+/// the ABSOLUTE speed there (#97).
+///
+/// Pure and separate from the drawing, because the property that matters —
+/// two gates of different speed cannot come out looking the same — is a
+/// property of these stops and of nothing else. Drawing it is a detail; this
+/// is the encoding.
+///
+/// `x` is the caller's strip-coordinate mapping and `width` the whole strip,
+/// so the locations stay put under `TimelineCanvas`'s per-tile translate:
+/// every tile draws the entire strip clipped to its own span.
+///
+/// `schematic` is the derived-gate case, and it takes the ramp OFF. Those
+/// speeds are a ±1 shape meaning "flood, then ebb" — running them through an
+/// absolute scale would render a one-knot gate, which is a number nobody
+/// measured. It fills `SN.steel` instead: colour is state, and the state of
+/// this curve's magnitude is *unknown*.
+func currentFillStops(_ points: [CurrentPoint], x: (Date) -> CGFloat,
+                      width: CGFloat, schematic: Bool = false) -> [Gradient.Stop] {
+    guard width > 0, !points.isEmpty else { return [] }
+    if schematic {
+        return [Gradient.Stop(color: SN.steel.opacity(0.32), location: 0),
+                Gradient.Stop(color: SN.steel.opacity(0.32), location: 1)]
+    }
+    // Not opaque: the night bands under the track keep a little of their
+    // reading through the fill. Not the old 0.32 either — below about 0.8 the
+    // top of the ramp stops arriving as bright, and a scale whose bright end
+    // is not bright is not a scale.
+    let alpha = 0.9
+    let stops = points.map { p in
+        Gradient.Stop(
+            color: SN.speedColour(Timeline.rampT(forSpeedKn: abs(p.speed))).opacity(alpha),
+            location: min(max(x(p.time) / width, 0), 1))
+    }
+    // A one-sample series is still a gradient, not a crash.
+    return stops.count == 1
+        ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)]
+        : stops
+}
+
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     guard points.count > 1 else { return [] }
     var events: [CurrentEvent] = []
@@ -253,6 +339,14 @@ struct TimelineData {
     /// Empty for a derived gate: `build(gate:)` synthesises a schematic ±1
     /// shape, and a 0.5 kn window measured off a shape would be fiction.
     let slackWindows: [(slack: Date, start: Date, end: Date)]
+
+    /// True when `currentPoints` is that schematic ±1 shape rather than
+    /// measured speed. Same fiction, one step further on: the shape says
+    /// "flood, then ebb", it does not say *one knot*. Colouring it through
+    /// the absolute ramp (#97) would print a speed the app has never been
+    /// told — so the ramp is skipped and the fill goes to `SN.steel`, which
+    /// is already this app's word for a state it does not know.
+    var speedsAreSchematic = false
 
     var hasTide: Bool { !tidePoints.isEmpty }
     var hasCurrent: Bool { !currentPoints.isEmpty }
@@ -484,7 +578,8 @@ struct TimelineData {
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, slackWindows: windows)
+                            snapTimes: snaps, slackWindows: windows,
+                            speedsAreSchematic: gate != nil)
     }
 }
 
@@ -825,19 +920,39 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
         area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
         area.closeSubpath()
-        // Flood fill above the zero line, ebb fill below (prototype clip paths).
-        // These were SN.leaf (the slack-only green) and a hardcoded blue —
-        // leftover from before the rebrand, still speaking the retired
-        // direction pair in the chart's most prominent area.
-        ctx.drawLayer { l in
-            l.clip(to: Path(CGRect(x: 0, y: geo.curTop - 10, width: data.totalWidth,
-                                   height: geo.zeroY - (geo.curTop - 10))))
-            l.fill(area, with: .color(SN.flood.opacity(0.32)))
+        // The workable slack column spans the WHOLE track — a column of time
+        // you can transit, not a patch hanging off the zero line. It is the
+        // GROUND now, drawn under the fill: near slack the fill has almost no
+        // height, so the column reads on the page either side of the curve,
+        // and green never tints the ramp. 0.12 keeps it a highlight rather
+        // than an opaque patch.
+        //
+        // Green is the window and nothing else (#97). It used to colour the
+        // slack instant too — but a mathematical point is not something you
+        // can transit *at*, and the window is the thing you plan around.
+        for w in data.slackWindows {
+            let x0 = data.x(w.start), x1 = data.x(w.end)
+            ctx.fill(Path(CGRect(x: x0, y: geo.curTop, width: x1 - x0,
+                                 height: geo.curBottom - geo.curTop)),
+                     with: .color(SN.go.opacity(0.12)))
         }
-        ctx.drawLayer { l in
-            l.clip(to: Path(CGRect(x: 0, y: geo.zeroY, width: data.totalWidth,
-                                   height: geo.curBottom + 10 - geo.zeroY)))
-            l.fill(area, with: .color(SN.ebb.opacity(0.32)))
+
+        // ONE fill, coloured by absolute speed along the track (#97). This was
+        // two clipped layers — flood blue above the zero line, ebb amber below
+        // — but the clip is what put each on its own side, so hue was saying
+        // what position already said while magnitude had no channel at all.
+        // The curve's SHAPE stays auto-fitted (`TimelineGeo` is untouched),
+        // which is what keeps a quiet station legible; colour carries the
+        // absolute number the geometry gave up, so a 3 kn pass and Sechelt
+        // Rapids can no longer draw as the same picture.
+        let fillStops = currentFillStops(data.currentPoints, x: data.x,
+                                         width: data.totalWidth,
+                                         schematic: data.speedsAreSchematic)
+        if !fillStops.isEmpty {
+            ctx.fill(area, with: .linearGradient(
+                Gradient(stops: fillStops),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: data.totalWidth, y: 0)))
         }
         var zero = Path()
         zero.move(to: CGPoint(x: 0, y: geo.zeroY))
@@ -851,24 +966,15 @@ struct TimelineCanvas: View {
                 && e.time <= data.end.addingTimeInterval(-margin)
         }
 
-        // The workable slack column spans the WHOLE track — a column of time
-        // you can transit, not a patch hanging off the zero line. Drawn before
-        // the events so the dots and the curve stay on top of the tint; 0.12
-        // keeps it a highlight rather than an opaque patch.
-        for w in data.slackWindows {
-            let x0 = data.x(w.start), x1 = data.x(w.end)
-            ctx.fill(Path(CGRect(x: x0, y: geo.curTop, width: x1 - x0,
-                                 height: geo.curBottom - geo.curTop)),
-                     with: .color(SN.go.opacity(0.12)))
-        }
-
         for e in filteredEvents {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
+                // Foam, not green: green is the column behind it. Form does
+                // the separating that hue used to — a figure on a ground.
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
                                                 width: 8, height: 8)),
-                         with: .color(SN.go))
+                         with: .color(SN.foam))
                 // ONE label, centred over the column: the SLACK ITSELF, not
                 // the window's opening edge — the magnet parks the strip on
                 // the zero crossing, so print what the strip can actually
@@ -886,25 +992,31 @@ struct TimelineCanvas: View {
                 if !suppressesSlackLabel(data.slackWindows, at: e.time) {
                     ctx.draw(Text(chartTime(e.time, data.tz))
                                 .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(SN.go),
+                                .foregroundStyle(SN.foam),
                              at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
                 }
             case .maxFlood, .maxEbb:
                 let flood = e.kind == .maxFlood
-                let tint = flood ? SN.floodLabel : SN.ebbLabel
                 let y = geo.curY(e.speed)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
-                         with: .color(tint))
+                         with: .color(SN.foam))
 
                 // The speed annotates the CURVE, not a band: inside the fill
-                // (inverted to white — it sits on colour) when the fill is
-                // deep enough to hold it, outside on the dark ground in its
-                // direction tint otherwise. No chip behind it.
+                // when the fill is deep enough to hold it, outside on the dark
+                // ground otherwise. No chip behind it.
+                //
+                // The inside ink can no longer be a fixed white. The fill runs
+                // dark-to-bright with speed now, and white on the top of the
+                // ramp fails — so it is picked from the ramp position. Note
+                // the y-offset cannot stand in for that: the shape is
+                // auto-fitted, so a quiet station's max also sits deep inside
+                // its (dark) fill.
                 let toward: CGFloat = flood ? 1 : -1      // toward the zero line
                 let labelH: CGFloat = 30
                 let inside = abs(y - geo.zeroY) >= labelH + 12
                 let cy = y + toward * (labelH / 2 + 8)
-                let mark = inside ? Color.white : tint
+                let mark = inside ? SN.speedInk(Timeline.rampT(forSpeedKn: abs(e.speed)))
+                                  : SN.foam
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
                             .font(.system(size: 14, weight: .semibold).monospacedDigit())
                             .foregroundStyle(mark),
