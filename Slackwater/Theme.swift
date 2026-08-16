@@ -60,6 +60,75 @@ enum SN {
     static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
+
+    // MARK: - Speed magnitude (#97)
+
+    /// Absolute current speed, inferno-family. Hue on the current track used
+    /// to say flood-versus-ebb, which the fills' clip to the zero line
+    /// already said — so it is spent here instead, on the one thing the
+    /// chart had no channel for at all.
+    ///
+    /// Not a Windy-style rainbow, for two reasons. Green means slack and only
+    /// slack, and a rainbow runs through its own green at moderate speed —
+    /// two greens with opposite meanings a few hundred points apart. And the
+    /// axis this replaces was deliberately "colourblind-safe amber/blue"
+    /// (above): under the Viénot–Brettel matrices a rainbow's
+    /// blue→green→yellow half collapses to one band for both deuteranopia and
+    /// protanopia, and its greyscale is non-monotonic, so it misstates rank
+    /// order. Inferno's luminance climbs from end to end, which is also what
+    /// lets it carry magnitude under Reduce Motion with no motion channel.
+    ///
+    /// Finishing near `amber` is a bonus rather than a compromise: at the top
+    /// of a speed scale, reading as alarming is correct.
+    static let speedRampStops: [(t: Double, hex: UInt32)] = [
+        (0.0, 0x0D2033), (0.2, 0x3B2C63), (0.4, 0x7B2E62),
+        (0.6, 0xB8434F), (0.8, 0xE8763C), (1.0, 0xF5C96B),
+    ]
+
+    /// The ramp sampled at `t`, clamped to 0...1. Piecewise-linear in sRGB:
+    /// the stops sit close enough together that a perceptual space buys
+    /// nothing a reader could see.
+    static func speedRGB(_ t: Double) -> (r: Double, g: Double, b: Double) {
+        let t = min(max(t, 0), 1)
+        let stops = speedRampStops
+        let channels = { (hex: UInt32) -> (Double, Double, Double) in
+            (Double((hex >> 16) & 0xFF), Double((hex >> 8) & 0xFF), Double(hex & 0xFF))
+        }
+        for i in 0..<(stops.count - 1) {
+            let a = stops[i], b = stops[i + 1]
+            guard t >= a.t, t <= b.t else { continue }
+            let f = b.t == a.t ? 0 : (t - a.t) / (b.t - a.t)
+            let lo = channels(a.hex)
+            let hi = channels(b.hex)
+            return (lo.0 + (hi.0 - lo.0) * f, lo.1 + (hi.1 - lo.1) * f, lo.2 + (hi.2 - lo.2) * f)
+        }
+        let (r, g, b) = channels(stops[stops.count - 1].hex)
+        return (r, g, b)
+    }
+
+    static func speedColour(_ t: Double) -> Color {
+        let c = speedRGB(t)
+        return Color(red: c.r / 255, green: c.g / 255, blue: c.b / 255)
+    }
+
+    /// Ink for a label drawn ON the ramp fill — whichever of white or `page`
+    /// has more contrast against it. Chosen from the ramp position rather
+    /// than from how far the label sits off the zero line: the curve's shape
+    /// stays auto-fitted, so a quiet station puts a label deep inside a dark
+    /// fill just as a violent one puts one inside a bright fill.
+    static func speedInk(_ t: Double) -> Color {
+        let c = speedRGB(t)
+        let lin = { (v: Double) -> Double in
+            let s = v / 255
+            return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+        }
+        let l = 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+        // `page` is 0x00121F — relative luminance 0.00532, so 0.05532 is its
+        // contrast denominator. The crossover lands at t ≈ 0.68, where both
+        // inks measure 4.47:1; that is the ramp's worst point and it clears
+        // WCAG's 3:1 for the 14pt semibold mark this styles.
+        return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.05532) ? .white : page
+    }
 }
 
 /// The uppercase mono section-label role. Sizes 9/10/11 used to be passed per

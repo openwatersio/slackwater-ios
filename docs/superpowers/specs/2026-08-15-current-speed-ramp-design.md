@@ -151,6 +151,26 @@ Both are fixed in the same pass rather than left for the screenshot to find:
   stroke's *outer* edge always sits against the dark page ground, so the boundary still
   reads. Verified on the screenshot rather than pre-empted with a halo.
 
+### Derived gates keep the ramp off
+
+Found by the suite, not by the design: `testM46MalibuDerivedGateSeededOffline` went red
+at ink 0.046 against a 0.05 floor.
+
+`build(gate:)` synthesises a **schematic ±1 shape** for a derived gate — it means "flood,
+then ebb", and no speed was ever measured. Running that through an absolute scale renders
+a one-knot gate, which is a number nobody has. It is the same fiction `slackWindows`
+already refuses to make out of the same shape ("a 0.5 kn window measured off a shape
+would be fiction").
+
+So `TimelineData` gains `speedsAreSchematic`, set only on the gate path, and
+`currentFillStops` fills `SN.steel` at 0.32 instead — already this app's word for a state
+it does not know (`StationGlyph.colour(for: .unknown)`). That also restores the ink
+fraction, but the ink was the symptom; the fabricated speed was the bug.
+
+Worth recording for #95: the tide track, if it ever moves to a rate-of-rise ramp, has no
+equivalent schematic case — but it does have the same question about what a derived value
+is allowed to assert.
+
 ### Accepted regression
 
 Night bands stop showing through inside the area fill (they show at 0.32 today). Night

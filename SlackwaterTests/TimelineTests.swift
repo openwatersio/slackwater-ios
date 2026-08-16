@@ -2,6 +2,7 @@
 // (TimelineStrip.swift): fixed window and x↔time mapping, the now-readout
 // equivalence with the old model's committed readout, night continuity across
 // midnight, and the multi-day schedule window.
+import SwiftUI
 import XCTest
 @testable import Slackwater
 import TideEngine
@@ -657,6 +658,113 @@ final class TimelineTests: XCTestCase {
         let events = sampleEvents(pts)
         XCTAssert(events.filter { $0.kind == .slack }.isEmpty)
         XCTAssertEqual(events.filter { $0.kind == .maxFlood }.count, 1)
+    }
+
+    // MARK: - The speed ramp's absolute domain (#97)
+
+    func testRampTLandsTheAnchorsWhereTheyBelong() {
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 0.5), 0, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 3), 1.0 / 3, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 6), 2.0 / 3, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 16), 1, accuracy: 1e-9)
+        // Clamped both ends. Above the ceiling everything is the top colour;
+        // "beyond the top of the scale" is not a distinction worth resolving.
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 0), 0, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 40), 1, accuracy: 1e-9)
+        // The bottom anchor IS the slack threshold, not a second opinion on it.
+        XCTAssertEqual(Timeline.speedRampAnchorsKn.first, Timeline.slackThresholdKn)
+    }
+
+    /// Why the anchors are not a linear 0→16. That ramp puts the median NOAA
+    /// current station (2.26 kn) at 14% and p90 (5.0 kn) at 31% — ninety
+    /// percent of stations compressed into the bottom third, which is #97's
+    /// own defect coming back through the transfer function instead of
+    /// through the geometry.
+    func testRampTSpreadsOrdinaryGatesAcrossTheRamp() {
+        let median = Timeline.rampT(forSpeedKn: 2.26)
+        XCTAssertGreaterThan(median, 0.18, "the median station must clear the ramp's floor")
+        XCTAssertLessThan(median, 0.30)
+        XCTAssertGreaterThan(Timeline.rampT(forSpeedKn: 5.0), 0.5,
+                             "p90 belongs above the halfway mark, not at a third of it")
+    }
+
+    /// **The defect this exists to fix.** `TimelineGeo` normalizes every curve
+    /// to its own extremes, so a 3 kn pass and Sechelt Rapids draw the same
+    /// shape. Colour is the absolutely-scaled channel now, and this is the
+    /// assertion that goes red if auto-fitting is ever reintroduced into it.
+    func testTwoGatesOfDifferentSpeedCannotFillTheSameColour() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        func series(peak: Double) -> [CurrentPoint] {
+            (0..<75).map { i in
+                let dt = Double(i) * 600
+                return CurrentPoint(time: t0.addingTimeInterval(dt),
+                                    speed: peak * sin(2 * .pi * dt / (12.42 * 3600)))
+            }
+        }
+        let x: (Date) -> CGFloat = { CGFloat($0.timeIntervalSince(t0) / 3600) * Timeline.pph }
+        let width = x(t0.addingTimeInterval(74 * 600))
+
+        let mild = currentFillStops(series(peak: 3), x: x, width: width)
+        let gate = currentFillStops(series(peak: 16), x: x, width: width)
+        XCTAssertEqual(mild.count, 75, "one stop per sample")
+        XCTAssertEqual(gate.count, 75)
+
+        XCTAssertNotEqual(brightest(mild), brightest(gate),
+                          "a 3 kn pass and a 16 kn gate must not fill the same colour")
+        XCTAssertGreaterThan(sum(brightest(gate)), sum(brightest(mild)),
+                             "the faster gate must sit higher on the ramp, not merely elsewhere")
+
+        // CGGradient requires non-decreasing locations inside 0...1.
+        XCTAssertEqual(gate.map(\.location), gate.map(\.location).sorted())
+        XCTAssertTrue(gate.allSatisfy { $0.location >= 0 && $0.location <= 1 })
+
+        XCTAssertTrue(currentFillStops([], x: x, width: width).isEmpty,
+                      "no samples, no fill — an empty gradient is a crash")
+        XCTAssertEqual(currentFillStops(series(peak: 3), x: x, width: 0).count, 0,
+                       "a zero-width strip has no gradient to build")
+    }
+
+    /// A derived gate's curve is a schematic ±1 shape standing in for "flood,
+    /// then ebb" — nobody measured a speed. Running it through the absolute
+    /// ramp would draw a one-knot gate, which is the same fiction the slack
+    /// windows already refuse to make out of that shape. It fills `SN.steel`,
+    /// the app's existing word for a state it does not know.
+    func testASchematicGateIsNotGivenASpeedItNeverHad() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let shape = (0..<75).map { i -> CurrentPoint in
+            let dt = Double(i) * 600
+            return CurrentPoint(time: t0.addingTimeInterval(dt),
+                                speed: sin(2 * .pi * dt / (12.42 * 3600)))
+        }
+        let x: (Date) -> CGFloat = { CGFloat($0.timeIntervalSince(t0) / 3600) * Timeline.pph }
+        let width = x(t0.addingTimeInterval(74 * 600))
+        let stops = currentFillStops(shape, x: x, width: width, schematic: true)
+
+        XCTAssertEqual(Set(stops.map(rgba)).count, 1, "a shape has one colour, not a gradient")
+        XCTAssertEqual(rgba(stops[0]), rgba(Gradient.Stop(color: SN.steel.opacity(0.32), location: 0)),
+                       "the unknown-magnitude fill is steel")
+
+        // And the ramp is genuinely off: the same points through the real path
+        // would come out somewhere on the ramp instead.
+        let ramped = currentFillStops(shape, x: x, width: width)
+        XCTAssertGreaterThan(Set(ramped.map(rgba)).count, 1,
+                             "sanity: the measured path really does vary with speed")
+        XCTAssertNotEqual(rgba(stops[0]), rgba(ramped.max { sum(rgba($0)) < sum(rgba($1)) }!))
+    }
+
+    /// Resolved sRGB of the highest-speed stop. The ramp climbs monotonically
+    /// in luminance (asserted in ColourAndFormTests), so the brightest stop is
+    /// the fastest sample.
+    private func brightest(_ stops: [Gradient.Stop]) -> [CGFloat] {
+        stops.map(rgba).max { sum($0) < sum($1) } ?? []
+    }
+
+    private func sum(_ c: [CGFloat]) -> CGFloat { c.prefix(3).reduce(0, +) }
+
+    private func rgba(_ stop: Gradient.Stop) -> [CGFloat] {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(stop.color).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return [r, g, b, a].map { ($0 * 1000).rounded() / 1000 }
     }
 
     /// An exact-zero sample IS the slack — both polarities, no interpolation.
