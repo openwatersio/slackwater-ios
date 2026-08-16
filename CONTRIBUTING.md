@@ -62,6 +62,42 @@ needs the network (the DFO IWLS API), so its artefact is trusted as committed.
 The other two are regenerated on every run, which is what makes the drift check
 meaningful.
 
+### A PR books the Studio. Docs-only work should not open one.
+
+CI runs on `pull_request` for **any** branch, but on `push` only for `main`. So
+pushing a branch costs nothing and opening a PR books ~25 minutes of the Mac
+Studio — the same machine the scheduled jobs and everyone's local
+`./scripts/test.sh` share. There is one macOS lane, so a PR that does not need
+it puts every other session in a queue behind it.
+
+**A change that touches no Swift, no `project.yml`, and no generated bundle —
+a spec, a plan, a note, a README edit — goes on a branch and stops there.**
+Push it so it is shareable and reviewable by URL, and say so rather than
+opening a PR:
+
+```sh
+git push -u origin docs/<topic>          # shareable, no CI, no queue
+# then link the branch or its compare URL; do NOT `gh pr create`
+```
+
+It merges by whatever route suits — fast-forward, or a PR opened later when the
+runner is idle. This rule exists because `docs/cross-flow-check-spec` — two
+markdown files, zero code — consumed a full 25-minute App-tests run, and a
+later PR from the same session queued behind two others while a third session
+waited.
+
+**CI now enforces this too**, so the habit is belt and braces rather than the
+only defence. The `What changed` job diffs the PR and skips the App-tests lane
+when *every* changed path is under `docs/` or is a top-level `.md`. It is
+fail-safe by construction: a path nobody anticipated runs the suite. It gates
+the job rather than the workflow (`on: paths-ignore`) so the free Ubuntu lane
+still runs, and so a required check — if this repo ever gets them — is
+satisfied by a skip instead of hanging forever on a workflow that never
+started.
+
+Opening a docs PR is therefore no longer expensive. Prefer a branch anyway when
+there is nothing to review; use a PR when someone actually needs to comment.
+
 ## Testing before you open the PR
 
 See the *Testing* section of `README.md`. Short version: `./scripts/test.sh`
@@ -70,9 +106,12 @@ the only coverage of the live CHS network path.
 
 ## Agents
 
-Claude Code and other agents work here under the same policy, with one addition:
-**an agent never merges its own PR.** It may open one, push to its branch, and
-respond to review. The merge is a human decision.
+Claude Code and other agents work here under the same policy, with two additions:
+**an agent never merges its own PR** — it may open one, push to its branch, and
+respond to review; the merge is a human decision — and **an agent does not open
+a PR for docs-only work** (see *A PR books the Studio* above). Agents write a
+lot of specs and plans into `docs/superpowers/`, so this rule bites them far
+more often than it bites a human.
 
 Agent-facing context lives in the `(agents: read this)` sections of `README.md`
 and in the workspace `CLAUDE.md` / `AGENTS.md` one directory up.
