@@ -13,7 +13,23 @@ final class ChsCurrentGateTests: XCTestCase {
     func testBundledGatesAreRegistryKeysWithBundledPairings() {
         for gate in ChsCurrentGateInfo.all {
             XCTAssert(gate.id.hasPrefix("chs-"), "\(gate.id) is not a registry key")
-            XCTAssertEqual(gate.timezone, "America/Vancouver")
+            // Was `== "America/Vancouver"`, which held only while every gate
+            // was Salish. The bundle now reaches Cape Breton, so assert the
+            // thing that assertion was really protecting: the zone resolves,
+            // and it is the right zone for where the gate actually is. A Bay
+            // of Fundy gate stamped Pacific renders its slacks four hours out,
+            // and that is exactly what this must catch.
+            let tz = TimeZone(identifier: gate.timezone)
+            XCTAssertNotNil(tz, "\(gate.id): \(gate.timezone) is not a time zone")
+            guard let tz else { continue }
+            // Solar time from longitude, against the zone's own offset today.
+            // Two hours of slack absorbs every honest zone boundary (a zone can
+            // legitimately sit well east or west of its solar meridian) while
+            // still failing an ocean-sized mistake.
+            let solarOffset = gate.longitude / 15.0 * 3600
+            let zoneOffset = Double(tz.secondsFromGMT(for: Date()))
+            XCTAssertLessThan(abs(zoneOffset - solarOffset), 2 * 3600,
+                              "\(gate.id): \(gate.timezone) is wrong for longitude \(gate.longitude)")
             if let ref = gate.tideReference {
                 // Dual-track needs the port on this device: it must be a
                 // bundled CHS tide port the app fits.
@@ -373,18 +389,18 @@ final class ChsCurrentGateTests: XCTestCase {
 
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)
 
-    /// The 7 validation rejects ship as online: true identities — findable,
+    /// The 9 validation rejects ship as online: true identities — findable,
     /// never fitted, never provisional (online-gates spec §1).
     func testOnlineGatesShipAndShippedGatesStayOffline() throws {
         let online = ChsCurrentGateInfo.all.filter(\.isOnline)
-        XCTAssertEqual(online.count, 7, "the 7 fit-rejects ship as online gates")
+        XCTAssertEqual(online.count, 9, "the 9 fit-rejects ship as online gates")
         for g in online {
             XCTAssert(g.id.hasPrefix("chs-"))
             XCTAssertFalse(g.offersProvisional, "an online gate never offers a fast answer")
             XCTAssertNotNil(g.onlineNote, "\(g.id) needs its plain-words measured error")
         }
-        // The 11 shipped gates are untouched: not online, still fittable.
-        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 11)
+        // The 13 shipped gates are untouched: not online, still fittable.
+        XCTAssertEqual(ChsCurrentGateInfo.all.filter { !$0.isOnline }.count, 13)
         XCTAssert(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" }?.isOnline == false)
     }
 

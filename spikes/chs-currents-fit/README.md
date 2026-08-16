@@ -108,6 +108,51 @@ up is 45.7 (Second Narrows, not bundled). It currently excludes **no bundled gat
 a live guard on `tools/gen-chs-gates.mjs` so a future gate cannot ship a fast answer nobody
 could act on, and `ChsProvisionalTests` re-checks it against the shipped bundle.
 
+## M55 — the national gates (2026-08-15)
+
+`station-corrections` took the registry national: CHS publishes tidal currents at exactly 30
+stations across Canada, and the survey against the gate rule admitted four beyond the Salish
+Sea (openwatersio/slackwater-ios#9, sailingnaturali/station-corrections#11). Same harness, same
+bar, same held-out window, and **the bar was not touched**.
+
+| Gate | fit rms | slack med/max | extrema med/max | speed med | Verdict |
+|---|---|---|---|---|---|
+| Great Bras d'Or | 0.22 | 4.2 / 14.1 | 15.6 / 31.5 | 0.10 | **PASS** |
+| Quatsino Narrows | 0.34 | 6.1 / 16.5 | 11.6 / 52.0 | 0.30 | **PASS** |
+| Masset Sound | 0.35 | 4.4 / 21.0 | 23.9 / 52.4 | 0.20 | FAIL — extrema med |
+| Nakwakto Rapids | 0.73 | 6.1 / 25.1 | 11.9 / 50.2 | 0.80 | FAIL — speed |
+
+60-day scores, and how each ships:
+
+| Gate | 60 d slack med/max | Ships as |
+|---|---|---|
+| Great Bras d'Or | 4.6 / 23.8 | **60 d, final** — passes the whole bar at 60 d |
+| Quatsino Narrows | 14.1 / 24.4 | 210 d · provisional ±25 min |
+| Masset Sound | 5.0 / 34.3 | online (never fitted) |
+| Nakwakto Rapids | 11.2 / 29.6 | online (never fitted) |
+
+**Finding 2 held, and Nakwakto is its clearest case.** ~14 kn through a gap with a slack lasting
+minutes is not something a 23-constituent linear basis describes: its *slack* numbers pass
+comfortably (6.1 / 25.1) while its peak speeds are off by 0.8 kn — half a knot worse than any
+shipped gate, and worse than Sechelt's 0.94 only barely. Masset failed the other established way,
+on extremum timing (23.9 vs the 20 bar), in a 24-mile sound where the zero crossing is sharp but
+the peak is not. Both ship as online identities rather than absent, which is what changed since
+M47: a mariner searching "Nakwakto" finds it and gets CHS's own predictions, and the app says
+plainly why it will not model that water itself.
+
+**Quatsino's provisional is a slack number, and only a slack number.** At 60 d it fails the bar on
+*speed* (0.7 kn) while its slack worst is 24.4 min — inside the 45-minute usefulness floor. That
+is the established rule (the provisional stage hedges slack timing, which is what you transit on)
+but it is worth stating out loud that the fast answer's peak speeds at this gate are weaker than
+its slack times.
+
+**Two harness changes, both forced by scale.** A 210-day gate is 60+ requests, and IWLS
+rate-limited two of the ten runs partway through; `cachedGet` used to treat that as fatal and
+threw away the whole gate. It now backs off (5 s doubling, 6 attempts) and carries on — the disk
+cache means a retry refetches only the chunk that failed. Separately, `tools/gen-chs-gates.mjs`
+stamped every gate `America/Vancouver`; it now reads the zone from the position like the tide
+ports do, which is the only reason Great Bras d'Or renders its slacks in Atlantic time.
+
 ## Findings
 
 1. **210 days is the window for most gates — but not for all of them, and that turned out

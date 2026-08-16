@@ -16,6 +16,8 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import tzLookup from "tz-lookup";
+import { currentGates as selectCurrentGates } from "@sailingnaturali/station-corrections";
 import { here, stationData } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
@@ -89,6 +91,10 @@ const SHIPPED = new Map([
   ["chs-porlier-pass", { fitDays: 210, slack60Max: 32.1 }],     // 2.2/18.8 · 10.6/38.1 · 0.16 | 60 d 12.3/32.1
   ["chs-race-passage", { fitDays: 210, slack60Max: 28.5 }],     // 4.2/11.6 · 9.9/50.4 · 0.44 | 60 d 7.8/28.5
   ["chs-weynton-passage", { fitDays: 210, slack60Max: 34.1 }],  // 3.0/19.2 · 5.6/25.5 · 0.12 | 60 d 2.9/34.1
+  // M55 — the national gates (2026-08-15), same harness, same bar, same
+  // held-out window. Two of the four passed; see ONLINE below for the others.
+  ["chs-great-bras-dor", { fitDays: 60 }],                      // 4.2/14.1 · 15.6/31.5 · 0.10 | 60 d 4.6/23.8 PASSES
+  ["chs-quatsino-narrows", { fitDays: 210, slack60Max: 24.4 }], // 6.1/16.5 · 11.6/52.0 · 0.30 | 60 d 14.1/24.4
 ]);
 // EXCLUDED — failed the bar (210 d window; slack med/max · extrema med/max ·
 // peak-speed med). Kept out entirely per §6a: wrong water under a trusted
@@ -101,6 +107,12 @@ const SHIPPED = new Map([
 //   chs-sechelt-rapids    15.5/39.5 · 11.7/55.7 · 0.94 kn — slack + speed (Skookumchuck)
 //   chs-second-narrows    5.9/13.5 · 20.6/48.1 · 0.26 kn — extrema med (near miss)
 //   chs-tillicum-bridge   19.0/93.0 · 19.1/96.5 · 0.15 kn — slack (Gorge Waterway)
+//   chs-masset-sound      4.4/21.0 · 23.9/52.4 · 0.20 kn — extrema med (M55)
+//   chs-nakwakto-rapids   6.1/25.1 · 11.9/50.2 · 0.80 kn — speed (M55)
+// Nakwakto is the clearest case yet of finding 2 below: ~14 kn through a gap
+// with a slack of minutes is not something a 23-constituent linear basis
+// describes, and its slack numbers pass comfortably while its speeds are half
+// a knot worse than any shipped gate. A better model, not a looser bar.
 // Their 60-day worsts, for the record — all four are also below the M51
 // usefulness floor, so they would not get a provisional stage either:
 //   second-narrows 45.7 · sechelt-rapids 60.4 · tillicum-bridge 79.4 ·
@@ -132,11 +144,25 @@ const ONLINE = new Map([
     "Juan de Fuca's current here is weak and slow to reverse, which makes slack hard to pin down — testing missed the published slacks by up to ~85 minutes, so Slackwater won't guess at Juan de Fuca - East." }],
   ["chs-tillicum-bridge", { onlineNote:
     "Tillicum Bridge sits on the Gorge Waterway's reversing tidal falls, where testing missed the published slacks by up to ~95 minutes, so Slackwater won't guess here." }],
+  // M55 — the two national gates that failed. Same rule as above: each note
+  // names THAT station's own failure mode. Nakwakto failed on peak speed and
+  // Masset on the timing of peak flows; neither failed on slack, so neither
+  // note quotes a slack number.
+  ["chs-nakwakto-rapids", { onlineNote:
+    "Nakwakto Rapids runs to about 14 knots and its slack lasts minutes — Slackwater's on-device model predicted the peak speeds here off by about 0.8 kn in testing, so it won't guess at Nakwakto." }],
+  ["chs-masset-sound", { onlineNote:
+    "Slackwater's on-device model missed the timing of peak flows here by about 25 minutes in testing, so it won't guess at Masset Sound." }],
 ]);
 
-const gateEntries = Object.entries(registry).filter(
-  ([, e]) => e.provider === "chs" && !e.kind && !e.derived,
-);
+// The registry's own selector, not a filter of our own. Ours was
+// `provider === "chs" && !e.kind && !e.derived`, which read "no kind" as "is a
+// gate" — true only because the registry was gates-only before it grew the
+// field. Every gate added since carries `kind: current` explicitly, so the
+// national gates were dropped silently: no warning, just four missing passes.
+// currentGates() treats an absent kind as current, which is the actual rule.
+const gateEntries = [
+  ...selectCurrentGates({ registry: new Map(Object.entries(registry)), provider: "chs" }),
+];
 const currentGates = gateEntries
   .filter(([id]) => SHIPPED.has(id))
   .map(([id, e]) => {
@@ -152,7 +178,10 @@ const currentGates = gateEntries
       aliases: e.aliases ?? [],
       latitude: e.position[0],
       longitude: e.position[1],
-      timezone: "America/Vancouver",
+      // From the position, the way the tide ports get theirs — not a constant.
+      // Every gate was in one zone while every gate was Salish; a Bay of Fundy
+      // gate stamped America/Vancouver would render its slacks four hours out.
+      timezone: tzLookup(e.position[0], e.position[1]),
       // Registry pairing (dual-track detail) — only if that port is bundled.
       tideReference: ports.some((p) => p.id === e.tideReference) ? e.tideReference : undefined,
       fitDays,
@@ -174,7 +203,7 @@ for (const [id, { onlineNote }] of ONLINE) {
     aliases: e.aliases ?? [],
     latitude: e.position[0],
     longitude: e.position[1],
-    timezone: "America/Vancouver",
+    timezone: tzLookup(e.position[0], e.position[1]),
     tideReference: ports.some((p) => p.id === e.tideReference) ? e.tideReference : undefined,
     fitDays: 0,
     online: true,
