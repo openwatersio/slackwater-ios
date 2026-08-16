@@ -309,6 +309,49 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
+    /// #30: the chart and the bathymetry used to stop at the Salish box, so a
+    /// station in Puget Sound opened onto seamarks and depth and one in San
+    /// Francisco onto bare land. Four tilesets now — the same shape as the two
+    /// land ones, twice over: seamap national z9 under Salish z12, seascape
+    /// national z6 under Salish z12.
+    ///
+    /// The assertion that earns its keep is the draw order. Both cuts of each
+    /// pair carry home water, and the detailed one has to be on top, or the
+    /// Salish Sea takes its chart from the coarse tileset — two thirds of its
+    /// rocks gone, with nothing on screen to say so.
+    func testFallbackStyleCarriesTheChartPastTheSalishBox() throws {
+        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
+        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
+        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
+        let drawn = { (source: String) in
+            layers.indices.filter { (layers[$0]["source"] as? String) == source }
+        }
+        let floor = try XCTUnwrap(layers.firstIndex { ($0["id"] as? String) == "land-usca" })
+
+        for (wide, detailed, script) in [("seamap-natl", "seamap", "build-seamap.sh"),
+                                         ("seascape-natl", "seascape-vector", "build-seascape.sh")] {
+            let source = try XCTUnwrap(sources[wide] as? [String: Any],
+                                       "no national \(wide): run tools/\(script)")
+            XCTAssertTrue((source["url"] as? String)?.hasPrefix("pmtiles://") == true,
+                          "\(wide) must read the bundle, not the network")
+            let national = drawn(wide), salish = drawn(detailed)
+            let lastNational = try XCTUnwrap(national.max(), "\(wide) draws nothing")
+            let firstSalish = try XCTUnwrap(salish.min(), "\(detailed) draws nothing")
+            XCTAssertLessThan(lastNational, firstSalish,
+                              "home water must draw \(detailed) over \(wide), not under it")
+            XCTAssertLessThan(floor, lastNational, "\(wide) must draw over the land floor")
+
+            // Neither seamap artifact carries the `land` source-layer — the app
+            // draws land from its own two tilesets, and seamap's was 92% of the
+            // national extract for a second, coarser copy of what land.pmtiles
+            // already has.
+            for i in national + salish {
+                XCTAssertNotEqual(layers[i]["source-layer"] as? String, "land",
+                                  "\(layers[i]["id"] ?? "?") reads a source-layer the extract does not have")
+            }
+        }
+    }
+
     // MARK: - Canada on demand
 
     /// The download set is the nearest few, not the country — it budgets the

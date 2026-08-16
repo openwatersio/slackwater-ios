@@ -40,14 +40,26 @@ BBOX=${SEASCAPE_BBOX:--125.5,47.0,-122.0,50.5}
 # z12 to match seamap. The archive goes to z15 and the cost curve is steep
 # (global z0-6 is 46 MB, global z0-8 is 1.1 GB); inside the box z12 is 35 MB.
 MAXZOOM=${SEASCAPE_MAXZOOM:-12}
+# And the national box, matching build-seamap.sh's. z6, and the gap from the
+# Salish z12 is the cost curve, not a preference: nationally this archive is
+# 13.2 MB at z6, 37.5 at z7 and 276 at z8. Seamap has no such gap because two
+# thirds of ITS extract is layers we drop; here `depare` IS the file, so
+# stripping `soundings` and `contour-labels` saves 1.5% and there is no lever to
+# pull. z6 buys shaded water under a station anywhere in the country, and that
+# is all it claims to buy.
+NATL_BBOX=${SEASCAPE_NATL_BBOX:--180,15,-52,72}
+NATL_MAXZOOM=${SEASCAPE_NATL_MAXZOOM:-6}
 ARCHIVE=${SEASCAPE_ARCHIVE:-https://pub-f8e3a6cde1304526acfa7eae3e9c78ec.r2.dev/seascape/c52dbf49d7ff89eb0be8a95356ea14260a5d98c2/vector.pmtiles}
 
 pmtiles extract "$ARCHIVE" Slackwater/Resources/seascape.pmtiles \
   --bbox="$BBOX" --maxzoom="$MAXZOOM"
+pmtiles extract "$ARCHIVE" Slackwater/Resources/seascape-natl.pmtiles \
+  --bbox="$NATL_BBOX" --maxzoom="$NATL_MAXZOOM"
 
 curl -fsS "https://tiles.openwaters.io/seascape/style.json?unit=ft" -o /tmp/seascape-style.json
 # seascape-vector only: the dem and coverage sources are not bundled, and a
 # layer pointing at a missing source is a style MapLibre refuses to load.
 python3 tools/slice-layers.py /tmp/seascape-style.json seascape-vector Slackwater/Resources/seascape-layers.json --strip-text
 
-ls -la Slackwater/Resources/seascape.pmtiles Slackwater/Resources/seascape-layers.json
+ls -la Slackwater/Resources/seascape.pmtiles Slackwater/Resources/seascape-natl.pmtiles \
+       Slackwater/Resources/seascape-layers.json
