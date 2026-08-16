@@ -67,7 +67,7 @@ user's own derivation. That yields three options, of which only one works:
 
 So, structurally:
 
-- **Identity only is bundled.** `Resources/chs-stations.json` (1,086 stations)
+- **Identity only is bundled.** `Resources/chs-stations.json` (1,058 stations)
   and `Resources/chs-current-gates.json` (22 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
 - **Models are fitted per user, on that user's device**, from predictions that
@@ -100,7 +100,7 @@ terms are worse than "no" — silence is not permission.
 
 ### The other two sources, and why they behave differently
 
-- **NOAA** — public domain. 1,425 tide stations and 842 current stations ship
+- **NOAA** — public domain. 1,429 tide stations and 842 current stations ship
   with full constituents, offline from first launch.
 - **TICON-4** — the CC BY 4.0 half ships (the non-commercial half can never);
   49 bundled stations cover Canadian water CHS does not gauge. Attribution is in
@@ -116,8 +116,8 @@ Coverage is not uniform, and the differences decide what any feature can render.
 | Tier | Count | Flow axis | Speed | Available |
 |---|---|---|---|---|
 | NOAA current stations | 842 | bundled | bundled constituents | immediately, offline |
-| Fitted CHS gates | 11 | IWLS metadata, at fit time | fitted model | after download |
-| Online CHS gates | 7 | in the fetched window | official CHS predictions | after fetch, needs signal |
+| Fitted CHS gates | 13 | IWLS metadata, at fit time | fitted model | after download |
+| Online CHS gates | 9 | in the fetched window | official CHS predictions | after fetch, needs signal |
 | Derived gate | 1 | **never** | **never** | timing only |
 
 **Fitted gates** (`online` absent/false) are fitted from `wcsp1`+`wcdp1` over the
@@ -125,7 +125,7 @@ gate's own validated window — 60 or 210 days, per gate, from the M51 validatio
 not a blanket number (`ChsCurrentGateInfo.fitDays`). 210 exists because K1/P1
 drive PNW diurnal inequality and separate under Rayleigh only at ≥183 days.
 
-Seven of them additionally offer a **provisional** 60-day fast answer with a
+Eight of them additionally offer a **provisional** 60-day fast answer with a
 measured worst-case slack error of 20–35 minutes (`provisionalSlackMinutes`),
 marked in the UI with a ⚠️ badge and a `~` on every number.
 
@@ -276,10 +276,10 @@ The practical list. Each of these has cost someone time.
 
 | Thing | File |
 |---|---|
-| CHS station identity (1,086) | `Slackwater/Resources/chs-stations.json` |
+| CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
 | CHS current gates (22: 13 fitted, 9 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
-| NOAA tide stations (1,425) | `Slackwater/Resources/stations.json` |
+| NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |
 | NOAA current stations (842) | `Slackwater/Resources/currents.json` |
 | Regeneration | `cd tools && npm install && npm run build:data` |
 | Fit validation history | `spikes/chs-currents-fit/README.md` |
