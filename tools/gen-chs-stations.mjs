@@ -108,6 +108,26 @@ function contextOf(id, name, latitude, longitude) {
   return r.derived ? r.context : coastOf(latitude, longitude);
 }
 
+/**
+ * IWLS publishes exactly one broken officialName — station 00550, "Sable
+ * Island/Sable, ÃŽle de". That is UTF-8 "Île" decoded as CP1252 and re-encoded,
+ * in DFO's own feed; nothing here mis-decodes it. It is also the feed's only
+ * bilingual name, so it renders on the card as an English name followed by a
+ * mangled French restatement of itself.
+ *
+ * Repaired by table rather than by a general latin1 round-trip: the other 89
+ * accented names in the feed are clean UTF-8, and re-decoding them yields
+ * replacement characters, so a general pass would need a guard that matches
+ * exactly this one row. The French half goes to aliases — it is a real name and
+ * someone might type it. The ID still slugs the RAW name: it is what stored
+ * fitted models on shipped builds are keyed by, and no rename is worth
+ * orphaning them.
+ * ponytail: one row, one entry. A second broken name is another line, not a parser.
+ */
+const NAME_FIXES = {
+  "Sable Island/Sable, ÃŽle de": { name: "Sable Island", aliases: ["sable, île de"] },
+};
+
 const slug = (name) =>
   "chs-" + name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -204,19 +224,24 @@ for (const s of iwls) {
   taken.add(id);
   // alternativeName is a comma-separated pile of French/former/variant names —
   // exactly what someone might type, which is what aliases are for.
-  const aliases = [...new Set((s.alternativeName ?? "").split(",")
-    .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== s.officialName.toLowerCase()))];
+  const fix = NAME_FIXES[s.officialName];
+  const name = fix?.name ?? s.officialName;
+  const aliases = [...new Set([...(fix?.aliases ?? []), ...(s.alternativeName ?? "").split(",")
+    .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== name.toLowerCase())])];
   if (!served.has(s.id)) {
+    // The repaired name, not the raw one: a tombstone is what a favorite renders
+    // as after the station leaves the bundle, so mangled text there is the same
+    // bug one screen later.
     dead.push({
-      id, name: s.officialName.trim(),
-      region: contextOf(id, s.officialName, s.latitude, s.longitude),
+      id, name: name.trim(),
+      region: contextOf(id, name, s.latitude, s.longitude),
       latitude: s.latitude, longitude: s.longitude,
     });
     continue;
   }
   stations.push({
-    id, name: s.officialName,
-    region: contextOf(id, s.officialName, s.latitude, s.longitude), aliases,
+    id, name,
+    region: contextOf(id, name, s.latitude, s.longitude), aliases,
     latitude: s.latitude, longitude: s.longitude,
     timezone: tzLookup(s.latitude, s.longitude),
   });
