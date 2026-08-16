@@ -91,17 +91,18 @@ Full draft:
 > dead zone, or with the boat's electronics down.
 >
 > CURRENTS, NOT JUST TIDES
-> Signed velocity curves with slack, max flood and max ebb. Scrub through the
-> day with your thumb. Every current station shows the tide at its reference
-> port on the same screen.
+> A curve for the whole day, with slack, max flood and max ebb marked. Drag
+> your thumb across it to read any moment. Every current station shows the
+> tide at its reference port on the same screen.
 >
 > US AND CANADIAN STATIONS
 > More than 2,200 NOAA tide and current stations are built in, with nothing to
 > download.
 >
-> Canadian stations work a little differently. Your phone fits a harmonic model
-> from CHS predictions, then works offline for good. The ones nearest you fit
-> automatically. Any other fits the moment you open it.
+> Canadian stations work a little differently. Your phone builds its own model
+> from the Canadian Hydrographic Service's published predictions, then works
+> offline for good. The ones nearest you are ready automatically. Any other is
+> ready the moment you open it.
 >
 > Canadian current passes run from the Salish Sea to Haida Gwaii and Cape
 > Breton, each one checked against published predictions before it ships. A few
