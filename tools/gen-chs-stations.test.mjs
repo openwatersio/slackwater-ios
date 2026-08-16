@@ -27,6 +27,18 @@ test("stations that advertise wlp but serve no data do not ship", () => {
   }
 });
 
+// IWLS ships station 00550 as "Sable Island/Sable, ÃŽle de" — UTF-8 "Île"
+// decoded as CP1252 upstream. "Ã" starts every such sequence and appears in no
+// real name in this feed, so it is the signature to watch: if the generator's
+// NAME_FIXES table is dropped, or DFO breaks a second name the same way, the
+// mangled text reaches the card and this goes red. Tombstones are checked too:
+// they are what a favorite renders as once a station leaves the bundle, so a
+// name only repaired on the shipping path fixes one screen and not the other.
+test("no name carries a double-encoded UTF-8 sequence", () => {
+  const mangled = [...stations, ...shipped].filter((s) => s.name.includes("Ã"));
+  assert.deepEqual(mangled.map((s) => `${s.id}: ${s.name}`), []);
+});
+
 // Ids are what stored fitted models are keyed by, and what gen-chs-gates.mjs
 // points its derived gates at.
 test("ids are unique", () => {
