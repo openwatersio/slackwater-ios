@@ -32,6 +32,15 @@ jobs:
   changes:
     name: What changed
     runs-on: ubuntu-latest
+    # This repo's default_workflow_permissions is `read`, which is GitHub's
+    # RESTRICTIVE default — contents and packages only, no pull-requests scope.
+    # Without this grant `gh api .../pulls/N/files` 403s, the step's fail-safe
+    # fires, and the gate runs the Studio lane for every docs PR: silently
+    # inert, exactly as if it were not here. Job-scoped so the other two jobs
+    # keep the restrictive default.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       app: ${{ steps.filter.outputs.app }}
     steps:
@@ -48,7 +57,15 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -uo pipefail
-          run_it() { echo "$1"; echo "app=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          # Falling through to "run" is the safe direction, but it must never be
+          # a SILENT one: a permanently broken gate that always runs the Studio
+          # lane looks exactly like a green, working gate. Warn, visibly, and
+          # still succeed.
+          run_it() {
+            echo "::warning title=Docs-only gate could not decide::$1"
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
 
           if [ "$EVENT" = "pull_request" ]; then
             # --paginate: up to 3000 files, far past anything real here.
