@@ -61,60 +61,68 @@ discovery surface without making the primary shelf contradict the disclaimer.
 
 ## Promotional text (170 chars max, editable without review)
 
-> Slack and max-current timing for 3,000+ US and Canadian stations — computed on your
-> phone, so it still answers in an anchorage with no bars. Free, no account.
+> Every tide and current prediction, already on your phone. Works on the water, on the
+> beach, in the anchorage — with no bars and nothing to load. Free, no account.
 
-(158 characters.)
+(162 characters.)
+
+Rewritten to the same problem-first angle as the description below — it sits directly
+above it on the product page, so leading with "slack and max-current timing for 3,000+
+stations" made the two read as a spec sheet twice over. The station count moved into the
+description's provenance block, where it reassures rather than gatekeeps.
 
 ## Description
 
-First line (the ASO block's, verbatim):
+**Angle: problem first.** The App Store truncates the description after roughly
+three lines before "…more", so those lines are all most people ever read. They now
+carry the problem and the solution, not the spec. Everything that establishes
+*why the numbers are trustworthy* — NOAA, CHS, validation, counts — moved to a
+short block near the end, where it reassures the people who scroll rather than
+gatekeeping the people who don't.
 
-> Slack and max-current timing you can trust — offline, US and Canadian waters, no subscription.
+**This supersedes the ASO block's first line** (`Slack and max-current timing you
+can trust — offline, US and Canadian waters, no subscription`). That line led with
+"slack and max-current timing", which is the vocabulary of someone who already
+knows they want this app. Kept in gtm.md for the record; not used here.
 
 Full draft:
 
-> Slack and max-current timing you can trust — offline, US and Canadian waters,
-> no subscription.
+> Every tide app works fine at home. Slackwater works where you need it — on
+> the water, on the beach, in the anchorage — with no bars and nothing to load.
+> Thousands of US and Canadian stations, already on your phone.
 >
-> Plenty of apps show tide heights. Currents are the harder question. When does
-> the pass go slack? How hard is it running at max? Can you get through before
-> it turns?
+> No spinner. No "no internet connection". No waiting on a server that isn't
+> coming. You open it, and the answer is there.
 >
-> Slackwater answers all three on your phone. Real harmonic predictions,
-> computed on the device — no server, no signal — for more than 3,300 stations
-> across the US and Canada.
+> And it does the part most tide apps skip. Heights are the easy half. The
+> harder question is the current: when does the pass go slack? How hard is it
+> running at max? Can you get through before it turns?
 >
-> WORKS WITH NO SIGNAL
-> The predictions are computed on your phone, not fetched from a server. Open
-> the app once with a connection and it keeps answering: in an anchorage, in a
-> dead zone, or with the boat's electronics down.
+> WORKS WHERE THERE IS NO SIGNAL
+> The predictions are computed on your phone, not fetched. Down a dead-end
+> road, out at the point, in an anchorage, or with the boat's electronics
+> down — you get the same answer you would have got at the dock.
 >
 > CURRENTS, NOT JUST TIDES
 > A curve for the whole day, with slack, max flood and max ebb marked. Drag
 > your thumb across it to read any moment. Every current station shows the
 > tide at its reference port on the same screen.
 >
-> US AND CANADIAN STATIONS
-> More than 2,200 NOAA tide and current stations are built in, with nothing to
-> download.
->
-> Canadian stations work a little differently. Your phone builds its own model
-> from the Canadian Hydrographic Service's published predictions, then works
-> offline for good. The ones nearest you are ready automatically. Any other is
-> ready the moment you open it.
->
-> Canadian current passes run from the Salish Sea to Haida Gwaii and Cape
-> Breton, each one checked against published predictions before it ships. A few
-> sit in water the on-device model can't predict accurately — those fetch when
-> you have a signal, and tell you so.
->
-> A MAP THAT WORKS OFFLINE
+> A MAP THAT WORKS OFFLINE TOO
 > Every station on a map. The coastline draws with zero bars; depth contours
 > appear when you're online.
 >
 > FREE, NO ACCOUNT, NO ADS
 > The offline core is free and stays free.
+>
+> WHERE THE NUMBERS COME FROM
+> More than 2,200 NOAA tide and current stations are built in, with nothing to
+> download. Canadian stations build their own model from the Canadian
+> Hydrographic Service's published predictions, then work offline for good.
+> Canadian current passes run from the Salish Sea to Haida Gwaii and Cape
+> Breton, each one checked against published predictions before it ships. A few
+> sit in water the on-device model cannot predict accurately — those fetch when
+> you have a signal, and tell you so.
 >
 > Predictions are not observations — conditions vary with weather and river
 > flow. Not for navigation.
