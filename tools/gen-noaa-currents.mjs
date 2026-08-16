@@ -15,6 +15,8 @@
  *      pass we care about turns out to be subordinate-only.
  *   2. Primary bin only (id without "@") — one station, one prediction.
  *   3. At least one non-zero constituent; zero-amplitude ones are dropped.
+ * A fourth guard is not a filter: the extract's crossFlow census bounds how much
+ * perpendicular flow this 1-D model drops. See the CROSS-FLOW note below.
  * The web's fourth filter — a Salish bounding box — is gone: national IS the
  * scope now, and the extract is US waters throughout.
  *
@@ -121,8 +123,35 @@ if (worstNeighbour > REGION_SANITY_KM) {
     "station — its region line would be a guess; check the extract's extent");
 }
 
+// CROSS-FLOW. Every station here is modelled as one signed speed along a fixed
+// flood axis. NOAA also publishes the flow PERPENDICULAR to that axis, which
+// runs at all times including slack, and the extract summarises it in a
+// bundle-level census (@sailingnaturali/current-stations >= 0.3.0). None of it
+// is shipped per station — bundling the minor axis was measured and rejected in
+// #102 (worth a median 4% of peak, and a 2D magnitude never crosses zero, so
+// slack detection silently returns nothing). We re-assert the bound here so a
+// re-vendor that drifts is caught by `build:data` rather than by a reader.
+// Source of truth for the number is that package's CROSS_FLOW_RATIO_MAX;
+// duplicated rather than adding an npm dep for one constant.
+const CROSS_FLOW_RATIO_MAX = 0.5;
+const cf = bundle.crossFlow;
+if (!cf?.worstRatio) {
+  throw new Error("the vendored extract carries no crossFlow census — re-vendor from " +
+    "current-stations >= 0.3.0 (gh release download v0.3.0 --repo sailingnaturali/" +
+    "current-stations --pattern currents.json --output data/noaa-currents.json)");
+}
+if (cf.worstRatio.ratio > CROSS_FLOW_RATIO_MAX) {
+  throw new Error(`cross-flow ratio ${cf.worstRatio.ratio} at ${cf.worstRatio.id} exceeds ` +
+    `${CROSS_FLOW_RATIO_MAX} — the flood axis no longer describes that station, so the ` +
+    "1-D model we ship for it is suspect; refusing to ship");
+}
+
 const size = writeBundle(join(res, "currents.json"), stations);
 console.log(
   `${stations.length} NOAA current stations, ${size}; ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);
+console.log(
+  `  cross-flow: worst ratio ${cf.worstRatio.ratio} at ${cf.worstRatio.id}, ` +
+  `worst ${cf.worstAbsolute.crossFlow} kn at ${cf.worstAbsolute.id} ` +
+  `(${cf.gte0_25kn} of ${cf.records} records >= 0.25 kn) — not shipped, measured only`);
