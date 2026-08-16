@@ -1,6 +1,7 @@
 /**
  * Generate Resources/chs-stations.json — the bundled IDENTITY of every
- * Canadian tide station Slackwater can fit.
+ * Canadian tide station Slackwater can fit — and Resources/chs-tombstones.json,
+ * the same identity for the ones that USED to ship (see writeTombstones).
  *
  * LICENSING POSTURE, unchanged (chs-online-design §2): the app bundles station
  * IDENTITY — name, position, provider — and nothing CHS-published. Predictions
@@ -49,12 +50,20 @@
  *
  * Run: cd tools && npm install && node gen-chs-stations.mjs
  */
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { here, placesResolver, stationData, byNameThenId, writeBundle } from "./bundle.mjs";
+import { here, placesResolver, stationData, byNameThenId, tombstones, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const out = join(here, "..", "Slackwater", "Resources", "chs-stations.json");
+const tombstonesOut = join(here, "..", "Slackwater", "Resources", "chs-tombstones.json");
+/** Both artifacts as they stand BEFORE this run — read here because
+ *  writeTombstones needs the previous station list and writeBundle has
+ *  overwritten it by then. Missing file reads as empty: first run. */
+const readArtifact = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return []; } };
+const wasShipped = readArtifact(out);
+const wasTombstoned = readArtifact(tombstonesOut);
 const resolvePlace = placesResolver();
 const registry = stationData("registry.json");
 
@@ -197,7 +206,14 @@ for (const s of iwls) {
   // exactly what someone might type, which is what aliases are for.
   const aliases = [...new Set((s.alternativeName ?? "").split(",")
     .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== s.officialName.toLowerCase()))];
-  if (!served.has(s.id)) { dead.push(`${id} (${s.officialName.trim()})`); continue; }
+  if (!served.has(s.id)) {
+    dead.push({
+      id, name: s.officialName.trim(),
+      region: contextOf(id, s.officialName, s.latitude, s.longitude),
+      latitude: s.latitude, longitude: s.longitude,
+    });
+    continue;
+  }
   stations.push({
     id, name: s.officialName,
     region: contextOf(id, s.officialName, s.latitude, s.longitude), aliases,
@@ -214,10 +230,28 @@ if (missing.length) {
 
 stations.sort(byNameThenId);
 const size = writeBundle(out, stations);
+const tombstoneCount = writeTombstones(stations, dead);
 
 const census = {};
 for (const s of stations) census[s.region] = (census[s.region] ?? 0) + 1;
 console.log(`${stations.length} CHS tide stations (${claimed.size} registry-curated), ${size}`);
-console.log(`${dead.length} dropped — advertise wlp, serve none:\n${dead.map((d) => `  ${d}`).join("\n")}`);
+console.log(`${dead.length} dropped — advertise wlp, serve none:\n` +
+  dead.map((d) => `  ${d.id} (${d.name})`).join("\n"));
+console.log(`${tombstoneCount} tombstones (cumulative)`);
 console.log(Object.entries(census).sort((a, b) => b[1] - a[1])
   .map(([k, n]) => `  ${String(n).padStart(4)}  ${k}`).join("\n"));
+
+/**
+ * Resources/chs-tombstones.json — see `tombstones()` in bundle.mjs for what
+ * goes in it and why. Deliberately a SEPARATE file from chs-stations.json:
+ * that one is a bare array and the Swift loader decodes it as one, so a new
+ * top-level key there would take every Canadian station out of the app
+ * silently (`bundled`'s `try?` swallows the failure into an empty catalog).
+ */
+function writeTombstones(shipping, dead) {
+  const list = tombstones({
+    shipping, dead, previous: wasShipped, existing: wasTombstoned,
+  });
+  writeBundle(tombstonesOut, list);
+  return list.length;
+}
