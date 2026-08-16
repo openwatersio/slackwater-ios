@@ -16,6 +16,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Gates the Studio lane below. There is ONE self-hosted macOS runner, shared
+  # with the scheduled jobs and with everyone's local ./scripts/test.sh, and the
+  # lane is ~25 minutes — so a docs-only change that books it puts every other
+  # session in a queue behind it. Measured: PRs whose entire diff was CLAUDE.md,
+  # or two markdown files, each took a full run.
+  #
+  # This is a JOB-level gate, not `on: paths-ignore`, for two reasons: the free
+  # Ubuntu lane below should still run, and a workflow that never starts leaves
+  # a required check pending forever, whereas a job skipped by `if:` satisfies
+  # it. (CI is advisory today — see the header — but this keeps the door open.)
+  #
+  # Fail-safe by construction: it skips only when EVERY changed path is docs or
+  # a top-level .md. A new directory nobody thought about runs the suite.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      # No checkout on purpose. `git diff` would need the history, and a full
+      # clone of this repo is 149 MB of committed pmtiles — a minute of runner
+      # time on every PR to answer a question the API answers in a second.
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.number }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          run_it() { echo "$1"; echo "app=true" >> "$GITHUB_OUTPUT"; exit 0; }
+
+          if [ "$EVENT" = "pull_request" ]; then
+            # --paginate: up to 3000 files, far past anything real here.
+            FILES=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename') \
+              || run_it "could not list PR files — running the app lane"
+          else
+            case "$BEFORE" in
+              ''|0000000000000000000000000000000000000000)
+                run_it "no usable base ref — running the app lane" ;;
+            esac
+            FILES=$(gh api "repos/$REPO/compare/$BEFORE...$SHA" --jq '.files[].filename') \
+              || run_it "could not compare $BEFORE...$SHA — running the app lane"
+            # The compare endpoint truncates at 300 files. A diff that large is
+            # not docs-only, but do not rely on guessing what got cut.
+            [ "$(echo "$FILES" | wc -l)" -ge 300 ] && run_it "diff truncated at 300 files — running the app lane"
+          fi
+
+          [ -z "$FILES" ] && run_it "no files reported — running the app lane"
+          echo "changed:"; echo "$FILES" | sed 's/^/  /'
+
+          OTHER=$(echo "$FILES" | grep -vE '^docs/|^[^/]*\.md$')
+          if [ -n "$OTHER" ]; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+            echo "-> app lane RUNS (non-docs paths present)"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "-> app lane SKIPPED (every path is docs/ or a top-level .md)"
+          fi
+
   data:
     name: Data generators
     runs-on: ubuntu-latest
@@ -49,6 +111,8 @@ jobs:
 
   app:
     name: App tests
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     # Self-hosted on the Mac Studio. GitHub-hosted macOS bills at 10x on a
     # private repo, and the fast plan across both simulators is ~25 min of wall
     # clock — about 250 billable minutes, which would exhaust the monthly
