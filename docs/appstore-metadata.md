@@ -42,8 +42,9 @@ now that most of the coverage would be undiscoverable.
 - **`harbor` *and* `harbour`** — Apple doesn't stem across spellings, and half the
   coverage is Canadian.
 - **One regional anchor kept: `salish sea`.** It's cheap to rank for (almost nobody
-  targets it), it's where the app is genuinely strongest (the only validated Canadian
-  currents), and it's the home audience. Dropping it to chase "tide chart" nationally
+  targets it), it's where the app is genuinely strongest (the densest cluster of
+  validated Canadian current gates — the national ones are single gates a coast
+  apart), and it's the home audience. Dropping it to chase "tide chart" nationally
   would trade a term we can win for one Garmin owns.
 
 Deliberately dropped: `gulf islands`, `juan de fuca`, `puget sound`, `knot`, `boating`
@@ -97,7 +98,9 @@ Full draft:
 > from CHS predictions, then work offline for good; the ones nearest you fit
 > automatically, and any other fits the moment you open it. Canadian current
 > passes run from the Salish Sea to Haida Gwaii and Cape Breton, each one
-> checked against published predictions before it ships.
+> checked against published predictions before it ships — the few whose water
+> the on-device model can't predict accurately fetch when you have a signal,
+> and say so.
 >
 > A MAP THAT WORKS OFFLINE
 > Every station on a pin map with coastline that renders with zero bars. Depth
