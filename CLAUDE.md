@@ -152,6 +152,39 @@ lockf -t 0 /tmp/slackwater-test.lock xcodebuild build-for-testing \
 *before* implementing too: the real compile error is better RED evidence than a
 reasoned-about one.
 
+## A workflow verified locally is not verified
+
+The docs-only gate in `ci.yml` — the job that skips the Studio lane when a PR touches
+nothing but `docs/` and top-level `.md` — took **three** PRs to work. Each time it was
+"verified locally" first, and each time the local run differed from CI in exactly the
+dimension that hid the bug.
+
+- **GitHub runs `run:` blocks as `bash -e {0}`. Your shell does not.** `grep -v` exits
+  **1** when it filters everything out — which is precisely the docs-only case the gate
+  exists to detect — so the step aborted before writing its decision. The gate went red
+  on `main` on the very first case it got right: `App tests` correctly skipped, but
+  because the job had died, not because it had decided. Test workflow shell with
+  `bash -e`, not `bash`.
+- **The workflow's `GITHUB_TOKEN` is not your `gh` token.** This repo's
+  `default_workflow_permissions` is `read` — GitHub's *restrictive* setting, contents and
+  packages only, **no `pull-requests` scope**. So `gh api .../pulls/N/files` 403s unless
+  the job asks for it. Locally it worked, because a personal token has the scope. The
+  gate shipped completely inert and every docs PR still booked the Studio for 25 minutes.
+  Check `gh api /repos/OWNER/REPO/actions/permissions/workflow` before assuming an API
+  call will work in a job.
+- **A fail-safe that succeeds silently is indistinguishable from a working feature.**
+  Both bugs above were invisible because the job went green either way — falling through
+  to "run the suite" is the *safe* direction, and it hid two consecutive failures. The
+  step now emits a `::warning::` when it cannot decide. Any guard whose failure mode is
+  "quietly do the conservative thing" needs to say so out loud, or nobody learns it
+  broke.
+
+The generalisable bit: for CI logic, "I ran it locally" is worth much less than it feels,
+because the interesting failures live in the *differences* between the two environments —
+shell flags, token scopes, event payloads. Replay the real inputs (`gh api` the actual PR
+number, the actual base/head SHAs) under the real flags, or accept that you have tested
+something adjacent.
+
 ## The window: `anchor` drives geometry, `today` drives language
 
 The single most erodable invariant in this codebase, established in #61.
