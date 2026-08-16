@@ -4,8 +4,7 @@ import SwiftUI
 /// drifted, and Task 4's ViewThatFits needs a single place to live.
 ///
 /// `trailing` is the reading block (a big value, a phase pill, or nothing at
-/// all for a pending card). `provisional` puts the ProvisionalBadge beside the
-/// region.
+/// all for a pending card). `status` is the strip below it.
 ///
 /// Two layouts, one shed step: distance and detail drop together when the
 /// width can't hold them (the list's grouping already answers "near me", and
@@ -22,15 +21,12 @@ struct StationCard<Trailing: View>: View {
     /// A next-event reading (`High 3.2 m · 14:20`) — mono-digit, sits inside
     /// the identity column beside the glyph.
     var detail: String? = nil
-    /// A status sentence ("Queued — Canadian tidal predictions download once,
-    /// then work offline") — prose, not a reading. Sits below the whole row
-    /// at full card width, dimmer than `detail`. Kept as its own slot rather
-    /// than a flag on `detail`: the two differ in opacity, width, and font
-    /// treatment, and conflating them regressed both (fix round 1, Task 3).
-    var message: String? = nil
+    /// What this card is waiting on — an icon and two words below the whole
+    /// row, at full card width (#93). Kept as its own slot rather than a flag
+    /// on `detail`: the two differ in opacity, width, and font treatment, and
+    /// conflating them regressed both (fix round 1, Task 3).
+    var status: CardStatus? = nil
     var opacity: Double = 1
-    /// Marks a 60-day fast answer: the ⚠️ badge beside the region.
-    var provisional = false
     @ViewBuilder var trailing: () -> Trailing
 
     /// Grows with the text it sits beside. Frozen, a 24pt mark next to 40pt
@@ -53,15 +49,12 @@ struct StationCard<Trailing: View>: View {
                     // iPad sidebar); `fixedSize(vertical:)` makes it take the
                     // height it actually needs instead.
                     .fixedSize(horizontal: false, vertical: true)
-                // Unconditional — region (and the badge beside it) never
-                // sheds: it is the only thing separating same-named stations.
-                HStack(spacing: 7) {
-                    if provisional { ProvisionalBadge() }
-                    Text(region)
-                        .font(.footnote)
-                        .foregroundStyle(SN.foam.opacity(0.78))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // Unconditional — region never sheds: it is the only thing
+                // separating same-named stations.
+                Text(region)
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
                 if extras, let km {
                     Text(formatNm(km))
                         .font(.caption.monospacedDigit())
@@ -87,18 +80,24 @@ struct StationCard<Trailing: View>: View {
                 content(extras: true)
                 content(extras: false)
             }
-            // `message` sits OUTSIDE the ViewThatFits, and that placement is
-            // load-bearing: `ViewThatFits` compares each candidate's IDEAL
-            // width, and a `Text`'s ideal width is its unwrapped single line —
-            // inside the candidates, a long message's ~470pt ideal dominated
-            // both, no candidate ever "fit", and every card carrying one fell
-            // through to the reduced layout regardless of width. The message
-            // is identical in both candidates, so it has no business being
-            // measured by the picker.
-            if let message {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(SN.foam.opacity(0.85))
+            // The dimming a pending card asks for is about its IDENTITY being
+            // quieter than a station with numbers — not about its status. Left
+            // on the whole card it also dims the strip, and amber at 0.82 over
+            // the card measures ~4.1:1, under AA for caption text where the
+            // full-strength 4.71:1 clears it (docs/testflight.md).
+            .opacity(opacity)
+            // The status strip sits OUTSIDE the ViewThatFits, and that
+            // placement is load-bearing: `ViewThatFits` compares each
+            // candidate's IDEAL width, and a `Text`'s ideal width is its
+            // unwrapped single line — inside the candidates, the ~470pt ideal
+            // of the paragraph this strip replaced dominated both, no candidate
+            // ever "fit", and every card carrying one fell through to the
+            // reduced layout regardless of width. The strip is identical in
+            // both candidates, so it has no business being measured by the
+            // picker — shorter copy does not change that, it only shrinks the
+            // window in which the bug would be visible.
+            if let status {
+                CardStatusStrip(status: status)
                     .padding(.top, 10)
             }
         }
@@ -108,6 +107,5 @@ struct StationCard<Trailing: View>: View {
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
-        .opacity(opacity)
     }
 }

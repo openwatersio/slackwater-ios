@@ -603,28 +603,11 @@ struct DetailFooter<Note: View>: View {
     }
 }
 
-/// The provisional ("fast answer") marking on a LIST card: the ⚠️ family and
-/// nothing else — the detail view carries the explanation. Amber on the flat
-/// card fill clears WCAG 1.4.11's 3:1 on both grounds (4.71:1 worst case;
-/// the measured numbers and their M52/M53 history live in docs/testflight.md).
-struct ProvisionalBadge: View {
-    /// Tracks the icon's own `.caption2` so the disc keeps containing the
-    /// triangle at the largest accessibility sizes.
-    @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 22
-
-    var body: some View {
-        Image(systemName: "exclamationmark.triangle.fill")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(SN.amber)
-            .frame(width: badgeSize, height: badgeSize)
-            .background(SN.canvas, in: Circle())
-            // A fixed 1pt hairline, deliberately not scaled: a separator, not
-            // a mark that needs to read at a distance.
-            .overlay(Circle().strokeBorder(SN.amber, lineWidth: 1))
-            .accessibilityLabel("Fast answer — still refining")
-            .accessibilityIdentifier("provisional-badge")
-    }
-}
+// `ProvisionalBadge` — the ⚠️ disc that used to sit beside the region on a
+// provisional card — is gone (#93). One marking per state: the fast answer is
+// now `CardStatus.refining`'s strip, which says the word and the tolerance
+// instead of leaving the reader to decode a triangle. Its contrast measurement
+// (docs/testflight.md) still governs, and CardStatus.tint cites it.
 
 // MARK: - Detail-to-detail navigation
 

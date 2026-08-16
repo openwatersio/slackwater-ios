@@ -393,14 +393,13 @@ final class NationalScaleTests: XCTestCase {
         })
         XCTAssertTrue(StationItem.search(far.name.lowercased()).contains { $0.id == far.id },
                       "an undownloaded station still has to be findable")
-        XCTAssertTrue(chsPendingMessage("tidal", id: far.id).hasPrefix("Open to download"),
-                      "it must not claim to be queued when it isn't")
+        XCTAssertEqual(cardStatus(id: far.id), .notDownloaded,
+                       "it must not claim to be queued when it isn't")
         service.promote(far.id)   // what ChsDetailView does on appear
         XCTAssertTrue(service.isQueued(far.id))
         XCTAssertEqual(service.queue.position(far.id), 1, "what you opened is next up")
-        XCTAssertTrue(chsPendingMessage("tidal", id: far.id).hasPrefix("Queued") ||
-                      chsPendingMessage("tidal", id: far.id).hasPrefix("Needs a moment"),
-                      "once queued it stops saying \"open to download\"")
+        XCTAssertTrue([.queued, .offline].contains(cardStatus(id: far.id)),
+                      "once queued it stops saying \"tap to download\"")
     }
 }
 
