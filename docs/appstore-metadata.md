@@ -1,6 +1,6 @@
 # App Store metadata — DRAFT for Bryan's review
 
-*M4, 2026-07-30. **Rewritten 2026-08-01 for national coverage** (M5.3: 3,125 bundled
+*M4, 2026-07-30. **Rewritten 2026-08-01 for national coverage** (M5.3: 3,352 bundled
 stations across the US and Canada — the previous draft described a Salish-Sea app).
 Nothing here has been submitted; App Store Connect still has placeholder values.
 Original keyword strategy from the ASO block in [gtm.md](gtm.md), now superseded below.*
@@ -17,8 +17,8 @@ privacy answers and review notes were already national and stand unchanged.
 | **Subtitle** | `Offline currents, US & Canada` | 30 (29 used) |
 
 Both still fit national coverage — "US & Canada" was always in the subtitle. The gtm.md
-alternate `Salish Sea slack & tide timing` is now **retired**: it describes 13 of 3,125
-stations.
+alternate `Salish Sea slack & tide timing` is now **retired**: it describes a handful of
+3,352 stations.
 
 ## Keywords (≤100 chars, name/subtitle words omitted)
 
@@ -77,34 +77,40 @@ Full draft:
 > Slack and max-current timing you can trust — offline, US and Canadian waters,
 > no subscription.
 >
-> Everyone does tide heights. Currents are the actual planning problem: when
-> does the pass go slack, how hard is it running at max, and can you be through
-> before it turns. Slackwater computes real harmonic predictions on your phone —
-> no server, no signal needed — for more than 3,000 stations across the US and
-> Canada.
+> Plenty of apps show tide heights. Currents are the harder question. When does
+> the pass go slack? How hard is it running at max? Can you get through before
+> it turns?
+>
+> Slackwater answers all three on your phone. Real harmonic predictions,
+> computed on the device — no server, no signal — for more than 3,300 stations
+> across the US and Canada.
 >
 > WORKS WITH NO SIGNAL
-> The harmonics run on the device. Open it once with a connection and it keeps
-> answering in an anchorage, a dead zone, or with the boat's electronics down.
+> The predictions are computed on your phone, not fetched from a server. Open
+> the app once with a connection and it keeps answering: in an anchorage, in a
+> dead zone, or with the boat's electronics down.
 >
 > CURRENTS, NOT JUST TIDES
-> Signed velocity curves with slack, max flood and max ebb — scrub the day with
-> your thumb. Current stations show the tide at their reference port on the
-> same screen.
+> Signed velocity curves with slack, max flood and max ebb. Scrub through the
+> day with your thumb. Every current station shows the tide at its reference
+> port on the same screen.
 >
 > US AND CANADIAN STATIONS
-> More than 2,000 NOAA tide and current stations are built in — nothing to
-> download. Canadian (CHS) tide stations fit a harmonic model on your device
-> from CHS predictions, then work offline for good; the ones nearest you fit
-> automatically, and any other fits the moment you open it. Canadian current
-> passes run from the Salish Sea to Haida Gwaii and Cape Breton, each one
-> checked against published predictions before it ships — the few whose water
-> the on-device model can't predict accurately fetch when you have a signal,
-> and say so.
+> More than 2,200 NOAA tide and current stations are built in, with nothing to
+> download.
+>
+> Canadian stations work a little differently. Your phone fits a harmonic model
+> from CHS predictions, then works offline for good. The ones nearest you fit
+> automatically. Any other fits the moment you open it.
+>
+> Canadian current passes run from the Salish Sea to Haida Gwaii and Cape
+> Breton, each one checked against published predictions before it ships. A few
+> sit in water the on-device model can't predict accurately — those fetch when
+> you have a signal, and tell you so.
 >
 > A MAP THAT WORKS OFFLINE
-> Every station on a pin map with coastline that renders with zero bars. Depth
-> contours appear when you're online.
+> Every station on a map. The coastline draws with zero bars; depth contours
+> appear when you're online.
 >
 > FREE, NO ACCOUNT, NO ADS
 > The offline core is free and stays free.
