@@ -23,6 +23,23 @@ keychain whose password lives on disk, unlocked by the script per run, holding a
 identity minted through the ASC API (no Xcode sign-in anywhere). Cloud-managed signing is never
 used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → import → new profile.
 
+## Tester groups
+
+| Group | Kind | Gets builds | Link |
+|---|---|---|---|
+| Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
+| Friends & Family | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | https://testflight.apple.com/join/HK7mHF19 |
+
+The public link is written down here because it exists nowhere else in the repo — App Store
+Connect mints it and `asc.mjs` never reads it back. Re-read it any time with
+`GET /v1/betaGroups` → the group's `attributes.publicLink` (`publicLinkEnabled` is the
+on/off switch, `publicLinkLimit` the tester cap, currently unset).
+
+Before handing the link to anyone, check what they'd actually install: `node scripts/asc.mjs
+builds` shows group membership, but membership is not availability — an external build sits
+in `WAITING_FOR_REVIEW` until Apple clears it, and testers keep getting the last **approved**
+build meanwhile. Build 25 was in the group and pending review the day it shipped.
+
 ## Cadence
 
 Per-release procedure lives in the `releasing-to-testflight` skill
