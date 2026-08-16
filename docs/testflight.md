@@ -112,14 +112,21 @@ the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix a
 rest on the runner. A bare `M1_SHOT_DIR` in the invoking shell never arrives and the tests
 silently fall back to `/tmp`.
 
-## Card contrast — ProvisionalBadge against the flat card background (2026-08-02)
+## Card contrast — amber against the flat card background (2026-08-02)
+
+**#93 deleted `ProvisionalBadge`** (the fast answer is now `CardStatus.refining`'s strip —
+icon, word and the gate's own tolerance, where the badge was a triangle to decode). The
+numbers below are why that strip can be plain amber text: at 4.71:1 worst case it clears AA
+for text, not just 1.4.11's 3:1 for the icon beside it, so the marking no longer needs its own
+opaque disc. `CardStatus.tint` cites this section.
+
 
 Superseded by M53 (layout A): the per-station `stationGradient`/`gradientTrios` this section
 used to warn about are deleted — every card background is now flat `SN.cardFill` (≈5% white)
 composited over the list's `SN.canvas`/`SN.canvasGlow` radial ground, so there is no longer a
-12-trio worst case to chase. A marking that must read on the card still can't be bare coloured
-text, though — `ProvisionalBadge` keeps its own opaque chrome (amber on an `SN.canvas` disc
-with a full-strength amber ring) rather than relying on the card fill directly.
+12-trio worst case to chase. The badge kept its own opaque chrome (amber on an `SN.canvas` disc
+with a full-strength amber ring) for the gradients' sake; against the flat fill that measured
+below, bare coloured text clears the bar on its own.
 
 Composited card background ranges `#121E35` (deep in the list, near `SN.canvas`) to `#162C4A`
 (top of list, near the brighter `SN.canvasGlow`). New amber `#EF6F4A` against that range is

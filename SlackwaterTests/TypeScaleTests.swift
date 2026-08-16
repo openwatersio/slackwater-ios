@@ -129,6 +129,11 @@ extension TypeScaleTests {
                 // string on the very next line, hence the n-1 check alongside
                 // same-line.
                 //
+                // (#93 replaced StationCard's `message:` prose slot with a
+                // `status:` enum, so no call site spells `message:` today. The
+                // guard stays as a tripwire: the exemption below is what would
+                // wave a future prose slot through, and it costs one `contains`.)
+                //
                 // `message:` deliberately gets NO such exemption: StationCard
                 // renders `message` as plain `.caption`, no mono treatment — it is
                 // prose, not a reading, and a formatter feeding it would be a real

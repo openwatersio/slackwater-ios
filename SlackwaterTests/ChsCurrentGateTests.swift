@@ -210,6 +210,21 @@ final class ChsCurrentGateTests: XCTestCase {
                        "past the edge it must fail, not silently render a hole")
     }
 
+    /// #93: "never fetched" and "fetched, ran out of coverage" are different
+    /// states, and the card literal this replaced printed one sentence for
+    /// both — the user could not tell a station that needs a first download
+    /// from one whose window has expired.
+    func testOnlineGateStatusSeparatesNeverFetchedFromExpired() {
+        XCTAssertEqual(onlineGateStatus(nil, online: true), .notDownloaded,
+                       "a gate with nothing on disk is one tap from its first fetch")
+        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: true), .expired,
+                       "a stored window that no longer covers the strip is expired, not missing")
+        // No signal: neither tapping nor waiting fetches anything, so the only
+        // true thing to say is "get online" — whatever is on disk.
+        XCTAssertEqual(onlineGateStatus(nil, online: false), .offline)
+        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .offline)
+    }
+
     // MARK: - Merging (the 30-day fetch, unioned on save)
 
     /// A window whose bounds are exactly its own samples — the shape a fetch

@@ -1347,31 +1347,11 @@ struct ChsCardView: View {
 
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
         ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
-                       message: chsPendingMessage("tidal", id: info.id,
-                                                  fitting: fitting, failed: failed))
+                       status: cardStatus(id: info.id, fitting: fitting, failed: failed))
     }
 }
 
-/// A station with no model yet. The honest situations, not one blanket line:
-///   - mid-download or failed-this-run — say which.
-///   - not in the download set at all (M53 — most of Canada): opening it is
-///     what downloads it, so say that rather than implying a queue it isn't in.
-///   - queued and connected: it is in line behind the nearer stations.
-///   - no signal: nothing is moving at all. The established moment-of-signal
-///     copy is kept verbatim.
-@MainActor func chsPendingMessage(_ series: String, id: String,
-                                  fitting: Bool = false, failed: Bool = false) -> String {
-    if fitting { return "Downloading Canadian \(series) predictions…" }
-    if failed { return "Canadian \(series) predictions didn't finish downloading — open it to retry." }
-    if !ChsFitService.shared.isQueued(id) {
-        return "Open to download — Canadian \(series) predictions download once, then work offline."
-    }
-    return Connectivity.shared.online
-        ? "Queued — Canadian \(series) predictions download once, then work offline."
-        : "Needs a moment of signal — Canadian \(series) predictions download once, then work offline."
-}
-
-/// The not-yet-fitted CHS shell: identity + an honest message, no numbers
+/// The not-yet-fitted CHS shell: identity + one status strip, no numbers
 /// (chs-online spec §7c). Shared by the tide ports and the derived gates —
 /// a gate is pending exactly while its reference port is.
 struct ChsPendingCard: View {
@@ -1384,12 +1364,12 @@ struct ChsPendingCard: View {
     /// the same wave/dome distinction as their fitted counterparts.
     let kind: StationGlyph.GlyphKind
     var km: Double? = nil
-    let message: String
+    let status: CardStatus
 
     var body: some View {
         StationCard(glyphKind: kind, glyphTone: .unknown,
                     name: name, region: region, km: km,
-                    message: message,
+                    status: status,
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
             // Named per station (M53). "Some card on screen says 'Canadian tidal
@@ -1437,8 +1417,7 @@ struct ChsGateCardView: View {
     /// A derived gate waits on its reference PORT's tidal download.
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
         ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                       message: chsPendingMessage("tidal", id: gate.reference,
-                                                  fitting: fitting, failed: failed))
+                       status: cardStatus(id: gate.reference, fitting: fitting, failed: failed))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -1515,14 +1494,13 @@ struct ChsCurrentGateCardView: View {
 
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
         ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                       message: chsPendingMessage("current", id: gate.id,
-                                                  fitting: fitting, failed: failed))
+                       status: cardStatus(id: gate.id, fitting: fitting, failed: failed))
     }
 
     /// The 7 online gates (online-gates spec §4): a covering fetched window
     /// reads like any other current card; without one, the pending shell
-    /// carries the honest "fetched when connected" line instead of a queue
-    /// status this gate never has.
+    /// carries the strip `onlineGateStatus` picks — never a queue status this
+    /// gate can't be in.
     @ViewBuilder private var onlineCard: some View {
         // ONE snapshot of today, not two calls: `Timeline.window` back-pads only
         // when `anchor == today` by exact equality, so a local midnight landing
@@ -1532,8 +1510,10 @@ struct ChsCurrentGateCardView: View {
         if let onlineWindow, onlineWindow.covers(anchor: today, today: today) {
             OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
         } else {
+            // Never fetched and fetched-but-run-out are different states, and
+            // this path used to print one string for both (#93).
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
-                           message: "Online — official CHS predictions, fetched when connected")
+                           status: onlineGateStatus(onlineWindow, online: net.online))
         }
     }
 }
@@ -1597,15 +1577,22 @@ struct CurrentCardView: View {
     let record: CurrentStationRecord
     var km: Double? = nil
     /// Set while this gate is showing its 60-day fast answer. On the LIST card
-    /// that is a ⚠️ badge and a `~` on the readings — nothing else (M52). The
-    /// amber prose this replaced was unreadable on the per-station gradients of
-    /// the day; those are gone and the numbers were redone against the flat
-    /// card (see `ProvisionalBadge`, which carries the current contrast story).
-    /// The full explanation, in the amber card that can afford the contrast,
-    /// lives on the detail view and is unchanged.
+    /// that is the amber "Refining" strip and a `~` on the readings — nothing
+    /// else. The strip replaced M52's ⚠️ badge beside the region (#93): one
+    /// marking per state, and this one can carry the gate's own tolerance,
+    /// which the badge could only gesture at. The full explanation still lives
+    /// on the detail view's amber card.
     var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
+
+    /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
+    /// a gate that never offered a fast answer has no measured number to show.
+    private var status: CardStatus? {
+        provisional.map {
+            .refining(tolerance: $0.provisionalSlackMinutes == nil ? nil : $0.provisionalTolerance)
+        }
+    }
 
     /// The tilde stays: at normal card contrast "~5.8" reads cleanly, and it is
     /// the one part of the old treatment that marked the NUMBER rather than
@@ -1627,7 +1614,7 @@ struct CurrentCardView: View {
         StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state),
                     name: record.name, region: record.region, km: km,
                     detail: state?.next.map { nextLine($0) },
-                    provisional: provisional != nil) {
+                    status: status) {
             if let state {
                 let phase = currentPhase(signed: state.signed)
                 if phase == .slack {

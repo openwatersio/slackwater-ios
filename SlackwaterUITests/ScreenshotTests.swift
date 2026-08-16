@@ -802,10 +802,13 @@ final class ScreenshotTests: XCTestCase {
     func testM43ChsPendingCopy() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
         openSearch(app, "victoria")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions download once'"))
+        // #93 took the sentence off the visible card — it is an icon and two
+        // words now — but the plain-language copy still has to reach VoiceOver,
+        // which is the reader with the LEAST context, not the most.
+        XCTAssert(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS 'download once, then work offline'"))
             .firstMatch.waitForExistence(timeout: 10),
-                  "pending card is missing the plain-language copy")
+                  "the pending card's status strip is missing the plain-language copy")
     }
 
     // M4.4: iPad split layout — regular width gets the web's ≥62rem shape
@@ -968,8 +971,8 @@ final class ScreenshotTests: XCTestCase {
         openSearch(app, "malibu")
         XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
                   "search did not find Malibu Rapids")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'Canadian tidal predictions download once'"))
+        XCTAssert(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS 'download once, then work offline'"))
             .firstMatch.waitForExistence(timeout: 10),
                   "derived gate must show the CHS pending register before its reference is fitted")
     }
@@ -1632,7 +1635,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(fitted.waitForExistence(timeout: 240), "Active Pass never fitted — IWLS unreachable?")
         report("nearest 60-day gate → FINAL", t0)
 
-        XCTAssertFalse(app.descendants(matching: .any)["provisional-badge"].firstMatch.exists,
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists,
                        "a gate validated at 60 d must go straight to final — no provisional marking")
         app.staticTexts["Active Pass"].firstMatch.tap()
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
@@ -1654,13 +1658,17 @@ final class ScreenshotTests: XCTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openSearch(app, "dodd")
 
-        // The fast answer, in the list: the ⚠️ badge and a tilde'd reading, and
-        // that is ALL — the amber prose that used to ride the card measured
-        // 1.03:1 against the palest station gradient (M52). The number it can
-        // be off by lives on the detail, where the amber card can afford it.
-        let badge = app.descendants(matching: .any)["provisional-badge"].firstMatch
+        // The fast answer, in the list: the amber "Refining · ±35 min" strip and
+        // a tilde'd reading, and that is ALL — the amber PROSE that used to ride
+        // the card measured 1.03:1 against the palest station gradient (M52),
+        // and the ⚠️ badge that replaced it said nothing a reader could act on
+        // (#93). The full explanation still lives on the detail.
+        let badge = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
         XCTAssert(badge.waitForExistence(timeout: 240),
                   "Dodd Narrows never published its 60-day fast answer")
+        XCTAssert(badge.label.contains("±35 min"),
+                  "the strip must carry THIS pass's measured tolerance, not a generic hedge")
         report("nearest 210-day gate → PROVISIONAL", t0)
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'FAST ANSWER'")).firstMatch.exists,
@@ -2130,8 +2138,9 @@ final class ScreenshotTests: XCTestCase {
         let halifax = app.staticTexts["Halifax"].firstMatch
         XCTAssert(halifax.waitForExistence(timeout: 5),
                   "a Canadian station 4,400 km away must still be findable offline")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Open to download'")).firstMatch.exists,
+        // The words on the card, not the VoiceOver phrasing: this is the one
+        // assertion about what a reader actually SEES on an unqueued station.
+        XCTAssert(app.staticTexts["Tap to download"].firstMatch.exists,
                   "an unqueued station must not claim to be queued")
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
         app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch.tap()
@@ -2310,8 +2319,9 @@ final class ScreenshotTests: XCTestCase {
             .firstMatch.waitForExistence(timeout: 5), "today's schedule row missing")
 
         // No fitted-station provisional story belongs anywhere near this page.
-        XCTAssertFalse(app.descendants(matching: .any)["provisional-badge"].firstMatch.exists,
-                       "an online gate can never carry the fitted-station provisional badge")
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists,
+                       "an online gate can never carry the fitted-station refining strip")
         XCTAssertFalse(app.descendants(matching: .any)["provisional-reading-badge"].firstMatch.exists,
                        "an online gate can never show a fitted-station fast-answer amber reading")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
