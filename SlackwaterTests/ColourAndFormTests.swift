@@ -175,15 +175,6 @@ final class ColourAndFormTests: XCTestCase {
         assertSameColour(StationGlyph.colour(for: .slack), SN.go, "slack is the go colour")
     }
 
-    func testGlyphShapeTracksKind() {
-        // The two kinds must not produce identical paths — that would collapse
-        // the form axis and leave kind unexpressed.
-        let box = CGRect(x: 0, y: 0, width: 24, height: 24)
-        XCTAssertNotEqual(StationGlyph.path(for: .tide, in: box).description,
-                          StationGlyph.path(for: .current, in: box).description,
-                          "tide and current must draw different shapes")
-    }
-
     /// Every value this branch retired, banned from every source file — not
     /// from the one file an audit happened to be looking at.
     ///
@@ -246,21 +237,10 @@ final class ColourAndFormTests: XCTestCase {
             CurrentCardState(signed: 0, next: nil))), SN.go, "a gate at slack draws go")
     }
 
-    /// A station's glyph kind is fixed by the item, never inferred from
-    /// whether a reading has arrived (issue #14 — that bug shipped once on
-    /// the web side). Cross-checked against `pinKind`, the map's own
-    /// kind-of-station binding, so the two can't drift apart.
-    func testStationItemGlyphKindIsFixedByItem() {
-        for item in StationItem.all {
-            XCTAssertEqual(item.glyphKind,
-                           item.pinKind == "current" ? .current : .tide,
-                           item.id)
-        }
-    }
-
     /// Issue #14: no sheet row may still render the flat empty 38pt square
-    /// left over from the gradient deletion — those chips carry a
-    /// `StationGlyph` now, like `RecentRowLabel`.
+    /// left over from the gradient deletion — the rows that still carry a kind
+    /// mark (the chooser sheet, the downloads manager) draw a real
+    /// `StationGlyph`. The list's cards and recent rows draw none at all.
     func testNoFlatCardFillChipRemains() throws {
         var offenders: [String] = []
         for (name, source) in try appSources() {

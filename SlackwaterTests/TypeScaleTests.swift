@@ -237,24 +237,17 @@ extension TypeScaleTests {
     /// becomes a 24pt mark next to 40pt type. @ScaledMetric is the sanctioned
     /// exception to "no literal sizes" — it scales a non-text dimension.
     ///
-    /// Both halves of this used to be theatre and are written positively now.
-    /// `card.contains("@ScaledMetric")` passed on a *comment* mentioning the
-    /// token, and `XCTAssertFalse(app.contains("Color.clear.frame(height: 96)"))`
-    /// banned one retired literal — `height: 100` sailed straight through. A
-    /// ban on one string is not a guarantee about the surviving code.
-    func testGlyphAndFabClearanceScale() throws {
-        let cardLines = try repoSource("Slackwater/StationCard.swift")
-            .components(separatedBy: .newlines)
-        // A real declaration, not a mention: same line carries the property
-        // wrapper and the name, and it is not a comment.
-        XCTAssertTrue(cardLines.contains {
-            let t = $0.trimmingCharacters(in: .whitespaces)
-            return !t.hasPrefix("//") && t.contains("@ScaledMetric") && t.contains("glyphSize")
-        }, "glyphSize must be declared @ScaledMetric — it sits beside the name and has to grow with it")
-        // …and the declaration has to reach the glyph, or it scales nothing.
-        XCTAssertTrue(cardLines.contains { $0.contains("size: glyphSize") },
-                      "StationGlyph must be given the scaled glyphSize")
-
+    /// This used to have a glyph half, asserting `StationCard` gave the kind
+    /// mark a scaled `glyphSize`. The mark is gone from every row, and
+    /// `StationGlyph` is a caseless enum now, so "no card draws one" is a
+    /// compile error rather than something a source scan has to police. A
+    /// grep that cannot fail is the theatre the note below is about.
+    ///
+    /// What remains was theatre once too and is written positively now:
+    /// `XCTAssertFalse(app.contains("Color.clear.frame(height: 96)"))` banned
+    /// one retired literal — `height: 100` sailed straight through. A ban on
+    /// one string is not a guarantee about the surviving code.
+    func testFabClearanceScales() throws {
         let appLines = try repoSource("Slackwater/SlackwaterApp.swift")
             .components(separatedBy: .newlines)
         let spacers = appLines.filter {

@@ -1096,8 +1096,6 @@ struct StationChooserSheet: View {
     @Environment(\.dismiss) private var dismiss
     // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
     // scales with type, the slot scales with it so it can't overflow the row.
-    @ScaledMetric(relativeTo: .callout) private var glyphSize: CGFloat = 26
-    @ScaledMetric(relativeTo: .callout) private var glyphSlot: CGFloat = 38
 
     var body: some View {
         ZStack {
@@ -1149,9 +1147,6 @@ struct StationChooserSheet: View {
             dismiss()
         } label: {
             HStack(spacing: 12) {
-                StationGlyph(kind: item.glyphKind, tone: item.glyphTone(at: appNow()),
-                             size: glyphSize)
-                    .frame(width: glyphSlot, height: glyphSlot)
                 VStack(alignment: .leading, spacing: 3) {
                     // The name is the same on every row — the qualifier is the
                     // whole point, so it leads.
@@ -1181,65 +1176,46 @@ struct StationChooserSheet: View {
     }
 }
 
-/// The compact recent-station row body: kind glyph, name over region, current
-/// reading trailing in Fraunces. The prototype's 38pt gradient chip is gone
-/// with the gradients (M53 layout A) — it had become a flat empty box sitting
-/// inches below cards that draw a real glyph, so it takes the same
-/// `StationGlyph` the cards do: wave or dome for kind, tone for state.
+/// The compact recent-station row body: name over region, current reading
+/// trailing in Fraunces. No kind mark — it came off these rows with the cards',
+/// for the same reason (the wave and the dome are not universal symbols), and
+/// a row that kept one beside cards that dropped theirs would read as a
+/// distinction that isn't there.
 struct RecentRowLabel: View {
     let item: StationItem
     let imperial: Bool
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     // Cache the engine state, format in body — unit switches re-render live.
-    // The whole card state, not just the number, because the glyph's tone
-    // needs the direction/phase the reading alone doesn't carry.
+    // Still the whole card state and not just the number: `reading` needs the
+    // slack test and the phase word, which the bare value doesn't carry.
     @State private var tide: CardState?
     @State private var current: CurrentCardState?
     @State private var gate: DerivedGateCardState?  // derived gate: phase word, never a speed
-    @ScaledMetric(relativeTo: .callout) private var tileGlyphSize: CGFloat = 26
-    /// The glyph's slot — tracks `tileGlyphSize` (sweep finding: `StationGlyph`
-    /// sizes its own internal `Canvas` from `size`, but this outer frame was
-    /// left at a literal 38, so once `tileGlyphSize` outgrew it the glyph
-    /// overflowed the slot into the row's name/reading text beside it).
-    @ScaledMetric(relativeTo: .callout) private var tileGlyphSlot: CGFloat = 38
-
-    /// Reuses the cards' own bindings so a row and its card can never disagree.
-    private var glyphTone: StationGlyph.Tone {
-        switch item {
-        case .tide, .chs: StationCardView.glyphTone(tide)
-        case .current, .chsCurrent: CurrentCardView.glyphTone(current)
-        case .chsGate: ChsGateCardView.glyphTone(gate?.phase)
-        }
-    }
-
     var body: some View {
-        HStack(spacing: 12) {
-            StationGlyph(kind: item.glyphKind, tone: glyphTone, size: tileGlyphSize)
-                .frame(width: tileGlyphSlot, height: tileGlyphSlot)
-            // The name owns the full row width (M50). It used to share the
-            // line with the reading, which in the 320pt iPad sidebar left it
-            // ~150pt — "Deception Pass State Park" came out "Deception Pas…",
-            // and two different stations truncated to the same string. The
-            // reading drops to the secondary line, where the region (the least
-            // load-bearing text here) is what gives way instead.
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(SN.paper)
-                HStack(spacing: 8) {
-                    Text(item.region)
-                        .font(.caption)
-                        .foregroundStyle(SN.foam.opacity(0.55))
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(reading)
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(0.7))
-                        .lineLimit(1)
-                        .layoutPriority(1)
-                }
+        // The name owns the full row width (M50). It used to share the
+        // line with the reading, which in the 320pt iPad sidebar left it
+        // ~150pt — "Deception Pass State Park" came out "Deception Pas…",
+        // and two different stations truncated to the same string. The
+        // reading drops to the secondary line, where the region (the least
+        // load-bearing text here) is what gives way instead.
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.name)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(SN.paper)
+            HStack(spacing: 8) {
+                Text(item.region)
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.55))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(reading)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(SN.foam.opacity(0.7))
+                    .lineLimit(1)
+                    .layoutPriority(1)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
@@ -1293,14 +1269,18 @@ struct StationCardView: View {
     /// here renders a perfectly valid flood blue on a falling tide and no
     /// token or colour test can see it (`ColourAndFormTests`
     /// `testCardGlyphToneBindings`).
+    /// ponytail: test-only since the kind mark came off the rows — the tide
+    /// tone now colours nothing. `ChsGateCardView`'s twin is still live
+    /// (`DerivedGateDetailView`), so the trio is kept together rather than
+    /// half-deleted. Delete this and `CurrentCardView`'s if nothing claims
+    /// them by the time tide colour is decided (#95).
     static func glyphTone(_ state: CardState?) -> StationGlyph.Tone {
         guard let state else { return .unknown }
         return state.rising ? .rising : .falling
     }
 
     var body: some View {
-        StationCard(glyphKind: .tide, glyphTone: Self.glyphTone(state),
-                    name: record.name, region: record.region, km: km,
+        StationCard(name: record.name, region: record.region, km: km,
                     detail: state?.next.map { next in
                         "\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))"
                     }) {
@@ -1346,7 +1326,7 @@ struct ChsCardView: View {
     }
 
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
-        ChsPendingCard(name: info.name, region: info.region, id: info.id, kind: .tide, km: km,
+        ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
                        status: cardStatus(id: info.id, fitting: fitting, failed: failed))
     }
 }
@@ -1358,17 +1338,11 @@ struct ChsPendingCard: View {
     let name: String
     let region: String
     let id: String
-    /// No reading has ever loaded here — there's nothing yet to fit, so the
-    /// glyph's tone is `.unknown`, never a guess. Kind still comes from the
-    /// caller: a pending tide port and a pending derived current gate look
-    /// the same wave/dome distinction as their fitted counterparts.
-    let kind: StationGlyph.GlyphKind
     var km: Double? = nil
     let status: CardStatus
 
     var body: some View {
-        StationCard(glyphKind: kind, glyphTone: .unknown,
-                    name: name, region: region, km: km,
+        StationCard(name: name, region: region, km: km,
                     status: status,
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
@@ -1416,13 +1390,12 @@ struct ChsGateCardView: View {
 
     /// A derived gate waits on its reference PORT's tidal download.
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
                        status: cardStatus(id: gate.reference, fitting: fitting, failed: failed))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state?.phase),
-                    name: gate.name, region: gate.region, km: km,
+        StationCard(name: gate.name, region: gate.region, km: km,
                     detail: state?.nextSlack.map { next in
                         "Slack · \(cardTime(next.time, gate.tz))"
                     }) {
@@ -1493,7 +1466,7 @@ struct ChsCurrentGateCardView: View {
     }
 
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
                        status: cardStatus(id: gate.id, fitting: fitting, failed: failed))
     }
 
@@ -1512,7 +1485,7 @@ struct ChsCurrentGateCardView: View {
         } else {
             // Never fetched and fetched-but-run-out are different states, and
             // this path used to print one string for both (#93).
-            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, kind: .current, km: km,
+            ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
                            status: onlineGateStatus(onlineWindow, online: net.online))
         }
     }
@@ -1532,8 +1505,7 @@ struct OnlineGateCardView: View {
 
     var body: some View {
         let state = state
-        StationCard(glyphKind: .current, glyphTone: CurrentCardView.glyphTone(state),
-                    name: gate.name, region: gate.region, km: km,
+        StationCard(name: gate.name, region: gate.region, km: km,
                     detail: state.next.map { nextLine($0) }) {
             if currentPhase(signed: state.signed) == .slack {
                 Text("SLACK")
@@ -1611,8 +1583,7 @@ struct CurrentCardView: View {
     }
 
     var body: some View {
-        StationCard(glyphKind: .current, glyphTone: Self.glyphTone(state),
-                    name: record.name, region: record.region, km: km,
+        StationCard(name: record.name, region: record.region, km: km,
                     detail: state?.next.map { nextLine($0) },
                     status: status) {
             if let state {

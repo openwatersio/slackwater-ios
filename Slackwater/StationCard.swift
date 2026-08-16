@@ -8,13 +8,18 @@ import SwiftUI
 ///
 /// Two layouts, one shed step: distance and detail drop together when the
 /// width can't hold them (the list's grouping already answers "near me", and
-/// "when" is the detail view's job one tap away). The glyph, name, region and
-/// reading are load-bearing at every size and render unconditionally — a
+/// "when" is the detail view's job one tap away). The name, region and reading
+/// are load-bearing at every size and render unconditionally — a
 /// region-shedding tier shipped once and silently dropped both the badge and
 /// the one field disambiguating same-named stations (M50).
+///
+/// No kind mark. The wave and the dome came off the cards because they are not
+/// universal symbols: they taught a new reader nothing, and a returning reader
+/// scans the names. Nothing replaces them, VoiceOver included — the mark's
+/// `accessibilityLabel` was the only thing announcing kind here, and keeping
+/// the phrase after retiring the drawing would tell a VoiceOver user something
+/// the card no longer tells anyone else. Parity, not preservation.
 struct StationCard<Trailing: View>: View {
-    let glyphKind: StationGlyph.GlyphKind
-    let glyphTone: StationGlyph.Tone
     let name: String
     let region: String
     var km: Double? = nil
@@ -29,17 +34,12 @@ struct StationCard<Trailing: View>: View {
     var opacity: Double = 1
     @ViewBuilder var trailing: () -> Trailing
 
-    /// Grows with the text it sits beside. Frozen, a 24pt mark next to 40pt
-    /// type reads as a bullet rather than a station kind.
-    @ScaledMetric(relativeTo: .title2) private var glyphSize: CGFloat = 24
-
     /// The identity row — the only thing `extras` changes, and so the only
     /// thing `ViewThatFits` measures. `message` and the card chrome sit
     /// outside it in `body`; see the note there for why that matters.
     @ViewBuilder
     func content(extras: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            StationGlyph(kind: glyphKind, tone: glyphTone, size: glyphSize)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.title2.weight(.semibold))
