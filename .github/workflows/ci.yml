@@ -56,6 +56,14 @@ jobs:
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
         run: |
+          # GitHub runs `run:` blocks as `bash -e {0}`, so ANY unhandled non-zero
+          # aborts the step mid-decision — including `grep -v` finding nothing,
+          # which is precisely the docs-only case this job exists to detect. That
+          # is not hypothetical: it turned the first correct skip into a red build
+          # on main. Every failure below is handled explicitly and falls through
+          # to running the suite, so -e can only convert a right answer into a
+          # broken one.
+          set +e
           set -uo pipefail
           # Falling through to "run" is the safe direction, but it must never be
           # a SILENT one: a permanently broken gate that always runs the Studio
@@ -86,7 +94,9 @@ jobs:
           [ -z "$FILES" ] && run_it "no files reported — running the app lane"
           echo "changed:"; echo "$FILES" | sed 's/^/  /'
 
-          OTHER=$(echo "$FILES" | grep -vE '^docs/|^[^/]*\.md$')
+          # `|| true`: grep -v exits 1 when everything is filtered out, i.e. the
+          # docs-only case. Belt and braces alongside `set +e` above.
+          OTHER=$(echo "$FILES" | grep -vE '^docs/|^[^/]*\.md$' || true)
           if [ -n "$OTHER" ]; then
             echo "app=true" >> "$GITHUB_OUTPUT"
             echo "-> app lane RUNS (non-docs paths present)"
