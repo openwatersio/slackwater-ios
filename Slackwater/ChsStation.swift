@@ -21,6 +21,31 @@ struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
     static let all: [ChsStationInfo] = bundled("chs-stations")
 }
 
+/// Identity for a station that HAS shipped and no longer does
+/// (chs-tombstones.json, issue #91). Favorites persist a bare `StationItem.id`
+/// and nothing else, so when a station leaves the bundle this file is the only
+/// thing left that can name what someone starred — and its last known position
+/// is what a replacement gets offered from.
+///
+/// Written by `gen-chs-stations.mjs`, which is also the only producer today;
+/// the app looks tombstones up by id, so a NOAA one would just be more rows.
+struct StationTombstone: Decodable, Identifiable, Hashable, StationIdentity {
+    let id: String
+    let name: String
+    let region: String
+    let latitude: Double
+    let longitude: Double
+    /// StationIdentity's search hook, computed rather than stored: a removed
+    /// station is never searched, and a stored-with-default property would
+    /// depend on synthesised-Decodable behaviour that `bundled`'s `try?` would
+    /// swallow into an empty catalog if it went the other way.
+    var aliases: [String] { [] }
+
+    static let all: [StationTombstone] = bundled("chs-tombstones")
+    static let byId: [String: StationTombstone] =
+        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+}
+
 /// A harmonic model fitted on this device from IWLS predictions (`wlp` for a
 /// tide port, `wcsp1`/`wcdp1` for a current gate) — the only CHS-derived
 /// artifact, and it never leaves the device. One shape for both series; the

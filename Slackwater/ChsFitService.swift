@@ -195,6 +195,57 @@ final class ChsFitService: ObservableObject {
         // After adopt(), so a `-chsFailOnly` id not already in the auto-fit
         // set (added by adopt() above) still gets marked.
         for id in Self.failOnly { queue.set(id, .failed) }
+        Self.sweepOrphans(files)
+    }
+
+    /// Which files under `ChsModels/` belong to no station the bundle still
+    /// ships (issue #91). Pure and passed its sets so it can be tested without
+    /// a filesystem — the destructive half is four lines in `sweepOrphans`.
+    ///
+    /// Keyed off the bundled catalogs rather than `candidates`, which
+    /// `-chsFitOnly` shrinks: a UI-test flag must never decide that a real
+    /// user's models are garbage.
+    /// `nonisolated` so a test can call it off the main actor: it reads nothing
+    /// but its arguments, all value types.
+    nonisolated static func orphanFiles(in files: Set<String>,
+                                        ports: Set<String>, gates: Set<String>) -> [String] {
+        files.sorted().filter { file in
+            guard file.hasSuffix(".json") else { return false }
+            let stem = String(file.dropLast(5))
+            // `-current` and `-online` are the only suffixes ChsModelStore
+            // writes, and both belong to gates; anything else is a port id.
+            if let suffix = ["-current", "-online"].first(where: { stem.hasSuffix($0) }) {
+                return !gates.contains(String(stem.dropLast(suffix.count)))
+            }
+            return !ports.contains(stem)
+        }
+    }
+
+    /// Delete fitted models for stations that have left the bundle. Nothing
+    /// else ever would: the launch scan iterates bundled candidates, never the
+    /// directory, so a removed station's downloaded model is neither loaded nor
+    /// deleted — dead weight, and most likely present precisely because someone
+    /// cared enough to favorite it.
+    ///
+    /// Runs off the listing `init` already has in hand, so it costs no I/O on
+    /// the overwhelmingly common no-orphans launch.
+    private static func sweepOrphans(_ files: Set<String>) {
+        let ports = Set(ChsStationInfo.all.map(\.id))
+        let gates = Set(ChsCurrentGateInfo.all.map(\.id))
+        // `bundled()` swallows a decode failure into an empty array, and an
+        // empty catalog would read as "every model on this device is an
+        // orphan". Nothing is worth deleting on that evidence.
+        guard !ports.isEmpty, !gates.isEmpty else { return }
+        for file in orphanFiles(in: files, ports: ports, gates: gates) {
+            // The chunk cache is keyed by IWLS id, which only the model
+            // carries — read it before the file goes. Best effort: an
+            // `-online.json` decodes as no model and keeps its chunks, and a
+            // chunk cache is re-fetchable by definition.
+            if let model: ChsModel = ChsModelStore.load(String(file.dropLast(5)), suffix: "") {
+                ChsChunkStore.purge(model.iwlsID)
+            }
+            try? FileManager.default.removeItem(at: ChsModelStore.dir.appendingPathComponent(file))
+        }
     }
 
     /// Take the nearest stations into the download set and re-sort. Jobs only

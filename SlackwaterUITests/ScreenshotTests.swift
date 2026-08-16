@@ -2405,4 +2405,106 @@ final class ScreenshotTests: XCTestCase {
                                           options: .regularExpression) != nil,
                   "provenance must carry a real covers-to date, not a placeholder")
     }
+
+    // MARK: - Issue #91: a favorite whose station left the bundle
+
+    /// `chs-north-galiano` is one of the 28 CHS withdrew: it shipped, it is
+    /// tombstoned, and it resolves to no StationItem. Before #91 this favorite
+    /// rendered as nothing at all — and with one favorite, the "FAVORITES"
+    /// header vanished with it. Assert the row, not its neighbour: the card's
+    /// TITLE has to be the station's real name, which is the only thing the
+    /// tombstone file exists to supply.
+    func testRemovedFavoriteKeepsItsRowAndOffersAReplacement() throws {
+        let app = launch("-seedGate", "-resetRecents",
+                         "-seedFavorites", "chs-north-galiano",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        defer {
+            // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
+            // lazy singleton, so a relaunch that stops at the first-run gate
+            // never touches it and the reset never happens.
+            app.launchArguments = ["-seedGate", "-resetFavorites"]
+            app.launch()
+        }
+
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 10),
+                  "the section header went with the station it could not render")
+        // The TITLE, not the presence of an amber card: the name is the one
+        // thing only the tombstone file can supply, so it is the assertion.
+        let title = app.staticTexts["North Galiano"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 5),
+                  "the removed favorite rendered no row, or rendered one it could not name")
+        scrollTo(title, in: app)
+        save(app, "issue91-removed-favorite.png")
+
+        // The offer: nearest to where the station WAS. Chemainus is ~50 km up
+        // island from the Victoria fix, so a chooser anchored on the user
+        // instead of the tombstone would list a visibly different set.
+        // ChsAmberCard's action is a .plain Button — the denied-card test reads
+        // its twin as a staticText, so accept either element type.
+        tapAmberAction(app, "Pick a replacement")
+        // `descendants(matching: .any)`, not `otherElements`: the identifier
+        // sits on the sheet's root ZStack and does not reliably surface as an
+        // `otherElement` (the same reason `listContainer` queries this way).
+        let sheet = app.descendants(matching: .any)["station-chooser"].firstMatch
+        XCTAssert(sheet.waitForExistence(timeout: 5), "the replacement chooser did not open")
+        save(app, "issue91-replacement-chooser.png")
+
+        // THE assertion for #91's anchoring: every offer is a station near
+        // where North Galiano WAS (Chemainus, ~1-4 nm) rather than near the
+        // simulated Victoria fix ~30 nm south. Anchor the chooser on the user
+        // instead and this named gate is nowhere in the list.
+        let pick = app.staticTexts["Galiano & Valdes Islands"].firstMatch
+        XCTAssert(pick.waitForExistence(timeout: 5),
+                  "the chooser is ranked from the wrong position — it offered no Galiano-area station")
+        pick.tap()
+
+        // Picking swaps the favorite in place and opens the station.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5),
+                  "the swap emptied Favorites instead of taking the removed station's slot")
+        XCTAssertFalse(app.staticTexts["North Galiano"].firstMatch.exists,
+                       "the removed station is still starred after picking a replacement")
+        XCTAssert(app.staticTexts["Galiano & Valdes Islands"].firstMatch.exists,
+                  "the replacement did not land in Favorites")
+    }
+
+    /// The other exit: there is no Recents to re-file a removed station to, so
+    /// its swipe action is true deletion — and it has to actually be reachable.
+    func testRemovedFavoriteCanBeRemovedOutright() throws {
+        let app = launch("-seedGate", "-resetRecents",
+                         "-seedFavorites", "chs-north-galiano",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        defer {
+            // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
+            // lazy singleton, so a relaunch that stops at the first-run gate
+            // never touches it and the reset never happens.
+            app.launchArguments = ["-seedGate", "-resetFavorites"]
+            app.launch()
+        }
+
+        let title = app.staticTexts["North Galiano"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 10))
+        scrollTo(title, in: app)
+        title.swipeLeft()
+        let remove = app.buttons["Remove"].firstMatch
+        XCTAssert(remove.waitForExistence(timeout: 5), "no swipe action on the removed-station row")
+        remove.tap()
+        sleep(1)
+        XCTAssertFalse(app.staticTexts["North Galiano"].firstMatch.exists,
+                       "the removed favorite came back")
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "the only favorite is gone — the group should be too")
+    }
+
+    /// ChsAmberCard's action renders as a `.plain` Button whose label is an
+    /// HStack; whether XCUI surfaces it as a button or a static text has
+    /// differed by card, so try both rather than guess.
+    private func tapAmberAction(_ app: XCUIApplication, _ label: String) {
+        let button = app.buttons[label].firstMatch
+        if button.exists { button.tap(); return }
+        let text = app.staticTexts[label].firstMatch
+        XCTAssert(text.waitForExistence(timeout: 5), "amber action \"\(label)\" is not on screen")
+        text.tap()
+    }
 }

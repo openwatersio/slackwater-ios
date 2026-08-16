@@ -834,6 +834,15 @@ final class FavoritesStore: ObservableObject {
         if CommandLine.arguments.contains("-resetFavorites") {
             UserDefaults.standard.removeObject(forKey: Self.key)
         }
+        // UI-test hook: `-seedFavorites a,b` starts the run with exactly those
+        // ids starred. The only way to exercise a favorite whose station has
+        // left the bundle (issue #91) — by construction the app can't star one,
+        // and the interesting state is a device that starred it releases ago.
+        if let i = CommandLine.arguments.firstIndex(of: "-seedFavorites"),
+           i + 1 < CommandLine.arguments.count {
+            UserDefaults.standard.set(
+                CommandLine.arguments[i + 1].split(separator: ",").map(String.init), forKey: Self.key)
+        }
         ids = UserDefaults.standard.stringArray(forKey: Self.key) ?? []
     }
 
@@ -847,6 +856,25 @@ final class FavoritesStore: ObservableObject {
         } else {
             ids.append(id)
         }
+        UserDefaults.standard.set(ids, forKey: Self.key)
+    }
+
+    /// True removal, for a station that has left the bundle (issue #91).
+    /// Not `toggle`: that re-files to Recents (spec §9), and a station that no
+    /// longer exists is the one thing Recents cannot show.
+    func forget(_ id: String) {
+        guard ids.contains(id) else { return }
+        ids.removeAll { $0 == id }
+        UserDefaults.standard.set(ids, forKey: Self.key)
+    }
+
+    /// Swap a removed station for the replacement the user picked, in place —
+    /// favorites render in the order they were starred, and the replacement
+    /// inherits the dead one's slot rather than jumping to the end.
+    func replace(_ old: String, with new: String) {
+        guard let i = ids.firstIndex(of: old) else { return }
+        ids.remove(at: i)
+        if !ids.contains(new) { ids.insert(new, at: i) }
         UserDefaults.standard.set(ids, forKey: Self.key)
     }
 

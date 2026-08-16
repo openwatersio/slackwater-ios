@@ -404,7 +404,11 @@ struct StationListView: View {
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         .sheet(item: $chooser) { place in
-            StationChooserSheet(place: place, anchor: anchor) { open($0) }
+            StationChooserSheet(place: place,
+                                anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in
+                if let dead = place.replacing?.id { favorites.replace(dead, with: item.id) }
+                open(item)
+            }
         }
         // Search covers everything — list, map, and (regular) the detail pane.
         .overlay { if searching { searchOverlay } }
@@ -674,21 +678,37 @@ struct StationListView: View {
         }
 
         // Favorites: starred stations, insertion order (spec §9 swipe-to-manage).
-        let favItems = items(groups.favorites)
-        if !favItems.isEmpty {
+        // Iterated by ID, not by resolved item: a favorite whose station has
+        // left the bundle still gets a row (issue #91). Everywhere else a
+        // resolve miss can only be a station the ranking itself produced, so
+        // there is nothing to miss.
+        if !groups.favorites.isEmpty {
             sectionLabel("Favorites")
-            ForEach(favItems) { item in
-                itemCard(item)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-                    // Spec §9: remove re-files to Recents — neutral tint, no
-                    // destructive full-swipe.
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button { favorites.toggle(item.id) } label: {
-                            Label("Unfavorite", systemImage: "star.slash")
+            ForEach(groups.favorites, id: \.self) { id in
+                if let item = StationItem.byId[id] {
+                    itemCard(item)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                        // Spec §9: remove re-files to Recents — neutral tint, no
+                        // destructive full-swipe.
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button { favorites.toggle(id) } label: {
+                                Label("Unfavorite", systemImage: "star.slash")
+                            }
+                            .tint(SN.steel)
                         }
-                        .tint(SN.steel)
-                    }
+                } else {
+                    removedCard(id)  // ChsAmberCard brings its own horizontal inset
+                        .padding(.bottom, 12)
+                        // Red destructive, unlike a live favorite's neutral
+                        // unfavorite: there is no Recents to re-file to, so
+                        // this really is deletion and says so.
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) { favorites.forget(id) } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                }
             }
         }
 
@@ -834,6 +854,45 @@ struct StationListView: View {
         case .chsCurrent(let gate):
             activatable(ChsCurrentGateCardView(gate: gate, km: km), item)
         }
+    }
+
+    /// A favorite whose station has left the bundle (issue #91). Stations come
+    /// and go — CHS withdrew 28 in one release — and a starred one that simply
+    /// stopped appearing is the worst of the options: no crash, no row, no
+    /// explanation, and a dead id sitting in UserDefaults forever. So the row
+    /// stays, says what happened, and offers the nearest stations to where that
+    /// station used to be.
+    ///
+    /// The tombstone list is what makes the name renderable at all; without one
+    /// (a favorite from a bundle older than tombstones, say) the card is
+    /// nameless and the replacements come from where the user is instead.
+    @ViewBuilder private func removedCard(_ id: String) -> some View {
+        let gone = StationTombstone.byId[id]
+        let origin = gone.map { (lat: $0.latitude, lon: $0.longitude) } ?? anchor
+        ChsAmberCard(title: gone?.name ?? "Station removed",
+                     headline: gone.map { "\($0.region) — no longer published." }
+                        ?? "This station is no longer published.",
+                     expectation: "It has been withdrawn from the hydrographic "
+                        + "service, so it has no readings to show. Swipe to remove it.",
+                     action: "Pick a replacement",
+                     identifier: "removed-station-card",
+                     icon: "mappin.slash") {
+            chooser = StationMatches(place: gone?.name ?? "Removed station",
+                                     matches: nearest(to: origin),
+                                     replacing: .init(id: id, lat: origin.lat, lon: origin.lon))
+        }
+    }
+
+    /// The five stations nearest a point, for the replacement chooser.
+    /// Deliberately not `RankedStations.near`: that memoises exactly one fix,
+    /// and asking it about a removed station's position would evict the user's
+    /// own ranking and re-sort the whole catalog on the next render. This runs
+    /// once, on a tap.
+    private func nearest(to origin: (lat: Double, lon: Double)) -> [StationItem] {
+        Array(StationItem.all
+            .sorted { $0.km(fromLat: origin.lat, lon: origin.lon)
+                    < $1.km(fromLat: origin.lat, lon: origin.lon) }
+            .prefix(5))
     }
 
     /// Location denied — the app's one amber card (ChsAmberCard carries the
@@ -1080,6 +1139,19 @@ struct StationMatches: Identifiable, Hashable {
     let place: String
     /// Nearest first; always includes the entry that opened the chooser.
     let matches: [StationItem]
+    /// Set when the chooser is offering a replacement for a favorite whose
+    /// station left the bundle (issue #91): the dead id to swap out, and the
+    /// position the distances are measured from — where that station *was*,
+    /// not where the user is. A dead Haida Gwaii favorite offering Victoria
+    /// stations because that is where the phone happens to be is not an offer.
+    /// A struct rather than the tuple it wants to be: tuples aren't Hashable,
+    /// and this type is.
+    struct Removed: Hashable {
+        let id: String
+        let lat: Double
+        let lon: Double
+    }
+    var replacing: Removed? = nil
     var id: String { place }
 }
 

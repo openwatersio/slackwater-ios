@@ -70,6 +70,9 @@ So, structurally:
 - **Identity only is bundled.** `Resources/chs-stations.json` (1,058 stations)
   and `Resources/chs-current-gates.json` (22 gates) carry name, region, aliases,
   position, timezone, pairings — and **no harmonic constants**.
+  `Resources/chs-tombstones.json` is the same posture for stations that have
+  since left the bundle: identity we authored, for a favorite that persists a
+  bare id and would otherwise have nothing left to name it (issue #91).
 - **Models are fitted per user, on that user's device**, from predictions that
   user fetched. A fitted `ChsModel` is written to Application Support and never
   re-served — `ChsStation.swift` says it in code: *"fetched by this user, kept
@@ -277,6 +280,7 @@ The practical list. Each of these has cost someone time.
 | Thing | File |
 |---|---|
 | CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
+| Identity for stations that have LEFT the bundle (28) | `Slackwater/Resources/chs-tombstones.json` |
 | CHS current gates (22: 13 fitted, 9 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |
