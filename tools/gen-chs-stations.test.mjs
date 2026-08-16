@@ -39,6 +39,17 @@ test("no name carries a double-encoded UTF-8 sequence", () => {
   assert.deepEqual(mangled.map((s) => `${s.id}: ${s.name}`), []);
 });
 
+// The check above only catches the mangling. Station 00550 is ALSO the feed's
+// only bilingual officialName, and repairing the encoding upstream — which CHS
+// was asked to do — would leave "Sable Island/Sable, Île de" passing it. This
+// asserts the name that ships. The id keeps the mangled slug on purpose: it is
+// what stored fitted models are keyed by.
+test("station 00550 ships its English name only", () => {
+  const sable = stations.find((s) => s.id === "chs-sable-island-sable-azle-de");
+  assert.equal(sable?.name, "Sable Island");
+  assert.ok(sable.aliases.includes("sable, île de"), "French half stays searchable");
+});
+
 // Ids are what stored fitted models are keyed by, and what gen-chs-gates.mjs
 // points its derived gates at.
 test("ids are unique", () => {

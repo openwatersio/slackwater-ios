@@ -123,9 +123,17 @@ function contextOf(id, name, latitude, longitude) {
  * fitted models on shipped builds are keyed by, and no rename is worth
  * orphaning them.
  * ponytail: one row, one entry. A second broken name is another line, not a parser.
+ *
+ * BOTH spellings are keyed, because this was reported to CHS and they do fix
+ * names (they renamed two BC stations by notice in 2023). The day DFO repairs
+ * the encoding without dropping the French half, a table keyed only on the
+ * mangled string stops matching, and the bilingual name walks back onto the
+ * card with every test still green.
  */
+const FIXED_SABLE = { name: "Sable Island", aliases: ["sable, île de"] };
 const NAME_FIXES = {
-  "Sable Island/Sable, ÃŽle de": { name: "Sable Island", aliases: ["sable, île de"] },
+  "Sable Island/Sable, ÃŽle de": FIXED_SABLE,
+  "Sable Island/Sable, Île de": FIXED_SABLE,
 };
 
 const slug = (name) =>
