@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
-import { here, REGION_WORD, FRESHWATER_NETWORKS, networkOf } from "./bundle.mjs";
+import { here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
 
@@ -50,23 +50,39 @@ test("no TICON station sits within the dedupe radius of another station", () => 
 });
 
 // untrail(): TICON repeats the state the region line already shows, as the
-// code ("... Savannah Ga · GA") and as the word ("Brockville Ontario · ON").
-//
-// SKIPPED (Task 3, world coverage): world coverage admits three stations this
-// now fails on — "Praia Cape Verde · Cape Verde" and "Syowa Antarctica ·
-// Antarctica" (×2, "Syowa Antarctica" and "Syowa Station Antarctica"). The
-// region fallback for a non-North-American station with no curated context is
-// the bare country name, and TICON sometimes appends that same country name
-// to the station name — untrail() never learned to strip it. The fix is
-// Task 4 ("Region lines for the world"), which restricts the North-American
-// gazetteer tier and routes non-NA stations through the upstream region field
-// instead of the country fallback. Remove this skip once Task 4 lands.
-test.skip("no name ends in its own region", () => {
+// code ("... Savannah Ga · GA") and as the word ("Brockville Ontario · ON") —
+// and, at world coverage, as a bare country name ("Praia Cape Verde · Cape
+// Verde", "Syowa Antarctica · Antarctica" ×2). Task 4 extended untrail() to
+// strip any region word, not just a two-letter code.
+test("no name ends in its own region", () => {
   const doubled = stations
     .filter((s) => new RegExp(
       `\\s(${s.region}${REGION_WORD[s.region] ? `|${REGION_WORD[s.region]}` : ""})$`, "i").test(s.name))
     .map((s) => `${s.name} · ${s.region}`);
   assert.deepEqual(doubled, []);
+});
+
+// Task 4 (region lines for the world). The gazetteer behind the derived
+// context tier is 9,660 US, Canadian and territory towns; outside those
+// countries it must never be trusted — nationally it produced "San Francisco
+// · near Olympia, WA", and Matamoros, MX sits 2.8 km from Brownsville, TX,
+// inside the resolver's own 40 km derivation radius. Nothing this close
+// currently reaches the naming stage (Matamoros ships as a `subordinate` row
+// and is filtered out earlier), which is why this asserts on the bundle
+// rather than reproducing a live failure — it is the guard against a future
+// upstream row landing where Matamoros almost does.
+test("no station outside North America carries a gazetteer-derived region", () => {
+  // stations.json carries no `country` field — correlate back to the
+  // upstream row by id, same as the licence and "reaches beyond North
+  // America" tests above.
+  const country = new Map(allStations.map((s) => [s.id, s.country]));
+  const borrowed = stations
+    .filter((s) => {
+      const c = country.get(s.id);
+      return c && !NORTH_AMERICA.has(c) && s.region.startsWith("~");
+    })
+    .map((s) => `${s.name} · ${s.region}`);
+  assert.deepEqual(borrowed, []);
 });
 
 test("every station has a region line and a usable model", () => {
