@@ -49,6 +49,16 @@ struct StationCard<Trailing: View>: View {
                     // iPad sidebar); `fixedSize(vertical:)` makes it take the
                     // height it actually needs instead.
                     .fixedSize(horizontal: false, vertical: true)
+                    // ...but a single word wider than the column still breaks
+                    // MID-WORD, and the My Location hero is the narrowest card
+                    // the app draws (MyLocationTile insets it 8pt a side inside
+                    // the same 16pt gutter every other card gets). In the iPad
+                    // sidebar that renders the first station a UK user opens as
+                    // "Portsmout / h". Tightening buys back the few points that
+                    // costs. NOT `minimumScaleFactor`: TypeScaleTests
+                    // `testOnlyTheWordmarkShrinks` allows exactly one in the
+                    // app and it is the wordmark.
+                    .allowsTightening(true)
                 // Unconditional — region never sheds: it is the only thing
                 // separating same-named stations.
                 Text(region)

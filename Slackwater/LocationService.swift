@@ -92,11 +92,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 extension LocationService {
     /// What Near Me ranks distances from: a real fix first, then the station
     /// the user last opened, and only a fixed coordinate on a genuine first
-    /// run with neither. Never nil in practice — the last branch always
-    /// resolves — but Optional because callers reach for it exactly where the
-    /// old code reached for the always-present `fallbackFix`, and this keeps
-    /// that call shape.
-    @MainActor var rankingAnchor: (lat: Double, lon: Double)? {
+    /// run with neither. Not Optional: the last branch always returns, so an
+    /// Optional made every caller write a `?? firstRunFix` that could never
+    /// run and read as load-bearing anyway.
+    @MainActor var rankingAnchor: (lat: Double, lon: Double) {
         // Gated like `SlackwaterApp`'s `fix`: `location` is never cleared on
         // revocation (only `status`/`locating` change in
         // `locationManagerDidChangeAuthorization`), so an unguarded read here

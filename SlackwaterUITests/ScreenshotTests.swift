@@ -2083,7 +2083,7 @@ final class ScreenshotTests: XCTestCase {
     /// T6 acceptance case for the whole world-coverage plan: the Solent, the
     /// water that started it (`firstRunFix`'s doc comment — the app once
     /// opened here and ranked from Vancouver Island). No NOAA or CHS current
-    /// station is within 20km of Portsmouth, so Near Me must say so in words
+    /// station is within `currentCoverageKm` of Portsmouth, so Near Me must say so in words
     /// rather than just show an empty currents list — an empty list here
     /// reads as "the water is slack", which is false and dangerous.
     func testM53NoCurrentCoverageNoticeAtPortsmouth() throws {
@@ -2120,7 +2120,7 @@ final class ScreenshotTests: XCTestCase {
         closeSearch(app)
     }
 
-    /// The map at continental scale. 3,125 pins is a grey smear without
+    /// The map at continental scale. Thousands of pins is a grey smear without
     /// clustering; this walks the camera out to the whole country, times the
     /// gestures, and checks the map is still a map afterwards.
     func testM53MapAtContinentalZoom() throws {
@@ -2137,12 +2137,18 @@ final class ScreenshotTests: XCTestCase {
         save(app, "m53-map-continental.png")
 
         // Then the interaction cost, timed: zooming the clustered source at the
-        // scale where an unclustered one is 3,125 separate dots.
+        // scale where an unclustered one is thousands of separate dots.
         let start = Date.now
         for _ in 0..<5 { map.pinch(withScale: 1.6, velocity: 2) }
         let gestures = Date.now.timeIntervalSince(start)
-        print(String(format: "M53 map · 5 pinches at z3.2 over %d pins: %.2f s", 3125, gestures))
-        XCTAssertLessThan(gestures, 20, "zooming a 3,125-pin map should not take 20 seconds")
+        // No pin count in the line. A UI test cannot see `StationItem.all`
+        // (separate target, no `@testable`), so the 3,125 that used to be
+        // printed here was a hardcoded literal from the pre-world bundle — it
+        // read as a measurement and was off by 1,500 the day world coverage
+        // landed. A diagnostic that states a number it cannot check is worse
+        // than one that states only what it timed.
+        print(String(format: "map · 5 pinches at z3.2 over the whole world bundle: %.2f s", gestures))
+        XCTAssertLessThan(gestures, 20, "zooming the world pin map should not take 20 seconds")
 
         // Still responsive and still a map afterwards.
         XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")

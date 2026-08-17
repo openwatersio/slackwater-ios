@@ -26,7 +26,7 @@ final class DerivedGateTests: XCTestCase {
 
     func testSearchFindsMalibu() {
         for query in ["malibu", "princess louisa", "malibu islet"] {
-            let hits = StationItem.search(query)
+            let hits = StationItem.search(query, near: firstRunFix)
             XCTAssert(hits.contains { $0.id == "chs-malibu-rapids" },
                       "search '\(query)' did not find Malibu Rapids")
         }

@@ -44,7 +44,7 @@ final class ChsCurrentGateTests: XCTestCase {
                                  "Dodd Narrows missing from chs-current-gates.json")
         XCTAssertEqual(dodd.name, "Dodd Narrows")
         for query in ["dodd", "nanaimo"] {
-            XCTAssert(StationItem.search(query).contains { $0.id == dodd.id },
+            XCTAssert(StationItem.search(query, near: firstRunFix).contains { $0.id == dodd.id },
                       "search '\(query)' did not find Dodd Narrows")
         }
     }
@@ -424,7 +424,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let sechelt = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
         XCTAssert(sechelt.isOnline)
         for query in ["sechelt", "skookumchuck"] {
-            XCTAssert(StationItem.search(query).contains { $0.id == sechelt.id },
+            XCTAssert(StationItem.search(query, near: firstRunFix).contains { $0.id == sechelt.id },
                       "search '\(query)' did not find Sechelt Rapids")
         }
     }
