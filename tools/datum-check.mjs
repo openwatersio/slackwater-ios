@@ -20,10 +20,15 @@
 import { createTidePredictor } from "@neaps/tide-predictor";
 
 /**
- * 0.30 m. Set from the measured distribution, not from taste: it clears 97% of
- * UK home waters and 98% of non-UK Europe while still failing Southampton
- * (0.53) and Penarth (0.59). The NOAA control sits two orders of magnitude
- * below it. Tighten to 0.15 m and 7% of good European stations go with it.
+ * 0.30 m. Independently justified by the NOAA control alone: its noise floor
+ * (0.011 m median / 0.018 m max) sits 16.7-27.3x below this tolerance, on data
+ * already known correct. It also clears 97% of UK home waters and 99% of
+ * non-UK Europe while still failing Southampton (0.53) and Penarth (0.59) —
+ * true, but that was known when 0.30 m was chosen (see
+ * docs/validation/world-tide-stations.md's provenance note), so the control
+ * argument is what to cite, not this sentence. Tighten to 0.15 m and 5.65% of
+ * all checkable non-UK Europe stations fail outright (4.75% of the
+ * currently-passing ones newly fail).
  */
 export const DATUM_TOLERANCE_M = 0.30;
 
