@@ -119,18 +119,26 @@ function contextOf(id, name, latitude, longitude) {
  * accented names in the feed are clean UTF-8, and re-decoding them yields
  * replacement characters, so a general pass would need a guard that matches
  * exactly this one row. The French half goes to aliases — it is a real name and
- * someone might type it. The ID still slugs the RAW name: it is what stored
- * fitted models on shipped builds are keyed by, and no rename is worth
- * orphaning them.
+ * someone might type it.
  * ponytail: one row, one entry. A second broken name is another line, not a parser.
  *
  * BOTH spellings are keyed, because this was reported to CHS and they do fix
- * names (they renamed two BC stations by notice in 2023). The day DFO repairs
- * the encoding without dropping the French half, a table keyed only on the
- * mangled string stops matching, and the bilingual name walks back onto the
- * card with every test still green.
+ * names (they renamed two BC stations by notice in 2023). **They did**: Michel
+ * Leger at CHS repaired the database on 2026-08-17, one day after the report,
+ * and `/stations` now returns "Sable Island/Sable, Île de" — so the second key
+ * is the live one and the mangled key is the one kept for history.
+ *
+ * Which is why the id is pinned here rather than slugged. The id slugs the RAW
+ * officialName, and the raw name just changed: a regenerate would rename
+ * `…-azle-de` to `…-ile-de` and orphan every fitted model stored under the old
+ * id on a shipped build. The ugly slug is the correct one — it is what is out
+ * there.
  */
-const FIXED_SABLE = { name: "Sable Island", aliases: ["sable, île de"] };
+const FIXED_SABLE = {
+  id: "chs-sable-island-sable-azle-de",
+  name: "Sable Island",
+  aliases: ["sable, île de"],
+};
 const NAME_FIXES = {
   "Sable Island/Sable, ÃŽle de": FIXED_SABLE,
   "Sable Island/Sable, Île de": FIXED_SABLE,
@@ -227,12 +235,12 @@ for (const s of iwls) {
     });
     continue;
   }
-  let id = slug(s.officialName);
+  const fix = NAME_FIXES[s.officialName];
+  let id = fix?.id ?? slug(s.officialName);
   for (let n = 2; taken.has(id); n += 1) id = `${slug(s.officialName)}-${n}`;
   taken.add(id);
   // alternativeName is a comma-separated pile of French/former/variant names —
   // exactly what someone might type, which is what aliases are for.
-  const fix = NAME_FIXES[s.officialName];
   const name = fix?.name ?? s.officialName;
   const aliases = [...new Set([...(fix?.aliases ?? []), ...(s.alternativeName ?? "").split(",")
     .map((a) => a.trim().toLowerCase()).filter((a) => a && a !== name.toLowerCase())])];
