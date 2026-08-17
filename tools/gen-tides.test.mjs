@@ -94,3 +94,19 @@ test("stations NOAA runs abroad do not ship as US", () => {
     ["Dakar", "Lagos", "Suva", "Easter Island", "Diego Garcia"].includes(s.name));
   assert.deepEqual(foreign, []);
 });
+
+// Task 1 (world coverage): a precondition guard for the datum-validation
+// gate Task 2 adds to gen-tides.mjs, which will read MHW/MLW off the
+// upstream row. Both 0.8.20260722 and 0.9.20260801 already publish these on
+// every commercial-ok TICON row (verified directly against allStations on
+// each version — 4,164/4,164, zero blind), so this test is green today. It
+// exists so that if a future upstream release drops the fields, this fails
+// loudly here instead of Task 2's gate silently passing everything.
+test("every TICON row carries the datums the quality gate reads", () => {
+  const ticon = allStations.filter(
+    (s) => s.id.startsWith("ticon/") && s.license?.commercial_use === true);
+  assert.ok(ticon.length > 4000, `only ${ticon.length} commercial-ok TICON rows`);
+  const blind = ticon.filter(
+    (s) => s.datums?.MHW === undefined || s.datums?.MLW === undefined);
+  assert.deepEqual(blind.map((s) => s.id), []);
+});
