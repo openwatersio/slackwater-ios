@@ -6,7 +6,7 @@
     "@sailingnaturali/station-corrections": "^2.9.0"
   },
   "devDependencies": {
-    "@neaps/tide-database": "^0.8.20260722",
+    "@neaps/tide-database": "^0.9.20260801",
     "tz-lookup": "^6.1.25"
   },
   "scripts": {
