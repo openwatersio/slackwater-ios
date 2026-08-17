@@ -160,8 +160,13 @@ analysed — the entire record is one deferred bullet in the 2026-07-12 spec. Th
 wedge is currents, so shipping tides-only into the UK ships the commodity half, and the
 UI must say so rather than imply coverage it does not have.
 
-Research into a UK/European currents path is running in parallel and lands in its own
-document.
+Research into a UK/European currents path is complete and lands in
+`docs/research/european-currents-licensing-2026-08-16.md`. Headline: there is a viable
+path, it is a per-country licensing exercise, and no global model reaches the gates.
+Germany's BSH stream atlas is free and commercially licensed today; France's currents are
+Licence Ouverte 2.0; the UK's free route is fitting constituents from CMEMS/Met Office
+AMM15 at 1.5 km, which we would own. Authoritative UK streams need a UKHO commercial
+licence whose price is unpublished.
 
 ## Success criteria
 
