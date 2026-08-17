@@ -2,7 +2,7 @@
 
 This is the follow-on to `spikes/chs-currents-fit/README.md`'s method for the tide side
 of world coverage: Task 6 of the world-tide-stations plan took Slackwater from 1,473
-US+Canada tide stations to 2,776 worldwide by adding TICON reference stations outside
+US+Canada tide stations to 2,765 worldwide by adding TICON reference stations outside
 NOAA/CHS. This pass validates that expansion against each station's own publishing
 authority before shipping it under a trusted name.
 
@@ -169,6 +169,72 @@ than passing by construction.
 
 Every other UK home-waters station — including the next-worst, Port Isaac at 0.215 m —
 clears the bar with room to spare.
+
+## What the gate removed from existing coverage
+
+The section above names the two UK stations the gate refused to *add*. It says nothing
+about what it *took away*, and that is the more important number for anyone already using
+the app: **the gate removed 10 stations that were shipping before this branch, every one
+of them in the United States.** Measured against the pre-branch bundle (`git diff` of
+`Slackwater/Resources/stations.json`, same `@neaps/tide-database` 0.9.20260801 either
+way), not inferred.
+
+| Station | Deviation | Region | Nearest surviving station |
+|---|---|---|---|
+| Goose Creek | 0.675 m | Knik Arm · Cook Inlet, AK | North Foreland, 80.5 km |
+| Carrollton | 0.521 m | New Orleans, LA | New Canal USCG station, 10.7 km |
+| Ashland Ave | 0.385 m | Niagara Falls, NY | American Falls, 2.1 km |
+| Port MacKenzie | 0.378 m | Anchorage, AK | North Foreland, 71.4 km |
+| Point Possession | 0.366 m | Cook Inlet, AK | North Foreland, 40.4 km |
+| Levelock | 0.329 m | Kvichak Bay, AK | Naknek, 43.3 km |
+| Snag Point | 0.322 m | Dillingham, AK | Nushagak Bay (Clarks Point), 22.2 km |
+| Anchorage | 0.308 m | Knik Arm, AK | North Foreland, 71.6 km |
+| Grosse Pointe YC | 0.308 m | Grosse Pointe Shores, MI | St Clair Shores, 4.3 km |
+| Fire Island | 0.304 m | Cook Inlet, AK | North Foreland, 53.0 km |
+
+Seven of the ten are Alaskan, and **Upper Cook Inlet loses five of its six gauges** —
+everything north of 61°N except North Foreland. That is defensible engineering rather
+than an accident: Upper Cook Inlet has ~9 m of range and extreme shallow-water
+distortion, which is precisely the water where a linear harmonic model is worst and
+where this check is doing the job it was built for. Anchorage's own model carries 120
+constituents — NOAA does not publish 120 anywhere the tide is simple.
+
+**But the reader should see the cost of 0.30 over 0.35.** Three of the ten sit within 3%
+of the bar (Anchorage and Grosse Pointe at 0.308, Fire Island at 0.304), and five of the
+ten would survive a 0.35 m tolerance. The tolerance is justified by the NOAA control's
+noise floor, and that argument is sound; it is not the same as saying the five stations
+between 0.30 and 0.35 are unusable. It says we cannot vouch for them, and this branch
+chose silence over an unvouched number.
+
+**Anchorage is the one that took a fix, not just a measurement.** The gate ran before the
+dedupe, so dropping `noaa/9455920` also stopped it blocking `ticon/anchorage-9455920-usa-noaa`
+— a 50-constituent TICON refit of the *same gauge*, 0.0 km away, which then shipped in
+its place. Its better-looking 0.237 m is scored against TICON's own recomputed datums,
+which drift 0.2–0.4 m off an adopted chart datum (see `CHS_COVERAGE_KM` in
+`gen-tides.mjs` — the CHS cede rule exists for exactly this, and nothing protected US
+water). A gate-failing NOAA row now still claims its position in the dedupe grid and then
+leaves, so Anchorage yields **no** station. "We cannot vouch for this water" has to mean
+no pin, not a worse pin.
+
+### The other 14 stations this branch stopped shipping
+
+Not the gate — deduplication, and all of them redundant rather than lost. Every one is a
+second publisher's copy of a gauge that still ships under a NOAA or curated name
+(Charlotte Amalie, Guantanamo Bay, Hilo, Kodiak, Mona Island, Nawiliwili, Neah Bay, New
+London, Ocean Springs, Palmyra Island, Panama City, Port San Luis, Prudhoe Bay, Sault Ste
+Marie — each within 0.0–4.3 km of its survivor, all scoring under 0.12 m). The nearest
+survivor is listed for every one of the 24 in the branch's final-fix report.
+
+### Stations the gate could not judge at all
+
+`passesDatumCheck` returns `true` when `datumDeviation` is `null` — an unjudgeable station
+is not a failing one (see The method, above). **15 shipped stations take that path**,
+publishing no `MHW`/`MLW`: Apia (Observatory), Balboa, Cristobal (Colon), Djakarta,
+Eugene Island, Fort Wadsworth, Guayaquil, Guaymas, La Libertad, La Union (Cutuco),
+Malakal Harbor, Massacre Bay, Puntarenas, Salina Cruz and San Cristobal. Twelve are new
+on this branch; three (Eugene Island, Fort Wadsworth, Massacre Bay) were already
+shipping. Every results table in this report excludes them by construction, so no pass
+rate quoted anywhere here covers them.
 
 ## The honest limitation
 

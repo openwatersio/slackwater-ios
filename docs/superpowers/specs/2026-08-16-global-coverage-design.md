@@ -1,8 +1,25 @@
 # Global coverage — the world floor, region packs, and the UK
 
-**Status:** design, approved 2026-08-16
+**Status:** design, approved 2026-08-16. **Partly delivered — read this header before
+citing anything below as shipped.**
 **Scope:** tide stations and basemap, worldwide. Currents are researched separately and
 explicitly out of this spec.
+
+> **What the `feat/global-coverage` branch actually delivered:** §1 (the station gates),
+> §3 (validation — see `docs/validation/world-tide-stations.md`) and §5. The station
+> allowlists are gone and 2,765 stations ship worldwide behind a measured datum gate.
+>
+> **§2 (the world basemap floor, its three tiers and its Delivery subsection) and success
+> criteria 2, 3 and 4 are Plan B and were NOT built.** The map still ships the national
+> basemap. Do not read §2 as a description of the app.
+>
+> **Criterion 1 names two stations that do not exist.** `@neaps/tide-database` has zero
+> rows for Cowes and zero for Poole, at any licence — so no gate could have shipped them
+> and no future one will without an upstream row. The Solent acceptance test
+> (`tools/gen-tides.test.mjs`, "the Solent is in the bundle") asserts the three that do
+> exist: **Portsmouth, Lymington and Bournemouth**. Southampton exists and is
+> deliberately excluded — it fails the datum gate at 0.529 m. §3's use of Poole as an
+> example double-tide port is subject to the same correction.
 
 ## Why now
 
@@ -170,11 +187,15 @@ licence whose price is unpublished.
 
 ## Success criteria
 
-1. Slackwater opened in the Solent lists Portsmouth, Cowes and Poole in Near Me, with
-   heights and extremes that match published UK tide tables within the validation
-   tolerance agreed in §3.
-2. The map draws a real chart at every zoom, anywhere on earth, with no pack downloaded.
-3. "UK & Ireland" downloads and the Solent draws at Salish-grade detail offline, with the
-   device in airplane mode.
-4. Bundle size does not exceed today's 104 MB.
-5. Nothing claims current coverage in UK waters.
+1. **DELIVERED (corrected).** Slackwater opened in the Solent lists **Portsmouth,
+   Lymington and Bournemouth** in Near Me, with heights and extremes that match the
+   validation tolerance agreed in §3. (As written this criterion named Cowes and Poole;
+   neither exists in `@neaps/tide-database`. These three are what the acceptance test
+   asserts.)
+2. **PLAN B — not built.** The map draws a real chart at every zoom, anywhere on earth,
+   with no pack downloaded.
+3. **PLAN B — not built.** "UK & Ireland" downloads and the Solent draws at Salish-grade
+   detail offline, with the device in airplane mode.
+4. **PLAN B — not built** (the bundle-size ceiling on the pack work above). Bundle size
+   does not exceed today's 104 MB.
+5. **DELIVERED.** Nothing claims current coverage in UK waters.
