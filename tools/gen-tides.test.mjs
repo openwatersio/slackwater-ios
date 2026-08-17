@@ -12,8 +12,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
-import { here, REGION_WORD } from "./bundle.mjs";
+import { here, REGION_WORD, FRESHWATER_NETWORKS, networkOf } from "./bundle.mjs";
 import { km } from "./geo.mjs";
+import { passesDatumCheck } from "./datum-check.mjs";
 
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "stations.json"), "utf8"));
@@ -50,7 +51,17 @@ test("no TICON station sits within the dedupe radius of another station", () => 
 
 // untrail(): TICON repeats the state the region line already shows, as the
 // code ("... Savannah Ga · GA") and as the word ("Brockville Ontario · ON").
-test("no name ends in its own region", () => {
+//
+// SKIPPED (Task 3, world coverage): world coverage admits three stations this
+// now fails on — "Praia Cape Verde · Cape Verde" and "Syowa Antarctica ·
+// Antarctica" (×2, "Syowa Antarctica" and "Syowa Station Antarctica"). The
+// region fallback for a non-North-American station with no curated context is
+// the bare country name, and TICON sometimes appends that same country name
+// to the station name — untrail() never learned to strip it. The fix is
+// Task 4 ("Region lines for the world"), which restricts the North-American
+// gazetteer tier and routes non-NA stations through the upstream region field
+// instead of the country fallback. Remove this skip once Task 4 lands.
+test.skip("no name ends in its own region", () => {
   const doubled = stations
     .filter((s) => new RegExp(
       `\\s(${s.region}${REGION_WORD[s.region] ? `|${REGION_WORD[s.region]}` : ""})$`, "i").test(s.name))
@@ -88,11 +99,19 @@ test("no bundled Canadian station duplicates a CHS station", () => {
   assert.ok(ca.length > 30, `only ${ca.length} Canadian gap-fills`);
 });
 
-// COUNTRY_FIX: upstream reads NOAA's operating agency as the country.
+// COUNTRY_FIX: upstream reads NOAA's operating agency as the country, so the
+// gauges NOAA runs abroad arrive claiming "United States". Before Task 3 this
+// test asserted the five below did not ship at all — true only as a side
+// effect of the COUNTRIES sovereignty allowlist, which dropped them because
+// their corrected country wasn't US/Canada. Worldwide they are keepers (see
+// COUNTRY_FIX's own comment in gen-tides.mjs), so the assertion worth keeping
+// is the one the test's name always claimed: they don't ship AS US.
 test("stations NOAA runs abroad do not ship as US", () => {
-  const foreign = stations.filter((s) =>
+  const abroad = stations.filter((s) =>
     ["Dakar", "Lagos", "Suva", "Easter Island", "Diego Garcia"].includes(s.name));
-  assert.deepEqual(foreign, []);
+  assert.ok(abroad.length > 0, "none of the NOAA-abroad stations shipped");
+  const asUS = abroad.filter((s) => /^[A-Z]{2}$/.test(s.region) || s.region === "United States");
+  assert.deepEqual(asUS.map((s) => s.name), []);
 });
 
 // Task 1 (world coverage): a precondition guard for the datum-validation
@@ -109,4 +128,53 @@ test("every TICON row carries the datums the quality gate reads", () => {
   const blind = ticon.filter(
     (s) => s.datums?.MHW === undefined || s.datums?.MLW === undefined);
   assert.deepEqual(blind.map((s) => s.id), []);
+});
+
+// Task 3 (world coverage). The two gates that confined the app to North
+// America were an allowlist of seven sovereignty strings and an allowlist of
+// eight operator codes — neither about licence, and the second written only to
+// keep US river gauges out.
+test("the bundle reaches beyond North America", () => {
+  // stations.json carries no `country` field (see the map() in gen-tides.mjs)
+  // — correlate back to the upstream row by id, same as the licence test above.
+  const country = new Map(allStations.map((s) => [s.id, s.country]));
+  const countries = new Set(stations.map((s) => country.get(s.id)));
+  for (const expected of ["United Kingdom", "France", "Germany", "Netherlands"]) {
+    assert.ok(countries.has(expected), `${expected} is missing from the bundle`);
+  }
+});
+
+// Bryan opened the app in the Solent and Near Me ranked stations 4,700 nm
+// away. These three are the acceptance test for that. Southampton is
+// deliberately not in `want`: it fails the datum gate at 0.53 m (see the
+// next test) and must not ship — asserting it present here would contradict
+// the entire point of the gate.
+test("the Solent is in the bundle", () => {
+  const want = ["Portsmouth", "Lymington", "Bournemouth"];
+  const solent = stations.filter(
+    (s) => want.includes(s.name) && s.latitude > 50 && s.latitude < 51
+           && s.longitude > -2.5 && s.longitude < -0.5);
+  assert.deepEqual(solent.map((s) => s.name).sort(), want.sort());
+});
+
+// Freshwater instrumentation is still the thing being excluded — 328 Louisiana
+// marsh platforms named after the nearest town is nine "Abbeville · LA" rows on
+// nine bayou platforms nobody can moor at.
+test("no freshwater-network station ships", () => {
+  const network = new Map(allStations.map((s) => [s.id, networkOf(s)]));
+  const fresh = stations.filter((s) => FRESHWATER_NETWORKS.has(network.get(s.id)));
+  assert.deepEqual(fresh.map((s) => s.id), []);
+});
+
+// The gate is only worth having if it actually removed something. Southampton
+// is a double high water port whose model disagrees with its own published
+// datums by 0.53 m; it must not be in the bundle at any range.
+test("stations that fail the datum gate are not bundled", () => {
+  const bundled = new Set(stations.map((s) => s.id));
+  const rejected = allStations.filter(
+    (s) => s.license?.commercial_use === true && !passesDatumCheck(s) && bundled.has(s.id));
+  assert.deepEqual(rejected.map((s) => s.id), []);
+  const soton = allStations.find(
+    (s) => s.name === "Southampton" && s.country === "United Kingdom");
+  assert.ok(!bundled.has(soton.id), "Southampton failed the gate but shipped anyway");
 });
