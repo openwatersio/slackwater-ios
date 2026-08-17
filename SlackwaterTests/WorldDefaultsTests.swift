@@ -59,4 +59,19 @@ final class WorldDefaultsTests: XCTestCase {
         XCTAssertNotEqual(anchor.lat, firstRunFix.lat, accuracy: 0.001,
                           "Victoria Harbour is the first-run value only")
     }
+
+    /// The wedge is currents, and currents don't ship worldwide — only NOAA
+    /// (US) and CHS (Canada) do. An empty currents list outside that
+    /// footprint must read as "we do not have this here", never as "the
+    /// water is slack" (T6).
+    func testCurrentsAbsenceIsStatedNotImplied() throws {
+        XCTAssertFalse(hasCurrentCoverage(latitude: 50.80, longitude: -1.11),
+                       "Portsmouth, UK has no NOAA or CHS current station within reach")
+        XCTAssertTrue(hasCurrentCoverage(latitude: 48.7621, longitude: -123.0520),
+                      "Boundary Pass sits in the middle of Salish Sea CHS/NOAA coverage")
+
+        let label = CardStatus.noCurrentCoverage.label.lowercased()
+        XCTAssertTrue(label.contains("not available"),
+                      "the label must say so in words, got \(CardStatus.noCurrentCoverage.label)")
+    }
 }

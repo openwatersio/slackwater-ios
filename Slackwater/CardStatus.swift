@@ -30,6 +30,11 @@ enum CardStatus: Equatable {
     /// this gate's own measured slack tolerance ("±35 min") — the number the
     /// ⚠️ badge it replaced could only gesture at.
     case refining(tolerance: String?)
+    /// Tides ship worldwide; the bundled current stations are NOAA (US) and
+    /// CHS (Canada) only. Outside that footprint the absence must be STATED
+    /// — an empty currents list where a mariner expects a reading reads as
+    /// "the water is slack here", which is false and dangerous (#T6).
+    case noCurrentCoverage
 
     var icon: String {
         switch self {
@@ -40,6 +45,7 @@ enum CardStatus: Equatable {
         case .notDownloaded: "arrow.down.circle.dotted"
         case .failed: "exclamationmark.triangle.fill"
         case .refining: "brain"
+        case .noCurrentCoverage: "slash.circle"
         }
     }
 
@@ -53,6 +59,7 @@ enum CardStatus: Equatable {
         case .notDownloaded: "Tap to download"
         case .failed: "Download failed"
         case .refining(let tolerance): tolerance.map { "Refining · \($0)" } ?? "Refining"
+        case .noCurrentCoverage: "Current predictions not available here"
         }
     }
 
@@ -72,6 +79,8 @@ enum CardStatus: Equatable {
         case .refining(let tolerance):
             let howWrong = tolerance.map { ", slack accurate to \($0)" } ?? ""
             return "Refining — showing the fast answer\(howWrong). The full model is still downloading."
+        case .noCurrentCoverage:
+            return "Current predictions not available here — the bundled current stations cover NOAA and Canada's CHS waters only. Tide predictions are unaffected."
         }
     }
 
@@ -84,9 +93,22 @@ enum CardStatus: Equatable {
     var tint: Color {
         switch self {
         case .downloading: SN.leaf
-        case .expired, .failed, .refining: SN.amber
+        case .expired, .failed, .refining, .noCurrentCoverage: SN.amber
         case .queued, .offline, .notDownloaded: SN.foam.opacity(0.85)
         }
+    }
+}
+
+/// The bundled current stations are NOAA (US) and CHS (Canada) — a coverage
+/// question about the DATA, not the boat's position, so this asks the bundle
+/// rather than a hardcoded box. 300km is comfortably inside real coverage
+/// (Salish Sea ~4-16km, Gulf of Mexico coast ~94km, Great Lakes interior
+/// ~1,000km+ — genuinely uncovered, correctly reported) and comfortably
+/// outside anywhere the bundle doesn't reach (nearest to Portsmouth UK,
+/// Sydney, Singapore: 4,700km+).
+func hasCurrentCoverage(latitude: Double, longitude: Double) -> Bool {
+    CurrentStationRecord.all.contains {
+        distanceKm(latitude, longitude, $0.latitude, $0.longitude) < 300
     }
 }
 

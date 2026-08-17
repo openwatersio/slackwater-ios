@@ -719,6 +719,16 @@ struct StationListView: View {
         }
 
         sectionLabel("Near Me")
+        // The wedge is currents, and an empty currents list reads as "the
+        // water is slack" unless it's stated otherwise (T6). Near Me's top
+        // picks skew toward the denser worldwide tide bundle even inside
+        // current coverage, so this checks the current bundle directly
+        // rather than scanning what happened to rank into view.
+        if !hasCurrentCoverage(latitude: anchor.lat, longitude: anchor.lon) {
+            CardStatusStrip(status: .noCurrentCoverage)
+                .padding(.horizontal, 26)
+                .padding(.bottom, 8)
+        }
         ForEach(items(groups.nearMe)) { item in
             VStack(spacing: 0) {
                 itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
