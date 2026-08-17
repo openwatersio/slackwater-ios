@@ -98,33 +98,49 @@ no published `MHW`/`MLW`, or no usable constituents — not counted as failing.
 
 ## Results by group
 
-Measured 2026-08-16 against the committed `@neaps/tide-database` package (no network;
-constituents and datums as published by each station's own authority). Filter for all
-six groups: `license.commercial_use === true`, `type === "reference"`,
-`harmonic_constituents` has at least one non-zero amplitude, and both `datums.MHW` and
-`datums.MLW` are defined (the filter the shipping test in `datum-check.test.mjs` uses).
+Measured 2026-08-16/17 against the committed `@neaps/tide-database` package (no network;
+constituents and datums as published by each station's own authority). Every row is
+measured over the **eligible pool** — `license.commercial_use === true`,
+`type === "reference"`, `harmonic_constituents` has at least one non-zero amplitude, and
+both `datums.MHW` and `datums.MLW` are defined (the filter the shipping test in
+`datum-check.test.mjs` uses) — applied to `allStations` directly, **before**
+`gen-tides.mjs`'s dedup/CHS-gating drops anything. A pass rate computed after that gate
+would be meaningless: failures are already gone by the time a station reaches
+`stations.json`, so a post-gate pass rate is 100% by construction regardless of how good
+the check is.
 
 | Group | n | median | p90 | max | pass rate |
 |---|---|---|---|---|---|
 | NOAA control | 25 | 0.011 m | 0.017 m | 0.018 m | 100% |
+| Americas non-NOAA (eligible) | 2,537 | 0.032 m | 0.110 m | 0.725 m | 98.9% |
 | UK home waters (lat 49–61°N) | 68 | 0.026 m | 0.085 m | 0.591 m | 97% |
 | Europe non-UK | 744 | 0.024 m | 0.114 m | 1.313 m | 99% |
 | Asia | 399 | 0.025 m | 0.094 m | 0.445 m | 99% |
 | Oceania | 313 | 0.021 m | 0.101 m | 2.193 m | 99% |
 | Africa | 81 | 0.018 m | 0.053 m | 0.127 m | 100% |
 
-Asia, Oceania and Africa together account for the roughly 784 checkable non-NOAA/UK/Europe
-stations `gen-tides.mjs` ships under this same global gate (`passesDatumCheck` is applied
-without a region carve-out). None of the three reads materially worse than Europe
-non-UK — medians and p90s all sit within the same narrow band as the rest of the table,
-and pass rates hold at 99–100%. Oceania's max (2.193 m, one station) is the largest single
-deviation measured in this report, well past the 0.30 m gate — meaning that station does
-not ship; it is not evidence the group as a whole is weaker, since Oceania's median and
-p90 are in line with everyone else.
+**Americas non-NOAA (eligible)** — `continent === "Americas"` and `id` does not start
+with `noaa/` — is the single largest group measured in this report: 2,537 stations, more
+than Europe, Asia, Oceania and Africa combined. It is the last continent-scale slice
+`gen-tides.mjs` ships under this gate that this report hadn't yet measured. (This is a
+distinct population from any "source is NOAA by name" reading that also sweeps in TICON
+rows mirroring NOAA gauges — the `-usa-noaa`-suffixed ids — which is not what this row
+counts; see the working notes for the trap in conflating the two.)
 
-UK home waters and non-UK groups all sit close to the NOAA control on median and p90 —
-the method holds up well outside North America. The max columns are dominated by a
-handful of named or gate-excluded outliers, not a systematic regional bias.
+Asia, Oceania and Africa together account for the roughly 784 checkable stations outside
+NOAA/Americas-non-NOAA/UK/Europe that `gen-tides.mjs` ships under this same global gate
+(`passesDatumCheck` is applied without a region carve-out). None of the six non-control
+groups reads materially worse than any other — medians cluster 0.018–0.032 m, p90s
+0.053–0.114 m, and every pass rate lands 97–100%. Oceania's max (2.193 m, one station) is
+the largest single deviation measured in this report, well past the 0.30 m gate — meaning
+that station does not ship; it is not evidence the group as a whole is weaker, since
+Oceania's median and p90 are in line with everyone else.
+
+**This is the report's most useful conclusion, not just its most reassuring one: the gate
+behaves consistently worldwide, not just where we happened to look first.** North America
+(the control), the Americas' non-NOAA majority, the UK, the rest of Europe, Asia, Oceania
+and Africa all cluster in the same narrow band. The method doesn't quietly get worse the
+farther a station sits from where it was first validated.
 
 **On the 0.30 m vs. a tighter bar (Europe non-UK, re-measured):** at 0.15 m, 5.65% of all
 744 checkable Europe non-UK stations fail outright, and 4.75% of the 737 that currently
@@ -177,9 +193,12 @@ occur.
 
 ## Verdict
 
-The datum/amplitude gate passes at 97–100% across all six measured groups (NOAA control,
-UK home waters, Europe non-UK, Asia, Oceania, Africa), its control's noise floor sits
-16.7–27.3× below its tolerance, and its two named failures are explained and excluded
-rather than shipped quietly. That is enough to justify shipping the passing stations'
+The datum/amplitude gate passes at 97–100% across all seven measured groups (NOAA
+control, Americas non-NOAA, UK home waters, Europe non-UK, Asia, Oceania, Africa), its
+control's noise floor sits 16.7–27.3× below its tolerance, and its two named failures are
+explained and excluded rather than shipped quietly. The consistency across groups matters
+as much as any single number: the gate performs the same everywhere it was checked, not
+just on the water it was built and calibrated against. That is enough to justify shipping
+the passing stations'
 levels under a trusted name. It is not, on its own, enough to claim their timing is
 validated — that claim is not made here.
