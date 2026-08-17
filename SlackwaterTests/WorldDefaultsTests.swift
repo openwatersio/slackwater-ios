@@ -74,4 +74,35 @@ final class WorldDefaultsTests: XCTestCase {
         XCTAssertTrue(label.contains("not available"),
                       "the label must say so in words, got \(CardStatus.noCurrentCoverage.label)")
     }
+
+    /// A political-border reading of "coverage" (any station within some
+    /// generous radius, regardless of country) is dishonest right at the
+    /// borders this app's own audience actually crosses — a boat in Ensenada
+    /// or Nassau is nowhere near the US bay entrance a wide radius would
+    /// borrow from. Currents are hyper-local (T6 §2), so coverage has to mean
+    /// "a station describing THIS water", not "a station within reach".
+    func testCurrentCoverageIsNotAPoliticalBox() throws {
+        XCTAssertFalse(hasCurrentCoverage(latitude: 32.5149, longitude: -117.0382),
+                       "Tijuana MX is 25.8km from San Diego Bay Entrance — a different bay, not this one")
+        XCTAssertFalse(hasCurrentCoverage(latitude: 31.8667, longitude: -116.6000),
+                       "Ensenada MX is 108km from the nearest bundled station")
+        XCTAssertFalse(hasCurrentCoverage(latitude: 26.5333, longitude: -78.6963),
+                       "Freeport, Bahamas is 136km from the nearest bundled (US) station")
+        XCTAssertFalse(hasCurrentCoverage(latitude: 23.1136, longitude: -82.3666),
+                       "Havana, Cuba is 161km from the nearest bundled (US) station")
+        XCTAssertFalse(hasCurrentCoverage(latitude: 25.0480, longitude: -77.3554),
+                       "Nassau, Bahamas is 289km from the nearest bundled (US) station")
+    }
+
+    /// Regression for the bug this exact review caught: an earlier
+    /// `hasCurrentCoverage` checked `CurrentStationRecord.all` (NOAA) only,
+    /// so it reported "not available" at Seymour Narrows — a validated CHS
+    /// gate the app ships a fitted model for, and one of this coast's
+    /// fiercest tidal passes. A missed bundle is the same dishonest silence
+    /// as a missed radius.
+    func testCurrentCoverageIncludesChsGates() throws {
+        let seymourNarrows = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-seymour-narrows" })
+        XCTAssertTrue(hasCurrentCoverage(latitude: seymourNarrows.latitude, longitude: seymourNarrows.longitude),
+                      "Seymour Narrows is itself a bundled CHS current gate")
+    }
 }
