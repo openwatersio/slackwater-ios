@@ -99,6 +99,11 @@ enum CardStatus: Equatable {
     }
 }
 
+/// How close a current station has to be before the app will claim it
+/// describes THIS water. See `hasCurrentCoverage` below for why 20 km, and why
+/// it is one constant rather than a literal in the function and five tests.
+let currentCoverageKm = 20.0
+
 /// NOT a political box (US/Canada) — currents are hyper-local (even a 1.5km
 /// ocean model can't resolve a tidal gate, per the currents research this app
 /// is built on), so a station 100km away describes different water, not this
@@ -133,9 +138,13 @@ enum CardStatus: Equatable {
 /// one of this coast's fiercest tidal passes, and a gate the app ships a
 /// validated model for — that predictions were "not available here". A
 /// missed source is the same class of dishonest silence as a missed radius.
+///
+/// The radius is `currentCoverageKm`, not a literal — the number is restated by
+/// this comment and by five tests, and three copies of "20" is how a measured
+/// value quietly becomes three different values.
 func hasCurrentCoverage(latitude: Double, longitude: Double) -> Bool {
     func near<T: StationIdentity>(_ items: [T]) -> Bool {
-        items.contains { distanceKm(latitude, longitude, $0.latitude, $0.longitude) < 20 }
+        items.contains { distanceKm(latitude, longitude, $0.latitude, $0.longitude) < currentCoverageKm }
     }
     return near(CurrentStationRecord.all) || near(ChsCurrentGateInfo.all) || near(ChsGateInfo.all)
 }

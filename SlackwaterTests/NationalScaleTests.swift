@@ -39,7 +39,7 @@ final class NationalScaleTests: XCTestCase {
     /// the bundle is not quietly a Pacific bundle with extras.
     func testFarStationsAreSearchableAndPredictable() throws {
         for query in ["boston", "san francisco", "key west", "halifax", "honolulu"] {
-            XCTAssertFalse(StationItem.search(query).isEmpty, "\"\(query)\" found nothing")
+            XCTAssertFalse(StationItem.search(query, near: firstRunFix).isEmpty, "\"\(query)\" found nothing")
         }
         let boston = try XCTUnwrap(TideStationRecord.all.first { $0.name == "Boston" })
         let now = Date(timeIntervalSince1970: 1_785_000_000)
@@ -98,7 +98,7 @@ final class NationalScaleTests: XCTestCase {
         }
         var worstBefore = 0
         for q in queries {
-            let shown = StationItem.search(q)
+            let shown = StationItem.search(q, near: firstRunFix)
             let every = naive(q)
             worstBefore = max(worstBefore, every.count)
             XCTAssertEqual(shown.count, min(every.count, StationItem.searchLimit),
@@ -112,7 +112,7 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(ports[0].km(fromLat: near.lat, lon: near.lon), 500,
                           "\"port\" in Boston must not answer with Alaska")
         let before = elapsed { for q in queries { _ = naive(q) } }
-        let after = elapsed { for q in queries { _ = StationItem.search(q) } }
+        let after = elapsed { for q in queries { _ = StationItem.search(q, near: firstRunFix) } }
         print(String(format: "M53 search · %d stations · %d queries: %.1f ms -> %.1f ms; " +
                      "worst result list %d rows -> %d",
                      StationItem.all.count, queries.count, before * 1000, after * 1000,
@@ -456,7 +456,7 @@ final class NationalScaleTests: XCTestCase {
         let far = try XCTUnwrap(ChsStationInfo.all.first {
             !service.isQueued($0.id) && $0.region == "Atlantic Coast"
         })
-        XCTAssertTrue(StationItem.search(far.name.lowercased()).contains { $0.id == far.id },
+        XCTAssertTrue(StationItem.search(far.name.lowercased(), near: firstRunFix).contains { $0.id == far.id },
                       "an undownloaded station still has to be findable")
         XCTAssertEqual(cardStatus(id: far.id), .notDownloaded,
                        "it must not claim to be queued when it isn't")

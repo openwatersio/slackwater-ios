@@ -53,11 +53,18 @@ final class WorldDefaultsTests: XCTestCase {
 
         // LocationService.location is nil in a test process, so the anchor
         // falls through to the last-opened station rather than to Victoria.
-        let anchor = try XCTUnwrap(LocationService.shared.rankingAnchor)
+        let anchor = LocationService.shared.rankingAnchor
         XCTAssertEqual(anchor.lat, pompey.latitude, accuracy: 0.001,
                        "with no fix, the ranking anchor must follow the last opened station")
         XCTAssertNotEqual(anchor.lat, firstRunFix.lat, accuracy: 0.001,
                           "Victoria Harbour is the first-run value only")
+
+        // Ends clean — RecentsStore is UserDefaults-backed and SHARED across
+        // every test in the process. Task 5's map-camera bug was exactly a
+        // RecentsStore value leaking between test methods; a test written to
+        // prove that fix must not re-arm it (UnitsAndGroupsTests does the same
+        // at its FavoritesStore round trip).
+        RecentsStore.shared.remove(pompey.id)
     }
 
     /// The wedge is currents, and currents don't ship worldwide — only NOAA
@@ -82,6 +89,11 @@ final class WorldDefaultsTests: XCTestCase {
     /// borrow from. Currents are hyper-local (T6 §2), so coverage has to mean
     /// "a station describing THIS water", not "a station within reach".
     func testCurrentCoverageIsNotAPoliticalBox() throws {
+        // Each distance below is the real nearest-bundled-station distance,
+        // measured; the bar they are measured against is `currentCoverageKm`
+        // (CardStatus.swift), which they clear by 29% or more. Left as measured
+        // literals on purpose — a test that recomputes the production constant
+        // asserts nothing about it.
         XCTAssertFalse(hasCurrentCoverage(latitude: 32.5149, longitude: -117.0382),
                        "Tijuana MX is 25.8km from San Diego Bay Entrance — a different bay, not this one")
         XCTAssertFalse(hasCurrentCoverage(latitude: 31.8667, longitude: -116.6000),

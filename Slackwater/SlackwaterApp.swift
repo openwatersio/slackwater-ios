@@ -334,7 +334,7 @@ struct StationListView: View {
     }
     /// What distances are measured from: the fix, then the last-opened
     /// station, then the Victoria fallback on a genuine first run.
-    private var anchor: (lat: Double, lon: Double) { loc.rankingAnchor ?? firstRunFix }
+    private var anchor: (lat: Double, lon: Double) { loc.rankingAnchor }
 
     /// One definition, two attachment points (the root `.environment` below,
     /// and the re-forward into `.sheet(showDownloads)`) — kept as a single

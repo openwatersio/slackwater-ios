@@ -249,7 +249,11 @@ enum StationItem: Identifiable, Hashable {
     /// measured the same as a prebuilt lowercased index at 3,125 stations
     /// (~6 ms per keystroke, debug simulator), and the index was 35 lines of
     /// cache that moved no number.
-    static func search(_ query: String, near anchor: (lat: Double, lon: Double) = firstRunFix) -> [StationItem] {
+    /// `near` has no default on purpose: defaulting it to `firstRunFix` is the
+    /// exact bug this branch exists to fix (search ranked from Victoria in the
+    /// Solent), and a default would let a future caller reintroduce it by
+    /// omission rather than by decision.
+    static func search(_ query: String, near anchor: (lat: Double, lon: Double)) -> [StationItem] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         var ranked: [(item: StationItem, rank: Int, km: Double)] = []
         ranked.reserveCapacity(128)

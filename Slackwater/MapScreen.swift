@@ -250,12 +250,7 @@ final class PinFeaturesCache: @unchecked Sendable {
     /// resolved instead of flashing every CHS pin back to "unknown".
     func snapshot(now: Date = appNow()) -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
-        let b = currentBucket(now)
-        if bucket != b || geojson.isEmpty {
-            geojson = pinFeatures(chsTones: tones)
-            bucket = b
-        }
-        return geojson
+        return rebuilt(tones, now)  // re-pushing what's cached IS "keep what we have"
     }
 
     /// `applyChsTones`'s entry point: the real, resolved CHS tones. Rebuilds
@@ -264,6 +259,13 @@ final class PinFeaturesCache: @unchecked Sendable {
     @discardableResult
     func update(tones newTones: [String: String], now: Date = appNow()) -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
+        return rebuilt(newTones, now)
+    }
+
+    /// The one cache rule both entry points share. CALLER HOLDS `lock` —
+    /// `NSLock` is not recursive, so this must never be called from outside
+    /// one of the two methods above.
+    private func rebuilt(_ newTones: [String: String], _ now: Date) -> [String: Any] {
         let b = currentBucket(now)
         if tones != newTones || bucket != b || geojson.isEmpty {
             tones = newTones
