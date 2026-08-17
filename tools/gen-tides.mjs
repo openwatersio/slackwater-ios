@@ -52,14 +52,16 @@
  *
  * NAMING. Same enrichment path as the Salish bundle: names, contexts and
  * aliases come from @sailingnaturali/station-corrections so the iOS app, the
- * web app and the MCP fleet all say the same thing. The one addition is a
- * guard the Salish-sized bundle never needed — the resolver's fourth tier is
- * "nearest place from the bundled gazetteer", and that gazetteer holds 19
- * Salish Sea towns. Nationally it produces "San Francisco · near Olympia, WA".
- * So a DERIVED context is discarded and replaced with the station's own
- * state/province — the presentation NOAA itself uses ("Boston, MA").
- * ponytail: state code, not an expanded name. Expand it when the registry
- * grows a real national gazetteer, which is where curation belongs anyway.
+ * web app and the MCP fleet all say the same thing. Two guards the
+ * Salish-sized bundle never needed, both in NORTH_AMERICA/upstreamRegion
+ * below: the resolver's fourth tier is "nearest place from the bundled
+ * gazetteer", and that gazetteer holds 9,660 US, Canadian and territory
+ * towns — worldwide it stays out of the region line entirely outside those
+ * countries, and upstream's own region field ("Scotland", "Bretagne") fills
+ * in instead, the presentation the source authority itself uses.
+ * ponytail: state code, not an expanded name, for the North American case.
+ * Expand it when the registry grows a real national gazetteer, which is
+ * where curation belongs anyway.
  *
  * And two presentation fixes at the data layer, once, rather than on every
  * render — see undangle() and untrail(). NOAA writes a qualifier as the phrase
@@ -78,7 +80,7 @@ import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
 import {
   here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle,
-  FRESHWATER_NETWORKS, networkOf,
+  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
@@ -171,10 +173,14 @@ const resolve = placesResolver();
  * showing: "Abercorn Creek near Savannah Ga · GA" says Georgia twice, on 571
  * cards, and "Brockville Ontario · ON" on 34 more. Both forms come off.
  *
- * Only a two-letter region is touched — those are the codes, so no regex
- * escaping and no risk of eating a place called "Santa Rita" — and the word
- * form only strips when it EXPANDS that same code, which is what keeps
- * "Kewaunee Lake Michigan · WI" intact.
+ * A two-letter code strips itself or the word it EXPANDS to (REGION_WORD),
+ * which is what keeps "Kewaunee Lake Michigan · WI" intact — "Michigan" only
+ * comes off when the code is actually MI. Anything else — a bare country or
+ * region name reaching here for a non-North-American station — strips as the
+ * literal word itself: world coverage repeats it too ("Praia Cape Verde ·
+ * Cape Verde", "Syowa Antarctica · Antarctica"). Escaped before going into the
+ * RegExp, since a country name (unlike a two-letter code) isn't guaranteed
+ * regex-safe.
  *
  * Several codes are tried, because the row's OWN code is not always the
  * province the card ends up showing. Upstream reads these Ontario gauges as
@@ -183,13 +189,14 @@ const resolve = placesResolver();
  * alone looks for "Michigan", finds none, and ships the duplication the region
  * line then contradicts: "Tecumseh Ontario · ON".
  */
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const untrail = (name, ...regions) => {
   for (const region of regions) {
-    if (!/^[A-Z]{2}$/.test(region ?? "")) continue;
-    const word = REGION_WORD[region];
-    const trimmed = name
-      .replace(new RegExp(`\\s+(${region}${word ? `|${word}` : ""})$`, "i"), "")
-      .trim();
+    if (!region) continue;
+    const isCode = /^[A-Z]{2}$/.test(region);
+    const word = isCode ? REGION_WORD[region] : undefined;
+    const pattern = `${escapeRegExp(region)}${word ? `|${word}` : ""}`;
+    const trimmed = name.replace(new RegExp(`\\s+(${pattern})$`, "i"), "").trim();
     if (trimmed) name = trimmed;
   }
   return name;
@@ -205,6 +212,33 @@ const regionOf = (s) => {
   // Great Lakes gauges carry Ontario's "08" on the US shore. "Algonac · 08"
   // is worse than "Algonac · United States", so let it fall through.
   return /^[0-9]+$/.test(r ?? "") ? "" : r;
+};
+
+/**
+ * Upstream's own `region` — "England", "Scotland", "Bretagne" — is the
+ * presentation the source authority uses, and outside North America it is
+ * the best context this pipeline has: the derived gazetteer tier never
+ * reaches this far (see NORTH_AMERICA in bundle.mjs), and station-corrections
+ * has no curated context for anywhere outside the Salish bundle yet.
+ *
+ * Two guards, both against a value that isn't a usable place name:
+ *
+ *   - Shape: same test regionOf applies to Canada's GeoNames leftovers. A
+ *     two-letter or bare-numeric value is a code that missed its map, not a
+ *     place — one NOAA row files Western Samoa's Apia gauge as region "AS",
+ *     American Samoa's own code, on the wrong country.
+ *   - Self-reference: some TICON rows already spell their region into the
+ *     name itself ("Reggio Calabria", "Puerto Chiapas", and — worst — "Praia
+ *     Cape Verde", whose OWN region field is "Praia"). Using a region that
+ *     overlaps the name either says nothing new or, combined with untrail(),
+ *     would strip a real proper name down to a fragment ("Puerto Chiapas" ->
+ *     "Puerto"). Either way it falls through to the country instead.
+ */
+const upstreamRegion = (s) => {
+  const region = s.region ?? "";
+  if (/^[A-Z]{2}$/.test(region) || /^[0-9]+$/.test(region)) return "";
+  if (region && new RegExp(`\\b${escapeRegExp(region)}\\b`, "i").test(s.name)) return "";
+  return region;
 };
 
 /**
@@ -287,23 +321,38 @@ const stations = shippable
     // context outranks it — but still its own fact, and `untrail` needs it
     // whatever gets displayed (see below).
     const code = ((countryOf(s) === "United States" || countryOf(s) === "Canada") && regionOf(s)) || "";
-    // Fallback chain: curated or derived context, then state/province, then
-    // country — the unincorporated Pacific islands (Midway, Wake, Johnston
-    // Atoll) carry no region at all.
+    const na = NORTH_AMERICA.has(countryOf(s));
+    // Fallback chain: curated or derived context, then state/province or the
+    // upstream region field, then country — the unincorporated Pacific
+    // islands (Midway, Wake, Johnston Atoll) carry no region at all.
     //
-    // A DERIVED context is no longer discarded. It used to be, because the
-    // gazetteer behind it held 19 Salish towns and nationally produced "San
-    // Francisco · near Olympia, WA"; station-corrections 2.8.0 derives from a
-    // national places list instead, capped at 40 km, so "~Bellingham, WA" beats
-    // the bare "WA" it replaces — it says the same thing and more.
-    const region = undangle(r.context) || code || countryOf(s);
+    // A DERIVED context is no longer discarded outright. It used to be,
+    // because the gazetteer behind it held 19 Salish towns and nationally
+    // produced "San Francisco · near Olympia, WA"; station-corrections 2.8.0
+    // derives from a national places list instead, capped at 40 km, so
+    // "~Bellingham, WA" beats the bare "WA" it replaces — it says the same
+    // thing and more. That gazetteer is still North-American places only
+    // (see NORTH_AMERICA above), so a derived context is trusted only there;
+    // everywhere else the upstream region field is both correct and the
+    // presentation the source authority itself uses ("Scotland", not
+    // "~Portsmouth Heights, VA").
+    const region =
+      (na || !r.derived ? undangle(r.context) : "") ||
+      (na ? code : upstreamRegion(s)) ||
+      countryOf(s);
     return {
       id: s.id,
-      // Trailing-state cleanup keys on the CODE, not the region line. Those
-      // parted company when a derived context started winning: "Abercorn Creek
-      // near Savannah Ga" reads beside "~Savannah, GA", and passing the label
-      // here would stop stripping the "Ga" on 571 cards.
-      name: untrail(r.name, code, trailingCode(region)),
+      // Trailing-state cleanup keys on the CODE, not the region line for the
+      // North American case — those parted company when a derived context
+      // started winning: "Abercorn Creek near Savannah Ga" reads beside
+      // "~Savannah, GA", and passing the label here would stop stripping the
+      // "Ga" on 571 cards. `region` itself is also tried, unconditionally: for
+      // a non-North-American station it now IS the word that can double back
+      // ("Praia Cape Verde · Cape Verde"), and for the North American case
+      // it's a harmless miss (`region` there is either the same code
+      // `trailingCode` already extracted, or a derived "~Town, XX" that never
+      // matches a bare name ending).
+      name: untrail(r.name, code, trailingCode(region), region),
       region,
       aliases: r.aliases ?? [],
       latitude: s.latitude,

@@ -125,3 +125,22 @@ export const FRESHWATER_NETWORKS = new Set([
 
 export const networkOf = (s) =>
   s.source?.name === NOAA ? "coops" : (s.id.split("-").pop() ?? "");
+
+/**
+ * Everywhere station-corrections' bundled gazetteer (places.json, 9,660
+ * towns) can legitimately label a station — its own countries, plus the
+ * territories it also carries towns for. Matamoros, MX sits 2.8 km from
+ * Brownsville, TX, inside the resolver's own 40 km derivation radius;
+ * nothing this close currently reaches gen-tides.mjs's naming stage (it
+ * ships as a `subordinate` row and is filtered out earlier), but the
+ * resolver has no way to know that, and a future upstream row could. So
+ * gen-tides.mjs trusts a DERIVED context (the resolver's `derived: true`)
+ * only inside this set — everywhere else the upstream region field is used
+ * instead (see upstreamRegion in gen-tides.mjs).
+ *
+ * Shared with gen-tides.test.mjs so the region-line tests can classify a
+ * station the same way the generator does, without importing gen-tides.mjs
+ * itself (that module writes the bundle and prints at top level).
+ */
+export const NORTH_AMERICA = new Set(["United States", "Canada", "Puerto Rico",
+  "Virgin Islands", "Guam", "Northern Mariana Islands", "American Samoa"]);
