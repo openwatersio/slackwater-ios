@@ -104,13 +104,52 @@ silently breaks the one promise the app exists to keep. **Background Assets** �
 separate extension target and an asset-pack pipeline for what is one file copy, and it
 couples pack updates to app releases.
 
-App-side change is small. Every tileset resolves through `Bundle.main.url(forResource:)`
-(`MapScreen.swift:374`, and `pmtilesUrl` at :546). One resolver that checks the packs
-directory before the bundle covers all of it.
+App-side change is small. Every tileset resolves through `Bundle.main.url(forResource:)`.
+One resolver that checks the packs directory before the bundle covers all of it.
+
+**This spec originally named two call sites. There are six**, found while planning Plan A:
+`MapScreen.swift:374` (pmtiles), `:375` (the layer-slice JSON), `:381` (the sprite JSON),
+`:414` (the glyph probe — it derives the *entire* glyph directory from one file's parent,
+so a pack shipping glyphs must move every range together), `:547` (`pmtilesUrl`), and
+`CurrentStation.swift:41`, the single loader behind all five station catalogs. A pack that
+adds zoom levels to an existing tileset can reuse the bundled slice; a pack introducing a
+*new* tileset cannot.
 
 **Free fallback:** PMTiles is range-addressable over HTTP, so a region with no pack
 downloaded still draws *online* by pointing MapLibre at the remote archive. Offline is
 the pack's job; online is free.
+
+### Carried over from Plan A (2026-08-17)
+
+Plan A shipped the stations and deliberately left these here rather than half-doing them.
+All three are Bryan's routing decision, recorded so they are not rediscovered.
+
+1. **The frame budget was loosened, and Plan B owns the strict alternative.**
+   `testPinLayerBuildsInsideAFrame` went 0.30 s → 0.75 s because the pin GeoJSON grew with
+   the station count. The measured cost is genuinely data volume, not slower code — 2.36×
+   in total constituent volume (2,765 stations × ~39.7 constituents against 1,473 × 31.7),
+   against only 1.56× in raw station count. `PinFeaturesCache` fixed the part that actually
+   reached users: `MapStyler.init` rebuilt the style on *every* construction and
+   `SlackwaterApp` remounts the map via `.id(mapFocusToken)` on **every pin-focus**, so a
+   ~0.5 s world-wide pass ran per focus rather than once per session.
+   **Deferred here because Plan B reworks `MapScreen` anyway:** build the pin source lazily
+   or off the main thread, then restore the 0.30 s line. A re-budgeted frame test is the
+   move that hides regressions, and it should not stay loosened permanently.
+
+2. **`CLAUDE.md`'s new `stations.json` → `currents.json` coupling entry undercounts.**
+   It says six records changed; the real diff against `main` is **eleven**. The extra five
+   (`SAB0809`/`0807`/`0808`, `LIS1005`/`1006`) trace to an *earlier* instance of the same
+   bug — Task 4b's dedupe dropped `ticon/panama_city-*` and `ticon/new_london-*` without
+   regenerating `currents.json` — silently repaired by a later regeneration.
+   **So the coupling bit twice on one branch, undetected both times**, which is a far
+   stronger argument than the entry currently makes. CI compares each artefact to its
+   generator; nothing checks what the diff *means*. Correct the number and add the
+   bit-twice fact.
+
+3. **Two cosmetics measured and left**, both pre-existing and both UK/territory-visible:
+   `Djibouti · Djibouti` (the self-reference guard falls through when the country equals
+   the name) and `Apra Harbor Guam · GU` (no `GU` in `REGION_WORD`). Residue is exactly two
+   lines across 2,765 stations.
 
 ## 3. The UK stations do not ship until they are validated
 
