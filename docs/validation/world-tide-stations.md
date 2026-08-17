@@ -127,8 +127,8 @@ distinct population from any "source is NOAA by name" reading that also sweeps i
 rows mirroring NOAA gauges — the `-usa-noaa`-suffixed ids — which is not what this row
 counts; see the working notes for the trap in conflating the two.)
 
-Asia, Oceania and Africa together account for the roughly 784 checkable stations outside
-NOAA/Americas-non-NOAA/UK/Europe that `gen-tides.mjs` ships under this same global gate
+Asia, Oceania and Africa together account for 793 checkable stations (399 + 313 + 81)
+outside NOAA/Americas-non-NOAA/UK/Europe that `gen-tides.mjs` ships under this same global gate
 (`passesDatumCheck` is applied without a region carve-out). None of the six non-control
 groups reads materially worse than any other — medians cluster 0.018–0.032 m, p90s
 0.053–0.114 m, and every pass rate lands 97–100%. Oceania's max (2.193 m, one station) is
