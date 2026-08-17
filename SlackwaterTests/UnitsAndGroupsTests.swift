@@ -98,8 +98,8 @@ final class UnitsAndGroupsTests: XCTestCase {
 
     func testSameNamedStationsCollapseToTheNearest() {
         let ranked = StationItem.all.sorted {
-            $0.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon) <
-            $1.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon)
+            $0.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon) <
+            $1.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon)
         }
         let places = StationGroups(ranked: ranked)
         let discovery = ranked.filter { $0.name == "Discovery Island" }
@@ -124,8 +124,8 @@ final class UnitsAndGroupsTests: XCTestCase {
     /// Recents case (visit both Point Wilsons, see one row).
     func testCollapseKeepsOrderAndDedupes() {
         let ranked = StationItem.all.sorted {
-            $0.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon) <
-            $1.km(fromLat: fallbackFix.lat, lon: fallbackFix.lon)
+            $0.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon) <
+            $1.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon)
         }
         let places = StationGroups(ranked: ranked)
         let wilsons = ranked.filter { $0.name == "Point Wilson" }

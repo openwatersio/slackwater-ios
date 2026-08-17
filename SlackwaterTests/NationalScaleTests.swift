@@ -126,7 +126,7 @@ final class NationalScaleTests: XCTestCase {
     /// every fit, favourite and unit switch. Memoised, a re-render is free.
     @MainActor
     func testRankedCatalogIsMemoisedPerFix() {
-        let fix = fallbackFix
+        let fix = firstRunFix
         _ = RankedStations.near(lat: 0, lon: 0)   // evict, so "cold" is cold
         let cold = elapsed { _ = RankedStations.near(lat: fix.lat, lon: fix.lon) }
         let warm = elapsed { for _ in 0..<20 { _ = RankedStations.near(lat: fix.lat, lon: fix.lon) } }
@@ -140,10 +140,75 @@ final class NationalScaleTests: XCTestCase {
 
     /// The map hands MapLibre one GeoJSON document; building it must not be
     /// something the map screen notices.
+    ///
+    /// The 0.30s budget was set at the M53 milestone against 3,125 bundled
+    /// stations. World coverage (Task 5) took the heavy tide/current path to
+    /// 1.56× in station count but **2.36×** in total constituent volume
+    /// (2,776 stations × 39.72 avg constituents vs the pre-world 1,473 × 31.68
+    /// — measured by diffing `stations.json` at the commit before world
+    /// coverage landed against today's), which is the quantity `Station.init`
+    /// and `heights()` actually do work proportional to. The number moved
+    /// because the data got legitimately bigger, not because this code got
+    /// slower — no quadratic or repeated-per-station work was found in
+    /// `Station`/`tidePinRisingHybrid`/`currentPinTone`.
+    ///
+    /// What DID regress, and is now fixed separately: `MapStyler.init`
+    /// rebuilt this whole pass from scratch on every single pin focus
+    /// (`.id(mapFocusToken)` remounts `MapViewRepresentable` on every tap) —
+    /// paid again and again in one map session, not once. `PinFeaturesCache`
+    /// (`MapScreen.swift`) now caches across those remounts, invalidating on
+    /// a real `chsTones` change or a moved time bucket; this test forces a
+    /// cold build via `resetForTesting()` so it keeps measuring the one-call
+    /// cost that regressed, not a cache hit.
+    ///
+    /// Re-budgeted from 0.30s to 0.75s: measured 569.3ms cold on this
+    /// machine at 4,699 total stations (all kinds), ~32% headroom above that
+    /// — enough to absorb shared-machine variance without sitting on the
+    /// edge, tight enough that a future 2×+ regression still trips it.
     func testPinLayerBuildsInsideAFrame() {
+        PinFeaturesCache.shared.resetForTesting()
         let build = elapsed { _ = localFallbackStyle(landUrl: "", uscaUrl: "") }
         print(String(format: "M53 pin source · %d stations: %.1f ms", StationItem.all.count, build * 1000))
-        XCTAssertLessThan(build, 0.30)
+        XCTAssertLessThan(build, 0.75)
+    }
+
+    /// The regression this exists for: a stale CHS tone surviving after a fit
+    /// lands would be a worse bug than the rebuild cost `PinFeaturesCache`
+    /// exists to avoid. Proves invalidation, not just caching — a test that
+    /// only checked "the second call is fast" would pass just as happily on
+    /// a cache that never updates.
+    func testPinFeaturesCacheInvalidatesOnRealChsToneChange() throws {
+        PinFeaturesCache.shared.resetForTesting()
+        let chsPort = try XCTUnwrap(StationItem.all.first { $0.pinKind == "chs" })
+
+        func stateFor(_ geojson: [String: Any], id: String) -> String? {
+            let features = geojson["features"] as? [[String: Any]] ?? []
+            let props = features.first { ($0["properties"] as? [String: Any])?["id"] as? String == id }
+            return (props?["properties"] as? [String: Any])?["state"] as? String
+        }
+
+        // Cold: nothing synced, this CHS station reads "unknown".
+        let cold = PinFeaturesCache.shared.snapshot()
+        XCTAssertEqual(stateFor(cold, id: chsPort.id), "unknown")
+
+        // A same-value push (no real sync progress) must be a no-op — the
+        // object identity check below only means something if this doesn't
+        // also happen to rebuild.
+        let stillEmpty = PinFeaturesCache.shared.update(tones: [:])
+        XCTAssertEqual(stateFor(stillEmpty, id: chsPort.id), "unknown")
+
+        // A real tone lands for exactly this station: the cache must
+        // invalidate and the NEXT read must reflect it — not the stale
+        // "unknown" from the cold build.
+        let synced = PinFeaturesCache.shared.update(tones: [chsPort.id: "flood"])
+        XCTAssertEqual(stateFor(synced, id: chsPort.id), "flood",
+                       "a real CHS tone must invalidate the cache, not be served stale")
+
+        // And a subsequent plain snapshot() (what a remounted MapStyler asks
+        // for) must see the same resolved tone, not fall back to blank.
+        let afterRemount = PinFeaturesCache.shared.snapshot()
+        XCTAssertEqual(stateFor(afterRemount, id: chsPort.id), "flood",
+                       "a remount must reuse the last-known real tone, not flash back to unknown")
     }
 
     /// Task 5 fix round 1 shrank the pin's direction search to a 1h window
@@ -363,7 +428,7 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(service.queue.total, 60,
                           "the queue is the download set, not the 1,097-station catalog")
         XCTAssertGreaterThan(service.notQueued, 1_000, "the rest of Canada is on demand, not gone")
-        for (place, fix, gates) in [("Victoria", fallbackFix, 3),
+        for (place, fix, gates) in [("Victoria", firstRunFix, 3),
                                     ("Halifax", (lat: 44.65, lon: -63.57), 0)] {
             let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon)
             let seconds = set.reduce(0) { $0 + $1.estimatedSeconds }

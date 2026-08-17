@@ -191,7 +191,7 @@ final class ChsFitService: ObservableObject {
         queue = ChsQueue(jobs)
         // Never an arbitrary order, even before a fix lands: the prototype's
         // Victoria fallback anchors the first sort, and a real fix re-sorts.
-        adopt(lat: fallbackFix.lat, lon: fallbackFix.lon)
+        adopt(lat: firstRunFix.lat, lon: firstRunFix.lon)
         // After adopt(), so a `-chsFailOnly` id not already in the auto-fit
         // set (added by adopt() above) still gets marked.
         for id in Self.failOnly { queue.set(id, .failed) }

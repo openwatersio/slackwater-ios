@@ -332,8 +332,9 @@ struct StationListView: View {
         guard loc.authorized, let l = loc.location else { return nil }
         return (l.coordinate.latitude, l.coordinate.longitude)
     }
-    /// What distances are measured from: the fix, or the Victoria fallback.
-    private var anchor: (lat: Double, lon: Double) { fix ?? fallbackFix }
+    /// What distances are measured from: the fix, then the last-opened
+    /// station, then the Victoria fallback on a genuine first run.
+    private var anchor: (lat: Double, lon: Double) { loc.rankingAnchor ?? firstRunFix }
 
     /// One definition, two attachment points (the root `.environment` below,
     /// and the re-forward into `.sheet(showDownloads)`) — kept as a single
@@ -582,6 +583,11 @@ struct StationListView: View {
             MapViewRepresentable(
                 center: mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
                     ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
+                    ?? RecentsStore.shared.lastOpened.map {
+                        CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                    }
+                    // SALISH_CENTER only survives to here on a genuine first
+                    // run: no fix, nothing ever opened.
                     ?? SALISH_CENTER,
                 zoom: mapFocus == nil ? discoveryZoom : stationZoom
             ) { item in
