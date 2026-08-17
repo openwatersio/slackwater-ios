@@ -80,7 +80,7 @@ import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
 import {
   here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle,
-  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA,
+  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
@@ -275,11 +275,30 @@ const collides = (s) => {
   }
   return false;
 };
+// Name-gated, SAME_PLACE_KM (10x DUPLICATE_KM): keyed on the name itself
+// rather than widening the grid above, because a grid sized for 1 km isn't
+// sized for 10 — at UK latitudes (~51N) a +-2-cell box only reaches ~7 km
+// east-west, short of SAME_PLACE_KM, and would silently miss a same-named
+// pair separated mostly in longitude. Filtering by name first is also just
+// selective: most names are unique, so each bucket a candidate lands in is
+// tiny, and a plain scan of it is cheap.
+//
+// Runs on the RESOLVED/display name, not the raw upstream one — raw names
+// disagree across networks for the exact same gauge ("HILO" vs "Hilo
+// Hawaii", "CHARLOTTE AMALIE, ST. THOMAS ISLAND" vs "Charlotte Amalie",
+// same station id both times) and only converge once station-corrections
+// and untrail() have run. Matching on the raw name missed those pairs
+// entirely; this is why the dedupe below runs AFTER naming, not before.
+const byName = new Map();
+const samePlace = (s) =>
+  (byName.get(s.name.toLowerCase()) ?? []).some((k) => km(s, k) < SAME_PLACE_KM);
 /** Only kept stations go in, and a kept station ALWAYS goes in — a NOAA row
  *  that survives a collision still has to block the TICON row behind it. */
 const remember = (s) => {
   const k = cell(s.latitude, s.longitude);
   grid.set(k, [...(grid.get(k) ?? []), s]);
+  const nameKey = s.name.toLowerCase();
+  byName.set(nameKey, [...(byName.get(nameKey) ?? []), s]);
 };
 
 /**
@@ -306,16 +325,24 @@ const stations = shippable
   .sort((a, b) =>
     (a.source?.name === NOAA ? 0 : 1) - (b.source?.name === NOAA ? 0 : 1) ||
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  // Named BEFORE the dedupe filter runs (see samePlace above) — the collision
+  // check needs the display name and NOAA-source flag can't survive on the
+  // built station object, so it's carried alongside.
+  .map((s) => ({ station: buildStation(s), isNoaa: s.source?.name === NOAA }))
   // A NOAA row is never dropped. It was already shipping, users have fits and
   // favourites keyed on its id, and NOAA publishing two gauges a few hundred
   // metres apart ("Garden City Pier (ocean)") is a judgement it is entitled to
   // make. Deduplication is about what TICON ADDS, so only TICON rows yield.
-  .filter((s) => {
-    if (collides(s) && s.source?.name !== NOAA) { dropped++; return false; }
-    remember(s);
+  .filter(({ station, isNoaa }) => {
+    if ((collides(station) || samePlace(station)) && !isNoaa) { dropped++; return false; }
+    remember(station);
     return true;
   })
-  .map((s) => {
+  .map(({ station }) => station)
+  .sort(byNameThenId);
+
+/** Builds the shape shipped in stations.json for one raw database row. */
+function buildStation(s) {
     const r = resolve({ id: s.id, name: s.name, latitude: s.latitude, longitude: s.longitude });
     // The state/province code. Not always the region line any more — a derived
     // context outranks it — but still its own fact, and `untrail` needs it
@@ -367,17 +394,18 @@ const stations = shippable
         .filter((c) => c.amplitude > 0)
         .map((c) => ({ name: c.name, amplitude: c.amplitude, phase: c.phase })),
     };
-  })
-  .sort(byNameThenId);
+}
 
-// Measured 2026-08-17 at world coverage: 2,895. The plan's ~3,800 estimate was
+// Measured 2026-08-17 at world coverage: 2,776. The plan's ~3,800 estimate was
 // taken before dedup ran at world scale and undercounted it — DUPLICATE_KM
-// (1 km, unchanged by this task) now also collapses UHSLC's own redundant
-// fast-delivery/research-quality feeds (435 stations, most of them nowhere
-// near North America) and Mexico's multi-sensor-per-pier UNAM rows (46), on
-// top of the TICON-mirrors-NOAA duplication (458) that already dominated the
-// old 1,300-floor North America bundle. 2,500 keeps the floor a sanity check
-// against a broken filter, not a tautology of today's exact count.
+// (1 km) collapses UHSLC's own redundant fast-delivery/research-quality feeds
+// (most of them nowhere near North America) and Mexico's multi-sensor-per-pier
+// UNAM rows, on top of the TICON-mirrors-NOAA duplication that already
+// dominated the old 1,300-floor North America bundle; SAME_PLACE_KM (Task 4b)
+// adds another 113 on top of that, for the same-named gauges four-plus
+// national publishers put on one harbour a few km apart. 2,500 keeps the
+// floor a sanity check against a broken filter, not a tautology of today's
+// exact count.
 if (stations.length < 2500) {
   throw new Error(`only ${stations.length} stations survived the filters — refusing to ship`);
 }

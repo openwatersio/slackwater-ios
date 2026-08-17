@@ -12,7 +12,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
-import { here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA } from "./bundle.mjs";
+import {
+  here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
+} from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
 
@@ -180,6 +182,36 @@ test("no freshwater-network station ships", () => {
   const network = new Map(allStations.map((s) => [s.id, networkOf(s)]));
   const fresh = stations.filter((s) => FRESHWATER_NETWORKS.has(network.get(s.id)));
   assert.deepEqual(fresh.map((s) => s.id), []);
+});
+
+// Four UK publishers cover the same harbours — bodc, cco, noc and da_idh, plus
+// two UHSLC feeds. The 1 km rule collapses co-located gauges; two gauges on one
+// harbour a few km apart survive it and put three pins on one anchorage.
+//
+// NOAA-vs-NOAA pairs are exempt, same as the DUPLICATE_KM test above and for
+// the same reason: NOAA already publishes distinct nearby gauges under names
+// that collapse to the same word once trimmed to a card ("Philadelphia, US
+// Coast Guard Station" and "Philadelphia, Municipal Pier 11" both ship as
+// "Philadelphia", 2.3 km apart) — that pairing predates this task and is
+// NOAA's call, not a multi-publisher duplicate to collapse.
+test("no two bundled stations share a name within sight of each other", () => {
+  const byName = new Map();
+  for (const s of stations) {
+    const key = s.name.toLowerCase();
+    byName.set(key, [...(byName.get(key) ?? []), s]);
+  }
+  const collisions = [];
+  for (const [, group] of byName) {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        if (km(group[i], group[j]) < SAME_PLACE_KM &&
+            (group[i].id.startsWith("ticon/") || group[j].id.startsWith("ticon/"))) {
+          collisions.push(`${group[i].name} (${group[i].id} / ${group[j].id})`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(collisions, []);
 });
 
 // The gate is only worth having if it actually removed something. Southampton

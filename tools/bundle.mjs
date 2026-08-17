@@ -144,3 +144,23 @@ export const networkOf = (s) =>
  */
 export const NORTH_AMERICA = new Set(["United States", "Canada", "Puerto Rico",
   "Virgin Islands", "Guam", "Northern Mariana Islands", "American Samoa"]);
+
+/**
+ * Two rules, because they answer different questions.
+ *
+ * DUPLICATE_KM (in gen-tides.mjs, 1 km) asks "is this the same gauge,
+ * published twice" and is name-blind — two genuinely different stations can
+ * sit 800 m apart in a busy harbour and both deserve a pin.
+ *
+ * SAME_PLACE_KM (10 km) asks "is this the same PLACE, gauged twice" and only
+ * applies when the names already match. Four UK publishers cover the same
+ * harbours (bodc, cco, noc, da_idh) and upstream names them all after the
+ * harbour, so "Lerwick" arrives three times from three networks. Ten km is
+ * the CHS_COVERAGE_KM radius, and for the same reason: it asks whether this
+ * water is already served, not whether this is the same instrument.
+ *
+ * Lives here, not in gen-tides.mjs, so gen-tides.test.mjs can import it
+ * without importing the generator itself (that module writes the bundle and
+ * prints at top level — no test may import it).
+ */
+export const SAME_PLACE_KM = 10.0;
