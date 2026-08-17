@@ -40,10 +40,12 @@ test("no name carries a double-encoded UTF-8 sequence", () => {
 });
 
 // The check above only catches the mangling. Station 00550 is ALSO the feed's
-// only bilingual officialName, and repairing the encoding upstream — which CHS
-// was asked to do — would leave "Sable Island/Sable, Île de" passing it. This
-// asserts the name that ships. The id keeps the mangled slug on purpose: it is
-// what stored fitted models are keyed by.
+// only bilingual officialName, and CHS repaired the encoding upstream on
+// 2026-08-17 — so the feed now says "Sable Island/Sable, Île de", which passes
+// that check while still being the wrong thing to put on a card. This asserts
+// the name that ships. The id keeps the mangled slug on purpose — it is what
+// stored fitted models are keyed by — and the generator pins it so the repaired
+// spelling cannot slug its way to a new one.
 test("station 00550 ships its English name only", () => {
   const sable = stations.find((s) => s.id === "chs-sable-island-sable-azle-de");
   assert.equal(sable?.name, "Sable Island");
