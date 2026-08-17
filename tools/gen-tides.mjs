@@ -22,10 +22,10 @@
  *
  * What this bought, honestly: about 200 more US saltwater stations, plus 49
  * Canadian gap-fills in water CHS does not gauge. It is NOT the whole cc-by
- * set — most of what that licence unlocks is either freshwater (see NETWORKS)
- * or a second, less accurate copy of a CHS station (see CHS_COVERAGE_KM), and
- * both are filtered out below. cc-by-4.0 obliges attribution, paid in
- * SettingsView's "Data & attribution" section.
+ * set — most of what that licence unlocks is either freshwater (see
+ * FRESHWATER_NETWORKS in bundle.mjs) or a second, less accurate copy of a CHS
+ * station (see CHS_COVERAGE_KM), and both are filtered out below. cc-by-4.0
+ * obliges attribution, paid in SettingsView's "Data & attribution" section.
  *
  * Three more filters, all inherited from slackwater-web's build-stations.mjs
  * and all still load-bearing:
@@ -36,16 +36,19 @@
  *   - at least one non-zero constituent, or there is nothing to predict.
  *   - zero-amplitude constituents dropped: they contribute nothing but bytes.
  *
- * GEOGRAPHY, by upstream `country`, not a bbox. "All of the US and Canada" is
- * a statement about sovereignty, so it is read off the field that states it.
- * NOAA publishes reference stations in Mexico, Panama, Fiji and Bermuda — real
- * data, outside the app's stated coverage and off the bundled basemap, so out.
+ * GEOGRAPHY no longer gates anything — coverage was "all of the US and
+ * Canada" behind a `country` allowlist (`COUNTRIES`); at world coverage
+ * quality (licence, FRESHWATER_NETWORKS, the CHS cede rule, the datum check
+ * below) decides what ships, and a station's country is no longer one of the
+ * questions asked.
  *
- * That field is trustworthy for NOAA rows and NOT for TICON's, which is why
- * COUNTRY_FIX exists below: upstream reads a station's operating agency as its
- * country, so the gauges NOAA runs abroad arrive claiming "United States".
- * The other two TICON-shaped corrections — NETWORKS and CA_PROVINCE — are
- * documented at their definitions.
+ * `country` itself is trustworthy for NOAA rows and NOT for TICON's, which is
+ * why COUNTRY_FIX exists below: upstream reads a station's operating agency as
+ * its country, so the gauges NOAA runs abroad arrive claiming "United States".
+ * With no COUNTRIES gate to drop them as a side effect, COUNTRY_FIX is what
+ * lets them ship labelled honestly — Dakar as Senegal, not as a US station.
+ * The other TICON-shaped correction, CA_PROVINCE, is documented at its
+ * definition.
  *
  * NAMING. Same enrichment path as the Salish bundle: names, contexts and
  * aliases come from @sailingnaturali/station-corrections so the iOS app, the
@@ -73,15 +76,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
-import { here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle } from "./bundle.mjs";
+import {
+  here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle,
+  FRESHWATER_NETWORKS, networkOf,
+} from "./bundle.mjs";
 import { km } from "./geo.mjs";
+import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
-/** US (states + territories) and Canada — the app's stated coverage. */
-const COUNTRIES = new Set([
-  "United States", "Puerto Rico", "Virgin Islands", "Guam",
-  "Northern Mariana Islands", "American Samoa", "Canada",
-]);
 
 /**
  * Upstream reads a station's OPERATING AGENCY as its country, so the 17 gauges
@@ -89,9 +91,9 @@ const COUNTRIES = new Set([
  * Easter Island. Every one carries a `-usa-noaa` id suffix, which is the tell.
  *
  * Corrected, not deny-listed, because the correction is what is actually true
- * and it is the form the world bundle needs: there these are keepers, they
- * just have to be labelled honestly. Here the COUNTRIES gate drops them as a
- * consequence of the fix rather than as a special case.
+ * and it is the form the world bundle needs: these are keepers, they just have
+ * to be labelled honestly — so worldwide they ship under the country this map
+ * corrects them to, not as a seventh US territory.
  */
 const COUNTRY_FIX = new Map([
   ["ticon/barbuda-9761115-usa-noaa", "Antigua and Barbuda"],
@@ -138,37 +140,6 @@ const CA_PROVINCE = {
  * ponytail: distance only. Add name similarity if the residue gets noticed.
  */
 const DUPLICATE_KM = 1.0;
-
-/**
- * NETWORK. TICON is an aggregate of operator networks, and its id carries the
- * operator as the last segment (`ticon/crms0501-crms0501-usa-crms`). Half of
- * what it adds in US waters is FRESHWATER instrumentation, which is the same
- * kind of dead pin the reference-only filter already rejects:
- *
- *   crms 328  Louisiana marsh platforms. Upstream names every one of them
- *             after the nearest town, so the bundle gets "Abbeville · LA"
- *             nine times over, on nine bayou platforms nobody can moor at.
- *   usgs 591  river and creek stage gauges — "Adams Bayou at Fm 3247 nr
- *             Orange Tx". Real data, upstream of anywhere with water under a
- *             keel.
- *   cdwr 131  California Delta. sfwmd/nwfwmd 52  Florida canals.
- *   ncdem  26 North Carolina emergency-management gauges.
- *
- * Keeping the saltwater networks costs 1,128 stations and 3.6 MB and loses
- * nothing a boat can reach. The list is an allowlist, not a denylist, so a
- * network that appears upstream tomorrow has to be looked at before it ships.
- * ponytail: allowlist by operator. The honest filter is "is there navigable
- * water here", which no field in this database answers.
- */
-const NETWORKS = new Set([
-  "coops",     // the NOAA CO-OPS rows, which carry no TICON id
-  "meds",      // Marine Environmental Data Service — the Canadian tide gauges
-  "noaa",      // NOAA gauges TICON has that CO-OPS does not
-  "uhslc_fd", "uhslc_rq", // University of Hawaii Sea Level Center
-  "hct", "cm", "da_sat",
-]);
-const networkOf = (s) =>
-  s.source?.name === NOAA ? "coops" : (s.id.split("-").pop() ?? "");
 
 /**
  * CHS WINS IN CANADIAN WATER. TICON's Canadian rows overlap the CHS path
@@ -291,12 +262,13 @@ const servedByChs = (s) =>
   chs.some((c) => km(s, c) <= CHS_COVERAGE_KM);
 
 let dropped = 0;
+let failedDatum = 0;
 const stations = shippable
-  .filter((s) => COUNTRIES.has(countryOf(s)))
-  .filter((s) => NETWORKS.has(networkOf(s)))
+  .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
   .filter((s) => (servedByChs(s) ? (cededToChs++, false) : true))
   .filter((s) => s.type === "reference")
   .filter((s) => s.harmonic_constituents?.some((c) => c.amplitude > 0))
+  .filter((s) => (passesDatumCheck(s) ? true : (failedDatum++, false)))
   .sort((a, b) =>
     (a.source?.name === NOAA ? 0 : 1) - (b.source?.name === NOAA ? 0 : 1) ||
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -349,7 +321,15 @@ const stations = shippable
   })
   .sort(byNameThenId);
 
-if (stations.length < 1300) {
+// Measured 2026-08-17 at world coverage: 2,895. The plan's ~3,800 estimate was
+// taken before dedup ran at world scale and undercounted it — DUPLICATE_KM
+// (1 km, unchanged by this task) now also collapses UHSLC's own redundant
+// fast-delivery/research-quality feeds (435 stations, most of them nowhere
+// near North America) and Mexico's multi-sensor-per-pier UNAM rows (46), on
+// top of the TICON-mirrors-NOAA duplication (458) that already dominated the
+// old 1,300-floor North America bundle. 2,500 keeps the floor a sanity check
+// against a broken filter, not a tautology of today's exact count.
+if (stations.length < 2500) {
   throw new Error(`only ${stations.length} stations survived the filters — refusing to ship`);
 }
 if (stations.some((s) => !s.region)) {
@@ -387,4 +367,4 @@ console.log(
   `(${stations.length - towns - codes} curated contexts, ${towns} nearest town, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
-  `${dropped} duplicates dropped)`);
+  `${dropped} duplicates dropped; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);

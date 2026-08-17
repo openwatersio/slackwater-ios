@@ -81,3 +81,47 @@ export function writeBundle(path, data) {
   writeFileSync(path, json);
   return `${(json.length / 1024 / 1024).toFixed(2)} MB`;
 }
+
+/** The @neaps/tide-database `source.name` NOAA CO-OPS rows carry — mirrors the
+ *  same-named constant in gen-tides.mjs, which also uses it outside network
+ *  classification (licence sort, CHS cede rule) so isn't itself moved here. */
+const NOAA = "US National Oceanic and Atmospheric Administration";
+
+/**
+ * INVERTED at world coverage. This was an allowlist of eight operator codes,
+ * which was the right shape while the bundle was one continent and the only
+ * thing to exclude was US freshwater instrumentation. Worldwide it excluded 29
+ * national hydrographic networks — BODC, REFMAR, RWS, WSV, JODC, BoM — for no
+ * reason anyone had stated.
+ *
+ * So it is a denylist now, and it names exactly what the allowlist was written
+ * to keep out: river and marsh gauges upstream of anywhere with water under a
+ * keel. Measured — it drops 1,137 of the 5,416-station eligible pool and
+ * admits 1,133 across the remaining 28 networks.
+ *
+ * The six US codes are the brief's original list, ported verbatim; `mi_r` was
+ * added after review caught it leaking through unaudited — see its own
+ * comment below. Every other network the inversion admits was checked by name
+ * and amplitude before being left out of this list.
+ *
+ * ponytail: still a proxy. The honest filter is "is there navigable water
+ * here", which no field in this database answers, and this is the cheapest
+ * thing that behaves like it.
+ */
+export const FRESHWATER_NETWORKS = new Set([
+  "crms",    // 328  Louisiana marsh platforms, each named for the nearest town
+  "usgs",    // 591  river and creek stage gauges
+  "cdwr",    // 131  California Delta
+  "sfwmd",   //  43  Florida canals
+  "nwfwmd",  //   9  Florida canals
+  "ncdem",   //  26  North Carolina emergency-management gauges
+  // Ireland's Marine Institute publishes two codes: mi_c is coastal harbours
+  // (Dublin Port, Galway, Killybegs — legitimate, stays admitted) and mi_r is
+  // its Burrishoole salmonid-research catchment in Co. Mayo plus one Dublin
+  // urban river — the non-US analogue of usgs/crms above. 9 stations, all
+  // river names ("Newport Black River", "River Tolka"), amplitude 0.04-0.76 m.
+  "mi_r",    //   9  Irish river gauges (Burrishoole catchment + River Tolka)
+]);
+
+export const networkOf = (s) =>
+  s.source?.name === NOAA ? "coops" : (s.id.split("-").pop() ?? "");
