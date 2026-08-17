@@ -28,6 +28,21 @@ func appSources() throws -> [(name: String, source: String)] {
     return out
 }
 
+/// One source line with any `//` comment removed — the line as the COMPILER
+/// sees it. Source-text linters scan for a token they want banned from the
+/// CODE, and a comment saying "deliberately not <token>, because …" is the
+/// documentation the next person needs, not an offence. Without this,
+/// `testOnlyTheWordmarkShrinks` counted such a comment as a second
+/// `minimumScaleFactor` and went red on a file that has none.
+///
+/// ponytail: a plain `//` split, not a lexer — a `//` inside a string literal
+/// (a URL) truncates the line early, hiding anything after it on that line.
+/// No banned token in this repo sits after a URL. Reach for a real lexer the
+/// first time one does.
+func codeOnly(_ line: String) -> String {
+    String(line[line.startIndex..<(line.range(of: "//")?.lowerBound ?? line.endIndex)])
+}
+
 /// One repo file by path relative to the repo root (e.g.
 /// "Slackwater/MapScreen.swift", "project.yml").
 func repoSource(_ path: String) throws -> String {
