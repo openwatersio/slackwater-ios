@@ -214,6 +214,53 @@ test("no two bundled stations share a name within sight of each other", () => {
   assert.deepEqual(collisions, []);
 });
 
+// A NOAA row that FAILS the datum gate must still block the TICON refit of the
+// same gauge. The gate ran as a filter before the dedupe, so a failing NOAA row
+// left the pipeline and stopped blocking: Anchorage's `noaa/9455920` (120
+// constituents, 0.308) was rejected and `ticon/anchorage-9455920-usa-noaa` (50
+// constituents, scored 0.237 against TICON's OWN recomputed datums) shipped in
+// its place from the identical position — the gate PROMOTING the model it had
+// just rejected, in Upper Cook Inlet, where a linear harmonic model is at its
+// worst. "We cannot vouch for this water" has to yield no station.
+//
+// Proven red: run against the bundle generated before the fix and Anchorage
+// appears here at 0.0 km.
+test("nothing ships in the water a gate-failing NOAA row was rejected for", () => {
+  const bundled = new Set(stations.map((s) => s.id));
+  const rejectedNoaa = allStations.filter(
+    (s) => s.license?.commercial_use === true
+        && s.source?.name === "US National Oceanic and Atmospheric Administration"
+        && !passesDatumCheck(s));
+  assert.ok(rejectedNoaa.length > 0, "no NOAA row fails the gate — this test is vacuous");
+  const promoted = [];
+  for (const r of rejectedNoaa) {
+    if (bundled.has(r.id)) promoted.push(`${r.name} shipped despite failing`);
+    for (const s of stations) {
+      if (km(r, s) < 1.0) promoted.push(`${s.name} (${s.id}) replaced ${r.id}`);
+    }
+  }
+  assert.deepEqual(promoted, []);
+});
+
+// UHSLC's two feeds of one gauge disagree on POSITION by more than
+// SAME_PLACE_KM (Port Stanley by 105.7 km, into open South Atlantic water) and
+// sometimes on NAME ("Male" / "Male Hulule"), so neither the radius rule nor
+// the name-gated one collapses them. The station number in the id does.
+test("no UHSLC gauge ships through both of its feeds", () => {
+  const key = (id) =>
+    id.match(/-(\d+)[a-z]?-([a-z]{3})-uhslc_(?:fd|rq)$/)?.slice(1, 3).join("-");
+  const seen = new Map();
+  const dupes = [];
+  for (const s of stations) {
+    const k = key(s.id);
+    if (k === undefined) continue;
+    if (seen.has(k)) dupes.push(`${k}: ${seen.get(k).id} / ${s.id}`);
+    else seen.set(k, s);
+  }
+  assert.ok(seen.size > 300, `only ${seen.size} UHSLC gauges — the id shape changed`);
+  assert.deepEqual(dupes, []);
+});
+
 // The gate is only worth having if it actually removed something. Southampton
 // is a double high water port whose model disagrees with its own published
 // datums by 0.53 m; it must not be in the bundle at any range.
