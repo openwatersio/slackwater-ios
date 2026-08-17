@@ -23,13 +23,13 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
+    /// A Salish Sea station kept only as a stable, well-known id for tests —
+    /// no longer pinned to the head of the list (world coverage: a home-water
+    /// courtesy that reads as a bug from anywhere else).
     static let fridayHarborID = "noaa/9449880"
 
-    /// All bundled stations, Friday Harbor first, rest alphabetical.
-    static let all: [TideStationRecord] = {
-        let sorted: [TideStationRecord] = bundled("stations")
-        return sorted.filter { $0.id == fridayHarborID } + sorted.filter { $0.id != fridayHarborID }
-    }()
+    /// All bundled stations, alphabetical.
+    static let all: [TideStationRecord] = bundled("stations")
 }
 
 /// What a list card shows: height now, direction, next turn. Heights in metres.

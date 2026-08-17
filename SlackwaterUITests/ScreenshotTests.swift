@@ -381,7 +381,14 @@ final class ScreenshotTests: XCTestCase {
             (48.40618896484375, -122.64311981201172, "Deception Pass (Narrows)"),  // current → circle
             (48.48500061035156, -123.08300018310547, "Kanaka Bay"),                // NOAA tide → square
         ] {
-            let app = launch("-seedGate")
+            // World coverage (Task 5): the map's opening camera now follows a
+            // real fix, then the last-opened station, before SALISH_CENTER —
+            // and `tapPin`'s mercator math below assumes the camera IS
+            // SALISH_CENTER. Without `-resetRecents`, a station recorded by an
+            // earlier test in this run (UserDefaults persists across launches
+            // in the same simulator) reliably steals the camera and every tap
+            // below lands on the wrong pin.
+            let app = launch("-seedGate", "-resetRecents")
             app.buttons["Map"].tap()
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.waitForExistence(timeout: 5))
@@ -1199,7 +1206,7 @@ final class ScreenshotTests: XCTestCase {
     /// card's nearest-shipped link now shares. `-chsResetModels` wipes the
     /// model store so the whole queue starts `.pending`; no `-fixLat`/`-fixLon`
     /// needed because `ChsFitService.init` unconditionally adopts the
-    /// `fallbackFix` (Victoria) before any real fix can land (its own doc
+    /// `firstRunFix` (Victoria) before any real fix can land (its own doc
     /// comment: "never an arbitrary order, even before a fix lands"), and
     /// Victoria itself is distance zero from that anchor — so it is always the
     /// queue's first job, deterministic without a location launch argument.

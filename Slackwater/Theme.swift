@@ -817,6 +817,10 @@ final class RecentsStore: ObservableObject {
     var items: [StationItem] {
         ids.compactMap { id in StationItem.all.first { $0.id == id } }
     }
+
+    /// The most recently opened station, which is the best guess at where the
+    /// user is when Core Location has told us nothing.
+    var lastOpened: StationItem? { items.first }
 }
 
 // MARK: - Favorites (current-detail spec §9; prototype TidesApp savedIds)

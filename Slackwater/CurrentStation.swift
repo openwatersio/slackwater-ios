@@ -212,7 +212,9 @@ enum StationItem: Identifiable, Hashable {
         distanceKm(lat1: lat, lon1: lon, lat2: latitude, lon2: longitude)
     }
 
-    /// All bundled stations, Friday Harbor (tide) first, rest alphabetical.
+    /// All bundled stations, alphabetical. World coverage: no station is
+    /// pinned to the head of the list — that read as a bug from anywhere but
+    /// the Salish Sea.
     static let all: [StationItem] = {
         var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
         merged += CurrentStationRecord.all.map { StationItem.current($0) }
@@ -220,8 +222,7 @@ enum StationItem: Identifiable, Hashable {
         merged += ChsGateInfo.all.map { StationItem.chsGate($0) }
         merged += ChsCurrentGateInfo.all.map { StationItem.chsCurrent($0) }
         merged.sort { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
-        guard let friday = merged.first(where: { $0.id == TideStationRecord.fridayHarborID }) else { return merged }
-        return [friday] + merged.filter { $0.id != friday.id }
+        return merged
     }()
 
     /// Id → item, built once. Every row, every map-pin tap and every id→item
@@ -248,7 +249,7 @@ enum StationItem: Identifiable, Hashable {
     /// measured the same as a prebuilt lowercased index at 3,125 stations
     /// (~6 ms per keystroke, debug simulator), and the index was 35 lines of
     /// cache that moved no number.
-    static func search(_ query: String, near anchor: (lat: Double, lon: Double) = fallbackFix) -> [StationItem] {
+    static func search(_ query: String, near anchor: (lat: Double, lon: Double) = firstRunFix) -> [StationItem] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         var ranked: [(item: StationItem, rank: Int, km: Double)] = []
         ranked.reserveCapacity(128)

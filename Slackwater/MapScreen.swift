@@ -210,6 +210,82 @@ private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
     ]
 }
 
+/// Caches `pinFeatures`' output across `MapStyler` instantiations.
+///
+/// `SlackwaterApp.mapPane` remounts `MapViewRepresentable` via
+/// `.id(mapFocusToken)` on every pin focus, so `MapStyler.init` used to
+/// rebuild the whole world bundle's tide/current tones from scratch on every
+/// single tap — the ~0.5s `testPinLayerBuildsInsideAFrame` measures, paid
+/// again and again in one map session, not once per session.
+///
+/// Keyed on two things that actually change the answer: `chsTones` (busts
+/// the instant a real dict arrives via `update`, called from
+/// `MapStyler.applyChsTones` after a CHS fit lands — a stale CHS tone would
+/// be a worse bug than the rebuild cost this exists to avoid) and a 30-minute
+/// time bucket, `PIN_TIDE_DIFF_DT` — the same resolution
+/// `tidePinRisingHybrid`'s own hybrid check already uses, so rebuilding more
+/// often than that buys nothing and rebuilding less often would show a tide
+/// pin that never turns.
+///
+/// Internal, not `private`, and its cache is lock-protected rather than
+/// actor-isolated: `stationSource()` runs on whatever thread builds a style —
+/// main for the fallback, a `URLSession` callback thread for Seascape
+/// (`fetchSeascape`/`composeStyle`) — and `applyChsTones` writes from its own
+/// detached task, so real cross-thread access exists; a lock around a few
+/// dictionary reads is the smaller fix than moving every caller onto an
+/// actor. Internal (not private) so `NationalScaleTests` can exercise the
+/// cache/invalidate contract directly and reset it between measurements.
+final class PinFeaturesCache: @unchecked Sendable {
+    static let shared = PinFeaturesCache()
+    private let lock = NSLock()
+    private var bucket: Int?
+    private var tones: [String: String] = [:]
+    private var geojson: [String: Any] = [:]
+
+    private func currentBucket(_ now: Date) -> Int { Int(now.timeIntervalSince1970 / PIN_TIDE_DIFF_DT) }
+
+    /// What a style build should source its pins from: whatever's cached,
+    /// rebuilt only when the time bucket has moved. Serves the last-known
+    /// `chsTones` (not blank) so a remount reuses whatever `update` last
+    /// resolved instead of flashing every CHS pin back to "unknown".
+    func snapshot(now: Date = appNow()) -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        let b = currentBucket(now)
+        if bucket != b || geojson.isEmpty {
+            geojson = pinFeatures(chsTones: tones)
+            bucket = b
+        }
+        return geojson
+    }
+
+    /// `applyChsTones`'s entry point: the real, resolved CHS tones. Rebuilds
+    /// when they differ from what's cached, or the time bucket moved — a
+    /// same-value push (a style reload that synced nothing new) is a no-op.
+    @discardableResult
+    func update(tones newTones: [String: String], now: Date = appNow()) -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        let b = currentBucket(now)
+        if tones != newTones || bucket != b || geojson.isEmpty {
+            tones = newTones
+            geojson = pinFeatures(chsTones: newTones)
+            bucket = b
+        }
+        return geojson
+    }
+
+    /// Test-only: forces the next `snapshot`/`update` to rebuild from
+    /// scratch. Without this, whichever test happens to touch the (process-
+    /// lifetime) shared cache first "warms" it for every test after —
+    /// including `testPinLayerBuildsInsideAFrame`, which needs a genuinely
+    /// cold build or it stops measuring the cost it exists to catch.
+    func resetForTesting() {
+        lock.lock(); defer { lock.unlock() }
+        bucket = nil
+        tones = [:]
+        geojson = [:]
+    }
+}
+
 private func landSource(_ landUrl: String) -> [String: Any] {
     ["type": "vector", "url": landUrl, "attribution": "© OpenStreetMap contributors"]
 }
@@ -255,7 +331,7 @@ private let CLUSTER_MAX_ZOOM = 6
 /// Every bundled station as a clustered GeoJSON source.
 private func stationSource() -> [String: Any] {
     [
-        "type": "geojson", "data": pinFeatures(),
+        "type": "geojson", "data": PinFeaturesCache.shared.snapshot(),
         "cluster": true, "clusterMaxZoom": CLUSTER_MAX_ZOOM, "clusterRadius": 46,
     ]
 }
@@ -623,7 +699,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
                 let tones = chsPinTones(at: appNow(), tideRecords: tides, currentRecords: currents)
                 guard !tones.isEmpty else { return nil }   // nothing synced — neutral is honest
-                return try? JSONSerialization.data(withJSONObject: pinFeatures(chsTones: tones))
+                let geojson = PinFeaturesCache.shared.update(tones: tones)
+                return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
             guard let geojson, let style,
                   let source = style.source(withIdentifier: "stations") as? MLNShapeSource,

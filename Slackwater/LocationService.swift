@@ -5,9 +5,13 @@ import CoreLocation
 
 let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
 
-/// Victoria Harbour — the ranking anchor when there is no fix (prototype
+/// Victoria Harbour — the last-resort ranking anchor, used only on a first run
+/// with no fix and nothing opened yet. Everywhere else the anchor follows the
+/// user: a real fix first, then the station they last opened (prototype
 /// NearMe.dc.html FALLBACK: denied/undetermined still gets a Near Me list).
-let fallbackFix = (lat: 48.4235, lon: -123.3705)
+/// Before world coverage this was `fallbackFix` and it was the ONLY fallback,
+/// which is why the app opened in the Solent and ranked from Vancouver Island.
+let firstRunFix = (lat: 48.4235, lon: -123.3705)
 
 final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = LocationService()
@@ -82,6 +86,25 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         locating = false
+    }
+}
+
+extension LocationService {
+    /// What Near Me ranks distances from: a real fix first, then the station
+    /// the user last opened, and only a fixed coordinate on a genuine first
+    /// run with neither. Never nil in practice — the last branch always
+    /// resolves — but Optional because callers reach for it exactly where the
+    /// old code reached for the always-present `fallbackFix`, and this keeps
+    /// that call shape.
+    @MainActor var rankingAnchor: (lat: Double, lon: Double)? {
+        // Gated like `SlackwaterApp`'s `fix`: `location` is never cleared on
+        // revocation (only `status`/`locating` change in
+        // `locationManagerDidChangeAuthorization`), so an unguarded read here
+        // would keep ranking off a stale fix forever after the user revokes
+        // permission in Settings.
+        if authorized, let fix = location { return (fix.coordinate.latitude, fix.coordinate.longitude) }
+        if let last = RecentsStore.shared.lastOpened { return (last.latitude, last.longitude) }
+        return firstRunFix
     }
 }
 
