@@ -99,17 +99,45 @@ enum CardStatus: Equatable {
     }
 }
 
-/// The bundled current stations are NOAA (US) and CHS (Canada) — a coverage
-/// question about the DATA, not the boat's position, so this asks the bundle
-/// rather than a hardcoded box. 300km is comfortably inside real coverage
-/// (Salish Sea ~4-16km, Gulf of Mexico coast ~94km, Great Lakes interior
-/// ~1,000km+ — genuinely uncovered, correctly reported) and comfortably
-/// outside anywhere the bundle doesn't reach (nearest to Portsmouth UK,
-/// Sydney, Singapore: 4,700km+).
+/// NOT a political box (US/Canada) — currents are hyper-local (even a 1.5km
+/// ocean model can't resolve a tidal gate, per the currents research this app
+/// is built on), so a station 100km away describes different water, not this
+/// water, regardless of whose waters it's in. A political-box reading of
+/// "coverage" put San Diego Bay Entrance (25.8km) inside "coverage" for
+/// Tijuana and Lake Worth Inlet (135.8km) inside "coverage" for Freeport,
+/// Bahamas — both dishonest silences the political framing produced.
+///
+/// 20km is measured, not guessed: it sits between the bundled network's own
+/// p90 (16.1km) and p95 (22.5km) nearest-neighbor spacing — i.e. inside the
+/// gap where 90-95% of real stations sit relative to their closest neighbor,
+/// the normal spacing of a genuinely local cluster (Golden Gate 0.6km,
+/// Deception Pass 0.7km, NY Narrows 0.7km, Sidney BC 12.3km, Long Island
+/// Sound mid-channel 10.8km — all real, all under 13km). Every cross-border
+/// reach case measured (Tijuana 25.8km, Ensenada 108.3km, Freeport 135.8km,
+/// Havana 161.1km, Nassau 289.4km) clears 20km by 29%+, so there is no
+/// ambiguous middle ground between "same water" and "reaching for a stranger's
+/// water" in the data actually checked.
+///
+/// This also, correctly, reports "not available" inside real US/Canada gaps
+/// where the network has nothing hyper-local to offer (Desolation Sound BC —
+/// ~30km from the nearest gate, Beazley Passage; central Oregon coast
+/// ~258km) — silence there is honest, not a regression, because the app
+/// genuinely cannot describe that water either.
+///
+/// Checks all three current sources the app ships, the same three
+/// `StationItem.all` (`CurrentStation.swift`) treats as "the currents we
+/// have": NOAA (`CurrentStationRecord`), validated CHS gates
+/// (`ChsCurrentGateInfo` — Seymour Narrows, Active Pass, Dodd Narrows and 19
+/// more), and the one derived gate (`ChsGateInfo`). An earlier version of
+/// this function checked NOAA only, so it told a mariner at Seymour Narrows —
+/// one of this coast's fiercest tidal passes, and a gate the app ships a
+/// validated model for — that predictions were "not available here". A
+/// missed source is the same class of dishonest silence as a missed radius.
 func hasCurrentCoverage(latitude: Double, longitude: Double) -> Bool {
-    CurrentStationRecord.all.contains {
-        distanceKm(latitude, longitude, $0.latitude, $0.longitude) < 300
+    func near<T: StationIdentity>(_ items: [T]) -> Bool {
+        items.contains { distanceKm(latitude, longitude, $0.latitude, $0.longitude) < 20 }
     }
+    return near(CurrentStationRecord.all) || near(ChsCurrentGateInfo.all) || near(ChsGateInfo.all)
 }
 
 /// Where a fittable CHS station stands, in precedence order: what is happening
