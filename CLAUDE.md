@@ -78,6 +78,20 @@ Worth knowing when it happens: the un-suppressed TICON rows are real stations, a
 the result was five Great Lakes and St. Lawrence gauges going from unusable to
 usable. Read the regenerated diff before assuming it is noise.
 
+**And `stations.json` changes `currents.json` too** — the same coupling one link
+further down the chain. `gen-noaa-currents.mjs` resolves each current station's
+**region line** *and* its **`tideReference`** against the committed tide bundle
+(`:95`, `:105-110`), so a tide station leaving `stations.json` silently unpairs the
+current stations that pointed at it. The world-coverage datum gate dropped Fire
+Island and Port MacKenzie; four NOAA Cook Inlet current stations (`noaa/COI1209`,
+`COI0301`, `COI0302`, `COI0303`) lost their `tideReference` as a result, and
+`CurrentStation.swift:69` / `OnlineGateDetailView.swift:29` render that pairing —
+so those views quietly fell back to current-only. Two more (`SEA0307`, `PWS0710`)
+changed region line. **So: `node gen-tides.mjs` is always followed by
+`node gen-noaa-currents.mjs`, and both artefacts go in the same commit.** CI's
+`git diff --exit-code` catches the omission; nothing catches the *meaning* of the
+diff, so read it.
+
 The same trap in miniature: `untrail()` keys on the row's own state code, and
 upstream mislabels several Ontario gauges as `MI` or a bare GeoNames number, so a
 newly-surfaced station can ship "Tecumseh Ontario · ON" and trip the name invariant.

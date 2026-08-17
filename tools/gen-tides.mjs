@@ -447,16 +447,17 @@ function buildStation(s) {
     };
 }
 
-// Measured 2026-08-17 at world coverage: 2,776. The plan's ~3,800 estimate was
+// Measured 2026-08-17 at world coverage: 2,765. The plan's ~3,800 estimate was
 // taken before dedup ran at world scale and undercounted it — DUPLICATE_KM
 // (1 km) collapses UHSLC's own redundant fast-delivery/research-quality feeds
 // (most of them nowhere near North America) and Mexico's multi-sensor-per-pier
 // UNAM rows, on top of the TICON-mirrors-NOAA duplication that already
 // dominated the old 1,300-floor North America bundle; SAME_PLACE_KM (Task 4b)
 // adds another 113 on top of that, for the same-named gauges four-plus
-// national publishers put on one harbour a few km apart. 2,500 keeps the
-// floor a sanity check against a broken filter, not a tautology of today's
-// exact count.
+// national publishers put on one harbour a few km apart, and the UHSLC gauge
+// key another 10 for the pairs a radius rule cannot see (see sameGauge).
+// 2,500 keeps the floor a sanity check against a broken filter, not a
+// tautology of today's exact count.
 if (stations.length < 2500) {
   throw new Error(`only ${stations.length} stations survived the filters — refusing to ship`);
 }
