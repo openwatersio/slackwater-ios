@@ -65,20 +65,33 @@ Measured over 25 NOAA reference stations (the first 25 that are commercial-use-l
 | max | 0.018 m |
 | pass rate (≤0.30 m) | 100% |
 
-Two orders of magnitude below the tolerance below. This is what makes 0.30 m a
-calibrated number rather than a round one picked by taste — the check's own noise floor
-on trusted data is ~1 cm, so a 30 cm gate has enormous headroom against the method itself
-and is doing real work when a station fails it.
+This is the method's own noise floor on data already known correct — a few centimetres,
+not the tens of centimetres the tolerance below allows. That gap is what licenses the
+tolerance; the exact multiple is worked out in the next section.
 
 ## The bar, stated before the results
 
-**0.30 m**, set from the measured distribution before results were reviewed for the
-groups it's applied to: it clears 97% of UK home waters and 99% of non-UK Europe while
-still failing Southampton and Penarth (below). Tightening to 0.15 m would additionally
-fail roughly 7% of otherwise-good European stations, per the calibration note in
-`tools/datum-check.mjs`. A station that fails is excluded from the shipped bundle
-(`gen-tides.mjs`, not touched by this task); a station with no publishable `MHW`/`MLW` is
-`null` and ships un-gated, since there is nothing to check it against.
+**0.30 m.** The independent justification rests on the control alone, and needs no
+knowledge of how any other group scores: the NOAA control measures 0.011 m median /
+0.018 m max noise floor for this method on data already known to be correct, so 0.30 m
+sits 16.7× the max and 27.3× the median above that floor (0.30 / 0.018, 0.30 / 0.011).
+The gate fires only on deviations far larger than anything the check reports against data
+we already trust.
+
+**Provenance, stated plainly, because it isn't independent history.** 0.30 m was not
+chosen blind. It was set during planning, in `task-2-brief.md`, written before Task 2
+ever ran — but by someone who had already measured the UK and European distributions
+this report presents, and `DATUM_TOLERANCE_M`'s own code comment justifies the number by
+exactly those outcomes (it clears 97% of UK home waters and 99% of non-UK Europe while
+still failing Southampton and Penarth). That is calibrated-with-knowledge, not a bar set
+blind and scored afterward — the anti-pattern this document exists to catch, one level up
+its own provenance chain. The control argument above is offered instead of, not
+alongside, an appeal to how well 0.30 m happens to score against the groups below,
+because that appeal is exactly the thing a reader can no longer trust as independent.
+
+A station that fails is excluded from the shipped bundle (`gen-tides.mjs`, not touched by
+this task); a station with no publishable `MHW`/`MLW` is `null` and ships un-gated, since
+there is nothing to check it against.
 
 PASS = `datumDeviation(station) <= 0.30` m. FAIL = exceeds it. UNJUDGEABLE (`null`) =
 no published `MHW`/`MLW`, or no usable constituents — not counted as failing.
@@ -87,7 +100,7 @@ no published `MHW`/`MLW`, or no usable constituents — not counted as failing.
 
 Measured 2026-08-16 against the committed `@neaps/tide-database` package (no network;
 constituents and datums as published by each station's own authority). Filter for all
-three groups: `license.commercial_use === true`, `type === "reference"`,
+six groups: `license.commercial_use === true`, `type === "reference"`,
 `harmonic_constituents` has at least one non-zero amplitude, and both `datums.MHW` and
 `datums.MLW` are defined (the filter the shipping test in `datum-check.test.mjs` uses).
 
@@ -96,10 +109,28 @@ three groups: `license.commercial_use === true`, `type === "reference"`,
 | NOAA control | 25 | 0.011 m | 0.017 m | 0.018 m | 100% |
 | UK home waters (lat 49–61°N) | 68 | 0.026 m | 0.085 m | 0.591 m | 97% |
 | Europe non-UK | 744 | 0.024 m | 0.114 m | 1.313 m | 99% |
+| Asia | 399 | 0.025 m | 0.094 m | 0.445 m | 99% |
+| Oceania | 313 | 0.021 m | 0.101 m | 2.193 m | 99% |
+| Africa | 81 | 0.018 m | 0.053 m | 0.127 m | 100% |
 
-UK home waters and Europe non-UK both sit close to the NOAA control on median and p90 —
+Asia, Oceania and Africa together account for the roughly 784 checkable non-NOAA/UK/Europe
+stations `gen-tides.mjs` ships under this same global gate (`passesDatumCheck` is applied
+without a region carve-out). None of the three reads materially worse than Europe
+non-UK — medians and p90s all sit within the same narrow band as the rest of the table,
+and pass rates hold at 99–100%. Oceania's max (2.193 m, one station) is the largest single
+deviation measured in this report, well past the 0.30 m gate — meaning that station does
+not ship; it is not evidence the group as a whole is weaker, since Oceania's median and
+p90 are in line with everyone else.
+
+UK home waters and non-UK groups all sit close to the NOAA control on median and p90 —
 the method holds up well outside North America. The max columns are dominated by a
-handful of named outliers below, not a systematic regional bias.
+handful of named or gate-excluded outliers, not a systematic regional bias.
+
+**On the 0.30 m vs. a tighter bar (Europe non-UK, re-measured):** at 0.15 m, 5.65% of all
+744 checkable Europe non-UK stations fail outright, and 4.75% of the 737 that currently
+pass at 0.30 m would newly fail. (The `tools/datum-check.mjs` comment previously quoted
+"roughly 7%" for this; that number did not reproduce and has been corrected in the source
+to match the measurement above.)
 
 ## The named failures
 
@@ -146,8 +177,9 @@ occur.
 
 ## Verdict
 
-The datum/amplitude gate passes at 97–100% across all three measured groups, its control
-sits two orders of magnitude below its tolerance, and its two failures are named,
-explained, and excluded rather than shipped quietly. That is enough to justify shipping
-the passing stations' levels under a trusted name. It is not, on its own, enough to claim
-their timing is validated — that claim is not made here.
+The datum/amplitude gate passes at 97–100% across all six measured groups (NOAA control,
+UK home waters, Europe non-UK, Asia, Oceania, Africa), its control's noise floor sits
+16.7–27.3× below its tolerance, and its two named failures are explained and excluded
+rather than shipped quietly. That is enough to justify shipping the passing stations'
+levels under a trusted name. It is not, on its own, enough to claim their timing is
+validated — that claim is not made here.
