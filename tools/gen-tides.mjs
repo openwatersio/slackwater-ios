@@ -292,6 +292,36 @@ const collides = (s) => {
 const byName = new Map();
 const samePlace = (s) =>
   (byName.get(s.name.toLowerCase()) ?? []).some((k) => km(s, k) < SAME_PLACE_KM);
+// IDENTITY, not proximity — the one duplicate class neither rule above can
+// see. UHSLC publishes each gauge through two feeds, fast-delivery and
+// research-quality, and they disagree on POSITION by more than SAME_PLACE_KM:
+// Port Stanley by 105.7 km, which put `...-290a-gbr-uhslc_rq` in open South
+// Atlantic water carrying a Falklands harbour's name and model. Langkawi 48.7,
+// Sao Tome 44.4, Port Sonara 23.4, Mossel Bay 22.5, Nouakchott 15.3, Inhambane
+// 13.6 — all past a radius rule. Three more (Fortaleza 1.8, Nuku'alofa 1.6,
+// Male 1.0) are inside SAME_PLACE_KM but escape the NAME gate, because the two
+// feeds file them under different names ("Male" / "Male Hulule").
+//
+// The UHSLC station number is in the id and is the same on both feeds
+// ("...-290-gbr-uhslc_fd" / "...-290a-gbr-uhslc_rq"; the rq feed's trailing
+// letter is its instrument record, same gauge). Country code is carried into
+// the key too — cheap, and it can only ever make the rule stricter.
+//
+// Which of the pair survives is the sort's existing "lowest id wins", NOT a
+// judgement that one feed is better: measured against the real harbours, fd is
+// the truthful position at Port Stanley, Sao Tome and Langkawi while rq is at
+// Mossel Bay, Port Sonara and Inhambane. Neither feed is reliably right, so
+// the tiebreak stays the deterministic one every machine reproduces.
+// ponytail: leaves a pin up to ~22 km off at Mossel Bay. Fix by curating the
+// position in station-corrections, which is where station identity belongs.
+const uhslcKey = (id) =>
+  id.match(/-(\d+)[a-z]?-([a-z]{3})-uhslc_(?:fd|rq)$/)?.slice(1, 3).join("-");
+const uhslcSeen = new Set();
+const sameGauge = (s) => {
+  const k = uhslcKey(s.id);
+  return k !== undefined && uhslcSeen.has(k);
+};
+
 /** Only kept stations go in, and a kept station ALWAYS goes in — a NOAA row
  *  that survives a collision still has to block the TICON row behind it. */
 const remember = (s) => {
@@ -299,6 +329,8 @@ const remember = (s) => {
   grid.set(k, [...(grid.get(k) ?? []), s]);
   const nameKey = s.name.toLowerCase();
   byName.set(nameKey, [...(byName.get(nameKey) ?? []), s]);
+  const gauge = uhslcKey(s.id);
+  if (gauge !== undefined) uhslcSeen.add(gauge);
 };
 
 /**
@@ -321,22 +353,41 @@ const stations = shippable
   .filter((s) => (servedByChs(s) ? (cededToChs++, false) : true))
   .filter((s) => s.type === "reference")
   .filter((s) => s.harmonic_constituents?.some((c) => c.amplitude > 0))
-  .filter((s) => (passesDatumCheck(s) ? true : (failedDatum++, false)))
+  // The datum gate is decided HERE and applied at the dedupe below, not as a
+  // filter of its own. A FAILING NOAA ROW STILL HAS TO REACH THE DEDUPE AND
+  // CLAIM ITS WATER. Filtering it out here made the gate promote the mirror it
+  // had just rejected: Anchorage's `noaa/9455920` (120 constituents, 0.308)
+  // dropped out, stopped blocking `ticon/anchorage-9455920-usa-noaa` (50
+  // constituents, 0.237) 0.0 km away — the SAME gauge refitted — and the app
+  // shipped the worse model of Upper Cook Inlet, ~9 m of range and extreme
+  // shallow-water distortion, which is exactly why NOAA publishes 120
+  // constituents there. TICON's 0.237 is not evidence it is better: it is
+  // scored against TICON's OWN recomputed datums, which drift 0.2-0.4 m off an
+  // adopted chart datum (see CHS_COVERAGE_KM above — the cede rule protects
+  // Canadian water from precisely this, and nothing protected US water).
+  //
+  // "We cannot vouch for this water" has to yield NO station, not a worse one.
+  // A failing TICON row is dropped outright; it has nothing to protect.
+  .map((s) => ({ s, passes: passesDatumCheck(s) }))
+  .filter(({ s, passes }) => (passes ? true : (failedDatum++, s.source?.name === NOAA)))
   .sort((a, b) =>
-    (a.source?.name === NOAA ? 0 : 1) - (b.source?.name === NOAA ? 0 : 1) ||
-    (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    (a.s.source?.name === NOAA ? 0 : 1) - (b.s.source?.name === NOAA ? 0 : 1) ||
+    (a.s.id < b.s.id ? -1 : a.s.id > b.s.id ? 1 : 0))
   // Named BEFORE the dedupe filter runs (see samePlace above) — the collision
   // check needs the display name and NOAA-source flag can't survive on the
   // built station object, so it's carried alongside.
-  .map((s) => ({ station: buildStation(s), isNoaa: s.source?.name === NOAA }))
+  .map(({ s, passes }) =>
+    ({ station: buildStation(s), isNoaa: s.source?.name === NOAA, passes }))
   // A NOAA row is never dropped. It was already shipping, users have fits and
   // favourites keyed on its id, and NOAA publishing two gauges a few hundred
   // metres apart ("Garden City Pier (ocean)") is a judgement it is entitled to
   // make. Deduplication is about what TICON ADDS, so only TICON rows yield.
-  .filter(({ station, isNoaa }) => {
-    if ((collides(station) || samePlace(station)) && !isNoaa) { dropped++; return false; }
+  .filter(({ station, isNoaa, passes }) => {
+    if ((collides(station) || samePlace(station) || sameGauge(station)) && !isNoaa) {
+      dropped++; return false;
+    }
     remember(station);
-    return true;
+    return passes;  // a gate-failing NOAA row blocks its mirror, then leaves
   })
   .map(({ station }) => station)
   .sort(byNameThenId);
