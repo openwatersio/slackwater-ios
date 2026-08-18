@@ -314,10 +314,14 @@ final class ScreenshotTests: XCTestCase {
         // Scoped to the search overlay's ScrollView, like M47: the list behind
         // it is accessibility-hidden but still QUERYABLE, so an unscoped match
         // can pick up some other station's Rising/Falling and let the test walk
-        // into a Victoria that is still downloading.
-        let fitted = app.scrollViews.firstMatch.staticTexts.matching(
-            NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
-        XCTAssert(fitted.waitForExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
+        // into a Victoria that is still downloading. Scoping to a ScrollView was
+        // not enough: `app.scrollViews.firstMatch` resolves to whichever scroll
+        // view the query walks first, which is the list BEHIND the overlay, so
+        // the wait returned on some other station's card and the test opened a
+        // Victoria with no model — "No predictions yet", four assertions down.
+        // The pending card carrying Victoria's own id is the unambiguous signal:
+        // it exists while the fit is outstanding and goes away when it lands.
+        XCTAssert(pending.waitForNonExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
         sleep(1)
         app.staticTexts["Victoria"].firstMatch.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
@@ -331,9 +335,12 @@ final class ScreenshotTests: XCTestCase {
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         openSearch(app, "victoria")
-        let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
-            NSPredicate(format: "label == 'Rising' OR label == 'Falling'")).firstMatch
-        XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored model did not survive relaunch")
+        // Victoria-scoped for the same reason as the online leg above: a stored
+        // model means the card is never pending again, and an unscoped
+        // Rising/Falling would happily match the list behind the overlay.
+        let offlinePending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
+        XCTAssertFalse(offlinePending.waitForExistence(timeout: 3),
+                       "stored model did not survive relaunch — Victoria is pending again")
         app.staticTexts["Victoria"].firstMatch.tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.waitForExistence(timeout: 5)
@@ -2099,7 +2106,14 @@ final class ScreenshotTests: XCTestCase {
     /// Search at 3,125 stations: bounded, nearest-first, and honest about what
     /// it is not showing.
     func testM53SearchAtNationalScale() throws {
-        let app = launch("-seedGate", "-networkKillSwitch")
+        // `-resetRecents` is load-bearing, not hygiene: since the ranking anchor
+        // became fix -> RecentsStore.lastOpened -> firstRunFix, "the Victoria
+        // fallback" this test asserts about only holds with no recents. The
+        // full plan runs testM53OnDemandCanadianStationFitsWhenOpened (Halifax)
+        // immediately before this, which left the anchor 4,500 km east and no
+        // BC or WA port inside the truncated set. The fast plan skips that test,
+        // so CI stayed green while the full run went red.
+        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents")
 
         // "port" matches several hundred stations nationally.
         openSearch(app, "port")
