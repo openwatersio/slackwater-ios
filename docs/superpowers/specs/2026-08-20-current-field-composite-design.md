@@ -1,6 +1,8 @@
 # The current field, composited — SSCOFS backdrop, station-grown patches, honest edges
 
 **Status:** design, direction approved 2026-08-20 ("1 now / 3 possibly later", #57).
+Spike outcome 2026-08-20: gates FAILED (slack timing; bundle) — backdrop is Plan B, see
+spikes/sscofs-field/README.md.
 **Scope:** the data architecture that turns Slackwater's point predictions into a
 renderable current *field*. Rendering itself stays with #57's particle layer — this
 spec decides what feeds it, not what it draws.
@@ -81,7 +83,7 @@ here only because near slack the reference field goes uniformly low-ramp and
 carries no planning signal — green-as-transitable-now remains the differentiator
 the fill channel cannot express.
 
-## 2. Backdrop pipeline (offline, one-time per release, Studio)
+## 2. Backdrop pipeline (offline, one-time per release, Studio) **[Plan B — not built; spike failed §3 gates]**
 
 1. **Corpus.** Surface u/v per element from `noaa-nos-ofs-pds` nowcast fields files via
    HTTP ranged reads (h5py + fsspec; verified ~14 MB/hourly file; netCDF4 `#mode=bytes`
@@ -116,7 +118,7 @@ Pass → Phase B (full domain, 190 days). Fail → the composite degrades to gro
 patches only, and this spec's backdrop sections are marked Plan B, global-coverage
 style.
 
-## 4. The validation gate, generalized
+## 4. The validation gate, generalized **[Plan B — not built; spike failed §3 gates]**
 
 The certification unit is a **region** (contiguous element neighbourhood), not the
 whole field:
@@ -187,6 +189,7 @@ re-derives them.
 2. The spike's certifiable sub-regions meet the ≤ 0.5 kn median peak-speed bar; Dodd
    Narrows' neighbourhood is masked by the gate, and its grown patch shows ~9.5 kn
    springs from the CHS-fitted gate model, not 1.46 kn from the mesh.
+   `[Outcome: FAILED — 0/53; see spike README]`
 3. Bundle delta ≤ 40 MB; everything works offline after sync, per app baseline.
 4. Field coverage visibly ends somewhere a user can see — no fade-to-calm anywhere.
 

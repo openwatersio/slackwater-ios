@@ -372,7 +372,7 @@ def main():
     json.dump(index, open("samples/index.json", "w"), indent=1)
 
 def to_sample(tt, vv):
-    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: metres})."""
+    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: signed knots})."""
     return {"t": int(tt * 1000), "v": float(vv)}
 
 if __name__ == "__main__":

@@ -24,8 +24,6 @@ Pairs run: 2004 / 2004 in samples/index.json (2004 produced a scoreable 210d rep
 | cattle-point,-1.2-nm-se-of (nearest, e109623) | 73 | 33.2 | 77.1 | 50.3 | 0.61 | FAIL |
 | cattle-point,-4.6-nm-sw-of (best, e98579) | 286 | 60.8 | 108.4 | 19.2 | 0.21 | FAIL |
 | cattle-point,-4.6-nm-sw-of (nearest, e98579) | 286 | 60.8 | 108.4 | 19.2 | 0.21 | FAIL |
-| cherry-point (best, e182032) | 432 | 46.8 | 175.3 | -1.0 | -1.00 | FAIL |
-| cherry-point (nearest, e183209) | 61 | 59.6 | 167.6 | -1.0 | -1.00 | FAIL |
 | cherry-point,-1.8-nm-southeast-of (best, e184303) | 578 | 111.6 | 170.6 | 64.7 | 0.15 | FAIL |
 | cherry-point,-1.8-nm-southeast-of (nearest, e186558) | 81 | 99.6 | 170.3 | 145.9 | 0.18 | FAIL |
 | clark-island,-1.6-nm-north-of (best, e190209) | 584 | 65.7 | 178.6 | 16.1 | 0.43 | FAIL |
@@ -52,7 +50,7 @@ Pairs run: 2004 / 2004 in samples/index.json (2004 produced a scoreable 210d rep
 | haro-strait,-1.2-nm-west-of-kellett-bluf (nearest, e111197) | 73 | 69.1 | 124.9 | 88.4 | 0.36 | FAIL |
 | lawrence-point,-orcas-island,-1.3-nm-ne (best, e190057) | 417 | 39.0 | 152.3 | 20.5 | 0.75 | FAIL |
 | lawrence-point,-orcas-island,-1.3-nm-ne (nearest, e191423) | 35 | 38.9 | 149.7 | 25.7 | 0.91 | FAIL |
-| lopez-pass (best, e148303) | 423 | -1.0 | -1.0 | -1.0 | -1.00 | FAIL |
+| lopez-pass (best, e141462) | 34 | 13.6 | 50.7 | 24.6 | 0.18 | FAIL |
 | lopez-pass (nearest, e141462) | 34 | 13.6 | 50.7 | 24.6 | 0.18 | FAIL |
 | matia-island,-west-of (best, e172815) | 390 | 95.3 | 157.2 | 89.2 | 0.08 | FAIL |
 | matia-island,-west-of (nearest, e173771) | 113 | 86.3 | 169.3 | 83.7 | 0.11 | FAIL |
@@ -84,7 +82,7 @@ Pairs run: 2004 / 2004 in samples/index.json (2004 produced a scoreable 210d rep
 | race-passage (nearest, e72216) | 254 | 50.3 | 89.1 | 30.8 | 1.02 | FAIL |
 | rosario-strait (best, e127611) | 439 | 60.1 | 121.0 | 30.1 | 0.16 | FAIL |
 | rosario-strait (nearest, e127613) | 105 | 64.6 | 134.6 | 31.2 | 0.26 | FAIL |
-| saddle-bag-island-passage (best, e177302) | 514 | 85.7 | 147.7 | -1.0 | -1.00 | FAIL |
+| saddle-bag-island-passage (best, e178332) | 237 | 94.7 | 150.7 | 14.1 | 0.69 | FAIL |
 | saddle-bag-island-passage (nearest, e179393) | 89 | 67.9 | 175.3 | 32.7 | 0.75 | FAIL |
 | san-juan-channel,-south-entrance (best, e116262) | 479 | 31.4 | 76.8 | 27.9 | 0.48 | FAIL |
 | san-juan-channel,-south-entrance (nearest, e114540) | 31 | 28.3 | 67.6 | 12.8 | 0.83 | FAIL |
@@ -178,9 +176,13 @@ Pairs run: 2004 / 2004 in samples/index.json (2004 produced a scoreable 210d rep
 
 2 truth stations had no mesh element within 600 m and so never reached samples/index.json (make_samples.py; see export.log): gabriola-passage, tillicum-bridge.
 
+## Unscoreable stations (all published extrema < 0.75 kn)
+
+1 station(s) reached samples/index.json but every nearby element's published extrema fell below fit-validation's SIGNIFICANT_KN floor (0.75 kn), so speedMedianKn is fit-validation's -1 sentinel (no scoreable extremum) on every row — excluded from the best/nearest table and decision gate 1: cherry-point.
+
 ## Decision gates (spec §3)
 
-1. **Certifiable sub-regions meet the bar:** 0/54 scored stations PASS on their best element — (none). Failing: active-pass, allan-pass, belle-rock-light,-east-of, bellingham-channel,-off-cypress-head-lig, bellingham-channel-north-entrance, bellingham-channel-south, burrows-pass, cattle-point,-1.2-nm-se-of, cattle-point,-4.6-nm-sw-of, cherry-point, cherry-point,-1.8-nm-southeast-of, clark-island,-1.6-nm-north-of, deception-pass-(narrows), discovery-island,-3.0-nm-ne-of, discovery-island,-7.6-mi.-sse-of, dodd-narrows, fauntleroy-point-light,-east-of, guemes-channel,-east-entrance, guemes-channel,-west-entrance, hale-passage,-east-of-lummi-point, harney-channel,-north-of-point-hudson, haro-strait,-1.2-nm-west-of-kellett-bluf, lawrence-point,-orcas-island,-1.3-nm-ne, lopez-pass, matia-island,-west-of, obstruction-pass,-north-of-obstruction-i, parker-reef-light,-north-of, patos-island,-south-of-toe-point, patos-island-light,-1.4-nm-west-of, peapod-rocks-light,-1.2-nm-south-of, pear-point,-east-of, peavine-pass,-west-entrance, point-colville,-1.4-nm-east-of, point-colville,-3.0-nm-east-of-(lawson-r, point-george,-west-of, porlier-pass, president-channel,-east-of-point-disney, race-passage, rosario-strait, saddle-bag-island-passage, san-juan-channel,-south-entrance, sinclair-island,-1.0-nm-ne-of, skagit-bay-channel,-sw-of-hope-island, smith-island,-5.5-mi.-wnw-of, south-haro-strait,-south-of-lime-kiln-li, spieden-channel,-north-of-limestone-poin, spring-passage,-south-entrance, strait-of-georgia,-4.5-nm-sw-of-point-ro, strawberry-island,-west-of, thatcher-pass, turn-point,-boundary-pass, upright-channel-narrows, wasp-passage-narrows, yokeko-point,-deception-pass.
+1. **Certifiable sub-regions meet the bar:** 0/53 scoreable stations PASS on their best element — (none). Failing: active-pass, allan-pass, belle-rock-light,-east-of, bellingham-channel,-off-cypress-head-lig, bellingham-channel-north-entrance, bellingham-channel-south, burrows-pass, cattle-point,-1.2-nm-se-of, cattle-point,-4.6-nm-sw-of, cherry-point,-1.8-nm-southeast-of, clark-island,-1.6-nm-north-of, deception-pass-(narrows), discovery-island,-3.0-nm-ne-of, discovery-island,-7.6-mi.-sse-of, dodd-narrows, fauntleroy-point-light,-east-of, guemes-channel,-east-entrance, guemes-channel,-west-entrance, hale-passage,-east-of-lummi-point, harney-channel,-north-of-point-hudson, haro-strait,-1.2-nm-west-of-kellett-bluf, lawrence-point,-orcas-island,-1.3-nm-ne, lopez-pass, matia-island,-west-of, obstruction-pass,-north-of-obstruction-i, parker-reef-light,-north-of, patos-island,-south-of-toe-point, patos-island-light,-1.4-nm-west-of, peapod-rocks-light,-1.2-nm-south-of, pear-point,-east-of, peavine-pass,-west-entrance, point-colville,-1.4-nm-east-of, point-colville,-3.0-nm-east-of-(lawson-r, point-george,-west-of, porlier-pass, president-channel,-east-of-point-disney, race-passage, rosario-strait, saddle-bag-island-passage, san-juan-channel,-south-entrance, sinclair-island,-1.0-nm-ne-of, skagit-bay-channel,-sw-of-hope-island, smith-island,-5.5-mi.-wnw-of, south-haro-strait,-south-of-lime-kiln-li, spieden-channel,-north-of-limestone-poin, spring-passage,-south-entrance, strait-of-georgia,-4.5-nm-sw-of-point-ro, strawberry-island,-west-of, thatcher-pass, turn-point,-boundary-pass, upright-channel-narrows, wasp-passage-narrows, yokeko-point,-deception-pass.
 2. **Dodd-class stations correctly fail:** {'dodd-narrows': ['FAIL', 'FAIL', 'FAIL', 'FAIL', 'FAIL']} — all FAIL as expected.
 3. **Bundle ≤ 40 MB:** no evaluated constituent count fits.
 

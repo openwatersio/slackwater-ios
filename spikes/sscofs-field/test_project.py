@@ -16,5 +16,5 @@ def test_cross_axis_is_zero():
     assert abs(project_signed_kn(np.array([u]), np.array([v]), 100.0)[0]) < 1e-9
 
 def test_sample_export_is_epoch_ms():
-    # per chs-glue.js:4: {t: epoch-ms, v: metres}
+    # per chs-glue.js:4: {t: epoch-ms, v: signed knots}
     assert to_sample(1e9, 1.5) == {"t": 1_000_000_000_000, "v": 1.5}
