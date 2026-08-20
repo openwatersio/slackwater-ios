@@ -208,19 +208,21 @@ The single most erodable invariant in this codebase, established in #61.
 - **`today`** — the real local midnight. Drives Today/Tomorrow labels, the now-marker,
   return-to-now. **Never geometry.**
 
-`Timeline.window(anchor:today:)` is the **only** definition of the window; four sites
-once re-derived `today ± hours` by hand. The failure that prevents is a coverage check
+`Timeline.window(anchor:)` is the **only** definition of the window; four sites once
+re-derived `today ± hours` by hand. The failure that prevents is a coverage check
 passing on a window with a hole in it, which renders as a strip with a dead zone.
 
-**One clock per decision.** `Timeline.window` applies the 48h back-pad on exact
-`anchor == today` equality, so two independent `todayLocal(tz)` reads either side of a
-local midnight silently drop it. Three instances of that were fixed in #61 and one more
-in #64.
+**The 48h back-pad is unconditional (#67 item 1).** Every window carries it, not just
+today's — it used to apply only on exact `anchor == today` equality, so two independent
+`todayLocal(tz)` reads either side of a local midnight could silently drop it. Three
+instances of that were fixed in #61 and one more in #64; the unconditional shape retires
+the whole defect class rather than fixing the next instance of it.
 
-**The window's width changes with the anchor** — 228h on the current week (the back-pad
-applies), 180h on any other. `TimelineScrubber.updateUIView` must resize the host frame
-and `contentSize` when `totalWidth` changes; not doing so is what rendered the blank
-chart.
+**The window's width is a constant 228h, for every anchor** — the back-pad no longer
+varies it. `TimelineScrubber.updateUIView` still resizes the host frame and
+`contentSize` whenever `totalWidth` changes; that guard is what rendered the blank
+chart the one time it was missing, and stays in place even though an anchor pick alone
+can no longer trigger it.
 
 ## Working with subagents here
 
