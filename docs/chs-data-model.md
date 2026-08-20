@@ -252,8 +252,10 @@ out; absence still renders as neutral, never calm.
 The SSCOFS backdrop itself was spike-tested 2026-08-20 and failed certification —
 slack timing missed the bar at every station in the box (see
 `spikes/sscofs-field/README.md`) — so the standing ruling ships grown patches only
-("Plan B"), with the speed-only fill question the spike raised still open with the
-owner.
+("Plan B"). The speed-only fill question the spike raised was subsequently ruled
+by the owner: **approved** — fill ships where speed certifies, the ramp never
+contains green, and timing/transitability authority stays with gates and patches
+(see the spec's status block for the full ruling).
 
 Coverage work still routes to more validated gates (#9) — every new gate also
 certifies backdrop and seeds a grown patch.
