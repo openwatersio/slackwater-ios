@@ -206,3 +206,5 @@ Adopting it would require, at minimum:
 gitignored — they aren't in this PR's diff, so a reader who wants to run the "Results —
 verified, not just quoted" snippet above needs to re-run the spike (`fetch_corpus.py` →
 `make_samples.py` → `run_matrix.sh` → `report.py`) to regenerate them first.
+
+> **Postscript (2026-08-20, after close):** the open question was ruled — **speed-only fill approved** with a no-green-ramp guardrail; see the spec status block and #99.

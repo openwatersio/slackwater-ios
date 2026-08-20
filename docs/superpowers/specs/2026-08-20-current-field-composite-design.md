@@ -3,6 +3,15 @@
 **Status:** design, direction approved 2026-08-20 ("1 now / 3 possibly later", #57).
 Spike outcome 2026-08-20: gates FAILED (slack timing; bundle) — backdrop is Plan B, see
 spikes/sscofs-field/README.md.
+**Owner ruling 2026-08-20 (Bryan, via the #57 session): speed-only fill APPROVED** —
+the colour backdrop ships where speed certifies (≤ 0.5 kn bar; 40/53 stations);
+throat failures stay governed by grown patches; the ±25 min phase skill is a
+documented staleness caveat; stations/patches remain the sole authority on slack
+timing and transitability; and **the fill ramp never contains green** — "transitable
+now" stays exclusively a per-gate signal, so the backdrop physically cannot say "go".
+Still required before the fill ships: the speed-only certification rule (region
+adjacency; stations too weak to grade, e.g. cherry-point) and the bundle-pruning
+proof (≤ 40 MB).
 **Scope:** the data architecture that turns Slackwater's point predictions into a
 renderable current *field*. Rendering itself stays with #57's particle layer — this
 spec decides what feeds it, not what it draws.
@@ -83,7 +92,7 @@ here only because near slack the reference field goes uniformly low-ramp and
 carries no planning signal — green-as-transitable-now remains the differentiator
 the fill channel cannot express.
 
-## 2. Backdrop pipeline (offline, one-time per release, Studio) **[Plan B — not built; spike failed §3 gates]**
+## 2. Backdrop pipeline (offline, one-time per release, Studio) **[not built; five-bar certification failed §3 — revived for the speed-only fill by the owner ruling above, pending the speed-only certification rule + pruning proof]**
 
 1. **Corpus.** Surface u/v per element from `noaa-nos-ofs-pds` nowcast fields files via
    HTTP ranged reads (h5py + fsspec; verified ~14 MB/hourly file; netCDF4 `#mode=bytes`
@@ -118,7 +127,7 @@ Pass → Phase B (full domain, 190 days). Fail → the composite degrades to gro
 patches only, and this spec's backdrop sections are marked Plan B, global-coverage
 style.
 
-## 4. The validation gate, generalized **[Plan B — not built; spike failed §3 gates]**
+## 4. The validation gate, generalized **[not built; the five-bar rule below failed the spike — to be respecified as speed-only for the fill channel per the owner ruling above; timing bars remain for gates/patches]**
 
 The certification unit is a **region** (contiguous element neighbourhood), not the
 whole field:
