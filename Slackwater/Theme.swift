@@ -463,11 +463,15 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         scrubCard(timeline)
                         scheduleCard(timeline)
                             .padding(.top, 14)
-                    } else {
+                    } else if anchor != .distantPast {
                         // #67 item 2: no timeline means the caller is showing its
                         // honesty card below — but the bar (and its picker) need
                         // no timeline, and without them that card is a dead end
-                        // with no way back to a covered week.
+                        // with no way back to a covered week. Guarded on anchor:
+                        // all four details start at .distantPast (real anchor
+                        // arrives in onAppear), and weekRangeLabel force-unwraps
+                        // a Calendar.date(byAdding:) against it — the pre-onAppear
+                        // frame must render nothing here, as it always has.
                         WeekRangeBar(anchor: anchor, today: todayLocal(tz), tz: tz,
                                      onTap: { showPicker = true })
                             .background(SN.cardFill)
