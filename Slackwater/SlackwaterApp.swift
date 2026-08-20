@@ -1355,21 +1355,6 @@ struct StationCardView: View {
     var km: Double? = nil
     @State private var state: CardState?
 
-    /// State → tone. `static`, like the detail views' `phaseColor`, so the
-    /// binding can be asserted without building a view: an inverted binding
-    /// here renders a perfectly valid flood blue on a falling tide and no
-    /// token or colour test can see it (`ColourAndFormTests`
-    /// `testCardGlyphToneBindings`).
-    /// ponytail: test-only since the kind mark came off the rows — the tide
-    /// tone now colours nothing. `ChsGateCardView`'s twin is still live
-    /// (`DerivedGateDetailView`), so the trio is kept together rather than
-    /// half-deleted. Delete this and `CurrentCardView`'s if nothing claims
-    /// them by the time tide colour is decided (#95).
-    static func glyphTone(_ state: CardState?) -> StationGlyph.Tone {
-        guard let state else { return .unknown }
-        return state.rising ? .rising : .falling
-    }
-
     var body: some View {
         StationCard(name: record.name, region: record.region, km: km,
                     detail: state?.next.map { next in
@@ -1661,17 +1646,6 @@ struct CurrentCardView: View {
     /// the one part of the old treatment that marked the NUMBER rather than
     /// shouting around it.
     private var tilde: String { provisional == nil ? "" : "~" }
-
-    /// Signed velocity → tone. `static` for the same reason as
-    /// `StationCardView`'s.
-    static func glyphTone(_ state: CurrentCardState?) -> StationGlyph.Tone {
-        guard let state else { return .unknown }
-        switch currentPhase(signed: state.signed) {
-        case .flood: return .flood
-        case .ebb: return .ebb
-        case .slack: return .slack
-        }
-    }
 
     var body: some View {
         StationCard(name: record.name, region: record.region, km: km,
