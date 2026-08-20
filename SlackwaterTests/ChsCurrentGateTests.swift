@@ -403,6 +403,84 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(prefetchAnchor(after: w, tz: tz), cal.startOfDay(for: end))
     }
 
+    // MARK: - Multi-block store (#67 item 4)
+
+    /// A far-forward fetch used to discard today's block outright (single
+    /// start/end, newest wins). The store keeps both.
+    func testInsertingKeepsDisjointBlocksSeparate() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let today = onlineWindow([t0, t0 + 900], [1, 2])
+        let far = onlineWindow([t0 + 40 * 86_400, t0 + 40 * 86_400 + 900], [3, 4])
+        let store = ChsOnlineStore(stationID: "chs-test-merge", blocks: [today])
+            .inserting(far, prunedBefore: Date(timeIntervalSince1970: t0 - 1))
+        XCTAssertEqual(store.blocks.count, 2, "a disjoint fetch must not cost the stored block")
+        XCTAssertEqual(store.blocks[0].times, today.times, "sorted by start, stored block intact")
+        XCTAssertEqual(store.blocks[1].times, far.times)
+    }
+
+    /// An incoming block that reaches two stored blocks joins all three — the
+    /// single ascending pass has to absorb a chain, not just one neighbour.
+    func testInsertingBridgesTwoStoredBlocks() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let a = onlineWindow([t0, t0 + 900], [1, 2])
+        let c = onlineWindow([t0 + 3600, t0 + 4500], [5, 6])
+        let bridge = onlineWindow([t0 + 1800, t0 + 2700], [3, 4])
+        let store = ChsOnlineStore(stationID: "chs-test-merge", blocks: [a, c])
+            .inserting(bridge, prunedBefore: Date(timeIntervalSince1970: t0 - 1))
+        XCTAssertEqual(store.blocks.count, 1, "the bridge joins both neighbours")
+        XCTAssertEqual(store.blocks[0].times, [t0, t0 + 900, t0 + 1800, t0 + 2700, t0 + 3600, t0 + 4500])
+    }
+
+    /// Coverage never stitches across the gap between blocks — the same "no strip
+    /// with a dead zone" rule `covers` enforces inside one block.
+    func testBlockCoveringRefusesTheGap() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let today = cal.startOfDay(for: Date())
+        func span(_ anchor: Date) -> ChsOnlineWindow {
+            let w = Timeline.window(anchor: anchor)
+            return ChsOnlineWindow(stationID: "g", iwlsName: "G", timezone: tz.identifier,
+                                   fetchedAt: .now, start: w.start, end: w.end,
+                                   floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+        }
+        let far = today.addingTimeInterval(60 * 86_400)
+        let store = ChsOnlineStore(stationID: "g", blocks: [span(today), span(far)])
+        XCTAssertNotNil(store.block(covering: today))
+        XCTAssertNotNil(store.block(covering: far))
+        XCTAssertNil(store.block(covering: today.addingTimeInterval(30 * 86_400)),
+                     "the gap between blocks has no samples — it must not read as covered")
+    }
+
+    /// #67 item 6 (bounded backward retention): a block ages out at the next save
+    /// after it falls behind today − 60d — but never the save's own fetch, so a
+    /// deliberately-picked old week still renders (the min(_, incoming.start)
+    /// guard lives in saveOnline; inserting itself just applies the cut).
+    func testInsertingPrunesAgedBlocks() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let aged = onlineWindow([t0 - 70 * 86_400, t0 - 70 * 86_400 + 900], [1, 2])
+        let fresh = onlineWindow([t0, t0 + 900], [3, 4])
+        let store = ChsOnlineStore(stationID: "chs-test-merge", blocks: [aged])
+            .inserting(fresh, prunedBefore: Date(timeIntervalSince1970: t0 - 60 * 86_400))
+        XCTAssertEqual(store.blocks.count, 1, "the aged block is gone, not half-kept")
+        XCTAssertEqual(store.blocks[0].times, fresh.times)
+    }
+
+    /// pruned(before:) follows merging's rule: `start` follows the cut, or
+    /// `covers` keeps claiming a range whose samples were deleted.
+    func testPrunedDropsSamplesAndMovesStart() {
+        let t0 = Date().timeIntervalSince1970.rounded(.down)
+        let w = onlineWindow([t0, t0 + 900, t0 + 1800], [1, 2, 3])
+        let cut = Date(timeIntervalSince1970: t0 + 900)
+        let p = w.pruned(before: cut)
+        XCTAssertEqual(p?.times, [t0 + 900, t0 + 1800])
+        XCTAssertEqual(p?.start, cut)
+        XCTAssertNil(w.pruned(before: Date(timeIntervalSince1970: t0 + 86_400)),
+                     "nothing survives → nil, not an empty shell that still claims a span")
+        XCTAssertEqual(w.pruned(before: Date(timeIntervalSince1970: t0 - 1))?.times, w.times,
+                       "a cut before the block is a no-op")
+    }
+
     // MARK: - Online gates (fit-rejects backed by official CHS predictions)
 
     /// The 9 validation rejects ship as online: true identities — findable,

@@ -50,6 +50,12 @@ enum Timeline {
     /// not need a signal to look at next month.
     static let onlineFetchDays = 30.0
 
+    /// How far back fetched online blocks are kept (#67 item 6: bounded backward
+    /// retention). A block ages out at the first save after it falls behind
+    /// today − this; a save's own fetch is always protected (`saveOnline`'s min),
+    /// so a deliberately-picked old week renders and only later saves collect it.
+    static let onlineRetentionDays = 60.0
+
     /// The "weak current" convention: under half a knot a small boat transits.
     /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
     static let slackThresholdKn = 0.5
