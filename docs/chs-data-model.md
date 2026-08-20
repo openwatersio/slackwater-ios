@@ -192,13 +192,14 @@ wrong, and wrong asymmetrically:
   which tells someone an unmodelled pass is safe. That is the dangerous
   direction, and it is the same guess the app already refuses to make at Sechelt.
 
-### The gridded-model option was investigated and is closed (#99)
+### The gridded-model option: closed for WebTide-era meshes (#99), reopened for SSCOFS (2026-08-20)
 
 The obvious next thought is a different **data product** — one storing harmonic
 constants per mesh node, which the engine could evaluate offline the way it
-already evaluates TICON constants. #99 went looking. **No viable dataset exists,
-and the reason is not licence or size — it is resolution, failing in the
-dangerous direction.**
+already evaluates TICON constants. #99 went looking and, among the
+datasets it measured, found none viable — **resolution, failing in the dangerous
+direction.** (The 2026-08-20 re-measurement below narrows that verdict to
+WebTide-era meshes and sub-mesh throats.)
 
 The mechanism was fine. WebTide really does store per-node velocity harmonics;
 the NE Pacific mesh `ne_pac4` is 51,330 nodes and **12.6 MB**, smaller than the
@@ -230,18 +231,26 @@ publishes no terms, which §3 says is worse than "no". The pattern is that the
 licences permitting commercial bundling are attached to the datasets that cannot
 resolve.
 
-**The finding worth keeping:** every gridded model converges on roughly 500 m in
-the Gulf Islands, which is about the width of Active Pass and eight times the
-width of Dodd Narrows. **The passes are a station problem, not a mesh problem** —
-almost certainly why CHS and NOAA both publish *station* current predictions for
-these gates rather than a grid. It is what the physics permits, not an oversight.
+**The finding, as corrected 2026-08-20:** the ~500 m convergence was a property of
+`ne_pac4`'s era, not of gridded models. NOAA's operational SSCOFS mesh, measured
+with the same method ([#99 comment](https://github.com/openwatersio/slackwater-ios/issues/99#issuecomment-5358204673)),
+validates at 0.86–1.00 of published peak speeds at Active Pass, Seymour Narrows,
+Deception Pass and Tacoma Narrows, covers the Canadian Strait of Georgia to 51 °N,
+and is public domain. What survives of the original finding — permanently — is the
+**sub-mesh throat failure**: Dodd Narrows (60–80 m against ~500 m elements) reads
+0.24× in SSCOFS exactly as it failed in WebTide. Sub-mesh throats are a station
+problem; the rest of the water is not.
 
-Which makes the ruling above right for a better reason than it first gave:
-sampling a model field is wrong for the same reason interpolating between our
-stations is wrong. The model has our problem too; it just hides it behind a
-continuous surface.
+The standing ruling is therefore the **composite** (spec:
+`docs/superpowers/specs/2026-08-20-current-field-composite-design.md`): a
+harmonic backdrop fitted by us from SSCOFS output, rendered only in regions
+certified against the station truth set; bounded fields grown from validated
+gates inside sub-mesh passes; visible no-data everywhere else. Interpolating
+between stations remains ruled out; an uncertified model field remains ruled
+out; absence still renders as neutral, never calm.
 
-Route coverage work to more validated gates (#9), not to a field.
+Coverage work still routes to more validated gates (#9) — every new gate also
+certifies backdrop and seeds a grown patch.
 
 ---
 
