@@ -206,35 +206,24 @@ final class ColourAndFormTests: XCTestCase {
                       "retired colour literal still in source:\n" + offenders.joined(separator: "\n"))
     }
 
-    /// The three list-card state→tone bindings. Every colour defect on this
-    /// branch lived in a binding, not a token: invert `state.rising` and the
-    /// card draws a perfectly valid flood blue on a falling tide, with every
-    /// token, `colour(for:)`, `path(for:)` and source-grep test still green.
+    /// The one surviving list-card state→tone binding. Every colour defect on
+    /// this branch lived in a binding, not a token: invert the phase and the
+    /// glyph draws a perfectly valid colour for a state it isn't in, with
+    /// every token, `colour(for:)`, `path(for:)` and source-grep test still
+    /// green. `StationCardView`'s and `CurrentCardView`'s twins were deleted
+    /// when #95 settled tide colour and nothing claimed them (their ponytail
+    /// note's trigger).
     func testCardGlyphToneBindings() {
-        // Tide: rising ↔ .rising, falling ↔ .falling, no reading ↔ .unknown.
-        XCTAssertEqual(StationCardView.glyphTone(CardState(height: 1, rising: true, next: nil)), .rising)
-        XCTAssertEqual(StationCardView.glyphTone(CardState(height: 1, rising: false, next: nil)), .falling)
-        XCTAssertEqual(StationCardView.glyphTone(nil), .unknown)
-
-        // Current: signed velocity through currentPhase, slack included.
-        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: 3, next: nil)), .flood)
-        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: -3, next: nil)), .ebb)
-        XCTAssertEqual(CurrentCardView.glyphTone(CurrentCardState(signed: 0, next: nil)), .slack)
-        XCTAssertEqual(CurrentCardView.glyphTone(nil), .unknown)
-
         // Derived gate: the phase word, no speed exists.
         XCTAssertEqual(ChsGateCardView.glyphTone(.flood), .flood)
         XCTAssertEqual(ChsGateCardView.glyphTone(.ebb), .ebb)
         XCTAssertEqual(ChsGateCardView.glyphTone(.slack), .slack)
         XCTAssertEqual(ChsGateCardView.glyphTone(nil), .unknown)
 
-        // And the tones each land on the colour the rule says they do — the
-        // binding and the palette asserted end to end, which is the whole
-        // chain a wrong glyph colour can break.
-        assertSameColour(StationGlyph.colour(for: StationCardView.glyphTone(
-            CardState(height: 1, rising: true, next: nil))), SN.flood, "a rising tide draws flood")
-        assertSameColour(StationGlyph.colour(for: CurrentCardView.glyphTone(
-            CurrentCardState(signed: 0, next: nil))), SN.go, "a gate at slack draws go")
+        // And the tone lands on the colour the rule says — the binding and
+        // the palette asserted end to end.
+        assertSameColour(StationGlyph.colour(for: ChsGateCardView.glyphTone(.slack)),
+                         SN.go, "a gate at slack draws go")
     }
 
     /// Issue #14: no sheet row may still render the flat empty 38pt square
