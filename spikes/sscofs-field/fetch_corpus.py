@@ -8,11 +8,14 @@ CYCLES = (3, 9, 15, 21)          # ×n001..n006 → 24 hourly steps/day
 DAYS = int(sys.argv[1]) if len(sys.argv) > 1 else 60
 
 def hour_urls(day):
+    # ponytail: shard name YYYYMMDD is a fetch-batch label, not a time contract. Files contain
+    # day−1 22:00Z .. day+0 21:00Z (offset range −2..+21 hours). Consumers must key on stored
+    # t array (epoch seconds), never the filename. Contiguous, no dupes; sorted by t.
     for c in CYCLES:
         for n in range(1, 7):
             yield (f"{BUCKET}/{day:%Y/%m/%d}/sscofs.t{c:02d}z.{day:%Y%m%d}.fields.n{n:03d}.nc",
                    dt.datetime(day.year, day.month, day.day, tzinfo=dt.timezone.utc)
-                   + dt.timedelta(hours=c - 6 + n))   # verify offset in Step 2 and fix if needed
+                   + dt.timedelta(hours=c - 6 + n))
 
 def fetch_hour(url, idx):
     try:
