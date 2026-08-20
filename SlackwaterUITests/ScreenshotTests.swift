@@ -2503,14 +2503,31 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "today's block must survive the far seed's save (single-window: it did not)")
 
-        // Two months out lands inside the far block ([today+30d, today+85d]:
-        // cell 10 of month+2 is today+35..70d, whose ±window fits regardless of
-        // today's day-of-month).
+        // today+45d always lands inside the seeded far block
+        // ([today+30d, today+85d] minus the 48h back-pad and 180h forward
+        // trim — 15 days of slack either side survives both), so target that
+        // date directly instead of a grid index: leading-blank/spillover
+        // cells shift what a fixed `boundBy` index means across month
+        // layouts (this repo's CLAUDE.md documents exactly that failure
+        // class). Calendar-based add, not `addingTimeInterval` — see
+        // "Calendar days are not 86,400 seconds".
+        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45, to: Date())!
+        let targetLabelFormatter = DateFormatter()
+        targetLabelFormatter.dateFormat = "EEEE, MMMM d"   // observed cell label shape:
+                                                            // "Sunday, October 11" (no year)
+        let targetLabel = targetLabelFormatter.string(from: target)
+
         app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons["Next Month"].firstMatch.tap()
-        app.buttons["Next Month"].firstMatch.tap()
-        app.collectionViews.buttons.element(boundBy: 10).tap()
+        let targetCell = app.collectionViews.buttons.matching(
+            NSPredicate(format: "label == %@", targetLabel)).firstMatch
+        var monthsAdvanced = 0
+        while !targetCell.exists, monthsAdvanced < 3 {
+            app.buttons["Next Month"].firstMatch.tap()
+            monthsAdvanced += 1
+        }
+        XCTAssert(targetCell.exists, "today+45d cell (\(targetLabel)) not found within 3 months forward")
+        targetCell.tap()
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
