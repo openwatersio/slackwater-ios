@@ -40,14 +40,34 @@ final class CurrentParticleTests: XCTestCase {
     }
 
     /// Flag on, the additions carry the zoom threshold and the pins' own
-    /// state-colour expression — one meaning, one value.
+    /// state-colour expression — one meaning, one value — on both the trail
+    /// and head layers.
     func testParticleStyleAdditionsCarryMinzoomAndStateColour() {
         var style: [String: Any] = ["sources": [String: Any](), "layers": [[String: Any]]()]
         addParticleStyle(&style)
-        let layer = (style["layers"] as? [[String: Any]])?.last
-        XCTAssertEqual(layer?["minzoom"] as? Double, PARTICLE_MIN_ZOOM)
-        let colour = (layer?["paint"] as? [String: Any])?["circle-color"] as? [Any]
+        let layers = style["layers"] as? [[String: Any]] ?? []
+        XCTAssertEqual(layers.count, 2)
+        let trail = layers.first, head = layers.last
+        XCTAssertEqual(trail?["id"] as? String, CurrentParticleAnimator.trailLayerID)
+        XCTAssertEqual(trail?["minzoom"] as? Double, PARTICLE_MIN_ZOOM)
+        XCTAssertEqual(head?["minzoom"] as? Double, PARTICLE_MIN_ZOOM)
+        let lineColour = (trail?["paint"] as? [String: Any])?["line-color"] as? [Any]
+        XCTAssertEqual(lineColour?.first as? String, "match")
+        let colour = (head?["paint"] as? [String: Any])?["circle-color"] as? [Any]
         XCTAssertEqual(colour?.first as? String, "match")
         XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentParticleAnimator.sourceID])
+    }
+
+    /// The tail trails the motion (ebb runs the axis backwards) and clamps
+    /// at the wrap boundary instead of jumping across it.
+    func testTailTrailsMotionAndClampsAtBoundary() {
+        XCTAssertEqual(particleTailAlong(100, signed: 3, trailM: 150, axisM: 1200),
+                       -50, accuracy: 1e-9)
+        XCTAssertEqual(particleTailAlong(100, signed: -3, trailM: 150, axisM: 1200),
+                       250, accuracy: 1e-9)
+        XCTAssertEqual(particleTailAlong(-550, signed: 3, trailM: 150, axisM: 1200),
+                       -600, accuracy: 1e-9)
+        XCTAssertEqual(particleTailAlong(550, signed: -3, trailM: 150, axisM: 1200),
+                       600, accuracy: 1e-9)
     }
 }

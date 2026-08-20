@@ -33,11 +33,25 @@ let PARTICLE_MIN_ZOOM = 9.0
 let PARTICLE_AXIS_M = 1200.0
 /// Perpendicular scatter so the field reads as water, not beads on a wire.
 let PARTICLE_SPREAD_M = 150.0
-let PARTICLES_PER_GATE = 16
+let PARTICLES_PER_GATE = 28
 /// Real water crosses 1.2 km in ~8 min at 5 kn — invisible. ×40 makes 5 kn
 /// traverse the axis in ~12 s and slack (<0.15 kn) a near-still creep, so
 /// particle speed still ENCODES water speed, just legibly.
 let PARTICLE_SPEED_SCALE = 40.0
+/// Comet tail: each particle drags a trail this many seconds of animated
+/// motion long, so tail LENGTH also encodes speed — 5 kn ≈ 310 m, slack a
+/// stub. The axis is straight, so the tail is the analytic segment behind
+/// the head: no position history to keep.
+let PARTICLE_TRAIL_S = 3.0
+
+/// Tail endpoint along the axis: `trailM` behind the head w.r.t. motion
+/// (ebb runs the axis backwards), clamped at the wrap boundary rather than
+/// wrapped across it — a tail may briefly shorten, never jump.
+func particleTailAlong(_ along: Double, signed: Double, trailM: Double,
+                       axisM: Double) -> Double {
+    let tail = along - (signed < 0 ? -trailM : trailM)
+    return max(-axisM / 2, min(axisM / 2, tail))
+}
 
 /// Wrap `x` into [0, length) — particle recycling along the axis.
 func particleWrap(_ x: Double, _ length: Double) -> Double {
@@ -58,10 +72,12 @@ func particleCoordinate(_ center: CLLocationCoordinate2D, bearingDeg: Double,
         longitude: center.longitude + east / (111_320 * cos(center.latitude * .pi / 180)))
 }
 
-/// The style-build side: an empty GeoJSON source and a circle layer coloured
-/// by the SAME state expression the pins use, hidden below the zoom
-/// threshold. Appended (on top — moving water over static pins) by both style
-/// builders when the flag is on.
+/// The style-build side: an empty GeoJSON source, a line layer for the comet
+/// tails, and a circle layer for the heads — both coloured by the SAME state
+/// expression the pins use, hidden below the zoom threshold. Appended (on
+/// top — moving water over static pins) by both style builders when the flag
+/// is on. One source carries both geometries; geometry-type filters keep
+/// each layer to its own kind.
 func addParticleStyle(_ style: inout [String: Any]) {
     var sources = style["sources"] as? [String: Any] ?? [:]
     sources[CurrentParticleAnimator.sourceID] = [
@@ -69,14 +85,24 @@ func addParticleStyle(_ style: inout [String: Any]) {
         "data": ["type": "FeatureCollection", "features": [] as [Any]],
     ]
     style["sources"] = sources
-    let layer: [String: Any] = [
+    let trail: [String: Any] = [
+        "id": CurrentParticleAnimator.trailLayerID, "type": "line",
+        "source": CurrentParticleAnimator.sourceID,
+        "minzoom": PARTICLE_MIN_ZOOM,
+        "filter": ["==", ["geometry-type"], "LineString"],
+        "layout": ["line-cap": "round"],
+        "paint": ["line-color": PIN_STATE_COLOUR, "line-width": 2.0,
+                  "line-opacity": 0.35],
+    ]
+    let head: [String: Any] = [
         "id": CurrentParticleAnimator.sourceID, "type": "circle",
         "source": CurrentParticleAnimator.sourceID,
         "minzoom": PARTICLE_MIN_ZOOM,
-        "paint": ["circle-radius": 2.2, "circle-color": PIN_STATE_COLOUR,
+        "filter": ["==", ["geometry-type"], "Point"],
+        "paint": ["circle-radius": 1.8, "circle-color": PIN_STATE_COLOUR,
                   "circle-opacity": 0.9],
     ]
-    style["layers"] = (style["layers"] as? [[String: Any]] ?? []) + [layer]
+    style["layers"] = (style["layers"] as? [[String: Any]] ?? []) + [trail, head]
 }
 
 /// Owns the particle state and the animation timer. One instance per
@@ -84,6 +110,7 @@ func addParticleStyle(_ style: inout [String: Any]) {
 /// Seascape) because the source object belongs to the style that loaded it.
 final class CurrentParticleAnimator {
     static let sourceID = "gate-particles"
+    static let trailLayerID = "gate-particle-trails"
 
     private struct Gate {
         let record: CurrentStationRecord
@@ -150,7 +177,7 @@ final class CurrentParticleAnimator {
         let bounds = map.visibleCoordinateBounds
         // Reduce Motion: the field stays, frozen — state colour still reads.
         let freeze = UIAccessibility.isReduceMotionEnabled
-        var features: [MLNPointFeature] = []
+        var features: [MLNShape & MLNFeature] = []
         for i in gates.indices {
             let c = gates[i].center
             guard c.latitude >= bounds.sw.latitude, c.latitude <= bounds.ne.latitude,
@@ -177,18 +204,34 @@ final class CurrentParticleAnimator {
         }
     }
 
-    private func particleFeatures(_ gate: Gate) -> [MLNPointFeature] {
+    private func particleFeatures(_ gate: Gate) -> [MLNShape & MLNFeature] {
         let phase = currentPhase(signed: gate.signed)
         let state = phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
-        return gate.offsets.map { off in
+        let trailM = abs(gate.signed) * 0.514444 * PARTICLE_SPEED_SCALE * PARTICLE_TRAIL_S
+        var shapes: [MLNShape & MLNFeature] = []
+        for off in gate.offsets {
             let along = particleWrap(off.along * PARTICLE_AXIS_M + gate.displacement,
                                      PARTICLE_AXIS_M) - PARTICLE_AXIS_M / 2
+            let head = particleCoordinate(gate.center,
+                                          bearingDeg: gate.record.floodDirection,
+                                          alongM: along, acrossM: off.across)
             let f = MLNPointFeature()
-            f.coordinate = particleCoordinate(gate.center,
-                                              bearingDeg: gate.record.floodDirection,
-                                              alongM: along, acrossM: off.across)
+            f.coordinate = head
             f.attributes = ["state": state]
-            return f
+            shapes.append(f)
+            // Near-slack the tail collapses to nothing — the head alone is
+            // the honest render of barely-moving water.
+            guard trailM > 1 else { continue }
+            let tailAlong = particleTailAlong(along, signed: gate.signed,
+                                              trailM: trailM, axisM: PARTICLE_AXIS_M)
+            var coords = [particleCoordinate(gate.center,
+                                             bearingDeg: gate.record.floodDirection,
+                                             alongM: tailAlong, acrossM: off.across),
+                          head]
+            let line = MLNPolylineFeature(coordinates: &coords, count: 2)
+            line.attributes = ["state": state]
+            shapes.append(line)
         }
+        return shapes
     }
 }
