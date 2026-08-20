@@ -79,27 +79,22 @@ extension ChsModelStore {
     /// The online gate's fetched window lives beside the fitted models, under
     /// its own suffix — same reason `-current.json` doesn't shadow `.json`.
     static func onlineUrl(_ stationID: String) -> URL { url(stationID, suffix: "-online") }
-    static func loadOnline(_ stationID: String) -> ChsOnlineWindow? { load(stationID, suffix: "-online") }
 
-    /// Merges into whatever is already on disk rather than replacing it.
-    /// Replacing would make a prefetch destructive: fetching the next block
-    /// would discard the current one, and paging back would refetch what the
-    /// user just had.
-    ///
-    /// The prune cut is the start of TODAY's strip — `Timeline.window`'s own
-    /// answer, never re-derived here, for the reason its doc comment gives —
-    /// or the incoming window's own start, whichever is earlier. The cut never
-    /// discards data the incoming window itself covers: a fetch anchored in the
-    /// past (the picker is unbounded in both directions, spec §5) starts before
-    /// today's strip does, and a fixed `today − 48h` cut would delete the block
-    /// that fetch just paid for, fail `covers` for that anchor, and refetch it
-    /// on every visit forever.
-    ///
-    /// Returns what it WROTE — the union — never the block handed in. The one
-    /// caller that keeps the result (`fetchOnlineWindow`, and through it
-    /// `OnlineGateDetailView`) would otherwise hold a window narrower than the
-    /// disk's and answer `covers` false for a week the app already has, sending
-    /// the very next page-back to the network for data it just saved.
+    /// Store decode first, then the legacy single-window shape (schemaVersion 1,
+    /// pre-#67): each fails cleanly on the other's bytes (`blocks` vs
+    /// `times`/`speeds` are required keys), so the order is just preference.
+    /// The first save rewrites the file in the store shape.
+    static func loadOnline(_ stationID: String) -> ChsOnlineStore? {
+        if let store: ChsOnlineStore = load(stationID, suffix: "-online") { return store }
+        guard let legacy: ChsOnlineWindow = load(stationID, suffix: "-online") else { return nil }
+        return ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
+    }
+
+    /// The prune cut is bounded backward retention (#67 item 6): blocks age out
+    /// at the first save after they fall behind today − onlineRetentionDays. The
+    /// min(_, window.start) guard is unchanged from the single-window days — the
+    /// cut never discards data the incoming fetch itself covers, or a picked old
+    /// week would be deleted by its own save and refetch forever.
     ///
     // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
     // someone who pages a year out accumulates ~1MB on a gate they evidently
@@ -107,11 +102,14 @@ extension ChsModelStore {
     // file gets big.
     @discardableResult
     static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
-        let today = todayLocal(TimeZone(identifier: window.timezone) ?? .current)
-        let cut = min(Timeline.window(anchor: today).start, window.start)
-        let merged = loadOnline(window.stationID)?.merging(window, prunedBefore: cut) ?? window
-        try save(merged, id: window.stationID, suffix: "-online")
-        return merged
+        let tz = TimeZone(identifier: window.timezone) ?? .current
+        let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
+                      window.start)
+        let store = (loadOnline(window.stationID)
+                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
+            .inserting(window, prunedBefore: cut)
+        try save(store, id: window.stationID, suffix: "-online")
+        return store.block(spanning: window) ?? window
     }
 }
 
