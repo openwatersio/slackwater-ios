@@ -10,7 +10,7 @@ options:
 packages:
   TideEngine:
     url: https://github.com/sailingnaturali/slackwater-engine
-    from: 0.3.0
+    from: 0.4.0
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
