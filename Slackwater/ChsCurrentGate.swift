@@ -201,6 +201,20 @@ struct ChsOnlineWindow: Codable {
             times: kept.map(\.key), speeds: kept.map(\.value))
     }
 
+    /// This window with everything before `cut` dropped — nil when nothing
+    /// survives. `start` follows the cut for `merging`'s reason: an unpruned
+    /// start keeps `covers` claiming a range whose samples are gone.
+    func pruned(before cut: Date) -> ChsOnlineWindow? {
+        guard start < cut else { return self }
+        guard end > cut else { return nil }
+        let c = cut.timeIntervalSince1970
+        let kept = zip(times, speeds).filter { $0.0 >= c }
+        return ChsOnlineWindow(stationID: stationID, iwlsName: iwlsName, timezone: timezone,
+                               fetchedAt: fetchedAt, start: cut, end: end,
+                               floodDirection: floodDirection, ebbDirection: ebbDirection,
+                               times: kept.map { $0.0 }, speeds: kept.map { $0.1 })
+    }
+
     /// The list/search card's reading: nearest 15-min sample to `now` (a card
     /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
     /// interpolating the drawn curve earns its keep), and the next event from
@@ -211,6 +225,56 @@ struct ChsOnlineWindow: Codable {
         let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
         let next = sampleEvents(points).first { $0.time > now }
         return CurrentCardState(signed: signed, next: next)
+    }
+}
+
+/// The on-disk shape for an online gate (#67 item 4): DISJOINT fetched
+/// blocks, sorted by start. The single start/end window before it made every
+/// disjoint merge lossy — a far-forward pick discarded today's block, and
+/// paging back refetched ~30 days the app had just held. Blocks stay pairwise
+/// separated by more than `sampleInterval`; anything closer merges on save.
+/// Coverage questions go to a SINGLE block: the gap between blocks has no
+/// samples, and claiming it renders a strip with a dead zone.
+struct ChsOnlineStore: Codable {
+    var schemaVersion = 2
+    let stationID: String
+    let blocks: [ChsOnlineWindow]
+
+    /// The one block covering `anchor`'s whole strip, or nil — never a stitch
+    /// across a gap.
+    func block(covering anchor: Date) -> ChsOnlineWindow? {
+        blocks.first { $0.covers(anchor: anchor) }
+    }
+
+    /// The block whose span contains `window`'s — what `saveOnline` returns:
+    /// the caller's copy must never be narrower than the disk's.
+    func block(spanning window: ChsOnlineWindow) -> ChsOnlineWindow? {
+        blocks.first { $0.start <= window.start && $0.end >= window.end }
+    }
+
+    /// Union `window` in: absorb every stored block that overlaps or abuts it
+    /// (within `sampleInterval` slack — the seam a clamped fetch end
+    /// produces), keep the rest, prune everything to `cut`, drop empties.
+    /// One ascending pass absorbs a chain: stored blocks are pairwise
+    /// disjoint, so only the incoming block can bridge two of them, and
+    /// sorted order means it meets each neighbour after absorbing the last.
+    /// `merging`'s own disjoint guard never fires here — the test above is
+    /// the same test it applies.
+    func inserting(_ window: ChsOnlineWindow, prunedBefore cut: Date) -> ChsOnlineStore {
+        let slack = ChsOnlineWindow.sampleInterval
+        var merged = window
+        var rest: [ChsOnlineWindow] = []
+        for b in blocks.sorted(by: { $0.start < $1.start }) {
+            if b.start <= merged.end.addingTimeInterval(slack),
+               merged.start <= b.end.addingTimeInterval(slack) {
+                merged = b.merging(merged, prunedBefore: cut)
+            } else if let kept = b.pruned(before: cut) {
+                rest.append(kept)
+            }
+        }
+        if let kept = merged.pruned(before: cut) { rest.append(kept) }
+        return ChsOnlineStore(stationID: stationID,
+                              blocks: rest.sorted { $0.start < $1.start })
     }
 }
 
