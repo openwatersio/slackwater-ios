@@ -169,6 +169,26 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
     }
 
+    /// #95 part 1: the readout says how fast the water is moving and how big
+    /// this tide is — rate of rise on the direction line, a Range block beside
+    /// the next-turn readout. Friday Harbor reads small; the point is the
+    /// figures exist at every station, so Ile Haute's 32 ft can't hide.
+    func testTideReadoutShowsRateAndRange() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-seedGate"]
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+
+        openFridayHarbor(app)
+        let rate = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'ft/hr'")).firstMatch
+        XCTAssert(rate.waitForExistence(timeout: 10), "no rate-of-rise readout")
+        let range = app.staticTexts.matching(
+            NSPredicate(format: "label ==[c] 'range'")).firstMatch
+        XCTAssert(range.exists, "no Range block in the readout")
+        save(app, "tide-readout-rate-range.png")
+    }
+
     /// The range bar heads the schedule card on every scrubable detail, and it
     /// says what span the list below it covers.
     func testWeekRangeBarHeadsTheSchedule() throws {
