@@ -135,12 +135,15 @@ enum Timeline {
     /// they would drift. The failure mode is a coverage check that passes on
     /// a window with a hole in it, which renders as a strip with a dead zone.
     ///
-    /// The back-pad is the whole reason this takes two dates: it answers a
-    /// question about NOW, so it exists only when the anchor IS now.
-    static func window(anchor: Date, today: Date) -> (start: Date, end: Date) {
-        let back = anchor == today ? backHours : 0
-        return (anchor.addingTimeInterval(-back * 3600),
-                anchor.addingTimeInterval(forwardHours * 3600))
+    /// The 48h back-pad is UNCONDITIONAL (#67 item 1). It used to exist only when
+    /// `anchor == today`, which (a) left the noon park with dead space to its left
+    /// on panes wider than 432pt — the centering target is `x(t) − width/2`, and
+    /// UIScrollView clamps the negative result to 0 — and (b) made the window's
+    /// shape depend on exact Date equality between two `todayLocal` calls, a
+    /// documented class of "two clocks answering one question" defects.
+    static func window(anchor: Date) -> (start: Date, end: Date) {
+        (anchor.addingTimeInterval(-backHours * 3600),
+         anchor.addingTimeInterval(forwardHours * 3600))
     }
 }
 
@@ -485,7 +488,7 @@ struct TimelineData {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)   // the caller's clock, not the app's
-        let w = Timeline.window(anchor: anchor, today: today)
+        let w = Timeline.window(anchor: anchor)
         // -3, not the -2 the 48h back-pad suggests: the look-back spans THREE
         // calendar days whenever a spring-forward falls inside it. The day
         // after that transition is 23 hours long, so `anchor - 48h` lands an

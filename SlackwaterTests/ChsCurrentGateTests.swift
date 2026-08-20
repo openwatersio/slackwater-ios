@@ -167,7 +167,7 @@ final class ChsCurrentGateTests: XCTestCase {
         cal.timeZone = tz
         let now0 = try XCTUnwrap(cal.date(from: DateComponents(year: 2026, month: 1, day: 15, hour: 12)))
         let today0 = cal.startOfDay(for: now0)
-        let need = Timeline.window(anchor: today0, today: today0)
+        let need = Timeline.window(anchor: today0)
 
         func window(start: Date, end: Date) -> ChsOnlineWindow {
             ChsOnlineWindow(stationID: "chs-test-online", iwlsName: "Test", timezone: "America/Vancouver",
@@ -177,16 +177,16 @@ final class ChsCurrentGateTests: XCTestCase {
 
         // Inside: a window wider than the strip needs still covers it.
         let padded = window(start: need.start.addingTimeInterval(-3600), end: need.end.addingTimeInterval(3600))
-        XCTAssert(padded.covers(anchor: today0, today: today0))
+        XCTAssert(padded.covers(anchor: today0))
 
         // Exact edge: start/end exactly matching the required strip bounds.
         let exact = window(start: need.start, end: need.end)
-        XCTAssert(exact.covers(anchor: today0, today: today0))
+        XCTAssert(exact.covers(anchor: today0))
 
         // 3 days later (a later today, anchor following it): the same window
         // no longer reaches the shifted strip end.
         let later = today0.addingTimeInterval(3 * 86_400)
-        XCTAssertFalse(exact.covers(anchor: later, today: later))
+        XCTAssertFalse(exact.covers(anchor: later))
     }
 
     /// A 30-day fetched window covers every anchor whose own 7.5-day strip fits
@@ -196,17 +196,17 @@ final class ChsCurrentGateTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: Date())
-        let w = Timeline.window(anchor: today, today: today)
+        let w = Timeline.window(anchor: today)
         let window = ChsOnlineWindow(
             stationID: "test", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: Date(), start: w.start,
             end: today.addingTimeInterval(30 * 86_400),
             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
 
-        XCTAssert(window.covers(anchor: today, today: today))
-        XCTAssert(window.covers(anchor: today.addingTimeInterval(22 * 86_400), today: today),
+        XCTAssert(window.covers(anchor: today))
+        XCTAssert(window.covers(anchor: today.addingTimeInterval(22 * 86_400)),
                   "22 days out still fits its 7.5-day strip inside 30 days of samples")
-        XCTAssertFalse(window.covers(anchor: today.addingTimeInterval(24 * 86_400), today: today),
+        XCTAssertFalse(window.covers(anchor: today.addingTimeInterval(24 * 86_400)),
                        "past the edge it must fail, not silently render a hole")
     }
 
@@ -352,9 +352,9 @@ final class ChsCurrentGateTests: XCTestCase {
 
     /// The anchored fetch's arithmetic, without the IWLS round trip the rest of
     /// `fetchOnlineWindow` needs: 30 days forward of the anchor, back-padded
-    /// only when the anchor IS today, and a chunk plan that reaches both ends of
-    /// it. The `from:` branch is what a date picker will call.
-    func testOnlineFetchSpanBackPadsOnlyTodayAndRunsThirtyDaysForward() throws {
+    /// like every window (#67 item 1), and a chunk plan that reaches both ends
+    /// of it. The `from:` branch is what a date picker will call.
+    func testOnlineFetchSpanBackPadsAndRunsThirtyDaysForward() throws {
         let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
         let today = todayLocal(tz)
         let month = Timeline.onlineFetchDays * 86_400
@@ -366,7 +366,8 @@ final class ChsCurrentGateTests: XCTestCase {
 
         let ahead = today.addingTimeInterval(21 * 86_400)
         let paged = ChsFitService.onlineFetchSpan(anchor: ahead, today: today)
-        XCTAssertEqual(paged.start, ahead, "an anchor that is not today gets no look-back")
+        XCTAssertEqual(paged.start, ahead.addingTimeInterval(-Timeline.backHours * 3600),
+                       "an anchored fetch is back-padded like every window (#67 item 1)")
         XCTAssertEqual(paged.end, ahead.addingTimeInterval(month))
 
         // The plan the fetch builds from that span must reach both of its ends,
@@ -383,7 +384,7 @@ final class ChsCurrentGateTests: XCTestCase {
             stationID: "chs-test-online", iwlsName: "Test", timezone: tz.identifier,
             fetchedAt: .now, start: paged.start, end: paged.end,
             floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
-        XCTAssert(fetched.covers(anchor: ahead, today: today),
+        XCTAssert(fetched.covers(anchor: ahead),
                   "a fetch from an anchor must cover that anchor's own strip")
     }
 
