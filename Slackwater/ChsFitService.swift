@@ -584,19 +584,19 @@ extension ChsFitService {
     /// so every caller, today's and any future one, gets the same
     /// "the fetch landed" signal without re-deriving it.
     ///
-    /// Returns the window as SAVED — the union of this block with whatever was
-    /// already stored — so the caller's copy is never narrower than the disk's.
-    /// Only a failed disk write falls back to the bare fetched block.
+    /// Returns the stored block this fetch merged into — never narrower than
+    /// the disk's copy of this span. Only a failed disk write falls back to
+    /// the bare fetched block.
     ///
     /// ONE fetch per gate at a time. The picker's speculative prefetch and the
     /// user's own fetch of the week they landed on are both fetches of the same
-    /// file, and run concurrently they interleave a read-modify-write: disjoint
-    /// blocks make `merging` return the incoming one outright, so whichever
-    /// saves LAST wins the whole file — the prefetch landing second discards the
-    /// block the user is looking at and swaps the strip for the honesty card
-    /// seconds after it appeared. A second caller joins the fetch already
-    /// running instead of starting its own, which also spares the duplicate
-    /// 30-day round trip.
+    /// file, and run concurrently they interleave a read-modify-write: the
+    /// store no longer loses a block to that race (disjoint blocks coexist on
+    /// disk since #67 item 4), but two concurrent read-modify-writes of one
+    /// file still lose ONE of the two fetches. A second caller joins the fetch
+    /// already running instead of starting its own, which also spares the
+    /// duplicate 30-day round trip — and is what the coalescing below is
+    /// actually still for.
     ///
     /// ponytail: coalescing is by gate, NOT by gate+span — a joiner gets the
     /// span the in-flight fetch asked for, which may not cover it. That path

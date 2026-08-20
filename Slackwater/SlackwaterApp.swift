@@ -1501,7 +1501,7 @@ struct ChsCurrentGateCardView: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     /// Only ever read for an online gate — a fitted gate never touches this.
-    @State private var onlineWindow: ChsOnlineWindow?
+    @State private var onlineStore: ChsOnlineStore?
 
     var body: some View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
@@ -1538,7 +1538,7 @@ struct ChsCurrentGateCardView: View {
 
     private func refreshOnlineWindow() {
         guard gate.isOnline else { return }
-        onlineWindow = ChsModelStore.loadOnline(gate.id)
+        onlineStore = ChsModelStore.loadOnline(gate.id)
     }
 
     private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
@@ -1552,13 +1552,15 @@ struct ChsCurrentGateCardView: View {
     /// gate can't be in.
     @ViewBuilder private var onlineCard: some View {
         let today = todayLocal(gate.tz)
-        if let onlineWindow, onlineWindow.covers(anchor: today) {
-            OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
+        if let block = onlineStore?.block(covering: today) {
+            OnlineGateCardView(gate: gate, window: block, km: km)
         } else {
             // Never fetched and fetched-but-run-out are different states, and
-            // this path used to print one string for both (#93).
+            // this path used to print one string for both (#93):
+            // `blocks.last` is nil for the former, the real expired block
+            // (non-nil, carries the real covered-to date) for the latter.
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                           status: onlineGateStatus(onlineWindow, online: net.online))
+                           status: onlineGateStatus(onlineStore?.blocks.last, online: net.online))
         }
     }
 }

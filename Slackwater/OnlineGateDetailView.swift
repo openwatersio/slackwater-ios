@@ -14,6 +14,11 @@ struct OnlineGateDetailView: View {
 
     @State private var live = appNow()
     @State private var scrubTime = appNow()
+    /// The store's block for the current `anchor` — narrower than "this
+    /// gate's whole store" since #67 item 4: the disjoint blocks live on
+    /// disk, and `window` is only ever the one covering where the view is
+    /// parked. Re-picked via `block(covering: anchor)` on `onAppear`,
+    /// `.onReceive`, and `applyAnchor`.
     @State private var window: ChsOnlineWindow?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
@@ -120,7 +125,7 @@ struct OnlineGateDetailView: View {
             .onAppear {
                 let today = todayLocal(tz)
                 if anchor == .distantPast { anchor = today }
-                if window == nil { window = ChsModelStore.loadOnline(gate.id) }
+                if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
                 RecentsStore.shared.record(gate.id)
                 if window?.covers(anchor: anchor) != true, net.online { fetchNow(from: anchor) }
             }
@@ -134,7 +139,7 @@ struct OnlineGateDetailView: View {
             // rather than @ObservedObject-ing the service keeps the fit
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
-                window = ChsModelStore.loadOnline(gate.id) ?? window
+                window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
             }
     }
 
@@ -157,19 +162,11 @@ struct OnlineGateDetailView: View {
         Task { try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
     }
 
-    /// The anchor moved. If the window covers it we are done; if not, this is
-    /// the same situation `.onAppear` already handles — fetch when online, and
-    /// when offline say nothing, because the honesty card `timeline == nil`
-    /// already puts on screen says it better than a flag would.
-    ///
-    /// `timeline == nil` IS the coverage question, asked once via
-    /// `window.covers(anchor:)`, not re-derived here.
-    ///
-    /// No `rebuild()` call, and deliberately: this view's `timeline` is a
-    /// COMPUTED property (unlike the other three details, which store theirs in
-    /// `@State`), so setting `anchor` is already enough — SwiftUI re-evaluates
-    /// it on the next render.
+    /// The anchor moved. The store may already hold a block for it — paging back
+    /// to a week the app has must be a disk read, never a refetch (#67 item 4) —
+    /// so re-pick first; only then is a nil timeline a real gap worth a fetch.
     private func applyAnchor() {
+        if let block = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) { window = block }
         if timeline == nil, net.online { fetchNow(from: anchor) }
     }
 
@@ -302,8 +299,8 @@ struct OnlineGateDetailView: View {
         var text = net.online
             ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a month ahead."
             : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a month ahead."
-        if let window {
-            text += " Last fetch covered to \(monthDay(window.end, tz))."
+        if let end = ChsModelStore.loadOnline(gate.id)?.blocks.last?.end {
+            text += " Last fetch covered to \(monthDay(end, tz))."
         }
         if fetchFailed {
             text += " The last attempt didn't finish."
@@ -329,12 +326,9 @@ struct OnlineGateDetailView: View {
         // the whole window back, not just park the centerline at a `now` that
         // isn't on this strip.
         anchor = todayLocal(tz)
-        // And the same coverage check every other anchor move gets. A
-        // far-forward pick's fetch can have discarded today's block (disjoint
-        // blocks: the incoming one wins), so coming back can land on a month
-        // this gate no longer holds — honesty card with no fetch attempted,
-        // online or not. `applyAnchor` asks `timeline`, which is computed off
-        // the `anchor`/`live` just set here, and fetches when it says nil.
+        // And the same coverage check every other anchor move gets.
+        // `applyAnchor` asks `timeline`, which is computed off the
+        // `anchor`/`live` just set here, and fetches when it says nil.
         applyAnchor()
     }
 }

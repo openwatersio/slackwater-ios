@@ -152,7 +152,9 @@ final class ChsCurrentGateTests: XCTestCase {
             floodDirection: 45, ebbDirection: 225, times: [0, 900], speeds: [1.5, -1.5])
         try ChsModelStore.saveOnline(window)
         defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl(window.stationID)) }
-        let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-online"))
+        let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-online"))
+        let loaded = try XCTUnwrap(store.blocks.first)
+        XCTAssertEqual(store.blocks.count, 1)
         XCTAssertEqual(loaded.floodDirection, 45)
         XCTAssertEqual(loaded.times, [0, 900])
         XCTAssertEqual(loaded.speeds, [1.5, -1.5])
@@ -343,11 +345,43 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(saved.times, [t0, t0 + 900, t0 + 1800, t0 + 2700],
                        "saveOnline returns the merged window, not its argument")
 
-        let loaded = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
-        XCTAssertEqual(loaded.times, [t0, t0 + 900, t0 + 1800, t0 + 2700])
-        XCTAssertEqual(loaded.speeds, [1, 2, 3, 4])
-        XCTAssertEqual(loaded.start, Date(timeIntervalSince1970: t0), "the earlier block survives the save")
-        XCTAssertEqual(loaded.end, Date(timeIntervalSince1970: t0 + 2700))
+        let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
+        XCTAssertEqual(store.blocks.count, 1)
+        XCTAssertEqual(store.blocks[0].times, [t0, t0 + 900, t0 + 1800, t0 + 2700])
+        XCTAssertEqual(store.blocks[0].speeds, [1, 2, 3, 4])
+        XCTAssertEqual(store.blocks[0].start, Date(timeIntervalSince1970: t0), "the earlier block survives the save")
+        XCTAssertEqual(store.blocks[0].end, Date(timeIntervalSince1970: t0 + 2700))
+    }
+
+    /// THE #67 item 4 headline: a far-forward fetch and today's block coexist on
+    /// disk. Under the single window the second save discarded the first.
+    func testSaveOnlineKeepsTodayWhenAFarBlockLands() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let t0 = todayLocal(tz).timeIntervalSince1970
+        let url = ChsModelStore.onlineUrl("chs-test-merge")
+        try? FileManager.default.removeItem(at: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        try ChsModelStore.saveOnline(onlineWindow([t0, t0 + 900], [1, 2]))
+        let far = t0 + 40 * 86_400
+        let saved = try ChsModelStore.saveOnline(onlineWindow([far, far + 900], [3, 4]))
+        XCTAssertEqual(saved.times, [far, far + 900],
+                       "saveOnline returns the block the fetch landed in, not the whole store")
+
+        let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-merge"))
+        XCTAssertEqual(store.blocks.count, 2, "today's block survived the far save")
+        XCTAssertEqual(store.blocks[0].times, [t0, t0 + 900])
+    }
+
+    /// A device that fetched under the single-window shape keeps its data: the
+    /// legacy file decodes as one block.
+    func testLoadOnlineMigratesALegacySingleWindowFile() throws {
+        let legacy = onlineWindow([0, 900], [1, 2], id: "chs-test-legacy")
+        try ChsModelStore.save(legacy, id: "chs-test-legacy", suffix: "-online")  // v1 bytes, straight to disk
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.onlineUrl("chs-test-legacy")) }
+        let store = try XCTUnwrap(ChsModelStore.loadOnline("chs-test-legacy"))
+        XCTAssertEqual(store.blocks.count, 1)
+        XCTAssertEqual(store.blocks[0].times, [0, 900])
     }
 
     /// The anchored fetch's arithmetic, without the IWLS round trip the rest of
