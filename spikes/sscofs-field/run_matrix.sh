@@ -15,6 +15,12 @@ jq -c '.[]' "$INDEX" | while read -r row; do
   slug=$(jq -r .slug <<<"$row"); elem=$(jq -r .elem <<<"$row")
   label="${slug}-e${elem}"
   [ -f "results/${label}.done" ] && continue
+  # Clear any stale report from a prior run before this one starts — a run
+  # that fails early (e.g. FAIL-FOR-FITTING) never writes a new one, and
+  # without this the copy below would grab yesterday's numbers and mark the
+  # pair done with no signal that they're stale.
+  report="${REPORTS}/${label}-210d-report.json"
+  rm -f "$report"
   (cd ../../tools/FitValidation && swift run -c release fit-validation \
     --samples "../../spikes/sscofs-field/$(jq -r .samples <<<"$row")" \
     --events  "../../spikes/sscofs-field/$(jq -r .events  <<<"$row")" \
@@ -23,7 +29,6 @@ jq -c '.[]' "$INDEX" | while read -r row; do
   # The tool's own 210d report (the window its exit code reflects) is the
   # per-pair verdict of record; a FAIL-FOR-FITTING pair (e.g. no usable
   # events) never writes one, so report.py just sees it missing.
-  report="${REPORTS}/${label}-210d-report.json"
   [ -f "$report" ] && cp "$report" "results/${label}.json"
   touch "results/${label}.done"
 done
