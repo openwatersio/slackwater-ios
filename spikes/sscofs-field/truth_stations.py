@@ -31,10 +31,14 @@ def chs_gates():
 
 def noaa_stations():
     out = []
+    seen = set()  # Dedup on station id (MDAPI returns one row per currbin)
     js = requests.get(f"{MD}/stations.json?type=currentpredictions&units=english", timeout=120).json()
     for st in js["stations"]:
         if not inbox(st["lat"], st["lng"]) or st.get("type") != "H":
             continue
+        if st["id"] in seen:
+            continue
+        seen.add(st["id"])
         # meanFloodDir/meanEbbDir come back with any currents_predictions data request
         r = requests.get(CP, params={"station": st["id"], "product": "currents_predictions",
                                      "date": "today", "range": "24", "interval": "MAX_SLACK",
@@ -59,3 +63,4 @@ if __name__ == "__main__":
           f"{sum(s['source']=='noaa' for s in stations)} NOAA)")
     assert any("dodd" in s["slug"] for s in stations), "Dodd Narrows missing — box or filter wrong"
     assert any("active" in s["slug"] for s in stations), "Active Pass missing"
+    assert len({s["slug"] for s in stations}) == len(stations), "slug collision"
