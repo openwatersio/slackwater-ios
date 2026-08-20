@@ -1585,8 +1585,9 @@ struct ChsCurrentGateCardView: View {
         } else {
             // Never fetched and fetched-but-run-out are different states, and
             // this path used to print one string for both (#93):
-            // `blocks.last` is nil for the former, the real expired block
-            // (non-nil, carries the real covered-to date) for the latter.
+            // `onlineGateStatus` only null-checks `blocks.last` — nil is the
+            // former (.notDownloaded), non-nil is the latter (.expired); it
+            // doesn't read the block's own covered-to date.
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
                            status: onlineGateStatus(onlineStore?.blocks.last, online: net.online))
         }

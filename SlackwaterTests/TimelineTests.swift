@@ -100,9 +100,10 @@ final class TimelineTests: XCTestCase {
     /// anchors following a spring-forward the 48h look-back reaches an hour
     /// into the THIRD calendar day back, because the day between them is only
     /// 23 hours long — narrow the range to -2 again and this fails on any day
-    /// of the year, not just in March. It carries its own `now` because the
-    /// back-pad exists only when the anchor IS today, so a March anchor with a
-    /// real `now` would be a past anchor and exercise nothing.
+    /// of the year, not just in March. `anchor` alone drives `start`/`end`/`days`
+    /// (the back-pad is unconditional, #67 item 1), so the custom `now` here
+    /// only keeps `today` sane for a March date — it plays no part in exercising
+    /// the -3-day spread.
     func testDayChromeCoversTheLastNightsMoon() {
         let springForwardPlusOne = vancouverMidnight(2026, 3, 9)
         for (anchor, now) in [(todayLocal(friday.tz), Date()),
@@ -200,6 +201,12 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(ahead.start, future.addingTimeInterval(-48 * 3600),
                        "a picked week gets the same look-back as today's")
         XCTAssertEqual(ahead.end, future.addingTimeInterval(180 * 3600))
+
+        let past = vancouverMidnight(2026, 7, 6)
+        let behind = Timeline.window(anchor: past)
+        XCTAssertEqual(behind.start, past.addingTimeInterval(-48 * 3600),
+                       "a past anchor gets the same look-back as today's")
+        XCTAssertEqual(behind.end, past.addingTimeInterval(180 * 3600))
     }
 
     /// The strip must stay WIDER than the list, or tapping the last schedule row

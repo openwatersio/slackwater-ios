@@ -1169,15 +1169,17 @@ struct TimelineScrubber: UIViewRepresentable {
         co.parent = self
         co.host?.rootView = canvas
         guard sv.bounds.width > 0 else { return }
-        // The canvas is not a fixed width. `Timeline.window` back-pads 48h ONLY
-        // when the anchor is today, so the first pick takes the window from
-        // 228h to 180h and `totalWidth` from 4104pt to 3240pt. Both the host
-        // frame and `contentSize` were set once in `makeUIView` and never
-        // again: the narrower canvas then laid itself out CENTRED inside the
-        // stale wider host view — ~432pt right of where the offset arithmetic
-        // below assumes the window starts — and the viewport landed on empty
-        // space. A blank strip under a perfectly correct readout, which is
-        // exactly what shipping this fix's first attempt produced.
+        // The window's width is a constant 228h for every anchor (the 48h
+        // back-pad is unconditional, #67 item 1) — an anchor pick alone can no
+        // longer change `totalWidth`. The guard below still earns its keep for
+        // whatever DOES change it: the host frame and `contentSize` were set
+        // once in `makeUIView` and never again, so a canvas that grew or
+        // shrank without a resize here lays itself out CENTRED inside the
+        // stale host view — off from where the offset arithmetic below assumes
+        // the window starts — and the viewport can land on empty space. A
+        // blank strip under a perfectly correct readout, which is exactly what
+        // shipping this fix's first attempt produced (back when an anchor pick
+        // was still the trigger).
         //
         // Resize BEFORE the offset: the offset is set against these bounds, and
         // shrinking `contentSize` afterwards lets UIKit clamp it out from under
