@@ -51,6 +51,20 @@ def main():
         per_station.setdefault(by_label[label]["slug"], []).append({**parse(path), **by_label[label]})
     n_scored = sum(len(rows) for rows in per_station.values())
 
+    # speed_med == -1 is fit-validation's sentinel for "no scoreable extremum"
+    # (main.swift: obs.speed skipped below SIGNIFICANT_KN = 0.75 kn) — not a
+    # real error, and never a legitimate min(). Split it out per station before
+    # any best/nearest selection or pass counting; a station where every row is
+    # sentinel never had a scoreable element at all.
+    scoreable = {}
+    unscoreable = []
+    for slug, rows in per_station.items():
+        good = [r for r in rows if r["speed_med"] >= 0]
+        if good:
+            scoreable[slug] = good
+        else:
+            unscoreable.append(slug)
+
     els = json.load(open("mesh/elements.json"))
     box = els["box"]
     box_deg2 = (box[2] - box[0]) * (box[3] - box[1])
@@ -65,7 +79,7 @@ def main():
         out.write("## Per-station (best + nearest element)\n\n")
         out.write("| station | dist m | slack med | slack max | ext med | speed med | verdict |\n")
         out.write("|---|---|---|---|---|---|---|\n")
-        for slug, rows in sorted(per_station.items()):
+        for slug, rows in sorted(scoreable.items()):
             best = min(rows, key=lambda r: r["speed_med"])
             near = min(rows, key=lambda r: r["dist_m"])
             for tag, r in (("best", best), ("nearest", near)):
@@ -82,12 +96,19 @@ def main():
                    f"reached samples/index.json (make_samples.py; see export.log): "
                    f"{', '.join(COVERAGE_GAPS)}.\n")
 
+        out.write("\n## Unscoreable stations (all published extrema < 0.75 kn)\n\n")
+        out.write(f"{len(unscoreable)} station(s) reached samples/index.json but every nearby element's "
+                   f"published extrema fell below fit-validation's SIGNIFICANT_KN floor (0.75 kn), so "
+                   f"speedMedianKn is fit-validation's -1 sentinel (no scoreable extremum) on every row — "
+                   f"excluded from the best/nearest table and decision gate 1: "
+                   f"{', '.join(sorted(unscoreable)) or '(none)'}.\n")
+
         out.write("\n## Decision gates (spec §3)\n\n")
-        passing = sorted(slug for slug, rows in per_station.items()
+        passing = sorted(slug for slug, rows in scoreable.items()
                           if min(rows, key=lambda r: r["speed_med"])["verdict"] == "PASS")
-        failing = sorted(slug for slug, rows in per_station.items()
+        failing = sorted(slug for slug, rows in scoreable.items()
                           if min(rows, key=lambda r: r["speed_med"])["verdict"] == "FAIL")
-        out.write(f"1. **Certifiable sub-regions meet the bar:** {len(passing)}/{len(per_station)} scored "
+        out.write(f"1. **Certifiable sub-regions meet the bar:** {len(passing)}/{len(scoreable)} scoreable "
                    f"stations PASS on their best element — {', '.join(passing) or '(none)'}. "
                    f"Failing: {', '.join(failing) or '(none)'}.\n")
         dodd = {slug: rows for slug, rows in per_station.items() if "dodd" in slug}

@@ -249,6 +249,12 @@ gates inside sub-mesh passes; visible no-data everywhere else. Interpolating
 between stations remains ruled out; an uncertified model field remains ruled
 out; absence still renders as neutral, never calm.
 
+The SSCOFS backdrop itself was spike-tested 2026-08-20 and failed certification —
+slack timing missed the bar at every station in the box (see
+`spikes/sscofs-field/README.md`) — so the standing ruling ships grown patches only
+("Plan B"), with the speed-only fill question the spike raised still open with the
+owner.
+
 Coverage work still routes to more validated gates (#9) — every new gate also
 certifies backdrop and seeds a grown patch.
 

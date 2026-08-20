@@ -49,7 +49,7 @@ def noaa_events(st, start, end):
     return out
 
 def to_sample(tt, vv):
-    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: metres})."""
+    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: signed knots})."""
     return {"t": int(tt * 1000), "v": float(vv)}
 
 def main():

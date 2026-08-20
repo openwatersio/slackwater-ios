@@ -22,7 +22,7 @@ def main():
     with open("mesh/elements.json", "w") as fh:
         json.dump(out, fh)
     print(f"{len(idx)} elements in box (full mesh {len(lonc)})")
-    # Self-check: the five reference passes must each have an element within 600 m.
+    # Self-check: the four reference passes must each have an element within 600 m.
     refs = {"dodd": (49.1367, -123.8183), "active": (48.8667, -123.3000),
             "boundary": (48.7621, -123.0520), "sanjuan": (48.4600, -122.9500)}
     for name, (la, lo) in refs.items():
