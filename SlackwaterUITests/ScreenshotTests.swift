@@ -2435,7 +2435,10 @@ final class ScreenshotTests: XCTestCase {
     /// Paging an online gate to a week nobody has downloaded, with no network,
     /// must SAY so — not render an empty strip that reads as slack water all
     /// week. Same picker choreography as `testPickingADateMovesTheWindow`, two
-    /// months out so no 30-day window could cover it.
+    /// months out so no 30-day window could cover it. The honesty card is not
+    /// a dead end: the week-range bar survives it, and its picker is the way
+    /// back to a week the app holds (#67 item 2) — it used to be that only the
+    /// navigation back button could get you off this screen.
     func testOnlineGatePagedBeyondItsWindowOffline() throws {
         let app = launch("-seedGate", "-chsResetModels",
                          "-seedOnlineWindow", "chs-sechelt-rapids",
@@ -2463,6 +2466,59 @@ final class ScreenshotTests: XCTestCase {
                   "an uncovered week offline must show the honesty card, never a dead strip")
         XCTAssertFalse(app.otherElements["timeline-strip"].exists,
                        "the strip must be GONE, not drawn flat over data nobody has")
+
+        // #67 item 2: the honesty card is not a dead end — the bar survives it,
+        // and its picker is the way back to a week the app holds.
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.exists, "the honesty card must keep the week-range bar")
+        bar.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Previous Month"].firstMatch.tap()
+        app.buttons["Previous Month"].firstMatch.tap()
+        let todayCell = app.collectionViews.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] 'today'")).firstMatch
+        XCTAssert(todayCell.exists, "the graphical picker labels today's cell")
+        todayCell.tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "back on the seeded week, the strip must render from disk — offline")
+    }
+
+    /// #67 item 4, hermetically: two DISJOINT seeded blocks, no network. Under
+    /// the single-window store the far seed's save DISCARDED today's block, so
+    /// this test's very first strip assertion is red there; and paging into the
+    /// far block must render from disk, which is the multi-block payoff.
+    func testOnlineGatePagesBetweenSeededBlocksOffline() throws {
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-seedOnlineWindow", "chs-sechelt-rapids",
+                         "-seedOnlineFarWindow", "chs-sechelt-rapids",
+                         "-networkKillSwitch",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+
+        openSearch(app, "skookumchuck")
+        let result = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(result.waitForExistence(timeout: 5))
+        result.tap()
+
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "today's block must survive the far seed's save (single-window: it did not)")
+
+        // Two months out lands inside the far block ([today+30d, today+85d]:
+        // cell 10 of month+2 is today+35..70d, whose ±window fits regardless of
+        // today's day-of-month).
+        app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Next Month"].firstMatch.tap()
+        app.buttons["Next Month"].firstMatch.tap()
+        app.collectionViews.buttons.element(boundBy: 10).tap()
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+
+        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+                  "a far week the app holds on disk must render offline, not honesty-card")
+        XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists)
+        let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
+        XCTAssert(ink > 0.05, "the far block's strip drew nothing — ink \(ink)")
+        save(app, "online-gate-far-block.png")
     }
 
     /// Full-plan only (`skipUnlessFull` — run via ./scripts/test.sh --full):
