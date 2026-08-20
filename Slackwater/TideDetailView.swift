@@ -28,6 +28,11 @@ struct TideDetailView: View {
         timeline?.tideExtremes.first { $0.time > scrubTime }
     }
     private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
+    private var prevExtreme: TideExtreme? {
+        timeline?.tideExtremes.last { $0.time <= scrubTime }
+    }
+    /// m/hr at the scrub time; sign lives in the ▲/▼, display is unsigned.
+    private var scrubRate: Double { record.engineStation.rateOfChange(at: scrubTime) }
 
     var body: some View {
         ScrubDetailScaffold(name: record.name, region: record.region,
@@ -68,10 +73,25 @@ struct TideDetailView: View {
                 HStack(spacing: 4) {
                     Text(rising ? "▲" : "▼").font(.caption2)
                     Text(rising ? "Rising" : "Falling").font(.footnote)
+                    // Rate of rise, first-class (#95): at Friday Harbor this
+                    // reads 0.8 ft/hr and nobody looks twice; at Ile Haute it
+                    // reads 8 ft/hr and does the work of a warning.
+                    Text("· \(formatHeight(abs(scrubRate), imperial: imperial)) \(unit)/hr")
+                        .font(.footnote.monospacedDigit())
                 }
                 .foregroundStyle(rising ? SN.rising : SN.falling)
             }
             Spacer()
+            if let prev = prevExtreme, let next = nextExtreme {
+                VStack(alignment: .trailing, spacing: 1) {
+                    MonoLabel(text: "Range", color: SN.foam.opacity(0.5), tracking: 1.4)
+                    // This tide's swing, prev turn to next — the subtraction
+                    // the reader was otherwise left to do across the readout.
+                    Text("\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)")
+                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
+                }
+                .padding(.trailing, 20)
+            }
             if let next = nextExtreme {
                 VStack(alignment: .trailing, spacing: 1) {
                     MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",

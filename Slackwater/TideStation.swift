@@ -52,3 +52,18 @@ extension TideStationRecord {
         return CardState(height: height, rising: rising, next: next)
     }
 }
+
+extension Station {
+    /// dh/dt at `t` in metres/hour — the rate-of-rise readout (#95 part 1).
+    /// Centered difference of exact engine evaluations at ±10 min, not
+    /// neighbouring strip samples (see the sampling-noise note in `cardState`).
+    /// ponytail: the strip's rate ramp wants analytic dh/dt in the engine;
+    /// switch this over when that lands.
+    func rateOfChange(at t: Date) -> Double {
+        let dt = 600.0
+        func exact(_ t: Date) -> Double {
+            heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+        }
+        return (exact(t.addingTimeInterval(dt)) - exact(t.addingTimeInterval(-dt))) / (2 * dt) * 3600
+    }
+}
