@@ -34,6 +34,7 @@ def chs_events(st, start, end):
     return requests.get(q, timeout=60).json()  # already [{eventDate, qualifier, value}]
 
 def noaa_events(st, start, end):
+    # ponytail: date-truncated by API limitation; window skews wider (conservative) — intentional
     r = requests.get(CP, params={"station": st["id"], "product": "currents_predictions",
                                  "begin_date": f"{start:%Y%m%d}", "end_date": f"{end:%Y%m%d}",
                                  "interval": "MAX_SLACK", "units": "english",
@@ -56,23 +57,45 @@ def main():
     os.makedirs("samples", exist_ok=True)
     index = []
     for st in stations:
-        near = elements_near(els, st["lat"], st["lon"])
-        if not near:
-            print(f"{st['slug']}: NO ELEMENT within 600 m — record as coverage gap")
+        try:
+            near = elements_near(els, st["lat"], st["lon"])
+            if not near:
+                print(f"{st['slug']}: NO ELEMENT within 600 m — record as coverage gap")
+                continue
+
+            ev_path = f"truth/{st['slug']}-events.json"
+
+            # resumability: skip if already fetched + sampled
+            sample_files = [f"samples/{st['slug']}-e{i}.json" for _, i, _ in near]
+            if os.path.exists(ev_path) and all(os.path.exists(sp) for sp in sample_files):
+                # rebuild index rows from disk
+                events = json.load(open(ev_path))
+                for k, i, d in near:
+                    sp = f"samples/{st['slug']}-e{i}.json"
+                    index.append({"slug": st["slug"], "elem": int(i), "samples": sp, "events": ev_path,
+                                  "flood": st["flood"], "ebb": st["ebb"], "dist_m": round(d)})
+                print(f"{st['slug']}: {len(near)} elements, {len(events)} truth events (resumed)")
+                json.dump(index, open("samples/index.json", "w"), indent=1)
+                continue
+
+            events = chs_events(st, *val) if st["source"] == "chs" else noaa_events(st, *val)
+            json.dump(events, open(ev_path, "w"))
+            for k, i, d in near:
+                signed = project_signed_kn(u[:, k], v[:, k], st["flood"])
+                good = np.isfinite(signed)
+                sp = f"samples/{st['slug']}-e{i}.json"
+                json.dump([{"t": float(tt), "v": float(vv)} for tt, vv in zip(t[good], signed[good])],
+                          open(sp, "w"))
+                index.append({"slug": st["slug"], "elem": int(i), "samples": sp, "events": ev_path,
+                              "flood": st["flood"], "ebb": st["ebb"], "dist_m": round(d)})
+            print(f"{st['slug']}: {len(near)} elements, {len(events)} truth events")
+
+            # incremental write: preserve completed stations on disk
+            json.dump(index, open("samples/index.json", "w"), indent=1)
+
+        except Exception as e:
+            print(f"{st['slug']}: FAILED {type(e).__name__}: {e}")
             continue
-        ev_path = f"truth/{st['slug']}-events.json"
-        events = chs_events(st, *val) if st["source"] == "chs" else noaa_events(st, *val)
-        json.dump(events, open(ev_path, "w"))
-        for k, i, d in near:
-            signed = project_signed_kn(u[:, k], v[:, k], st["flood"])
-            good = np.isfinite(signed)
-            sp = f"samples/{st['slug']}-e{i}.json"
-            json.dump([{"t": float(tt), "v": float(vv)} for tt, vv in zip(t[good], signed[good])],
-                      open(sp, "w"))
-            index.append({"slug": st["slug"], "elem": int(i), "samples": sp, "events": ev_path,
-                          "flood": st["flood"], "ebb": st["ebb"], "dist_m": round(d)})
-        print(f"{st['slug']}: {len(near)} elements, {len(events)} truth events")
-    json.dump(index, open("samples/index.json", "w"), indent=1)
 
 if __name__ == "__main__":
     main()
