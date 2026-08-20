@@ -62,6 +62,25 @@ bearing and fixed here:
 
 The renderer does not know which tier it is animating.
 
+**Render channels** (from the #57 session's frame dissection of PredictWind's
+TIDAL layer, 2026-08-20): the reference product draws **two separate channels** —
+a per-cell colour raster fill carrying speed (visibly blocky at cell resolution,
+unsmoothed), and monochrome streaklines on top carrying only direction and
+motion. The composite maps onto this cleanly and the spec adopts it:
+
+- The backdrop tier's render target is a **fill layer** — element polygon +
+  evaluated speed at t → ramp colour — not only a particle feed. Grown patches
+  contribute to both channels.
+- The sample provider above feeds the **streak channel**.
+- **No smoothing or interpolation across cells.** Blocky cell boundaries have
+  shipping-product precedent, and smoothing would repaint colour across the
+  certification-mask edge — exactly the dishonesty the mask exists to prevent.
+
+Ramp, particle colour, and slack-state treatment stay #57/#97 decisions; noted
+here only because near slack the reference field goes uniformly low-ramp and
+carries no planning signal — green-as-transitable-now remains the differentiator
+the fill channel cannot express.
+
 ## 2. Backdrop pipeline (offline, one-time per release, Studio)
 
 1. **Corpus.** Surface u/v per element from `noaa-nos-ofs-pds` nowcast fields files via
