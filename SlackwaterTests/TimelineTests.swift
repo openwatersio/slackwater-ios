@@ -415,7 +415,7 @@ final class TimelineTests: XCTestCase {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let cur = TimelineGeo(data: TimelineData(
             tz: .current, anchor: t0, today: t0, start: t0, end: t0.addingTimeInterval(3600),
-            days: [], tidePoints: [], tideExtremes: [],
+            days: [], tidePoints: [], tideRates: [], tideExtremes: [],
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
@@ -447,7 +447,8 @@ final class TimelineTests: XCTestCase {
         // build above; only the current side is synthesized.
         let both = TimelineGeo(data: TimelineData(
             tz: tideData.tz, anchor: tideData.anchor, today: tideData.today, start: tideData.start, end: tideData.end,
-            days: tideData.days, tidePoints: tideData.tidePoints, tideExtremes: tideData.tideExtremes,
+            days: tideData.days, tidePoints: tideData.tidePoints, tideRates: tideData.tideRates,
+            tideExtremes: tideData.tideExtremes,
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
         XCTAssert(both.hasTide && both.hasCurrent)
@@ -871,5 +872,61 @@ final class TimelineTests: XCTestCase {
                        "Dec 29 – Jan 4, 2027")
         XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 6, 1), tz: tz),
                        "Jun 1 – 7", "a same-year range never prints a year")
+    }
+}
+
+// MARK: - The tide track's rate-of-rise ramp (#95)
+
+extension TimelineTests {
+    /// The anchors land equally spaced, and both ends clamp.
+    func testTideRampTLandsTheAnchorsWhereTheyBelong() {
+        let a = Timeline.tideRateAnchorsMHr
+        XCTAssertEqual(a.count, 4)
+        for (i, v) in a.enumerated() {
+            XCTAssertEqual(Timeline.rampT(forRateMHr: v), Double(i) / 3, accuracy: 1e-9)
+        }
+        XCTAssertEqual(Timeline.rampT(forRateMHr: 0), 0)
+        XCTAssertEqual(Timeline.rampT(forRateMHr: 40), 1)
+    }
+
+    /// tools/ramp-domain.mjs across all 2,765 bundled stations: median peak
+    /// rate 1.50 ft/hr (0.457 m/hr), p90 4.59 ft/hr (1.399 m/hr). The domain
+    /// must spread that spine, not compress it into the bottom of the ramp.
+    func testTideRampSpreadsOrdinaryStationsAcrossTheRamp() {
+        let median = Timeline.rampT(forRateMHr: 0.457)
+        XCTAssertGreaterThan(median, 0.18)
+        XCTAssertLessThan(median, 0.30)
+        XCTAssertGreaterThan(Timeline.rampT(forRateMHr: 1.399), 0.5)
+    }
+
+    /// The defect this exists to fix (#95, via #97's finding): TimelineGeo
+    /// normalizes every curve to its own extremes, so a harbour tide and Ile
+    /// Haute drew the same picture. The rate fill is absolute: a big tide's
+    /// stops must come out brighter than a small one's, not merely different.
+    func testTwoTidesOfDifferentSizeCannotFillTheSameColour() {
+        func stops(amplitude: Double) -> [Gradient.Stop] {
+            let s = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: amplitude, phase: 0)])
+            let t0 = Date(timeIntervalSince1970: 1_770_000_000)
+            let rates = s.rates(from: t0, to: t0.addingTimeInterval(24 * 3600), step: 600)
+            let width: CGFloat = 3240
+            let span = rates.last!.time.timeIntervalSince(rates.first!.time)
+            return tideFillStops(rates, x: { CGFloat($0.timeIntervalSince(rates.first!.time) / span) * width },
+                                 width: width)
+        }
+        let harbour = stops(amplitude: 0.5)   // peak dh/dt ≈ 0.25 m/hr — bottom third
+        let fundy = stops(amplitude: 5)       // peak dh/dt ≈ 2.5 m/hr — top third
+        XCTAssertEqual(harbour.count, 145, "one stop per sample")
+        XCTAssertEqual(fundy.count, 145)
+        XCTAssertNotEqual(brightest(harbour), brightest(fundy))
+        XCTAssertGreaterThan(sum(brightest(fundy)), sum(brightest(harbour)),
+                             "the big tide sits higher on the ramp, not merely elsewhere")
+        for pair in zip(fundy, fundy.dropFirst()) {
+            XCTAssertLessThanOrEqual(pair.0.location, pair.1.location)
+        }
+        XCTAssertTrue(fundy.allSatisfy { (0.0...1.0).contains($0.location) })
+        XCTAssertTrue(tideFillStops([], x: { _ in 0 }, width: 100).isEmpty)
+        let one = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 1, phase: 0)])
+            .rates(from: Date(timeIntervalSince1970: 0), to: Date(timeIntervalSince1970: 3600))
+        XCTAssertTrue(tideFillStops(one, x: { _ in 0 }, width: 0).isEmpty)
     }
 }

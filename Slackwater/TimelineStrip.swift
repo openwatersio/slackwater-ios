@@ -90,12 +90,32 @@ enum Timeline {
     /// anchors and clamped at both ends. Above the ceiling everything is the
     /// top colour — "beyond the top of the scale" is not a distinction worth
     /// resolving.
-    static func rampT(forSpeedKn kn: Double) -> Double {
-        let a = speedRampAnchorsKn
+    static func rampT(forSpeedKn kn: Double) -> Double { rampT(kn, anchors: speedRampAnchorsKn) }
+
+    /// The absolute domain of the tide track's rate-of-rise ramp (#95), spaced
+    /// equally, in metres/hour — the same move as `speedRampAnchorsKn`:
+    /// capability anchors, hard-coded, never derived from on-device stations.
+    ///
+    ///   0.15 m/hr (≈0.5 ft/hr) — standing water; a neap harbour tide
+    ///    0.6 m/hr (≈2 ft/hr)   — an ordinary coastal mid-tide
+    ///    1.5 m/hr (≈5 ft/hr)   — an inch a minute; a flat floods faster than
+    ///                            the walk back off it
+    ///    3.6 m/hr (≈12 ft/hr)  — the Severn/Fundy regime (Avonmouth peaks 13.7)
+    ///
+    /// tools/ramp-domain.mjs across the 2,765 bundled stations: p50 1.50,
+    /// p90 4.59, p99 8.13, max 13.89 ft/hr. This domain lands the median at
+    /// 22% of the ramp and p90 at 63% — the same spine the speed ramp keeps
+    /// (23%/56%). The middle two are estimates and want a source, the same
+    /// flag the speed anchors carry.
+    static let tideRateAnchorsMHr: [Double] = [0.15, 0.6, 1.5, 3.6]
+
+    static func rampT(forRateMHr rate: Double) -> Double { rampT(rate, anchors: tideRateAnchorsMHr) }
+
+    private static func rampT(_ v: Double, anchors a: [Double]) -> Double {
         let step = 1.0 / Double(a.count - 1)
-        if kn <= a[0] { return 0 }
-        for i in 0..<(a.count - 1) where kn <= a[i + 1] {
-            return (Double(i) + (kn - a[i]) / (a[i + 1] - a[i])) * step
+        if v <= a[0] { return 0 }
+        for i in 0..<(a.count - 1) where v <= a[i + 1] {
+            return (Double(i) + (v - a[i]) / (a[i + 1] - a[i])) * step
         }
         return 1
     }
@@ -256,6 +276,26 @@ func currentFillStops(_ points: [CurrentPoint], x: (Date) -> CGFloat,
         : stops
 }
 
+/// The tide track's area fill: one stop per sample, coloured by the ABSOLUTE
+/// rate of rise |dh/dt| in m/hr (#95). Same encoding and same pure-function
+/// reasoning as `currentFillStops`. No schematic case — a tide series reaches
+/// the strip only from real constituents (a CHS station renders once fitted).
+/// Peak rate falls at mid-tide, so the fill runs hot between the extreme dots
+/// and goes dark at the turns where their tints live — complementary channels.
+func tideFillStops(_ rates: [TideRatePoint], x: (Date) -> CGFloat,
+                   width: CGFloat) -> [Gradient.Stop] {
+    guard width > 0, !rates.isEmpty else { return [] }
+    let alpha = 0.9
+    let stops = rates.map { p in
+        Gradient.Stop(
+            color: SN.speedColour(Timeline.rampT(forRateMHr: abs(p.rate))).opacity(alpha),
+            location: min(max(x(p.time) / width, 0), 1))
+    }
+    return stops.count == 1
+        ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)]
+        : stops
+}
+
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     guard points.count > 1 else { return [] }
     var events: [CurrentEvent] = []
@@ -326,6 +366,7 @@ struct TimelineData {
     let end: Date            // anchor + 180h
     let days: [TimelineDay]  // offsets -3…8 (the ends are DST/moon slack, see dayChrome)
     let tidePoints: [TidePoint]        // empty when current-only
+    let tideRates: [TideRatePoint]     // index-aligned with tidePoints (#95)
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
     let currentEvents: [CurrentEvent]
@@ -516,7 +557,7 @@ struct TimelineData {
 
         return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
                             start: start, end: end, days: chrome.days,
-                            tidePoints: [], tideExtremes: [],
+                            tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows)
     }
@@ -532,10 +573,12 @@ struct TimelineData {
 
         let pad = eventPad
         var tidePoints: [TidePoint] = []
+        var tideRates: [TideRatePoint] = []
         var tideExtremes: [TideExtreme] = []
         if let tide {
             let s = tide.engineStation
             tidePoints = s.heights(from: start, to: end, step: 600)
+            tideRates = s.rates(from: start, to: end, step: 600)
             tideExtremes = s.extremes(from: start.addingTimeInterval(-pad),
                                       to: end.addingTimeInterval(pad))
         }
@@ -576,7 +619,7 @@ struct TimelineData {
             .sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
-                            tidePoints: tidePoints, tideExtremes: tideExtremes,
+                            tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows,
                             speedsAreSchematic: gate != nil)
@@ -861,11 +904,17 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: data.totalWidth, y: geo.tideBottom))
         area.addLine(to: CGPoint(x: 0, y: geo.tideBottom))
         area.closeSubpath()
-        ctx.fill(area, with: .linearGradient(
-            Gradient(stops: [.init(color: Color(hex: 0x9CC0DC, opacity: 0.7), location: 0),
-                             .init(color: Color(hex: 0x0D3A5C, opacity: 0.12), location: 1)]),
-            startPoint: CGPoint(x: 0, y: geo.tideTop),
-            endPoint: CGPoint(x: 0, y: geo.tideBottom)))
+        // Rate-of-rise ramp (#95): the fill's colour carries |dh/dt| on the
+        // absolute tide-rate domain, replacing a fixed decorative gradient
+        // that was constant at every station and every phase. Horizontal, in
+        // full-strip coordinates — same tiling contract as the current fill.
+        let fillStops = tideFillStops(data.tideRates, x: data.x, width: data.totalWidth)
+        if !fillStops.isEmpty {
+            ctx.fill(area, with: .linearGradient(
+                Gradient(stops: fillStops),
+                startPoint: CGPoint(x: 0, y: 0),
+                endPoint: CGPoint(x: data.totalWidth, y: 0)))
+        }
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
 
