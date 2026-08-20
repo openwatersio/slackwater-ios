@@ -299,6 +299,8 @@ struct OnlineGateDetailView: View {
         var text = net.online
             ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a month ahead."
             : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a month ahead."
+        // Deliberate: a disk read per body evaluation, but this only renders
+        // on the honesty path — re-pick into state if it ever shows in a trace.
         if let end = ChsModelStore.loadOnline(gate.id)?.blocks.last?.end {
             text += " Last fetch covered to \(monthDay(end, tz))."
         }
