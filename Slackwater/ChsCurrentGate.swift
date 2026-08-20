@@ -108,7 +108,7 @@ extension ChsModelStore {
     @discardableResult
     static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
         let today = todayLocal(TimeZone(identifier: window.timezone) ?? .current)
-        let cut = min(Timeline.window(anchor: today, today: today).start, window.start)
+        let cut = min(Timeline.window(anchor: today).start, window.start)
         let merged = loadOnline(window.stationID)?.merging(window, prunedBefore: cut) ?? window
         try save(merged, id: window.stationID, suffix: "-online")
         return merged
@@ -141,7 +141,7 @@ struct ChsOnlineWindow: Codable {
     /// gate identity.
     let timezone: String
     let fetchedAt: Date
-    let start: Date            // Timeline.window(anchor:today:).start at fetch, pruned forward
+    let start: Date            // Timeline.window(anchor:).start at fetch, pruned forward
     let end: Date              // anchor + Timeline.onlineFetchDays, clamped to the samples
     let floodDirection: Double // IWLS metadata at fetch time, kept local
     let ebbDirection: Double
@@ -154,11 +154,11 @@ struct ChsOnlineWindow: Codable {
 
     /// Does the stored window cover the FULL strip `Timeline` would build for
     /// `anchor`? The window is computed by `Timeline.window`, never re-derived
-    /// here — with a conditional back-pad, a second derivation drifts, and the
-    /// failure mode is this returning true for a window with a hole in it,
-    /// which renders as a strip with a dead zone.
-    func covers(anchor: Date, today: Date) -> Bool {
-        let need = Timeline.window(anchor: anchor, today: today)
+    /// here — a second derivation drifts, and the failure mode is this
+    /// returning true for a window with a hole in it, which renders as a
+    /// strip with a dead zone.
+    func covers(anchor: Date) -> Bool {
+        let need = Timeline.window(anchor: anchor)
         return start <= need.start && end >= need.end
     }
 

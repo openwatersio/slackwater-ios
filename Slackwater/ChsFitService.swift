@@ -557,7 +557,7 @@ final class ChsFitService: ObservableObject {
 
 extension ChsFitService {
     /// The span one fetch covers: `Timeline.window`'s start for the anchor —
-    /// back-padded only when the anchor IS today, never re-derived here — and
+    /// back-padded like every window (#67 item 1), never re-derived here — and
     /// `Timeline.onlineFetchDays` forward of it, four strips' worth, so ordinary
     /// paging lands in cache instead of on the network.
     ///
@@ -566,7 +566,7 @@ extension ChsFitService {
     /// branch — the one a date picker will use — shipping unexercised.
     nonisolated static func onlineFetchSpan(anchor: Date?, today: Date) -> (start: Date, end: Date) {
         let from = anchor ?? today
-        return (Timeline.window(anchor: from, today: today).start,
+        return (Timeline.window(anchor: from).start,
                 from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
     }
 

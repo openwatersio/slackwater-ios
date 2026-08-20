@@ -495,11 +495,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     // negative and the strip opens on half a viewport of dead space
                     // before the curve starts — and the readout reads "12:00 AM",
                     // which looks like a boundary artefact rather than a reading.
-                    // Noon is 216pt in, past half a phone viewport, and it is the
-                    // middle of the day that was actually asked for: a full day's
-                    // curve either side of the centerline, sun up, the day's
-                    // extremes both in view.
-                    let week = Timeline.window(anchor: picked, today: timeline?.today ?? picked)
+                    // With the unconditional 48h back-pad, noon has 60h (1080pt) of
+                    // data behind it — no pane is that wide, so the park never
+                    // opens on dead space (#67 item 1).
+                    let week = Timeline.window(anchor: picked)
                     if scrubTime < week.start || scrubTime > week.end {
                         scrubTime = picked.addingTimeInterval(12 * 3600)
                     }

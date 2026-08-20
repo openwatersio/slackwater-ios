@@ -64,8 +64,9 @@ final class TimelineTests: XCTestCase {
         let d = TimelineData.build(tide: friday, current: nil, now: now, anchor: future)
         XCTAssertEqual(d.anchor, future)
         XCTAssertEqual(d.today, today, "today is the real day, not the anchor")
-        XCTAssertEqual(d.start, future, "no back-pad off the current week")
-        XCTAssertEqual(d.end.timeIntervalSince(d.start), 180 * 3600, accuracy: 3601)
+        XCTAssertEqual(d.start, future.addingTimeInterval(-Timeline.backHours * 3600),
+                       "the 48h back-pad is unconditional (#67 item 1)")
+        XCTAssertEqual(d.end.timeIntervalSince(d.start), (Timeline.backHours + 180) * 3600, accuracy: 3601)
         XCTAssert(d.tidePoints.allSatisfy { $0.time >= d.start && $0.time <= d.end })
     }
 
@@ -182,24 +183,23 @@ final class TimelineTests: XCTestCase {
         return cal.date(from: DateComponents(year: y, month: m, day: d))!
     }
 
-    /// The 48h look-back exists to answer "what did the water just do", which is a
-    /// question about NOW. On a Tuesday in September it is two days of the previous
-    /// week scrolled in behind you for no reason.
-    func testWindowBackPadOnlyOnTheCurrentWeek() {
+    /// #67 item 1: every window carries the 48h look-back — today's answers "what
+    /// did the water just do"; a picked week's puts data behind the noon park
+    /// (216pt in), which otherwise opens on dead space on any pane wider than
+    /// 432pt (UIScrollView clamps the negative centering offset). One
+    /// unconditional shape also deletes the anchor == today exact-equality trap
+    /// three comment blocks used to guard.
+    func testWindowBackPadIsUnconditional() {
         let today = vancouverMidnight(2026, 8, 11)
-
-        let current = Timeline.window(anchor: today, today: today)
+        let current = Timeline.window(anchor: today)
         XCTAssertEqual(current.start, today.addingTimeInterval(-48 * 3600))
         XCTAssertEqual(current.end, today.addingTimeInterval(180 * 3600))
 
         let future = vancouverMidnight(2026, 9, 14)
-        let ahead = Timeline.window(anchor: future, today: today)
-        XCTAssertEqual(ahead.start, future, "a future week starts clean at its own midnight")
+        let ahead = Timeline.window(anchor: future)
+        XCTAssertEqual(ahead.start, future.addingTimeInterval(-48 * 3600),
+                       "a picked week gets the same look-back as today's")
         XCTAssertEqual(ahead.end, future.addingTimeInterval(180 * 3600))
-
-        let past = vancouverMidnight(2026, 7, 6)
-        let behind = Timeline.window(anchor: past, today: today)
-        XCTAssertEqual(behind.start, past, "a past week gets no pad either")
     }
 
     /// The strip must stay WIDER than the list, or tapping the last schedule row
@@ -798,9 +798,8 @@ final class TimelineTests: XCTestCase {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let today = cal.startOfDay(for: now)
-        // The shared definition, not a second derivation of it — this test only
-        // passed by hand because `anchor == today` here.
-        let (start, end) = Timeline.window(anchor: today, today: today)
+        // The shared definition, not a second derivation of it.
+        let (start, end) = Timeline.window(anchor: today)
 
         // 15-min samples spanning the whole strip window, oscillating with a
         // ~12h period so slack/max events recur across it (real semidiurnal shape).

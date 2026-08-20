@@ -84,7 +84,7 @@ private func seedTideModel(stationID: String) {
 }
 
 /// UI-test hook (SlackwaterApp.init's `-seedOnlineWindow <id>`): writes a
-/// synthetic `ChsOnlineWindow` covering exactly `Timeline.window(anchor:today:)`'s
+/// synthetic `ChsOnlineWindow` covering exactly `Timeline.window(anchor:)`'s
 /// span for today — the same definition `ChsFitService.fetchOnlineWindow` uses
 /// for a real fetch (`covers`'s neighborhood, ChsCurrentGate.swift) — so
 /// `OnlineGateDetailView` reads it as
@@ -99,7 +99,7 @@ private func seedTideModel(stationID: String) {
 private func seedOnlineWindow(stationID: String) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
     let today = todayLocal(gate.tz)
-    let w = Timeline.window(anchor: today, today: today)
+    let w = Timeline.window(anchor: today)
     let start = w.start, end = w.end
     let period = 12.42 * 3600.0   // M2 tidal period, seconds
     let amplitude = 2.0           // kn
@@ -1551,12 +1551,8 @@ struct ChsCurrentGateCardView: View {
     /// carries the strip `onlineGateStatus` picks — never a queue status this
     /// gate can't be in.
     @ViewBuilder private var onlineCard: some View {
-        // ONE snapshot of today, not two calls: `Timeline.window` back-pads only
-        // when `anchor == today` by exact equality, so a local midnight landing
-        // between two evaluations would silently drop the 48h look-back and let
-        // `covers` pass on a window with a hole in it.
         let today = todayLocal(gate.tz)
-        if let onlineWindow, onlineWindow.covers(anchor: today, today: today) {
+        if let onlineWindow, onlineWindow.covers(anchor: today) {
             OnlineGateCardView(gate: gate, window: onlineWindow, km: km)
         } else {
             // Never fetched and fetched-but-run-out are different states, and
