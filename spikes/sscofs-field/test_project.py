@@ -1,6 +1,6 @@
 # test_project.py — run: uv run --with pytest,numpy pytest -q test_project.py
 import numpy as np
-from make_samples import project_signed_kn
+from make_samples import project_signed_kn, to_sample
 
 def test_pure_flood_is_positive():
     # flow toward 100° at 2 m/s, flood axis 100° → +2*1.94384 kn
@@ -14,3 +14,7 @@ def test_pure_ebb_is_negative():
 def test_cross_axis_is_zero():
     u = 3 * np.sin(np.radians(190)); v = 3 * np.cos(np.radians(190))
     assert abs(project_signed_kn(np.array([u]), np.array([v]), 100.0)[0]) < 1e-9
+
+def test_sample_export_is_epoch_ms():
+    # per chs-glue.js:4: {t: epoch-ms, v: metres}
+    assert to_sample(1e9, 1.5) == {"t": 1_000_000_000_000, "v": 1.5}
