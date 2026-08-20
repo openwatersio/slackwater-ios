@@ -48,6 +48,10 @@ def noaa_events(st, start, end):
                     "qualifier": kind, "value": abs(vel)})
     return out
 
+def to_sample(tt, vv):
+    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: metres})."""
+    return {"t": int(tt * 1000), "v": float(vv)}
+
 def main():
     els = json.load(open("mesh/elements.json"))["elements"]
     stations = json.load(open("truth/stations.json"))
@@ -84,7 +88,7 @@ def main():
                 signed = project_signed_kn(u[:, k], v[:, k], st["flood"])
                 good = np.isfinite(signed)
                 sp = f"samples/{st['slug']}-e{i}.json"
-                json.dump([{"t": float(tt), "v": float(vv)} for tt, vv in zip(t[good], signed[good])],
+                json.dump([to_sample(tt, vv) for tt, vv in zip(t[good], signed[good])],
                           open(sp, "w"))
                 index.append({"slug": st["slug"], "elem": int(i), "samples": sp, "events": ev_path,
                               "flood": st["flood"], "ebb": st["ebb"], "dist_m": round(d)})

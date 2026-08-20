@@ -15,7 +15,7 @@
 - **Corpus:** 60 days of hourly surface u/v ending at run date, nowcast files only, from `https://noaa-nos-ofs-pds.s3.amazonaws.com/sscofs/netcdf/YYYY/MM/DD/sscofs.tHHz.YYYYMMDD.fields.nNNN.nc`; per day use cycles {03,09,15,21} × files n001..n006 = 24 hourly steps. ~14 MB transferred per file (ranged reads), ~1,440 files, ~20 GB, ≥4 but ≤6 concurrent requests.
 - **Held-out validation window:** published events +28..+35 days after the fit epoch (the chs-currents-fit convention).
 - **Decision gates (spec §3):** certifiable sub-regions meet the bar; Dodd-class stations correctly FAIL; extrapolated bundle ≤ 40 MB. Any gate failing → spike concludes Plan B (grown patches only), and that is a *successful* spike outcome — record it, don't rescue it.
-- **fitTides input shape:** JSON array `[{"t":<epoch seconds>,"v":<signed knots>}]` (main.swift:232). **Events shape:** `[{"eventDate": ISO8601, "qualifier": "SLACK"|"EXTREMA_FLOOD"|"EXTREMA_EBB", "value": <kn, positive>}]` (main.swift:151, 200-209).
+- **fitTides input shape:** JSON array `[{"t":<epoch milliseconds>,"v":<signed knots>}]` (main.swift:232; corrected during execution: chs-glue.js:4 specifies epoch-ms). **Events shape:** `[{"eventDate": ISO8601, "qualifier": "SLACK"|"EXTREMA_FLOOD"|"EXTREMA_EBB", "value": <kn, positive>}]` (main.swift:151, 200-209).
 - Everything under `spikes/sscofs-field/`; no app-target code changes; FitValidation is the only tool modified.
 - SSCOFS units: u/v in m/s → knots ×1.94384. Direction convention: bearing the flow sets TOWARD, `dir = atan2(u, v)` in degrees true, normalized 0..360 — matching IWLS `wcdp1` so the harness projection `v·cos(dir−flood)` transfers unchanged.
 
@@ -264,7 +264,7 @@ git commit -m "spike(sscofs-field): truth-station table (CHS gates + NOAA type-H
 
 **Interfaces:**
 - Consumes: `mesh/elements.json`, `corpus/*.npz`, `truth/stations.json`.
-- Produces: per (station, element within 600 m): `samples/<slug>-e<i>.json` in the exact fitTides shape `[{"t": epochSec, "v": signedKn}]`; per station: `truth/<slug>-events.json` in the harness event shape `[{"eventDate", "qualifier", "value"}]` covering fit-end +28..+35 d. Also `samples/index.json`: `[{"slug", "elem", "samples", "events", "flood", "ebb", "dist_m"}...]` — the run matrix.
+- Produces: per (station, element within 600 m): `samples/<slug>-e<i>.json` in the exact fitTides shape `[{"t": epochMs, "v": signedKn}]` (epoch milliseconds per chs-glue.js:4); per station: `truth/<slug>-events.json` in the harness event shape `[{"eventDate", "qualifier", "value"}]` covering fit-end +28..+35 d. Also `samples/index.json`: `[{"slug", "elem", "samples", "events", "flood", "ebb", "dist_m"}...]` — the run matrix.
 
 - [ ] **Step 1: Write the projection unit test (pure function first)**
 
@@ -364,12 +364,16 @@ def main():
             signed = project_signed_kn(u[:, k], v[:, k], st["flood"])
             good = np.isfinite(signed)
             sp = f"samples/{st['slug']}-e{i}.json"
-            json.dump([{"t": float(tt), "v": float(vv)} for tt, vv in zip(t[good], signed[good])],
+            json.dump([to_sample(tt, vv) for tt, vv in zip(t[good], signed[good])],
                       open(sp, "w"))
             index.append({"slug": st["slug"], "elem": int(i), "samples": sp, "events": ev_path,
                           "flood": st["flood"], "ebb": st["ebb"], "dist_m": round(d)})
         print(f"{st['slug']}: {len(near)} elements, {len(events)} truth events")
     json.dump(index, open("samples/index.json", "w"), indent=1)
+
+def to_sample(tt, vv):
+    """Export fitTides sample: epoch-ms per chs-glue.js:4 contract ({t: epoch-ms, v: metres})."""
+    return {"t": int(tt * 1000), "v": float(vv)}
 
 if __name__ == "__main__":
     main()
