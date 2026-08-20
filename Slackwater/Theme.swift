@@ -463,6 +463,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         scrubCard(timeline)
                         scheduleCard(timeline)
                             .padding(.top, 14)
+                    } else {
+                        // #67 item 2: no timeline means the caller is showing its
+                        // honesty card below — but the bar (and its picker) need
+                        // no timeline, and without them that card is a dead end
+                        // with no way back to a covered week.
+                        WeekRangeBar(anchor: anchor, today: todayLocal(tz), tz: tz,
+                                     onTap: { showPicker = true })
+                            .background(SN.cardFill)
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 14)
                     }
                     bottom()
                         .padding(.top, 14)

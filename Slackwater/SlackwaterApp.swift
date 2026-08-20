@@ -45,6 +45,12 @@ struct SlackwaterApp: App {
             _ = ChsFitService.shared
             seedOnlineWindow(stationID: id)
         }
+        // -seedOnlineFarWindow <id>: same trap, same fix — a second, DISJOINT
+        // seeded block (#67 item 4) for the hermetic two-block UI proof.
+        if let id = UserDefaults.standard.string(forKey: "seedOnlineFarWindow") {
+            _ = ChsFitService.shared
+            seedOnlineFarWindow(stationID: id)
+        }
     }
 
     var body: some Scene {
@@ -97,10 +103,32 @@ private func seedTideModel(stationID: String) {
 /// files live in beside the fitted `.json`/`-current.json` ones
 /// (`ChsModelStore.onlineUrl`) — nothing extra to wipe there.
 private func seedOnlineWindow(stationID: String) {
+    seedOnline(stationID: stationID, offsetDays: nil, spanDays: nil)
+}
+
+/// UI-test hook (SlackwaterApp.init's `-seedOnlineFarWindow <id>`): like
+/// `seedOnlineWindow`, but a DISJOINT far block — [today+30d, today+85d],
+/// wide enough that "two months out, cell 10" in the picker always lands a
+/// whole strip inside it, and far enough that it can never merge with
+/// today's block. Written through `saveOnline` so the test exercises the
+/// real disjoint-save path (#67 item 4).
+private func seedOnlineFarWindow(stationID: String) {
+    seedOnline(stationID: stationID, offsetDays: 30, spanDays: 55)
+}
+
+/// nil offset = today's real window (`Timeline.window(anchor: today)`); an
+/// offset seeds [today+offset, today+offset+span] instead.
+private func seedOnline(stationID: String, offsetDays: Double?, spanDays: Double?) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
     let today = todayLocal(gate.tz)
-    let w = Timeline.window(anchor: today)
-    let start = w.start, end = w.end
+    let start: Date, end: Date
+    if let offsetDays, let spanDays {
+        start = today.addingTimeInterval(offsetDays * 86_400)
+        end = start.addingTimeInterval(spanDays * 86_400)
+    } else {
+        let w = Timeline.window(anchor: today)
+        start = w.start; end = w.end
+    }
     let period = 12.42 * 3600.0   // M2 tidal period, seconds
     let amplitude = 2.0           // kn
     var times: [Double] = []
