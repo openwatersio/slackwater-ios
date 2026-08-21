@@ -260,4 +260,4 @@ A(x,t).
    variant.
 7. **Dent + Beazley stay out** until someone chooses to fit them (§0) — the
    existing no-model rule decides this, but flagging since they're the two
-   named rapids users will ask about.
+   named rapids users will ask about. Tracked in #147.
