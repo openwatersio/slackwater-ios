@@ -56,6 +56,13 @@ that procedure sits on.
   Connect UI — records can't be created via the public API.
 - Export-only variant (signed .ipa, no upload): `build/exportOptions.plist` with
   `destination: export` — what the first proof run used.
+- **Fill bundle refit is a release-time decision, not a sync** (`fill-salish.bin`,
+  2026-08-21). Fitted constants do not expire; ship the committed bundle as-is
+  unless SSCOFS revises its mesh/model or new stations change certification.
+  Refit = re-run `tools/fill-pipeline/` end-to-end (README there; ~5 h fetch +
+  hours of compute + the size gate + re-pin the real golden in
+  `FillFieldTests`). The header JSON records corpus window + mesh hash — check
+  those before assuming a refit is needed.
 
 ## Test runs — fast by default, full before an upload (2026-08-01)
 
