@@ -83,7 +83,7 @@ person willing to do it was never going to pay.
 - **Entry point:** a single field on the **tier sheet** — "Have a code?" — not a first-run
   screen. A first-run code prompt is a nag wearing a different hat, and it would violate
   `widgets-premium-design.md` §5's closed list of surfaces.
-- **Prefill, so nobody types:** the share link `https://slackwater.sailingnaturali.com/r/<CODE>`
+- **Prefill, so nobody types:** the share link `https://<share-host>/r/<CODE>`
   is a **universal link**. App installed → opens the tier sheet with the code filled in. Not
   installed → App Store, and the tier sheet offers a **Paste code** button
   (`UIPasteControl`) next to the field. That button, not a silent read: since iOS 16 reading
@@ -113,7 +113,7 @@ If both signals fed the same counter, the farmable one would be the one that pay
   forget, non-blocking, retried at most once per launch until acknowledged, and it never
   gates anything in the UI: the referee's 3 months are granted locally whether or not the
   report lands (§6).
-- **Link opens (display only).** `slackwater.sailingnaturali.com/r/<CODE>` counts the hit and
+- **Link opens (display only).** The share host (§ infrastructure note) counts the hit at `/r/<CODE>` and
   redirects to the App Store. Shown to the referrer as "people who looked", useful for their
   own sense of whether sharing is working, and structurally incapable of unlocking a year.
   On Android/desktop the link resolves to the PWA, where the install *is* exact and the web
@@ -135,12 +135,20 @@ It is rejected for the same reason §3 rejects Branch and AppsFlyer — it is fi
 with our own name on it — and it would misfire exactly where our users are: several boats on
 one marina wifi, or a whole carrier behind CGNAT, share an address and would cross-attribute.
 
-**Infrastructure note:** `slackwater-web` is static on GitHub Pages with no backend, by
-design — it cannot count. The lazy fit is a **Cloudflare Worker + KV** on the `/r/*` route
-plus a redemption endpoint, since Cloudflare already holds the `sailingnaturali.com` zone.
-*Check before building:* the `slackwater` record must be proxied for a Worker route to
-intercept it; a DNS-only record will pass straight through to Pages. This Worker is the
-program's only server component and holds nothing but opaque code → two counts.
+**Infrastructure note — the host has to change.** `slackwater-web` is static on GitHub
+Pages with no backend, by design; it cannot count. The lazy fit is a **Cloudflare Worker +
+KV** serving `/r/*` and the redemption endpoint, holding nothing but opaque code → two
+counts. But a Worker route only intercepts a **proxied** record, and every
+`sailingnaturali.com` record is pinned to DNS-only because an orange cloud stops GitHub
+Pages provisioning its cert (`infrastructure/dns.md`). So the Worker **cannot** live on
+`slackwater.sailingnaturali.com`, which keeps serving the PWA.
+
+It goes on **`slackwater.xyz`** (registered 2026-08-21, Hover, not yet delegated to
+Cloudflare) — with the same trap one level down: if the landing page there is served by
+GitHub Pages it needs grey cloud too, and the Worker is blocked again. Either put the Worker
+on a proxied subdomain (`go.slackwater.xyz/r/<CODE>`) or serve the landing page from
+Cloudflare Pages and keep the apex proxied. Share links throughout this spec should be read
+as that host once it is picked.
 
 ## 8. Granting the reward
 
