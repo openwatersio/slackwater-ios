@@ -19,9 +19,13 @@
 // free — a cheap sanity signal, not a substitute for the driver's R².
 //
 // Parity gate: run parity_check.sh first. This filter refuses to process
-// stdin without data/.parity-ok present, unless FIT_BATCH_SKIP_PARITY=1
-// (set by parity_check.sh itself — it has to call this filter to prove
-// parity before the guard file can exist).
+// stdin unless data/.parity-ok's recorded sha256 of BOTH artifacts matches
+// what's on disk right now — existence alone isn't enough, since a
+// chs-bundle.js/chs-glue.js edit after the guard was written would
+// otherwise fit silently against a fitter the gate never actually checked.
+// FIT_BATCH_SKIP_PARITY=1 (set by parity_check.sh itself) bypasses this —
+// it has to call this filter to prove parity before the guard can exist.
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import vm from "node:vm";
@@ -32,12 +36,27 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RESOURCES = path.join(HERE, "../../Slackwater/Resources");
 const GUARD = path.join(HERE, "data/.parity-ok");
 
+function loadArtifact(name) {
+  const src = readFileSync(path.join(RESOURCES, name), "utf8");
+  const hash = createHash("sha256").update(src).digest("hex");
+  return { src, hash };
+}
+const bundle = loadArtifact("chs-bundle.js");
+const glue = loadArtifact("chs-glue.js");
+
 if (process.env.FIT_BATCH_SKIP_PARITY !== "1") {
+  let guard;
   try {
-    readFileSync(GUARD);
+    guard = JSON.parse(readFileSync(GUARD, "utf8"));
   } catch {
+    guard = null;
+  }
+  const stale =
+    !guard || guard["chs-bundle.js"] !== bundle.hash || guard["chs-glue.js"] !== glue.hash;
+  if (stale) {
     console.error(
-      "fit_batch.mjs: parity gate not proven — run tools/fill-pipeline/parity_check.sh first",
+      "fit_batch.mjs: parity gate not proven (or chs-bundle.js/chs-glue.js changed " +
+        "since it last ran) — re-run tools/fill-pipeline/parity_check.sh",
     );
     process.exit(1);
   }
@@ -45,22 +64,37 @@ if (process.env.FIT_BATCH_SKIP_PARITY !== "1") {
 
 const ctx = vm.createContext({ Date, Math, JSON });
 vm.runInContext("var console={log(){},warn(){},error(){},info(){},debug(){}};", ctx);
-vm.runInContext(readFileSync(path.join(RESOURCES, "chs-bundle.js"), "utf8"), ctx);
-vm.runInContext(readFileSync(path.join(RESOURCES, "chs-glue.js"), "utf8"), ctx);
+vm.runInContext(bundle.src, ctx);
+vm.runInContext(glue.src, ctx);
 
+// Per-line fault isolation: a 300k-element run WILL hit degenerate series
+// (dry cells with <2 samples, malformed input) and one bad line must not
+// take the whole batch down. Failures report as {elem,axis,error} on stdout
+// (same stream as successes — the driver counts them per-elem) rather than
+// crashing the process; elem/axis fall back to null if the line's JSON
+// itself didn't parse.
 const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
 rl.on("line", (line) => {
   if (!line.trim()) return;
-  const { elem, axis, samples } = JSON.parse(line);
-  ctx.__s = JSON.stringify(samples);
-  const fit = JSON.parse(vm.runInContext("fitTides(__s)", ctx));
-  process.stdout.write(
-    JSON.stringify({
-      elem,
-      axis,
-      constituents: fit.constituents,
-      offset: fit.offset,
-      rms: fit.rms,
-    }) + "\n",
-  );
+  let elem = null;
+  let axis = null;
+  try {
+    const parsed = JSON.parse(line);
+    ({ elem, axis } = parsed);
+    ctx.__s = JSON.stringify(parsed.samples);
+    const fit = JSON.parse(vm.runInContext("fitTides(__s)", ctx));
+    process.stdout.write(
+      JSON.stringify({
+        elem,
+        axis,
+        constituents: fit.constituents,
+        offset: fit.offset,
+        rms: fit.rms,
+      }) + "\n",
+    );
+  } catch (err) {
+    process.stdout.write(
+      JSON.stringify({ elem, axis, error: `${err.constructor.name}: ${err.message}` }) + "\n",
+    );
+  }
 });
