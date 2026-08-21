@@ -3,17 +3,20 @@
 # shipping chs-bundle.js/chs-glue.js) reproduces a real FitValidation fit
 # (run in JSCore via tools/FitValidation, Swift) on the exact same sample
 # bytes. Wire this as the first line of any real batch invocation — the
-# guard file it writes on success is what fit_batch.mjs checks for.
+# guard file it writes on success (sha256 of both artifacts, not just an
+# existence marker — a chs-bundle.js/chs-glue.js edit after the fact must
+# re-fail the gate) is what fit_batch.mjs checks for.
 #
 # NOT literal byte-identity. spikes/chs-currents-fit/README.md's own M47
 # finding #4 measured amplitude diffs up to ~9e-16 between node and JSCore on
 # identical samples ("machine epsilon (FP reassociation between engines) ...
 # physically nil") — re-checking empirically against these cached fits
-# reproduces the same ~1e-15 order noise, not zero. So this gate tolerates
-# < 1e-9 absolute difference per number — 6+ orders of magnitude above the
-# measured engine noise, 8+ below anything a downstream R²/floor decision
-# would ever see — and still fails hard past that, with the failing values
-# printed.
+# reproduces the same order of noise (worst measured here: ~6e-13), not
+# zero. So this gate tolerates < 1e-9 absolute difference per number —
+# roughly 3 orders of magnitude above the ~6e-13 measured here, and still
+# far below any amplitude/phase difference that would flip a downstream
+# R²/floor decision — and still fails hard past that, with the failing
+# values printed.
 #
 # Usage: parity_check.sh [samples-file] [fit-file]
 #   Defaults to the first cached pair under /tmp/fit-validation/reports/ (the
@@ -45,6 +48,7 @@ NODE_OUT=$(echo "$LINE" | FIT_BATCH_SKIP_PARITY=1 node fit_batch.mjs)
 
 node -e '
 const node = JSON.parse(process.argv[1]);
+if (node.error) { console.error(`fit_batch.mjs errored on the parity sample itself: ${node.error}`); process.exit(1); }
 const jscore = JSON.parse(require("fs").readFileSync(process.argv[2], "utf8"));
 const TOL = 1e-9;
 let worst = 0;
@@ -78,5 +82,13 @@ console.log("PARITY OK");
 ' "$NODE_OUT" "$FIT"
 
 mkdir -p data
-touch data/.parity-ok
-echo "parity_check.sh: wrote data/.parity-ok"
+node -e '
+const { createHash } = require("crypto");
+const { readFileSync, writeFileSync } = require("fs");
+const hash = (p) => createHash("sha256").update(readFileSync(p, "utf8")).digest("hex");
+writeFileSync("data/.parity-ok", JSON.stringify({
+  "chs-bundle.js": hash("../../Slackwater/Resources/chs-bundle.js"),
+  "chs-glue.js": hash("../../Slackwater/Resources/chs-glue.js"),
+}, null, 2) + "\n");
+'
+echo "parity_check.sh: wrote data/.parity-ok (sha256 of both artifacts)"
