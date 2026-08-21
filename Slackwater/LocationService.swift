@@ -109,12 +109,6 @@ extension LocationService {
 
 // MARK: - Distance + coordinate formatting (prototype NearMe.dc.html semantics)
 
-/// Great-circle distance in kilometres (the labelled spelling; forwards to
-/// the positional one in ChsFitService.swift).
-func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
-    distanceKm(lat1, lon1, lat2, lon2)
-}
-
 /// "1.2 nm" / "14 nm" — the prototype's fmtDist.
 func formatNm(_ km: Double) -> String {
     let nm = km / 1.852

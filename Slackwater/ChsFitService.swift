@@ -859,10 +859,89 @@ final class ChsFitter {
     }
 }
 
-// MARK: - Geo
+extension CurrentStationRecord {
+    /// The paired reference tide port: a bundled NOAA record, or — for a CHS
+    /// gate — the reference port's on-device fitted record (pending ports pair
+    /// once their fit lands; until then the gate renders current-only).
+    @MainActor var pairedTide: TideStationRecord? {
+        tideReference.flatMap { rid in
+            if let bundled = TideStationRecord.all.first(where: { $0.id == rid }) { return bundled }
+            if case .fitted(let record) = ChsFitService.shared.state(rid) { return record }
+            return nil
+        }
+    }
+}
 
-/// Great-circle distance in kilometres.
-func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
-    CLLocation(latitude: lat1, longitude: lon1)
-        .distance(from: CLLocation(latitude: lat2, longitude: lon2)) / 1000
+extension ChsModelStore {
+    /// UI-test hook: `-chsResetModels` wipes the store for a clean first run —
+    /// including the fetched chunks, or "first run" would silently be a resume.
+    static func resetIfRequested() {
+        guard CommandLine.arguments.contains("-chsResetModels") else { return }
+        try? FileManager.default.removeItem(at: dir)
+        try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+    }
+
+    /// The prune cut is bounded backward retention (#67 item 6): blocks age out
+    /// at the first save after they fall behind today − onlineRetentionDays. The
+    /// min(_, window.start) guard is unchanged from the single-window days — the
+    /// cut never discards data the incoming fetch itself covers, or a picked old
+    /// week would be deleted by its own save and refetch forever.
+    ///
+    // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
+    // someone who pages a year out accumulates ~1MB on a gate they evidently
+    // care about, and -chsResetModels already clears it. Add a cap when a real
+    // file gets big.
+    @discardableResult
+    static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
+        let tz = TimeZone(identifier: window.timezone) ?? .current
+        let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
+                      window.start)
+        let store = (loadOnline(window.stationID)
+                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
+            .inserting(window, prunedBefore: cut)
+        try save(store, id: window.stationID, suffix: "-online")
+        return store.block(spanning: window) ?? window
+    }
+}
+
+extension ChsOnlineWindow {
+    /// Does the stored window cover the FULL strip `Timeline` would build for
+    /// `anchor`? The window is computed by `Timeline.window`, never re-derived
+    /// here — a second derivation drifts, and the failure mode is this
+    /// returning true for a window with a hole in it, which renders as a
+    /// strip with a dead zone.
+    func covers(anchor: Date) -> Bool {
+        let need = Timeline.window(anchor: anchor)
+        return start <= need.start && end >= need.end
+    }
+
+    /// The list/search card's reading: nearest 15-min sample to `now` (a card
+    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
+    /// interpolating the drawn curve earns its keep), and the next event from
+    /// the same fetched series `sampleEvents` scans — the same shape
+    /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
+    /// card rendering doesn't need to know which kind of gate it's reading.
+    func cardState(at now: Date) -> CurrentCardState {
+        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
+        let next = sampleEvents(points).first { $0.time > now }
+        return CurrentCardState(signed: signed, next: next)
+    }
+}
+
+extension ChsOnlineStore {
+    /// The one block covering `anchor`'s whole strip, or nil — never a stitch
+    /// across a gap.
+    func block(covering anchor: Date) -> ChsOnlineWindow? {
+        blocks.first { $0.covers(anchor: anchor) }
+    }
+}
+
+extension ChsCurrentGateInfo {
+    /// Offline, "stay connected" is advice you can't act on — say what's true
+    /// instead, without implying a wait in progress.
+    func provisionalExpectation(online: Bool) -> String {
+        online
+            ? "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
+            : "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full \(Int(fitDays))-day model — nothing to tap."
+    }
 }

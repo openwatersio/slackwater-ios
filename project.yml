@@ -24,6 +24,8 @@ targets:
         product: TideEngine
       - package: MapLibre
         product: MapLibre
+      - target: SlackwaterWidgets
+        embed: true
     info:
       path: Slackwater/Info.plist
       properties:
@@ -77,6 +79,38 @@ targets:
           # exist locally; the profile embeds only this one (docs/testflight.md)
           CODE_SIGN_IDENTITY: "02FBDB9A5D2DB409A4331349069A8C8B09D73069"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater App Store"
+  SlackwaterWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - SlackwaterWidgets
+      - path: Slackwater/Resources
+      - Slackwater/AppGroup.swift
+      - Slackwater/SlackWindow.swift
+      - Slackwater/WidgetStationLoader.swift
+      - Slackwater/WidgetSnapshot.swift
+      - Slackwater/TideStation.swift
+      - Slackwater/CurrentStation.swift
+      - Slackwater/ChsStation.swift
+      - Slackwater/ChsGate.swift
+      - Slackwater/ChsCurrentGate.swift
+    dependencies:
+      - package: TideEngine
+        product: TideEngine
+    info:
+      path: SlackwaterWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Slackwater
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater.widgets
+        CODE_SIGN_ENTITLEMENTS: SlackwaterWidgets/SlackwaterWidgets.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: R3H8DPTV9C
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
   SlackwaterTests:
     type: bundle.unit-test
     platform: iOS
