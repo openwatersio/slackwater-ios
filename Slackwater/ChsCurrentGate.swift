@@ -89,28 +89,6 @@ extension ChsModelStore {
         guard let legacy: ChsOnlineWindow = load(stationID, suffix: "-online") else { return nil }
         return ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
     }
-
-    /// The prune cut is bounded backward retention (#67 item 6): blocks age out
-    /// at the first save after they fall behind today − onlineRetentionDays. The
-    /// min(_, window.start) guard is unchanged from the single-window days — the
-    /// cut never discards data the incoming fetch itself covers, or a picked old
-    /// week would be deleted by its own save and refetch forever.
-    ///
-    // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
-    // someone who pages a year out accumulates ~1MB on a gate they evidently
-    // care about, and -chsResetModels already clears it. Add a cap when a real
-    // file gets big.
-    @discardableResult
-    static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
-        let tz = TimeZone(identifier: window.timezone) ?? .current
-        let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
-                      window.start)
-        let store = (loadOnline(window.stationID)
-                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
-            .inserting(window, prunedBefore: cut)
-        try save(store, id: window.stationID, suffix: "-online")
-        return store.block(spanning: window) ?? window
-    }
 }
 
 /// Where the next speculative fetch starts: the local midnight at the stored
@@ -148,16 +126,6 @@ struct ChsOnlineWindow: Codable {
 
     var points: [CurrentPoint] {
         zip(times, speeds).map { CurrentPoint(time: Date(timeIntervalSince1970: $0), speed: $1) }
-    }
-
-    /// Does the stored window cover the FULL strip `Timeline` would build for
-    /// `anchor`? The window is computed by `Timeline.window`, never re-derived
-    /// here — a second derivation drifts, and the failure mode is this
-    /// returning true for a window with a hole in it, which renders as a
-    /// strip with a dead zone.
-    func covers(anchor: Date) -> Bool {
-        let need = Timeline.window(anchor: anchor)
-        return start <= need.start && end >= need.end
     }
 
     /// IWLS's last returned sample routinely lands one 15-min interval short of
@@ -212,18 +180,6 @@ struct ChsOnlineWindow: Codable {
                                floodDirection: floodDirection, ebbDirection: ebbDirection,
                                times: kept.map { $0.0 }, speeds: kept.map { $0.1 })
     }
-
-    /// The list/search card's reading: nearest 15-min sample to `now` (a card
-    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
-    /// interpolating the drawn curve earns its keep), and the next event from
-    /// the same fetched series `sampleEvents` scans — the same shape
-    /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
-    /// card rendering doesn't need to know which kind of gate it's reading.
-    func cardState(at now: Date) -> CurrentCardState {
-        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
-        let next = sampleEvents(points).first { $0.time > now }
-        return CurrentCardState(signed: signed, next: next)
-    }
 }
 
 /// The on-disk shape for an online gate (#67 item 4): DISJOINT fetched
@@ -237,12 +193,6 @@ struct ChsOnlineStore: Codable {
     var schemaVersion = 2
     let stationID: String
     let blocks: [ChsOnlineWindow]
-
-    /// The one block covering `anchor`'s whole strip, or nil — never a stitch
-    /// across a gap.
-    func block(covering anchor: Date) -> ChsOnlineWindow? {
-        blocks.first { $0.covers(anchor: anchor) }
-    }
 
     /// The block whose span contains `window`'s — what `saveOnline` returns:
     /// the caller's copy must never be narrower than the disk's.
@@ -288,14 +238,6 @@ extension ChsCurrentGateInfo {
 
     var provisionalHeadline: String {
         "Fitted from the last \(Int(Self.provisionalDays)) days — slack at \(name) can be off by up to ~\(provisionalSlackMinutes ?? 0) min."
-    }
-
-    /// Offline, "stay connected" is advice you can't act on — say what's true
-    /// instead, without implying a wait in progress.
-    func provisionalExpectation(online: Bool) -> String {
-        online
-            ? "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
-            : "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full \(Int(fitDays))-day model — nothing to tap."
     }
 
     /// Is this stored model the fast answer rather than the full model?

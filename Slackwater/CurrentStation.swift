@@ -2,11 +2,26 @@
 // data, the same file slackwater-web ships as currents.json, enriched with
 // resolved names/regions/aliases from @sailingnaturali/station-corrections —
 // harmonic stations only, primary bin, exactly the web's bundle).
+import CoreLocation
 import Foundation
 import TideEngine
 
 /// Below this magnitude the water reads "Slack", not a direction (web chs/current.ts SLACK_KN).
 let slackKn = 0.15
+
+// MARK: - Geo
+
+/// Great-circle distance in kilometres.
+func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+    CLLocation(latitude: lat1, longitude: lon1)
+        .distance(from: CLLocation(latitude: lat2, longitude: lon2)) / 1000
+}
+
+/// Great-circle distance in kilometres (the labelled spelling; forwards to
+/// the positional one above).
+func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+    distanceKm(lat1, lon1, lat2, lon2)
+}
 
 // MARK: - Shared station identity
 
@@ -61,17 +76,6 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// against station-corrections v2.5.0; absent = current-only fallback).
     let tideReference: String?
     let constituents: [Con]
-
-    /// The paired reference tide port: a bundled NOAA record, or — for a CHS
-    /// gate — the reference port's on-device fitted record (pending ports pair
-    /// once their fit lands; until then the gate renders current-only).
-    @MainActor var pairedTide: TideStationRecord? {
-        tideReference.flatMap { rid in
-            if let bundled = TideStationRecord.all.first(where: { $0.id == rid }) { return bundled }
-            if case .fitted(let record) = ChsFitService.shared.state(rid) { return record }
-            return nil
-        }
-    }
 
     var engineStation: CurrentStation {
         CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
