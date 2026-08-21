@@ -208,3 +208,75 @@ verified, not just quoted" snippet above needs to re-run the spike (`fetch_corpu
 `make_samples.py` → `run_matrix.sh` → `report.py`) to regenerate them first.
 
 > **Postscript (2026-08-20, after close):** the open question was ruled — **speed-only fill approved** with a no-green-ramp guardrail; see the spec status block and #99.
+
+## Prerequisites executed (2026-08-20)
+
+The owner ruling's two prerequisites (spec §4a certification rule, §10 pruning method) have
+both been run against this spike's real 60-day box data. Both PASS. Numbers below are
+independently reproducible — neither script recomputes anything from a cached summary.
+
+### Certification geometry (§4a)
+
+`./certify.py` grades the 54 scoreable stations from `results/*.json` (see "Results" above),
+then classifies every one of the box's 73,550 mesh elements by nearest-scoreable-station
+distance. Station verdicts: **40 PASS / 13 FAIL / 1 UNSCOREABLE** (`cherry-point` — no
+published extremum above the 0.75 kn significance floor at any nearby element, so it grades
+nothing, per spec). At the spec's default D = 3 km:
+
+| status | elements | % of box |
+|---|---|---|
+| certified (yes) | 22,681 | 30.8% |
+| masked (nearest station FAILED) | 4,336 | 5.9% |
+| no-data (no scoreable station within D) | 46,533 | 63.3% |
+
+Sensitivity (same station verdicts, D varied): **18.1% certified @ 2 km, 30.8% @ 3 km, 45.5%
+@ 5 km.**
+
+Artifacts (gitignored, regenerate with `./certify.py`): `certified/certified.json`,
+`certified/certified.geojson`, `certified/CERTIFY.md`.
+
+### Bundle-pruning proof (§10) — PASS
+
+`./prune_proof.py` fits every box element with vectorized numpy-lstsq sizing fits (23-name
+shipping basis, not `chs-glue`'s `fitTides` — that label is kept on every line of its output
+report on purpose), applies the R² ≥ 0.8 tidal floor and the per-element energy floor, then
+extrapolates the surviving elements' measured size to the full render region, capped at the
+SSCOFS mesh's own element count (433,410 — the earlier density-only extrapolation in this
+README's "Results" section overshot that cap and was called out in review).
+
+At D = 3 km / R² ≥ 0.8 (the spec defaults): 6,319 of the 22,681 certified elements survive
+the R² floor — **1.40 MB measured in-box**, extrapolating to **13.25 MB** for the render
+region. **PASS against the 40 MB budget**, and PASS at all six D × R² sensitivity
+combinations run (D = 2/3/5 km, R² = 0.7/0.8/0.9): range 5.27–19.72 MB, every one well under
+40 MB.
+
+Artifact (gitignored, regenerate with `./prune_proof.py`): `certified/PRUNING.md`.
+
+### Owner-visible yield facts
+
+Two things a PASS verdict doesn't say on its own, and that need to be plain before anyone
+scopes the fill render layer:
+
+1. **Only 27.9% of D = 3 km-certified elements clear the R² ≥ 0.8 floor.** The painted fill
+   ends up covering **≈8.6% of box water** (6,319 of 73,550 elements) — sparse, honest, and
+   concentrated where the tide actually dominates the signal. Most of the box is either
+   uncertified (no nearby scoreable station), masked (nearest station failed), or certified
+   but too weakly tidal to paint.
+2. **The energy floor barely prunes on real data.** Surviving elements keep a mean of
+   21.3 of 23 possible constituents — the 2%-of-max-amplitude floor is mostly catching noise,
+   not trimming a fat basis. That's the conservative direction for a size estimate (it means
+   13.25 MB is close to what a real shipping fit would cost, not an optimistic floor), but it
+   means constituent-count pruning isn't where the bundle's headroom under 40 MB comes from —
+   region certification is.
+
+### What remains before a fill pixel ships (Phase B engineering — pointers, not plans)
+
+- **Real fits via the shipping fitter** (`chs-glue`'s `fitTides`, not this proof's sizing
+  fits) for the elements that survive both certification and the R² floor.
+- **Mask + bundle shipping format** — this spike proved the size and geometry, not the
+  on-disk/on-wire format the app will actually ship and load.
+- **The fill render layer** — #57's channel-2 sibling seam (particle layer ships separately;
+  this is the backdrop-colour channel it composites under).
+- **No green in the ramp** — the spec status block's guardrail is the render layer's
+  responsibility to enforce, not this spike's; nothing here checks it because nothing here
+  renders.

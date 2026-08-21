@@ -9,7 +9,15 @@ throat failures stay governed by grown patches; the ±25 min phase skill is a
 documented staleness caveat; stations/patches remain the sole authority on slack
 timing and transitability; and **the fill ramp never contains green** — "transitable
 now" stays exclusively a per-gate signal, so the backdrop physically cannot say "go".
-Speed-only certification rule (§4a) and bundle-pruning method (§10) specified; execution in progress.
+**Both prerequisites executed 2026-08-20 against the spike's real 60-day box data — both
+PASS.** Certification geometry (§4a): 40 PASS / 13 FAIL / 1 UNSCOREABLE stations; 30.8% of
+box elements certified at D = 3 km (18.1% @ 2 km, 45.5% @ 5 km). Bundle-pruning proof (§10):
+13.25 MB extrapolated render-region bundle at D = 3 km / R² ≥ 0.8, against the 40 MB budget
+(5.27–19.72 MB across all six D×R² sensitivity combos run). One yield fact worth keeping in
+view: only 27.9% of D = 3 km-certified elements clear the R² floor, so the painted fill covers
+≈8.6% of box water — sparse and honest, not a shortfall. Full numbers, reproduce commands, and
+what remains before a fill pixel ships: `spikes/sscofs-field/README.md`'s "Prerequisites
+executed" section.
 **Scope:** the data architecture that turns Slackwater's point predictions into a
 renderable current *field*. Rendering itself stays with #57's particle layer — this
 spec decides what feeds it, not what it draws.
