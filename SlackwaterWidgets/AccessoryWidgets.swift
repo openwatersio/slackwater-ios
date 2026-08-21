@@ -21,7 +21,7 @@ struct SlackInlineWidget: Widget {
             if !entry.premium { Locked() }
             else if let s = entry.snapshot, let next = s.next {
                 // e.g. "Slack 14:32 · Race Passage"
-                Text("\(next.label) \(next.time.formatted(.dateTime.hour().minute())) · \(s.stationName)")
+                (Text(next.label + " ") + Text(next.time, style: .time) + Text(" · " + s.stationName))
                     .environment(\.timeZone, s.tz)
             } else { Text("Open Slackwater") }
         }
@@ -70,7 +70,7 @@ struct SlackRectangularWidget: Widget {
                     }
                     .font(.caption)
                     if let w = s.window {
-                        Text("window \(w.start.formatted(.dateTime.hour().minute()))–\(w.end.formatted(.dateTime.hour().minute()))")
+                        (Text("window ") + Text(w.start, style: .time) + Text("–") + Text(w.end, style: .time))
                             .font(.caption2).foregroundStyle(.secondary)
                             .environment(\.timeZone, s.tz)
                     }
