@@ -1,0 +1,51 @@
+{
+  "identifier" : "6D31BE8A-0000-4000-8000-5A6C6B770001",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "24.99",
+      "familyShareable" : false,
+      "internalID" : "6D31BE8A-0000-4000-8000-5A6C6B770002",
+      "localizations" : [
+        {
+          "description" : "The lock screen, forever — and a thank-you.",
+          "displayName" : "Premium Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "org.openwaters.slackwater.premium.lifetime",
+      "referenceName" : "Premium Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : { "_failTransactionsEnabled" : false },
+  "subscriptionGroups" : [
+    {
+      "id" : "6D31BE8A-0000-4000-8000-5A6C6B770003",
+      "localizations" : [],
+      "name" : "Slackwater Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "displayPrice" : "5.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6D31BE8A-0000-4000-8000-5A6C6B770004",
+          "localizations" : [
+            {
+              "description" : "The lock screen — and it funds development.",
+              "displayName" : "Premium Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "org.openwaters.slackwater.premium.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Premium Yearly",
+          "subscriptionGroupID" : "6D31BE8A-0000-4000-8000-5A6C6B770003",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : { "major" : 4, "minor" : 0 }
+}
