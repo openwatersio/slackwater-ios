@@ -115,8 +115,21 @@ If both signals fed the same counter, the farmable one would be the one that pay
   report lands (§6).
 - **Link opens (display only).** `go.slackwater.xyz/r/<CODE>` counts the hit and redirects to the App Store. Shown to the referrer as "people who looked", useful for their
   own sense of whether sharing is working, and structurally incapable of unlocking a year.
-  On Android/desktop the link resolves to the PWA, where the install *is* exact and the web
-  app reports its own redemption the same way.
+  On Android/desktop the link resolves to the web client, and those opens are counted here
+  too — but only as opens. See the asymmetry below.
+
+**The web half is opens-only, by construction.** The web client is a demo and cannot be the
+paid surface: charging on the web requires accounts, and this product is account-free from
+the entitlement down (`slackwater/docs/superpowers/specs/2026-07-20-web-client-design.md`).
+So there is nothing on the web to grant a referee, no reason for a web visitor to type a
+code, and no redemption for the web to report. Both rewards — the referee's 3 months and the
+referrer's year — are **iOS-only**. A shared link that lands someone on the web client is a
+real win for reach and contributes nothing to anyone's five.
+
+This inverts an earlier reading of the same fact: web installs are *observable* where iOS
+installs are not, which made them look like the precise half of the count. They are precise
+and irrelevant. The countable event is a redemption, and redemptions only exist where there
+is something to redeem.
 
 **What the report contains:** the redeemed code and nothing else. No device identifier, no
 IP retention, no user identity — there is no account to attach one to.
