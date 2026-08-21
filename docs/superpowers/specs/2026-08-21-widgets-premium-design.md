@@ -120,9 +120,9 @@ scattered through Settings.
 1. **Seller entity / revenue split** — the collaboration plan requires the Open Waters
    seller/revenue agreement before any paid tier ships. Spec and code can proceed; the
    App Store submission of the paid tier cannot.
-2. **ASO copy** — drafted first description line says "no subscription"; with a yearly SKU
-   that must be rewritten ("free core forever, no account, no ads" still true).
-   `docs/appstore-metadata.md` is Bryan's file; flagged, not edited.
+2. **ASO copy** — resolved 2026-08-21: the drafted first description line now reads
+   "no subscription required" (Bryan's wording), true alongside a yearly SKU since the
+   lifetime purchase covers Premium without one.
 
 ## 9. Out of scope
 
