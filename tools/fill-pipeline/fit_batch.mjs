@@ -8,7 +8,7 @@
 //
 // in:  {"elem": <i>, "axis": "u"|"v", "samples": [{"t": <epochMs>, "v": <kn>}...]}
 // out: {"elem": <i>, "axis": "u"|"v", "constituents": [{name,amplitude,phase}...],
-//       "offset": <n>, "rms": <n>}
+//       "offset": <n>, "rms": <n>, "unseparable": [<"NAME1/NAME2">...]}
 //
 // R²: chs-glue's fitTides() (Slackwater/Resources/chs-glue.js) does not
 // expose a prediction function — only the fit's own residual rms, not a
@@ -17,6 +17,13 @@
 // the cos-sum at each sample time, compare to the samples) per
 // task-3-brief.md. `rms` rides along since fitTides already returns it for
 // free — a cheap sanity signal, not a substitute for the driver's R².
+//
+// unseparable: fitTides() also returns this for free (Rayleigh-unseparable
+// name-pairs, e.g. "S2/T2" at this corpus's 190-day window) -- previously
+// dropped here (task-3-report.md fix round 2 flagged it as a T4 wiring
+// note, not a bug). Now passed through unchanged so the Python driver can
+// treat it as authoritative for "known limit vs. real problem" instead of
+// re-deriving it by eyeballing which constituent won.
 //
 // Parity gate: run parity_check.sh first. This filter refuses to process
 // stdin unless data/.parity-ok's recorded sha256 of BOTH artifacts matches
@@ -90,6 +97,7 @@ rl.on("line", (line) => {
         constituents: fit.constituents,
         offset: fit.offset,
         rms: fit.rms,
+        unseparable: fit.unseparable,
       }) + "\n",
     );
   } catch (err) {
