@@ -36,12 +36,13 @@ Station data and shared libraries live in the Open Waters / Neaps ecosystem
 ## The free / paid line
 
 - **Free forever:** the entire offline core — heights and extremes for any date, currents, slack
-  times, saved locations, local threshold alerts (deterministic, scheduled on-device, no
-  server). **The free core never shrinks.** Hard rule.
-- **Paid:** the slack Live Activity / Dynamic Island view (the live tile), boat-relative
-  **go-windows** (tell it your boat and your slack window; it tells you the green spans to
-  transit a gate), and anything needing live observed data (weather, swell, wind overlays and
-  alerts on them).
+  times, saved locations, and home screen widgets. **The free core never shrinks.** Hard rule.
+- **Premium (one tier):** everything on the **lock screen** — accessory widgets, and the slack
+  Live Activity / Dynamic Island view (the live tile) when it ships — plus local threshold
+  alerts (decided-premium before ever shipping free), boat-relative **go-windows** (tell it
+  your boat and your slack window; it tells you the green spans to transit a gate), and
+  anything needing live observed data (weather, swell, wind overlays and alerts on them).
+  Canonical spec: `docs/superpowers/specs/2026-08-21-widgets-premium-design.md`.
 
 ## The bar
 
