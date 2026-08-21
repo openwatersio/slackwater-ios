@@ -83,7 +83,7 @@ person willing to do it was never going to pay.
 - **Entry point:** a single field on the **tier sheet** — "Have a code?" — not a first-run
   screen. A first-run code prompt is a nag wearing a different hat, and it would violate
   `widgets-premium-design.md` §5's closed list of surfaces.
-- **Prefill, so nobody types:** the share link `https://<share-host>/r/<CODE>`
+- **Prefill, so nobody types:** the share link `https://go.slackwater.xyz/r/<CODE>`
   is a **universal link**. App installed → opens the tier sheet with the code filled in. Not
   installed → App Store, and the tier sheet offers a **Paste code** button
   (`UIPasteControl`) next to the field. That button, not a silent read: since iOS 16 reading
@@ -113,8 +113,7 @@ If both signals fed the same counter, the farmable one would be the one that pay
   forget, non-blocking, retried at most once per launch until acknowledged, and it never
   gates anything in the UI: the referee's 3 months are granted locally whether or not the
   report lands (§6).
-- **Link opens (display only).** The share host (§ infrastructure note) counts the hit at `/r/<CODE>` and
-  redirects to the App Store. Shown to the referrer as "people who looked", useful for their
+- **Link opens (display only).** `go.slackwater.xyz/r/<CODE>` counts the hit and redirects to the App Store. Shown to the referrer as "people who looked", useful for their
   own sense of whether sharing is working, and structurally incapable of unlocking a year.
   On Android/desktop the link resolves to the PWA, where the install *is* exact and the web
   app reports its own redemption the same way.
@@ -143,12 +142,16 @@ counts. But a Worker route only intercepts a **proxied** record, and every
 Pages provisioning its cert (`infrastructure/dns.md`). So the Worker **cannot** live on
 `slackwater.sailingnaturali.com`, which keeps serving the PWA.
 
-It goes on **`slackwater.xyz`** (registered 2026-08-21, Hover, not yet delegated to
-Cloudflare) — with the same trap one level down: if the landing page there is served by
-GitHub Pages it needs grey cloud too, and the Worker is blocked again. Either put the Worker
-on a proxied subdomain (`go.slackwater.xyz/r/<CODE>`) or serve the landing page from
-Cloudflare Pages and keep the apex proxied. Share links throughout this spec should be read
-as that host once it is picked.
+It goes on **`go.slackwater.xyz`** — decided 2026-08-21. `slackwater.xyz` (registered
+2026-08-21, delegated to Cloudflare, zone active) keeps its apex on **GitHub Pages** for the
+landing page, which pins the apex to grey cloud; `go` is a separate proxied hostname the
+Worker owns outright, so the two settings stop fighting. Prefer a Workers **Custom Domain**
+over a Route — it creates and manages its own DNS record. Details and the record plan:
+`infrastructure/dns.md` § slackwater.xyz.
+
+**The share link is therefore `https://go.slackwater.xyz/r/<CODE>`**, and that is the host
+the universal-link entitlement (§6) must be configured for. All of it lives in the
+`openwatersio` org alongside this repo.
 
 ## 8. Granting the reward
 
