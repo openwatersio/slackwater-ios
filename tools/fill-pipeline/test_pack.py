@@ -57,6 +57,8 @@ def _read_bundle(bin_bytes, header):
             lon, lat = struct.unpack_from("<ff", chunk, pos)
             pos += 8
             verts.append((lon, lat))
+        offset_u, offset_v = struct.unpack_from("<ee", chunk, pos)
+        pos += 4
         axes = []
         for _ in range(2):  # u then v
             n = chunk[pos]
@@ -67,11 +69,12 @@ def _read_bundle(bin_bytes, header):
                 pos += 5
                 axis.append({"id": cid, "amplitude": amp, "phase": phase})
             axes.append(axis)
-        out.append({"verts": verts, "u": axes[0], "v": axes[1]})
+        out.append({"verts": verts, "offset_u": offset_u, "offset_v": offset_v,
+                    "u": axes[0], "v": axes[1]})
     return out
 
 
-def _mk_element(i, lon=-123.0, lat=48.7):
+def _mk_element(i, lon=-123.0, lat=48.7, offset_u=0.0, offset_v=0.0):
     verts = [[lon, lat], [lon + 0.01, lat], [lon, lat + 0.01]]
     survivor = {
         "i": i,
@@ -86,6 +89,8 @@ def _mk_element(i, lon=-123.0, lat=48.7):
         ],
         "r2_u": 0.95,
         "r2_v": 0.9,
+        "offset_u": offset_u,
+        "offset_v": offset_v,
     }
     mesh_el = {"i": i, "lon": lon, "lat": lat, "verts": verts}
     return survivor, mesh_el
@@ -93,8 +98,13 @@ def _mk_element(i, lon=-123.0, lat=48.7):
 
 def _fixture_3_elements():
     els, mesh_els = [], []
+    # Element 20 carries a nonzero Z0 offset -- one element on-floor-zero,
+    # one off, so the round-trip test can't pass by accident on an
+    # all-zeros encode/decode.
+    offsets = {10: (0.0, 0.0), 20: (-0.65, 0.27), 30: (0.0, 0.0)}
     for i in (10, 20, 30):
-        e, m = _mk_element(i, lon=-123.0 + i, lat=48.7)
+        e, m = _mk_element(i, lon=-123.0 + i, lat=48.7,
+                            offset_u=offsets[i][0], offset_v=offsets[i][1])
         els.append(e)
         mesh_els.append(m)
     survivors = {"D_m": 3000, "counts": {"certified": 3, "survivors": 3}, "elements": els}
@@ -116,6 +126,12 @@ def test_round_trip(tmp_path):
     assert header["bin_sha256"]
     assert header["corpus_window"] == {"start": "2026-01-01", "end": "2026-01-10"}
     assert header["precision"]["phase_deg_worst_ulp"] == 0.25
+    # station_set.path is basename-only, never the packer's local filesystem
+    # path (tmp_path here is absolute -- a regression would leak it verbatim
+    # into a committed artifact).
+    assert header["station_set"]["path"] == "stations.json"
+    assert "/" not in header["station_set"]["path"]
+    assert header["offset_note"]
     PHASE_TOL = header["precision"]["phase_deg_worst_ulp"]
 
     parsed = _read_bundle(bin_bytes, header)
@@ -124,6 +140,12 @@ def test_round_trip(tmp_path):
         for (vlon, vlat), (plon, plat) in zip(m["verts"], p["verts"]):
             assert plon == pytest.approx(vlon, abs=1e-4)
             assert plat == pytest.approx(vlat, abs=1e-4)
+
+        # Z0 offset round-trips through f16 (~0.1% relative, same precision
+        # as amplitude) -- element 20's nonzero offset and elements 10/30's
+        # zero offset both must survive.
+        assert p["offset_u"] == pytest.approx(e["offset_u"], abs=5e-3)
+        assert p["offset_v"] == pytest.approx(e["offset_v"], abs=5e-3)
 
         # S2 (amp 0.003) is below its axis floor and must not survive.
         assert len(p["u"]) == 1

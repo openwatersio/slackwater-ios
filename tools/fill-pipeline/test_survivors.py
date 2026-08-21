@@ -75,11 +75,11 @@ def test_build_survivors_applies_floor_both_axes(tmp_path):
         return (( 1 - r2) * ss_tot / n) ** 0.5
 
     rows = [
-        {"elem": 1, "axis": "u", "rms": rms_for_r2(0.95), "constituents": [{"name": "M2", "amplitude": 0.5, "phase": 10}]},
-        {"elem": 1, "axis": "v", "rms": rms_for_r2(0.90), "constituents": [{"name": "K1", "amplitude": 0.3, "phase": 20}]},
-        {"elem": 2, "axis": "u", "rms": rms_for_r2(0.95), "constituents": []},
-        {"elem": 2, "axis": "v", "rms": rms_for_r2(0.10), "constituents": []},
-        {"elem": 3, "axis": "u", "rms": rms_for_r2(0.95), "constituents": []},
+        {"elem": 1, "axis": "u", "rms": rms_for_r2(0.95), "constituents": [{"name": "M2", "amplitude": 0.5, "phase": 10}], "offset": -0.42},
+        {"elem": 1, "axis": "v", "rms": rms_for_r2(0.90), "constituents": [{"name": "K1", "amplitude": 0.3, "phase": 20}], "offset": 0.17},
+        {"elem": 2, "axis": "u", "rms": rms_for_r2(0.95), "constituents": [], "offset": 0.0},
+        {"elem": 2, "axis": "v", "rms": rms_for_r2(0.10), "constituents": [], "offset": 0.0},
+        {"elem": 3, "axis": "u", "rms": rms_for_r2(0.95), "constituents": [], "offset": 0.0},
         {"elem": 3, "axis": "v", "error": "fit needs at least two samples"},
     ]
     fits_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
@@ -97,6 +97,8 @@ def test_build_survivors_applies_floor_both_axes(tmp_path):
     assert survivors[0]["constituents_u"] == [{"name": "M2", "amplitude": 0.5, "phase": 10}]
     assert survivors[0]["constituents_v"] == [{"name": "K1", "amplitude": 0.3, "phase": 20}]
     assert survivors[0]["r2_u"] > 0.8 and survivors[0]["r2_v"] > 0.8
+    assert survivors[0]["offset_u"] == -0.42
+    assert survivors[0]["offset_v"] == 0.17
     assert n_error == 1
 
 
@@ -107,8 +109,8 @@ def test_build_survivors_passes_through_unseparable_for_reporting(tmp_path):
     ss_tot = float(np.sum((values - values.mean()) ** 2))
     rms = ((1 - 0.99) * ss_tot / n) ** 0.5
     rows = [
-        {"elem": 1, "axis": "u", "rms": rms, "constituents": [], "unseparable": ["S2/T2"]},
-        {"elem": 1, "axis": "v", "rms": rms, "constituents": [], "unseparable": ["S2/T2"]},
+        {"elem": 1, "axis": "u", "rms": rms, "constituents": [], "offset": 0.0, "unseparable": ["S2/T2"]},
+        {"elem": 1, "axis": "v", "rms": rms, "constituents": [], "offset": 0.0, "unseparable": ["S2/T2"]},
     ]
     fits_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
 

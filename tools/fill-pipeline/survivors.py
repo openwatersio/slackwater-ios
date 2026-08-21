@@ -265,6 +265,12 @@ def build_survivors(fits_path, shortlist_elems, shortlist_cols, t, u_kn, v_kn):
                 "constituents_v": axes["v"]["constituents"],
                 "r2_u": r2_u,
                 "r2_v": r2_v,
+                # Z0 mean-flow term (chs-glue.js's fitTides "offset", kn) --
+                # carried through so the shipped fill isn't a zero-mean
+                # approximation of a real, nonzero mean flow. See pack.py's
+                # build_header offset note for the corpus-window caveat.
+                "offset_u": axes["u"]["offset"],
+                "offset_v": axes["v"]["offset"],
             })
     survivors.sort(key=lambda e: e["i"])
     return survivors, n_error, sorted(unseparable_seen)

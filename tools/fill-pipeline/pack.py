@@ -11,6 +11,8 @@ load anyway, so a fixed head array would only duplicate it):
     per element:
         u8 vert_count (=3)
         3 x (f32 lon, f32 lat)
+        f16 offset_u, f16 offset_v (Z0 mean-flow term, kn -- see
+            build_header's "offset" note for the corpus-window caveat)
         u8 nu (kept u-constituent count)
         nu x (u8 constituent_id, f16 amplitude, f16 phase)
         u8 nv (kept v-constituent count)
@@ -88,8 +90,10 @@ def prune_axis(constituents):
     return [c for c in constituents if c["amplitude"] >= floor]
 
 
-def pack_element(verts, constituents_u, constituents_v):
-    """verts: [[lon, lat]] x3. Returns chunk_bytes."""
+def pack_element(verts, constituents_u, constituents_v, offset_u, offset_v):
+    """verts: [[lon, lat]] x3. offset_u/offset_v: Z0 mean-flow term (kn),
+    the fitter's own least-squares offset (survivors.py carries these
+    through from fits.jsonl). Returns chunk_bytes."""
     assert len(verts) == 3, f"expected 3 verts, got {len(verts)}"
     kept_u = prune_axis(constituents_u)
     kept_v = prune_axis(constituents_v)
@@ -97,6 +101,7 @@ def pack_element(verts, constituents_u, constituents_v):
     buf += struct.pack("<B", 3)
     for lon, lat in verts:
         buf += struct.pack("<ff", lon, lat)
+    buf += struct.pack("<ee", offset_u, offset_v)
     for kept in (kept_u, kept_v):
         buf += struct.pack("<B", len(kept))
         for c in kept:
@@ -110,15 +115,16 @@ def pack_element(verts, constituents_u, constituents_v):
 
 
 def pack_elements(elements_data):
-    """elements_data: [(i, verts, constituents_u, constituents_v), ...] in
-    ship order. Returns (bin_bytes, offsets) -- offsets is a prefix-sum
-    array of length len(elements_data)+1 (offsets[k]..offsets[k+1] is
-    element k's byte range; offsets[-1] is the total bin size)."""
+    """elements_data: [(i, verts, constituents_u, constituents_v, offset_u,
+    offset_v), ...] in ship order. Returns (bin_bytes, offsets) -- offsets
+    is a prefix-sum array of length len(elements_data)+1 (offsets[k]..
+    offsets[k+1] is element k's byte range; offsets[-1] is the total bin
+    size)."""
     buf = bytearray()
     offsets = [0]
-    for i, verts, cu, cv in elements_data:
+    for i, verts, cu, cv, offset_u, offset_v in elements_data:
         try:
-            chunk = pack_element(verts, cu, cv)
+            chunk = pack_element(verts, cu, cv, offset_u, offset_v)
         except ValueError as e:
             raise ValueError(f"element {i}: {e}") from e
         buf += chunk
@@ -153,7 +159,23 @@ def build_header(*, mesh, mesh_path, stations_path, corpus_dir, survivors,
                      "composite-design.md §10's sizing estimate, which "
                      "kept a constituent for both axes if either cleared"),
         },
-        "station_set": {"path": stations_path, "sha256": sha256_file(stations_path)},
+        # basename only -- stations_path is a local filesystem path (default
+        # "data/stations.json", but a test fixture's tmp_path is absolute),
+        # and the sha256 already pins the actual content; a full path just
+        # leaks the machine/run that packed it into a committed artifact.
+        "station_set": {"path": os.path.basename(stations_path), "sha256": sha256_file(stations_path)},
+        # Z0 mean-flow term (per element, per axis, kn -- see the binary
+        # layout in this module's docstring). Honest caveat, stated rather
+        # than hidden: this offset is a least-squares fit over THIS bundle's
+        # corpus_window only (190 days, see above) -- it is that window's
+        # mean flow, which includes whatever seasonal mean circulation the
+        # window happens to capture, not a long-term climatological mean.
+        # A refit over a different season's window will fit a different
+        # offset for the same element.
+        "offset_note": ("Z0 mean-flow term, kn, per axis -- least-squares "
+                         "fit over this bundle's corpus_window (190 days); "
+                         "includes seasonal mean circulation from that "
+                         "window, not a long-term climatological mean"),
         # f16 encoding contract, machine-visible so Task 6's Swift reader
         # inherits it knowingly rather than discovering it: phase's
         # worst-case ULP is ~0.25 deg near 360 deg (~30 s of M2 timing) --
@@ -194,7 +216,8 @@ def pack(survivors_path, mesh_path, stations_path, corpus_dir,
             raise ValueError(
                 f"element {i}: r2_u={r2_u} r2_v={r2_v} below floor {R2_FLOOR} "
                 "-- survivors.json should already be filtered upstream")
-        elements_data.append((i, verts_by_i[i], el["constituents_u"], el["constituents_v"]))
+        elements_data.append((i, verts_by_i[i], el["constituents_u"], el["constituents_v"],
+                              el["offset_u"], el["offset_v"]))
 
     bin_bytes, offsets = pack_elements(elements_data)
     # A plain `assert` here is stripped by `python -O`; this gate has to
