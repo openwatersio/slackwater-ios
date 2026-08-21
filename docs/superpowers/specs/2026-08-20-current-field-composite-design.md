@@ -9,9 +9,7 @@ throat failures stay governed by grown patches; the ±25 min phase skill is a
 documented staleness caveat; stations/patches remain the sole authority on slack
 timing and transitability; and **the fill ramp never contains green** — "transitable
 now" stays exclusively a per-gate signal, so the backdrop physically cannot say "go".
-Still required before the fill ships: the speed-only certification rule (region
-adjacency; stations too weak to grade, e.g. cherry-point) and the bundle-pruning
-proof (≤ 40 MB).
+Speed-only certification rule (§4a) and bundle-pruning method (§10) specified; execution in progress.
 **Scope:** the data architecture that turns Slackwater's point predictions into a
 renderable current *field*. Rendering itself stays with #57's particle layer — this
 spec decides what feeds it, not what it draws.
@@ -141,6 +139,24 @@ whole field:
 - The mask is computed offline and shipped as geometry; the app never decides
   trustworthiness at runtime.
 
+## 4a. Speed-only certification (the fill channel's gate) — per the owner ruling
+
+Replaces the five-bar rule for the BACKDROP FILL only. Gates/patches keep §4's
+timing bars untouched.
+
+- **Grading stations:** a truth station grades iff scoreable — its best element
+  carries ≥ 1 published extremum ≥ 0.75 kn. Unscoreable stations (cherry-point)
+  grade nothing: their neighbourhood is uncertified, absent, never calm.
+- **Verdict:** a scoreable station PASSES iff its best element's median
+  peak-speed error ≤ 0.5 kn (the existing bar, speed row only).
+- **Element rule:** an element is certified iff its nearest scoreable station
+  lies within D = 3 km and PASSED. Nearest-failed → masked (throats are
+  grown-patch territory). No scoreable station within D → uncertified.
+- **Sensitivity is part of the record:** certified counts at D = 2/3/5 km ship
+  with the geometry so the choice of D stays legible.
+- **Fill semantics:** certified elements feed the speed fill only. The ramp
+  never contains green. Nothing here carries timing.
+
 ## 5. Grown patches (sub-mesh passes)
 
 For a pass with a validated gate but no resolvable mesh: grow the field from the gate.
@@ -214,3 +230,14 @@ re-derives them.
   80 m throat): validate patch speed against the gate's own published values along the
   pass where CHS gives secondary stations; where sensitivity is high, shrink the patch
   rather than smooth it.
+
+## 10. Bundle-pruning proof (the ≤ 40 MB gate)
+
+Method, so the number is reproducible: vectorized least-squares sizing fits
+(23-constituent shipping basis frequencies, mean term, hourly 60 d corpus) for
+every box element — SIZING fits; the shipping fitter remains chs-glue's
+fitTides. Floors: per-axis tidal R² ≥ 0.8 (elements below are uncertified —
+weakly tidal water is not painted); per-element constituent energy floor
+amp ≥ max(2 % of element max, 0.005 kn). Quantization: 5 B per kept
+constituent per axis + 8 B/element. Extrapolation to the render region scales
+by certified-area density and is CAPPED by the full-mesh element count.
