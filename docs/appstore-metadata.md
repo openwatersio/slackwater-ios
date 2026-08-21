@@ -81,7 +81,7 @@ short block near the end, where it reassures the people who scroll rather than
 gatekeeping the people who don't.
 
 **This supersedes the ASO block's first line** (`Slack and max-current timing you
-can trust — offline, US and Canadian waters, no subscription`). That line led with
+can trust — offline, US and Canadian waters, no subscription required`). That line led with
 "slack and max-current timing", which is the vocabulary of someone who already
 knows they want this app. Kept in gtm.md for the record; not used here.
 
