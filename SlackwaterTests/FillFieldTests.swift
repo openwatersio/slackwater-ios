@@ -112,19 +112,47 @@ final class FillFieldTests: XCTestCase {
         }
     }
 
-    // (c) Real golden: gated on the real bundle existing (Task 4/7 haven't
-    // shipped it yet). Once fill-salish.bin/.json land in Slackwater/Resources,
-    // this activates automatically -- nobody needs to come back and un-skip it.
+    // (c) Real golden: gated on the real bundle existing. fill-salish.bin/.json
+    // landed in Task 7 (2.56 MB, 13,168 elements, generated 2026-08-21T17:48:59Z,
+    // bin_sha256 9165bc21...127d1 -- see the header JSON for the full digest).
+    //
+    // Element pinned: shipped-order position 3597 (i.e. `field.cells(at:)[3597]`),
+    // picked as the element whose u-axis M2 amplitude is the *median* of all
+    // 13,168 survivors (rank 6584 of 13168 by u-axis M2 amplitude, decoded
+    // directly from fill-salish.bin with a throwaway script, independent of
+    // FillField) -- "mid-strength", not the strongest or weakest cell, and not
+    // hand-picked for a convenient answer. Its triangle sits at roughly
+    // (-123.04, 48.77), the Haro Strait / Saanich Peninsula approach.
+    //
+    // This is a REGRESSION pin, not an independent derivation (unlike
+    // testSyntheticGoldenTwoInstants's synthetic golden, which is built from
+    // constituents fed straight into TideEngine by a path that never calls
+    // FillField). There is no third-party published speed for this element to
+    // check against -- it's a SSCOFS-fitted grid cell, not a named station --
+    // so the expected value below was captured from FillField's own first run
+    // against the real bundle and is pinned here to catch any future
+    // regression in decode, astronomy wiring, or the fitted constants
+    // themselves changing under a bundle refit.
     func testRealBundleGoldenElement() throws {
         guard Bundle.main.url(forResource: "fill-salish", withExtension: "bin") != nil else {
-            throw XCTSkip("fill-salish.bin not yet committed (Task 4/7) — real golden pending")
+            throw XCTSkip("fill-salish.bin not yet committed — real golden pending")
         }
         let field = try XCTUnwrap(FillField())
-        // Fixed instant, one element: pin against the header's first element
-        // once real data exists. Left as a smoke check on load until the
-        // real bundle's actual element-0 speed is known and can be hardcoded
-        // with the tolerance pack.py's header["precision"] implies.
-        let cells = field.cells(at: Date(timeIntervalSince1970: 1_787_227_200))
-        XCTAssertFalse(cells.isEmpty)
+        // 2026-09-01T00:00:00Z, a fixed instant with no other significance.
+        let t = Date(timeIntervalSince1970: 1_788_220_800)
+        let cells = field.cells(at: t)
+        XCTAssertEqual(cells.count, 13168, "fill-salish header declares element_count 13168")
+
+        let cell = cells[3597]
+        // Captured from FillField's own first run against this exact bundle
+        // (xcodebuild test -only-testing:SlackwaterTests/FillFieldTests,
+        // iPhone 17 simulator, 2026-08-21) -- see the class comment above.
+        // f16 amplitude is ~0.1% relative, phase worst-case ULP ~0.25 deg near
+        // the 360 wrap (header["precision"]) -- 1e-6 tolerance is far tighter
+        // than that quantization, so this pins the provider's arithmetic
+        // (decode, astronomy wiring, hypot/atan2 composition), not just "some
+        // value in the right ballpark."
+        XCTAssertEqual(cell.speedKn, 1.7572526882345332, accuracy: 1e-6)
+        XCTAssertEqual(cell.bearingDeg, 25.541084983909457, accuracy: 1e-6)
     }
 }

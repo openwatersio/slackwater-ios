@@ -282,3 +282,7 @@ scopes the fill render layer:
 - **No green in the ramp** — the spec status block's guardrail is the render layer's
   responsibility to enforce, not this spike's; nothing here checks it because nothing here
   renders.
+
+**Production pipeline:** the region-wide version of everything above (real corpus,
+certification, shipping fits, committed bundle) lives in `tools/fill-pipeline/` —
+see `tools/fill-pipeline/README.md` for the end-to-end reproduce and real numbers.

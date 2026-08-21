@@ -98,7 +98,7 @@ here only because near slack the reference field goes uniformly low-ramp and
 carries no planning signal — green-as-transitable-now remains the differentiator
 the fill channel cannot express.
 
-## 2. Backdrop pipeline (offline, one-time per release, Studio) **[not built; five-bar certification failed §3 — revived for the speed-only fill by the owner ruling above — §4a geometry produced and §10 pruning proof PASSED (13.25 MB); remaining: Phase B engineering]**
+## 2. Backdrop pipeline (offline, one-time per release, Studio) **[DELIVERED for the speed-only fill — Phase B engineering (`docs/superpowers/specs/2026-08-20-fill-phase-b-design.md`, `tools/fill-pipeline/README.md`) ran the region-wide corpus/certification/fit/pack chain against real data: 13,168-element bundle committed at 2.56 MB, `Slackwater/Resources/fill-salish.bin`. Render layer (#57 seam consumer) still not built.]**
 
 1. **Corpus.** Surface u/v per element from `noaa-nos-ofs-pds` nowcast fields files via
    HTTP ranged reads (h5py + fsspec; verified ~14 MB/hourly file; netCDF4 `#mode=bytes`

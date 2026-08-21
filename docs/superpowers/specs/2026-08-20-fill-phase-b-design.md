@@ -1,6 +1,19 @@
 # Fill Phase B — shipping data path for the speed-only fill
 
-**Status:** design, executing on the owner's "Let's go" (2026-08-20) after #135 merged.
+**Status:** delivered (data path). Region-wide corpus (190 d), certification (§4a,
+D = 3 km: 63,374/311,447 elements, 20.35%), shipping fits (node parity-gated), and the
+committed bundle all ran against real data: 149 truth stations, 143 matrixed, 6,713
+pair-verdicts, 99 PASS / 23 FAIL / 21 unscoreable; prefilter shortlist 20,501 → final
+survivors 13,168 (shipping-fit R² ≥ 0.8 both axes, 0 fitter errors). Seymour Narrows
+(1.42 kn) and Dodd Narrows (4.52 kn) both FAIL and mask, as expected — grown-patch
+territory, not a regression. `Slackwater/Resources/fill-salish.bin` + `.json`
+committed: 2.56 MB (well under the 40 MB gate), 13,168 elements, mean 16.8/23
+constituents kept per axis. `FillField`'s real-bundle golden test is pinned (one
+mid-strength element, fixed instant, regression pin against this bundle's fit).
+Full reproduce + numbers: `tools/fill-pipeline/README.md`. **Not yet done:** the UI
+test leg re-run this branch still owes before merge (shared-machine interference
+during Task 6, unrelated to this bundle — see `.superpowers/sdd/2026-08-20-fill-phase-b/progress.md`);
+the render layer itself (#57's seam consumer) hasn't started.
 **Scope:** everything between the certified geometry (#135) and the seam the render
 layer consumes: region-wide corpus → region-wide certification → shipping-fitter
 constants → committed bundle → Swift provider. The render layer itself (fill drawing,
