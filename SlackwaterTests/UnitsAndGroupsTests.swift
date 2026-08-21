@@ -172,7 +172,7 @@ final class UnitsAndGroupsTests: XCTestCase {
         store.remove(auto)
     }
 
-    // MARK: - FavoritesStore round trip (ends clean — shared UserDefaults)
+    // MARK: - FavoritesStore round trip (ends clean — App Group defaults)
 
     @MainActor
     func testFavoriteToggleRoundTrip() {
@@ -181,7 +181,7 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertFalse(store.contains(id))
         store.toggle(id)
         XCTAssertTrue(store.contains(id), "toggle must add a new favorite")
-        XCTAssertEqual(UserDefaults.standard.stringArray(forKey: "slackwater.favorites")?.contains(id), true)
+        XCTAssertEqual(AppGroup.defaults.stringArray(forKey: "slackwater.favorites")?.contains(id), true)
         store.toggle(id)
         XCTAssertFalse(store.contains(id), "second toggle must remove it")
         // Spec §9: unfavoriting re-files to Recents.
