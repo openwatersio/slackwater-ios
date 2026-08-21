@@ -138,6 +138,7 @@ schemes:
         SlackwaterUITests: [test]
     run:
       config: Debug
+      storeKitConfiguration: Slackwater.storekit
     test:
       config: Debug
       targets: [SlackwaterTests, SlackwaterUITests]
