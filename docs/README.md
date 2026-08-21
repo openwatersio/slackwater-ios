@@ -19,6 +19,7 @@ snapshots rather than edited:
 | [`tide-guide-teardown-2026-07-17.md`](research/tide-guide-teardown-2026-07-17.md) | Design-benchmark teardown of Tide Guide (the ADA winner) — what to steal, what to flank |
 | [`design-readiness-2026-07-22.md`](research/design-readiness-2026-07-22.md) | Pre-build design review — verdict: ready; loose ends listed blocking → parked |
 | [`mytide-2026-08-21.md`](research/mytide-2026-08-21.md) | MyTide.ie — Irish indie tide PWA, convergent design; gauge-vs-modelled overlay + crossing windows worth stealing |
+| [`xtide-ios-2026-08-21.md`](research/xtide-ios-2026-08-21.md) | XTide for iOS — the free-and-clean incumbent: stale (2023), US-only; the niche is real but undefended |
 
 Deeper background (specs, superpowers plans) lives in the Slackwater planning repo
 (`sailingnaturali/slackwater`, private) — ask if you want anything from there surfaced here.
