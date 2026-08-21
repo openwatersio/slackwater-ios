@@ -64,6 +64,7 @@ targets:
         MARKETING_VERSION: 1.3.0
         CURRENT_PROJECT_VERSION: 27
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Slackwater/Slackwater.entitlements
         DEVELOPMENT_TEAM: R3H8DPTV9C
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"

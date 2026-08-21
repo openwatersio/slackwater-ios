@@ -79,8 +79,17 @@ struct ChsModel: Codable {
 /// registry key, so a future second region is just more files, no migration.
 enum ChsModelStore {
     static let dir: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("ChsModels", isDirectory: true)
+        let dest = AppGroup.container.appendingPathComponent("ChsModels", isDirectory: true)
+        let legacy = FileManager.default.urls(for: .applicationSupportDirectory,
+                                              in: .userDomainMask)[0]
+            .appendingPathComponent("ChsModels", isDirectory: true)
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: dest.path), fm.fileExists(atPath: legacy.path) {
+            try? fm.createDirectory(at: dest.deletingLastPathComponent(),
+                                    withIntermediateDirectories: true)
+            try? fm.moveItem(at: legacy, to: dest)
+        }
+        return dest
     }()
 
     static func url(_ stationID: String, suffix: String = "") -> URL {
