@@ -89,7 +89,7 @@ def prune_axis(constituents):
 
 
 def pack_element(verts, constituents_u, constituents_v):
-    """verts: [[lon, lat]] x3. Returns (chunk_bytes, kept_u, kept_v)."""
+    """verts: [[lon, lat]] x3. Returns chunk_bytes."""
     assert len(verts) == 3, f"expected 3 verts, got {len(verts)}"
     kept_u = prune_axis(constituents_u)
     kept_v = prune_axis(constituents_v)
@@ -100,8 +100,13 @@ def pack_element(verts, constituents_u, constituents_v):
     for kept in (kept_u, kept_v):
         buf += struct.pack("<B", len(kept))
         for c in kept:
+            # f16 phase: worst-case ULP near 360 deg is ~0.25 deg (~30 s of
+            # M2 timing). Accepted for the speed-only fill -- this bundle
+            # ships no timing semantics (owner ruling, spec §4) -- but it's
+            # a real, ULP-derived bound, not a "close enough" guess, and the
+            # Swift reader inherits it: see header["precision"].
             buf += struct.pack("<Bee", NAME_TO_ID[c["name"]], c["amplitude"], c["phase"])
-    return bytes(buf), kept_u, kept_v
+    return bytes(buf)
 
 
 def pack_elements(elements_data):
@@ -113,7 +118,7 @@ def pack_elements(elements_data):
     offsets = [0]
     for i, verts, cu, cv in elements_data:
         try:
-            chunk, _, _ = pack_element(verts, cu, cv)
+            chunk = pack_element(verts, cu, cv)
         except ValueError as e:
             raise ValueError(f"element {i}: {e}") from e
         buf += chunk
@@ -149,6 +154,12 @@ def build_header(*, mesh, mesh_path, stations_path, corpus_dir, survivors,
                      "kept a constituent for both axes if either cleared"),
         },
         "station_set": {"path": stations_path, "sha256": sha256_file(stations_path)},
+        # f16 encoding contract, machine-visible so Task 6's Swift reader
+        # inherits it knowingly rather than discovering it: phase's
+        # worst-case ULP is ~0.25 deg near 360 deg (~30 s of M2 timing) --
+        # fine for a speed fill with no timing semantics, wrong for a slack
+        # predictor. Amplitude is relative (~0.1% at f16's ~11-bit mantissa).
+        "precision": {"phase_deg_worst_ulp": 0.25, "amp_kn_rel": "f16 (~0.1%)"},
         "generated": generated,
         "element_count": len(offsets) - 1,
         "constituents": {str(i): name for i, name in enumerate(BASIS_NAMES)},
@@ -186,10 +197,13 @@ def pack(survivors_path, mesh_path, stations_path, corpus_dir,
         elements_data.append((i, verts_by_i[i], el["constituents_u"], el["constituents_v"]))
 
     bin_bytes, offsets = pack_elements(elements_data)
-    assert len(bin_bytes) <= max_bytes, (
-        f"bundle {len(bin_bytes)} bytes exceeds {max_bytes} byte budget "
-        f"({len(bin_bytes) / 1e6:.2f} MB vs {max_bytes / 1e6:.2f} MB) -- "
-        "shrink the survivor set or basis before shipping")
+    # A plain `assert` here is stripped by `python -O`; this gate has to
+    # hold even then, so it's a explicit check + SystemExit instead.
+    if len(bin_bytes) > max_bytes:
+        raise SystemExit(
+            f"bundle {len(bin_bytes)} bytes exceeds {max_bytes} byte budget "
+            f"({len(bin_bytes) / 1e6:.2f} MB vs {max_bytes / 1e6:.2f} MB) -- "
+            "shrink the survivor set or basis before shipping")
 
     generated = generated or datetime.now(timezone.utc).isoformat()
     header = build_header(mesh=mesh, mesh_path=mesh_path, stations_path=stations_path,

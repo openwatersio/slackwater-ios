@@ -6,12 +6,18 @@
 #     independently of pack.py's own pack_element -- so a bug shared between
 #     writer and reader wouldn't hide here. Assert verts/constituents match
 #     within f16 tolerance.
-# (b) the 40 MB size assert fires -- forced via a tiny max_bytes rather than
-#     actually generating 40 MB of synthetic elements (same assertion path,
-#     far less test data; brief allows either).
+# (b) the 40 MB size gate fires -- forced via a tiny max_bytes rather than
+#     actually generating 40 MB of synthetic elements (same code path, far
+#     less test data; brief allows either). Gate is an explicit
+#     if/SystemExit, not a bare `assert`, so `python -O` can't strip it.
 # (c) energy floor: per-axis, per-element -- an amp below both this
 #     element's own floors is dropped, one above ships.
 # (d) unknown constituent name is a hard error, never a silent drop.
+#
+# Phase tolerance in these tests is 0.25 deg -- f16's worst-case ULP near
+# 360 deg (pack.py's build_header/precision), not an arbitrary "close
+# enough" number. The round-trip fixture below deliberately phases M2/K1
+# near that boundary (359.9 / 0.1) so the worst case is what's exercised.
 import json
 import struct
 
@@ -70,11 +76,13 @@ def _mk_element(i, lon=-123.0, lat=48.7):
     survivor = {
         "i": i,
         "constituents_u": [
-            {"name": "M2", "amplitude": 1.0, "phase": 45.0},    # floor = max(2%, 0.005) = 0.02 -> kept
+            # phase 359.9 sits right at the f16 wraparound boundary --
+            # worst-case ULP territory, not a comfortable mid-range value.
+            {"name": "M2", "amplitude": 1.0, "phase": 359.9},  # floor = max(2%, 0.005) = 0.02 -> kept
             {"name": "S2", "amplitude": 0.003, "phase": 10.0},  # below 0.02 -> dropped
         ],
         "constituents_v": [
-            {"name": "K1", "amplitude": 0.5, "phase": 200.0},
+            {"name": "K1", "amplitude": 0.5, "phase": 0.1},  # same boundary, other side of 0/360
         ],
         "r2_u": 0.95,
         "r2_v": 0.9,
@@ -107,6 +115,8 @@ def test_round_trip(tmp_path):
     assert header["constituents"]["0"] == BASIS_NAMES[0]
     assert header["bin_sha256"]
     assert header["corpus_window"] == {"start": "2026-01-01", "end": "2026-01-10"}
+    assert header["precision"]["phase_deg_worst_ulp"] == 0.25
+    PHASE_TOL = header["precision"]["phase_deg_worst_ulp"]
 
     parsed = _read_bundle(bin_bytes, header)
     assert len(parsed) == 3
@@ -119,18 +129,18 @@ def test_round_trip(tmp_path):
         assert len(p["u"]) == 1
         assert p["u"][0]["id"] == BASIS_NAMES.index("M2")
         assert p["u"][0]["amplitude"] == pytest.approx(1.0, abs=5e-3)
-        assert p["u"][0]["phase"] == pytest.approx(45.0, abs=0.5)
+        assert p["u"][0]["phase"] == pytest.approx(359.9, abs=PHASE_TOL)
 
         assert len(p["v"]) == 1
         assert p["v"][0]["id"] == BASIS_NAMES.index("K1")
         assert p["v"][0]["amplitude"] == pytest.approx(0.5, abs=5e-3)
-        assert p["v"][0]["phase"] == pytest.approx(200.0, abs=0.5)
+        assert p["v"][0]["phase"] == pytest.approx(0.1, abs=PHASE_TOL)
 
 
-def test_size_assert_fires(tmp_path):
+def test_size_gate_fires(tmp_path):
     survivors, mesh = _fixture_3_elements()
     paths = _write_fixture(tmp_path, survivors, mesh)
-    with pytest.raises(AssertionError, match="exceeds"):
+    with pytest.raises(SystemExit, match="exceeds"):
         pack(*paths, max_bytes=1)
 
 
