@@ -8,10 +8,10 @@ import WidgetKit
 @MainActor
 final class PremiumStore: ObservableObject {
     static let shared = PremiumStore()
-    static let yearlyID = "org.openwaters.slackwater.premium.yearly"
-    static let lifetimeID = "org.openwaters.slackwater.premium.lifetime"
-    private static let ids = [yearlyID, lifetimeID]
-    static let premiumKey = "slackwater.premium"
+    nonisolated static let yearlyID = "org.openwaters.slackwater.premium.yearly"
+    nonisolated static let lifetimeID = "org.openwaters.slackwater.premium.lifetime"
+    private nonisolated static let ids = [yearlyID, lifetimeID]
+    nonisolated static let premiumKey = "slackwater.premium"
 
     @Published private(set) var isPremium: Bool
     @Published private(set) var products: [Product] = []
