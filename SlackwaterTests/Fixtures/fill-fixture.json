@@ -23,9 +23,10 @@
   "note": "per-axis independently at pack time -- differs from composite-design.md \u00a710's sizing estimate, which kept a constituent for both axes if either cleared"
  },
  "station_set": {
-  "path": "/private/tmp/claude-501/-Users-clarkbw-src-sailingnaturali/e967b715-706d-4e62-9daf-92040109f879/scratchpad/fillfix/_src_fill-fixture/stations.json",
+  "path": "stations.json",
   "sha256": "a5489e63878830136fc47b5d8ef4691dda20de6aaef148040cc8cb856df0844a"
  },
+ "offset_note": "Z0 mean-flow term, kn, per axis -- least-squares fit over this bundle's corpus_window (190 days); includes seasonal mean circulation from that window, not a long-term climatological mean",
  "precision": {
   "phase_deg_worst_ulp": 0.25,
   "amp_kn_rel": "f16 (~0.1%)"
@@ -58,11 +59,11 @@
   "22": "M3"
  },
  "constituent_basis_source": "spikes/sscofs-field/prune_proof.py:34-35",
- "bin_sha256": "afbb19057e7121c5efa85651e812d42cde109b57f63db575d0c6a2b56984473a",
+ "bin_sha256": "3a72126166fbe4207c2c9190c60ce689dfa7d67b6f2770efb069425353737e98",
  "offsets": [
   0,
-  37,
-  74,
-  111
+  41,
+  82,
+  123
  ]
 }

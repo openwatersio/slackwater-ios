@@ -7,8 +7,10 @@ pair-verdicts, 99 PASS / 23 FAIL / 21 unscoreable; prefilter shortlist 20,501 �
 survivors 13,168 (shipping-fit R² ≥ 0.8 both axes, 0 fitter errors). Seymour Narrows
 (1.42 kn) and Dodd Narrows (4.52 kn) both FAIL and mask, as expected — grown-patch
 territory, not a regression. `Slackwater/Resources/fill-salish.bin` + `.json`
-committed: 2.56 MB (well under the 40 MB gate), 13,168 elements, mean 16.8/23
-constituents kept per axis. `FillField`'s real-bundle golden test is pinned (one
+committed: 2.61 MB (well under the 40 MB gate), 13,168 elements, mean 16.8/23
+constituents kept per axis. Each element's fitted Z0 mean-flow offset ships
+too (final-review fix — previously dropped, +4 bytes/element over the
+pre-offset 2.56 MB). `FillField`'s real-bundle golden test is pinned (one
 mid-strength element, fixed instant, regression pin against this bundle's fit).
 Full reproduce + numbers: `tools/fill-pipeline/README.md`. **Not yet done:** the UI
 test leg re-run this branch still owes before merge (shared-machine interference

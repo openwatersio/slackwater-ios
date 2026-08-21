@@ -36,7 +36,10 @@ into `data/corpus/YYYYMMDD.npz` (`t`, `u`, `v`), ranged HDF5 reads over NODD,
 5 threaded workers, one file per day. **Resumable**: skips any day whose
 `.npz` already exists, so a killed run picks up where it left off — re-run
 the same command. A day is only written if ≥20/24 hours came back; a day
-below that gate is skipped (retry it later, or accept the gap).
+below that gate is skipped and must be retried — a saved 20-23/24 day still
+carries NaN in its missing hours, and `survivors.py`'s corpus loader
+hard-fails on any NaN (by design, loud), so "accept the gap" is not
+actually an option once a gap day gets past this gate.
 
 Real run: **190 days**, ~4,560 hourly file reads, **~64 GB transferred
 once** (~9.7 GB stored after compression). Wall clock is dominated by
@@ -166,15 +169,23 @@ every survivor's `r2_u`/`r2_v` actually clears 0.8 (a regression upstream in
 Not resumable and doesn't need to be — one deterministic pass over already-
 computed inputs, seconds.
 
-Real bundle: **2,561,941 bytes (2.56 MB)**, 13,168 elements — well under the
+Real bundle: **2,614,613 bytes (2.61 MB)**, 13,168 elements — well under the
 40 MB gate (and under the composite spec §10 proof's 13.25 MB extrapolate,
 because region certification — not constituent pruning — is what keeps the
 bundle small; §10 measured a mean of 21.3/23 constituents kept per axis on
 its box-scale proof run, and this real region-scale bundle keeps a mean of
 **16.8 of 23 possible constituents per axis** (33.5 combined across both
 axes per element), so the floor prunes harder here too). Generated
-2026-08-21T17:48:59Z; `bin_sha256` `9165bc21…` (full digest in the header
+2026-08-21T18:57:30Z; `bin_sha256` `e16c1aaf…` (full digest in the header
 JSON, `Slackwater/Resources/fill-salish.json`'s `bin_sha256` field).
+
+Per-element Z0 mean-flow offset (`offset_u`/`offset_v`, kn) ships in this
+bundle too, as of the final-review fix — a real, nonzero least-squares mean
+flow from the fitter (`fits.jsonl`'s `offset`), not zeroed out. It's a fit
+over this bundle's own 190-day corpus window, so it carries that window's
+seasonal mean circulation, not a long-term climatological mean (stated in
+the header's `offset_note`, not hidden) — grew the bundle by 4 bytes/element
+(2 x f16) over the pre-offset 2.56 MB.
 
 ## End-to-end reproduce
 

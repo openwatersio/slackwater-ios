@@ -47,6 +47,19 @@ final class FillFieldTests: XCTestCase {
         XCTAssertEqual(field.cells(at: Date(timeIntervalSince1970: 1_787_000_000), in: including).count, 3)
     }
 
+    // Regression for the under-inclusive "any vertex inside bbox" cull: a
+    // bbox zoomed in far enough to sit strictly INSIDE a triangle (none of
+    // that triangle's 3 vertices fall inside the small bbox) must still
+    // return that cell. Element 0's triangle is (-123.0, 48.7), (-122.99,
+    // 48.7), (-123.0, 48.71); this bbox is a small box entirely within its
+    // bounding extent and touches none of the 3 vertices.
+    func testBBoxStrictlyInsideTriangleStillReturnsCell() throws {
+        let field = try loadFixture()
+        let insideOnly = FillBBox(minLon: -122.998, minLat: 48.702, maxLon: -122.996, maxLat: 48.704)
+        let cells = field.cells(at: Date(timeIntervalSince1970: 1_787_000_000), in: insideOnly)
+        XCTAssertEqual(cells.count, 1, "a bbox inside element 0's triangle must still return it")
+    }
+
     // (b) Synthetic golden: fixture element 0 carries one constituent per
     // axis — M2 (u) and K1 (v) — with phases chosen at pack.py's precision
     // boundary (359.9/0.1 deg, see pack.py's own comment on f16's ~0.25 deg
@@ -80,14 +93,26 @@ final class FillFieldTests: XCTestCase {
         // elements share these constituents): u = M2 amp 1.2001953125 phase
         // 360.0 (359.9 rounds UP through the f16 wrap to exactly 360, i.e.
         // 0 -- the sharpest case pack.py's precision note describes); v = K1
-        // amp 0.60009765625 phase 0.0999755859375.
+        // amp 0.60009765625 phase 0.0999755859375. Element 0 also carries a
+        // nonzero Z0 mean-flow offset (the only one of the 3 fixture
+        // elements that does, by construction -- elements 1/2 are 0.0/0.0):
+        // offset_u 0.5 (f16-exact), offset_v -0.300048828125 (f16 rounds
+        // -0.3 to this). Both read from the same independent byte-decode as
+        // the constituents above, never from FillField's own decoder.
         let expectedU = HarmonicConstituent(name: "M2", amplitude: 1.2001953125, phase: 360.0)
         let expectedV = HarmonicConstituent(name: "K1", amplitude: 0.60009765625, phase: 0.0999755859375)
+        let expectedOffsetU = 0.5
+        let expectedOffsetV = -0.300048828125
 
         for t in [Date(timeIntervalSince1970: 1_787_227_200),           // 2026-08-20T12:00:00Z
                   Date(timeIntervalSince1970: 1_787_227_200 + 6 * 3600)] {  // +6h — a different M2 phase
-            let uStation = CurrentStation(constituents: [expectedU], floodDirection: 0, ebbDirection: 180)
-            let vStation = CurrentStation(constituents: [expectedV], floodDirection: 0, ebbDirection: 180)
+            // offset: shifts the evaluated speed by the Z0 term production
+            // applies the same way (CurrentStation's own Z0 basis
+            // constituent, amplitude = offset, phase = 0) -- exercising this
+            // here is what makes the u/v this test compares against actually
+            // depend on the offset, not just the tidal constituents.
+            let uStation = CurrentStation(constituents: [expectedU], floodDirection: 0, ebbDirection: 180, offset: expectedOffsetU)
+            let vStation = CurrentStation(constituents: [expectedV], floodDirection: 0, ebbDirection: 180, offset: expectedOffsetV)
             let u = try XCTUnwrap(uStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first?.speed)
             let v = try XCTUnwrap(vStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first?.speed)
             let expectedSpeed = hypot(u, v)
@@ -113,8 +138,11 @@ final class FillFieldTests: XCTestCase {
     }
 
     // (c) Real golden: gated on the real bundle existing. fill-salish.bin/.json
-    // landed in Task 7 (2.56 MB, 13,168 elements, generated 2026-08-21T17:48:59Z,
-    // bin_sha256 9165bc21...127d1 -- see the header JSON for the full digest).
+    // (2.61 MB, 13,168 elements, generated 2026-08-21T18:57:30Z, bin_sha256
+    // e16c1aaf...1dbd5ce -- see the header JSON for the full digest) --
+    // re-packed for the final-review offset fix (mean-flow Z0 now shipped
+    // per element/axis, format v1 unchanged; +4 bytes/element grew the
+    // bundle from 2.56 MB, same 13,168 survivors).
     //
     // Element pinned: shipped-order position 3597 (i.e. `field.cells(at:)[3597]`),
     // picked as the element whose u-axis M2 amplitude is the *median* of all
@@ -132,7 +160,11 @@ final class FillFieldTests: XCTestCase {
     // so the expected value below was captured from FillField's own first run
     // against the real bundle and is pinned here to catch any future
     // regression in decode, astronomy wiring, or the fitted constants
-    // themselves changing under a bundle refit.
+    // themselves changing under a bundle refit. Re-captured after the offset
+    // fix (element 3597's Z0 mean-flow term now shifts u/v, so both
+    // speedKn/bearingDeg changed from the pre-offset pin) the same way: one
+    // run with a deliberately-loose placeholder assertion, read the actual
+    // values off stdout, then pinned at 1e-6.
     func testRealBundleGoldenElement() throws {
         guard Bundle.main.url(forResource: "fill-salish", withExtension: "bin") != nil else {
             throw XCTSkip("fill-salish.bin not yet committed — real golden pending")
@@ -152,7 +184,7 @@ final class FillFieldTests: XCTestCase {
         // than that quantization, so this pins the provider's arithmetic
         // (decode, astronomy wiring, hypot/atan2 composition), not just "some
         // value in the right ballpark."
-        XCTAssertEqual(cell.speedKn, 1.7572526882345332, accuracy: 1e-6)
-        XCTAssertEqual(cell.bearingDeg, 25.541084983909457, accuracy: 1e-6)
+        XCTAssertEqual(cell.speedKn, 1.4969466423542093, accuracy: 1e-6)
+        XCTAssertEqual(cell.bearingDeg, 35.747437152706084, accuracy: 1e-6)
     }
 }

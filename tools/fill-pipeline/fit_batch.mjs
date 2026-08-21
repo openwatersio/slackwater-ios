@@ -13,10 +13,12 @@
 // R²: chs-glue's fitTides() (Slackwater/Resources/chs-glue.js) does not
 // expose a prediction function — only the fit's own residual rms, not a
 // per-sample R². This filter cannot compute R² itself, so no "r2" key ships
-// from here; the Python driver computes it from these constituents (evaluate
-// the cos-sum at each sample time, compare to the samples) per
-// task-3-brief.md. `rms` rides along since fitTides already returns it for
-// free — a cheap sanity signal, not a substitute for the driver's R².
+// from here; the Python driver computes it exactly from this rms alone
+// (survivors.py's r2_from_rms: ss_res = rms^2 * n, n the sample count the
+// driver itself sent — no cos-sum evaluation, no re-derivation of the fit)
+// per task-3-brief.md's "simpler and correct" note. `rms` rides along since
+// fitTides already returns it for free — the input the driver's R² is
+// computed from, not a separate sanity signal.
 //
 // unseparable: fitTides() also returns this for free (Rayleigh-unseparable
 // name-pairs, e.g. "S2/T2" at this corpus's 190-day window) -- previously
