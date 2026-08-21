@@ -18,6 +18,7 @@ snapshots rather than edited:
 | [`market-research-2026-07-17.md`](research/market-research-2026-07-17.md) | The tides/currents app landscape — competitor table, the currents gap, pricing anchors, spec gap-analysis |
 | [`tide-guide-teardown-2026-07-17.md`](research/tide-guide-teardown-2026-07-17.md) | Design-benchmark teardown of Tide Guide (the ADA winner) — what to steal, what to flank |
 | [`design-readiness-2026-07-22.md`](research/design-readiness-2026-07-22.md) | Pre-build design review — verdict: ready; loose ends listed blocking → parked |
+| [`mytide-2026-08-21.md`](research/mytide-2026-08-21.md) | MyTide.ie — Irish indie tide PWA, convergent design; gauge-vs-modelled overlay + crossing windows worth stealing |
 
 Deeper background (specs, superpowers plans) lives in the Slackwater planning repo
 (`sailingnaturali/slackwater`, private) — ask if you want anything from there surfaced here.
