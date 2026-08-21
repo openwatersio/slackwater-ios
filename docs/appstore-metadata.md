@@ -61,10 +61,10 @@ discovery surface without making the primary shelf contradict the disclaimer.
 
 ## Promotional text (170 chars max, editable without review)
 
-> Every tide and current prediction, already on your phone. Works on the water, on the
-> beach, in the anchorage — with no bars and nothing to load. Free, no account.
+> All tide and current predictions, offline on your phone. Works on the water, on the
+> beach, in the anchorage — no bars and nothing to load. Free, no account.
 
-(162 characters.)
+(156 characters.)
 
 Rewritten to the same problem-first angle as the description below — it sits directly
 above it on the product page, so leading with "slack and max-current timing for 3,000+
@@ -80,6 +80,12 @@ carry the problem and the solution, not the spec. Everything that establishes
 short block near the end, where it reassures the people who scroll rather than
 gatekeeping the people who don't.
 
+**"offline" is placed, not swapped** (2026-08-21). The obvious edit was changing the
+closing "already on your phone" to "offline on your phone", matching slackwater.xyz. But
+that phrase sits at character 187, past the ~3-line truncation this section is written
+around — most readers would never have seen the word. Moving it into the second sentence
+puts it at character 52, inside the collapsed view, without touching the problem-first hook.
+
 **This supersedes the ASO block's first line** (`Slack and max-current timing you
 can trust — offline, US and Canadian waters, no subscription required`). That line led with
 "slack and max-current timing", which is the vocabulary of someone who already
@@ -87,9 +93,9 @@ knows they want this app. Kept in gtm.md for the record; not used here.
 
 Full draft:
 
-> Every tide app works fine at home. Slackwater works where you need it — on
-> the water, on the beach, in the anchorage — with no bars and nothing to load.
-> Thousands of US and Canadian stations, already on your phone.
+> Every tide app works fine at home. Slackwater works offline, where you need
+> it — on the water, on the beach, in the anchorage — no bars and nothing to
+> load. Thousands of US and Canadian stations, already on your phone.
 >
 > No spinner. No "no internet connection". No waiting on a server that isn't
 > coming. You open it, and the answer is there.
