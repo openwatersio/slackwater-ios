@@ -75,6 +75,15 @@ no green, timing stays with gates/patches). Nothing here re-decides those.
 - Tests: bundle round-trip (pack → load → constants match), evaluation against a
   known-constituent synthetic element, and a golden test pinning one real element's
   speed at a fixed instant.
+- **API frozen for channel 1** (agreed with the #57 session, 2026-08-21): the
+  renderer's compile-time surface is exactly `FillField()` failable init,
+  `cells(at:)`, `FillCell.polygon`, `.speedKn` (+ `.bearingDeg` reserved for
+  channel 2). Consumer evaluates once per minute off-main; the per-call
+  construction cost is acceptable at that cadence and any future fix is caching
+  at the consumer boundary, never re-derived astronomy.
+- **Future (channel 2, not built):** advected streaks will want velocity sampled
+  at an arbitrary lat/lon — a new point-in-triangle lookup method over the same
+  elements, additive to `cells(at:)`, someday.
 
 ## 5. Out of scope
 
