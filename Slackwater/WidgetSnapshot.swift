@@ -33,8 +33,10 @@ struct WidgetSnapshot: Equatable {
         }
         cal.timeZone = tz
         let dayStart = cal.startOfDay(for: now)
-        let dayEnd = dayStart.addingTimeInterval(86_400)
-        let nowFraction = min(1, max(0, now.timeIntervalSince(dayStart) / 86_400))
+        // A calendar day, not 86_400s — 23/25 hours across a DST transition.
+        let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
+        let dayLength = dayEnd.timeIntervalSince(dayStart)
+        let nowFraction = min(1, max(0, now.timeIntervalSince(dayStart) / dayLength))
 
         func normalize(_ values: [Double]) -> [Double] {
             guard let lo = values.min(), let hi = values.max(), hi > lo else {
@@ -83,13 +85,25 @@ struct WidgetSnapshot: Equatable {
                          nowFraction: nowFraction)
 
         case .derived(let s, _, let name):
-            let slacks = s.slacks(from: dayStart, to: now.addingTimeInterval(172_800))
+            // Backward pad comfortably over one semidiurnal period (~12h25m):
+            // schematicSigned reads 0 before slacks[0], so an unpadded fetch
+            // starting at dayStart leaves the sparkline flat from midnight to
+            // the day's first slack. Forward range is unchanged — the
+            // next-slack search only ever looks past `now`, which is always
+            // >= dayStart, so the extra early slacks can't leak into it.
+            let backPad = 13.0 * 3600
+            let slacks = s.slacks(from: dayStart.addingTimeInterval(-backPad),
+                                  to: now.addingTimeInterval(172_800))
             let nextSlack = slacks.first { $0.time > now }
             let next = nextSlack.map {
                 Event(time: $0.time, label: "Slack", symbol: "minus")
             }
-            let samples = stride(from: 0, through: 96, by: 1).map {
-                abs(s.schematicSigned(at: dayStart.addingTimeInterval(Double($0) * 900),
+            // Explicit instants across the real day length, not the engine's
+            // floor/ceil-to-step bucketing — the only way to keep this at
+            // exactly 97 samples on a 23/25-hour DST day.
+            let step = dayLength / 96
+            let samples = (0...96).map {
+                abs(s.schematicSigned(at: dayStart.addingTimeInterval(Double($0) * step),
                                       slacks: slacks))
             }
             // No window for a derived gate — a window measured off a schematic
