@@ -1,7 +1,7 @@
 # The current field, composited — SSCOFS backdrop, station-grown patches, honest edges
 
 **Status:** design, direction approved 2026-08-20 ("1 now / 3 possibly later", #57).
-Spike outcome 2026-08-20: gates FAILED (slack timing; bundle) — backdrop is Plan B, see
+Spike outcome 2026-08-20: gates FAILED (slack timing; whole-region bundle) — backdrop is Plan B, see
 spikes/sscofs-field/README.md.
 **Owner ruling 2026-08-20 (Bryan, via the #57 session): speed-only fill APPROVED** —
 the colour backdrop ships where speed certifies (≤ 0.5 kn bar; 40/53 stations);
@@ -98,7 +98,7 @@ here only because near slack the reference field goes uniformly low-ramp and
 carries no planning signal — green-as-transitable-now remains the differentiator
 the fill channel cannot express.
 
-## 2. Backdrop pipeline (offline, one-time per release, Studio) **[not built; five-bar certification failed §3 — revived for the speed-only fill by the owner ruling above, pending the speed-only certification rule + pruning proof]**
+## 2. Backdrop pipeline (offline, one-time per release, Studio) **[not built; five-bar certification failed §3 — revived for the speed-only fill by the owner ruling above — §4a geometry produced and §10 pruning proof PASSED (13.25 MB); remaining: Phase B engineering]**
 
 1. **Corpus.** Surface u/v per element from `noaa-nos-ofs-pds` nowcast fields files via
    HTTP ranged reads (h5py + fsspec; verified ~14 MB/hourly file; netCDF4 `#mode=bytes`
@@ -133,7 +133,7 @@ Pass → Phase B (full domain, 190 days). Fail → the composite degrades to gro
 patches only, and this spec's backdrop sections are marked Plan B, global-coverage
 style.
 
-## 4. The validation gate, generalized **[not built; the five-bar rule below failed the spike — to be respecified as speed-only for the fill channel per the owner ruling above; timing bars remain for gates/patches]**
+## 4. The validation gate, generalized **[not built; the five-bar rule below failed the spike — respecified as speed-only for the fill channel in §4a below (owner ruling), which has now been run and PASSED; timing bars remain for gates/patches]**
 
 The certification unit is a **region** (contiguous element neighbourhood), not the
 whole field:
@@ -245,7 +245,8 @@ Method, so the number is reproducible: vectorized least-squares sizing fits
 (23-constituent shipping basis frequencies, mean term, hourly 60 d corpus) for
 every box element — SIZING fits; the shipping fitter remains chs-glue's
 fitTides. Floors: per-axis tidal R² ≥ 0.8 (elements below are uncertified —
-weakly tidal water is not painted); per-element constituent energy floor
-amp ≥ max(2 % of element max, 0.005 kn). Quantization: 5 B per kept
-constituent per axis + 8 B/element. Extrapolation to the render region scales
-by certified-area density and is CAPPED by the full-mesh element count.
+weakly tidal water is not painted); per-axis floor amp ≥ max(2 % of that
+axis's max, 0.005 kn), kept if either axis clears. Quantization: 5 B per
+kept constituent per axis + 8 B/element. Extrapolation to the render region
+scales by surviving-element density over the box and is CAPPED by the
+full-mesh element count.

@@ -5,7 +5,7 @@ nearest-scoreable-station distance. Fill-channel gate only — no timing here.
 
 Outputs: certified/certified.json, certified/certified.geojson, certified/CERTIFY.md
 """
-import glob, json, os
+import json, os
 import numpy as np
 
 D_M = 3000  # spec §4a default
@@ -120,7 +120,7 @@ def main():
 
     with open("certified/CERTIFY.md", "w") as out_md:
         out_md.write("# Certification geometry (spec §4a)\n\n")
-        out_md.write(f"## Station verdicts ({len(stations)} scoreable stations)\n\n")
+        out_md.write(f"## Station verdicts ({len(stations)} stations scored, {n_pass + n_fail} scoreable)\n\n")
         out_md.write(f"- PASS: {n_pass}\n- FAIL: {n_fail}\n- UNSCOREABLE: {n_unsc}\n\n")
         out_md.write("| station | verdict | speed_med (kn) |\n|---|---|---|\n")
         for s in stations:
