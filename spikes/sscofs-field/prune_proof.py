@@ -6,12 +6,13 @@ Vectorized numpy-lstsq SIZING fits (23-name shipping basis, mean term, hourly
 60 d corpus) for every box element at once -- SIZING fits only; the shipping
 fitter remains chs-glue's fitTides (`tools/FitValidation`, Task 5). Floors:
 per-axis tidal R^2 >= 0.8 (elements below are uncertified -- weakly tidal
-water is not painted); per-element constituent energy floor
-amp >= max(2% of that element's max amplitude, 0.005 kn). Quantization: 5 B
-per kept constituent per axis + 8 B/element header. Extrapolation to the
-render region scales by certified-area density and is CAPPED by the
-full-mesh element count (433,410) -- the earlier README's plain box-density
-extrapolation overshot the full mesh and was called out in review.
+water is not painted); per-axis constituent energy floor
+amp >= max(2% of that axis's max amplitude, 0.005 kn), kept if either axis
+clears. Quantization: 5 B per kept constituent per axis + 8 B/element
+header. Extrapolation to the render region scales by surviving-element
+density over the box and is CAPPED by the full-mesh element count
+(433,410) -- the earlier README's plain box-density extrapolation
+overshot the full mesh and was called out in review.
 
 Consumes: corpus/*.npz, mesh/elements.json, certified/certified.json,
 samples/index.json + truth/stations.json (via certify.py's own
@@ -76,10 +77,13 @@ def basis_speeds(bundle_path="../../Slackwater/Resources/chs-bundle.js"):
     `Object.keys(CHSConstituents)` is only `["BASIS", "fit"]` -- no speeds
     table on the public surface. The speeds live in the bundle regardless,
     baked into each `defineConstituent(...)` record that `fit` closes over
-    internally; MU2 has no record of its own and resolves via the alias on
-    the "2MS2" entry. So: parse those name/speed/alias records straight out
-    of chs-bundle.js's own source text -- the literal constants the shipping
-    fitter runs against -- rather than falling back to a second-sourced,
+    internally; MU2 has its own record (`name: "mu2"`, `aliases: ["μ2",
+    "MU2"]`) -- the separate "2MS2" record just happens to carry the
+    identical 27.9682085 deg/h speed, a genuine compound-frequency
+    coincidence, not a resolved alias. So: parse those name/speed/alias
+    records straight out of chs-bundle.js's own source text -- the literal
+    constants the shipping fitter runs against -- rather than falling back
+    to a second-sourced,
     hand-typed NOAA table. (They match the standard published NOAA harmonic
     speeds to displayed precision, which is expected, not what's asserted.)
     """
@@ -131,6 +135,10 @@ def fit_elements(t, U, speeds_deg_per_hour):
     rows (missing hours -- none in this corpus, checked) dropped before the
     fit. Returns (const [1+2*len(speeds), n_elements], r2 [n_elements])."""
     mask = ~np.isnan(U).any(axis=1)
+    assert mask.sum() == len(t), (
+        f"{len(t) - int(mask.sum())} NaN row(s) dropped from the corpus -- "
+        "the report's headline sample count (len(t)) would overstate what "
+        "was actually fit")
     t_use, U_use = t[mask], U[mask]
     A = design_matrix(t_use, speeds_deg_per_hour, epoch=t[0])
     pinv_a = np.linalg.pinv(A)
@@ -144,12 +152,14 @@ def fit_elements(t, U, speeds_deg_per_hour):
     return const, r2
 
 
-def energy_floor_keep(amps):
-    """Per-element constituent energy floor (§10): keep constituent i iff
-    amp[i] >= max(2% of this element's max amplitude, 0.005 kn)."""
-    amps = np.asarray(amps)
-    floor = max(0.02 * float(amps.max()), 0.005) if amps.size else 0.005
-    return amps >= floor
+def energy_floor_keep(amp_u, amp_v):
+    """Per-axis constituent energy floor (§10): floor[axis] = max(2% of
+    that axis's max amplitude, 0.005 kn); keep constituent i iff either
+    axis's amplitude clears its own axis's floor. amp_u/amp_v: [n_speeds,
+    n_elements]."""
+    floor_u = np.maximum(0.02 * amp_u.max(axis=0), 0.005)
+    floor_v = np.maximum(0.02 * amp_v.max(axis=0), 0.005)
+    return (amp_u >= floor_u[None, :]) | (amp_v >= floor_v[None, :])
 
 
 def bundle_bytes(kept_counts):
@@ -231,9 +241,7 @@ def main():
     # filtered per sensitivity config.
     amp_u = np.hypot(const_u[1::2, :], const_u[2::2, :])  # [23, n_elements]
     amp_v = np.hypot(const_v[1::2, :], const_v[2::2, :])
-    floor_u = np.maximum(0.02 * amp_u.max(axis=0), 0.005)
-    floor_v = np.maximum(0.02 * amp_v.max(axis=0), 0.005)
-    keep = (amp_u >= floor_u[None, :]) | (amp_v >= floor_v[None, :])  # kept if either axis
+    keep = energy_floor_keep(amp_u, amp_v)
     kept_counts_all = keep.sum(axis=0)
 
     def evaluate(D, r2_floor):
@@ -275,7 +283,8 @@ def write_report(speeds, n_hours, r2_u, r2_v, min_r2, certified, baseline,
         out.write("`node vm`-confirmed `CHSConstituents` public surface is `{BASIS, fit}` "
                    "only (no speeds table); speeds parsed from the bundle's own embedded "
                    "`defineConstituent(...)` records instead of a hand-typed NOAA table "
-                   "(MU2 resolved via its \"2MS2\" alias). 23/23 basis names resolved: "
+                   "(MU2 has its own record; the separate \"2MS2\" record shares its speed "
+                   "by coincidence, not an alias). 23/23 basis names resolved: "
                    f"{', '.join(f'{n}={speeds[n]:g}°/h' for n in BASIS_NAMES)}\n\n")
 
         out.write(f"## Corpus\n\n{n_hours} hourly samples ({n_hours / 24:.0f} days), "
@@ -321,10 +330,10 @@ def write_report(speeds, n_hours, r2_u, r2_v, min_r2, certified, baseline,
                    f"**{baseline['measured_mb']:.3f} MB** measured, in-box, no extrapolation.\n\n")
 
         out.write(f"## Render-region extrapolation, capped at {FULL_MESH_ELEMENTS:,} — {LABEL}\n\n")
-        out.write(f"Certified-area density ({baseline['n_survive']} / {box_deg2:.3f} deg²) × "
-                   f"render region ({RENDER_REGION_DEG2:.2f} deg², Salish clip) = "
-                   f"{baseline['n_render_raw']:,.0f} elements raw, capped to "
-                   f"**{baseline['n_render_capped']:,.0f}** (full-mesh element count). "
+        out.write(f"Surviving-element density over the box ({baseline['n_survive']} / "
+                   f"{box_deg2:.3f} deg²) × render region ({RENDER_REGION_DEG2:.2f} deg², "
+                   f"Salish clip) = **{baseline['n_render_raw']:,.0f}** elements raw "
+                   f"(cap {FULL_MESH_ELEMENTS:,} — never binds at any evaluated combo). "
                    f"→ **{baseline['extrap_mb']:.2f} MB** extrapolated.\n\n")
 
         out.write(f"## Verdict vs {BUNDLE_BUDGET_MB} MB (D = {baseline['D']} m, "

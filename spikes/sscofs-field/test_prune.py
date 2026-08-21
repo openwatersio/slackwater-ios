@@ -5,8 +5,9 @@
 # within 0.02 kn and R^2 > 0.95 against the full 23-name basis (the other 20
 # constituents have no signal, only noise, and should fit near zero).
 # (b) quantization math: bundle_bytes(kept_counts) == sum(8 + 5*2*k).
-# (c) energy floor: amplitudes [1.0, 0.03, 0.004] with floor
-# max(0.02*max, 0.005) = 0.02 keeps exactly 2 (0.004 < 0.02 dropped).
+# (c) energy floor is per-axis, kept if either axis clears (§10): one
+# constituent clearing only its u-axis floor is kept; one clearing neither
+# axis's floor is dropped. floor = max(2% of that axis's max, 0.005 kn).
 import numpy as np
 
 from prune_proof import basis_speeds, bundle_bytes, energy_floor_keep, fit_elements
@@ -17,11 +18,19 @@ def test_bundle_bytes_known_inputs():
     assert bundle_bytes(kept) == sum(8 + 5 * 2 * k for k in kept)
 
 
-def test_energy_floor_keeps_exactly_two():
-    amps = np.array([1.0, 0.03, 0.004])
-    floor = max(0.02 * amps.max(), 0.005)
-    assert floor == 0.02  # pins the worked example in the brief
-    assert energy_floor_keep(amps).sum() == 2
+def test_energy_floor_keeps_if_either_axis_clears():
+    # one synthetic element, 3 constituents. floor_u = max(0.02*1.0, 0.005)
+    # = 0.02; floor_v = max(0.02*0.003, 0.005) = 0.005 (floors pin the
+    # worked example in the brief).
+    amp_u = np.array([[1.0], [0.03], [0.004]])  # c0/c1 clear floor_u, c2 doesn't
+    amp_v = np.array([[0.001], [0.003], [0.002]])  # none clear floor_v
+    floor_u = max(0.02 * amp_u.max(), 0.005)
+    floor_v = max(0.02 * amp_v.max(), 0.005)
+    assert floor_u == 0.02
+    assert floor_v == 0.005
+    keep = energy_floor_keep(amp_u, amp_v)
+    # c0/c1 kept via u-axis alone (v-axis doesn't clear); c2 clears neither -> dropped.
+    assert keep[:, 0].tolist() == [True, True, False]
 
 
 def test_fit_elements_recovers_synthetic_constituents():

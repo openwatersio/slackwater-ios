@@ -136,6 +136,7 @@ accepts") and it holds.
 **3. Extrapolated bundle ≤ 40 MB at which constituent count?** None. 165.8 MB at 23
 constituents, 89.2 MB at 12 — both against the (over-estimated) density extrapolation; even
 the full-mesh-capped floor (≈55 MB at 12 constituents) is still over budget.
+(superseded for the certified region — see "Prerequisites executed" below: PASS at 13.25 MB)
 
 ## Verdict
 
@@ -217,7 +218,8 @@ independently reproducible — neither script recomputes anything from a cached 
 
 ### Certification geometry (§4a)
 
-`./certify.py` grades the 54 scoreable stations from `results/*.json` (see "Results" above),
+`./certify.py` grades the 54 stations in `samples/index.json` (53 scoreable) from
+`results/*.json` (see "Results" above),
 then classifies every one of the box's 73,550 mesh elements by nearest-scoreable-station
 distance. Station verdicts: **40 PASS / 13 FAIL / 1 UNSCOREABLE** (`cherry-point` — no
 published extremum above the 0.75 kn significance floor at any nearby element, so it grades
