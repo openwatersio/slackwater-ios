@@ -85,8 +85,11 @@ person willing to do it was never going to pay.
   `widgets-premium-design.md` §5's closed list of surfaces.
 - **Prefill, so nobody types:** the share link `https://slackwater.sailingnaturali.com/r/<CODE>`
   is a **universal link**. App installed → opens the tier sheet with the code filled in. Not
-  installed → App Store, and on first open of the tier sheet the field is prefilled from the
-  pasteboard if it holds a well-formed code. Typing is the fallback path, not the path.
+  installed → App Store, and the tier sheet offers a **Paste code** button
+  (`UIPasteControl`) next to the field. That button, not a silent read: since iOS 16 reading
+  the pasteboard programmatically raises the system "Allow Paste?" alert, and firing that at
+  a user who just opened the app is precisely the creepy first-run moment we are avoiding.
+  One tap to paste, or type five characters.
 
 **We do not validate codes.** Any well-formed code grants the 3 months, with no network call
 at all. This is the one decision that keeps the feature compatible with an offline-first app
@@ -97,20 +100,47 @@ toward a real referrer's five; the app never needs to know.
 
 ## 7. Counting the referrer's five
 
-**We count link opens, not installs**, because installs are not observable (§3) and link
-opens are.
+**Redemptions reported by the app are the count. Link opens are display only, and never
+unlock the reward.**
 
-`slackwater.sailingnaturali.com/r/<CODE>` counts the hit and redirects to the App Store (or
-serves the PWA on Android/desktop, where the install *is* exact). The app also reports a
-redemption opportunistically when it next has network, so a code typed from a screenshot
-still counts; the server takes the higher of the two signals rather than summing them.
+The asymmetry that decides this: a link open costs an attacker one line of `curl`, while a
+redemption report requires a real device that really installed the app from the App Store.
+If both signals fed the same counter, the farmable one would be the one that pays.
+
+- **Redemption report (authoritative).** The moment the app knows a code, it reports it —
+  and it almost always knows at first launch, when network is as close to guaranteed as it
+  ever gets, because the user has just downloaded the app from the App Store. Fire-and-
+  forget, non-blocking, retried at most once per launch until acknowledged, and it never
+  gates anything in the UI: the referee's 3 months are granted locally whether or not the
+  report lands (§6).
+- **Link opens (display only).** `slackwater.sailingnaturali.com/r/<CODE>` counts the hit and
+  redirects to the App Store. Shown to the referrer as "people who looked", useful for their
+  own sense of whether sharing is working, and structurally incapable of unlocking a year.
+  On Android/desktop the link resolves to the PWA, where the install *is* exact and the web
+  app reports its own redemption the same way.
+
+**What the report contains:** the redeemed code and nothing else. No device identifier, no
+IP retention, no user identity — there is no account to attach one to.
+
+**The gap, stated plainly:** iOS has no deferred deep link. A universal link that bounces a
+new user to the App Store is *not* replayed when the app first opens, so the app only knows
+a code the referee actively supplied — pasted or typed (§6). An install we can see but not
+attribute is worth nothing here: App Store Connect already reports install counts for free.
+So the report is not an install counter, it is a redemption courier that leaves at the
+moment the network is most reliable.
+
+**The bridge we are not building.** Matching a click to an install by IP + timestamp within
+a window is the classic deferred-attribution trick, needs no SDK, and would close that gap.
+It is rejected for the same reason §3 rejects Branch and AppsFlyer — it is fingerprinting
+with our own name on it — and it would misfire exactly where our users are: several boats on
+one marina wifi, or a whole carrier behind CGNAT, share an address and would cross-attribute.
 
 **Infrastructure note:** `slackwater-web` is static on GitHub Pages with no backend, by
-design — it cannot count. The lazy fit is a **Cloudflare Worker + KV** on the `/r/*` route,
-since Cloudflare already holds the `sailingnaturali.com` zone. *Check before building:* the
-`slackwater` record must be proxied for a Worker route to intercept it; a DNS-only record
-will pass straight through to Pages. This Worker is the program's only server component and
-holds nothing but opaque code → count.
+design — it cannot count. The lazy fit is a **Cloudflare Worker + KV** on the `/r/*` route
+plus a redemption endpoint, since Cloudflare already holds the `sailingnaturali.com` zone.
+*Check before building:* the `slackwater` record must be proxied for a Worker route to
+intercept it; a DNS-only record will pass straight through to Pages. This Worker is the
+program's only server component and holds nothing but opaque code → two counts.
 
 ## 8. Granting the reward
 
