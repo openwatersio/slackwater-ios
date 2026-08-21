@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(speedUnitKey) private var speedUnit = "kn"
     @ObservedObject private var chs = ChsFitService.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var showPremium = false
 
     private var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -48,6 +49,20 @@ struct SettingsView: View {
                         } label: {
                             HStack {
                                 Text("\(chs.queue.ready) of \(chs.queue.total) nearby Canadian stations on this device")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
+                    }
+
+                    section("Slackwater Premium") {
+                        Button { showPremium = true } label: {
+                            HStack {
+                                Text(PremiumStore.shared.isPremium
+                                     ? "Premium — thank you for supporting the app"
+                                     : "Support the app — lock screen widgets and more")
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
@@ -100,6 +115,7 @@ struct SettingsView: View {
                         .foregroundStyle(SN.leaf)
                 }
             }
+            .sheet(isPresented: $showPremium) { PremiumView() }
         }
         .preferredColorScheme(.dark)
     }
