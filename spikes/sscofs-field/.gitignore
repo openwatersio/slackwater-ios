@@ -3,5 +3,6 @@ corpus/
 samples/
 truth/
 results/
+certified/
 __pycache__/
 *.log
