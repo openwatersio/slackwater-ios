@@ -1,0 +1,68 @@
+{
+ "format_version": 1,
+ "region": "salish",
+ "bbox": [
+  -125.5,
+  47.0,
+  -122.0,
+  50.6
+ ],
+ "corpus_window": {
+  "start": "2026-01-01",
+  "end": "2026-01-10"
+ },
+ "mesh_source": {
+  "url": "https://example.test/fields.nc",
+  "sha256": "984df8b119b7772cd56faafe5052017cc98084e0fe006923530f23f31972035f"
+ },
+ "D_m": 3000,
+ "floors": {
+  "r2_min": 0.8,
+  "energy_pct": 0.02,
+  "energy_min_kn": 0.005,
+  "note": "per-axis independently at pack time -- differs from composite-design.md \u00a710's sizing estimate, which kept a constituent for both axes if either cleared"
+ },
+ "station_set": {
+  "path": "/private/tmp/claude-501/-Users-clarkbw-src-sailingnaturali/e967b715-706d-4e62-9daf-92040109f879/scratchpad/fillfix/_src_fill-fixture/stations.json",
+  "sha256": "a5489e63878830136fc47b5d8ef4691dda20de6aaef148040cc8cb856df0844a"
+ },
+ "precision": {
+  "phase_deg_worst_ulp": 0.25,
+  "amp_kn_rel": "f16 (~0.1%)"
+ },
+ "generated": "2026-08-20T00:00:00+00:00",
+ "element_count": 3,
+ "constituents": {
+  "0": "M2",
+  "1": "S2",
+  "2": "N2",
+  "3": "K2",
+  "4": "K1",
+  "5": "O1",
+  "6": "P1",
+  "7": "Q1",
+  "8": "M4",
+  "9": "MS4",
+  "10": "MN4",
+  "11": "2N2",
+  "12": "MU2",
+  "13": "NU2",
+  "14": "L2",
+  "15": "T2",
+  "16": "J1",
+  "17": "MM",
+  "18": "MSF",
+  "19": "MF",
+  "20": "M6",
+  "21": "S4",
+  "22": "M3"
+ },
+ "constituent_basis_source": "spikes/sscofs-field/prune_proof.py:34-35",
+ "bin_sha256": "afbb19057e7121c5efa85651e812d42cde109b57f63db575d0c6a2b56984473a",
+ "offsets": [
+  0,
+  37,
+  74,
+  111
+ ]
+}
