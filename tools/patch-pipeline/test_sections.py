@@ -1,7 +1,7 @@
 # tools/patch-pipeline/test_sections.py — run: uv run --with pytest,numpy pytest -q test_sections.py
 import math
 import numpy as np
-from sections import build_pass
+from sections import build_pass, _walk
 
 M_PER_DEG_LAT = 111320.0
 
@@ -49,6 +49,22 @@ def test_scales_anchor_identity():
     assert out["scales"][k] == 1.0
     # deeper north sections -> larger area -> scale < 1 north of anchor
     assert out["scales"][-1] < 1.0 or out["scales"][0] < 1.0
+
+def test_walk_keeps_spacing_across_segment_boundary():
+    # Regression: a segment boundary must not reset the walk's phase. Two
+    # unevenly-spaced segments (995 m, 1300 m) at 500 m spacing, straight
+    # north so distance is pure lat*M_PER_DEG_LAT. The first segment's
+    # leftover carry (-495 m, i.e. the next mark falls 5 m into segment 2)
+    # must persist -- a carry reset to 0 at the boundary produces one gap
+    # of ~995 m (~2x spacing) where a correct walk holds every gap at 500 m.
+    spacing = 500.0
+    seg1_m, seg2_m = 995.0, 1300.0
+    lat1 = seg1_m / M_PER_DEG_LAT
+    lat2 = lat1 + seg2_m / M_PER_DEG_LAT
+    stations = _walk([[0.0, 0.0], [0.0, lat1], [0.0, lat2]], spacing)
+    cumulative = [lat * M_PER_DEG_LAT for _, lat in stations]
+    gaps = [b - a for a, b in zip(cumulative, cumulative[1:])]
+    assert all(gap <= 1.5 * spacing for gap in gaps), gaps
 
 def test_flood_bearing_assert():
     bad = synthetic_inputs()
