@@ -65,7 +65,7 @@ def test_anchor_area_swing_hard_errors():
     # anchor doesn't drift (index 2 in both), but the physical area computed
     # there swings 40% -- real placement instability, must not be masked by
     # the self-normalized scale (which would show delta 0 at the anchor).
-    variants = [_variant(2, [{"area_m2": 50.0}, {"area_m2": 80.0}, {"area_m2": 140.0}])]
+    variants = [_variant(2, [{"area_reach_m2": 50.0}, {"area_reach_m2": 80.0}, {"area_reach_m2": 140.0}])]
     try:
         check_anchor_stability(base_anchor=2, base_anchor_area=100.0,
                                variants=variants, labels=["shift+0.5"])
@@ -77,8 +77,8 @@ def test_anchor_area_swing_hard_errors():
 def test_anchor_drift_hard_errors():
     # anchor's own nearest-section assignment moved 2 stations under a
     # half-spacing nudge -- unstable by definition, regardless of area match.
-    variants = [_variant(4, [{"area_m2": 0}, {"area_m2": 0}, {"area_m2": 0}, {"area_m2": 0},
-                             {"area_m2": 100.0}])]
+    variants = [_variant(4, [{"area_reach_m2": 0}, {"area_reach_m2": 0}, {"area_reach_m2": 0}, {"area_reach_m2": 0},
+                             {"area_reach_m2": 100.0}])]
     try:
         check_anchor_stability(base_anchor=2, base_anchor_area=100.0,
                                variants=variants, labels=["shift-0.5"])
@@ -88,7 +88,7 @@ def test_anchor_drift_hard_errors():
 
 
 def test_anchor_stability_returns_evidence_when_stable():
-    variants = [_variant(2, [{}, {}, {"area_m2": 104.0}])]
+    variants = [_variant(2, [{}, {}, {"area_reach_m2": 104.0}])]
     evidence = check_anchor_stability(base_anchor=2, base_anchor_area=100.0,
                                       variants=variants, labels=["datum=CD"])
     assert evidence == [{"label": "datum=CD", "anchor_index_offset": 0, "anchor_area_delta_pct": 4.0}]

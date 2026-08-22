@@ -37,6 +37,56 @@ def test_areas_match_analytic():
         y = sec["center"][1] * M_PER_DEG_LAT
         expect = (2.0 / 3.0) * 2000.0 * (50.0 + y * 0.001)
         assert abs(sec["area_m2"] - expect) / expect < 0.05
+        # reach mean of a smooth (near-linear-in-y) channel should track the
+        # transect value about as closely as the transect tracks the analytic
+        # value -- the estimator must not distort a clean reach.
+        assert abs(sec["area_reach_m2"] - expect) / expect < 0.05
+
+DIP_Y_M = 2500.0  # metres north of the seed's own y=0
+
+def dip_inputs():
+    # Straight, flat-bottomed channel like the flare fixture below, but with
+    # one placement-noisy transect: a single station's half-width is notched
+    # 15% narrower in a band far tighter than the 500 m station spacing, so
+    # only that one station's cross-section is affected. Exercises the
+    # reach-mean estimator (spec 3, owner ruling 2026-08-21 third amendment)
+    # introduced because a single transect at a sharp throat is placement-
+    # noisy -- Deception Pass measured a 12.7% anchor-area swing under a
+    # half-spacing seed shift.
+    return {
+        "slug": "dip",
+        "anchor": {"provider": "noaa", "station_id": "DIP1", "lat": 0.0, "lon": 0.0,
+                   "flood_deg": 0.0, "spring_max_kn": 4.0},
+        "thalweg_seed": [[0.0, -500.0 / M_PER_DEG_LAT], [0.0, 5500.0 / M_PER_DEG_LAT]],
+        "section_spacing_m": 500,
+        "max_half_width_m": 1200,
+        "cd_to_mwl_m": 0.0,
+        "tile_value": "depth",
+        "ends": {"start": "test", "end": "test"},
+        "check_stations": [],
+    }
+
+def dip_depth(lon, lat):
+    x = lon * M_PER_DEG_LAT
+    y = lat * M_PER_DEG_LAT
+    half = 850.0 if abs(y - DIP_Y_M) < 20.0 else 1000.0  # notch band << 500 m spacing
+    return 50.0 if abs(x) <= half else float("nan")
+
+def test_reach_mean_damps_a_single_narrow_transect():
+    out = build_pass(dip_inputs(), dip_depth)
+    idx = min(range(len(out["sections"])),
+             key=lambda i: abs(out["sections"][i]["center"][1] * M_PER_DEG_LAT - DIP_Y_M))
+    nominal = 2 * 1000.0 * 50.0  # flat-bottom rectangle: width x depth
+    raw = out["sections"][idx]["area_m2"]
+    reach = out["sections"][idx]["area_reach_m2"]
+    raw_dip = abs(raw - nominal) / nominal
+    reach_dip = abs(reach - nominal) / nominal
+    assert raw_dip > 0.10, raw_dip           # sanity: the notch really is a >=10% transect dip
+    assert reach_dip < 0.10, reach_dip       # reach mean damps it under the anchor-stability bar
+    assert reach_dip < raw_dip / 1.5, (raw_dip, reach_dip)  # meaningfully damped, not rounding noise
+    # scales must be derived from the reach-mean area, not the raw transect
+    a = out["anchor"]["section_index"]
+    assert out["scales"][idx] == round(out["sections"][a]["area_reach_m2"] / reach, 4)
 
 def test_thalweg_refined_to_deepest():
     out = build_pass(synthetic_inputs(), synthetic_depth)

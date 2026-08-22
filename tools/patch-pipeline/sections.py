@@ -94,6 +94,29 @@ def _section(center, bearing_deg, half_width_m, depth_at):
     return pts[lo], pts[hi], width, area, float(offsets[dpi]), float(depths[dpi])
 
 
+def _reach_mean(areas):
+    """A(x) as the reach-mean cross-section area over +/- half a section
+    spacing (spec 3, owner ruling 2026-08-21 third amendment): transport
+    conservation is a reach statement, and a single transect at a sharp
+    throat is placement-noisy (measured 12.7% anchor-area swing at
+    Deception's 140 m gut vs 1.4-5.3% at Tacoma's 1370 m throat). Sections
+    already sit at one-spacing intervals, so the window mean under a
+    piecewise-linear model of A(x) between stations is just the 3-point
+    weighted average of a station with its two neighbours -- Simpson-ish
+    weights 0.25/0.5/0.25 (no need to re-sample new cross-sections at
+    x +/- spacing/2; the existing stations already are that grid). Clamped
+    at strip ends by renormalizing over whichever neighbour exists, so every
+    output is still a true weighted mean (weights sum to 1), not a
+    foreshortened sum that would bias the ends low."""
+    n = len(areas)
+    out = []
+    for i in range(n):
+        avail = [(j, w) for j, w in ((i - 1, 0.25), (i, 0.5), (i + 1, 0.25)) if 0 <= j < n]
+        wsum = sum(w for _, w in avail)
+        out.append(sum(areas[j] * w for j, w in avail) / wsum)
+    return out
+
+
 def build_pass(inputs, depth_at):
     """Pure core: inputs dict + depth_at(lon, lat)->metres-at-MWL (NaN=dry)."""
     spacing = inputs["section_spacing_m"]
@@ -142,6 +165,14 @@ def build_pass(inputs, depth_at):
                          "left": [float(left[0]), float(left[1])],
                          "right": [float(right[0]), float(right[1])]})
 
+    # A(x) for the speed scale: reach-mean, not the raw transect (spec 3,
+    # owner ruling 2026-08-21 third amendment). Raw area_m2 stays in the doc
+    # so both are auditable; scales are derived from area_reach_m2 only.
+    # (Mouth termination/flare below is a WIDTH rule -- unaffected.)
+    areas_reach = _reach_mean([s["area_m2"] for s in sections])
+    for s, ar in zip(sections, areas_reach):
+        s["area_reach_m2"] = round(ar, 1)
+
     # anchor section = nearest to the anchor station; flood-orientation assert
     a = inputs["anchor"]
     dists = [math.hypot((s["center"][0] - a["lon"]) * _m_per_deg_lon(a["lat"]),
@@ -152,8 +183,8 @@ def build_pass(inputs, depth_at):
         raise SystemExit(f"{inputs['slug']}: thalweg bearing {sections[k]['bearing_deg']} vs "
                          f"anchor flood {a['flood_deg']} — seed must be drawn in the flood direction")
 
-    a_area = sections[k]["area_m2"]
-    scales = [round(a_area / s["area_m2"], 4) for s in sections]
+    a_area = sections[k]["area_reach_m2"]
+    scales = [round(a_area / s["area_reach_m2"], 4) for s in sections]
 
     # Mouth termination (spec 3, owner ruling 2026-08-21): walking outward from
     # the anchor, the patch ends at the first section wider than FLARE x the
