@@ -29,6 +29,7 @@ struct PremiumView: View {
                     } else {
                         ForEach(store.products, id: \.id) { product in
                             Button {
+                                purchaseError = nil
                                 purchasing = true
                                 Task {
                                     defer { purchasing = false }

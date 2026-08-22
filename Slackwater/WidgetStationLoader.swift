@@ -59,8 +59,8 @@ enum WidgetStationLoader {
     /// First favorite, else most-recent, else Friday Harbor — the widget's
     /// default when unconfigured.
     static func defaultStationID() -> String {
-        AppGroup.defaults.stringArray(forKey: "slackwater.favorites")?.first
-            ?? AppGroup.defaults.stringArray(forKey: "slackwater.recents")?.first
+        AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey)?.first
+            ?? AppGroup.defaults.stringArray(forKey: AppGroup.recentsKey)?.first
             ?? TideStationRecord.fridayHarborID
     }
 }

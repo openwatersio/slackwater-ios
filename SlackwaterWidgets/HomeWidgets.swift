@@ -28,7 +28,11 @@ struct NextEventView: View {
                     Text(next.time, style: .time)
                         .font(.title2.weight(.semibold).monospacedDigit())
                         .environment(\.timeZone, s.tz)
-                    Text(next.label).font(.caption).lineLimit(1)
+                    // .monospacedDigit(): `next.label` carries a formatted
+                    // height/speed (H2's formatHeight/formatSpeed) — same
+                    // no-jitter rule as every other numeric reading
+                    // (TypeScaleTests.testNumericFormattersAreMonospacedDigit).
+                    Text(next.label).font(.caption.monospacedDigit()).lineLimit(1)
                 } else {
                     Text("—").font(.title)
                 }
@@ -68,7 +72,7 @@ struct DayCurveView: View {
                         Text(next.time, style: .time)
                             .font(.caption.weight(.semibold).monospacedDigit())
                             .environment(\.timeZone, s.tz)
-                        Text(next.label).font(.caption2).foregroundStyle(.secondary)
+                        Text(next.label).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                     }
                 }
                 SparklineView(values: s.sparkline, nowFraction: s.nowFraction)
@@ -104,23 +108,7 @@ struct SparklineView: View {
     }
 }
 
-/// RFC 3986 "unreserved" only. `.urlPathAllowed` looked like the obvious
-/// choice (it does escape ":", e.g. "current:PUG1515") but it does NOT escape
-/// "/" — and every tide/current station id in the bundled catalogs (all 3,607
-/// of them: "noaa/9454616", "current:noaa/jx0701", "ticon/aasiaat-...") has
-/// one. With `.urlPathAllowed`, `url.pathComponents` splits on that "/" and
-/// the receiving `.onOpenURL` only ever sees the first fragment. Only CHS
-/// stations (no "/" in their ids) round-tripped by accident under the wider
-/// set. Confirmed by direct round-trip test — see task-9-report.md.
-private let idPathCharacters = CharacterSet(charactersIn:
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-
-func deepLink(_ entry: SlackwaterEntry) -> URL? {
-    // Station ids contain ":" and "/" (e.g. "current:noaa/jx0701") —
-    // percent-encode both; the receiving `.onOpenURL` reads the id back
-    // decoded via `url.pathComponents`.
-    guard let id = entry.stationID,
-          let encoded = id.addingPercentEncoding(withAllowedCharacters: idPathCharacters)
-    else { return URL(string: "slackwater://station") }
-    return URL(string: "slackwater://station/\(encoded)")
-}
+/// The encoding itself (the character set + the fallback-to-premium rule)
+/// lives in `Slackwater/DeepLink.swift` (M3): a shared, appex-and-app file
+/// so a round-trip test can exercise it without linking `SlackwaterEntry`.
+func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }

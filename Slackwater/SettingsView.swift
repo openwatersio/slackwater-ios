@@ -5,8 +5,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage(unitsKey) private var units = "imperial"
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @ObservedObject private var chs = ChsFitService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false

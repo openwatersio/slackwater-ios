@@ -4,10 +4,21 @@
 import CoreLocation
 import SwiftUI
 import TideEngine
+import WidgetKit
 
 @main
 struct SlackwaterApp: App {
     init() {
+        // Must run BEFORE anything touches FavoritesStore/RecentsStore/
+        // ChsFitService: AppGroup.defaults itself no longer migrates on first
+        // touch (B2) — an appex process can be the very first reader of the
+        // shared suite on a fresh install, and migrating on that read would
+        // burn the app's own standard-defaults history the appex never had.
+        AppGroup.migrateIfNeeded(into: AppGroup.defaults, from: .standard)
+        // The widget-reload hook (ChsStation.swift's `WidgetReload`): a no-op
+        // until the app assigns it, so the widget extension — which also
+        // compiles ChsModelStore.save — never triggers its own reload.
+        WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
         // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
         // gate; -seedGate skips it (arguments-domain values would mask the
         // in-app write, so tests set persisted state explicitly instead).
@@ -313,7 +324,7 @@ struct StationListView: View {
     /// same key `currentFillEnabled` reads, so the style builders and this
     /// toggle can never disagree.
     @AppStorage(currentFillKey) private var showFill = true
-    @AppStorage(unitsKey) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -1337,7 +1348,7 @@ struct StationChooserSheet: View {
 struct RecentRowLabel: View {
     let item: StationItem
     let imperial: Bool
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     // Cache the engine state, format in body — unit switches re-render live.
     // Still the whole card state and not just the number: `reading` needs the
     // slack test and the phase word, which the bare value doesn't carry.
@@ -1636,7 +1647,7 @@ struct OnlineGateCardView: View {
     let gate: ChsCurrentGateInfo
     let window: ChsOnlineWindow
     var km: Double? = nil
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
 
     private var state: CurrentCardState { window.cardState(at: appNow()) }
 
@@ -1692,7 +1703,7 @@ struct CurrentCardView: View {
     /// which the badge could only gesture at. The full explanation still lives
     /// on the detail view's amber card.
     var provisional: ChsCurrentGateInfo? = nil
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:

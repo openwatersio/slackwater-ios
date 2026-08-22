@@ -2,6 +2,16 @@
 import Foundation
 import TideEngine
 
+/// The "weak current" convention: under half a knot a small boat transits.
+/// A constant, not a setting, until someone asks (split-scrubbers spec §2).
+///
+/// Top-level rather than a `Timeline` member (M1): the widget's
+/// `WidgetSnapshot.build` needs this exact number too, and used to carry its
+/// own separately-declared `0.5` — two literals that could silently drift
+/// apart. One definition, shared by the strip and the widget extension, same
+/// as `slackWindow` below.
+let slackThresholdKn = 0.5
+
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
 /// the same series the strip renders, so the window can never disagree with

@@ -181,7 +181,7 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertFalse(store.contains(id))
         store.toggle(id)
         XCTAssertTrue(store.contains(id), "toggle must add a new favorite")
-        XCTAssertEqual(AppGroup.defaults.stringArray(forKey: "slackwater.favorites")?.contains(id), true)
+        XCTAssertEqual(AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey)?.contains(id), true)
         store.toggle(id)
         XCTAssertFalse(store.contains(id), "second toggle must remove it")
         // Spec §9: unfavoriting re-files to Recents.

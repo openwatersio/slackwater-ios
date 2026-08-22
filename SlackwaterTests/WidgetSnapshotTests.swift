@@ -28,6 +28,26 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssert(s.next!.label.hasPrefix("High") || s.next!.label.hasPrefix("Low"))
     }
 
+    /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
+    /// app's own Settings choice, so a metric-only label shipped to every
+    /// imperial user. Setting imperial explicitly (rather than relying on
+    /// the unset default, which is already imperial) is the test that
+    /// actually distinguishes the fix from the old hardcoded string — that
+    /// one always ended in "m", imperial or not.
+    func testTideLabelRespectsImperialUnits() {
+        let saved = AppGroup.defaults.object(forKey: unitsKey)
+        defer {
+            if let saved { AppGroup.defaults.set(saved, forKey: unitsKey) }
+            else { AppGroup.defaults.removeObject(forKey: unitsKey) }
+        }
+        AppGroup.defaults.set("imperial", forKey: unitsKey)
+
+        let s = WidgetSnapshot.build(friday, now: Date())
+        let label = try! XCTUnwrap(s.next).label
+        XCTAssert(label.hasSuffix("ft"), "expected an imperial label, got \(label)")
+        XCTAssertFalse(label.hasSuffix("m"), "expected an imperial label, got \(label)")
+    }
+
     func testCurrentNextEventAndWindow() {
         let s = WidgetSnapshot.build(current, now: Date())
         XCTAssertNotNil(s.next)

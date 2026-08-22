@@ -7,6 +7,15 @@ options:
   # concern, not this app's.
   deploymentTarget:
     iOS: "26.0"
+settings:
+  base:
+    # Shared by both targets so the appex's Info.plist $(MARKETING_VERSION)/
+    # $(CURRENT_PROJECT_VERSION) substitutions resolve to the same values the
+    # app ships — a per-target pair here silently drifts the two Info.plists
+    # apart (the appex shipped 1.0/1 otherwise; see the app target's own
+    # CFBundleVersion/CFBundleShortVersionString comment below for the history).
+    MARKETING_VERSION: 1.3.0
+    CURRENT_PROJECT_VERSION: 27
 packages:
   TideEngine:
     url: https://github.com/sailingnaturali/slackwater-engine
@@ -70,8 +79,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
-        MARKETING_VERSION: 1.3.0
-        CURRENT_PROJECT_VERSION: 27
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Slackwater/Slackwater.entitlements
         DEVELOPMENT_TEAM: R3H8DPTV9C
@@ -103,6 +110,8 @@ targets:
       - path: Slackwater/Resources/chs-current-gates.json
       - path: Slackwater/Resources/chs-tombstones.json
       - Slackwater/AppGroup.swift
+      - Slackwater/Units.swift
+      - Slackwater/DeepLink.swift
       - Slackwater/SlackWindow.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/WidgetSnapshot.swift
@@ -118,6 +127,11 @@ targets:
       path: SlackwaterWidgets/Info.plist
       properties:
         CFBundleDisplayName: Slackwater
+        # Without these the appex ships XcodeGen's literal "1.0"/"1" instead
+        # of the app's real version — the appex-version blocker (see the
+        # top-level `settings.base` these substitute from).
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

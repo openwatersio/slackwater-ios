@@ -3,6 +3,7 @@
 // roles, and the web app's unit formatting. The per-station gradient trios
 // this once carried are gone (M53 layout A) — cards take a flat SN.cardFill.
 import SwiftUI
+import WidgetKit
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -162,38 +163,6 @@ func todayLocal(_ tz: TimeZone) -> Date {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
     return cal.startOfDay(for: appNow())
-}
-
-// MARK: - Units (mirrors slackwater-web src/units.ts)
-
-let unitsKey = "slackwater.units"  // "imperial" | "metric", same values as the web
-
-func toFeet(_ metres: Double) -> Double { metres * 3.28084 }
-
-/// Strip a negative zero, which appears whenever a tide sits just below datum.
-private func unsign(_ n: Double) -> Double { abs(n) < 0.05 ? abs(n) : n }
-
-func formatHeight(_ metres: Double, imperial: Bool) -> String {
-    imperial ? String(format: "%.1f", unsign(toFeet(metres)))
-             : String(format: "%.2f", unsign(metres))
-}
-
-func heightUnit(imperial: Bool) -> String { imperial ? "ft" : "m" }
-
-// Current speed (web units.ts SpeedUnit): "kn" | "kmh" | "ms", same key/values.
-let speedUnitKey = "slackwater.speedUnit"
-
-func toKmh(_ knots: Double) -> Double { knots * 1.852 }
-func toMs(_ knots: Double) -> Double { knots * 0.514444 }
-
-/// Web formatSpeed: convert, strip a near-zero sign, one decimal.
-func formatSpeed(_ knots: Double, unit: String) -> String {
-    let v = unit == "kmh" ? toKmh(knots) : unit == "ms" ? toMs(knots) : knots
-    return String(format: "%.1f", abs(v) < 0.05 ? abs(v) : v)
-}
-
-func speedUnitLabel(_ unit: String) -> String {
-    unit == "kmh" ? "km/h" : unit == "ms" ? "m/s" : "kn"
 }
 
 // MARK: - Station-local time formatting
@@ -792,7 +761,7 @@ struct TideAtPortLink: View {
 /// in UserDefaults. Recorded by the detail views on appear.
 final class RecentsStore: ObservableObject {
     static let shared = RecentsStore()
-    private static let key = "slackwater.recents"
+    private static let key = AppGroup.recentsKey
 
     @Published private(set) var ids: [String]
 
@@ -845,7 +814,7 @@ final class RecentsStore: ObservableObject {
 /// star and the list swipe actions.
 final class FavoritesStore: ObservableObject {
     static let shared = FavoritesStore()
-    private static let key = "slackwater.favorites"
+    private static let key = AppGroup.favoritesKey
 
     @Published private(set) var ids: [String]
 
@@ -877,6 +846,11 @@ final class FavoritesStore: ObservableObject {
             ids.append(id)
         }
         AppGroup.defaults.set(ids, forKey: Self.key)
+        // A widget's default station is "first favorite" (WidgetStationLoader
+        // .defaultStationID) — starring/unstarring can change what an
+        // unconfigured widget shows, so its timeline must not wait for the
+        // next half-hourly tick (H1).
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     /// True removal, for a station that has left the bundle (issue #91).
