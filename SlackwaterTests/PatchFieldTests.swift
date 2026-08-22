@@ -6,7 +6,10 @@ import XCTest
 final class PatchFieldTests: XCTestCase {
     /// Fixture: one patch, anchor = bundled NOAA station PUG1701, two cells
     /// (scale 0.5 / bearing 90 / width 200; scale 2.0 / bearing 270 / width 300).
-    private func fixture(anchorId: String = "PUG1701") -> (Data, Data) {
+    /// `provider` defaults to "noaa" — pass "chs" to exercise the CHS anchor
+    /// branch (the bin bytes are identical either way; only the anchor lookup
+    /// differs, and an unresolvable anchor never reaches the cell bytes).
+    private func fixture(provider: String = "noaa", anchorId: String = "PUG1701") -> (Data, Data) {
         var bin = Data()
         func cell(_ verts: [(Double, Double)], _ scale: Float16, _ bearing: Float16, _ width: Float16) {
             for (lon, lat) in verts {
@@ -21,7 +24,7 @@ final class PatchFieldTests: XCTestCase {
         cell([(-122.64, 48.41), (-122.63, 48.41), (-122.63, 48.42)], 2.0, 270, 300)
         let header = """
         {"format_version": 1, "region": "salish", "patches":
-         [{"id": "test-pass", "anchor": {"provider": "noaa", "station_id": "\(anchorId)"},
+         [{"id": "test-pass", "anchor": {"provider": "\(provider)", "station_id": "\(anchorId)"},
            "cell_count": 2, "offset": 0}]}
         """
         return (bin, Data(header.utf8))
@@ -50,6 +53,19 @@ final class PatchFieldTests: XCTestCase {
         let (bin, header) = fixture(anchorId: "NO-SUCH-STATION")
         let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
         XCTAssertTrue(field.cells(at: Date()).isEmpty)   // absence stays absence
+    }
+
+    // Coverage gate: the "chs" arm of anchorSpeed's provider switch had zero
+    // test coverage — a typo in the provider string or an inverted condition
+    // there would pass the full suite silently. The cheap, fixture-free case:
+    // an unknown CHS gate id short-circuits at ChsCurrentGateInfo.all.first
+    // before ChsModelStore.loadCurrent is even called, so no on-disk model
+    // fixture is needed to prove absence stays absence through this branch too.
+    func testUnresolvableChsAnchorVendsNothing() throws {
+        let (bin, header) = fixture(provider: "chs", anchorId: "chs-no-such-gate")
+        let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
+        XCTAssertTrue(field.cells(at: Date()).isEmpty)
+        XCTAssertTrue(field.samples(at: Date()).isEmpty)
     }
 
     func testBBoxCullUsesTriangleExtent() throws {
