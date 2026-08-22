@@ -149,8 +149,10 @@ failure as yours:
   killed mid-write leaves a bundle with no `Info.plist`.
 - **Live-network tests with fixed timeouts fail under load.**
   `testM51PromotionInterruptsAnInFlightDownload` fails roughly two of three full runs on
-  the iPad leg — which starts ~1600s in — and passes alone every time in 49 seconds
-  (issue #65). **Before blaming your change: re-run the single test in isolation.**
+  the iPad leg — which starts late, after the whole iPhone leg — and passes alone every
+  time in 49 seconds (issue #65). **Before blaming your change: re-run the single test
+  in isolation.** This is a `--full` problem only: the fast run is iPhone-only, so the
+  iPad leg no longer exists there at all.
 - **"Timed out trying to boot simulator after waiting 60.00s" means a stale
   Simulator.app, not your code.** A long-running Simulator.app wedges every new device
   boot — a 12-day-old instance did this on the Studio (2026-08-21), and the same

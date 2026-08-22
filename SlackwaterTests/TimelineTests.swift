@@ -410,9 +410,12 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        XCTAssertEqual(tide.height, 328, "NEAPS bands above and below the track, no gutter")
-        XCTAssertEqual(tide.tideTop, 106)
-        XCTAssertEqual(tide.tideBottom, 256)
+        // NEAPS bands above and below the track, no gutter. Asserted as
+        // structure, not as pixels: the literals that used to sit here
+        // (328/106/256) restated TimelineGeo's own constants back at it, so any
+        // deliberate change to the band grid reddened this test having caught
+        // nothing. assertBandsAreReadable and the body/track identities below
+        // are what actually fail when the geometry breaks.
         XCTAssertEqual(tide.bodyTop, tide.tideTop)
         XCTAssertEqual(tide.bodyBottom, tide.tideBottom)
         assertBandsAreReadable(tide)
@@ -433,7 +436,6 @@ final class TimelineTests: XCTestCase {
         // speeds annotating the curve itself — two rows, not six — so borrowing
         // tide's grid would leave four rows of dead height on every gate.
         // Shorter canvas, taller track.
-        XCTAssertEqual(cur.height, 312)
         XCTAssertLessThan(cur.height, tide.height, "fewer rows, shorter canvas")
         XCTAssertGreaterThan(cur.curBottom - cur.curTop, tide.tideBottom - tide.tideTop,
                              "and the reclaimed height goes to the curve")
@@ -459,7 +461,8 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: tideData.start, speed: 1)], currentEvents: [],
             snapTimes: tideData.snapTimes, slackWindows: []))
         XCTAssert(both.hasTide && both.hasCurrent)
-        XCTAssertEqual(both.height, 328, "combined input resolves tide-first — no combined case exists (spec §1/§2)")
+        XCTAssertEqual(both.height, tide.height,
+                       "combined input resolves tide-first — no combined case exists (spec §1/§2)")
         XCTAssertEqual(both.curTop, 0)
     }
 
@@ -820,11 +823,10 @@ final class TimelineTests: XCTestCase {
 
         let d = TimelineData.build(onlinePoints: pts, tz: tz, lat: 48.5, lon: -123.0, now: now, anchor: today)
 
+        // TimelineGeo keys only on which point arrays are non-empty
+        // (testSingleTrackGeometries), so this is already the current-only
+        // geometry — the `== 312` that used to follow just restated its height.
         XCTAssert(d.hasCurrent && !d.hasTide)
-        // 312: the current strip's own height since its rows collapsed to one
-        // above and one below (was 380 with the three-row gutter, 328 while
-        // both tracks briefly shared tide's band grid).
-        XCTAssertEqual(TimelineGeo(data: d).height, 312)
         XCTAssertFalse(d.currentEvents.isEmpty)
         // Fetched official samples are real velocities, so the online-gate path
         // gets slack windows — the derived-gate path does not, because its curve
@@ -858,26 +860,22 @@ final class TimelineTests: XCTestCase {
 
     // MARK: - The range bar label (spec §5)
 
-    func testWeekRangeLabelNamesTheLastDayShown() {
+    /// One label, four shapes it has to take. Was three tests with one assert
+    /// each and the same two setup lines.
+    func testWeekRangeLabel() {
         let tz = TimeZone(identifier: "America/Vancouver")!
-        // Anchor Aug 11 → groups Aug 11…Aug 17. The label names Aug 17, the last
-        // day ON SCREEN, never the exclusive Aug 18 boundary.
-        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 8, 11), tz: tz),
-                       "Aug 11 – 17")
-    }
-
-    func testWeekRangeLabelSpellsTheMonthWhenItChanges() {
-        let tz = TimeZone(identifier: "America/Vancouver")!
-        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 8, 28), tz: tz),
-                       "Aug 28 – Sep 3")
-    }
-
-    func testWeekRangeLabelShowsTheYearOnlyWhenItChanges() {
-        let tz = TimeZone(identifier: "America/Vancouver")!
-        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 12, 29), tz: tz),
-                       "Dec 29 – Jan 4, 2027")
-        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 6, 1), tz: tz),
-                       "Jun 1 – 7", "a same-year range never prints a year")
+        let cases: [(y: Int, m: Int, d: Int, expected: String, why: String)] = [
+            // Anchor Aug 11 → groups Aug 11…Aug 17. The label names Aug 17, the
+            // last day ON SCREEN, never the exclusive Aug 18 boundary.
+            (2026, 8, 11, "Aug 11 – 17", "names the last day shown"),
+            (2026, 8, 28, "Aug 28 – Sep 3", "spells the month when it changes"),
+            (2026, 12, 29, "Dec 29 – Jan 4, 2027", "shows the year when it changes"),
+            (2026, 6, 1, "Jun 1 – 7", "a same-year range never prints a year"),
+        ]
+        for c in cases {
+            XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d), tz: tz),
+                           c.expected, c.why)
+        }
     }
 }
 

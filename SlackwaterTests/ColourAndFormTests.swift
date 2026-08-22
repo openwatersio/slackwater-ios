@@ -163,10 +163,13 @@ final class ColourAndFormTests: XCTestCase {
                       Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
     }
 
-    func testGlyphColourTracksStateAndNeverKind() {
-        // Same state, different kinds: same colour.
-        assertSameColour(StationGlyph.colour(for: .slack), StationGlyph.colour(for: .slack),
-                         "tone determines colour")
+    /// Colour is the STATE axis. The "and never kind" this used to be named for
+    /// is unenforceable by construction now — `colour(for:)` takes a `Tone` and
+    /// nothing else, so there is no kind to pass it (StationGlyph.swift). The
+    /// assertion that carried that half had decayed to
+    /// `assertSameColour(colour(for: .slack), colour(for: .slack))` — literally
+    /// x == x — when kind left the signature, and passed forever after.
+    func testGlyphColourIsTheStateAxis() {
         // Different states: different colours.
         assertDifferentColour(StationGlyph.colour(for: .flood), StationGlyph.colour(for: .ebb),
                               "flood and ebb must not share a colour")

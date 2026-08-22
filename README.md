@@ -123,18 +123,23 @@ own. Full policy, including why the macOS CI lane is self-hosted, in `CONTRIBUTI
 
 ## Testing (agents: read this)
 
-One checked-in test plan (`TestPlans/Slackwater.xctestplan`), run on both reference
-simulators by `scripts/test.sh`. `--full` does not switch plans — it exports
-`TEST_RUNNER_SLACKWATER_FULL`, and the live-IWLS tests skip themselves without it:
+One checked-in test plan (`TestPlans/Slackwater.xctestplan`), driven by
+`scripts/test.sh`. `--full` does not switch plans — it adds the iPad simulator and
+exports `TEST_RUNNER_SLACKWATER_FULL`, and the live-IWLS tests skip themselves
+without it:
 
 ```sh
-./scripts/test.sh          # FAST (default) — ~9 min/sim idle. Use this while iterating.
-./scripts/test.sh --full   # FULL — ~21 min/sim idle, and variable. Before every upload.
+./scripts/test.sh          # FAST (default) — iPhone only, ~15 min. Use this while iterating.
+./scripts/test.sh --full   # FULL — both sims + live IWLS, 35 min+ and variable. Before every upload.
 ```
 
+**Fast is iPhone-only on purpose.** The iPad leg is 1169 s and is the only place
+three tests run (100 s between them); everything else it runs is a second rendering
+of what the iPhone leg just proved. That trade is worth making before an upload, not
+on every commit.
+
 Those are idle-machine figures. With the self-hosted CI runner competing for the same
-Mac, fast has been observed at ~14–16 min/sim and full at ~27–37 — budget accordingly,
-and see `CLAUDE.md` for what contention does to live-network tests.
+Mac, budget more — and see `CLAUDE.md` for what contention does to live-network tests.
 
 Fast is everything that runs on stored or mocked state. Full adds the nine UI tests that
 fetch live from CHS IWLS and fit harmonics on-device — that is the entire difference, it

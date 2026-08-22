@@ -154,6 +154,15 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Settings"].tap()
         let segment = app.buttons[label]
         XCTAssert(segment.waitForExistence(timeout: 5))
+        // The sheet's two fixed statements, asserted on the way past. This used
+        // to be testM4Settings — its own launch, its own Settings round trip,
+        // for two strings that every caller of this helper already has on
+        // screen. M1Walkthrough alone opens the sheet four times.
+        XCTAssert(app.staticTexts["Not for navigation."].exists,
+                  "the settings sheet lost its disclaimer")
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'OpenStreetMap'")).firstMatch.exists,
+                  "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
@@ -221,9 +230,14 @@ final class ScreenshotTests: XCTestCase {
         save(app, "tide-ramp-avonmouth.png")
     }
 
-    /// The range bar heads the schedule card on every scrubable detail, and it
-    /// says what span the list below it covers.
-    func testWeekRangeBarHeadsTheSchedule() throws {
+    /// The range bar heads the schedule card on every scrubable detail and says
+    /// what span the list below it covers; tapping it opens the picker, and
+    /// picking a date moves the window with the bar following.
+    ///
+    /// The bar-exists-and-states-a-span case used to be its own test and its own
+    /// app launch. It is the first three lines of this one — a launch costs ~6 s
+    /// and this test already had to wait for the same element to read `before`.
+    func testPickingADateMovesTheWindow() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
         app.launch()
@@ -233,19 +247,6 @@ final class ScreenshotTests: XCTestCase {
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
         XCTAssert(bar.waitForExistence(timeout: 10), "no range bar above the schedule")
         XCTAssert(bar.label.contains("–"), "the bar states a span, got '\(bar.label)'")
-    }
-
-    /// Tapping the bar opens the picker; picking a date moves the window and the
-    /// bar says so.
-    func testPickingADateMovesTheWindow() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-seedGate"]
-        app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
-
-        openFridayHarbor(app)
-        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
-        XCTAssert(bar.waitForExistence(timeout: 10))
         let before = bar.label
 
         bar.tap()
@@ -528,17 +529,6 @@ final class ScreenshotTests: XCTestCase {
                   "port detail shows its own tide schedule")
         XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.exists,
                   "the link did not open the reference port's detail")
-    }
-
-    // M4: settings — units share the pill's store; the statement + licenses show.
-    func testM4Settings() throws {
-        let app = launch("-seedGate")
-        app.buttons["Settings"].tap()
-        XCTAssert(app.staticTexts["Not for navigation."].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenStreetMap'")).firstMatch.exists)
-        app.buttons["Done"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
     }
 
     // M4.1 design pass: the regrouped list — My Location hero (nm pill, 3-dp
@@ -863,18 +853,32 @@ final class ScreenshotTests: XCTestCase {
                           "first scrub left the readout frozen — initial centering raced layout again")
     }
 
-    // M4.3: the CHS pending card speaks plain language — held pending by the
-    // network kill switch (no fit can start, honest offline stand-in).
-    func testM43ChsPendingCopy() throws {
+    // M4.3 + M4.6: the CHS pending card speaks plain language — held pending by
+    // the network kill switch (no fit can start, honest offline stand-in). Both
+    // station kinds in one launch: a plain CHS tide port (Victoria) and a
+    // DERIVED gate (Malibu Rapids), which is pending for a different reason —
+    // its reference port, Point Atkinson, is the thing that is unfitted. They
+    // asserted the same string under identical launch args in two tests and
+    // two cold launches.
+    func testChsPendingCopy() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
-        openSearch(app, "victoria")
         // #93 took the sentence off the visible card — it is an icon and two
         // words now — but the plain-language copy still has to reach VoiceOver,
         // which is the reader with the LEAST context, not the most.
-        XCTAssert(app.descendants(matching: .any).matching(
-            NSPredicate(format: "label CONTAINS 'download once, then work offline'"))
+        let copy = NSPredicate(format: "label CONTAINS 'download once, then work offline'")
+
+        openSearch(app, "victoria")
+        XCTAssert(app.descendants(matching: .any).matching(copy)
             .firstMatch.waitForExistence(timeout: 10),
                   "the pending card's status strip is missing the plain-language copy")
+        closeSearch(app)
+
+        openSearch(app, "malibu")
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+                  "search did not find Malibu Rapids")
+        XCTAssert(app.descendants(matching: .any).matching(copy)
+            .firstMatch.waitForExistence(timeout: 10),
+                  "derived gate must show the CHS pending register before its reference is fitted")
     }
 
     // M4.4: iPad split layout — regular width gets the web's ≥62rem shape
@@ -1028,19 +1032,6 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
         app.staticTexts["Dodd Narrows"].firstMatch.tap()
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
-    }
-
-    // M4.6: the derived gate (Malibu Rapids) — pending while its reference
-    // port (Point Atkinson) is unfitted, held there by the network kill switch.
-    func testM46MalibuPendingBeforeFit() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
-        openSearch(app, "malibu")
-        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
-                  "search did not find Malibu Rapids")
-        XCTAssert(app.descendants(matching: .any).matching(
-            NSPredicate(format: "label CONTAINS 'download once, then work offline'"))
-            .firstMatch.waitForExistence(timeout: 10),
-                  "derived gate must show the CHS pending register before its reference is fitted")
     }
 
     // M4.6: after the reference port fits (live IWLS, like M3), the gate card
@@ -1383,11 +1374,47 @@ final class ScreenshotTests: XCTestCase {
     /// wiring the correct center/zoom into `MapViewRepresentable` is covered
     /// by reading the source, same as the rest of MapStyler's camera
     /// assertion, which nothing here exercises either.
+    ///
+    /// Two entry paths, one launch. They assert the identical contract and
+    /// differed only in how the detail was reached, which is worth a second leg
+    /// but not a second cold launch.
     func testHeaderTitleFocusesMap() throws {
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        // Camera dead-centered on Friday Harbor (stations.json) so the pin leg
+        // below can tap it: a finger-sized box at the exact center of a
+        // station-scale zoom holds one pin. Same convention as
+        // testM48MapPinToUnfittedDetail.
+        let app = launch("-seedGate", "-fixLat", "48.5453", "-fixLon", "-123.0125",
+                         "-mapZoom", "11")
 
+        // Leg 1 — detail reached from a list row.
         openFridayHarbor(app)
+        assertTitleTapFocusesMap(app)
 
+        // Leg 2 — detail reached from a MAP PIN. Review finding on the first cut
+        // of #32: that path leaves `showMap` already `true` on iPhone, so the map
+        // pane doesn't naturally remount for the title tap that follows.
+        // `.id(mapFocusToken)` on `MapViewRepresentable` forces the remount and
+        // `makeUIView` applies the focus (MapScreen.swift). iPhone-only: on iPad
+        // the split layout's `mapPane` `onSelect` resets `showMap` on a pin tap,
+        // so the scenario cannot arise there — an inline guard rather than a
+        // whole-test skip, so leg 1 still runs on both.
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.waitForExistence(timeout: 5))
+        sleep(5)  // tiles
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+                  "the pin tap did not open a detail")
+        assertTitleTapFocusesMap(app)
+    }
+
+    /// Tap the detail's header title: the map comes up and the detail is gone.
+    /// The camera move itself is not independently assertable — no accessibility
+    /// surface exposes `MLNMapView`'s live center — so this is the navigation
+    /// contract; the `.id(mapFocusToken)` remount is verified by reading
+    /// MapScreen.swift, traced in the issue-32 report.
+    private func assertTitleTapFocusesMap(_ app: XCUIApplication) {
         // Top of the detail, under the status bar clearance — should be
         // hittable the moment the header renders, no scroll needed.
         let title = app.descendants(matching: .any)["map-header-title"].firstMatch
@@ -1395,51 +1422,8 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
         title.tap()
 
-        let map = app.otherElements["map-canvas"].firstMatch
-        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
-        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
-                       "the title tap must pop the detail, not layer the map over it")
-    }
-
-    /// Review finding on the first cut of #32: a detail reached via a MAP PIN
-    /// tap (not a list row) leaves `showMap` already `true` on iPhone — only
-    /// the regular layout's `mapPane` `onSelect` resets it before pushing,
-    /// so the map pane doesn't naturally remount for the title tap that
-    /// follows. `.id(mapFocusToken)` on `MapViewRepresentable` forces that
-    /// remount, and `makeUIView` applies the focus (MapScreen.swift).
-    /// iPhone-only: this is specifically the compact stack layout's
-    /// showMap-stays-true path — on iPad the split layout's `mapPane` DOES
-    /// reset `showMap` on a pin tap, so this scenario can't arise there.
-    func testHeaderTitleAfterMapPinFocusesMap() throws {
-        guard UIDevice.current.userInterfaceIdiom == .phone else {
-            throw XCTSkip("iPhone-only: the split layout's onSelect already resets showMap on a pin tap")
-        }
-        // Camera dead-centered on Friday Harbor (stations.json), same
-        // convention as testM48MapPinToUnfittedDetail — a finger-sized box at
-        // the exact center of a station-scale zoom holds one pin.
-        let app = launch("-seedGate", "-fixLat", "48.5453", "-fixLon", "-123.0125", "-mapZoom", "11")
-
-        app.buttons["Map"].tap()
-        let map = app.otherElements["map-canvas"].firstMatch
-        XCTAssert(map.waitForExistence(timeout: 5))
-        sleep(5)  // tiles
-
-        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5), "the pin tap did not open a detail")
-
-        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
-        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
-        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
-        title.tap()
-
-        // Same navigation contract testHeaderTitleFocusesMap asserts, but
-        // reached through the showMap-already-true path, which is the entire
-        // point of this test. The camera move itself still isn't
-        // independently assertable here (no accessibility surface exposes
-        // MLNMapView's live center — see testHeaderTitleFocusesMap's doc
-        // comment); the `.id(mapFocusToken)` remount fix is verified by
-        // reading MapScreen.swift, traced in the issue-32 report.
-        XCTAssert(map.waitForExistence(timeout: 5), "the title tap did not show the map")
+        XCTAssert(app.otherElements["map-canvas"].firstMatch.waitForExistence(timeout: 5),
+                  "the title tap did not show the map")
         XCTAssertFalse(app.otherElements["detail-map-header"].exists,
                        "the title tap must pop the detail, not layer the map over it")
     }

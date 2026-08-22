@@ -18,7 +18,7 @@ concurrency:
 jobs:
   # Gates the Studio lane below. There is ONE self-hosted macOS runner, shared
   # with the scheduled jobs and with everyone's local ./scripts/test.sh, and the
-  # lane is ~25 minutes — so a docs-only change that books it puts every other
+  # lane is ~15 minutes — so a docs-only change that books it puts every other
   # session in a queue behind it. Measured: PRs whose entire diff was CLAUDE.md,
   # or two markdown files, each took a full run.
   #
@@ -141,19 +141,21 @@ jobs:
     needs: changes
     if: needs.changes.outputs.app == 'true'
     # Self-hosted on the Mac Studio. GitHub-hosted macOS bills at 10x on a
-    # private repo, and the fast plan across both simulators is ~25 min of wall
-    # clock — about 250 billable minutes, which would exhaust the monthly
-    # allowance in roughly eight runs. The Studio is already the always-on
-    # scheduled-job host and keeps a warm SPM cache. See CONTRIBUTING.md.
+    # private repo, and the fast lane is ~15 min of wall clock — about 150
+    # billable minutes, which would exhaust the monthly allowance in roughly
+    # thirteen runs. The Studio is already the always-on scheduled-job host
+    # and keeps a warm SPM cache. See CONTRIBUTING.md.
     runs-on: [self-hosted, macOS]
     steps:
       - uses: actions/checkout@v7
 
-      # The runner is the Mac we develop on, so CI gets its own pair of
-      # simulator devices — same device types, different instances. Sharing a
-      # device with a local `xcodebuild` run makes the two SIGKILL each other's
-      # test runner, which reads as a real test failure and is not one.
-      # Created on first run; kept afterwards.
+      # The runner is the Mac we develop on, so CI gets its own simulator
+      # devices — same device types, different instances. Sharing a device with
+      # a local `xcodebuild` run makes the two SIGKILL each other's test runner,
+      # which reads as a real test failure and is not one.
+      # Created on first run; kept afterwards. The iPad device is still created
+      # here even though the fast lane no longer uses it: a `--full` run driven
+      # by hand on this machine expects it to exist.
       - name: CI-only simulators
         run: |
           xcrun simctl list devices | grep -q 'SlackwaterCI-iPhone' \
@@ -161,10 +163,14 @@ jobs:
           xcrun simctl list devices | grep -q 'SlackwaterCI-iPad' \
             || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
 
-      # Runs xcodegen, then the fast suite on both reference simulators — the
-      # live-IWLS UI tests skip themselves unless SLACKWATER_FULL is set
-      # (scripts/test.sh --full), and that full run stays a pre-upload step
-      # run by hand.
+      # Runs xcodegen, then the fast suite on the iPhone simulator. Two things
+      # stay out of this lane and ride `scripts/test.sh --full`, run by hand
+      # before an upload: the live-IWLS UI tests (they skip themselves unless
+      # SLACKWATER_FULL is set) and the iPad leg.
+      #
+      # SLACKWATER_SIMS must name ONE device here. It overrides the script's own
+      # fast/full device list outright, so leaving the iPad in it would silently
+      # undo the split and keep booking the shared runner for ~34 minutes.
       - run: ./scripts/test.sh
         env:
-          SLACKWATER_SIMS: SlackwaterCI-iPhone,SlackwaterCI-iPad
+          SLACKWATER_SIMS: SlackwaterCI-iPhone
