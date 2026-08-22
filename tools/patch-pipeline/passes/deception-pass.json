@@ -927,14 +927,20 @@
   0.2261
  ],
  "kept_range": [
-  0,
-  40
+  11,
+  14
  ],
+ "flare_ratio": 1.3,
+ "throat": {
+  "width_m": 140.0,
+  "reference": "anchor section",
+  "limit_m": 182.0
+ },
  "ends": {
   "start": "W: at the pass mouth between Lighthouse Point and Deception Island, where the channel still has walls (~800 m). The seed used to run 500 m further west into Rosario Strait; out there the cross-section is open water whose area grows with whatever search window it is given (1670 m at half-width 900, 2270 m at 1500, 3270 m at 2500), so those sections measured the window, not the channel. Rosario Strait is the junction spec 2 says to stop at.",
   "end": "E: past Yokeko Point (PUG1629), stopping at the Similk Bay / Swinomish Channel junction where the channel fans out"
  },
- "generated": "2026-08-22T01:06:54Z",
+ "generated": "2026-08-22T01:32:01Z",
  "provenance": {
   "tiles": [
    {
@@ -966,6 +972,6 @@
     "derived_by": "gdal_translate -b 1 -co COMPRESS=DEFLATE -co TILED=YES <bag> <tiff>"
    }
   ],
-  "inputs_sha256": "fe7acb9ceb06cca55c18e4f7ea8d8fa131375dae31606cc67b3f256c404762c5"
+  "inputs_sha256": "a02a76aff9f6ec87d3cbf91df90d18eee5cff777e935fa4e2accc057cb77ff20"
  }
 }
