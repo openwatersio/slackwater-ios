@@ -6,10 +6,13 @@ at chart datum (cd_to_mwl_m = 0) instead of MWL. Two gates:
 
 - anchor stability (check_anchor_stability): hard SystemExit if the anchor's
   own nearest-section assignment drifts more than one station, or the
-  absolute area computed at its physical position swings more than 10% of
-  the base area, under any variant. Non-self-normalized signals only --
-  scale is always 1.0 at a run's own anchor by construction, so it cannot
-  see this (see align_to_anchor's docstring).
+  reach-mean area (sections.py's A(x) estimator, spec 3) computed at its
+  physical position swings more than 10% of the base area, under any
+  variant. Non-self-normalized signals only -- scale is always 1.0 at a
+  run's own anchor by construction, so it cannot see this (see
+  align_to_anchor's docstring). A pass whose anchor still fails this bar
+  under the reach estimator ships no patch (owner ruling 2026-08-21, third
+  amendment) -- not a further escalation, the pre-decided fallback.
 - per-section truncation: any section whose spring-peak speed (scale x
   anchor spring_max_kn) moves more than max(10%, 0.25 kn) under any variant
   is dropped; kept_range = longest contiguous stable run containing the
@@ -83,10 +86,12 @@ def check_anchor_stability(base_anchor, base_anchor_area, variants, labels,
     self-normalized (scale is always 1.0 at a run's own anchor, so it can't
     detect this -- see align_to_anchor's note). Two checks per variant:
     the anchor's nearest-section assignment drifting more than drift_bar
-    stations under a half-spacing nudge, and the absolute area computed at
-    the anchor's physical position swinging more than area_bar (10%) of the
-    base area. Returns per-variant evidence for the pass doc's `sensitivity`
-    block: [{"label", "anchor_index_offset", "anchor_area_delta_pct"}]."""
+    stations under a half-spacing nudge, and the reach-mean area (spec 3,
+    owner ruling 2026-08-21 third amendment -- the estimator this stability
+    bar is measured against, same as `scales`) computed at the anchor's
+    physical position swinging more than area_bar (10%) of the base area.
+    Returns per-variant evidence for the pass doc's `sensitivity` block:
+    [{"label", "anchor_index_offset", "anchor_area_delta_pct"}]."""
     evidence = []
     for v, label in zip(variants, labels):
         v_anchor = v["anchor"]["section_index"]
@@ -94,7 +99,7 @@ def check_anchor_stability(base_anchor, base_anchor_area, variants, labels,
         if abs(offset) > drift_bar:
             raise SystemExit(f"anchor drifted {offset} stations under variant "
                              f"'{label}' — anchor placement is sensitivity-unstable")
-        delta_pct = abs(v["sections"][v_anchor]["area_m2"] - base_anchor_area) / base_anchor_area
+        delta_pct = abs(v["sections"][v_anchor]["area_reach_m2"] - base_anchor_area) / base_anchor_area
         if delta_pct > area_bar:
             raise SystemExit(f"anchor area swung {delta_pct:.1%} under variant "
                              f"'{label}' — anchor placement is sensitivity-unstable")
@@ -144,7 +149,7 @@ def main(slug):
     # real anchor-stability gate first (align_to_anchor's own scale-based
     # check is dead code -- see its docstring): absolute area at the
     # anchor's physical position + anchor index drift, neither self-normalized
-    anchor_evidence = check_anchor_stability(base_anchor, doc["sections"][base_anchor]["area_m2"],
+    anchor_evidence = check_anchor_stability(base_anchor, doc["sections"][base_anchor]["area_reach_m2"],
                                              variants, labels)
     # align each variant to the base by anchor position, not raw index —
     # variant runs may differ in count upstream of the anchor
