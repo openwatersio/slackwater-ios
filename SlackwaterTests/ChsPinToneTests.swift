@@ -50,9 +50,9 @@ final class ChsPinToneTests: XCTestCase {
             floodDirection: 90, ebbDirection: 270, meanFlow: 0, tideReference: nil,
             constituents: [.init(name: "M2", amplitude: 2.0, phase: 0)])
         let tones = chsPinTones(at: now, tideRecords: [:], currentRecords: [gate.id: record])
-        XCTAssertEqual(tones[gate.id], currentPinTone(record, at: now))
-        XCTAssertTrue(["flood", "ebb", "slack"].contains(tones[gate.id] ?? ""),
-                      "a gate tone must be a PIN_STATE_COLOUR match key")
+        XCTAssertEqual(tones[gate.id], currentPinColour(record, at: now))
+        XCTAssertTrue((tones[gate.id] ?? "").hasPrefix("#"),
+                      "a fitted gate is speed-bearing: its tone is a colour literal (#13)")
     }
 
     /// A derived gate has no model (and no `cardState(at:)`) of its own: it
