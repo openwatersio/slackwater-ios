@@ -17,7 +17,7 @@
   [-122.5620, 47.2565]
  ],
  "section_spacing_m": 150,
- "max_half_width_m": 1100,
+ "max_half_width_m": 1400,
  "cd_to_mwl_m": 2.085,
  "tile_value": "elevation",
  "ends": {
@@ -33,6 +33,7 @@
   "flood_direction": "Flood sets SOUTH through The Narrows (Admiralty Inlet -> South Sound). anchor.flood_deg 208.5 is PUG1527's floodDirection in Slackwater/Resources/currents.json; NOAA CO-OPS reports meanFloodDir 198 for bin 19 of the same station. The seed is therefore drawn N->S. The task brief's claim that flood sets N at Tacoma is wrong.",
   "spring_max_kn": "max |Velocity_Major| = 6.58 kn at 2026-05-17 22:48Z, from CO-OPS currents_predictions interval=6 over the spring week 2026-05-14..2026-05-21 (new moon 2026-05-16). This is also the 2026 annual maximum for the station (MAX_SLACK scan of the full year).",
   "cd_to_mwl_m": "MSL - MLLW at NOAA 9446484 Tacoma (Commencement Bay) = 7.46 - 0.62 ft = 6.84 ft = 2.085 m. Cross-check: 9446545 TACOMA 6.88 ft (2.097 m); 9446491 ARLETTA 7.60 ft (2.317 m) is the outlier and is on the Hale Passage side.",
+  "max_half_width_m": "1400, not the 1100 first chosen. 1100 was picked to cap the degenerate cross-channel sections that the unconstrained thalweg refinement produced; with the refinement now slew-limited those are gone, and 1100 was clipping the real north-mouth sections by ~10% (2180 m of channel read as 1970 m at PUG1524). At 1400 every width is bounded by land, not by the window: the widths at half-width 1600 and 2200 are identical to those at 1400.",
   "bathymetry": "NOAA Office of Coast Survey National Bathymetric Source. BlueTopo has NO Pacific Northwest coverage in the noaa-ocs-nationalbathymetry-pds bucket (verified: zero delivered tiles north of 42 N in UTM 10), so the 4 m NOAA Navigation Test-and-Evaluation BAG surfaces from the same bucket and the same NBS programme are used instead. Same vertical datum (MLLW), same elevation-up sign convention. See data/tiles/tacoma-narrows/MANIFEST.json."
  }
 }
