@@ -133,7 +133,7 @@ Pass → Phase B (full domain, 190 days). Fail → the composite degrades to gro
 patches only, and this spec's backdrop sections are marked Plan B, global-coverage
 style.
 
-## 4. The validation gate, generalized **[not built; the five-bar rule below failed the spike — respecified as speed-only for the fill channel in §4a below (owner ruling), which has now been run and PASSED; timing bars remain for gates/patches]**
+## 4. The validation gate, generalized **[not built; the five-bar rule below failed the spike — respecified as speed-only for the fill channel in §4a below (owner ruling), which has now been run and PASSED; timing bars remain for gates. Grown patches: owner ruling 2026-08-21 — patches certify on the §4a speed-only bar and make no timing claim; slack/transitability authority is the gate card's alone. Measured basis + phase caveat: 2026-08-21-grown-patches-design.md §3/§6a.]**
 
 The certification unit is a **region** (contiguous element neighbourhood), not the
 whole field:
