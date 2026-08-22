@@ -308,6 +308,10 @@ struct StationListView: View {
     /// push/pop. Distinct from the coordinate so re-focusing the SAME
     /// station twice still counts.
     @State private var mapFocusToken = 0
+    /// The currents-fill map switch (graduation spec §2) — stored under the
+    /// same key `currentFillEnabled` reads, so the style builders and this
+    /// toggle can never disagree.
+    @AppStorage(currentFillKey) private var showFill = true
     @AppStorage(unitsKey) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
@@ -622,7 +626,10 @@ struct StationListView: View {
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
             }
-            .id(mapFocusToken)
+            // The fill toggle joins the remount key: flipping it rebuilds the
+            // style, which is how the layer appears/disappears — rare, user
+            // -initiated, and far simpler than mutating a live style.
+            .id("\(mapFocusToken)-\(showFill)")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
@@ -994,6 +1001,14 @@ struct StationListView: View {
         HStack {
             fab("magnifyingglass", label: "Search") { openSearch() }
             Spacer()
+            // Beside the list toggle, not centered — bottom-center belongs to
+            // the "Not for navigation" pill.
+            if showMap {
+                fab(showFill ? "water.waves" : "water.waves.slash",
+                    label: showFill ? "Hide currents" : "Show currents") { showFill.toggle() }
+                    .accessibilityIdentifier("currents-toggle")
+                    .padding(.trailing, 12)
+            }
             fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
                 showMap.toggle()
                 // Regular width: opening the map replaces the shown detail;

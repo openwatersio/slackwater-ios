@@ -554,6 +554,7 @@ func localFallbackStyle(landUrl: String, uscaUrl: String) -> [String: Any] {
         style["sprite"] = [["id": "freenauticalchart", "url": spriteUrl]]
         insertAboveLand(seamap.layers)
     }
+    if currentFillEnabled { addFillStyle(&style) }
     return style
 }
 
@@ -594,6 +595,7 @@ func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -
     let font = (sample?["layout"] as? [String: Any])?["text-font"] as? [String]
         ?? ["Open Sans Regular", "Arial Unicode MS Regular"]
     style["layers"] = layers + pinLayers(hasGlyphs: hasGlyphs, labelFont: font)
+    if currentFillEnabled { addFillStyle(&style) }
     return style
 }
 
@@ -609,6 +611,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private let cacheName: String
     private let center: CLLocationCoordinate2D
     private let zoom: Double
+    private let fill = currentFillEnabled ? CurrentFillRenderer() : nil
 
     init(map: MLNMapView, cacheName: String, center: CLLocationCoordinate2D, zoom: Double) {
         self.map = map
@@ -683,6 +686,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
         applyChsTones(to: style)
+        fill?.attach(to: style, map: mapView)
     }
 
     /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
