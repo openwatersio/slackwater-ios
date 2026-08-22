@@ -1,0 +1,28 @@
+{
+ "format_version": 1,
+ "region": "salish",
+ "generated": "2026-08-22T04:43:29.821376+00:00",
+ "bin_sha256": "ab9cd13fbfbb200e305303524d1f00c2dc6c488bce402bde6cfbeea9cdbc128a",
+ "patches": [
+  {
+   "id": "deception-pass",
+   "anchor": {
+    "provider": "noaa",
+    "station_id": "PUG1701"
+   },
+   "cell_count": 0,
+   "offset": 0,
+   "source_sha256": "14852dc7ba2dad844d0ed4356e6e42701ed59b9de607b43b91e9cda3c78edfea"
+  },
+  {
+   "id": "tacoma-narrows",
+   "anchor": {
+    "provider": "noaa",
+    "station_id": "PUG1527"
+   },
+   "cell_count": 56,
+   "offset": 0,
+   "source_sha256": "188d46873d4eea61b8b5ccd0eb503d77118cc975b717d84cf17c6ec338826a47"
+  }
+ ]
+}
