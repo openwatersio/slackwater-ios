@@ -55,10 +55,31 @@ sha256 + provenance is copied into the committed pass artifact instead.
   GeoTIFFs). A BAG has no contributor band — band 2 is uncertainty — so the
   per-tile provenance check is the ISO-19139 block:
   `gdalinfo -mdd xml:BAG <tile>.bag`.
-- **NONNA** (Canada, `tile_value: "depth"`, metres positive-down): register
-  at the CHS NONNA portal `https://data.chs-shc.ca`, accept the licence, and
-  download NONNA-10 GeoTIFF tiles for the pass. Note the licence acceptance
-  date in `MANIFEST.json`.
+- **GSC West Coast DEM** (Canada, `tile_value: "elevation"`, metres negative-down —
+  water is negative): the Geological Survey of Canada / NRCan *Canada West Coast
+  Topo-Bathymetric DEM*, 10 m, version 2, under **OGL – Canada**, no account and no
+  licence acceptance needed. Owner ruling 2026-08-21 makes this the primary Canadian
+  source; NONNA-10 is the fallback if a throat proves too smooth to resolve (it did not
+  — the DEM resolves Dodd's 80 m gut). Catalogue record:
+  `https://open.canada.ca/data/en/dataset/e6e11b99-f0cc-44f7-f5eb-3b995fb1637e`
+  (the Atlantic-coast record `335408ab-…` is a different dataset — check before
+  downloading). **Vertical datum is CHS chart datum, not CGVD2013/MSL**, per the
+  dataset's own lineage and verified against the NOAA MLLW surface where they overlap
+  at Deception Pass (median +0.41 m over 6608 wet cells) — so `cd_to_mwl_m` is a real
+  offset, the MWL height above chart datum from the nearest IWLS tide station.
+
+  It is **one seamless raster, not a tile scheme**: 86117 × 97965 float32, EPSG:3005,
+  inside an 11.4 GB zip whose member is deflate-compressed and therefore not randomly
+  addressable — `/vsizip//vsicurl/` would stream the whole 7.3 GB member for every
+  window. Fetch the member's deflate stream once by HTTP range, inflate it to a scratch
+  GeoTIFF, cut the pass windows with `gdal_translate -projwin` (in EPSG:3005), and
+  delete the scratch file. Record the archive URL, the member sha256 and the window in
+  `MANIFEST.json`.
+- **NONNA** (Canada, fallback only, `tile_value: "depth"`, metres positive-down):
+  register at the CHS NONNA portal `https://data.chs-shc.ca`, accept the licence, and
+  download NONNA-10 GeoTIFF tiles for the pass. Note the licence acceptance date in
+  `MANIFEST.json` — and NONNA-derived data carries a verbatim-notice obligation that
+  must ship with the release.
 
 `MANIFEST.json` shape:
 
