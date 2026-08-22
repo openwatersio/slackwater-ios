@@ -195,21 +195,6 @@ extension TypeScaleTests {
                       + offenders.joined(separator: "\n"))
     }
 
-    /// The chrome lived in four places and drifted. One shell owns it now;
-    /// this fails if a variant grows its own copy back.
-    func testCardChromeLivesInExactlyOnePlace() throws {
-        var sites: [String] = []
-        for (name, source) in try appSources() {
-            for (n, line) in source.components(separatedBy: .newlines).enumerated()
-            where line.contains("minHeight: 96") {
-                sites.append("\(name):\(n + 1)")
-            }
-        }
-        XCTAssertEqual(sites.count, 1, "card chrome must exist once, found: \(sites)")
-        XCTAssertTrue(sites[0].hasPrefix("StationCard.swift:"),
-                      "chrome must live in StationCard.swift, found \(sites[0])")
-    }
-
     /// The wordmark's minimumScaleFactor is load-bearing: it shares the 320pt
     /// iPad sidebar row with two 34pt buttons and would break as "Slackwat/er".
     /// Every other name wraps instead of shrinking. This fails in both

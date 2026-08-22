@@ -71,12 +71,18 @@ scheme by `project.yml`. The live-IWLS / on-device-fit UI tests carry
 `skipUnlessFull()` (ScreenshotTests) and skip themselves unless `SLACKWATER_FULL`
 reaches the UI-test runner — `scripts/test.sh --full` sets
 `TEST_RUNNER_SLACKWATER_FULL=1`, the same `TEST_RUNNER_` route as `M1_SHOT_DIR`
-below. Drive it with `scripts/test.sh`, which runs **both reference simulators**
-(iPhone 17, iPad Pro 11-inch (M5)) and prints a per-sim wall clock:
+below. Drive it with `scripts/test.sh`, which prints a per-sim wall clock.
+
+**Fast is iPhone 17 only; `--full` adds the iPad** (Pro 11-inch (M5)). Measured on
+build 27, the iPad leg costs 1169 s and is the only place three tests run —
+`testM44IPadSplit`, `testM50DetailSwapsBetweenSameKindStations`,
+`testM52IPadAutoSelectsTheFirstStation`, 100 s between them. The other 34 UI tests
+it runs are a second rendering of what the iPhone leg just proved, so it is a
+pre-release check rather than an every-commit one.
 
 ```sh
-./scripts/test.sh                                  # fast run  — the default
-./scripts/test.sh --full                           # full run  — live-IWLS tests included
+./scripts/test.sh                                  # fast run  — iPhone only, the default
+./scripts/test.sh --full                           # full run  — both sims + live-IWLS tests
 SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save screenshots
 SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 ```
@@ -109,10 +115,18 @@ Two smaller pieces of the same story:
 - Both modes write screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
   otherwise, CI included, so a local run and CI overwrite each other's images.
 
-| Mode | Contents | Wall clock (per sim) |
-|---|---|---|
-| **Fast** (default) | all unit tests + the UI tests that run on stored/mocked state | **9 min** (iPhone 534 s, iPad 626 s) |
-| **Full** (`--full`) | everything: + the 11 live-IWLS / on-device-fit UI tests | **21 min** (iPhone 1293 s) |
+| Mode | Devices | Contents | Wall clock |
+|---|---|---|---|
+| **Fast** (default) | iPhone 17 | unit tests + the UI tests that run on stored/mocked state | **~15 min** (876 s measured, build 27) |
+| **Full** (`--full`) | + iPad Pro 11-inch (M5) | everything: + the live-IWLS / on-device-fit UI tests, the iPad leg, and the national hybrid-direction sweep | **35 min+**, variable |
+
+Figures re-measured at build 27 from `build/results-fast-*.xcresult`. The old
+"9 min/sim" in this table predated the worldwide tide bundle and was stale by
+roughly 2x. Where the fast run's time actually goes: 50 UI tests are 814 s of it;
+the whole 151-test unit target is **21 s**, of which
+`testHybridDirectionHasFullCoverageAndMatchesBaseline` alone is 18 s (it sweeps
+every bundled station, so it rides `--full` — `scripts/test.sh` skips it by name
+in fast mode).
 
 The eleven the fast run skips (each carries `try skipUnlessFull()` at the top —
 grep ScreenshotTests.swift for the current list) fetch live from IWLS

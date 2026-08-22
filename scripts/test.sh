@@ -1,8 +1,9 @@
 #!/bin/zsh
-# Run the test suite on both reference simulators.
+# Run the test suite.
 #
-#   ./scripts/test.sh              fast run   — iterate with this
-#   ./scripts/test.sh --full       full run   — live IWLS + on-device fits; before an upload
+#   ./scripts/test.sh              fast run   — iPhone only; iterate with this
+#   ./scripts/test.sh --full       full run   — both simulators + live IWLS and
+#                                               on-device fits; before an upload
 #   SHOT_DIR=/tmp/shots ./scripts/test.sh     where the UI tests save their screenshots
 #   SLACKWATER_SIMS='A,B' ./scripts/test.sh   run on other devices (CI sets this)
 #
@@ -60,8 +61,26 @@ xcodegen generate
 # failures read as "Test crashed with signal kill" and results even bleed across
 # the two sessions. CI passes its own device names here so it can never share a
 # device with a local run (see .github/workflows/ci.yml).
-sims=("iPhone 17" "iPad Pro 11-inch (M5)")
+#
+# Fast is iPhone-only. Measured on build 27: the iPad leg costs 1169 s and is
+# the ONLY place three tests run (testM44IPadSplit,
+# testM50DetailSwapsBetweenSameKindStations, testM52IPadAutoSelectsTheFirstStation
+# — 100 s between them). The other 34 UI tests it runs are a second rendering of
+# what the iPhone leg just proved. Nineteen minutes for 100 s of unique coverage
+# is a pre-release check, not an every-commit one, so --full keeps both.
+sims=("iPhone 17")
+[[ $MODE == full ]] && sims+=("iPad Pro 11-inch (M5)")
 [[ -n "${SLACKWATER_SIMS:-}" ]] && sims=("${(@s/,/)SLACKWATER_SIMS}")
+
+# testHybridDirectionHasFullCoverageAndMatchesBaseline sweeps all 2,776 bundled
+# stations x 20 times, each a 30-hour extremes search: 18 s, which is 86% of the
+# whole unit target's 21 s. It validates stations.json — it can only change when
+# the BUNDLE changes, never when app code does — so it rides the full plan with
+# the other data-shaped checks. -skip-testing rather than an env gate: the
+# TEST_RUNNER_ route below reaches the UI-test runner process only, never the
+# app process that hosts the unit bundle.
+skip=()
+[[ $MODE == fast ]] && skip=(-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline)
 
 for sim in "${sims[@]}"; do
   echo "=== $MODE · $sim ==="
@@ -72,6 +91,7 @@ for sim in "${sims[@]}"; do
   # (docs/testflight.md — two resolvers on the MapLibre artifact corrupt it).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
+    "${skip[@]}" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
     | tail -40

@@ -48,12 +48,13 @@ Two jobs, both defined in `.github/workflows/ci.yml`:
 | Job | Where | What it does |
 |-----|-------|--------------|
 | Data generators | GitHub-hosted Ubuntu | `npm ci`, regenerates the two offline bundles, checks the committed artefacts still match, runs the bundle invariants |
-| App tests | Self-hosted, Mac Studio | `scripts/test.sh` — xcodegen plus the fast test plan on both reference simulators |
+| App tests | Self-hosted, Mac Studio | `scripts/test.sh` — xcodegen plus the fast test plan on the iPhone simulator |
 
 The macOS lane is self-hosted because GitHub-hosted macOS bills at **10× on a
-private repo**. The fast plan across both simulators is ~25 minutes of wall
-clock, so ~250 billable minutes per run — roughly eight runs against the free
-2,000-minute monthly allowance. The Studio is already the always-on
+private repo**. The fast lane is ~15 minutes of wall clock, so ~150 billable
+minutes per run — roughly thirteen runs against the free 2,000-minute monthly
+allowance. (It was ~25 min across both simulators until the iPad leg moved to
+`--full`: it cost 19 minutes and was the only place three tests ran.) The Studio is already the always-on
 scheduled-job host, so it runs the lane for free and faster, off a warm SPM
 cache.
 
@@ -65,7 +66,7 @@ meaningful.
 ### A PR books the Studio. Docs-only work should not open one.
 
 CI runs on `pull_request` for **any** branch, but on `push` only for `main`. So
-pushing a branch costs nothing and opening a PR books ~25 minutes of the Mac
+pushing a branch costs nothing and opening a PR books ~15 minutes of the Mac
 Studio — the same machine the scheduled jobs and everyone's local
 `./scripts/test.sh` share. There is one macOS lane, so a PR that does not need
 it puts every other session in a queue behind it.
