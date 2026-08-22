@@ -5,13 +5,21 @@ import Foundation
 import StoreKit
 import WidgetKit
 
+/// Thrown by `purchase(_:)` when StoreKit hands back a transaction it could
+/// not verify (T6) — everything else `product.purchase()` can return
+/// (`.userCancelled`, `.pending`) is an ordinary non-error outcome and stays
+/// silent; only an unverified transaction is worth telling the user about.
+enum PremiumError: LocalizedError {
+    case unverified
+    var errorDescription: String? { "Purchase couldn't be verified — try again." }
+}
+
 @MainActor
 final class PremiumStore: ObservableObject {
     static let shared = PremiumStore()
     nonisolated static let yearlyID = "org.openwaters.slackwater.premium.yearly"
     nonisolated static let lifetimeID = "org.openwaters.slackwater.premium.lifetime"
     private nonisolated static let ids = [yearlyID, lifetimeID]
-    nonisolated static let premiumKey = "slackwater.premium"
 
     @Published private(set) var isPremium: Bool
     @Published private(set) var products: [Product] = []
@@ -19,7 +27,7 @@ final class PremiumStore: ObservableObject {
     private var updatesTask: Task<Void, Never>?
 
     private init() {
-        isPremium = AppGroup.defaults.bool(forKey: Self.premiumKey)
+        isPremium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
         updatesTask = Task { [weak self] in
             for await _ in Transaction.updates { await self?.refreshEntitlement() }
         }
@@ -33,7 +41,7 @@ final class PremiumStore: ObservableObject {
     }
 
     nonisolated static func cache(_ premium: Bool, into defaults: UserDefaults) {
-        defaults.set(premium, forKey: premiumKey)
+        defaults.set(premium, forKey: AppGroup.premiumKey)
     }
 
     func loadProducts() async {
@@ -44,10 +52,19 @@ final class PremiumStore: ObservableObject {
 
     func purchase(_ product: Product) async throws {
         let result = try await product.purchase()
-        if case .success(let verification) = result,
-           case .verified(let transaction) = verification {
-            await transaction.finish()
-            await refreshEntitlement()
+        switch result {
+        case .success(let verification):
+            switch verification {
+            case .verified(let transaction):
+                await transaction.finish()
+                await refreshEntitlement()
+            case .unverified:
+                throw PremiumError.unverified
+            }
+        case .userCancelled, .pending:
+            break
+        @unknown default:
+            break
         }
     }
 
@@ -64,7 +81,7 @@ final class PremiumStore: ObservableObject {
             }
         }
         let premium = Self.isPremium(owned: owned)
-        guard premium != isPremium || AppGroup.defaults.object(forKey: Self.premiumKey) == nil
+        guard premium != isPremium || AppGroup.defaults.object(forKey: AppGroup.premiumKey) == nil
         else { return }
         isPremium = premium
         Self.cache(premium, into: AppGroup.defaults)

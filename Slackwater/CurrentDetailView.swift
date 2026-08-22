@@ -33,7 +33,7 @@ func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speed
 
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -190,7 +190,7 @@ struct CurrentDetailView: View {
                         // The threshold prints HERE, once, and not on the
                         // strip: one statement of a constant is information,
                         // six a day is texture.
-                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                             .accessibilityIdentifier("slack-window")

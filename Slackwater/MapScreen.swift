@@ -644,7 +644,10 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
 
     private func fetchSeascape() {
         guard !networkKillSwitch else { return }
-        let imperial = UserDefaults.standard.string(forKey: unitsKey) != "metric"
+        // Not .standard: Settings' unit toggle now writes to the App Group
+        // (H2), so a plain .standard read here would freeze at whatever the
+        // one-time migration copied and never see a later change.
+        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
         guard let url = URL(string: "https://tiles.openwaters.io/seascape/style.json?unit=\(imperial ? "ft" : "m")")
         else { return }
         URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in

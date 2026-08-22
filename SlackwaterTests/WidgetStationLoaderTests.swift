@@ -32,9 +32,9 @@ final class WidgetStationLoaderTests: XCTestCase {
 
     func testDefaultFollowsFavorites() {
         let d = AppGroup.defaults
-        let saved = d.stringArray(forKey: "slackwater.favorites")
-        defer { d.set(saved, forKey: "slackwater.favorites") }
-        d.set([TideStationRecord.fridayHarborID], forKey: "slackwater.favorites")
+        let saved = d.stringArray(forKey: AppGroup.favoritesKey)
+        defer { d.set(saved, forKey: AppGroup.favoritesKey) }
+        d.set([TideStationRecord.fridayHarborID], forKey: AppGroup.favoritesKey)
         XCTAssertEqual(WidgetStationLoader.defaultStationID(), TideStationRecord.fridayHarborID)
     }
 }

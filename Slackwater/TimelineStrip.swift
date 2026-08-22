@@ -56,10 +56,6 @@ enum Timeline {
     /// so a deliberately-picked old week renders and only later saves collect it.
     static let onlineRetentionDays = 60.0
 
-    /// The "weak current" convention: under half a knot a small boat transits.
-    /// A constant, not a setting, until someone asks (split-scrubbers spec §2).
-    static let slackThresholdKn = 0.5
-
     /// The absolute domain of the speed ramp (#97), spaced equally across it.
     /// Anchored to **capability** rather than to quantiles — the move Beaufort
     /// makes, and the reason Windy's ramp reads well: the colour says what you
@@ -516,7 +512,7 @@ struct TimelineData {
         // draws.
         let windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
             slackWindow(currentPoints, around: e.time,
-                        threshold: Timeline.slackThresholdKn)
+                        threshold: slackThresholdKn)
                 .map { (slack: e.time, start: $0.start, end: $0.end) }
         }
 
@@ -567,7 +563,7 @@ struct TimelineData {
                                      to: end.addingTimeInterval(pad))
             windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
                 slackWindow(currentPoints, around: e.time,
-                            threshold: Timeline.slackThresholdKn)
+                            threshold: slackThresholdKn)
                     .map { (slack: e.time, start: $0.start, end: $0.end) }
             }
         }

@@ -10,7 +10,7 @@ import TideEngine
 
 struct TideDetailView: View {
     let record: TideStationRecord
-    @AppStorage(unitsKey) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
 
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.

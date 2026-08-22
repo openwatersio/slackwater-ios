@@ -55,7 +55,7 @@ extension TypeScaleTests {
     /// 2. A formatter relayed through a helper `func`/computed `var` that
     ///    returns a `String`, consumed by a `Text` far away or in another
     ///    file, is invisible to line-proximity scanning — Swift puts no
-    ///    distance limit on where you can call a function. Four real sites
+    ///    distance limit on where you can call a function. Five real sites
     ///    are exactly this shape and are hand-verified into
     ///    `knownIndirections` below rather than silently passing unseen:
     ///      - `CurrentCardView.nextLine(_:)` (SlackwaterApp.swift)
@@ -63,7 +63,15 @@ extension TypeScaleTests {
     ///      - `scheduleEntries()` in the four detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
-    ///    (`TimelineStrip.compactTime(_:)` was a fifth until the NEAPS pass
+    ///      - `WidgetSnapshot.build(_:now:)` (WidgetSnapshot.swift, H2 — the
+    ///        allowlist key is `normalize`, not `build`; see the comment on
+    ///        that entry below): the formatted height/speed lands in
+    ///        `Event.label`, a plain `String` the widget/lock-screen views
+    ///        consume as `Text(next.label)` in a SIXTH and SEVENTH file
+    ///        (HomeWidgets.swift, AccessoryWidgets.swift) — all four
+    ///        consuming sites carry `.monospacedDigit()` themselves,
+    ///        verified by hand rather than by this scan.
+    ///    (`TimelineStrip.compactTime(_:)` was a sixth until the NEAPS pass
     ///    deleted it along with the gutter — its `cardTime(` reading now
     ///    prints as 24h `clockTime(`, which is not a watched formatter.)
     ///    That allowlist is a point-in-time attestation, not a live check:
@@ -91,6 +99,15 @@ extension TypeScaleTests {
             // builders used to cost.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
+            // The heuristic's blind spot in miniature: these three calls live
+            // in `build(_:now:)`, but `enclosingDeclaration` walks upward to
+            // the nearest brace-opening `func`/`var` line by TEXT, not real
+            // nesting — and `build` declares a local `func normalize(...)`
+            // earlier in its own body, which is textually closer than
+            // `build`'s own declaration line. The scanner reports
+            // "normalize", not "build"; the key below has to match what it
+            // actually computes, not what a real parser would say.
+            "WidgetSnapshot.swift:normalize",
         ]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
@@ -116,7 +133,7 @@ extension TypeScaleTests {
                 guard !trimmed.hasPrefix("//") else { continue }  // e.g. "formatSpeed(_:unit:)" in a doc comment
                 let matched = formatters.filter { line.contains($0) }
                 guard !matched.isEmpty else { continue }
-                // Skip the formatters' own `func` definitions (Theme.swift /
+                // Skip the formatters' own `func` definitions (Units.swift /
                 // LocationService.swift) — not call sites.
                 guard !matched.contains(where: { line.contains("func \($0)") }) else { continue }
                 checked += 1

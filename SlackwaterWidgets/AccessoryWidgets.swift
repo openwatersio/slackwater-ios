@@ -20,8 +20,11 @@ struct SlackInlineWidget: Widget {
                                provider: StationProvider()) { entry in
             if !entry.premium { Locked() }
             else if let s = entry.snapshot, let next = s.next {
-                // e.g. "Slack 14:32 · Race Passage"
-                (Text(next.label + " ") + Text(next.time, style: .time) + Text(" · " + s.stationName))
+                // e.g. "Slack 14:32 · Race Passage" — label carries a
+                // formatted height/speed on a max event, so it gets the same
+                // .monospacedDigit() as the clock half.
+                (Text(next.label + " ").monospacedDigit()
+                    + Text(next.time, style: .time) + Text(" · " + s.stationName))
                     .environment(\.timeZone, s.tz)
             } else { Text("Open Slackwater") }
         }
@@ -66,7 +69,7 @@ struct SlackRectangularWidget: Widget {
                         Image(systemName: next.symbol)
                         Text(next.time, style: .time).fontWeight(.semibold)
                             .environment(\.timeZone, s.tz)
-                        Text(next.label).lineLimit(1)
+                        Text(next.label).monospacedDigit().lineLimit(1)
                     }
                     .font(.caption)
                     if let w = s.window {

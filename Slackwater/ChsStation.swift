@@ -75,6 +75,18 @@ struct ChsModel: Codable {
     let constituents: [Con]
 }
 
+/// The app-only side effect of a fitted model landing on disk: reload the
+/// widget's timelines so a freshly-fitted station shows up without waiting
+/// for the next half-hourly tick (H1). A closure, not a direct
+/// `WidgetCenter.shared.reloadAllTimelines()` call, because this file also
+/// compiles into the widget extension (see the appex source list in
+/// project.yml) — the appex has no reason to reload itself mid-fit, so it
+/// keeps the default no-op and only `SlackwaterApp.init()` assigns the real
+/// trigger.
+enum WidgetReload {
+    static var trigger: () -> Void = {}
+}
+
 /// One JSON file per station under Application Support/ChsModels — keyed by
 /// registry key, so a future second region is just more files, no migration.
 enum ChsModelStore {
@@ -104,6 +116,11 @@ enum ChsModelStore {
     static func save<T: Encodable>(_ value: T, id: String, suffix: String) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try JSONEncoder().encode(value).write(to: url(id, suffix: suffix), options: .atomic)
+        // The one place every model write funnels through — tide (suffix
+        // ""), current (suffix "-current") and online-window (suffix
+        // "-online") saves all land here, so one call covers all three
+        // rather than each public entry point remembering its own (H1).
+        WidgetReload.trigger()
     }
 
     static func load(_ stationID: String) -> ChsModel? { load(stationID, suffix: "") }

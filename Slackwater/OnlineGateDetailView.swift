@@ -8,7 +8,7 @@ import TideEngine
 
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo
-    @AppStorage(speedUnitKey) private var speedUnit = "kn"
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @ObservedObject private var net = Connectivity.shared
     @Environment(\.openChsRoute) private var openChsRoute
 
@@ -71,7 +71,7 @@ struct OnlineGateDetailView: View {
     private var slackWin: (start: Date, end: Date)? {
         guard let slack = nextSlack, let tl = timeline else { return nil }
         return slackWindow(tl.currentPoints, around: slack.time,
-                           threshold: Timeline.slackThresholdKn)
+                           threshold: slackThresholdKn)
     }
 
     /// The unfetched card's one tap out: nearest of the 11 shipped (fittable)
@@ -252,7 +252,7 @@ struct OnlineGateDetailView: View {
                         // an already-open window must not claim its full run.
                         // The threshold prints HERE, once, and not on the
                         // strip.
-                        Text("for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(Timeline.slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        Text("for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam.opacity(0.7))
                             .accessibilityIdentifier("slack-window")

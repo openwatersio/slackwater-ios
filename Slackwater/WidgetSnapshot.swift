@@ -23,9 +23,13 @@ struct WidgetSnapshot: Equatable {
             && a.sparkline == b.sparkline && a.nowFraction == b.nowFraction
     }
 
-    static let threshold = 0.5  // kn — speedRampAnchorsKn[0], the app's window bar
-
     static func build(_ station: WidgetStation, now: Date) -> WidgetSnapshot {
+        // Read once, here — not per format call — so `build` stays a pure
+        // function of (station, now) (H2): the setting is an input, same as
+        // the other two.
+        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
+
         var cal = Calendar(identifier: .gregorian)
         let tz: TimeZone
         switch station {
@@ -53,7 +57,7 @@ struct WidgetSnapshot: Equatable {
             let next = ext.map {
                 Event(time: $0.time,
                       label: ($0.kind == .high ? "High" : "Low")
-                          + String(format: " %.1f m", $0.height),
+                          + " \(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
                       symbol: $0.kind == .high ? "arrow.up" : "arrow.down")
             }
             return .init(stationName: name, tz: tz, next: next, window: nil,
@@ -67,16 +71,16 @@ struct WidgetSnapshot: Equatable {
             if let ev, ev.kind == .slack {
                 let windowPts = s.speeds(from: ev.time.addingTimeInterval(-21_600),
                                          to: ev.time.addingTimeInterval(21_600))
-                window = slackWindow(windowPts, around: ev.time, threshold: threshold)
+                window = slackWindow(windowPts, around: ev.time, threshold: slackThresholdKn)
             }
             let next = ev.map {
                 switch $0.kind {
                 case .slack: Event(time: $0.time, label: "Slack", symbol: "minus")
                 case .maxFlood: Event(time: $0.time,
-                                      label: String(format: "Max flood %.1f kn", abs($0.speed)),
+                                      label: "Max flood \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                                       symbol: "arrow.up.right")
                 case .maxEbb: Event(time: $0.time,
-                                    label: String(format: "Max ebb %.1f kn", abs($0.speed)),
+                                    label: "Max ebb \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
                                     symbol: "arrow.down.right")
                 }
             }

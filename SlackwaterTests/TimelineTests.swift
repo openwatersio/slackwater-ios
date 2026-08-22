@@ -472,7 +472,7 @@ final class TimelineTests: XCTestCase {
                          speed: 2.0 - Double(i) / 3.0)
         }
         let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(3600),
-                                          threshold: Timeline.slackThresholdKn))
+                                          threshold: slackThresholdKn))
         XCTAssertEqual(w.start.timeIntervalSince(t0), 2700, accuracy: 1)
         XCTAssertEqual(w.end.timeIntervalSince(t0), 4500, accuracy: 1)
     }
@@ -680,7 +680,7 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 0), 0, accuracy: 1e-9)
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 40), 1, accuracy: 1e-9)
         // The bottom anchor IS the slack threshold, not a second opinion on it.
-        XCTAssertEqual(Timeline.speedRampAnchorsKn.first, Timeline.slackThresholdKn)
+        XCTAssertEqual(Timeline.speedRampAnchorsKn.first, slackThresholdKn)
     }
 
     /// Why the anchors are not a linear 0→16. That ramp puts the median NOAA

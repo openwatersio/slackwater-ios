@@ -17,7 +17,7 @@ struct StationProvider: AppIntentTimelineProvider {
         let snapshot = WidgetStationLoader.load(id: id)
             .map { WidgetSnapshot.build($0, now: date) }
         return SlackwaterEntry(date: date, snapshot: snapshot,
-                               premium: AppGroup.defaults.bool(forKey: "slackwater.premium"),
+                               premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
                                stationID: id)
     }
     func placeholder(in context: Context) -> SlackwaterEntry {
