@@ -41,13 +41,14 @@ def _walk(points, spacing_m):
     for p0, p1 in zip(points, points[1:]):
         seg = math.hypot((p1[0] - p0[0]) * _m_per_deg_lon(p0[1]),
                          (p1[1] - p0[1]) * M_PER_DEG_LAT)
+        if seg <= 0.0:
+            continue  # degenerate (duplicate) point: no distance to carry across
         d = carry
         while d + spacing_m <= seg:
             d += spacing_m
             f = d / seg
             out.append([p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f])
-        carry = (d + spacing_m) - seg - spacing_m  # distance already walked into next seg
-        carry = max(carry, 0.0)
+        carry = d - seg  # signed: how far the next mark overshoots into the next segment
     return out
 
 
