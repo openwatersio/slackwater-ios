@@ -40,6 +40,29 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
     }
 
+    /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
+    /// order, and feature order within one source does NOT guarantee paint
+    /// order — so patches get their own layer, directly above the fill's
+    /// (grown-patches spec §5; the ordering rule lives here by agreement).
+    func testPatchLayerSitsDirectlyAboveFillWithIdenticalPaint() {
+        var style: [String: Any] = ["sources": [String: Any](),
+                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
+        addFillStyle(&style)
+        let layers = style["layers"] as? [[String: Any]] ?? []
+        let ids = layers.map { $0["id"] as? String ?? "" }
+        let fill = ids.firstIndex(of: CurrentFillRenderer.sourceID)
+        let patch = ids.firstIndex(of: CurrentFillRenderer.patchSourceID)
+        XCTAssertNotNil(fill); XCTAssertNotNil(patch)
+        XCTAssertEqual(patch, fill.map { $0 + 1 }, "patches must draw directly above the fill")
+        XCTAssertLessThan(patch ?? 99, ids.firstIndex(of: "land-usca") ?? -1,
+                          "both layers stay under land")
+        // Identical paint minus the source binding: one ramp, one opacity law,
+        // one no-green rule for both providers.
+        var a = layers[fill!], b = layers[patch!]
+        XCTAssertEqual(a["paint"] as? NSDictionary, b["paint"] as? NSDictionary)
+        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
+    }
+
     /// The fill layer sits UNDER the land layers — SSCOFS elements cross the
     /// shoreline, and land drawn over the fill clips them to water — and
     /// colours per feature from the "colour" attribute.
@@ -49,8 +72,8 @@ final class CurrentFillTests: XCTestCase {
         addFillStyle(&style)
         let layers = style["layers"] as? [[String: Any]] ?? []
         XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[1]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 3)
+        XCTAssertEqual(layers[2]["id"] as? String, "land-usca")
+        XCTAssertEqual(layers.count, 4)
         let paint = layers.first?["paint"] as? [String: Any]
         XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
         XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)

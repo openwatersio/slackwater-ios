@@ -58,10 +58,12 @@ func fillColourHex(forSpeedKn kn: Double) -> String {
 /// vanish while the outer certified/uncertified edge stays a hard step.
 func addFillStyle(_ style: inout [String: Any]) {
     var sources = style["sources"] as? [String: Any] ?? [:]
-    sources[CurrentFillRenderer.sourceID] = [
+    let empty: [String: Any] = [
         "type": "geojson",
         "data": ["type": "FeatureCollection", "features": [] as [Any]],
     ]
+    sources[CurrentFillRenderer.sourceID] = empty
+    sources[CurrentFillRenderer.patchSourceID] = empty
     style["sources"] = sources
     let layer: [String: Any] = [
         "id": CurrentFillRenderer.sourceID, "type": "fill",
@@ -81,11 +83,19 @@ func addFillStyle(_ style: inout [String: Any]) {
     // cross the shoreline, and land drawn over the fill clips them to water
     // for free — no geometry clipping. ponytail: if the depth relief above
     // proves opaque enough to bury the fill, this anchor moves back up.
+    // Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
+    // mouth fringe is draw order and nothing else (grown-patches spec §5),
+    // and feature order within one source does not guarantee paint order —
+    // layer order does. Same paint dict: one ramp, one opacity law, one
+    // no-green rule for both providers.
+    var patch = layer
+    patch["id"] = CurrentFillRenderer.patchSourceID
+    patch["source"] = CurrentFillRenderer.patchSourceID
     let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
     let anchor = landIdx
         ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
         ?? layers.count
-    layers.insert(layer, at: anchor)
+    layers.insert(contentsOf: [layer, patch], at: anchor)
     style["layers"] = layers
 }
 
@@ -94,13 +104,19 @@ func addFillStyle(_ style: inout [String: Any]) {
 /// source object belongs to the style that loaded it.
 final class CurrentFillRenderer {
     static let sourceID = "current-fill"
+    static let patchSourceID = "current-fill-patches"
 
     private weak var map: MLNMapView?
     /// Strong on purpose — same MapLibre gotcha the particle spike hit: a
     /// source looked up out of a JSON-declared style is a fresh wrapper the
     /// style does NOT retain.
     private var source: MLNShapeSource?
+    private var patchSource: MLNShapeSource?
+    /// Both providers vend the same FillCell shape (the frozen seam); the
+    /// grown patches simply land in their own source/layer. A pass whose
+    /// certification collapsed (Deception) vends zero cells and costs nothing.
     private var field: FillField?
+    private var patches: PatchField?
     private var timer: Timer?
     private var evaluating = false
 
@@ -109,9 +125,11 @@ final class CurrentFillRenderer {
     func attach(to style: MLNStyle, map: MLNMapView) {
         self.map = map
         source = style.source(withIdentifier: Self.sourceID) as? MLNShapeSource
+        patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
         if field == nil { field = FillField() }
+        if patches == nil { patches = PatchField() }
         refresh()
-        guard timer == nil, field != nil else { return }
+        guard timer == nil, field != nil || patches != nil else { return }
         let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in self?.refresh() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -123,22 +141,28 @@ final class CurrentFillRenderer {
     /// ponytail: full-region evaluate off-main; cull to bbox if profiling
     /// ever says the minute tick is felt.
     private func refresh() {
-        guard let field, !evaluating else { return }
+        guard field != nil || patches != nil, !evaluating else { return }
         evaluating = true
         let when = appNow()
-        DispatchQueue.global(qos: .utility).async { [weak self] in
-            let cells = field.cells(at: when)
-            let features: [MLNPolygonFeature] = cells.map { cell in
+        let field = self.field
+        let patches = self.patches
+        func features(_ cells: [FillCell]) -> [MLNPolygonFeature] {
+            cells.map { cell in
                 var coords = cell.polygon
                 let f = MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
                 f.attributes = ["colour": fillColourHex(forSpeedKn: cell.speedKn),
                                 "kn": cell.speedKn]
                 return f
             }
+        }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let fillFeatures = features(field?.cells(at: when) ?? [])
+            let patchFeatures = features(patches?.cells(at: when) ?? [])
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.evaluating = false
-                self.source?.shape = MLNShapeCollectionFeature(shapes: features)
+                self.source?.shape = MLNShapeCollectionFeature(shapes: fillFeatures)
+                self.patchSource?.shape = MLNShapeCollectionFeature(shapes: patchFeatures)
             }
         }
     }
