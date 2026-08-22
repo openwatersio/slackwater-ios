@@ -32,6 +32,19 @@ sha256 + provenance is copied into the committed pass artifact instead.
   `https://noaa-ocs-nationalbathymetry-pds.s3.amazonaws.com/index.html#BlueTopo/`,
   download the tile(s) covering the pass bbox, and record the band-2
   contributor check in `MANIFEST.json`'s `contributor` field.
+  **BlueTopo has no Pacific Northwest coverage** (checked 2026-08-21: the
+  tile scheme geopackage under `BlueTopo/_BlueTopo_Tile_Scheme/` has zero
+  delivered tiles north of 42 N, and UTM-10 deliveries stop at the
+  California/Oregon border). For WA passes use the NOAA **Navigation Test and
+  Evaluation** BAG surfaces in the *same* bucket instead — same agency (Office
+  of Coast Survey, National Bathymetric Source), 4 m, MLLW, elevation-up, so
+  still `tile_value: "elevation"`. Find them via
+  `Test-and-Evaluation/Navigation_Test_and_Evaluation/_Navigation_Tile_Scheme/*.gpkg`
+  (fields `BAG`, `BAG_SHA256`), verify the published sha256, then
+  `gdal_translate -b 1` the `.bag` to a `.tiff` (this script only reads
+  GeoTIFFs). A BAG has no contributor band — band 2 is uncertainty — so the
+  per-tile provenance check is the ISO-19139 block:
+  `gdalinfo -mdd xml:BAG <tile>.bag`.
 - **NONNA** (Canada, `tile_value: "depth"`, metres positive-down): register
   at the CHS NONNA portal `https://data.chs-shc.ca`, accept the licence, and
   download NONNA-10 GeoTIFF tiles for the pass. Note the licence acceptance
