@@ -110,7 +110,16 @@ resumable stages, hard asserts, committed outputs only where licence-clean.
 ## 3. Patch construction
 
 - **Speed:** per-cell scale `s = A_gate / A(cell section)`. Scale is 1 at the
-  anchor section by construction.
+  anchor section by construction. **A(x) is the reach-mean cross-section
+  area over ±half a section spacing** (owner ruling 2026-08-21, third
+  amendment): transport conservation is a reach statement, and a single
+  transect at a sharp throat is placement-noisy — measured 12.7 % anchor-area
+  swing at Deception's 140 m gut vs 1.4–5.3 % at Tacoma's 1370 m throat.
+  The same window applies uniformly, so anchor identity (scale = 1) holds
+  by construction on the reach estimator. This is an estimator choice, not
+  field smoothing — the sensitivity sweep and the shrink rule run unchanged
+  on top of it, and **a pass whose anchor still fails the stability bar
+  ships no patch** (honest absence; its gate/station card is unaffected).
 - **Phase:** the anchor's phase everywhere — an approximation, and the
   certification runs measured its error rather than assuming the L ≪ λ/4
   criterion: along 1.75 km of confined Tacoma Narrows, slack timing differs
