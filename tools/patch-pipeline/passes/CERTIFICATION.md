@@ -1,3 +1,24 @@
+# Shipped inventory — all five Tier-1 passes
+
+The phase's verdict of record, in one table. "Ships?" is whether a
+`passes/<slug>.json` is committed *and* survives to a non-empty `kept_range`
+after both the §3 flare rule and the §6b.2 sensitivity sweep — the two
+narrowing steps are sequential, and a pass can clear the first and still be
+cut to nothing by the second (Deception).
+
+| pass | final kept_range | cells | ships? | why not |
+|---|---|---|---|---|
+| tacoma-narrows | `[18, 46]` | 56 | **yes** | — |
+| seymour-narrows | `[19, 24]` | 10 | **yes** | — |
+| deception-pass | `[11, 14]` flare → `[12, 12]` after sensitivity | 0 | **no** | single section after the sensitivity shrink — no interval to triangulate, zero cells |
+| dodd-narrows | `[18, 18]` (flare only; sensitivity never runs) | 0 | **no** | anchor instability 19.7–20.5 % across all three sensitivity variants, blows the 10 % bar |
+| porlier-pass | `[20, 25]` (flare only; sensitivity never runs) | 0 | **no** | anchor instability 12.7 % on the `datum=CD` axis (blows the 10 % bar) + springs plausibility +46 % over published |
+
+Three of five ship. The §6a RUN method-certification record for the two US
+passes (Tacoma, Deception) is immediately below; the §6b BC record (Seymour,
+Dodd, Porlier, including the Dodd/Porlier failures in detail) follows it
+further down this file.
+
 # RUN method certification (spec §6a, second amendment)
 
 Verdict of record for the two committed passes, graded against live NOAA CO-OPS
@@ -46,10 +67,12 @@ flood/ebb axis flip (wrong-sign 0/31 on both). **The short-channel continuity la
 `|u|(x) = |u|_gate · A_gate/A(x)` is what these two rows certify**, in both directions
 across the same 1.75 km of confined channel.
 
-Deception Pass generates no in-bounds pair: the flare rule shrinks it to a 300 m strip
-(`[11, 14]`) and its only candidate station, Yokeko PUG1629, is 2.2 km east of that.
-It does not gate; it is covered by the Tacoma certification, which is what a
-method-certification channel is for.
+Deception Pass generates no in-bounds pair: the flare rule leaves `[11, 14]`, but the
+§6b.2 sensitivity sweep shrinks that further to `[12, 12]` — a single section, zero
+cells, ships nothing (see the shipped-inventory table below) — and its only candidate
+station, Yokeko PUG1629, is 2.2 km east of even the flare-stage strip. It does not gate;
+it is covered by the Tacoma certification, which is what a method-certification channel
+is for.
 
 ## Phase caveat (measured, not gating)
 
@@ -124,10 +147,17 @@ inside a 180-minute window: that is what the confined-channel assumption looks l
 the walls end.
 
 Deception's throat is 140 m at the anchor (limit **182 m**); the width jumps to 350 m at
-section 10 and 550 m at section 15, so `kept_range` is `[11, 14]` — a 300 m strip through
-the pass itself. Yokeko is 2.2 km east at section 37, in the 490 m wide eastern arm. Its
-single-bar first-run miss (slack max 34.8 vs 30.0 min) is spec §9's predicted phase
-non-uniformity along that arm, realized.
+section 10 and 550 m at section 15, so the flare rule alone leaves `kept_range [11, 14]`
+— a 300 m strip through the pass itself. Deception's anchor itself is not unstable (8.06 /
+8.06 / 5.4 % across the three sensitivity variants, comfortably inside the 10 % bar — see
+`anchor_stability` in the committed `deception-pass.json`); what narrows `[11, 14]` to
+`[12, 12]` is the §6b.2 **per-section** truncation gate — one section below the anchor and
+two above it move more than max(10 %, 0.25 kn) at spring peak under at least one variant
+(`sensitivity.dropped_below: 1`, `dropped_above: 2`, same file) and get dropped, leaving a
+single surviving section with no neighbour to triangulate an interval from — zero cells,
+not a special-cased omission (`pack.py`'s own docstring says as much). Yokeko is 2.2 km
+east at section 37, in the 490 m wide eastern arm. Its single-bar first-run miss (slack
+max 34.8 vs 30.0 min) is spec §9's predicted phase non-uniformity along that arm, realized.
 
 PUG1628 (Skagit Bay channel, 48.39783, -122.57955) was never fetched, in either run; the
 far-field row stays empty rather than being filled from a re-run.
@@ -285,5 +315,9 @@ it is noted here because a reader comparing 960 m to a chart will otherwise assu
   final centreline.
 - Tile windows, the archive's sha256s, the datum finding and the OGL – Canada licence note
   are in `data/tiles/<slug>/MANIFEST.json` (gitignored, like all tiles).
-- Review plots (§6b.4 owner bounds review): `data/plot-seymour-narrows.png`,
-  `data/plot-dodd-narrows-throat.png`, `data/plot-porlier-pass.png`.
+- Review plots (§6b.4 owner bounds review):
+  `docs/superpowers/specs/grown-patches-plots/plot-tacoma-narrows.png`,
+  `docs/superpowers/specs/grown-patches-plots/plot-deception-pass.png`,
+  `docs/superpowers/specs/grown-patches-plots/plot-seymour-narrows.png`,
+  `docs/superpowers/specs/grown-patches-plots/plot-dodd-narrows-throat.png`,
+  `docs/superpowers/specs/grown-patches-plots/plot-porlier-pass.png`.

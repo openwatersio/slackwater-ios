@@ -965,7 +965,7 @@ final class PatchFieldTests: XCTestCase {
 **Files:**
 - Modify: `tools/patch-pipeline/README.md`, `tools/patch-pipeline/passes/CERTIFICATION.md`
 
-- [ ] **Step 1: Drift check** (spec §6b.5): re-run `sections.py` for one pass; `git diff tools/patch-pipeline/passes/` must show only the `generated` timestamp. Record the check in README as the standing release-time procedure (mirror the fill-refit runbook note in `docs/`).
+- [ ] **Step 1: Drift check** (spec §6b.5): re-run `./sections.py <slug> && ./sensitivity.py <slug>` for one pass — `sections.py`'s `main()` rewrites the pass doc wholesale (reverting `kept_range` and deleting the `sensitivity` block), so both steps must run in order to reproduce the committed doc; `git diff tools/patch-pipeline/passes/` must show only the `generated` timestamp. Record the check in README as the standing release-time procedure (mirror the fill-refit runbook note in `docs/`).
 - [ ] **Step 2: CERTIFICATION.md final form:** method-certification table (Task 4), per-patch §6b results (Tasks 5/8), springs numbers, kept_range per pass. This file is the phase's verdict of record, SURVIVORS.md style.
 - [ ] **Step 3: Verify spec success criteria (§7) one by one** — write the five checks + observed values into the PR body: 4/4 check stations PASS; Dodd ≈ 9.5 kn springs (actual number); bundle size (actual bytes); traceability (every patch has a passes/*.json + anchor); NONNA notice present.
 - [ ] **Step 4:** `git log --oneline origin/main..HEAD` — only this phase's commits. Open the PR with the review plots attached (bounds review is the owner's §6b.4 gate) — do not merge it.

@@ -97,16 +97,20 @@ sha256 + provenance is copied into the committed pass artifact instead.
 ./pack.py                   # committed bundle
 ```
 
-Only `sections.py` exists so far; the rest are later tasks in this pipeline.
+All four stages are built: `sections.py`, `sensitivity.py`, `certify_patch.py`, `pack.py`.
 
 ## Drift check
 
-Re-run `./sections.py <slug>` — `git diff passes/` must be empty apart from
-the `generated` timestamp field. A non-timestamp diff means either the tiles
-changed (re-check `MANIFEST.json` hashes) or the geometry code did.
+Re-run `./sections.py <slug> && ./sensitivity.py <slug>` — `sections.py`'s
+`main()` rewrites the pass doc wholesale (it reverts `kept_range` to the
+flare-only value and deletes the `sensitivity` block until `sensitivity.py`
+puts them back), so both must run in that order. `git diff passes/` must
+then be empty apart from the `generated` timestamp field. A non-timestamp
+diff means either the tiles changed (re-check `MANIFEST.json` hashes) or the
+geometry code did.
 
 ## Tests
 
 ```sh
-uv run --with pytest,numpy,rasterio pytest -q test_sections.py
+uv run --with pytest,numpy,rasterio pytest -q test_sections.py test_sensitivity.py test_certify.py test_pack.py
 ```
