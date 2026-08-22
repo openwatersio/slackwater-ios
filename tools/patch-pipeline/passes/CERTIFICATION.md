@@ -167,3 +167,123 @@ this gate's 0.18 kn (PUG1528, `0.5 − 0.32`) and 0.30 kn (recip, `0.5 − 0.20`
 PASS verdicts on the §4a speed-only bar (`speedMedianKn <= 0.5`) are robust to that drift.
 No FitValidation re-run required; this addendum records the shipped-vs-certified numbers
 and the reasoning rather than re-grading.
+
+---
+
+# BC passes — §6b verdicts (Dodd, Seymour, Porlier)
+
+No check station exists at any of the three, so **the §6a certification harness does not
+run here** — that is precisely why the US pair certified the method first (§6a, Task 4:
+CLEARED). What follows is the §6b per-patch record: anchor identity, the sensitivity
+sweep's anchor-stability gate, the flare/sensitivity bounds, and the §6b.3 springs
+plausibility number. Bathymetry for all three is the **GSC Canada West Coast
+Topo-Bathymetric DEM, 10 m, v2** (NRCan, OGL – Canada; owner ruling 2026-08-21 makes it the
+primary Canadian source, NONNA-10 the recorded fallback). Its vertical datum is **CHS chart
+datum, elevation-up** — stated in the dataset's own lineage ("data elevations were
+re-calculated to the vertical chart datum used by the Canadian Hydrographic Service") and
+checked empirically against the certified NOAA MLLW surface at Deception Pass, where the
+two overlap: median difference **+0.41 m** over 6608 wet cells (p25 −0.24, p75 +1.07). An
+MSL-referenced grid would have read ~1.41 m deeper there. So `tile_value: "elevation"` and
+a real non-zero `cd_to_mwl_m`, exactly as for the US pair.
+
+## Verdict: 1 of 3 ships. Seymour clears; Dodd and Porlier fall to the no-patch fallback
+
+| pass | sections | anchor | throat (ref) | kept_range | anchor stability (worst variant) | §6b.3 springs | ships? |
+|---|---|---|---|---|---|---|---|
+| **seymour-narrows** | 32 @ 150 m | 23 | **770 m** (anchor section) | flare `[18, 25]` → sensitivity **`[19, 24]`** | **7.24 %** (`shift−0.5`) — clears the 10 % bar | max scale 1.1112 × 15.60 = **17.33 kn** vs published **15.60** → **+11.1 %**, inside ~15 % → **PASS** | **yes** |
+| **dodd-narrows** | 42 @ 50 m | 18 | **80 m** (strip minimum — anchor is not the throat) | flare `[18, 18]`; sensitivity **never completed** | **19.91 / 20.52 / 19.67 %** — all three variants blow the 10 % bar | 1.0 × 9.43 = **9.43 kn** vs **9.43** (+0.0 %) — trivially true on a one-section range, see below | **no** |
+| **porlier-pass** | 40 @ 100 m | 25 | **960 m** (strip minimum — anchor is not the throat) | flare `[20, 25]`; sensitivity **never completed** | shift ±0.5: 3.62 / 4.35 % — but `datum=CD` **12.71 %** | max scale 1.4602 × 9.76 = **14.25 kn** vs published **9.76** → **+46.0 %** → **FAIL** | **no** |
+
+"Ships no patch" is the pre-decided fallback for an anchor-unstable pass (owner ruling
+2026-08-21, third amendment), not an escalation. It is implemented by **not committing
+`passes/dodd-narrows.json` or `passes/porlier-pass.json` at all**: `pack.py` globs
+`passes/*.json` and has no gate of its own, so a committed artifact *is* a shipped patch.
+The inputs are committed, so both runs reproduce from `./sections.py <slug>` and both
+`SystemExit`s reproduce from `./sensitivity.py <slug>`.
+
+## The binding constraint at both failures is the datum axis, not anchor placement
+
+The `datum=CD` variant recomputes `A(x)` at chart datum instead of MWL — for these passes
+that is 3.08 m (Dodd) and 2.59 m (Porlier) of water removed from a cross-section that
+includes broad shallow margins. Anchoring each pass at the DEM's own throat instead of the
+CHS gate position (a diagnostic run, not a committed input) does **not** rescue either:
+
+| diagnostic: anchor moved to the DEM throat | `shift+0.5` | `shift−0.5` | `datum=CD` |
+|---|---|---|---|
+| dodd-narrows @ section 20 (80 m gut) | 8.60 % | 9.58 % | **22.67 %** |
+| porlier-pass @ section 21 (960 m) | 3.72 % | 3.51 % | **12.52 %** |
+
+Dodd's gut carries ~12 m of water over an 80 m width; 3.08 m of datum is a quarter of its
+depth, so its cross-section area is a function of the tide stage in a way Seymour's 90–150 m
+channel simply is not (`datum=CD` moves Seymour's anchor area by 4.56 %). This is spec §2's
+"in shallow throats it is exactly the kind of instability the shrink rule handles",
+realized — except that at Dodd and Porlier it is the *anchor* that is unstable, so the
+shrink rule never gets to run. The honest upgrade path is the one the spec already names
+and defers: a tide-stage-dependent `A(x, t)`.
+
+Dodd's spacing is not the cause: re-run at 100 m (the spec's stated 100–200 m band) the
+anchor area swings **27.62 / 33.64 / 20.33 %**, worse than 50 m's 19.91 / 20.52 / 19.67 %.
+Recorded in `inputs/dodd-narrows.json` notes.
+
+## Second finding: at Dodd and Porlier the gate is not at the hydraulic control
+
+Both CHS gate positions sit in water materially wider than the pass's own throat, and the
+published spring maximum is a *throat* number. The consequences differ only because the
+flare rule catches one of them:
+
+- **Dodd** — anchor section 18 is 160 m wide (reach-mean area 2322 m²) and sits ~130 m SSE
+  of the DEM's 80 m gut (section 20, 1216 m²). The continuity law therefore implies
+  **18.01 kn** at the gut against a published 9.43 — a 91 % over-prediction. It is **not
+  shipped**: the flare rule (limit 1.3 × 80 = 104 m) terminates the patch at `[18, 18]`,
+  the anchor section alone, so the gut is outside the bounds and the patch makes no claim
+  about it. The §6b.3 number in the table above (+0.0 %) is therefore true but vacuous —
+  a one-section range can only ever read the gate's own value back. Recorded so that
+  "Dodd passes springs" is never read as evidence.
+- **Porlier** — anchor section 25 (reach-mean 30 129 m²) is at the pass's NE opening,
+  ~400 m NE of the narrowest section 21 (20 634 m²), which **is** inside the flare bounds.
+  So the over-prediction lands inside the patch: **14.25 kn vs 9.76 published, +46.0 %**.
+  This is a clean §6b.3 FAIL, independent of the anchor-stability failure above, and it
+  would still fail if the stability gate were cleared.
+
+The fix, if the owner wants one, belongs in `station-corrections` (the workspace's source
+of truth for station *position*), not in this pipeline: the CHS current-station positions
+for Dodd (49.134351 / −123.817132) and Porlier (49.015 / −123.585 — three decimals, and
+exactly round) are nominal chart labels, not the point the predictions describe. Seymour's
+(50.133333 / −125.35) happens to land on its control section, which is why it is the pass
+that clears. No position was corrected here.
+
+## Throat widths read wider than the navigable channel — by design
+
+The pipeline measures the **contiguous wet run at MWL**, not the charted fairway. Seymour's
+770 m matches the chart because its shores are steep-to; **Porlier's 960 m is ~2× the
+~400–500 m fairway** because the pass's drying ledges are covered at MWL and the wet run
+crosses them. Swept over every orientation at the narrows, the minimum wet width there is
+760–1020 m — the geometry, not a mis-traced thalweg. Dodd's 80 m matches the chart (a rock
+gut has no ledges to cover). The convention is the same one the US pair certified under;
+it is noted here because a reader comparing 960 m to a chart will otherwise assume an error.
+
+## Provenance and reproduction
+
+- Anchors: CHS gates, identity from `station-corrections/data/registry.json` (no
+  provider-minted station code is committed — the registry ships identity, the id resolves
+  under the operator's own provider licence). Flood axes are the IWLS station metadata
+  `floodDirection`: Dodd **355°** (floods N), Seymour **180°** (floods S), Porlier **30°**
+  (floods NE, out into the Strait of Georgia). Every seed is drawn in the flood direction
+  and clears `sections.py`'s 60° orientation assert.
+- `spring_max_kn` is the 2026 annual maximum over every `EXTREMA_FLOOD` / `EXTREMA_EBB`
+  event in each gate's CHS IWLS `wcp1-events` series (~2820 events per station):
+  **Dodd 9.43 kn** (2026-05-17, new-moon flood), **Seymour 15.60 kn** (2026-06-15 flood),
+  **Porlier 9.76 kn** (2026-05-17 flood). All three match the Sailing Directions / tide-table
+  figures the spec quotes (~9, 15–16, ~9).
+- `cd_to_mwl_m` is the IWLS **MWL** height above chart datum at the nearest tide station:
+  Dodd **3.08 m** (Nanaimo Harbour, 3.4 km; Ladysmith on the other side reads 2.53 m),
+  Seymour **2.88 m** (the Seymour Narrows tide station itself), Porlier **2.59 m** (the
+  Porlier Pass tide station itself).
+- Thalweg seeds are not hand-traced from a rendered picture: each is a least-cost route
+  (cost 1/depth², land impassable) between a point in the water either side of the pass,
+  decimated to ~1 spacing. `sections.py`'s relief-gated, slew-capped refinement owns the
+  final centreline.
+- Tile windows, the archive's sha256s, the datum finding and the OGL – Canada licence note
+  are in `data/tiles/<slug>/MANIFEST.json` (gitignored, like all tiles).
+- Review plots (§6b.4 owner bounds review): `data/plot-seymour-narrows.png`,
+  `data/plot-dodd-narrows-throat.png`, `data/plot-porlier-pass.png`.
