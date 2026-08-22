@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. PatchField provider tests (grown-patches spec §7.3,
+// Slackwater — GPL v3. PatchField provider tests (grown-patches spec §5,
 // task-7-brief.md). Transcribed from the brief verbatim.
 import XCTest
 @testable import Slackwater
@@ -100,5 +100,48 @@ final class PatchFieldTests: XCTestCase {
         // Activates once patches-salish.bin is committed; mirrors FillFieldTests' skip idiom.
         guard let field = PatchField() else { throw XCTSkip("patches-salish not bundled yet") }
         XCTAssertFalse(field.cells(at: Date(timeIntervalSince1970: 1_787_000_000)).isEmpty)
+    }
+
+    // Real golden: tacoma-narrows' first cell (patches-salish.json's
+    // "offset": 300, i.e. bin byte 300 -- global cell index 10, since
+    // deception-pass ships 0 cells and seymour-narrows' 10 precede it).
+    // Decoded directly from Slackwater/Resources/patches-salish.bin with a
+    // throwaway `python3 -c "import struct; ..."` script, independent of
+    // PatchField: scale 0.80517578125 (f16-exact), bearingDeg 157.0,
+    // widthM 1625.0. pack.py's docstring: the two triangles of one section
+    // interval carry identical scale/bearing/width, so bin index 11 (the
+    // interval's second triangle) decodes to the same three values -- not a
+    // coincidence to be surprised by if this pin is ever re-derived.
+    //
+    // This is a REGRESSION pin against this generation (the FillFieldTests
+    // real-bundle golden pattern), not an independent derivation -- refit
+    // invalidates deliberately. `cells(at:)` folds the anchor's sign into
+    // `bearingDeg`, so the scale-level pins are checked through
+    // `samples(at:)` instead, whose `bearingDeg` is always the cell's own
+    // (unsigned) channel axis and whose `extentM` is `widthM` verbatim --
+    // matching on both pinned values finds this exact cell without needing
+    // a fragile array-index assumption about which anchors resolve in a
+    // given test environment. `signedKn` is checked against
+    // `anchorSigned * pinnedScale`, computed from the PUG1527 anchor record
+    // in-test at a fixed instant (the FillFieldTests golden pattern) rather
+    // than pinning a numeric literal for it, since deriving that literal
+    // would mean re-deriving the harmonic model too.
+    func testRealBundleGoldenCellTacoma() throws {
+        guard let field = PatchField() else { throw XCTSkip("patches-salish not bundled yet") }
+        let anchor = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/PUG1527" })
+        let date = Date(timeIntervalSince1970: 1_787_000_000)
+        let signed = try XCTUnwrap(anchor.engineStation
+            .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
+
+        let pinnedScale = 0.80517578125
+        let pinnedBearing = 157.0
+        let pinnedWidth = 1625.0
+
+        let cell = try XCTUnwrap(field.samples(at: date).first {
+            $0.bearingDeg == pinnedBearing && $0.extentM == pinnedWidth
+        })
+        XCTAssertEqual(cell.signedKn, signed * pinnedScale, accuracy: 1e-9)
+        XCTAssertEqual(cell.bearingDeg, pinnedBearing, accuracy: 1e-9)
+        XCTAssertEqual(cell.extentM, pinnedWidth, accuracy: 1e-9)
     }
 }

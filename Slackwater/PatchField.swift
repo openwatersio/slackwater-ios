@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. PatchField provider (grown-patches spec §7.3,
+// Slackwater — GPL v3. PatchField provider (grown-patches spec §5,
 // task-7-brief.md): loads the committed patches bundle
 // (tools/patch-pipeline/pack.py, format_version 1) and evaluates each
 // patch's ANCHOR harmonic (a bundled NOAA current station or a fitted CHS
