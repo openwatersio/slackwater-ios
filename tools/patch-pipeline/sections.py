@@ -7,7 +7,11 @@ A(x) at MWL, continuity scales A(anchor)/A(x).
 
 Thalweg refinement = "deepest connected path", operationally: build sections
 perpendicular to the hand-drawn seed, recenter each on its deepest sample,
-rebuild sections perpendicular to the refined polyline once. The sensitivity
+rebuild sections perpendicular to the refined polyline once. "Connected" is
+load-bearing: the run measured contains the station's own centre, relief must
+beat MIN_RELIEF_M to move the line at all, and the lateral move per station is
+slew-limited and then smoothed. Without those three the refinement chases
+noise across the channel and pass 2 lays sections along it. The sensitivity
 sweep (sensitivity.py) owns placement-error truncation.
 
 Licence: tiles are never committed (NONNA clause 7 / BlueTopo per-tile
@@ -21,6 +25,8 @@ import numpy as np
 
 M_PER_DEG_LAT = 111320.0
 CROSS_STEP_M = 10.0  # depth-sample step across a section
+MIN_RELIEF_M = 2.0   # deepest must beat the seed point by this to move the thalweg
+MAX_SLEW = 0.5       # thalweg lateral move per station, as a fraction of spacing
 
 
 def _m_per_deg_lon(lat):
@@ -52,30 +58,38 @@ def _walk(points, spacing_m):
     return out
 
 
+def _offset_point(center, bearing_deg, offset_m):
+    """Point offset_m to starboard of center, perpendicular to bearing."""
+    perp = math.radians(bearing_deg + 90.0)
+    return [center[0] + math.sin(perp) / _m_per_deg_lon(center[1]) * offset_m,
+            center[1] + math.cos(perp) / M_PER_DEG_LAT * offset_m]
+
+
 def _section(center, bearing_deg, half_width_m, depth_at):
     """Sample depth across the channel perpendicular to bearing.
-    Returns (left, right, width_m, area_m2, deepest_point) or None if dry."""
-    perp = math.radians(bearing_deg + 90.0)
-    ux = math.sin(perp) / _m_per_deg_lon(center[1])
-    uy = math.cos(perp) / M_PER_DEG_LAT
+    Returns (left, right, width_m, area_m2, deepest_offset_m, deepest_depth_m)
+    or None if dry."""
     offsets = np.arange(-half_width_m, half_width_m + CROSS_STEP_M, CROSS_STEP_M)
-    pts = [[center[0] + ux * o, center[1] + uy * o] for o in offsets]
+    pts = [_offset_point(center, bearing_deg, o) for o in offsets]
     depths = np.array([depth_at(p[0], p[1]) for p in pts])
     wet = np.isfinite(depths) & (depths > 0)
     if not wet.any():
         return None
-    # contiguous wet run containing the channel: take the run containing the
-    # deepest sample (side embayments/other channels excluded by construction)
-    dpi = int(np.nanargmax(np.where(wet, depths, -np.inf)))
-    lo = dpi
+    # the channel is the contiguous wet run containing the center -- the water
+    # this station is actually in. Growing the run from the deepest sample
+    # instead lets a station on one side of an island measure the water on the
+    # other side (Pass Island, Deception): a different body, not this channel.
+    mid = len(offsets) // 2  # offset 0
+    i0 = mid if wet[mid] else int(np.nanargmax(np.where(wet, depths, -np.inf)))
+    lo = hi = i0
     while lo > 0 and wet[lo - 1]:
         lo -= 1
-    hi = dpi
     while hi < len(wet) - 1 and wet[hi + 1]:
         hi += 1
+    dpi = lo + int(np.argmax(depths[lo:hi + 1]))
     area = float(np.trapezoid(depths[lo:hi + 1], dx=CROSS_STEP_M))
     width = float((hi - lo) * CROSS_STEP_M)
-    return pts[lo], pts[hi], width, area, pts[dpi]
+    return pts[lo], pts[hi], width, area, float(offsets[dpi]), float(depths[dpi])
 
 
 def build_pass(inputs, depth_at):
@@ -83,17 +97,33 @@ def build_pass(inputs, depth_at):
     spacing = inputs["section_spacing_m"]
     half_w = inputs["max_half_width_m"]
 
-    # pass 1: sections on the seed, recenter on deepest point
+    # pass 1: sections on the seed, recenter on the deepest sample -- under two
+    # constraints that make it a *connected* path rather than a sequence of
+    # independent argmaxes. Without them the refined polyline runs across the
+    # channel and pass 2 lays "perpendicular" sections along it.
+    #   relief: in a flat reach "deepest" is a metre of noise that flips sides
+    #           between stations; there the hand-drawn seed is the centerline.
+    #   slew:   a real thalweg cannot move sideways faster than it advances.
     seed = _walk(inputs["thalweg_seed"], spacing)
-    refined = []
+    refined, prev_off = [], 0.0
     for i, c in enumerate(seed):
         nb = seed[max(i - 1, 0)], seed[min(i + 1, len(seed) - 1)]
         b = _bearing_deg(*nb)
         s = _section(c, b, half_w, depth_at)
-        if s:
-            refined.append(s[4])
+        if not s:
+            continue
+        d_seed = depth_at(c[0], c[1])
+        off = s[4] if s[5] > d_seed + MIN_RELIEF_M or not (d_seed > 0) else 0.0
+        slew = spacing * MAX_SLEW
+        off = min(max(off, prev_off - slew), prev_off + slew)
+        prev_off = off
+        refined.append(_offset_point(c, b, off))
     if len(refined) < 3:
         raise SystemExit(f"{inputs['slug']}: <3 wet sections — check tiles/inputs")
+    # moving average (window 3), ends fixed: kills the remaining station-to-
+    # station jitter before it becomes a pass-2 bearing
+    refined = [refined[0]] + [[(p[0] + q[0] + r[0]) / 3.0, (p[1] + q[1] + r[1]) / 3.0]
+                              for p, q, r in zip(refined, refined[1:], refined[2:])] + [refined[-1]]
 
     # pass 2: sections perpendicular to the refined thalweg
     stations = _walk(refined, spacing)
@@ -104,7 +134,7 @@ def build_pass(inputs, depth_at):
         s = _section(c, b, half_w, depth_at)
         if s is None:
             continue
-        left, right, width, area, _ = s
+        left, right, width, area = s[:4]
         sections.append({"center": [float(c[0]), float(c[1])], "bearing_deg": round(b, 1),
                          "width_m": round(width, 1), "area_m2": round(area, 1),
                          "left": [float(left[0]), float(left[1])],
