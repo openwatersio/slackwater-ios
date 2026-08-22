@@ -1,0 +1,38 @@
+{
+ "slug": "deception-pass",
+ "anchor": {"provider": "noaa", "station_id": "PUG1701", "lat": 48.40619,
+            "lon": -122.64312, "flood_deg": 101.5, "spring_max_kn": 8.73},
+ "thalweg_seed": [
+  [-122.6640, 48.4098],
+  [-122.6605, 48.4090],
+  [-122.6570, 48.4070],
+  [-122.6535, 48.4058],
+  [-122.6500, 48.4060],
+  [-122.6470, 48.4059],
+  [-122.6445, 48.4060],
+  [-122.6425, 48.4065],
+  [-122.6405, 48.4073],
+  [-122.6350, 48.4078],
+  [-122.6285, 48.4092],
+  [-122.6220, 48.4080],
+  [-122.6160, 48.4108],
+  [-122.6110, 48.4158]
+ ],
+ "section_spacing_m": 100,
+ "max_half_width_m": 900,
+ "cd_to_mwl_m": 1.411,
+ "tile_value": "elevation",
+ "ends": {
+  "start": "W: ~1 channel-width west of the pass mouth at Lighthouse Point / Deception Island, on the Rosario Strait side",
+  "end": "E: past Yokeko Point (PUG1629), stopping at the Similk Bay / Swinomish Channel junction where the channel fans out"
+ },
+ "check_stations": [
+  {"station_id": "PUG1629", "lat": 48.41272, "lon": -122.61317, "flood_deg": 52.0, "ebb_deg": 232.0}
+ ],
+ "notes": {
+  "flood_direction": "Flood sets EAST through the pass. anchor.flood_deg 101.5 is PUG1701's floodDirection in Slackwater/Resources/currents.json; NOAA CO-OPS reports meanFloodDir 108 for bin 33 of the same station. Seed drawn W->E.",
+  "spring_max_kn": "max |Velocity_Major| = 8.73 kn at 2026-11-26 02:06Z, from CO-OPS currents_predictions interval=6 over the spring week 2026-11-23..2026-11-30 (full moon 2026-11-24). Also the 2026 annual maximum for the station.",
+  "cd_to_mwl_m": "MSL - MLLW at NOAA 9448614 BOWMAN BAY, FIDALGO ISLAND (1.2 km NW of the pass) = 8.73 - 4.10 ft = 4.63 ft = 1.411 m. The brief's suggested 9448558 is LA CONNER, Swinomish Slough (10.9 km away, 5.96 ft / 1.817 m) - Bowman Bay is nearer and on the anchor side. A pass whose whole point is a cross-pass head difference does not have one datum offset; the cd=0 sensitivity variant (spec 6b.2) is the axis that covers this.",
+  "bathymetry": "NOAA Office of Coast Survey National Bathymetric Source. BlueTopo has NO Pacific Northwest coverage in the noaa-ocs-nationalbathymetry-pds bucket, so the 4 m NOAA Navigation Test-and-Evaluation BAG surfaces from the same bucket and programme are used. Same vertical datum (MLLW), same elevation-up sign convention. See data/tiles/deception-pass/MANIFEST.json."
+ }
+}

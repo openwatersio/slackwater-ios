@@ -1,0 +1,38 @@
+{
+ "slug": "tacoma-narrows",
+ "anchor": {"provider": "noaa", "station_id": "PUG1527", "lat": 47.27432,
+            "lon": -122.54532, "flood_deg": 208.5, "spring_max_kn": 6.58},
+ "thalweg_seed": [
+  [-122.5527, 47.3085],
+  [-122.5499, 47.3040],
+  [-122.5466, 47.3000],
+  [-122.5423, 47.2950],
+  [-122.5395, 47.2900],
+  [-122.5387, 47.2850],
+  [-122.5411, 47.2800],
+  [-122.5447, 47.2750],
+  [-122.5498, 47.2700],
+  [-122.5546, 47.2650],
+  [-122.5599, 47.2600],
+  [-122.5620, 47.2565]
+ ],
+ "section_spacing_m": 150,
+ "max_half_width_m": 1100,
+ "cd_to_mwl_m": 2.085,
+ "tile_value": "elevation",
+ "ends": {
+  "start": "N: ~1 channel-width past the north mouth at Point Defiance, stopping short of the Dalco Passage / East Passage junction (the 150 m East Passage basin takes over at 47.310)",
+  "end": "S: the south mouth at Point Fosdick, stopping before the Hale Passage junction where the channel opens into the 3.5 km Fox Island basin (47.254 and south)"
+ },
+ "check_stations": [
+  {"station_id": "PUG1524", "lat": 47.30600, "lon": -122.55003, "flood_deg": 151.1, "ebb_deg": 331.1},
+  {"station_id": "PUG1526", "lat": 47.30400, "lon": -122.55675, "flood_deg": 149.9, "ebb_deg": 329.9},
+  {"station_id": "PUG1528", "lat": 47.26130, "lon": -122.55828, "flood_deg": 213.5, "ebb_deg": 33.5}
+ ],
+ "notes": {
+  "flood_direction": "Flood sets SOUTH through The Narrows (Admiralty Inlet -> South Sound). anchor.flood_deg 208.5 is PUG1527's floodDirection in Slackwater/Resources/currents.json; NOAA CO-OPS reports meanFloodDir 198 for bin 19 of the same station. The seed is therefore drawn N->S. The task brief's claim that flood sets N at Tacoma is wrong.",
+  "spring_max_kn": "max |Velocity_Major| = 6.58 kn at 2026-05-17 22:48Z, from CO-OPS currents_predictions interval=6 over the spring week 2026-05-14..2026-05-21 (new moon 2026-05-16). This is also the 2026 annual maximum for the station (MAX_SLACK scan of the full year).",
+  "cd_to_mwl_m": "MSL - MLLW at NOAA 9446484 Tacoma (Commencement Bay) = 7.46 - 0.62 ft = 6.84 ft = 2.085 m. Cross-check: 9446545 TACOMA 6.88 ft (2.097 m); 9446491 ARLETTA 7.60 ft (2.317 m) is the outlier and is on the Hale Passage side.",
+  "bathymetry": "NOAA Office of Coast Survey National Bathymetric Source. BlueTopo has NO Pacific Northwest coverage in the noaa-ocs-nationalbathymetry-pds bucket (verified: zero delivered tiles north of 42 N in UTM 10), so the 4 m NOAA Navigation Test-and-Evaluation BAG surfaces from the same bucket and the same NBS programme are used instead. Same vertical datum (MLLW), same elevation-up sign convention. See data/tiles/tacoma-narrows/MANIFEST.json."
+ }
+}
