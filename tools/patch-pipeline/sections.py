@@ -1,0 +1,182 @@
+#!/usr/bin/env -S uv run --script --with numpy,rasterio
+"""Slackwater patch-pipeline — cross-section derivation (grown-patches spec §2).
+
+inputs/<slug>.json + bathymetry tiles (data/tiles/<slug>/, gitignored, with
+MANIFEST.json) -> passes/<slug>.json: refined thalweg, perpendicular sections,
+A(x) at MWL, continuity scales A(anchor)/A(x).
+
+Thalweg refinement = "deepest connected path", operationally: build sections
+perpendicular to the hand-drawn seed, recenter each on its deepest sample,
+rebuild sections perpendicular to the refined polyline once. The sensitivity
+sweep (sensitivity.py) owns placement-error truncation.
+
+Licence: tiles are never committed (NONNA clause 7 / BlueTopo per-tile
+contributor check); this file copies MANIFEST provenance into the committed
+pass artifact so the tile cache is disposable.
+"""
+import hashlib, json, math, os, sys
+from datetime import datetime, timezone
+
+import numpy as np
+
+M_PER_DEG_LAT = 111320.0
+CROSS_STEP_M = 10.0  # depth-sample step across a section
+
+
+def _m_per_deg_lon(lat):
+    return M_PER_DEG_LAT * math.cos(math.radians(lat))
+
+
+def _bearing_deg(p0, p1):
+    """Initial bearing p0->p1, degrees true, flat-earth (passes are km-scale)."""
+    dx = (p1[0] - p0[0]) * _m_per_deg_lon(p0[1])
+    dy = (p1[1] - p0[1]) * M_PER_DEG_LAT
+    return math.degrees(math.atan2(dx, dy)) % 360
+
+
+def _walk(points, spacing_m):
+    """Resample a polyline to ~spacing_m station points (lon/lat)."""
+    out = [points[0]]
+    carry = 0.0
+    for p0, p1 in zip(points, points[1:]):
+        seg = math.hypot((p1[0] - p0[0]) * _m_per_deg_lon(p0[1]),
+                         (p1[1] - p0[1]) * M_PER_DEG_LAT)
+        d = carry
+        while d + spacing_m <= seg:
+            d += spacing_m
+            f = d / seg
+            out.append([p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f])
+        carry = (d + spacing_m) - seg - spacing_m  # distance already walked into next seg
+        carry = max(carry, 0.0)
+    return out
+
+
+def _section(center, bearing_deg, half_width_m, depth_at):
+    """Sample depth across the channel perpendicular to bearing.
+    Returns (left, right, width_m, area_m2, deepest_point) or None if dry."""
+    perp = math.radians(bearing_deg + 90.0)
+    ux = math.sin(perp) / _m_per_deg_lon(center[1])
+    uy = math.cos(perp) / M_PER_DEG_LAT
+    offsets = np.arange(-half_width_m, half_width_m + CROSS_STEP_M, CROSS_STEP_M)
+    pts = [[center[0] + ux * o, center[1] + uy * o] for o in offsets]
+    depths = np.array([depth_at(p[0], p[1]) for p in pts])
+    wet = np.isfinite(depths) & (depths > 0)
+    if not wet.any():
+        return None
+    # contiguous wet run containing the channel: take the run containing the
+    # deepest sample (side embayments/other channels excluded by construction)
+    dpi = int(np.nanargmax(np.where(wet, depths, -np.inf)))
+    lo = dpi
+    while lo > 0 and wet[lo - 1]:
+        lo -= 1
+    hi = dpi
+    while hi < len(wet) - 1 and wet[hi + 1]:
+        hi += 1
+    area = float(np.trapezoid(depths[lo:hi + 1], dx=CROSS_STEP_M))
+    width = float((hi - lo) * CROSS_STEP_M)
+    return pts[lo], pts[hi], width, area, pts[dpi]
+
+
+def build_pass(inputs, depth_at):
+    """Pure core: inputs dict + depth_at(lon, lat)->metres-at-MWL (NaN=dry)."""
+    spacing = inputs["section_spacing_m"]
+    half_w = inputs["max_half_width_m"]
+
+    # pass 1: sections on the seed, recenter on deepest point
+    seed = _walk(inputs["thalweg_seed"], spacing)
+    refined = []
+    for i, c in enumerate(seed):
+        nb = seed[max(i - 1, 0)], seed[min(i + 1, len(seed) - 1)]
+        b = _bearing_deg(*nb)
+        s = _section(c, b, half_w, depth_at)
+        if s:
+            refined.append(s[4])
+    if len(refined) < 3:
+        raise SystemExit(f"{inputs['slug']}: <3 wet sections — check tiles/inputs")
+
+    # pass 2: sections perpendicular to the refined thalweg
+    stations = _walk(refined, spacing)
+    sections = []
+    for i, c in enumerate(stations):
+        nb = stations[max(i - 1, 0)], stations[min(i + 1, len(stations) - 1)]
+        b = _bearing_deg(*nb)
+        s = _section(c, b, half_w, depth_at)
+        if s is None:
+            continue
+        left, right, width, area, _ = s
+        sections.append({"center": [float(c[0]), float(c[1])], "bearing_deg": round(b, 1),
+                         "width_m": round(width, 1), "area_m2": round(area, 1),
+                         "left": [float(left[0]), float(left[1])],
+                         "right": [float(right[0]), float(right[1])]})
+
+    # anchor section = nearest to the anchor station; flood-orientation assert
+    a = inputs["anchor"]
+    dists = [math.hypot((s["center"][0] - a["lon"]) * _m_per_deg_lon(a["lat"]),
+                        (s["center"][1] - a["lat"]) * M_PER_DEG_LAT) for s in sections]
+    k = int(np.argmin(dists))
+    diff = abs((sections[k]["bearing_deg"] - a["flood_deg"] + 180) % 360 - 180)
+    if diff > 60:
+        raise SystemExit(f"{inputs['slug']}: thalweg bearing {sections[k]['bearing_deg']} vs "
+                         f"anchor flood {a['flood_deg']} — seed must be drawn in the flood direction")
+
+    a_area = sections[k]["area_m2"]
+    scales = [round(a_area / s["area_m2"], 4) for s in sections]
+    return {
+        "slug": inputs["slug"],
+        "anchor": {**a, "section_index": k},
+        "datum": {"reference": "MWL", "cd_to_mwl_m": inputs["cd_to_mwl_m"]},
+        "section_spacing_m": spacing,
+        "thalweg": [[float(p[0]), float(p[1])] for p in refined],
+        "sections": sections,
+        "scales": scales,
+        "kept_range": [0, len(sections) - 1],
+        "ends": inputs["ends"],
+    }
+
+
+def tile_depth_fn(tile_dir, tile_value, cd_to_mwl_m):
+    """depth_at(lon, lat) over every GeoTIFF in tile_dir (WGS84-warped read)."""
+    import rasterio
+    from rasterio.warp import transform as rio_transform
+    from rasterio.crs import CRS
+    srcs = [rasterio.open(os.path.join(tile_dir, f))
+            for f in sorted(os.listdir(tile_dir)) if f.lower().endswith((".tif", ".tiff"))]
+    if not srcs:
+        raise SystemExit(f"no GeoTIFFs in {tile_dir}")
+    wgs = CRS.from_epsg(4326)
+
+    def depth_at(lon, lat):
+        for src in srcs:
+            xs, ys = rio_transform(wgs, src.crs, [lon], [lat])
+            row, col = src.index(xs[0], ys[0])
+            if 0 <= row < src.height and 0 <= col < src.width:
+                v = src.read(1, window=((row, row + 1), (col, col + 1)))[0, 0]
+                if src.nodata is not None and v == src.nodata:
+                    return float("nan")
+                d = -float(v) if tile_value == "elevation" else float(v)
+                return d + cd_to_mwl_m
+        return float("nan")
+    return depth_at
+
+
+def main(slug):
+    inputs = json.load(open(f"inputs/{slug}.json"))
+    tile_dir = f"data/tiles/{slug}"
+    manifest = json.load(open(os.path.join(tile_dir, "MANIFEST.json")))
+    for t in manifest["tiles"]:  # verify cache integrity before deriving anything
+        got = hashlib.sha256(open(os.path.join(tile_dir, t["file"]), "rb").read()).hexdigest()
+        if got != t["sha256"]:
+            raise SystemExit(f"{t['file']}: sha256 mismatch — re-download, or update MANIFEST deliberately")
+    depth_at = tile_depth_fn(tile_dir, inputs["tile_value"], inputs["cd_to_mwl_m"])
+    out = build_pass(inputs, depth_at)
+    out["generated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out["provenance"] = {"tiles": manifest["tiles"],
+                         "inputs_sha256": hashlib.sha256(open(f"inputs/{slug}.json", "rb").read()).hexdigest()}
+    os.makedirs("passes", exist_ok=True)
+    json.dump(out, open(f"passes/{slug}.json", "w"), indent=1)
+    print(f"{slug}: {len(out['sections'])} sections, anchor at index {out['anchor']['section_index']}, "
+          f"scale range {min(out['scales'])}-{max(out['scales'])}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
