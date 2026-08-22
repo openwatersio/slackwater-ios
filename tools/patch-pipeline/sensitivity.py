@@ -2,13 +2,23 @@
 """Slackwater patch-pipeline — cross-section sensitivity sweep (spec §6b.2).
 
 Variants: sections shifted +/- half a spacing along the thalweg seed; datum
-at chart datum (cd_to_mwl_m = 0) instead of MWL. Any section whose spring-peak
-speed (scale x anchor spring_max_kn) moves more than max(10%, 0.25 kn) under
-any variant is dropped; kept_range = longest contiguous stable run containing
-the anchor, WITHIN the committed (flare-truncated) kept_range already on the
-pass -- sensitivity truncation composes with the flare rule, it never widens
-past it. The committed pass artifact is updated in place -- shrink, never
-smooth.
+at chart datum (cd_to_mwl_m = 0) instead of MWL. Two gates:
+
+- anchor stability (check_anchor_stability): hard SystemExit if the anchor's
+  own nearest-section assignment drifts more than one station, or the
+  absolute area computed at its physical position swings more than 10% of
+  the base area, under any variant. Non-self-normalized signals only --
+  scale is always 1.0 at a run's own anchor by construction, so it cannot
+  see this (see align_to_anchor's docstring).
+- per-section truncation: any section whose spring-peak speed (scale x
+  anchor spring_max_kn) moves more than max(10%, 0.25 kn) under any variant
+  is dropped; kept_range = longest contiguous stable run containing the
+  anchor, WITHIN the committed (flare-truncated) kept_range already on the
+  pass -- sensitivity truncation composes with the flare rule, it never
+  widens past it.
+
+The committed pass artifact is updated in place -- shrink, never smooth --
+and only if both gates clear.
 """
 import json, math, sys
 from sections import M_PER_DEG_LAT, _m_per_deg_lon, build_pass, tile_depth_fn
@@ -46,11 +56,51 @@ def align_to_anchor(base_len, base_anchor, variant_scales, variant_anchor):
     base_anchor) is. Returns a list of length base_len; positions with no
     corresponding variant station are None (kept_range_from_deltas treats
     that as unverifiable -> unstable, same as running off the end of a
-    same-length list)."""
+    same-length list).
+
+    Single-offset assumption: one constant offset is applied across the
+    whole overlap. This is only correct if no *further* station gets added
+    or dropped as dry between the anchor and either kept-range bound in one
+    run but not the other -- only the phase shift upstream of the anchor is
+    corrected for. check_anchor_stability()'s drift check is what catches it
+    if the anchor's own offset is already too large to trust.
+
+    NOTE: because this pivots the comparison on each run's own anchor,
+    aligned[base_anchor] is *always* the variant's own anchor scale, which is
+    always exactly 1.0 by construction (scale = area / area at the anchor).
+    A scale-based stability check at the anchor is therefore dead code after
+    alignment -- see check_anchor_stability() for the real (non-normalized)
+    anchor check this pipeline relies on instead."""
     offset = variant_anchor - base_anchor
     n = len(variant_scales)
     return [variant_scales[i + offset] if 0 <= i + offset < n else None
             for i in range(base_len)]
+
+
+def check_anchor_stability(base_anchor, base_anchor_area, variants, labels,
+                           area_bar=0.10, drift_bar=1):
+    """Hard-error on anchor-placement instability using signals that are NOT
+    self-normalized (scale is always 1.0 at a run's own anchor, so it can't
+    detect this -- see align_to_anchor's note). Two checks per variant:
+    the anchor's nearest-section assignment drifting more than drift_bar
+    stations under a half-spacing nudge, and the absolute area computed at
+    the anchor's physical position swinging more than area_bar (10%) of the
+    base area. Returns per-variant evidence for the pass doc's `sensitivity`
+    block: [{"label", "anchor_index_offset", "anchor_area_delta_pct"}]."""
+    evidence = []
+    for v, label in zip(variants, labels):
+        v_anchor = v["anchor"]["section_index"]
+        offset = v_anchor - base_anchor
+        if abs(offset) > drift_bar:
+            raise SystemExit(f"anchor drifted {offset} stations under variant "
+                             f"'{label}' — anchor placement is sensitivity-unstable")
+        delta_pct = abs(v["sections"][v_anchor]["area_m2"] - base_anchor_area) / base_anchor_area
+        if delta_pct > area_bar:
+            raise SystemExit(f"anchor area swung {delta_pct:.1%} under variant "
+                             f"'{label}' — anchor placement is sensitivity-unstable")
+        evidence.append({"label": label, "anchor_index_offset": offset,
+                         "anchor_area_delta_pct": round(delta_pct * 100, 2)})
+    return evidence
 
 
 def variant(inputs, depth_at, shift_frac=0.0, cd_override=None):
@@ -84,14 +134,20 @@ def main(slug):
     doc = json.load(open(f"passes/{slug}.json"))
     depth_mwl = tile_depth_fn(f"data/tiles/{slug}", inputs["tile_value"], inputs["cd_to_mwl_m"])
     depth_cd = tile_depth_fn(f"data/tiles/{slug}", inputs["tile_value"], 0.0)
+    labels = ["shift+0.5", "shift-0.5", "datum=CD"]
     variants = [
         variant(inputs, depth_mwl, shift_frac=+0.5),
         variant(inputs, depth_mwl, shift_frac=-0.5),
         variant(inputs, depth_cd, cd_override=0.0),
     ]
+    base_anchor = doc["anchor"]["section_index"]
+    # real anchor-stability gate first (align_to_anchor's own scale-based
+    # check is dead code -- see its docstring): absolute area at the
+    # anchor's physical position + anchor index drift, neither self-normalized
+    anchor_evidence = check_anchor_stability(base_anchor, doc["sections"][base_anchor]["area_m2"],
+                                             variants, labels)
     # align each variant to the base by anchor position, not raw index —
     # variant runs may differ in count upstream of the anchor
-    base_anchor = doc["anchor"]["section_index"]
     vscales = [align_to_anchor(len(doc["scales"]), base_anchor, v["scales"], v["anchor"]["section_index"])
               for v in variants]
     before = doc["kept_range"]  # already flare-truncated (sections.py); sensitivity narrows further
@@ -100,10 +156,11 @@ def main(slug):
                                 doc["anchor"]["spring_max_kn"],
                                 within=before)
     doc["kept_range"] = kr
-    doc["sensitivity"] = {"variants": ["shift+0.5", "shift-0.5", "datum=CD"],
+    doc["sensitivity"] = {"variants": labels,
                           "kept_range_before": before,
                           "dropped_below": kr[0] - before[0],
-                          "dropped_above": before[1] - kr[1]}
+                          "dropped_above": before[1] - kr[1],
+                          "anchor_stability": anchor_evidence}
     json.dump(doc, open(f"passes/{slug}.json", "w"), indent=1)
     print(f"{slug}: kept sections {kr[0]}..{kr[1]} (was {before[0]}..{before[1]}) of 0..{len(doc['scales']) - 1}")
 
