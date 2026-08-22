@@ -1,6 +1,7 @@
 # Grown Patches — bounded per-pass current fields from validated gate harmonics
 
-**Status: DRAFT — awaiting owner review.**
+**Status: AMENDED IN EXECUTION — three owner rulings recorded (2026-08-21);
+awaiting final owner review.**
 Third and last piece of the composite current field
 (`2026-08-20-current-field-composite-design.md` §5 is the physics sketch this
 phase executes; Phase B `2026-08-20-fill-phase-b-design.md` shipped the backdrop
@@ -93,6 +94,9 @@ resumable stages, hard asserts, committed outputs only where licence-clean.
   shallow throats it is exactly the kind of instability the shrink rule
   handles. `ponytail:` single-datum areas; a tide-stage-dependent A(x,t)
   upgrade exists if certification says the physics needs it.
+  `[Trigger fired at certification: Dodd and Porlier are both datum-axis
+  anchor-unstable (§6b). Tracked as a follow-on, still deferred — not built
+  in this phase; see CERTIFICATION.md's binding-constraint finding.]`
 - **Committed derived artifact** (the licence-clean "ours"):
   `tools/patch-pipeline/passes/<slug>.json` — channel polygon, thalweg
   polyline, section positions + `A(x)` profile, datum, bounds rationale
@@ -160,9 +164,13 @@ payloads, sidecar carries offsets + provenance):
 
 - **Sidecar header:** `format_version`, `region`, `generated`, `bin_sha256`,
   per-patch table: patch id (pass slug), anchor (`provider`,
-  station/gate id), source `passes/<slug>.json` sha256, cell count, offsets.
-- **Per patch, in the bin:** cell count, then per cell: 3 × (f32 lon, f32
-  lat), f16 `scale`, f16 `bearingDeg`.
+  station/gate id), source `passes/<slug>.json` sha256, **`cell_count` and
+  `offset`** (the bin carries no per-patch cell count of its own — the
+  sidecar is the sole source of it, and a patch's byte range is
+  `[offset, offset + cell_count * 30)`).
+- **Per cell in the bin (fixed 30 bytes, no per-cell header):** 3 × (f32 lon,
+  f32 lat) — the triangle's vertices — then f16 `scale`, f16 `bearingDeg`,
+  f16 `widthM` (the local channel width, the channel-2 sample's extent).
 - Total for Tier 1 is a few hundred cells — **single-digit KB** against the
   40 MB shared budget. No per-patch files, no lazy-loading cleverness.
   `ponytail:` one bundle for all patches; more regions are more files, same as
@@ -256,6 +264,9 @@ reused.
    out-of-bounds reference rows recorded as the documented caveat.
 2. The Dodd patch shows ≈ 9.5 kn springs from the CHS-fitted gate model where
    the mesh said 1.46 kn — composite §8.2, delivered.
+   `[Outcome: not met — Dodd ships no patch; anchor-unstable under the datum
+   axis (19.7–20.5 % vs 10 % bar) and the gate sits ~130 m off the hydraulic
+   control; see CERTIFICATION.md + the station-corrections follow-up]`
 3. Tier-1 bundle ≤ 100 KB (expected single-digit KB); 40 MB budget untouched.
 4. Every patch cell traces to a committed `passes/<slug>.json` + a validated
    anchor; everywhere else absence is unchanged.
@@ -278,6 +289,11 @@ A(x,t).
   it sits in the denominator at the *anchor*, so it cancels there (scale = 1)
   and matters most mid-patch. The sensitivity sweep is sized to catch exactly
   this; the failure mode is a shorter patch, not a wrong one.
+  `[Realized outcome: worse than "shorter" — the instability is at the anchor
+  itself (19.7–20.5 % swing on the datum axis, all three sensitivity variants),
+  so the shrink rule never gets a stable core to shrink to and Dodd ships no
+  patch at all. See CERTIFICATION.md's "binding constraint is the datum axis"
+  section.]`
 - **Phase non-uniformity** at Deception's long eastern arm — *realized in
   the first certification run exactly as predicted* (Yokeko failed only the
   slack-max bar, 34.8 vs 30.0 min): the patch terminates west of Yokeko per
@@ -299,6 +315,14 @@ A(x,t).
 2. **Method certification gate** (§6a): no BC patch ships before Tacoma +
    Deception pass M47 bars at four check stations. This is the phase's
    go/no-go.
+   `[Amended twice after the first run: (a) the gate reduced from four
+   check stations to the two in-bounds checks — PUG1528 from a PUG1527
+   anchor, and the reciprocal PUG1527 from a PUG1528 anchor — once the
+   flared-mouth stations were shown to be out-of-bounds by §3's rule; (b)
+   the gating bar switched from the M47 timing bars to the §4a speed-only
+   bar (≤ 0.5 kn median peak-speed error), since a patch makes no timing
+   claim. Both amendments recorded in CERTIFICATION.md; the phase went
+   CLEARED on the amended protocol, 2/2 in-bounds checks PASS.]`
 3. **Direction v1 = thalweg/section tangent** (§3), Laplace deferred with a
    named trigger. Alternative: build the Laplace solve now — rejected as
    speculative; the fallback is pre-authorized in the composite and the

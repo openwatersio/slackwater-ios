@@ -198,8 +198,10 @@ without a gate: Sechelt stays empty until it has a validated model, unchanged.
 |---|---|---|
 | SSCOFS output | Public domain (17 USC §105, NODD), incl. over Canadian water | Attribution requested; no NOAA-endorsement implication; "model guidance" mirrored by our planning-not-navigation disclaimer |
 | CHS NONNA | Clause 7 derivative products | Verbatim CHS notice |
-| NOAA BlueTopo/CUDEM | Public domain / CC0 | Acknowledgement |
+| NOAA BlueTopo/CUDEM | Public domain / CC0 — **not actually shipped**: BlueTopo has no PNW coverage (verified 2026-08-21, see grown-patches spec §2/README), so no shipped patch derives from it; row kept for the licence record, not because it fed anything | Acknowledgement |
 | NOAA harcon | Public domain | — |
+| GSC Canada West Coast Topo-Bathymetric DEM 10 m | OGL – Canada | Attribution statement in About/credits (shipped) |
+| NOAA NBS Navigation T&E BAG surfaces | Public domain (17 USC §105) | None required (acknowledged in provenance) |
 
 SalishSeaCast (Apache-2.0) and ECCC CIOPS-SalishSea (commercial explicitly granted)
 are validated fallbacks/cross-checks, not shipped sources — recorded so nobody
@@ -223,6 +225,9 @@ re-derives them.
    Narrows' neighbourhood is masked by the gate, and its grown patch shows ~9.5 kn
    springs from the CHS-fitted gate model, not 1.46 kn from the mesh.
    `[Outcome: FAILED — 0/53; see spike README]`
+   `[Outcome, Dodd patch half: not met — Dodd ships no patch; anchor-unstable under
+   the datum axis (19.7–20.5 % vs the 10 % bar) and the CHS gate sits ~130 m off the
+   hydraulic control; see 2026-08-21-grown-patches-design.md §7 + CERTIFICATION.md]`
 3. Bundle delta ≤ 40 MB; everything works offline after sync, per app baseline.
 4. Field coverage visibly ends somewhere a user can see — no fade-to-calm anywhere.
 
