@@ -25,15 +25,22 @@
   "end": "S: the south mouth at Point Fosdick, stopping before the Hale Passage junction where the channel opens into the 3.5 km Fox Island basin (47.254 and south)"
  },
  "check_stations": [
-  {"station_id": "PUG1524", "lat": 47.30600, "lon": -122.55003, "flood_deg": 151.1, "ebb_deg": 331.1},
-  {"station_id": "PUG1526", "lat": 47.30400, "lon": -122.55675, "flood_deg": 149.9, "ebb_deg": 329.9},
   {"station_id": "PUG1528", "lat": 47.26130, "lon": -122.55828, "flood_deg": 213.5, "ebb_deg": 33.5}
+ ],
+ "reciprocal_check": {
+  "anchor_station_id": "PUG1528",
+  "target": {"station_id": "PUG1527", "lat": 47.27432, "lon": -122.54532, "flood_deg": 208.5, "ebb_deg": 28.5}
+ },
+ "reference_stations": [
+  {"station_id": "PUG1524", "lat": 47.30600, "lon": -122.55003, "flood_deg": 151.1, "ebb_deg": 331.1},
+  {"station_id": "PUG1526", "lat": 47.30400, "lon": -122.55675, "flood_deg": 149.9, "ebb_deg": 329.9}
  ],
  "notes": {
   "flood_direction": "Flood sets SOUTH through The Narrows (Admiralty Inlet -> South Sound). anchor.flood_deg 208.5 is PUG1527's floodDirection in Slackwater/Resources/currents.json; NOAA CO-OPS reports meanFloodDir 198 for bin 19 of the same station. The seed is therefore drawn N->S. The task brief's claim that flood sets N at Tacoma is wrong.",
   "spring_max_kn": "max |Velocity_Major| = 6.58 kn at 2026-05-17 22:48Z, from CO-OPS currents_predictions interval=6 over the spring week 2026-05-14..2026-05-21 (new moon 2026-05-16). This is also the 2026 annual maximum for the station (MAX_SLACK scan of the full year).",
   "cd_to_mwl_m": "MSL - MLLW at NOAA 9446484 Tacoma (Commencement Bay) = 7.46 - 0.62 ft = 6.84 ft = 2.085 m. Cross-check: 9446545 TACOMA 6.88 ft (2.097 m); 9446491 ARLETTA 7.60 ft (2.317 m) is the outlier and is on the Hale Passage side.",
   "max_half_width_m": "1400, not the 1100 first chosen. 1100 was picked to cap the degenerate cross-channel sections that the unconstrained thalweg refinement produced; with the refinement now slew-limited those are gone, and 1100 was clipping the real north-mouth sections by ~10% (2180 m of channel read as 1970 m at PUG1524). At 1400 every width is bounded by land, not by the window: the widths at half-width 1600 and 2200 are identical to those at 1400.",
+  "check_stations": "PUG1524 and PUG1526 sit at the north mouth (sections 2-3, widths 2180/2090 m) — outside the flare-terminated kept_range [18, 46] (spec 3, limit 1.3 x 1370 = 1781 m). They are recorded here as reference_stations, not graded: their first-run numbers (CERTIFICATION.md) are the empirical case for the bounds rule, not a verdict on the in-bounds patch. PUG1528 (section 43) is the in-bounds check; the reciprocal_check grades PUG1527 from a PUG1528 anchor over the same geometry.",
   "bathymetry": "NOAA Office of Coast Survey National Bathymetric Source. BlueTopo has NO Pacific Northwest coverage in the noaa-ocs-nationalbathymetry-pds bucket (verified: zero delivered tiles north of 42 N in UTM 10), so the 4 m NOAA Navigation Test-and-Evaluation BAG surfaces from the same bucket and the same NBS programme are used instead. Same vertical datum (MLLW), same elevation-up sign convention. See data/tiles/tacoma-narrows/MANIFEST.json."
  }
 }
