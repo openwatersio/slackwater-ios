@@ -1,0 +1,115 @@
+{
+ "slug": "dodd-narrows",
+ "anchor": {
+  "provider": "chs",
+  "station_id": "chs-dodd-narrows",
+  "lat": 49.13435,
+  "lon": -123.81713,
+  "flood_deg": 355.0,
+  "spring_max_kn": 9.43
+ },
+ "thalweg_seed": [
+  [
+   -123.8085,
+   49.12901
+  ],
+  [
+   -123.80915,
+   49.12983
+  ],
+  [
+   -123.81021,
+   49.13058
+  ],
+  [
+   -123.81127,
+   49.13132
+  ],
+  [
+   -123.81234,
+   49.13197
+  ],
+  [
+   -123.8137,
+   49.13218
+  ],
+  [
+   -123.81477,
+   49.13274
+  ],
+  [
+   -123.81583,
+   49.13348
+  ],
+  [
+   -123.81634,
+   49.1343
+  ],
+  [
+   -123.81699,
+   49.13504
+  ],
+  [
+   -123.81749,
+   49.13586
+  ],
+  [
+   -123.81814,
+   49.13668
+  ],
+  [
+   -123.8192,
+   49.13742
+  ],
+  [
+   -123.81943,
+   49.13833
+  ],
+  [
+   -123.82022,
+   49.13907
+  ],
+  [
+   -123.82128,
+   49.13981
+  ],
+  [
+   -123.82234,
+   49.14055
+  ],
+  [
+   -123.82355,
+   49.14102
+  ],
+  [
+   -123.82463,
+   49.1415
+  ],
+  [
+   -123.8257,
+   49.14197
+  ],
+  [
+   -123.8265,
+   49.14252
+  ]
+ ],
+ "section_spacing_m": 50,
+ "max_half_width_m": 600,
+ "cd_to_mwl_m": 3.08,
+ "tile_value": "elevation",
+ "ends": {
+  "start": "SE: ~1.2 km into Stuart Channel past the south mouth, stopping well short of the Pylades Channel / Stuart Channel opening \u2014 the gut is only ~200 m long, so 'one width past the mouth' is metres, and the flare rule (1.3 x throat) is what actually terminates the patch. The seed runs long on purpose so the flare has sections to walk out to.",
+  "end": "NW: ~1.1 km into Northumberland Channel past the north mouth. Stops before the channel opens to its full ~900 m width off Jack Point, and does not enter False Narrows, which branches EAST out of Northumberland Channel north of the gut (the seed runs NW, away from it)."
+ },
+ "check_stations": [],
+ "notes": {
+  "flood_direction": "Flood sets NORTH through Dodd Narrows \u2014 Stuart Channel into Northumberland Channel and on toward Nanaimo. flood_deg 355 is the CHS IWLS station metadata floodDirection for the Dodd Narrows current station (ebbDirection 155). Seed drawn S->N. The refined thalweg's bearing at the anchor section is ~334 (the gut lies NNW-SSE), 21 deg off the fitted flood axis and inside sections.py's 60 deg orientation assert.",
+  "spring_max_kn": "9.43 kn \u2014 the maximum |value| over every EXTREMA_FLOOD/EXTREMA_EBB event in the CHS IWLS wcp1-events series for the whole of 2026 (2820 events), at 2026-05-17T21:07Z, a flood on the 2026-05-16 new moon. Matches the ~9 kn figure Sailing Directions and the Canadian tide tables give for Dodd. Station resolved by officialName against the IWLS station list, not by a provider-minted id (station-corrections policy: the registry ships identity, not the provider's code).",
+  "anchor_position": "49.13435 / -123.81713 \u2014 the CHS current station's own IWLS position, which is the registry position (49.1344 / -123.8171) at full precision. It lands ~50 m from the traced thalweg, inside the gut.",
+  "cd_to_mwl_m": "3.08 m = Mean Water Level above chart datum at Nanaimo Harbour (IWLS station heights, MWL height type), 3.4 km NNW and on the flood-exit side of the gut. Cross-check: Ladysmith, 15 km S on the Stuart Channel side, reads 2.53 m \u2014 a 0.55 m spread across the pass, which is exactly the kind of thing the cd=0 sensitivity variant (spec 6b.2) exists to bound.",
+  "bathymetry": "GSC Canada West Coast Topo-Bathymetric DEM, 10 m, version 2 (NRCan, OGL-Canada) \u2014 owner ruling 2026-08-21 makes this the primary Canadian source, with NONNA-10 held as the fallback if a throat proves too smooth to resolve. Vertical datum is CHS chart datum and the sign convention is elevation-up (water negative), so tile_value is \"elevation\" exactly as for the US pair; both facts are recorded, with the empirical cross-check against the NOAA MLLW surface at Deception Pass, in data/tiles/dodd-narrows/MANIFEST.json.",
+  "thalweg_seed": "Not hand-traced from a picture: a least-cost route (cost 1/depth^2, land impassable) between a point in Stuart Channel and one in Northumberland Channel, decimated to ~100 m. Least depth along it is 12.6 m, at the gut. sections.py's own relief-gated, slew-capped refinement then owns the final centreline.",
+  "section_spacing_m": "50 m, finer than the spec's stated 100-200 m band, because the whole gut is only ~200 m long: at 100 m the strip carries 21 sections and the narrowest reads 100 m instead of 80 m. The choice does not buy stability - re-run at 100 m the anchor's reach-mean area swings 27.6/33.6/20.3 % across the three sensitivity variants, worse than 50 m's 19.9/20.5/19.7 %. Recorded so the spacing is not mistaken for the cause of the sensitivity verdict."
+ }
+}
