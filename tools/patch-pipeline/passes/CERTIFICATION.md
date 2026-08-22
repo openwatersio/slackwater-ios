@@ -147,3 +147,23 @@ timing bars and therefore reads `FAIL` for `tacoma-narrows-recip-PUG1527`. **Tha
 not the verdict of record for this gate** — under §6a as amended the gate is the speed
 median column above, and both in-bounds checks pass it. Run 1's verdict files are
 preserved at `data/verdicts-run1/` (gitignored, like all of `data/`).
+
+## Shipped-scale addendum (reach-mean estimator, spec §3 third amendment)
+
+The scales this certification was graded against are stale: `tools/patch-pipeline/passes/CERTIFICATION.md`
+above cites `scales[43] = 0.9064` (fwd) and the renormalized reciprocal `1.1033`, computed
+before the owner ruling of 2026-08-21 (third amendment) made `A(x)` the **reach-mean**
+cross-section area over ±half a section spacing rather than the raw single-transect area
+— a single transect at a sharp throat is placement-noisy (measured 12.7 % anchor-area
+swing at Deception's 140 m gut under a half-spacing seed shift), so the estimator averages
+each section with its two neighbours, uniformly, across every pass. The committed
+`tacoma-narrows.json` now ships `scales[43] = 0.912` (fwd) / reciprocal `1.0965` — a
+~0.62 % drift from the certified values, from the estimator swap alone (anchor identity
+`scales[31] = 1.0` is unchanged by construction on either estimator).
+
+**Immateriality (re-reviewer's verdict, not re-derived here):** a ~0.6 % scale drift moves
+each row's error terms by ~0.6 % of the predicted speed — hundredths of a knot — against
+this gate's 0.18 kn (PUG1528, `0.5 − 0.32`) and 0.30 kn (recip, `0.5 − 0.20`) margins. Both
+PASS verdicts on the §4a speed-only bar (`speedMedianKn <= 0.5`) are robust to that drift.
+No FitValidation re-run required; this addendum records the shipped-vs-certified numbers
+and the reasoning rather than re-grading.
