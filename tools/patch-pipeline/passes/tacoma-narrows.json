@@ -1115,6 +1115,23 @@
    46
   ],
   "dropped_below": 0,
-  "dropped_above": 0
+  "dropped_above": 0,
+  "anchor_stability": [
+   {
+    "label": "shift+0.5",
+    "anchor_index_offset": -1,
+    "anchor_area_delta_pct": 1.56
+   },
+   {
+    "label": "shift-0.5",
+    "anchor_index_offset": 0,
+    "anchor_area_delta_pct": 1.36
+   },
+   {
+    "label": "datum=CD",
+    "anchor_index_offset": 0,
+    "anchor_area_delta_pct": 5.26
+   }
+  ]
  }
 }
