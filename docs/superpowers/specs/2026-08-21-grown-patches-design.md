@@ -66,11 +66,20 @@ FAILs (forever, see §0).
 Sibling of `tools/fill-pipeline/`, same conventions: gitignored `data/` cache,
 resumable stages, hard asserts, committed outputs only where licence-clean.
 
-- **Sources.** BC: CHS NONNA-10 tiles (clause 7 — commercial derivatives
-  permitted, verbatim notice required, raw tiles never ship, tiles deletable
-  on termination). US: NOAA BlueTopo via the `noaa-ocs-nationalbathymetry-pds`
-  bucket (CC0; per-tile contributor layer checked and recorded in provenance).
-  Tiles live only in `data/` — never committed, never bundled.
+- **Sources** (owner ruling 2026-08-21; coverage source-of-record is the
+  Open Waters Seascape index, openwaters.io/charts/seascape — if it isn't
+  there, it doesn't exist). US: NOAA NBS via the
+  `noaa-ocs-nationalbathymetry-pds` bucket — BlueTopo where published;
+  **Navigation T&E 4 m BAG surfaces where not** (BlueTopo has no PNW
+  coverage; verified against the live tile scheme). Public domain,
+  per-tile contributor/licence check recorded in provenance. BC: **GSC
+  Canada West Coast Topo-Bathymetric DEM 10 m** (NRCan, Open Government
+  Licence – Canada, direct download from open.canada.ca — no portal
+  account) as primary; CHS NONNA-10 (clause 7 — commercial derivatives
+  permitted, verbatim notice required, tiles deletable on termination) as
+  the fallback if the DEM reads too smooth in a throat (the width guards
+  and sensitivity sweep decide). Tiles live only in `data/` — never
+  committed, never bundled, regardless of source.
 - **Per pass:** land/water mask at datum → channel polygon, trimmed by hand at
   the hard bounds (junction, side embayment, ~1 width past each mouth — the
   bounds are geometric judgment and get human review, §6b); thalweg as the
@@ -91,10 +100,11 @@ resumable stages, hard asserts, committed outputs only where licence-clean.
   PR, drift-testable against a re-derivation (the `station-corrections`
   pattern), and the sole input `pack` needs — the pipeline can lose its tile
   cache without losing the product.
-- **Licence surfacing:** the first BC patch is the first CHS-derived data in a
-  shipped bundle (Phase B stayed SSCOFS-only deliberately). The verbatim CHS
-  NONNA notice lands in the app About/credits in the same change that ships
-  it — composite §6 already reserves the slot.
+- **Licence surfacing:** BC patches derived from the GSC DEM carry OGL –
+  Canada attribution in the app About/credits, shipped in the same change
+  as the first BC patch. The verbatim CHS NONNA notice is required only if
+  the NONNA fallback actually feeds a shipped patch — composite §6 already
+  reserves the slot for it.
 
 ## 3. Patch construction
 
@@ -209,8 +219,9 @@ reused.
 3. Tier-1 bundle ≤ 100 KB (expected single-digit KB); 40 MB budget untouched.
 4. Every patch cell traces to a committed `passes/<slug>.json` + a validated
    anchor; everywhere else absence is unchanged.
-5. CHS NONNA verbatim notice ships in credits in the same release as the
-   first BC patch.
+5. Bathymetry attribution ships in credits in the same release as the
+   first BC patch (OGL – Canada for the GSC DEM; the CHS NONNA verbatim
+   notice too iff NONNA-derived data ships).
 
 ## 8. Out of scope
 
@@ -222,7 +233,7 @@ A(x,t).
 
 ## 9. Risks
 
-- **NONNA-10 resolution in a 60–80 m throat (Dodd):** ~6–8 depth cells
+- **10 m bathymetry resolution (GSC DEM / NONNA) in a 60–80 m throat (Dodd):** ~6–8 depth cells
   across the narrows makes A(throat) the noisiest number in the phase — and
   it sits in the denominator at the *anchor*, so it cancels there (scale = 1)
   and matters most mid-patch. The sensitivity sweep is sized to catch exactly
