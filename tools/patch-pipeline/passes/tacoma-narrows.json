@@ -1103,5 +1103,18 @@
    }
   ],
   "inputs_sha256": "c9d73770185b985a295b202426d8e219201de37c6d1a1e3e39fd1ad0946c8a13"
+ },
+ "sensitivity": {
+  "variants": [
+   "shift+0.5",
+   "shift-0.5",
+   "datum=CD"
+  ],
+  "kept_range_before": [
+   18,
+   46
+  ],
+  "dropped_below": 0,
+  "dropped_above": 0
  }
 }
