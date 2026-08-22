@@ -2521,12 +2521,21 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
         let targetCell = app.collectionViews.buttons.matching(
             NSPredicate(format: "label == %@", targetLabel)).firstMatch
+        // `.exists` is a no-wait snapshot; taken right after `.tap()` it races
+        // the graphical calendar's month-transition animation and can read
+        // false on a month the target is already in — the loop then taps past
+        // it and the final check (also a bare `.exists`) fails one month late.
+        // Proved by forcing that exact outcome (3 unconditional taps land on
+        // November while the target is in October): `waitForExistence` gives
+        // each check up to a second for the animation to settle, so a taken
+        // tap can no longer be "lost" against an in-flight transition either.
         var monthsAdvanced = 0
-        while !targetCell.exists, monthsAdvanced < 3 {
+        while !targetCell.waitForExistence(timeout: 1), monthsAdvanced < 3 {
             app.buttons["Next Month"].firstMatch.tap()
             monthsAdvanced += 1
         }
-        XCTAssert(targetCell.exists, "today+45d cell (\(targetLabel)) not found within 3 months forward")
+        XCTAssert(targetCell.waitForExistence(timeout: 1),
+                  "today+45d cell (\(targetLabel)) not found within 3 months forward")
         targetCell.tap()
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
