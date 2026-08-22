@@ -9,7 +9,8 @@ it composes with; the evidence trail is openwatersio/slackwater-ios#99).
 **Inherited rulings, not reopened here:** render only what passed validation;
 a patch renders only where a validated gate/station anchors it; patch outranks
 backdrop; no green in any field ramp; timing/transitability authority stays
-with gates/patches; absence stays absence; speed by short-channel continuity
+with gates alone (owner ruling 2026-08-21 — see §6a; patches are a speed +
+direction field, like the fill); absence stays absence; speed by short-channel continuity
 `|u|(x) = |u|_gate · A_gate / A(x)` from bathymetry cross-sections; direction
 by depth-weighted Laplace with thalweg tangent as the pre-authorized fallback;
 hard bounds at junctions/side embayments and ~1 channel-width past each mouth;
@@ -110,9 +111,15 @@ resumable stages, hard asserts, committed outputs only where licence-clean.
 
 - **Speed:** per-cell scale `s = A_gate / A(cell section)`. Scale is 1 at the
   anchor section by construction.
-- **Phase:** the anchor's phase everywhere. Uniform phase along the channel
-  *is* the L ≪ λ/4 criterion; the certification channels check it empirically
-  (slack-timing error at the check stations, §6a) rather than assuming it.
+- **Phase:** the anchor's phase everywhere — an approximation, and the
+  certification runs measured its error rather than assuming the L ≪ λ/4
+  criterion: along 1.75 km of confined Tacoma Narrows, slack timing differs
+  from the anchor's by ~10–25 min median (the reciprocal check exposed
+  error cancellation in the forward direction). Consequence (owner ruling
+  2026-08-21): a patch makes **no timing claim** — it is a speed +
+  direction field; streak reversals track the anchor's slack within the
+  ~±25 min class already documented for the fill backdrop, and slack/
+  transitability authority stays with the gate card alone.
 - **Direction, v1:** section-normal / thalweg tangent per cell — the
   pre-authorized fallback. The Laplace solve is deferred with an explicit
   trigger: build it only if certification-channel bearings or the rendered
@@ -185,10 +192,16 @@ a new concept:
 **(a) Method certification — runs once, gates the phase.** Build the Tacoma
 and Deception patches; at every check station **inside the patch's final
 bounds**, grade the patch's prediction against the station's own
-published-harmonic prediction using the **existing FitValidation bars (M47:
-slack timing, extrema timing, ≤ 0.5 kn median peak speed)** — the patch at a
-check station must read as well as a shipping gate, graded by the same
-tooling, one implementation of the rule, never a fork.
+published-harmonic prediction with the existing FitValidation tooling —
+one implementation of the rule, never a fork. **Gating bar (owner ruling
+2026-08-21, second amendment): the fill's §4a speed-only bar — ≤ 0.5 kn
+median peak-speed error** — because patches feed the same render channels
+as the fill (speed colour + direction streaks) and make no timing claim
+(§3). The timing rows are still measured and recorded verbatim in
+CERTIFICATION.md as the documented phase caveat, not as a gate. Rationale
+on record: run 2's reciprocal check failed M47 slack bars (20.3/52.2 min)
+while both directions passed speed with wide margin (0.20/0.32 kn vs
+0.5) — phase uniformity does not hold at gate grade, the speed law does.
 
 *Protocol as amended by owner ruling 2026-08-21 after the first run (1/4
 PASS):* the flared-mouth stations (Tacoma PUG1524/PUG1526) and Yokeko
@@ -230,7 +243,8 @@ reused.
 ## 7. Success criteria
 
 1. Method certification (§6a, amended protocol) passes at every in-bounds
-   check on M47 bars, with the out-of-bounds reference rows recorded.
+   check on the §4a speed-only bar, with timing measurements and
+   out-of-bounds reference rows recorded as the documented caveat.
 2. The Dodd patch shows ≈ 9.5 kn springs from the CHS-fitted gate model where
    the mesh said 1.46 kn — composite §8.2, delivered.
 3. Tier-1 bundle ≤ 100 KB (expected single-digit KB); 40 MB budget untouched.
