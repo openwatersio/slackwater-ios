@@ -41,8 +41,8 @@ data past that.
 
 | Pass | Anchor | Side | Why |
 |---|---|---|---|
-| Tacoma Narrows | PUG1527 (anchor), PUG1524/1526/1528 as in-channel checks | US / BlueTopo | **Method-certification channel** — four published harmonic stations in series along one channel; the only place the A(gate)/A(x) law can be graded against independent truth at three points. Also a real constriction with real users. |
-| Deception Pass | PUG1701; Yokeko Point PUG1629 in-pass check | US / BlueTopo | Second certification channel (one in-pass check) + the highest-value US gate. Exercises the whole US pipeline. |
+| Tacoma Narrows | PUG1527 (anchor), PUG1524/1526/1528 as in-channel checks | US / NBS T&E BAG | **Method-certification channel** — four published harmonic stations in series along one channel; the only place the A(gate)/A(x) law can be graded against independent truth at three points. Also a real constriction with real users. |
+| Deception Pass | PUG1701; Yokeko Point PUG1629 in-pass check | US / NBS T&E BAG | Second certification channel (one in-pass check) + the highest-value US gate. Exercises the whole US pipeline. |
 | Dodd Narrows | chs-dodd-narrows | BC / NONNA | Worst mesh failure in the matrix (4.52 kn); the composite's own acceptance example (~9.5 kn springs, §8.2); Nanaimo inside route. |
 | Seymour Narrows | chs-seymour-narrows | BC / NONNA | The definitive Inside Passage gate; best-fitted model in the set. |
 | Porlier Pass | chs-porlier-pass | BC / NONNA | Gulf Islands ⇄ Strait of Georgia gate; 2.62 kn mesh error. |
