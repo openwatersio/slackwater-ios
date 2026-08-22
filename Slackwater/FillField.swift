@@ -89,7 +89,7 @@ private struct FillHeader: Decodable {
 /// layout in this file's header comment. Not `Data`-generic on purpose —
 /// FillField holds the whole bin as `[UInt8]` once at load so every element
 /// read is a plain array index, not a `Data` subscript through its indices.
-private struct FillByteReader {
+struct FillByteReader {
     let bytes: [UInt8]
     var pos: Int
 
