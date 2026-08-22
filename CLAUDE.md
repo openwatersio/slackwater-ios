@@ -151,6 +151,17 @@ failure as yours:
   `testM51PromotionInterruptsAnInFlightDownload` fails roughly two of three full runs on
   the iPad leg — which starts ~1600s in — and passes alone every time in 49 seconds
   (issue #65). **Before blaming your change: re-run the single test in isolation.**
+- **"Timed out trying to boot simulator after waiting 60.00s" means a stale
+  Simulator.app, not your code.** A long-running Simulator.app wedges every new device
+  boot — a 12-day-old instance did this on the Studio (2026-08-21), and the same
+  symptom+fix showed on a MacBook the same day. `killall Simulator` clears it, and is
+  safe while another session's headless `xcodebuild test` is mid-run: its booted
+  devices re-boot headless under CoreSimulatorService (verified against a live run).
+  The app is only a viewer; nothing on this machine needs it running.
+- **Shut down every simulator you boot when you're done with it** (`xcrun simctl
+  shutdown <udid>` — never `shutdown all`; another session or CI may be mid-test on
+  its own device). Left-behind sims accumulate: the Studio reached 608 CoreSimulator
+  processes holding 60.8 GB RSS, most of them 7 days old, before anyone noticed.
 
 **Fast feedback without the suite:** a compile-check takes a minute and catches most of
 what a 15-minute cycle would.
