@@ -153,7 +153,7 @@ def tile_depth_fn(tile_dir, tile_value, cd_to_mwl_m):
             if 0 <= row < src.height and 0 <= col < src.width:
                 v = src.read(1, window=((row, row + 1), (col, col + 1)))[0, 0]
                 if src.nodata is not None and v == src.nodata:
-                    return float("nan")
+                    continue  # tiles overlap at seams; nodata here can be real data in the next tile
                 d = -float(v) if tile_value == "elevation" else float(v)
                 return d + cd_to_mwl_m
         return float("nan")
