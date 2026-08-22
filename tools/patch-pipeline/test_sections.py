@@ -243,3 +243,59 @@ def test_flare_ratio_override_widens_the_bounds():
     out = build_pass(inp, flared_depth)
     assert out["kept_range"] == [0, len(out["sections"]) - 1]
     assert out["flare_ratio"] == 5.0
+
+
+def offthroat_inputs():
+    # Straight flat-bottomed channel whose narrowest water is NOT at the
+    # anchor: 900 m south of y = -1000, 700 m through the anchor at y = 0,
+    # a 600 m gut at y = +1000..1400, 700 m north of that. The anchor's own
+    # width (700) exceeds the strip minimum (600) by more than THROAT_TOL
+    # (1.1), so the flare rule must fall back to the strip minimum. Seymour
+    # and Porlier can land here for real: a CHS gate sits where the reference
+    # station is, not necessarily at the narrowest section.
+    return {
+        "slug": "offthroat",
+        "anchor": {"provider": "chs", "station_id": "OFF1", "lat": 0.0, "lon": 0.0,
+                   "flood_deg": 0.0, "spring_max_kn": 8.0},
+        "thalweg_seed": [[0.0, -2000.0 / M_PER_DEG_LAT], [0.0, 2600.0 / M_PER_DEG_LAT]],
+        "section_spacing_m": 200,
+        "max_half_width_m": 800,
+        "cd_to_mwl_m": 0.0,
+        "tile_value": "depth",
+        "ends": {"start": "test", "end": "test"},
+        "check_stations": [],
+    }
+
+
+def offthroat_depth(lon, lat):
+    x = lon * M_PER_DEG_LAT
+    y = lat * M_PER_DEG_LAT
+    if y < -1000.0:
+        half = 450.0
+    elif y < 1000.0:
+        half = 350.0
+    elif y < 1400.0:
+        half = 300.0      # the gut: strip minimum, 1000 m north of the anchor
+    else:
+        half = 350.0
+    return 50.0 if abs(x) <= half else float("nan")
+
+
+def test_throat_falls_back_to_strip_minimum_when_anchor_is_not_narrowest():
+    out = build_pass(offthroat_inputs(), offthroat_depth)
+    k = out["anchor"]["section_index"]
+    anchor_w = out["sections"][k]["width_m"]
+    min_w = min(s["width_m"] for s in out["sections"])
+    assert anchor_w > min_w * 1.1, (anchor_w, min_w)   # fixture really is off-throat
+    assert out["throat"]["width_m"] == min_w, (out["throat"], min_w)
+    assert out["throat"]["reference"].startswith("strip minimum"), out["throat"]
+    assert out["throat"]["limit_m"] == round(min_w * 1.3, 1), out["throat"]
+    # ...and the bounds are the strip minimum's, not the anchor's: the 900 m
+    # sections south of y = -1000 sit outside 1.3 x min_w but inside
+    # 1.3 x anchor_w, so this range is only correct under the fallback.
+    lo, hi = out["kept_range"]
+    limit = out["throat"]["limit_m"]
+    assert all(s["width_m"] <= limit for s in out["sections"][lo:hi + 1])
+    assert lo > 0 and out["sections"][lo - 1]["width_m"] > limit, out["sections"][lo - 1]
+    assert out["sections"][lo - 1]["width_m"] <= 1.3 * anchor_w, out["sections"][lo - 1]
+    assert hi == len(out["sections"]) - 1, (hi, len(out["sections"]))
