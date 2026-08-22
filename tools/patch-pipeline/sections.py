@@ -27,6 +27,8 @@ M_PER_DEG_LAT = 111320.0
 CROSS_STEP_M = 10.0  # depth-sample step across a section
 MIN_RELIEF_M = 2.0   # deepest must beat the seed point by this to move the thalweg
 MAX_SLEW = 0.5       # thalweg lateral move per station, as a fraction of spacing
+FLARE = 1.3          # mouth termination: first section wider than FLARE x throat ends the patch
+THROAT_TOL = 1.1     # anchor width may exceed the strip minimum by this and still be "the throat"
 
 
 def _m_per_deg_lon(lat):
@@ -152,6 +154,26 @@ def build_pass(inputs, depth_at):
 
     a_area = sections[k]["area_m2"]
     scales = [round(a_area / s["area_m2"], 4) for s in sections]
+
+    # Mouth termination (spec 3, owner ruling 2026-08-21): walking outward from
+    # the anchor, the patch ends at the first section wider than FLARE x the
+    # throat. Timing coherence dies at the flare, so the bounds are the
+    # geometry's, not a judgment call. Throat reference = the anchor's own
+    # width -- scale is 1 there by construction -- but only while the anchor
+    # really is the narrowest water in the strip; otherwise fall back to the
+    # strip minimum and say so.
+    flare = float(inputs.get("flare_ratio", FLARE))
+    min_w = min(s["width_m"] for s in sections)
+    throat = sections[k]["width_m"]
+    throat_ref = "anchor section"
+    if throat > min_w * THROAT_TOL:
+        throat, throat_ref = min_w, "strip minimum (anchor is not the throat)"
+    limit = throat * flare
+    lo = hi = k
+    while lo > 0 and sections[lo - 1]["width_m"] <= limit:
+        lo -= 1
+    while hi < len(sections) - 1 and sections[hi + 1]["width_m"] <= limit:
+        hi += 1
     return {
         "slug": inputs["slug"],
         "anchor": {**a, "section_index": k},
@@ -160,7 +182,9 @@ def build_pass(inputs, depth_at):
         "thalweg": [[float(p[0]), float(p[1])] for p in refined],
         "sections": sections,
         "scales": scales,
-        "kept_range": [0, len(sections) - 1],
+        "kept_range": [lo, hi],
+        "flare_ratio": flare,
+        "throat": {"width_m": throat, "reference": throat_ref, "limit_m": round(limit, 1)},
         "ends": inputs["ends"],
     }
 
@@ -206,7 +230,10 @@ def main(slug):
     os.makedirs("passes", exist_ok=True)
     json.dump(out, open(f"passes/{slug}.json", "w"), indent=1)
     print(f"{slug}: {len(out['sections'])} sections, anchor at index {out['anchor']['section_index']}, "
-          f"scale range {min(out['scales'])}-{max(out['scales'])}")
+          f"scale range {min(out['scales'])}-{max(out['scales'])}\n"
+          f"  kept_range {out['kept_range']} of [0, {len(out['sections']) - 1}] — "
+          f"throat {out['throat']['width_m']} m ({out['throat']['reference']}), "
+          f"flare {out['flare_ratio']} → limit {out['throat']['limit_m']} m")
 
 
 if __name__ == "__main__":

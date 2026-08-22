@@ -24,7 +24,8 @@ FIT_DAYS = 190
 VAL_OFFSET_DAYS, VAL_LEN_DAYS = 28, 7       # mirror make_matrix's held-out window
 
 
-def nearest_scale(pass_doc, lat, lon):
+def nearest_section(pass_doc, lat, lon):
+    """Index of the kept section nearest (lat, lon); hard error if none is close."""
     lo, hi = pass_doc["kept_range"]
     best, best_d = None, float("inf")
     for i in range(lo, hi + 1):
@@ -35,7 +36,29 @@ def nearest_scale(pass_doc, lat, lon):
             best, best_d = i, d
     if best is None or best_d > pass_doc.get("section_spacing_m", 150) * 2:
         raise SystemExit(f"check station {lat},{lon} has no section within 2 spacings of kept_range")
-    return pass_doc["scales"][best]
+    return best
+
+
+def nearest_scale(pass_doc, lat, lon):
+    return pass_doc["scales"][nearest_section(pass_doc, lat, lon)]
+
+
+def reciprocal_spec(pass_doc, inputs):
+    """The reciprocal in-bounds check (spec 6a, amended): grade the *anchor*
+    station from one of the check stations, same geometry, scales renormalized
+    so the reciprocal anchor's section is 1.0. scales[i] = A_anchor/A_i, so
+    A_recip/A_i = scales[i]/scales[recip] — one division, no re-derivation.
+    Returns None for a pass without a `reciprocal_check` input."""
+    rc = inputs.get("reciprocal_check")
+    if not rc:
+        return None
+    ra = next(c for c in inputs["check_stations"] if c["station_id"] == rc["anchor_station_id"])
+    i_recip = nearest_section(pass_doc, ra["lat"], ra["lon"])
+    t = rc["target"]
+    i_target = nearest_section(pass_doc, t["lat"], t["lon"])
+    return {"label": f"{pass_doc['slug']}-recip-{t['station_id']}",
+            "anchor_id": rc["anchor_station_id"], "target": t,
+            "scale": round(pass_doc["scales"][i_target] / pass_doc["scales"][i_recip], 4)}
 
 
 def scale_samples(samples, scale):
@@ -86,6 +109,18 @@ def main():
             index.append({"slug": label, "samples": sp, "events": ep,
                           "flood": ck["flood_deg"], "ebb": ck["ebb_deg"]})
             print(label)
+        rc = reciprocal_spec(pass_doc, inputs)
+        if rc:
+            t = rc["target"]
+            sp = f"data/certify/samples/{rc['label']}.json"
+            ep = f"data/certify/events/{rc['label']}.json"
+            if not (os.path.exists(sp) and os.path.exists(ep)):   # resumable
+                json.dump(scale_samples(anchor_series(rc["anchor_id"], start, end), rc["scale"]),
+                          open(sp, "w"))
+                json.dump(noaa_events({"id": t["station_id"]}, *val), open(ep, "w"))
+            index.append({"slug": rc["label"], "samples": sp, "events": ep,
+                          "flood": t["flood_deg"], "ebb": t["ebb_deg"]})
+            print(f"{rc['label']} (scale {rc['scale']} from {rc['anchor_id']})")
     json.dump(index, open("data/certify/index.json", "w"), indent=1)
 
 

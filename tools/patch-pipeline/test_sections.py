@@ -152,3 +152,44 @@ def test_section_measures_the_channel_the_station_is_in():
     assert width == 200.0, width
     assert area == 6000.0, area
     assert deep_d == 30.0 and abs(deep_off) <= 100.0, (deep_d, deep_off)
+
+def flared_inputs():
+    # Straight channel, flat 50 m bottom, 1000 m wide up to y = +1750 m and
+    # 4000 m wide north of it -- a mouth flare. Anchor at y = 0 (the throat).
+    return {
+        "slug": "flared",
+        "anchor": {"provider": "noaa", "station_id": "FLARE1", "lat": 0.0, "lon": 0.0,
+                   "flood_deg": 0.0, "spring_max_kn": 4.0},
+        "thalweg_seed": [[0.0, -3000.0 / M_PER_DEG_LAT], [0.0, 5000.0 / M_PER_DEG_LAT]],
+        "section_spacing_m": 500,
+        "max_half_width_m": 2500,
+        "cd_to_mwl_m": 0.0,
+        "tile_value": "depth",
+        "ends": {"start": "test", "end": "test"},
+        "check_stations": [],
+    }
+
+def flared_depth(lon, lat):
+    x = lon * M_PER_DEG_LAT
+    y = lat * M_PER_DEG_LAT
+    half = 500.0 if y < 1750.0 else 2000.0
+    return 50.0 if abs(x) <= half else float("nan")
+
+def test_kept_range_stops_at_the_flare():
+    # Spec 3: walking outward from the anchor, the patch ends at the first
+    # section wider than FLARE x the throat width. 4000 m > 1.3 x 1000 m.
+    out = build_pass(flared_inputs(), flared_depth)
+    lo, hi = out["kept_range"]
+    assert lo == 0, lo                                  # no flare southward
+    assert hi < len(out["sections"]) - 1, (hi, len(out["sections"]))
+    for s in out["sections"][lo:hi + 1]:
+        assert s["width_m"] <= 1.3 * 1000.0, s
+    assert out["sections"][hi + 1]["width_m"] > 1.3 * 1000.0
+    assert out["sections"][hi]["center"][1] * M_PER_DEG_LAT == 1500.0
+
+def test_flare_ratio_override_widens_the_bounds():
+    inp = flared_inputs()
+    inp["flare_ratio"] = 5.0                            # 4000 m < 5 x 1000 m
+    out = build_pass(inp, flared_depth)
+    assert out["kept_range"] == [0, len(out["sections"]) - 1]
+    assert out["flare_ratio"] == 5.0
