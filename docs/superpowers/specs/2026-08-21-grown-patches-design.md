@@ -128,6 +128,13 @@ resumable stages, hard asserts, committed outputs only where licence-clean.
 - **Cells:** the section strip triangulated into cells (two triangles per
   section interval), each carrying `scale` and `bearingDeg`. Blocky like the
   fill, no smoothing across cells — same honesty rule, same precedent.
+- **Mouth termination is objective** (owner ruling 2026-08-21, from the
+  first certification run): walking outward from the anchor, the patch ends
+  at the first section whose width exceeds **1.3× the throat width** (any
+  per-pass override is recorded in the inputs with its justification). The
+  run showed timing coherence dies exactly at the flare — the confined-
+  channel check passed all bars while both flared-mouth stations failed
+  slack timing badly.
 
 ## 4. Shipped format
 
@@ -176,16 +183,25 @@ a new concept:
 ## 6. Validation
 
 **(a) Method certification — runs once, gates the phase.** Build the Tacoma
-and Deception patches; at every in-channel check station (Tacoma: PUG1524,
-PUG1526, PUG1528 predicted from a PUG1527 anchor; Deception: Yokeko Point
-PUG1629 predicted from PUG1701), grade the patch's prediction against the
-station's own published-harmonic prediction using the **existing FitValidation
-bars (M47: slack timing, extrema timing, ≤ 0.5 kn median peak speed)** — the
-patch at a check station must read as well as a shipping gate, graded by the
-same tooling, one implementation of the rule, never a fork. Skagit Bay SW of
-Hope Island (PUG1628) is recorded as an informative far-field decay check,
-not a bar. **Fail → the phase halts** and the fallback conversation is the
-composite §7 Discovery-FVCOM path — not a loosened bar.
+and Deception patches; at every check station **inside the patch's final
+bounds**, grade the patch's prediction against the station's own
+published-harmonic prediction using the **existing FitValidation bars (M47:
+slack timing, extrema timing, ≤ 0.5 kn median peak speed)** — the patch at a
+check station must read as well as a shipping gate, graded by the same
+tooling, one implementation of the rule, never a fork.
+
+*Protocol as amended by owner ruling 2026-08-21 after the first run (1/4
+PASS):* the flared-mouth stations (Tacoma PUG1524/PUG1526) and Yokeko
+PUG1629 sit outside the objectively-terminated bounds (§3) — they become
+**out-of-bounds reference rows**, recorded in CERTIFICATION.md but not
+gating (the first run's numbers stand as the empirical case for the bounds
+rule). The gating in-bounds checks are: PUG1528 predicted from the PUG1527
+anchor, and the **reciprocal check** — PUG1527 predicted from a PUG1528
+anchor (same geometry, scales renormalized to the PUG1528 section) — two
+independent within-bounds gradings. Same bars, nothing loosened. Skagit Bay
+SW of Hope Island (PUG1628) stays an informative far-field row. **Fail →
+the phase halts** and the fallback conversation is the composite §7
+Discovery-FVCOM path — not a loosened bar.
 
 **(b) Per-patch certification — every patch, including the uncheckable BC
 five:**
@@ -213,7 +229,8 @@ reused.
 
 ## 7. Success criteria
 
-1. Method certification (§6a) passes at all four check stations on M47 bars.
+1. Method certification (§6a, amended protocol) passes at every in-bounds
+   check on M47 bars, with the out-of-bounds reference rows recorded.
 2. The Dodd patch shows ≈ 9.5 kn springs from the CHS-fitted gate model where
    the mesh said 1.46 kn — composite §8.2, delivered.
 3. Tier-1 bundle ≤ 100 KB (expected single-digit KB); 40 MB budget untouched.
@@ -238,10 +255,11 @@ A(x,t).
   it sits in the denominator at the *anchor*, so it cancels there (scale = 1)
   and matters most mid-patch. The sensitivity sweep is sized to catch exactly
   this; the failure mode is a shorter patch, not a wrong one.
-- **Phase non-uniformity** at Deception's long eastern arm — the Yokeko check
-  measures it; if slack timing fails there, the patch terminates west of
-  Yokeko and the certification is re-run on the shorter patch (shrink rule
-  applies to timing too).
+- **Phase non-uniformity** at Deception's long eastern arm — *realized in
+  the first certification run exactly as predicted* (Yokeko failed only the
+  slack-max bar, 34.8 vs 30.0 min): the patch terminates west of Yokeko per
+  the shrink rule (timing shrinks too), leaving Deception with no in-bounds
+  check — Yokeko stands as its out-of-bounds reference row.
 - **Gate fit-state coupling:** BC patches are invisible until the gate's
   on-device fit completes — same UX truth as the gate cards today; accepted,
   not worked around.
