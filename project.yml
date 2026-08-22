@@ -60,6 +60,13 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # The app's first URL scheme: `slackwater://premium` opens the Widgets
+        # gallery, `slackwater://station/<id>` opens that station's detail.
+        # Widgets already emit both (Task 5/6); StationListView.onOpenURL
+        # (SlackwaterApp.swift) is the receiving end.
+        CFBundleURLTypes:
+          - CFBundleURLName: org.openwaters.slackwater
+            CFBundleURLSchemes: [slackwater]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
@@ -84,7 +91,17 @@ targets:
     platform: iOS
     sources:
       - SlackwaterWidgets
-      - path: Slackwater/Resources
+      # Explicit station catalogs only — NOT the whole Resources folder. That
+      # folder also holds ~98 MB of map tiles (pmtiles) and chart sprites that
+      # nothing in this appex reads; bundling it inflated every widget build.
+      # Keep this list in sync with the `bundled("...")` calls in the model
+      # files below (grep bundled\( to verify).
+      - path: Slackwater/Resources/stations.json
+      - path: Slackwater/Resources/currents.json
+      - path: Slackwater/Resources/chs-stations.json
+      - path: Slackwater/Resources/chs-gates.json
+      - path: Slackwater/Resources/chs-current-gates.json
+      - path: Slackwater/Resources/chs-tombstones.json
       - Slackwater/AppGroup.swift
       - Slackwater/SlackWindow.swift
       - Slackwater/WidgetStationLoader.swift

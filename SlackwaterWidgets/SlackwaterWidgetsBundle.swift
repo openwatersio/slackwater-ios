@@ -8,6 +8,7 @@ struct SlackwaterEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?   // nil: unknown/unfitted station
     let premium: Bool
+    let stationID: String?          // for the widget's deepLink (Task 9)
 }
 
 struct StationProvider: AppIntentTimelineProvider {
@@ -16,7 +17,8 @@ struct StationProvider: AppIntentTimelineProvider {
         let snapshot = WidgetStationLoader.load(id: id)
             .map { WidgetSnapshot.build($0, now: date) }
         return SlackwaterEntry(date: date, snapshot: snapshot,
-                               premium: AppGroup.defaults.bool(forKey: "slackwater.premium"))
+                               premium: AppGroup.defaults.bool(forKey: "slackwater.premium"),
+                               stationID: id)
     }
     func placeholder(in context: Context) -> SlackwaterEntry {
         entry(StationConfigIntent(), at: .now)
