@@ -17,7 +17,17 @@ and per-section continuity scales relative to the anchor station's section.
 
 Thalweg refinement is two passes: build sections perpendicular to the
 hand-drawn seed, recenter each on its deepest sample, then rebuild sections
-perpendicular to the refined polyline once. `build_pass(inputs, depth_at)`
+perpendicular to the refined polyline once. "Connected" is three constraints
+on that recentering, and dropping any of them puts sections *along* the
+channel instead of across it:
+
+- a section measures the contiguous wet run containing **its own centre**, so
+  a station beside an island cannot measure the water on the far side of it;
+- the deepest sample only moves the thalweg when it beats the seed point by
+  `MIN_RELIEF_M` — in a flat reach "deepest" is a metre of noise that flips
+  sides between stations, and there the hand-drawn seed is the centreline;
+- the lateral move per station is capped at `MAX_SLEW x section_spacing_m`,
+  then the polyline is smoothed (moving average, window 3). `build_pass(inputs, depth_at)`
 is the pure, testable core — no file or tile I/O — see `test_sections.py`
 for a synthetic V-channel with analytically known areas.
 
@@ -77,5 +87,5 @@ changed (re-check `MANIFEST.json` hashes) or the geometry code did.
 ## Tests
 
 ```sh
-uv run --with pytest,numpy pytest -q test_sections.py
+uv run --with pytest,numpy,rasterio pytest -q test_sections.py
 ```
