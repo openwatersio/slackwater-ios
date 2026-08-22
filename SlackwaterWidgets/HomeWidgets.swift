@@ -104,8 +104,23 @@ struct SparklineView: View {
     }
 }
 
+/// RFC 3986 "unreserved" only. `.urlPathAllowed` looked like the obvious
+/// choice (it does escape ":", e.g. "current:PUG1515") but it does NOT escape
+/// "/" — and every tide/current station id in the bundled catalogs (all 3,607
+/// of them: "noaa/9454616", "current:noaa/jx0701", "ticon/aasiaat-...") has
+/// one. With `.urlPathAllowed`, `url.pathComponents` splits on that "/" and
+/// the receiving `.onOpenURL` only ever sees the first fragment. Only CHS
+/// stations (no "/" in their ids) round-tripped by accident under the wider
+/// set. Confirmed by direct round-trip test — see task-9-report.md.
+private let idPathCharacters = CharacterSet(charactersIn:
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
 func deepLink(_ entry: SlackwaterEntry) -> URL? {
-    // Station route lands in Task 9; harmless until the app registers the scheme.
-    guard entry.snapshot != nil else { return URL(string: "slackwater://station") }
-    return URL(string: "slackwater://station")  // refined to carry the id in Task 9
+    // Station ids contain ":" and "/" (e.g. "current:noaa/jx0701") —
+    // percent-encode both; the receiving `.onOpenURL` reads the id back
+    // decoded via `url.pathComponents`.
+    guard let id = entry.stationID,
+          let encoded = id.addingPercentEncoding(withAllowedCharacters: idPathCharacters)
+    else { return URL(string: "slackwater://station") }
+    return URL(string: "slackwater://station/\(encoded)")
 }

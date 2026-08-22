@@ -294,6 +294,7 @@ struct StationListView: View {
     @State private var query = ""
     @State private var showSettings = false
     @State private var showDownloads = false
+    @State private var showWidgetsGallery = false
     @State private var searching = false
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
@@ -436,6 +437,24 @@ struct StationListView: View {
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
+        // No environment re-forward needed here (unlike showSettings/showDownloads
+        // above): the gallery's only nested presentation is PremiumView, which
+        // reads no custom environment key. If it ever grows a station link, mind
+        // the reforwarding gotcha those two sheets document.
+        .sheet(isPresented: $showWidgetsGallery) { WidgetsGalleryView() }
+        // The app's first URL scheme (project.yml CFBundleURLTypes). Widgets
+        // emit both routes: locked accessory widgets → premium (Task 6), home
+        // widgets and the free ones' deepLink → station/<id> (HomeWidgets.swift).
+        .onOpenURL { url in
+            guard url.scheme == "slackwater" else { return }
+            switch url.host {
+            case "premium": showWidgetsGallery = true
+            case "station":
+                let id = url.pathComponents.dropFirst().first ?? ""
+                if let item = StationItem.byId[id] { open(item) }
+            default: break
+            }
+        }
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,
                                 anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in

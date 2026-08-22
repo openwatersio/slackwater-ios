@@ -10,6 +10,7 @@ struct SettingsView: View {
     @ObservedObject private var chs = ChsFitService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
+    @State private var showWidgets = false
 
     private var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -69,6 +70,15 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
+                        Button { showWidgets = true } label: {
+                            HStack {
+                                Text("Widgets — add them to your home and lock screen")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
                     }
 
                     section("About these predictions") {
@@ -116,6 +126,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showPremium) { PremiumView() }
+            .sheet(isPresented: $showWidgets) { WidgetsGalleryView() }
         }
         .preferredColorScheme(.dark)
     }
