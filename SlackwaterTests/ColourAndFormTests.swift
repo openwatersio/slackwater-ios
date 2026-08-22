@@ -255,11 +255,16 @@ final class ColourAndFormTests: XCTestCase {
             "falling": SN.ebbHex, "ebb": SN.ebbHex,
             "slack": SN.goHex,
         ]
+        // #13: the expression is now to-color(state, match(...)) — a state
+        // that IS a colour (speed-bearing current pins) renders as itself,
+        // a named state falls through to the match below.
+        XCTAssertEqual(PIN_STATE_COLOUR.first as? String, "to-color")
+        let match = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var seen: Set<String> = []
         var i = 2   // past "match" and ["get", "state"]
-        while i + 1 < PIN_STATE_COLOUR.count {
-            let state = try XCTUnwrap(PIN_STATE_COLOUR[i] as? String)
-            let hex = try XCTUnwrap(PIN_STATE_COLOUR[i + 1] as? String)
+        while i + 1 < match.count {
+            let state = try XCTUnwrap(match[i] as? String)
+            let hex = try XCTUnwrap(match[i + 1] as? String)
             // Darkened by the map's one land-contrast factor (issue #13), but
             // still FROM the token — retarget SN.flood and the map follows.
             XCTAssertEqual(hex, mapHex(try XCTUnwrap(expected[state], "unexpected pin state \(state)"),
@@ -275,7 +280,53 @@ final class ColourAndFormTests: XCTestCase {
         // that constant rather than repeating its value.
         XCTAssertEqual(PIN_NEUTRAL, mapHex(SN.steelHex), "the unknown pin must be SN.steel")
         assertSameColour(StationGlyph.colour(for: .unknown), SN.steel, "the unknown glyph must be SN.steel")
-        XCTAssertEqual(PIN_STATE_COLOUR.last as? String, PIN_NEUTRAL, "the fallback must be PIN_NEUTRAL")
+        XCTAssertEqual(match.last as? String, PIN_NEUTRAL, "the fallback must be PIN_NEUTRAL")
+    }
+
+    /// #13: a speed-bearing current pin's colour is the #97 ramp darkened by
+    /// the land-contrast factor — except inside the slack window, where it is
+    /// the go colour. The boundary is `slackThresholdKn`, the same number the
+    /// strip's green column uses.
+    func testCurrentPinColourIsRampOutsideWindowGoInside() {
+        let still = record(speedKn: 0)
+        XCTAssertEqual(currentPinColour(still, at: refTime),
+                       mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
+        let fast = record(speedKn: 3.0)
+        XCTAssertEqual(currentPinColour(fast, at: refTime),
+                       pinRampHex(forSpeedKn: 3.0), "moving pin must be the darkened ramp")
+        XCTAssertNotEqual(currentPinColour(fast, at: refTime),
+                          mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
+                          "a moving pin must never read go")
+    }
+
+    /// The darkened pin ramp must clear the 3:1 land floor at every speed it
+    /// can actually render (above the threshold — below it the pin is go),
+    /// and must never read green: green is the window's, exclusively.
+    func testPinRampClearsContrastAndNeverGreen() throws {
+        let source = try repoSource("Slackwater/MapScreen.swift")
+        let match = try XCTUnwrap(
+            source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
+            "LAND_TONE must stay a plain hex literal this test can read")
+        let land = String(source[match].suffix(8).prefix(7))
+        var kn = slackThresholdKn + 0.01
+        while kn <= 17 {
+            let hex = pinRampHex(forSpeedKn: kn)
+            XCTAssertGreaterThanOrEqual(contrast(hex, land), 3.0,
+                                        "pin ramp at \(kn) kn (\(hex)) is under 3:1 on land")
+            let v = UInt32(hex.dropFirst(), radix: 16) ?? 0
+            let (r, g, b) = (Double((v >> 16) & 0xFF), Double((v >> 8) & 0xFF), Double(v & 0xFF))
+            XCTAssertFalse(g > r && g > b, "pin ramp at \(kn) kn reads green — green means go")
+            kn += 0.25
+        }
+    }
+
+    private var refTime: Date { Date(timeIntervalSince1970: 1_787_000_000) }
+    private func record(speedKn: Double) -> CurrentStationRecord {
+        // M2 amplitude 0 → speed is meanFlow exactly, at any instant.
+        CurrentStationRecord(
+            id: "t", name: "t", region: "t", aliases: [], latitude: 0, longitude: 0,
+            timezone: "UTC", floodDirection: 0, ebbDirection: 180, meanFlow: speedKn,
+            tideReference: nil, constituents: [.init(name: "M2", amplitude: 0, phase: 0)])
     }
 
     func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {
@@ -363,11 +414,12 @@ final class ColourAndFormTests: XCTestCase {
             "LAND_TONE must stay a plain hex literal this test can read")
         let land = String(source[match].suffix(8).prefix(7))
 
-        var fills: [String: String] = ["unknown": try XCTUnwrap(PIN_STATE_COLOUR.last as? String)]
+        let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
+        var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]
         var i = 2   // past "match" and ["get", "state"]
-        while i + 1 < PIN_STATE_COLOUR.count {
-            fills[try XCTUnwrap(PIN_STATE_COLOUR[i] as? String)] =
-                try XCTUnwrap(PIN_STATE_COLOUR[i + 1] as? String)
+        while i + 1 < stateMatch.count {
+            fills[try XCTUnwrap(stateMatch[i] as? String)] =
+                try XCTUnwrap(stateMatch[i + 1] as? String)
             i += 2
         }
         for (state, hex) in fills {

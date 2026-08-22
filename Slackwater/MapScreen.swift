@@ -83,15 +83,40 @@ private let PIN_HALO: Double = 1.5
 
 // A pin's colour by state — literally the same expression on both pin layers
 // (Task 5), so kind (which layer a pin lands in) cannot influence colour.
+//
+// #13: a speed-bearing current pin's state IS a colour literal — the #97 ramp
+// darkened for land contrast, or go inside the slack window — which the
+// to-color head renders as itself. Named states (tide rising/falling, and
+// flood/ebb/slack for the one speed-less kind, derived gates — "No speed
+// exists to show", ChsGate.swift) fall through to the match. Anything else
+// is neutral.
 let PIN_STATE_COLOUR: [Any] = [
-    "match", ["get", "state"],
-    "rising", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
-    "flood", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
-    "falling", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
-    "ebb", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
-    "slack", mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
-    PIN_NEUTRAL,   // unknown — SN.steel, already 3.25:1 on land
+    "to-color", ["get", "state"],
+    ["match", ["get", "state"],
+     "rising", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
+     "flood", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
+     "falling", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
+     "ebb", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
+     "slack", mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
+     PIN_NEUTRAL] as [Any],   // unknown — SN.steel, already 3.25:1 on land
 ]
+
+/// The pin ramp's own land-contrast factor. Deeper than the named states'
+/// `PIN_STATE_DARKEN` (0.28) because the ramp's top end is the palest colour
+/// any pin can take — at 0.28 it bottoms out at 2.55:1 on the land tone;
+/// 0.36 clears the 3:1 floor across the whole sweep with margin (worst
+/// 3.16:1, measured), pinned by `testPinRampClearsContrastAndNeverGreen`.
+/// Uniform, not speed-dependent: inferno's monotone luminance is what lets
+/// the ramp rank speeds at a glance, and a nonuniform darken would bend it.
+let PIN_RAMP_DARKEN = 0.36
+
+/// The map's ramp fill for a speed-bearing current pin: the #97 transfer
+/// (the strip's own composition) under the pin ramp's land-contrast darken.
+func pinRampHex(forSpeedKn kn: Double) -> String {
+    let c = SN.speedRGB(Timeline.rampT(forSpeedKn: kn))
+    let d = { (v: Double) -> Int in Int((v * (1 - PIN_RAMP_DARKEN)).rounded()) }
+    return String(format: "#%02x%02x%02x", d(c.r), d(c.g), d(c.b))
+}
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
 /// half-period, so it always finds the next turn. Only the minority of
@@ -148,13 +173,18 @@ func tidePinTone(_ record: TideStationRecord, at now: Date) -> String {
     return rising ? "rising" : "falling"
 }
 
-/// A current record's tone. Exact PIN_STATE_COLOUR match keys —
-/// CurrentPhase.word ("Flooding") is the pill's word, not these.
-func currentPinTone(_ station: CurrentStationRecord, at now: Date) -> String {
+/// A speed-bearing current pin's tone IS its colour (#13): green exactly when
+/// the instant sits inside the slack window — |v| under the same
+/// `slackThresholdKn` that defines the strip's green column — and the
+/// darkened #97 ramp at the current speed otherwise. Hue no longer says
+/// flood-versus-ebb here; the detail card's arrow + cardinal carries
+/// direction (#97's own argument for taking it off hue).
+func currentPinColour(_ station: CurrentStationRecord, at now: Date) -> String {
     let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
         .first?.speed ?? 0
-    let phase = currentPhase(signed: signed)
-    return phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
+    return abs(signed) <= slackThresholdKn
+        ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
+        : pinRampHex(forSpeedKn: abs(signed))
 }
 
 /// A station's state as a tone name, for the pin's colour.
@@ -169,7 +199,7 @@ private func pinTone(_ item: StationItem, at now: Date, chsTones: [String: Strin
     case .tide(let record):
         return tidePinTone(record, at: now)
     case .current(let station):
-        return currentPinTone(station, at: now)
+        return currentPinColour(station, at: now)
     case .chs, .chsGate, .chsCurrent:
         return chsTones[item.id] ?? "unknown"
     }
@@ -194,7 +224,7 @@ func chsPinTones(at now: Date,
             tones[item.id] = tidePinTone(record, at: now)
         case .chsCurrent(let gate):
             guard let record = currentRecords[gate.id] else { continue }
-            tones[item.id] = currentPinTone(record, at: now)
+            tones[item.id] = currentPinColour(record, at: now)
         case .chsGate(let gate):
             guard let port = tideRecords[gate.reference] else { continue }
             let phase = DerivedGateRecord(gate: gate, port: port).cardState(at: now).phase
