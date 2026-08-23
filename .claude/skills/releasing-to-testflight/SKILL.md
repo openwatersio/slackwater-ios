@@ -49,7 +49,7 @@ rejected upload.** Nothing renumbers it for you.
    say so in the PR, and check `git diff` really is version-only.
 5. Open the release PR. Nothing reaches App Store Connect before it merges, and
    you never merge your own PR (`CONTRIBUTING.md`).
-6. After the merge, from `main`: `./scripts/testflight.sh --family` for a release,
+6. After the merge, from `main`: `./scripts/testflight.sh --external` for a release,
    plain `./scripts/testflight.sh` for a build only Nightly needs. **The script
    archives the working tree, not `HEAD`** — if `git status` isn't clean, build
    from a throwaway worktree (`git worktree add <dir> origin/main`) rather than
@@ -71,7 +71,8 @@ Settled, so they don't get re-litigated:
 | Does ASC accept a *lower* pre-release train? | It accepts it and no tester can install it. Builds 22 (0.6.0) and 23 (0.7.0) both went `VALID`, both reached `IN_BETA_TESTING` on the internal group — and the TestFlight app kept offering 1.0 (21), because it offers the highest version train it holds and does not even list the lower ones under Previous Builds. Two releases went nowhere this way. **`MARKETING_VERSION` must stay above 1.0** until the accidental 1.0 train (builds 1–21) is retired. |
 | Why do builds 1–21 sit under a `1.0` train? | They shipped the plist literal. The eventual real 1.0 needs a build number above 21. |
 | A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
-| Why does Friends & Family need a flag when Nightly doesn't? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **Friends & Family is external, behind a public link**, so a build reaches it only after Apple beta review. `asc.mjs promote` does both steps; `externalState` goes `READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_TESTING`. |
+| Why do the external groups need a flag when Nightly doesn't? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **The external groups sit behind public links**, so a build reaches them only after Apple beta review. `asc.mjs promote` does both steps; `externalState` goes `READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_TESTING`. |
+| Which external groups does a release go to? | **All of them.** A bare `asc.mjs promote <build>` discovers every group with `isInternalGroup: false` and adds the build to each, then submits beta review **once** (review is per build — a second submission 409s). Pass a group name to target just one. The old default named `Friends & Family` alone, which is how build 28 reached two groups where build 27 reached three, leaving the `slackwater.xyz` download button on the previous release. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |
 | `promote` 422s `INVALID_QC_STATE` seconds after an upload | It promoted the *previous* build. ASC doesn't list a fresh upload for several minutes, and a bare `promote` takes the newest build it lists — build 23's release hit build 22, already reviewed. Since PR #88 `testflight.sh` passes the archive's own build number and `promote` waits for that build to appear. |
 | Every UI test reports `Test crashed with signal kill`, zero assertion failures | Two test runs overlapping on this machine, not a code failure. See `docs/testflight.md`. |

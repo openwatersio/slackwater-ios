@@ -31,6 +31,7 @@ used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → impo
 |---|---|---|---|
 | Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
 | Friends & Family | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | https://testflight.apple.com/join/HK7mHF19 |
+| OSS and Externals | external, public link | same — and this is the link `slackwater.xyz` publishes as its download button (`src/routes/index.tsx`), so a release that skips it leaves the public page on the previous build | https://testflight.apple.com/join/FCSS4w8s |
 
 The public link is written down here because it exists nowhere else in the repo — App Store
 Connect mints it and `asc.mjs` never reads it back. Re-read it any time with
@@ -91,6 +92,12 @@ Per-release procedure lives in the `releasing-to-testflight` skill
 (`.claude/skills/`) — bump, test, PR, upload, verify. What follows is the state
 that procedure sits on.
 
+- **A release goes to every external group, not one.** `./scripts/testflight.sh --external`
+  (the flag was `--family`, still accepted) promotes to all groups with
+  `isInternalGroup: false`, discovered at run time rather than named — adding a fourth
+  group needs no code change. Beta review is submitted **once per build**; it is not
+  per group and a second submission 409s. Check with `node scripts/asc.mjs builds`,
+  whose group column is the only place the asymmetry is visible.
 - Bump `CURRENT_PROJECT_VERSION` in `project.yml` per upload (App Store Connect rejects reused
   build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
   because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and

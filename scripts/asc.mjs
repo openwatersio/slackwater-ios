@@ -81,19 +81,37 @@ if (cmd === 'create-cert') {
   // internal "Nightly" group needs none of this — it has hasAccessToAllBuilds
   // and every upload lands there on its own, which is why this command exists
   // only for the external side.
-  const group = args[1] ?? 'Friends & Family';
+  // With no group named, promote to EVERY external group. Naming one group was
+  // the old default ('Friends & Family'), and it silently shipped an asymmetry:
+  // build 27 reached three groups, build 28 reached two, because a second
+  // external group ("OSS and Externals" — the one the slackwater.xyz landing
+  // page links) had been added and nothing in the release path knew about it.
+  // Discovering them beats a hardcoded list precisely because that is the
+  // failure mode: a new group needs no code change to get releases.
+  const named = args[1];
   const groups = await api('GET', '/v1/betaGroups?limit=20');
-  const g = groups.data.find((x) => x.attributes.name === group);
-  if (!g) throw new Error(`no beta group named "${group}"`);
+  let targets;
+  if (named) {
+    const g = groups.data.find((x) => x.attributes.name === named);
+    if (!g) throw new Error(`no beta group named "${named}"`);
+    targets = [g];
+  } else {
+    targets = groups.data.filter((x) => !x.attributes.isInternalGroup);
+    if (!targets.length) throw new Error('no external beta groups to promote to');
+  }
 
   const build = await waitForBuild(args[0]);
 
-  await api('POST', `/v1/betaGroups/${g.id}/relationships/builds`, {
-    data: [{ type: 'builds', id: build.id }],
-  });
-  console.log(`build ${build.attributes.version} -> ${group}`);
+  for (const g of targets) {
+    await api('POST', `/v1/betaGroups/${g.id}/relationships/builds`, {
+      data: [{ type: 'builds', id: build.id }],
+    });
+    console.log(`build ${build.attributes.version} -> ${g.attributes.name}`);
+  }
 
-  if (!g.attributes.isInternalGroup) {
+  // Beta review is per BUILD, not per group — submitting once per group 409s on
+  // the second. One submission covers every external group the build is in.
+  if (targets.some((g) => !g.attributes.isInternalGroup)) {
     await api('POST', '/v1/betaAppReviewSubmissions', {
       data: {
         type: 'betaAppReviewSubmissions',
@@ -145,5 +163,5 @@ if (cmd === 'create-cert') {
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
 } else {
-  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName]');
+  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName — default: all external groups] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName]');
 }
