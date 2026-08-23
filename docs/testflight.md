@@ -8,9 +8,11 @@ to archive + upload; everything below is the one-time state it relies on, and ho
 | Piece | Where | Notes |
 |---|---|---|
 | ASC API key | `~/.appstoreconnect/private_keys/AuthKey_VM6W5HP585.p8` (Key ID `VM6W5HP585`, Issuer `69a6de81-5896-47e3-e053-5b8c7c11a4d1`, role App Manager) | Signs API requests + authenticates the upload. Re-mint at App Store Connect → Users and Access → Integrations |
-| Bundle ID | `org.openwaters.slackwater` (ASC id `D696FS7JD3`) | Registered in ASC (one-time, 2026-07) |
+| Bundle ID (app) | `org.openwaters.slackwater` (ASC id `D696FS7JD3`) | Registered in ASC (one-time, 2026-07) |
+| Bundle ID (appex) | `org.openwaters.slackwater.widgets` (ASC id `BC99FA5V78`) | Registered 2026-08-23 for the widget extension. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
+| App Group | `group.org.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Created in the developer.apple.com UI — `/v1/appGroups` is a 404, App Groups are not in the ASC API at all** |
 | Distribution identity | `slackwater-ci.keychain-db` — "Apple Distribution: Bryan Clark (R3H8DPTV9C)", expires 2027-07-30 (cert `D5456R8W23`) | Key generated locally (openssl CSR → `asc.mjs create-cert`); keychain password in `~/.appstoreconnect/ci-keychain-pass` |
-| Provisioning profile | "Slackwater App Store" (`LF393ZYMCC`), installed in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` | Recreate with `asc.mjs create-profile org.openwaters.slackwater D5456R8W23 out.mobileprovision` (idempotent — deletes stale same-name profile first) |
+| Provisioning profiles | "Slackwater App Store" (`JZRK3RW824`) **and** "Slackwater Widgets App Store" (`8395577WG2`), both re-minted 2026-08-23 and installed in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` under their UUID filename | `asc.mjs create-profile <bundleIdentifier> D5456R8W23 <out> [profileName]` — the name defaults to "Slackwater App Store", so the appex **must** pass its own or it deletes the app's profile and mints a duplicate wearing the app's name. **Both are needed**, and both must post-date the App Groups capability: a profile minted before a capability was added carries an empty `application-groups` array and the archive fails with entitlement errors. The predecessor `LF393ZYMCC` (2026-07-30) was replaced because it predated widgets |
 | Signing config | `project.yml`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
 
 ## Why the dedicated keychain (the gotcha that cost the afternoon)
@@ -39,6 +41,49 @@ Before handing the link to anyone, check what they'd actually install: `node scr
 builds` shows group membership, but membership is not availability — an external build sits
 in `WAITING_FOR_REVIEW` until Apple clears it, and testers keep getting the last **approved**
 build meanwhile. Build 25 was in the group and pending review the day it shipped.
+
+## Adding a capability breaks every existing profile (2026-08-23)
+
+Build 28 was merged, approved, and dead on arrival: `xcodebuild archive` failed with
+six errors, all of them App Groups. The suite had been green twice on both simulators.
+It could not have helped — simulator builds sign with a wildcard development profile
+and ignore entitlements the archive enforces.
+
+The order that works, when a target gains an entitlement:
+
+1. **Register the bundle ID** if it is new (`POST /v1/bundleIds`). An app extension
+   is a separate bundle ID; the app's does not cover it.
+2. **Create the App Group in the developer.apple.com UI.** There is no API —
+   `/v1/appGroups` returns 404 `NOT_FOUND`, "the path provided does not match a
+   defined resource type". Enable App Groups on *each* bundle ID and assign the group.
+3. **Re-mint every affected profile.** Profiles are snapshots: "Slackwater App Store"
+   was minted 2026-07-30, long before the entitlement existed, and adding the
+   capability does not retroactively update it.
+4. **Give the appex a `Release` block in `project.yml`.** Without one it stays on
+   `CODE_SIGN_STYLE: Automatic` and Release falls back to
+   `"iOS Team Provisioning Profile: *"` — which needs a GUI session to mint, so a
+   headless archive simply fails.
+5. **Add the appex to `exportOptions`' `provisioningProfiles` dict** in
+   `testflight.sh`. A missing entry fails the export *after* a successful archive.
+
+Verify before archiving, rather than after:
+
+```sh
+node scripts/asc.mjs builds     # highest build already on ASC
+# Does the profile carry the group, and is it bound to the bundle you think?
+for f in ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/*.mobileprovision; do
+  security cms -D -i "$f" | plutil -p - \
+    | grep -E '^  "Name"|application-identifier"|group\.'
+done
+```
+
+**Check `application-identifier`, not just the name.** `filter[identifier]` on
+`/v1/bundleIds` is a **prefix** match: it returns `org.openwaters.slackwater` *and*
+`org.openwaters.slackwater.widgets`, appex first. `create-profile` took `data[0]`,
+so the first mint after the appex was registered produced a profile **named**
+"Slackwater App Store" and **bound to the widget's bundle id** — success message,
+right name, wrong profile. Fixed by matching the identifier exactly; the check
+above is what caught it.
 
 ## Cadence
 
