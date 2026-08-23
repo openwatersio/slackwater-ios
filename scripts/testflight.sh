@@ -52,8 +52,14 @@ cat > build/exportUpload.plist <<'EOF'
   <key>signingStyle</key><string>manual</string>
   <key>teamID</key><string>R3H8DPTV9C</string>
   <key>signingCertificate</key><string>02FBDB9A5D2DB409A4331349069A8C8B09D73069</string>
+  <!-- Every signed bundle in the archive needs an entry, the appex included:
+       an app's profile does not cover its extensions, and a missing entry
+       fails the export AFTER a successful archive. -->
   <key>provisioningProfiles</key>
-  <dict><key>org.openwaters.slackwater</key><string>Slackwater App Store</string></dict>
+  <dict>
+    <key>org.openwaters.slackwater</key><string>Slackwater App Store</string>
+    <key>org.openwaters.slackwater.widgets</key><string>Slackwater Widgets App Store</string>
+  </dict>
 </dict>
 </plist>
 EOF

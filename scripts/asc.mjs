@@ -116,16 +116,26 @@ if (cmd === 'create-cert') {
     console.log(`build ${build.attributes.version} notes -> ${l.attributes.locale}`);
   }
 } else if (cmd === 'create-profile') {
-  const [bundleIdRes, certId, outPath] = args;
+  const [bundleIdRes, certId, outPath, profileName = 'Slackwater App Store'] = args;
+  // filter[identifier] is a PREFIX match, not an exact one: it returns both
+  // org.openwaters.slackwater and org.openwaters.slackwater.widgets, and the
+  // appex sorts FIRST. Taking data[0] therefore bound the app's own profile to
+  // the widget's bundle id — silently, since the profile still builds and is
+  // still named "Slackwater App Store". Match the identifier exactly.
   const b = await api('GET', `/v1/bundleIds?filter[identifier]=${bundleIdRes}`);
-  const bundleId = b.data[0].id;
+  const match = b.data.find((x) => x.attributes.identifier === bundleIdRes);
+  if (!match) throw new Error(`no bundle id exactly matching ${bundleIdRes}`);
+  const bundleId = match.id;
+  // The name was hardcoded while one profile existed. The appex needs its own
+  // ("Slackwater Widgets App Store"), and hardcoding meant minting it DELETED
+  // the app's profile and produced a second one wearing the app's name.
   // delete a stale same-name profile if present (idempotent reruns)
-  const existing = await api('GET', `/v1/profiles?filter[name]=Slackwater%20App%20Store`);
+  const existing = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(profileName)}`);
   for (const p of existing.data) await api('DELETE', `/v1/profiles/${p.id}`);
   const r = await api('POST', '/v1/profiles', {
     data: {
       type: 'profiles',
-      attributes: { name: 'Slackwater App Store', profileType: 'IOS_APP_STORE' },
+      attributes: { name: profileName, profileType: 'IOS_APP_STORE' },
       relationships: {
         bundleId: { data: { type: 'bundleIds', id: bundleId } },
         certificates: { data: [{ type: 'certificates', id: certId }] },
@@ -135,5 +145,5 @@ if (cmd === 'create-cert') {
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
 } else {
-  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision>');
+  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName]');
 }

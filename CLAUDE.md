@@ -237,6 +237,42 @@ varies it. `TimelineScrubber.updateUIView` still resizes the host frame and
 chart the one time it was missing, and stays in place even though an anchor pick alone
 can no longer trigger it.
 
+## The archive signs differently from everything you tested
+
+Two release-blocking defects in 1.4.0 shared one shape: **the thing that breaks is
+configured for a build the test suite never runs.** 560 tests passed on both
+simulators, twice, and neither could have caught either one.
+
+- **A new target's entitlements are validated at archive time, not before.**
+  Adding the widget extension added `com.apple.security.application-groups` to two
+  entitlements files. Simulator builds sign with a wildcard development profile and
+  do not care. `xcodebuild archive` does: build 28's first upload died on six
+  errors — the App Group did not exist in the developer portal, the appex bundle ID
+  was never registered, and the widgets target had no `Release` block, so it fell
+  back to `"iOS Team Provisioning Profile: *"`, which a headless session cannot
+  mint. That is *after* the merge gate, on a release everyone had already approved.
+  **An appex needs its own profile — an app's profile does not cover its
+  extensions** — and every signed bundle needs its own entry in `exportOptions`'
+  `provisioningProfiles`, or the export fails after a successful archive.
+- **App Groups are not in the App Store Connect API.** `/v1/appGroups` is a 404 —
+  not empty, *not a defined resource type*. Bundle IDs, capabilities, certificates
+  and profiles are all scriptable; the group itself is developer.apple.com UI work
+  and nothing automates it. Budget a human for it.
+- **A `.storekit` file wired to the scheme's `run:` action never reaches an
+  archive.** `project.yml` puts it under `run:` on Debug, so StoreKit works in the
+  simulator and silently does not on TestFlight, where `Product.products(for:)`
+  goes to real App Store Connect. 1.4.0's notes announced a subscription and a
+  lifetime unlock while ASC held zero in-app purchases and zero subscription
+  groups; `PremiumView`'s bare `ForEach(store.products)` would have rendered the
+  pitch and a lone Restore button. **Check `inAppPurchasesV2` and
+  `subscriptionGroups` on the app before writing a word about a purchase.**
+
+The generalisable bit, and it is the same one the CI section makes: a green run
+certifies the configuration it ran. Debug-on-simulator and Release-archive differ in
+signing, entitlements, StoreKit source and version numbering — four of the places a
+release actually breaks. Before an upload, the question is not "did the tests pass"
+but "what has never been built the way the archive builds it."
+
 ## Working with subagents here
 
 - **A subagent's backgrounded job dies when its turn ends.** A `./scripts/test.sh` started

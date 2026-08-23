@@ -142,6 +142,18 @@ targets:
         DEVELOPMENT_TEAM: R3H8DPTV9C
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
+      configs:
+        # The appex needs its OWN distribution profile — an app's profile does
+        # not cover its extensions. Without this block the target stayed on
+        # Automatic and Release fell back to "iOS Team Provisioning Profile: *",
+        # which a headless session cannot mint: build 28's first archive died on
+        # six App-Groups entitlement errors after a fully green suite, because
+        # distribution signing is only ever exercised by testflight.sh, i.e.
+        # after the merge gate. See docs/testflight.md.
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "02FBDB9A5D2DB409A4331349069A8C8B09D73069"
+          PROVISIONING_PROFILE_SPECIFIER: "Slackwater Widgets App Store"
   SlackwaterTests:
     type: bundle.unit-test
     platform: iOS
