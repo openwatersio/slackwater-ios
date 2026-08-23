@@ -112,20 +112,6 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertGreaterThan(body.count, 40, "body extraction looks wrong — check the guard above")
     }
 
-    /// Rank order has to survive greyscale, which is also Reduce Motion: with
-    /// nothing allowed to animate, luminance is the whole signal. A Windy-style
-    /// rainbow fails exactly here — its mid speeds read brighter than its top,
-    /// so the ramp misstates which water is faster.
-    func testSpeedRampLuminanceIsMonotonic() {
-        var previous = -1.0
-        for i in 0...40 {
-            let t = Double(i) / 40
-            let l = luminance(rampHex(t))
-            XCTAssertGreaterThan(l, previous, "ramp luminance must climb at t=\(t)")
-            previous = l
-        }
-    }
-
     /// Green means slack and only slack. A ramp that passes through green puts
     /// a second, opposite meaning a few hundred points from the column that
     /// means *go* — which is the specific reason this is not a rainbow.
@@ -136,6 +122,15 @@ final class ColourAndFormTests: XCTestCase {
             XCTAssertFalse(c.g > c.r && c.g > c.b,
                            "the ramp is green-dominant at t=\(t); green is reserved for slack")
         }
+    }
+
+    func testSpeedRampRunsFromYellowThroughOrangeToRed() {
+        let low = SN.speedRGB(0)
+        let high = SN.speedRGB(1)
+        XCTAssertGreaterThan(low.r, low.b, "the threshold colour must read yellow")
+        XCTAssertGreaterThan(low.g, low.b, "the threshold colour must read yellow")
+        XCTAssertGreaterThan(high.r, high.g, "the fastest water must read red")
+        XCTAssertGreaterThan(high.g, high.b, "the fastest water must not return to purple")
     }
 
     /// A label sitting on the fill has to be readable at both ends of a ramp

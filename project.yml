@@ -14,8 +14,8 @@ settings:
     # app ships — a per-target pair here silently drifts the two Info.plists
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
-    MARKETING_VERSION: 1.4.0
-    CURRENT_PROJECT_VERSION: 28
+    MARKETING_VERSION: 1.5.0
+    CURRENT_PROJECT_VERSION: 29
 packages:
   TideEngine:
     url: https://github.com/sailingnaturali/slackwater-engine

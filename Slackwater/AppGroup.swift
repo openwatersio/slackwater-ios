@@ -35,6 +35,7 @@ enum AppGroup {
     static let favoritesKey = "slackwater.favorites"
     static let recentsKey = "slackwater.recents"
     static let premiumKey = "slackwater.premium"
+    static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
 
     private static let migratedKey = "slackwater.appgroup.migrated"
     private static let arrayKeys = [favoritesKey, recentsKey]

@@ -91,6 +91,9 @@ extension TypeScaleTests {
             "SlackwaterApp.swift:reading",
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
+            "CurrentDetailView.swift:body",
+            "OnlineGateDetailView.swift:body",
+            "TideDetailView.swift:body",
             "DerivedGateDetailView.swift:scheduleEntries",
             // The NEAPS bands: both tracks format their reading at the
             // `drawBand(...)` call and the `.monospacedDigit()` lives in

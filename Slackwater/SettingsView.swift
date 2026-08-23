@@ -1,12 +1,13 @@
 // Slackwater — GPL v3. M4 settings: units (the same @AppStorage the list's
-// pill toggles), the not-for-navigation statement, attribution & licenses,
-// version. Nothing speculative — slack limit is the paid tier's, sold rather
-// than missing (web Settings.tsx note).
+// pill toggles), boat-specific slack speed, the not-for-navigation statement,
+// attribution & licenses, version.
 import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var chs = ChsFitService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
@@ -37,6 +38,20 @@ struct SettingsView: View {
                             Text("m/s").tag("ms")
                         }
                         .pickerStyle(.segmented)
+                    }
+
+                    section("Slack window") {
+                        Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
+                            HStack {
+                                Text("Comfort current")
+                                Spacer()
+                                Text(slackWindowSpeedBinding.wrappedValue,
+                                     format: .number.precision(.fractionLength(1)))
+                                    .monospacedDigit()
+                                Text("kn")
+                            }
+                        }
+                        Text("0.1–10 kn. This changes when Slackwater marks a current as a usable slack window.")
                     }
 
                     // The downloads manager also lives one tap from the list,
@@ -129,6 +144,11 @@ struct SettingsView: View {
             .sheet(isPresented: $showWidgets) { WidgetsGalleryView() }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var slackWindowSpeedBinding: Binding<Double> {
+        Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
+                set: { slackWindowSpeed = normalizedSlackThresholdKn($0) })
     }
 
     @ViewBuilder private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {

@@ -10,6 +10,27 @@ import TideEngine
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
+    func testSlackWindowSettingHasIncrementalTouchControls() throws {
+        let source = try repoSource("Slackwater/SettingsView.swift")
+        XCTAssertTrue(source.contains("Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1)"),
+                      "Comfort current needs visible ± controls in 0.1-kn steps")
+        XCTAssertFalse(source.contains("TextField(\"0.5\""),
+                       "a bare text field makes the setting look non-interactive")
+    }
+
+    func testSlackWindowSpeedStaysInItsSupportedRange() {
+        XCTAssertEqual(normalizedSlackThresholdKn(1), 1)
+        XCTAssertEqual(normalizedSlackThresholdKn(0), defaultSlackThresholdKn)
+        XCTAssertEqual(normalizedSlackThresholdKn(10.1), defaultSlackThresholdKn)
+    }
+
+    func testTimelineKeepsItsChosenSlackWindowSpeed() {
+        let station = CurrentStationRecord.all.first!
+        let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
+                                          anchor: todayLocal(station.tz), threshold: 1)
+        XCTAssertEqual(timeline.slackThreshold, 1)
+    }
+
     /// Calendar days, never `n * 86_400`. Only durations belong in
     /// `addingTimeInterval`: across a DST transition a 34×86,400-second offset
     /// from a local midnight lands at 01:00 or 23:00, and an anchor that isn't
@@ -37,6 +58,71 @@ final class TimelineTests: XCTestCase {
         // Snap stops exist across the whole window (turns + sun events).
         XCTAssert(d.snapTimes.count > 20, "expected a full week of stops, got \(d.snapTimes.count)")
         XCTAssert(d.snapTimes.first! < d.today, "stops must reach back before today")
+    }
+
+    func testTideChevronCentersAreMagneticStops() {
+        let fastest = TideStationRecord.all.max {
+            $0.constituents.reduce(0) { $0 + $1.amplitude }
+                < $1.constituents.reduce(0) { $0 + $1.amplitude }
+        }!
+        let d = TimelineData.build(tide: fastest, current: nil, now: Date(), anchor: todayLocal(fastest.tz))
+        let chevrons = tideFlowArrows(d.tideRates).filter { $0.time >= d.start && $0.time <= d.end }
+        XCTAssertFalse(chevrons.isEmpty)
+        XCTAssertTrue(chevrons.allSatisfy { d.snapTimes.contains($0.time) })
+    }
+
+    func testFloatingReadoutMovesAwayFromTheCurve() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let data = TimelineData(tz: .current, anchor: t0, today: t0, start: t0,
+                                end: t0.addingTimeInterval(3600), days: [], tidePoints: [],
+                                tideRates: [], tideExtremes: [], currentPoints: [CurrentPoint(time: t0, speed: 1)],
+                                currentEvents: [], snapTimes: [], slackWindows: [])
+        let geo = TimelineGeo(data: data)
+        XCTAssertGreaterThan(floatingReadoutY(pointY: geo.curTop, geo: geo), geo.curTop)
+        XCTAssertLessThan(floatingReadoutY(pointY: geo.curBottom, geo: geo), geo.curBottom)
+    }
+
+    func testCurrentRangeIsPeakToPeakBetweenAdjacentMaxima() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let events = [
+            CurrentEvent(time: t0, speed: 2.4, kind: .maxFlood),
+            CurrentEvent(time: t0.addingTimeInterval(3_600), speed: 0, kind: .slack),
+            CurrentEvent(time: t0.addingTimeInterval(6_000), speed: -1.8, kind: .maxEbb),
+        ]
+        XCTAssertEqual(try XCTUnwrap(currentPeakToPeakRange(events, around: t0.addingTimeInterval(3_600))),
+                       4.2, accuracy: 1e-9)
+    }
+
+    func testCurrentAxisUsesTheSelectedDisplayUnit() {
+        XCTAssertEqual(currentAxisTicks(maxAbsKn: 2, unit: "kn"), [-2, -1, 0, 1, 2])
+        XCTAssertEqual(currentAxisKnots(3.704, unit: "kmh"), 2, accuracy: 1e-9)
+        XCTAssertEqual(currentAxisKnots(1.028888, unit: "ms"), 2, accuracy: 1e-9)
+    }
+
+    func testSixFeetPerHourTideRateIsRed() {
+        XCTAssertEqual(Timeline.rampT(forTideRateMHr: 1.8), 1, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forTideRateMHr: 6.1 / 3.28084), 1, accuracy: 1e-9)
+    }
+
+    func testTideRateWarningsFollowTheChevronSeverityBands() {
+        XCTAssertEqual(tideRateSeverity(0.8), "⚠️ Fast")
+        XCTAssertEqual(tideRateSeverity(1.2), "‼️ Very fast")
+        XCTAssertEqual(tideRateSeverity(1.6), "🚨 Extreme")
+        XCTAssertNil(tideRateSeverity(0.5))
+    }
+
+    func testChevronWarningsDoNotAppendTide() throws {
+        XCTAssertFalse(try repoSource("Slackwater/TideDetailView.swift").contains("\\(severity) \\(direction) tide"))
+    }
+
+    func testCurrentHeadersLeadWithPlainLanguageAndRestoreNow() throws {
+        let current = try repoSource("Slackwater/CurrentDetailView.swift")
+        let online = try repoSource("Slackwater/OnlineGateDetailView.swift")
+        let strip = try repoSource("Slackwater/TimelineStrip.swift")
+        XCTAssertTrue(current.contains("\\(phase.gloss?.capitalized ?? phase.word) · \\(phase.word)"))
+        XCTAssertTrue(online.contains("\\(phase.gloss?.capitalized ?? phase.word) · \\(phase.word)"))
+        XCTAssertTrue(strip.contains("scrubbedAway(scrubTime, from: now)"))
+        XCTAssertTrue(strip.contains("detail-return-now"))
     }
 
     /// `now:` used to be a dead parameter — `today` was always derived from the
@@ -375,9 +461,8 @@ final class TimelineTests: XCTestCase {
     /// is not a snap stop — you read "7:48pm", let go, and landed on 7:56pm
     /// with nothing explaining the gap.
     ///
-    /// The second half is the part that makes this a real guard rather than a
-    /// tautology: it proves the window edges genuinely AREN'T snap stops, so
-    /// re-labelling with one would fail here rather than pass by coincidence.
+    /// Window edges are labelled as the start/end of the usable window, so
+    /// they need to be valid stops too.
     func testEveryLabelledTimeIsSomethingTheMagnetCanStopOn() throws {
         let victoria = CurrentStationRecord.all.first { !$0.isChs } ?? CurrentStationRecord.all[0]
         let d = TimelineData.build(tide: nil, current: victoria, now: Date(), anchor: todayLocal(victoria.tz))
@@ -396,13 +481,12 @@ final class TimelineTests: XCTestCase {
                       "the strip labels a max at \(e.time) but the magnet cannot stop there")
         }
 
-        // And the window edges are NOT stops — which is exactly why they can't
-        // be what the label shows.
-        let edges = d.slackWindows.filter { $0.start >= d.start && $0.start <= d.end }
-        XCTAssertFalse(edges.isEmpty, "no windows at this station — pick another fixture")
-        XCTAssert(edges.contains { !stops.contains($0.start) },
-                  "window edges turn out to be snap stops after all — if the magnet "
-                  + "learned to park on them, this guard needs rethinking, not deleting")
+        let windows = d.slackWindows.filter { $0.start >= d.start && $0.end <= d.end }
+        XCTAssertFalse(windows.isEmpty, "no windows at this station — pick another fixture")
+        for window in windows {
+            XCTAssert(stops.contains(window.start))
+            XCTAssert(stops.contains(window.end))
+        }
     }
 
     /// Two single-track geometries, no combined case (split-scrubbers spec §1/§2).
@@ -466,6 +550,22 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.curTop, 0)
     }
 
+    func testTideTrackUsesBlueFillAndCurveFollowingChevrons() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = source.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func drawTide(") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("private func deg(") })
+        else { return XCTFail("drawTide body not found") }
+        let body = lines[start..<end].joined(separator: "\n")
+
+        XCTAssertFalse(body.contains("tideFillStops"), "tide fill must not use the current speed palette")
+        XCTAssertTrue(body.contains("SN.flood.opacity"), "tide fill stays light blue")
+        XCTAssertTrue(body.contains("tideFlowArrows"), "fast tide movement needs chevrons")
+        XCTAssertTrue(body.contains("Text(\"››››\")"), "each tide run gets one bold chevron set")
+        XCTAssertTrue(body.contains("rotate(by:"), "chevrons follow the tide curve")
+        XCTAssertTrue(body.contains("rampT(forTideRateMHr:"), "chevrons use an absolute tide-rate scale")
+    }
+
     /// v falls linearly 2 kn → -2 kn over 2 h (slack at +60 min); |v| < 0.5
     /// between +45 and +75 min. Samples every 10 min like the drawn series.
     func testSlackWindowInterpolatesCrossings() throws {
@@ -475,7 +575,7 @@ final class TimelineTests: XCTestCase {
                          speed: 2.0 - Double(i) / 3.0)
         }
         let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(3600),
-                                          threshold: slackThresholdKn))
+                                          threshold: 0.5))
         XCTAssertEqual(w.start.timeIntervalSince(t0), 2700, accuracy: 1)
         XCTAssertEqual(w.end.timeIntervalSince(t0), 4500, accuracy: 1)
     }
@@ -487,6 +587,18 @@ final class TimelineTests: XCTestCase {
         let w = try XCTUnwrap(slackWindow(pts, around: t0.addingTimeInterval(1800), threshold: 0.5))
         XCTAssertEqual(w.start, pts.first!.time)
         XCTAssertEqual(w.end, pts.last!.time)
+    }
+
+    func testSlackWindowIncludesAnExactThresholdPoint() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [
+            CurrentPoint(time: t0, speed: 2),
+            CurrentPoint(time: t0.addingTimeInterval(600), speed: 1),
+            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 2),
+        ]
+        let window = try XCTUnwrap(slackWindow(points, around: points[1].time, threshold: 1))
+        XCTAssertEqual(window.start, points[1].time)
+        XCTAssertEqual(window.end, points[1].time)
     }
 
     /// No sub-threshold sample brackets the slack (a violent gate where the
@@ -515,6 +627,44 @@ final class TimelineTests: XCTestCase {
                      "a slack after the series must not borrow the trailing run")
     }
 
+    /// Removing either interpolated endpoint lets the green overlay cross its
+    /// threshold line; including an out-of-window point paints a fast segment
+    /// green. The renderer consumes these exact, clipped paths.
+    func testSlackFillSegmentsClipToInterpolatedThresholdCrossings() {
+        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+        let points = [
+            CurrentPoint(time: t0, speed: -1),
+            CurrentPoint(time: t0.addingTimeInterval(600), speed: -0.25),
+            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 0.25),
+            CurrentPoint(time: t0.addingTimeInterval(1800), speed: 1),
+        ]
+
+        let segments = slackFillSegments(points, threshold: 0.5)
+
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].map(\.time), [
+            t0.addingTimeInterval(400), t0.addingTimeInterval(600),
+            t0.addingTimeInterval(1200), t0.addingTimeInterval(1400),
+        ])
+        XCTAssertEqual(segments[0].map(\.speed), [-0.5, -0.25, 0.25, 0.5])
+    }
+
+    func testCurrentExcessSegmentsStartAtTheSlackThreshold() {
+        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+        let points = [
+            CurrentPoint(time: t0, speed: -2),
+            CurrentPoint(time: t0.addingTimeInterval(600), speed: -0.5),
+            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 0.5),
+            CurrentPoint(time: t0.addingTimeInterval(1800), speed: 2),
+        ]
+
+        let segments = currentExcessSegments(points, threshold: 1)
+
+        XCTAssertEqual(segments.map { $0.map(\.speed) }, [[-2, -1], [1, 2]])
+        XCTAssertEqual(segments[0][1].time, t0.addingTimeInterval(400))
+        XCTAssertEqual(segments[1][0].time, t0.addingTimeInterval(1400))
+    }
+
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.
@@ -530,6 +680,15 @@ final class TimelineTests: XCTestCase {
             XCTAssert(slacks.contains { $0.time == w.slack },
                       "every window belongs to a drawn slack event")
         }
+    }
+
+    func testSlackWindowEdgesAreMagneticPoints() throws {
+        let station = try XCTUnwrap(CurrentStationRecord.all.first)
+        let timeline = TimelineData.build(tide: nil, current: station, now: Date(),
+                                          anchor: todayLocal(station.tz), threshold: 1)
+        let window = try XCTUnwrap(timeline.slackWindows.first)
+        XCTAssertTrue(timeline.snapTimes.contains(window.start))
+        XCTAssertTrue(timeline.snapTimes.contains(window.end))
     }
 
     /// Adjacent slack windows that touch or overlap merge into one green
@@ -676,27 +835,25 @@ final class TimelineTests: XCTestCase {
     func testRampTLandsTheAnchorsWhereTheyBelong() {
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 0.5), 0, accuracy: 1e-9)
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 3), 1.0 / 3, accuracy: 1e-9)
-        XCTAssertEqual(Timeline.rampT(forSpeedKn: 6), 2.0 / 3, accuracy: 1e-9)
-        XCTAssertEqual(Timeline.rampT(forSpeedKn: 16), 1, accuracy: 1e-9)
+        XCTAssertLessThan(Timeline.rampT(forSpeedKn: 2.2), 0.25,
+                          "an ordinary 2.2-kn current remains in yellow")
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 8), 2.0 / 3, accuracy: 1e-9)
+        XCTAssertEqual(Timeline.rampT(forSpeedKn: 12), 1, accuracy: 1e-9)
         // Clamped both ends. Above the ceiling everything is the top colour;
         // "beyond the top of the scale" is not a distinction worth resolving.
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 0), 0, accuracy: 1e-9)
         XCTAssertEqual(Timeline.rampT(forSpeedKn: 40), 1, accuracy: 1e-9)
-        // The bottom anchor IS the slack threshold, not a second opinion on it.
-        XCTAssertEqual(Timeline.speedRampAnchorsKn.first, slackThresholdKn)
+        XCTAssertEqual(Timeline.speedRampAnchorsKn.first, 0.5)
     }
 
-    /// Why the anchors are not a linear 0→16. That ramp puts the median NOAA
-    /// current station (2.26 kn) at 14% and p90 (5.0 kn) at 31% — ninety
-    /// percent of stations compressed into the bottom third, which is #97's
-    /// own defect coming back through the transfer function instead of
-    /// through the geometry.
+    /// Ordinary currents should remain in the yellow portion of the global
+    /// scale; a station-local scale would incorrectly turn them red.
     func testRampTSpreadsOrdinaryGatesAcrossTheRamp() {
         let median = Timeline.rampT(forSpeedKn: 2.26)
         XCTAssertGreaterThan(median, 0.18, "the median station must clear the ramp's floor")
         XCTAssertLessThan(median, 0.30)
-        XCTAssertGreaterThan(Timeline.rampT(forSpeedKn: 5.0), 0.5,
-                             "p90 belongs above the halfway mark, not at a third of it")
+        XCTAssertLessThan(Timeline.rampT(forSpeedKn: 5.0), 0.5,
+                          "a 5-kn current remains below orange on the global scale")
     }
 
     /// **The defect this exists to fix.** `TimelineGeo` normalizes every curve
@@ -720,10 +877,10 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(mild.count, 75, "one stop per sample")
         XCTAssertEqual(gate.count, 75)
 
-        XCTAssertNotEqual(brightest(mild), brightest(gate),
+        XCTAssertNotEqual(hottest(mild), hottest(gate),
                           "a 3 kn pass and a 16 kn gate must not fill the same colour")
-        XCTAssertGreaterThan(sum(brightest(gate)), sum(brightest(mild)),
-                             "the faster gate must sit higher on the ramp, not merely elsewhere")
+        XCTAssertLessThan(sum(hottest(gate)), sum(hottest(mild)),
+                          "the faster gate must reach the red end of the ramp")
 
         // CGGradient requires non-decreasing locations inside 0...1.
         XCTAssertEqual(gate.map(\.location), gate.map(\.location).sorted())
@@ -755,19 +912,16 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(rgba(stops[0]), rgba(Gradient.Stop(color: SN.steel.opacity(0.32), location: 0)),
                        "the unknown-magnitude fill is steel")
 
-        // And the ramp is genuinely off: the same points through the real path
-        // would come out somewhere on the ramp instead.
+        // And the ramp is genuinely off: this nominal one-knot shape would
+        // otherwise be yellow, not the unknown-magnitude steel.
         let ramped = currentFillStops(shape, x: x, width: width)
-        XCTAssertGreaterThan(Set(ramped.map(rgba)).count, 1,
-                             "sanity: the measured path really does vary with speed")
-        XCTAssertNotEqual(rgba(stops[0]), rgba(ramped.max { sum(rgba($0)) < sum(rgba($1)) }!))
+        XCTAssertNotEqual(rgba(stops[0]), rgba(ramped[0]))
     }
 
-    /// Resolved sRGB of the highest-speed stop. The ramp climbs monotonically
-    /// in luminance (asserted in ColourAndFormTests), so the brightest stop is
-    /// the fastest sample.
-    private func brightest(_ stops: [Gradient.Stop]) -> [CGFloat] {
-        stops.map(rgba).max { sum($0) < sum($1) } ?? []
+    /// The yellow → orange → red ramp gets darker as it heats up, so its
+    /// darkest stop is the highest-speed one.
+    private func hottest(_ stops: [Gradient.Stop]) -> [CGFloat] {
+        stops.map(rgba).min { sum($0) < sum($1) } ?? []
     }
 
     private func sum(_ c: [CGFloat]) -> CGFloat { c.prefix(3).reduce(0, +) }
@@ -876,61 +1030,5 @@ final class TimelineTests: XCTestCase {
             XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d), tz: tz),
                            c.expected, c.why)
         }
-    }
-}
-
-// MARK: - The tide track's rate-of-rise ramp (#95)
-
-extension TimelineTests {
-    /// The anchors land equally spaced, and both ends clamp.
-    func testTideRampTLandsTheAnchorsWhereTheyBelong() {
-        let a = Timeline.tideRateAnchorsMHr
-        XCTAssertEqual(a.count, 4)
-        for (i, v) in a.enumerated() {
-            XCTAssertEqual(Timeline.rampT(forRateMHr: v), Double(i) / 3, accuracy: 1e-9)
-        }
-        XCTAssertEqual(Timeline.rampT(forRateMHr: 0), 0)
-        XCTAssertEqual(Timeline.rampT(forRateMHr: 40), 1)
-    }
-
-    /// tools/ramp-domain.mjs across all 2,765 bundled stations: median peak
-    /// rate 1.50 ft/hr (0.457 m/hr), p90 4.59 ft/hr (1.399 m/hr). The domain
-    /// must spread that spine, not compress it into the bottom of the ramp.
-    func testTideRampSpreadsOrdinaryStationsAcrossTheRamp() {
-        let median = Timeline.rampT(forRateMHr: 0.457)
-        XCTAssertGreaterThan(median, 0.18)
-        XCTAssertLessThan(median, 0.30)
-        XCTAssertGreaterThan(Timeline.rampT(forRateMHr: 1.399), 0.5)
-    }
-
-    /// The defect this exists to fix (#95, via #97's finding): TimelineGeo
-    /// normalizes every curve to its own extremes, so a harbour tide and Ile
-    /// Haute drew the same picture. The rate fill is absolute: a big tide's
-    /// stops must come out brighter than a small one's, not merely different.
-    func testTwoTidesOfDifferentSizeCannotFillTheSameColour() {
-        func stops(amplitude: Double) -> [Gradient.Stop] {
-            let s = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: amplitude, phase: 0)])
-            let t0 = Date(timeIntervalSince1970: 1_770_000_000)
-            let rates = s.rates(from: t0, to: t0.addingTimeInterval(24 * 3600), step: 600)
-            let width: CGFloat = 3240
-            let span = rates.last!.time.timeIntervalSince(rates.first!.time)
-            return tideFillStops(rates, x: { CGFloat($0.timeIntervalSince(rates.first!.time) / span) * width },
-                                 width: width)
-        }
-        let harbour = stops(amplitude: 0.5)   // peak dh/dt ≈ 0.25 m/hr — bottom third
-        let fundy = stops(amplitude: 5)       // peak dh/dt ≈ 2.5 m/hr — top third
-        XCTAssertEqual(harbour.count, 145, "one stop per sample")
-        XCTAssertEqual(fundy.count, 145)
-        XCTAssertNotEqual(brightest(harbour), brightest(fundy))
-        XCTAssertGreaterThan(sum(brightest(fundy)), sum(brightest(harbour)),
-                             "the big tide sits higher on the ramp, not merely elsewhere")
-        for pair in zip(fundy, fundy.dropFirst()) {
-            XCTAssertLessThanOrEqual(pair.0.location, pair.1.location)
-        }
-        XCTAssertTrue(fundy.allSatisfy { (0.0...1.0).contains($0.location) })
-        XCTAssertTrue(tideFillStops([], x: { _ in 0 }, width: 100).isEmpty)
-        let one = Station(constituents: [HarmonicConstituent(name: "M2", amplitude: 1, phase: 0)])
-            .rates(from: Date(timeIntervalSince1970: 0), to: Date(timeIntervalSince1970: 3600))
-        XCTAssertTrue(tideFillStops(one, x: { _ in 0 }, width: 0).isEmpty)
     }
 }

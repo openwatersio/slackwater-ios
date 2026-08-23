@@ -325,6 +325,8 @@ struct StationListView: View {
     /// toggle can never disagree.
     @AppStorage(currentFillKey) private var showFill = true
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -660,7 +662,7 @@ struct StationListView: View {
             // The fill toggle joins the remount key: flipping it rebuilds the
             // style, which is how the layer appears/disappears — rare, user
             // -initiated, and far simpler than mutating a live style.
-            .id("\(mapFocusToken)-\(showFill)")
+            .id("\(mapFocusToken)-\(showFill)-\(slackWindowSpeed)")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a

@@ -2,15 +2,19 @@
 import Foundation
 import TideEngine
 
-/// The "weak current" convention: under half a knot a small boat transits.
-/// A constant, not a setting, until someone asks (split-scrubbers spec §2).
-///
-/// Top-level rather than a `Timeline` member (M1): the widget's
-/// `WidgetSnapshot.build` needs this exact number too, and used to carry its
-/// own separately-declared `0.5` — two literals that could silently drift
-/// apart. One definition, shared by the strip and the widget extension, same
-/// as `slackWindow` below.
-let slackThresholdKn = 0.5
+/// The boat-specific speed that defines a usable slack window. It is shared
+/// with the widget and map, and falls back safely when a stored value is bad.
+let defaultSlackThresholdKn = 0.5
+let slackThresholdRange = 0.1...10.0
+
+func normalizedSlackThresholdKn(_ value: Double) -> Double {
+    slackThresholdRange.contains(value) ? value : defaultSlackThresholdKn
+}
+
+var slackThresholdKn: Double {
+    normalizedSlackThresholdKn(AppGroup.defaults.object(forKey: AppGroup.slackWindowSpeedKey) as? Double
+                               ?? defaultSlackThresholdKn)
+}
 
 /// The workable window around a slack: where |v| stays under `threshold`,
 /// linearly interpolated at the crossings from the drawn 10-min samples —
@@ -27,8 +31,8 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
           slack >= first.time, slack <= last.time else { return nil }
     let i = points.lastIndex(where: { $0.time <= slack }) ?? 0
     let k: Int
-    if abs(points[i].speed) < threshold { k = i }
-    else if i + 1 < points.count, abs(points[i + 1].speed) < threshold { k = i + 1 }
+    if abs(points[i].speed) <= threshold { k = i }
+    else if i + 1 < points.count, abs(points[i + 1].speed) <= threshold { k = i + 1 }
     else { return nil }
     func cross(_ a: CurrentPoint, _ b: CurrentPoint) -> Date {
         let va = abs(a.speed), vb = abs(b.speed)
@@ -38,13 +42,13 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     var start = points[0].time
     var a = k
     while a > 0 {
-        if abs(points[a - 1].speed) >= threshold { start = cross(points[a - 1], points[a]); break }
+        if abs(points[a - 1].speed) > threshold { start = cross(points[a - 1], points[a]); break }
         a -= 1
     }
     var end = points[points.count - 1].time
     var b = k
     while b < points.count - 1 {
-        if abs(points[b + 1].speed) >= threshold { end = cross(points[b], points[b + 1]); break }
+        if abs(points[b + 1].speed) > threshold { end = cross(points[b], points[b + 1]); break }
         b += 1
     }
     return (start, end)

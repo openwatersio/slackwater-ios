@@ -34,6 +34,8 @@ func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speed
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -88,6 +90,10 @@ struct CurrentDetailView: View {
                             onReturn: returnToNow,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            scrubSummary: { tl in
+                                guard let range = currentPeakToPeakRange(tl.currentEvents, around: scrubTime) else { return nil }
+                                return ("Range", "\(formatSpeed(range, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            },
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
@@ -102,7 +108,7 @@ struct CurrentDetailView: View {
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    speedUnit: speedUnit, now: live,
                                                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                                                   scrubTime: $scrubTime)
+                                                   scrubTime: $scrubTime, onReturn: returnToNow)
                                     .padding(.horizontal, -16)  // full-bleed strip
                                     .padding(.top, 12)
                             },
@@ -121,6 +127,7 @@ struct CurrentDetailView: View {
             // The refinement lands under an open page: same station, new model. The
             // curve, the schedule and the amber marking all have to follow it.
             .onChange(of: record) { _, _ in rebuild() }
+            .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
     }
 
     // MARK: - Readout above the strip
@@ -136,25 +143,19 @@ struct CurrentDetailView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 if phase == .slack {
-                    Text("Slack").font(.largeTitle)
+                    Text("Slack").font(.title2.weight(.medium))
                         .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                     Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                        .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                 } else {
-                    // The tilde is the whole point of the provisional
-                    // treatment: the number itself stops claiming to be
-                    // exact, before any badge or card is read.
-                    (Text(tilde).font(.largeTitle)
-                     + Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
-                     + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
-                        .foregroundStyle(readingColor)
+                    Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
                     HStack(spacing: 4) {
-                        // The plain-word gloss for non-sailors (#59) — this
-                        // hero has the room; list cards lead with direction.
-                        Text(phase.gloss.map { "\(phase.word) · \($0)" } ?? phase.word)
-                            .font(.footnote)
-                        CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.footnote)
-                        Text(compass16(record.setDegrees(signed: scrubSigned))).font(.footnote)
+                        Text("\(tilde)\(formatSpeed(abs(scrubSigned), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            .font(.title3.monospacedDigit())
+                        CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.title3)
+                        Text(compass16(record.setDegrees(signed: scrubSigned))).font(.title3)
                     }
                     .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
                 }
@@ -242,6 +243,7 @@ struct CurrentDetailView: View {
     /// One place the timeline is rebuilt from, so the anchor and the record
     /// can never be applied by two different code paths.
     private func rebuild() {
-        timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: anchor)
+        timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: anchor,
+                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
     }
 }

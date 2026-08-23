@@ -31,8 +31,24 @@ struct TideDetailView: View {
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
+    private var tideState: String {
+        if let turn = timeline?.tideExtremes.first(where: { abs($0.time.timeIntervalSince(scrubTime)) < 1 }) {
+            return turn.kind == .high ? "High tide" : "Low tide"
+        }
+        return rising ? "Rising" : "Falling"
+    }
     /// m/hr at the scrub time; sign lives in the ▲/▼, display is unsigned.
     private var scrubRate: Double { record.engineStation.rateOfChange(at: scrubTime) }
+    private var tideRateWarning: (text: String, color: Color)? {
+        guard let flow = timeline.flatMap({ timeline in
+            tideFlowArrows(timeline.tideRates).first {
+                abs($0.time.timeIntervalSince(scrubTime)) < 1
+            }
+        }), let severity = tideRateSeverity(flow.rate) else { return nil }
+        let direction = flow.rate >= 0 ? "rising" : "falling"
+        return ("\(severity) \(direction)",
+                SN.speedColour(Timeline.rampT(forTideRateMHr: abs(flow.rate))))
+    }
 
     var body: some View {
         ScrubDetailScaffold(name: record.name, region: record.region,
@@ -43,11 +59,16 @@ struct TideDetailView: View {
                             onReturn: returnToNow,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            scrubSummary: { _ in
+                                guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+                                return ("Range", "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)")
+                            },
                             above: { EmptyView() },
                             card: { tl in
                                 readout
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   imperial: imperial, now: live, scrubTime: $scrubTime)
+                                                   imperial: imperial, now: live, scrubTime: $scrubTime,
+                                                   onReturn: returnToNow)
                                     .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
                                     .padding(.top, 12)
                             },
@@ -67,31 +88,25 @@ struct TideDetailView: View {
     private var readout: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
-                (Text(formatHeight(scrubHeight, imperial: imperial)).font(.largeTitle.monospacedDigit())
-                 + Text(" \(unit)").font(.footnote))
-                    .foregroundStyle(.white)
+                Text(tideState)
+                    .font(.title2.weight(.medium))
+                    .foregroundStyle(rising ? SN.rising : SN.falling)
                 HStack(spacing: 4) {
                     Text(rising ? "▲" : "▼").font(.caption2)
-                    Text(rising ? "Rising" : "Falling").font(.footnote)
                     // Rate of rise, first-class (#95): at Friday Harbor this
                     // reads 0.8 ft/hr and nobody looks twice; at Ile Haute it
                     // reads 8 ft/hr and does the work of a warning.
-                    Text("· \(formatHeight(abs(scrubRate), imperial: imperial)) \(unit)/hr")
-                        .font(.footnote.monospacedDigit())
+                    Text("\(formatHeight(abs(scrubRate), imperial: imperial)) \(unit)/hr")
+                        .font(.title3.monospacedDigit())
+                    if let warning = tideRateWarning {
+                        Text(warning.text)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(warning.color)
+                    }
                 }
                 .foregroundStyle(rising ? SN.rising : SN.falling)
             }
             Spacer()
-            if let prev = prevExtreme, let next = nextExtreme {
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Range", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    // This tide's swing, prev turn to next — the subtraction
-                    // the reader was otherwise left to do across the readout.
-                    Text("\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)")
-                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                }
-                .padding(.trailing, 20)
-            }
             if let next = nextExtreme {
                 VStack(alignment: .trailing, spacing: 1) {
                     MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
