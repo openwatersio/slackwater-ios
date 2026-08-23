@@ -27,6 +27,15 @@ struct PremiumView: View {
                         Label("You have Premium — thank you.", systemImage: "checkmark.seal")
                             .font(.callout.weight(.semibold))
                     } else {
+                        // ponytail: products is empty whenever StoreKit has nothing to
+                        // sell — no SKUs on App Store Connect yet (build 28), or a
+                        // failed load. Without this the sheet is a pitch and a lone
+                        // Restore button, which reads as broken.
+                        if store.products.isEmpty {
+                            Text("Premium isn't on sale yet — these widgets are still being finished. Everything you use today stays free either way.")
+                                .font(.footnote)
+                                .foregroundStyle(SN.foam.opacity(0.7))
+                        }
                         ForEach(store.products, id: \.id) { product in
                             Button {
                                 purchaseError = nil
