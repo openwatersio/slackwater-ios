@@ -7,13 +7,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# --family also promotes the finished build to the external Friends & Family
-# group. Opt-in rather than the default because that group sits behind a public
-# link and every promotion submits the build to Apple's beta review — a real
-# release, not another nightly. The internal Nightly group needs no flag; it
-# takes every upload on its own.
-FAMILY=no
-[[ "${1:-}" == "--family" ]] && FAMILY=yes
+# --external also promotes the finished build to EVERY external beta group.
+# Opt-in rather than the default because those groups sit behind public links
+# and the promotion submits the build to Apple's beta review — a real release,
+# not another nightly. The internal Nightly group needs no flag; it takes every
+# upload on its own.
+#
+# It was --family, and that named ONE group. A second external group ("OSS and
+# Externals", the one slackwater.xyz links as its download button) was added
+# later and nothing here knew: build 27 reached three groups, build 28 reached
+# two, and the public link kept serving the older release. asc.mjs now
+# discovers the external groups instead of naming one, so adding a third needs
+# no change here. --family still works and means the same thing.
+EXTERNAL=no
+case "${1:-}" in --external|--family) EXTERNAL=yes ;; esac
 
 KEY_ID=VM6W5HP585
 ISSUER=69a6de81-5896-47e3-e053-5b8c7c11a4d1
@@ -90,11 +97,11 @@ else
   echo "no $NOTES — build $BUILD ships with no release notes"
 fi
 
-if [[ $FAMILY == yes ]]; then
+if [[ $EXTERNAL == yes ]]; then
   # Waits out processing itself, so this blocks for as long as Apple takes.
   node scripts/asc.mjs promote "$BUILD"
 else
-  echo "Nightly has it. For Friends & Family: node scripts/asc.mjs promote $BUILD"
+  echo "Nightly has it. For the external groups: node scripts/asc.mjs promote $BUILD"
 fi
 
 node scripts/asc.mjs builds
