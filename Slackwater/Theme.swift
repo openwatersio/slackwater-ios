@@ -64,26 +64,12 @@ enum SN {
 
     // MARK: - Speed magnitude (#97)
 
-    /// Absolute current speed, inferno-family. Hue on the current track used
-    /// to say flood-versus-ebb, which the fills' clip to the zero line
-    /// already said — so it is spent here instead, on the one thing the
-    /// chart had no channel for at all.
-    ///
-    /// Not a Windy-style rainbow, for two reasons. Green means slack and only
-    /// slack, and a rainbow runs through its own green at moderate speed —
-    /// two greens with opposite meanings a few hundred points apart. And the
-    /// axis this replaces was deliberately "colourblind-safe amber/blue"
-    /// (above): under the Viénot–Brettel matrices a rainbow's
-    /// blue→green→yellow half collapses to one band for both deuteranopia and
-    /// protanopia, and its greyscale is non-monotonic, so it misstates rank
-    /// order. Inferno's luminance climbs from end to end, which is also what
-    /// lets it carry magnitude under Reduce Motion with no motion channel.
-    ///
-    /// Finishing near `amber` is a bonus rather than a compromise: at the top
-    /// of a speed scale, reading as alarming is correct.
+    /// The shared speed scale: yellow at the comfort threshold, orange beyond
+    /// it, red at the fast end. It deliberately never enters green: green is
+    /// reserved for a usable Slack window.
     static let speedRampStops: [(t: Double, hex: UInt32)] = [
-        (0.0, 0x0D2033), (0.2, 0x3B2C63), (0.4, 0x7B2E62),
-        (0.6, 0xB8434F), (0.8, 0xE8763C), (1.0, 0xF5C96B),
+        (0.0, 0xF5C96B), (1.0 / 3.0, 0xF5C96B),
+        (2.0 / 3.0, 0xE8763C), (1.0, 0xC93A32),
     ]
 
     /// The ramp sampled at `t`, clamped to 0...1. Piecewise-linear in sRGB:
@@ -298,9 +284,23 @@ struct ScrubWhen: View {
     let live: Date
     let tz: TimeZone
     let onReturn: () -> Void
+    var summary: (label: String, value: String)? = nil
 
     var body: some View {
         let moon = SunMoon.moonIllumination(date: scrubTime)
+        if let summary {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    MonoLabel(text: summary.label, color: SN.foam.opacity(0.5))
+                    Text(summary.value)
+                        .font(.title.weight(.medium).monospacedDigit())
+                        .foregroundStyle(SN.foam)
+                }
+                Spacer()
+                moonPhase(moon)
+            }
+            .accessibilityElement(children: .contain)
+        } else {
         // Wrap, never truncate (the StationCard rule): the one-line row is
         // tier 1, and when the .title time, the fixed 44pt slot and the
         // phase name outgrow the width — AX3 and up on a phone — the moon
@@ -319,6 +319,7 @@ struct ScrubWhen: View {
             }
         }
         .accessibilityElement(children: .contain)
+        }
     }
 
     private var timeAndSlot: some View {
@@ -405,6 +406,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// Fired after the anchor moves, with the picked date. The three
     /// `@State`-backed views rebuild here; the online gate re-checks coverage.
     var onPicked: (Date) -> Void = { _ in }
+    /// Optional aggregate reading for the bottom of the scrub card.
+    var scrubSummary: (TimelineData) -> (label: String, value: String)? = { _ in nil }
     @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -503,7 +506,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // the label still didn't find the horizontal scroll. The strip's
             // own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn)
+            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn,
+                      summary: scrubSummary(tl))
                 .padding(.top, 14)
 
             links()

@@ -257,7 +257,7 @@ private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
 /// single tap — the ~0.5s `testPinLayerBuildsInsideAFrame` measures, paid
 /// again and again in one map session, not once per session.
 ///
-/// Keyed on two things that actually change the answer: `chsTones` (busts
+/// Keyed on the inputs that actually change the answer: `chsTones` (busts
 /// the instant a real dict arrives via `update`, called from
 /// `MapStyler.applyChsTones` after a CHS fit lands — a stale CHS tone would
 /// be a worse bug than the rebuild cost this exists to avoid) and a 30-minute
@@ -278,6 +278,7 @@ final class PinFeaturesCache: @unchecked Sendable {
     static let shared = PinFeaturesCache()
     private let lock = NSLock()
     private var bucket: Int?
+    private var slackThreshold: Double?
     private var tones: [String: String] = [:]
     private var geojson: [String: Any] = [:]
 
@@ -306,10 +307,12 @@ final class PinFeaturesCache: @unchecked Sendable {
     /// one of the two methods above.
     private func rebuilt(_ newTones: [String: String], _ now: Date) -> [String: Any] {
         let b = currentBucket(now)
-        if tones != newTones || bucket != b || geojson.isEmpty {
+        let threshold = slackThresholdKn
+        if tones != newTones || bucket != b || slackThreshold != threshold || geojson.isEmpty {
             tones = newTones
             geojson = pinFeatures(chsTones: newTones)
             bucket = b
+            slackThreshold = threshold
         }
         return geojson
     }
@@ -322,6 +325,7 @@ final class PinFeaturesCache: @unchecked Sendable {
     func resetForTesting() {
         lock.lock(); defer { lock.unlock() }
         bucket = nil
+        slackThreshold = nil
         tones = [:]
         geojson = [:]
     }

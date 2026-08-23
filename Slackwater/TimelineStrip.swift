@@ -61,10 +61,10 @@ enum Timeline {
     /// makes, and the reason Windy's ramp reads well: the colour says what you
     /// can still do about the water, not what percentile the station is in.
     ///
-    ///   0.5 kn — `slackThresholdKn`; a small boat transits
+    ///   0.5 kn — the fixed low end of this visual scale
     ///     3 kn — around where a paddled craft can no longer make way against it
-    ///     6 kn — around where a small displacement craft can no longer stem it
-    ///    16 kn — Sechelt Rapids; the overfall regime, timed rather than transited
+    ///     8 kn — severe current
+    ///    12 kn — red ceiling; faster water stays red
     ///
     /// Across the 842 bundled NOAA current stations that puts the median at
     /// 23% of the ramp and p90 at 56%. A linear 0→16 puts them at 14% and 31%,
@@ -82,11 +82,7 @@ enum Timeline {
     /// rather than a computed hazard call: an anchor wrong by half a knot moves
     /// a colour, not a decision.
     ///
-    /// This array is also where a per-vessel limit lands when it arrives — a
-    /// powerboat's thresholds sit higher than a paddled craft's, keyed off the
-    /// boat's own identity. One anchors array keeps that door open without any
-    /// settings plumbing today.
-    static let speedRampAnchorsKn: [Double] = [0.5, 3, 6, 16]
+    static let speedRampAnchorsKn: [Double] = [0.5, 3, 8, 12]
 
     /// Position on the speed ramp for `kn`, piecewise-linear between the
     /// anchors and clamped at both ends. Above the ceiling everything is the
@@ -94,24 +90,13 @@ enum Timeline {
     /// resolving.
     static func rampT(forSpeedKn kn: Double) -> Double { rampT(kn, anchors: speedRampAnchorsKn) }
 
-    /// The absolute domain of the tide track's rate-of-rise ramp (#95), spaced
-    /// equally, in metres/hour — the same move as `speedRampAnchorsKn`:
-    /// capability anchors, hard-coded, never derived from on-device stations.
-    ///
-    ///   0.15 m/hr (≈0.5 ft/hr) — standing water; a neap harbour tide
-    ///    0.6 m/hr (≈2 ft/hr)   — an ordinary coastal mid-tide
-    ///    1.5 m/hr (≈5 ft/hr)   — an inch a minute; a flat floods faster than
-    ///                            the walk back off it
-    ///    3.6 m/hr (≈12 ft/hr)  — the Severn/Fundy regime (Avonmouth peaks 13.7)
-    ///
-    /// tools/ramp-domain.mjs across the 2,765 bundled stations: p50 1.50,
-    /// p90 4.59, p99 8.13, max 13.89 ft/hr. This domain lands the median at
-    /// 22% of the ramp and p90 at 63% — the same spine the speed ramp keeps
-    /// (23%/56%). The middle two are estimates and want a source, the same
-    /// flag the speed anchors carry.
-    static let tideRateAnchorsMHr: [Double] = [0.15, 0.6, 1.5, 3.6]
-
-    static func rampT(forRateMHr rate: Double) -> Double { rampT(rate, anchors: tideRateAnchorsMHr) }
+    /// Tide change is a separate measurement from current speed, but uses the
+    /// same global warning palette. The red ceiling is 1.8 m/hr (about
+    /// 6 ft/hr), so Fundy-scale movement reaches the warning colour.
+    static let tideRateRampAnchorsMHr: [Double] = [0.6, 1.0, 1.5, 1.8]
+    static func rampT(forTideRateMHr rate: Double) -> Double {
+        rampT(rate, anchors: tideRateRampAnchorsMHr)
+    }
 
     private static func rampT(_ v: Double, anchors a: [Double]) -> Double {
         let step = 1.0 / Double(a.count - 1)
@@ -155,6 +140,18 @@ func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
     abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
 }
 
+/// Places the scrub card on the open side of the curve with one half-card of
+/// breathing room from the reading point. The card rides the fixed centerline,
+/// not the scrolling canvas.
+func floatingReadoutY(pointY: CGFloat, geo: TimelineGeo) -> CGFloat {
+    let halfCard: CGFloat = 30
+    let clearance = halfCard
+    let midpoint = (geo.bodyTop + geo.bodyBottom) / 2
+    let proposed = pointY < midpoint ? pointY + halfCard + clearance
+                                     : pointY - halfCard - clearance
+    return min(max(proposed, geo.bodyTop + halfCard), geo.bodyBottom - halfCard)
+}
+
 /// Adjacent slack windows that touch or overlap render as one continuous
 /// green column (Race Rocks Aug 11: a 0.1 kn blip between two slacks), so
 /// only the FIRST slack in the run gets a time label — a second time drawn
@@ -194,6 +191,21 @@ func axisTickMetres(_ tick: Double, imperial: Bool) -> Double {
 /// "4", "0.5", "-1" — trailing zeros are noise in an axis column.
 func axisTickLabel(_ tick: Double) -> String {
     String(format: "%g", tick == 0 ? 0 : tick)   // strip a negative zero
+}
+
+/// Symmetric, display-unit ticks for the signed current chart. The curve keeps
+/// its physics in knots; the fixed legend speaks the unit the boater selected.
+func currentAxisTicks(maxAbsKn: Double, unit: String) -> [Double] {
+    let scale = unit == "kmh" ? 1.852 : unit == "ms" ? 0.514444 : 1
+    let maxValue = maxAbsKn * scale
+    let steps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20]
+    let step = steps.first { maxValue / $0 <= 2 } ?? steps.last!
+    return [-2, -1, 0, 1, 2].map { Double($0) * step }
+        .filter { abs($0) <= maxValue * 1.01 }
+}
+
+func currentAxisKnots(_ tick: Double, unit: String) -> Double {
+    tick / (unit == "kmh" ? 1.852 : unit == "ms" ? 0.514444 : 1)
 }
 
 /// Slack/max events scanned from a sampled signed-velocity series — the
@@ -243,24 +255,118 @@ func currentFillStops(_ points: [CurrentPoint], x: (Date) -> CGFloat,
         : stops
 }
 
-/// The tide track's area fill: one stop per sample, coloured by the ABSOLUTE
-/// rate of rise |dh/dt| in m/hr (#95). Same encoding and same pure-function
-/// reasoning as `currentFillStops`. No schematic case — a tide series reaches
-/// the strip only from real constituents (a CHS station renders once fitted).
-/// Peak rate falls at mid-tide, so the fill runs hot between the extreme dots
-/// and goes dark at the turns where their tints live — complementary channels.
-func tideFillStops(_ rates: [TideRatePoint], x: (Date) -> CGFloat,
-                   width: CGFloat) -> [Gradient.Stop] {
-    guard width > 0, !rates.isEmpty else { return [] }
-    let alpha = 0.9
-    let stops = rates.map { p in
-        Gradient.Stop(
-            color: SN.speedColour(Timeline.rampT(forRateMHr: abs(p.rate))).opacity(alpha),
-            location: min(max(x(p.time) / width, 0), 1))
+/// The portions of a real current curve that lie within the usable threshold.
+/// Endpoints are interpolated at ±threshold, so the green overlay lands on the
+/// reference lines instead of spilling into faster water between samples.
+func slackFillSegments(_ points: [CurrentPoint], threshold: Double) -> [[CurrentPoint]] {
+    guard points.count > 1 else { return [] }
+    var segments: [[CurrentPoint]] = []
+    var segment: [CurrentPoint] = []
+
+    func append(_ point: CurrentPoint) {
+        if segment.last?.time == point.time { return }
+        segment.append(point)
     }
-    return stops.count == 1
-        ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)]
-        : stops
+    func finish() {
+        if segment.count > 1 { segments.append(segment) }
+        segment = []
+    }
+
+    for (a, b) in zip(points, points.dropFirst()) {
+        var cuts = [a]
+        for limit in [-threshold, threshold] where (a.speed - limit) * (b.speed - limit) < 0 {
+            let f = (limit - a.speed) / (b.speed - a.speed)
+            cuts.append(CurrentPoint(time: a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f),
+                                     speed: limit))
+        }
+        cuts.append(b)
+        cuts.sort { $0.time < $1.time }
+
+        for (start, end) in zip(cuts, cuts.dropFirst()) {
+            let middle = (start.speed + end.speed) / 2
+            if abs(middle) <= threshold {
+                append(start)
+                append(end)
+            } else {
+                finish()
+            }
+        }
+    }
+    finish()
+    return segments
+}
+
+/// The fast portions of a current curve, clipped to the configured threshold.
+/// These are the only paths allowed to carry the yellow→red speed fill.
+func currentExcessSegments(_ points: [CurrentPoint], threshold: Double) -> [[CurrentPoint]] {
+    guard points.count > 1 else { return [] }
+    var segments: [[CurrentPoint]] = []
+    var segment: [CurrentPoint] = []
+
+    func append(_ point: CurrentPoint) {
+        if segment.last?.time == point.time { return }
+        segment.append(point)
+    }
+    func finish() {
+        if segment.count > 1 { segments.append(segment) }
+        segment = []
+    }
+
+    for (a, b) in zip(points, points.dropFirst()) {
+        var cuts = [a]
+        for limit in [-threshold, threshold] where (a.speed - limit) * (b.speed - limit) < 0 {
+            let f = (limit - a.speed) / (b.speed - a.speed)
+            cuts.append(CurrentPoint(time: a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f),
+                                     speed: limit))
+        }
+        cuts.append(b)
+        cuts.sort { $0.time < $1.time }
+
+        for (start, end) in zip(cuts, cuts.dropFirst()) {
+            if abs((start.speed + end.speed) / 2) > threshold {
+                append(start)
+                append(end)
+            } else {
+                finish()
+            }
+        }
+    }
+    finish()
+    return segments
+}
+
+/// Each rising or falling run gets one curve-following motion cue, placed at
+/// its fastest point. Repeating it along the whole curve turns motion into
+/// texture, especially at Fundy-scale stations.
+func tideFlowArrows(_ rates: [TideRatePoint]) -> [TideRatePoint] {
+    var peaks: [TideRatePoint] = []
+    var run: [TideRatePoint] = []
+    var direction = 0
+
+    func finishRun() {
+        if let peak = run.max(by: { abs($0.rate) < abs($1.rate) }), abs(peak.rate) >= 0.6 {
+            peaks.append(peak)
+        }
+        run = []
+    }
+
+    for point in rates {
+        guard abs(point.rate) >= 0.0001 else { finishRun(); direction = 0; continue }
+        let nextDirection = point.rate.sign == .minus ? -1 : point.rate.sign == .plus ? 1 : 0
+        if direction != 0, nextDirection != direction { finishRun() }
+        direction = nextDirection
+        run.append(point)
+    }
+    finishRun()
+    return peaks
+}
+
+func tideRateSeverity(_ rate: Double) -> String? {
+    let rate = abs(rate)
+    guard rate >= Timeline.tideRateRampAnchorsMHr[0] else { return nil }
+    if rate >= Timeline.tideRateRampAnchorsMHr[2] { return "🚨 Extreme" }
+    if rate >= Timeline.tideRateRampAnchorsMHr[1] { return "‼️ Very fast" }
+    return "⚠️ Fast"
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
@@ -313,6 +419,15 @@ func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     return events.sorted { $0.time < $1.time }
 }
 
+/// The useful current-cycle aggregate: the signed difference between the
+/// adjoining flood and ebb maxima around a reading, expressed in knots.
+func currentPeakToPeakRange(_ events: [CurrentEvent], around time: Date) -> Double? {
+    let maxima = events.filter { $0.kind != .slack }.sorted { $0.time < $1.time }
+    guard let before = maxima.last(where: { $0.time <= time }),
+          let after = maxima.first(where: { $0.time > time }) else { return nil }
+    return abs(after.speed - before.speed)
+}
+
 // MARK: - Data: everything the strip draws, computed once per station
 
 struct TimelineDay {
@@ -347,6 +462,9 @@ struct TimelineData {
     /// Empty for a derived gate: `build(gate:)` synthesises a schematic ±1
     /// shape, and a 0.5 kn window measured off a shape would be fiction.
     let slackWindows: [(slack: Date, start: Date, end: Date)]
+    /// The setting used to build `slackWindows`, retained so the chart cannot
+    /// render a different threshold than the duration it reports.
+    var slackThreshold: Double = defaultSlackThresholdKn
 
     /// True when `currentPoints` is that schematic ±1 shape rather than
     /// measured speed. Same fiction, one step further on: the shape says
@@ -494,7 +612,7 @@ struct TimelineData {
     /// counts if it lands within the pad; only `currentPoints`/`snapTimes`
     /// clip to the visible window.
     static func build(onlinePoints: [CurrentPoint], tz: TimeZone, lat: Double, lon: Double,
-                      now: Date, anchor: Date) -> TimelineData {
+                      now: Date, anchor: Date, threshold: Double = slackThresholdKn) -> TimelineData {
         let chrome = dayChrome(tz: tz, lat: lat, lon: lon, anchor: anchor, now: now)
         let start = chrome.start, end = chrome.end
 
@@ -512,25 +630,26 @@ struct TimelineData {
         // draws.
         let windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
             slackWindow(currentPoints, around: e.time,
-                        threshold: slackThresholdKn)
+                        threshold: threshold)
                 .map { (slack: e.time, start: $0.start, end: $0.end) }
         }
 
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
-        let snaps = (currentEvents.map(\.time) + sunTimes)
-            .filter { $0 >= start && $0 <= end }
-            .sorted()
+        let snaps = Array(Set(currentEvents.map(\.time) + sunTimes
+                              + windows.flatMap { [$0.start, $0.end] }))
+            .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: chrome.tz, anchor: chrome.anchor, today: chrome.today,
                             start: start, end: end, days: chrome.days,
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, slackWindows: windows)
+                            snapTimes: snaps, slackWindows: windows, slackThreshold: threshold)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
-                      now: Date, anchor: Date, gate: DerivedGateRecord? = nil) -> TimelineData {
+                      now: Date, anchor: Date, gate: DerivedGateRecord? = nil,
+                      threshold: Double = slackThresholdKn) -> TimelineData {
         // The primary station names the timezone and the sky position.
         let tz = gate?.gate.tz ?? current?.tz ?? tide?.tz ?? .current
         let lat = gate?.gate.latitude ?? current?.latitude ?? tide?.latitude ?? 48.5
@@ -563,7 +682,7 @@ struct TimelineData {
                                      to: end.addingTimeInterval(pad))
             windows = currentEvents.filter { $0.kind == .slack }.compactMap { e in
                 slackWindow(currentPoints, around: e.time,
-                            threshold: slackThresholdKn)
+                            threshold: threshold)
                     .map { (slack: e.time, start: $0.start, end: $0.end) }
             }
         }
@@ -581,14 +700,16 @@ struct TimelineData {
 
         let sunTimes = days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
-        let snaps = (tideExtremes.map(\.time) + currentEvents.map(\.time) + sunTimes)
-            .filter { $0 >= start && $0 <= end }
-            .sorted()
+        let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
+                              + currentEvents.map(\.time) + sunTimes
+                              + windows.flatMap { [$0.start, $0.end] }))
+            .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
                             snapTimes: snaps, slackWindows: windows,
+                            slackThreshold: threshold,
                             speedsAreSchematic: gate != nil)
     }
 }
@@ -752,7 +873,7 @@ struct TimelineCanvas: View {
         var nowLine = Path()
         nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
         nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
-        ctx.stroke(nowLine, with: .color(SN.leaf.opacity(0.55)),
+        ctx.stroke(nowLine, with: .color(SN.flood.opacity(0.7)),
                    style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
     }
 
@@ -847,6 +968,11 @@ struct TimelineCanvas: View {
                         .foregroundStyle(SN.foam.opacity(0.85)),
                      at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
                      anchor: .center)
+            ctx.draw(Text(monthDay(day.start, data.tz))
+                        .font(.system(size: 10, weight: .medium).monospaced())
+                        .foregroundStyle(SN.foam.opacity(0.48)),
+                     at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY + 17),
+                     anchor: .center)
             // Sun rise/set dots + "↑5:24AM" labels.
             for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {
                 guard let t else { continue }
@@ -871,19 +997,28 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: data.totalWidth, y: geo.tideBottom))
         area.addLine(to: CGPoint(x: 0, y: geo.tideBottom))
         area.closeSubpath()
-        // Rate-of-rise ramp (#95): the fill's colour carries |dh/dt| on the
-        // absolute tide-rate domain, replacing a fixed decorative gradient
-        // that was constant at every station and every phase. Horizontal, in
-        // full-strip coordinates — same tiling contract as the current fill.
-        let fillStops = tideFillStops(data.tideRates, x: data.x, width: data.totalWidth)
-        if !fillStops.isEmpty {
-            ctx.fill(area, with: .linearGradient(
-                Gradient(stops: fillStops),
-                startPoint: CGPoint(x: 0, y: 0),
-                endPoint: CGPoint(x: data.totalWidth, y: 0)))
-        }
+        // Tide height stays blue. Motion is carried by chevrons on the curve,
+        // so it reads as rising/falling water rather than current intensity.
+        ctx.fill(area, with: .color(SN.flood.opacity(0.32)))
         ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+        for flow in tideFlowArrows(data.tideRates) where data.contains(flow.time) {
+            let timeStep: TimeInterval = 5 * 60
+            let before = CGPoint(x: data.x(flow.time.addingTimeInterval(-timeStep)),
+                                 y: geo.tideY(data.heightAt(flow.time.addingTimeInterval(-timeStep))))
+            let after = CGPoint(x: data.x(flow.time.addingTimeInterval(timeStep)),
+                                y: geo.tideY(data.heightAt(flow.time.addingTimeInterval(timeStep))))
+            let angle = atan2(after.y - before.y, after.x - before.x)
+            let mark = Text("››››")
+                .font(.system(size: 30, weight: .black))
+                .tracking(-4)
+                .foregroundStyle(SN.speedColour(Timeline.rampT(forTideRateMHr: abs(flow.rate))))
+            ctx.drawLayer { layer in
+                layer.translateBy(x: data.x(flow.time), y: geo.tideY(data.heightAt(flow.time)))
+                layer.rotate(by: .radians(Double(angle)))
+                layer.draw(mark, at: .zero, anchor: .center)
+            }
+        }
 
         // Chart datum, the reference every printed height is quoted against —
         // the axis column names it "0" and this is the line it points at. Drawn
@@ -932,48 +1067,85 @@ struct TimelineCanvas: View {
             let pt = CGPoint(x: data.x(p.time), y: geo.curY(p.speed))
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
-        var area = line
-        area.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
-        area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
-        area.closeSubpath()
-        // The workable slack column spans the WHOLE track — a column of time
-        // you can transit, not a patch hanging off the zero line. It is the
-        // GROUND now, drawn under the fill: near slack the fill has almost no
-        // height, so the column reads on the page either side of the curve,
-        // and green never tints the ramp. 0.12 keeps it a highlight rather
-        // than an opaque patch.
-        //
-        // Green is the window and nothing else (#97). It used to colour the
-        // slack instant too — but a mathematical point is not something you
-        // can transit *at*, and the window is the thing you plan around.
-        for w in data.slackWindows {
-            let x0 = data.x(w.start), x1 = data.x(w.end)
-            ctx.fill(Path(CGRect(x: x0, y: geo.curTop, width: x1 - x0,
-                                 height: geo.curBottom - geo.curTop)),
-                     with: .color(SN.go.opacity(0.12)))
+        if !data.speedsAreSchematic {
+            // Hot water starts at the comfort limit, never at zero. The
+            // green interior is the usable window; only the excess rises out
+            // of it toward red.
+            for segment in currentExcessSegments(data.currentPoints, threshold: data.slackThreshold) {
+                let positive = segment[0].speed > 0
+                let thresholdY = geo.curY(positive ? data.slackThreshold : -data.slackThreshold)
+                var excess = Path()
+                for (i, point) in segment.enumerated() {
+                    let p = CGPoint(x: data.x(point.time), y: geo.curY(point.speed))
+                    i == 0 ? excess.move(to: p) : excess.addLine(to: p)
+                }
+                excess.addLine(to: CGPoint(x: data.x(segment.last!.time), y: thresholdY))
+                excess.addLine(to: CGPoint(x: data.x(segment[0].time), y: thresholdY))
+                excess.closeSubpath()
+                ctx.fill(excess, with: .linearGradient(
+                    Gradient(colors: [SN.speedColour(0), SN.speedColour(0.5), SN.speedColour(1)]),
+                    startPoint: CGPoint(x: 0, y: thresholdY),
+                    endPoint: CGPoint(x: 0, y: positive ? geo.curTop : geo.curBottom)))
+            }
+            for speed in [-data.slackThreshold, data.slackThreshold] {
+                var threshold = Path()
+                threshold.move(to: CGPoint(x: 0, y: geo.curY(speed)))
+                threshold.addLine(to: CGPoint(x: data.totalWidth, y: geo.curY(speed)))
+                ctx.stroke(threshold, with: .color(SN.go.opacity(0.85)), lineWidth: 1)
+            }
+            for segment in slackFillSegments(data.currentPoints, threshold: data.slackThreshold) {
+                var slackArea = Path()
+                for (i, point) in segment.enumerated() {
+                    let p = CGPoint(x: data.x(point.time), y: geo.curY(point.speed))
+                    i == 0 ? slackArea.move(to: p) : slackArea.addLine(to: p)
+                }
+                slackArea.addLine(to: CGPoint(x: data.x(segment.last!.time), y: geo.zeroY))
+                slackArea.addLine(to: CGPoint(x: data.x(segment[0].time), y: geo.zeroY))
+                slackArea.closeSubpath()
+                let startX = data.x(segment[0].time)
+                let endX = data.x(segment.last!.time)
+                // A sine envelope avoids a bright rectangular plateau while
+                // retaining enough green through short usable windows.
+                ctx.fill(slackArea, with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: SN.go.opacity(0), location: 0),
+                        .init(color: SN.go.opacity(0.37), location: 0.125),
+                        .init(color: SN.go.opacity(0.68), location: 0.25),
+                        .init(color: SN.go.opacity(0.89), location: 0.375),
+                        .init(color: SN.go.opacity(0.98), location: 0.5),
+                        .init(color: SN.go.opacity(0.89), location: 0.625),
+                        .init(color: SN.go.opacity(0.68), location: 0.75),
+                        .init(color: SN.go.opacity(0.37), location: 0.875),
+                        .init(color: SN.go.opacity(0), location: 1),
+                    ]),
+                    startPoint: CGPoint(x: startX, y: 0), endPoint: CGPoint(x: endX, y: 0)))
+            }
+            for window in data.slackWindows {
+                for time in [window.start, window.end] {
+                    var rail = Path()
+                    rail.move(to: CGPoint(x: data.x(time), y: geo.curBottom))
+                    rail.addLine(to: CGPoint(x: data.x(time), y: geo.curY(data.velocityAt(time))))
+                    ctx.stroke(rail, with: .color(SN.go.opacity(0.7)),
+                               style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                }
+            }
+        } else {
+            var area = line
+            area.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
+            area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
+            area.closeSubpath()
+            let fillStops = currentFillStops(data.currentPoints, x: data.x,
+                                             width: data.totalWidth, schematic: true)
+            if !fillStops.isEmpty {
+                ctx.fill(area, with: .linearGradient(
+                    Gradient(stops: fillStops),
+                    startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: data.totalWidth, y: 0)))
+            }
+            var zero = Path()
+            zero.move(to: CGPoint(x: 0, y: geo.zeroY))
+            zero.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
+            ctx.stroke(zero, with: .color(.white.opacity(0.4)), lineWidth: 1)
         }
-
-        // ONE fill, coloured by absolute speed along the track (#97). This was
-        // two clipped layers — flood blue above the zero line, ebb amber below
-        // — but the clip is what put each on its own side, so hue was saying
-        // what position already said while magnitude had no channel at all.
-        // The curve's SHAPE stays auto-fitted (`TimelineGeo` is untouched),
-        // which is what keeps a quiet station legible; colour carries the
-        // absolute number the geometry gave up, so a 3 kn pass and Sechelt
-        // Rapids can no longer draw as the same picture.
-        let fillStops = currentFillStops(data.currentPoints, x: data.x,
-                                         width: data.totalWidth,
-                                         schematic: data.speedsAreSchematic)
-        if !fillStops.isEmpty {
-            ctx.fill(area, with: .linearGradient(
-                Gradient(stops: fillStops),
-                startPoint: CGPoint(x: 0, y: 0),
-                endPoint: CGPoint(x: data.totalWidth, y: 0)))
-        }
-        var zero = Path()
-        zero.move(to: CGPoint(x: 0, y: geo.zeroY))
-        zero.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
-        ctx.stroke(zero, with: .color(.white.opacity(0.4)), lineWidth: 1)
         ctx.stroke(line, with: .color(Color(hex: 0xDFEEE0)),
                    style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         let margin = 0.3 * 3600
@@ -986,16 +1158,13 @@ struct TimelineCanvas: View {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
-                // Foam, not green: green is the column behind it. Form does
-                // the separating that hue used to — a figure on a ground.
+                // Foam keeps the exact zero crossing distinct from the green
+                // threshold interval that surrounds it.
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
                                                 width: 8, height: 8)),
                          with: .color(SN.foam))
-                // ONE label, centred over the column: the SLACK ITSELF, not
-                // the window's opening edge — the magnet parks the strip on
-                // the zero crossing, so print what the strip can actually
-                // stop on. The window stays drawn as the green column:
-                // context you look at, not a time you read off.
+                // The label stays at the slack instant; the dashed rails carry
+                // the interval's start and end.
                 if data.slackWindows.first(where: { $0.slack == e.time }) == nil {
                     // No window (a violent gate the sampling steps over, every
                     // derived gate): a hairline rather than a column — a
@@ -1021,18 +1190,11 @@ struct TimelineCanvas: View {
                 // when the fill is deep enough to hold it, outside on the dark
                 // ground otherwise. No chip behind it.
                 //
-                // The inside ink can no longer be a fixed white. The fill runs
-                // dark-to-bright with speed now, and white on the top of the
-                // ramp fails — so it is picked from the ramp position. Note
-                // the y-offset cannot stand in for that: the shape is
-                // auto-fitted, so a quiet station's max also sits deep inside
-                // its (dark) fill.
+                // The chart's event labels always use its foam ink; the warm
+                // fill is a magnitude cue, not a second text-colour system.
                 let toward: CGFloat = flood ? 1 : -1      // toward the zero line
-                let labelH: CGFloat = 30
-                let inside = abs(y - geo.zeroY) >= labelH + 12
-                let cy = y + toward * (labelH / 2 + 8)
-                let mark = inside ? SN.speedInk(Timeline.rampT(forSpeedKn: abs(e.speed)))
-                                  : SN.foam
+                let cy = y + toward * 23
+                let mark = SN.foam
                 ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
                             .font(.system(size: 14, weight: .semibold).monospacedDigit())
                             .foregroundStyle(mark),
@@ -1271,14 +1433,66 @@ struct TimelineScrubStrip: View {
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
+    var onReturn: (() -> Void)? = nil
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                          now: now, floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime)
             .frame(height: geo.height)
             .overlay { overlay }
+            .overlay { floatingReadout }
+            .overlay { floatingNowButton }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("timeline-strip")
+    }
+
+    @ViewBuilder private var floatingNowButton: some View {
+        if let onReturn, scrubbedAway(scrubTime, from: now) {
+            GeometryReader { _ in
+                Button(action: onReturn) {
+                    Label("Now", systemImage: "arrow.left")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(SN.foam.opacity(0.8))
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(SN.page.opacity(0.68), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(SN.steel.opacity(0.35), lineWidth: 1))
+                }
+                .position(x: 52, y: geo.hasTide ? geo.bottomTimeY : geo.maxTimeY)
+                .accessibilityLabel("Return to now")
+                .accessibilityIdentifier("detail-return-now")
+            }
+        }
+    }
+
+    private var floatingReadout: some View {
+        GeometryReader { proxy in
+            let pointY = geo.hasTide ? geo.tideY(data.heightAt(scrubTime))
+                                      : geo.curY(data.velocityAt(scrubTime))
+            VStack(spacing: 1) {
+                Text(cardTime(scrubTime, data.tz))
+                    .font(.system(size: 12, weight: .medium).monospaced())
+                    .foregroundStyle(SN.foam.opacity(0.58))
+                if data.speedsAreSchematic {
+                    Text("Slack timing")
+                        .font(.system(size: 18, weight: .semibold))
+                } else if geo.hasTide {
+                    Text("\(formatHeight(data.heightAt(scrubTime), imperial: imperial)) \(heightUnit(imperial: imperial))")
+                        .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                } else {
+                    Text("\(formatSpeed(abs(data.velocityAt(scrubTime)), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                }
+            }
+            .foregroundStyle(SN.foam)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(SN.page.opacity(0.92), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(SN.steel.opacity(0.55), lineWidth: 1))
+            .position(x: proxy.size.width / 2, y: floatingReadoutY(pointY: pointY, geo: geo))
+            .allowsHitTesting(false)
+        }
     }
 
     private var overlay: some View {
@@ -1289,6 +1503,7 @@ struct TimelineScrubStrip: View {
                 // the one thing on this chart that never moves when you pan, and
                 // it is what lets the turn labels drop their unit.
                 if geo.hasTide { tideAxis }
+                if geo.hasCurrent { currentAxis }
                 // Fixed reading line + cap triangle (prototype chartEl overlay).
                 LinearGradient(colors: [.white.opacity(0.95), .white.opacity(0.3)],
                                startPoint: .top, endPoint: .bottom)
@@ -1334,6 +1549,31 @@ struct TimelineScrubStrip: View {
                     .font(.system(size: 12, weight: .medium).monospacedDigit())
                     .foregroundStyle(.white.opacity(0.5))
                     .position(x: 26, y: geo.tideY(axisTickMetres(tick, imperial: imperial)))
+            }
+        }
+    }
+
+    /// The current equivalent of the tide-height column. It stays signed so
+    /// the zero line reads as the slack boundary, while its unit follows the
+    /// user's current-speed setting.
+    private var currentAxis: some View {
+        ZStack(alignment: .topLeading) {
+            LinearGradient(colors: [SN.page.opacity(0.9), SN.page.opacity(0)],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: 60)
+            let threshold = data.slackThreshold
+            ForEach(currentAxisTicks(maxAbsKn: geo.maxAbsCur, unit: speedUnit)
+                .filter { abs(abs(currentAxisKnots($0, unit: speedUnit)) - threshold) > 0.01 }, id: \.self) { tick in
+                Text("\(axisTickLabel(tick)) \(speedUnitLabel(speedUnit))")
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .foregroundStyle(SN.foam.opacity(0.5))
+                    .position(x: 26, y: geo.curY(currentAxisKnots(tick, unit: speedUnit)))
+            }
+            ForEach([-threshold, threshold], id: \.self) { value in
+                Text("\(value > 0 ? "+" : "−")\(formatSpeed(abs(value), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(SN.go)
+                    .position(x: 26, y: geo.curY(value))
             }
         }
     }

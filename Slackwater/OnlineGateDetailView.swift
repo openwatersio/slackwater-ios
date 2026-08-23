@@ -9,6 +9,8 @@ import TideEngine
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var net = Connectivity.shared
     @Environment(\.openChsRoute) private var openChsRoute
 
@@ -59,7 +61,8 @@ struct OnlineGateDetailView: View {
     private var timeline: TimelineData? {
         guard let window else { return nil }
         let tl = TimelineData.build(onlinePoints: window.points, tz: tz,
-                                    lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor)
+                                    lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,
+                                    threshold: normalizedSlackThresholdKn(slackWindowSpeed))
         return window.covers(anchor: anchor) ? tl : nil
     }
 
@@ -99,6 +102,10 @@ struct OnlineGateDetailView: View {
                             anchor: $anchor,
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in applyAnchor() },
+                            scrubSummary: { tl in
+                                guard let range = currentPeakToPeakRange(tl.currentEvents, around: scrubTime) else { return nil }
+                                return ("Range", "\(formatSpeed(range, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            },
                             above: { EmptyView() },
                             card: { tl in
                                 if let window {
@@ -106,7 +113,7 @@ struct OnlineGateDetailView: View {
                                     TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                        speedUnit: speedUnit, now: live,
                                                        floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
-                                                       scrubTime: $scrubTime)
+                                                       scrubTime: $scrubTime, onReturn: returnToNow)
                                         .padding(.horizontal, -16)  // full-bleed strip
                                         .padding(.top, 12)
                                 }
@@ -211,21 +218,19 @@ struct OnlineGateDetailView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 if phase == .slack {
-                    Text("Slack").font(.largeTitle)
+                    Text("Slack").font(.title2.weight(.medium))
                         .foregroundStyle(CurrentDetailView.phaseColor(phase))
                     Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                        .font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                 } else {
-                    (Text(formatSpeed(abs(scrubSigned), unit: speedUnit)).font(.largeTitle.monospacedDigit())
-                     + Text(" \(speedUnitLabel(speedUnit))").font(.footnote))
-                        .foregroundStyle(.white)
+                    Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(CurrentDetailView.phaseColor(phase))
                     HStack(spacing: 4) {
-                        // The plain-word gloss for non-sailors (#59) — this
-                        // hero has the room; list cards lead with direction.
-                        Text(phase.gloss.map { "\(phase.word) · \($0)" } ?? phase.word)
-                            .font(.footnote)
-                        CompassArrow(deg: setDegrees(scrubSigned, window)).font(.footnote)
-                        Text(compass16(setDegrees(scrubSigned, window))).font(.footnote)
+                        Text("\(formatSpeed(abs(scrubSigned), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            .font(.title3.monospacedDigit())
+                        CompassArrow(deg: setDegrees(scrubSigned, window)).font(.title3)
+                        Text(compass16(setDegrees(scrubSigned, window))).font(.title3)
                     }
                     .foregroundStyle(CurrentDetailView.phaseColor(phase))
                 }

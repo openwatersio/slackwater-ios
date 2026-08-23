@@ -90,8 +90,8 @@ final class CurrentFillTests: XCTestCase {
     /// endpoints pin the ramp, and no speed may ever produce a green (green
     /// means transitable and only the gates may say it; spec §1 ruling).
     func testFillColourIsTheSharedRampAndNeverGreen() {
-        XCTAssertEqual(fillColourHex(forSpeedKn: 0), "#0d2033")     // ramp floor
-        XCTAssertEqual(fillColourHex(forSpeedKn: 99), "#f5c96b")    // clamped ceiling
+        XCTAssertEqual(fillColourHex(forSpeedKn: 0), "#f5c96b")     // threshold yellow
+        XCTAssertEqual(fillColourHex(forSpeedKn: 99), "#c93a32")    // clamped red ceiling
         // Mid-anchor: kn=3 is exactly t=1/3 by the strip's own anchors.
         let c = SN.speedRGB(Timeline.rampT(forSpeedKn: 3))
         XCTAssertEqual(fillColourHex(forSpeedKn: 3),
