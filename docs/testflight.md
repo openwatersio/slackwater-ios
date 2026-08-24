@@ -86,6 +86,33 @@ so the first mint after the appex was registered produced a profile **named**
 right name, wrong profile. Fixed by matching the identifier exactly; the check
 above is what caught it.
 
+**Favourites went to iCloud (#134) and the app target gained
+`com.apple.developer.ubiquity-kvstore-identifier`.** Same drill, with one
+difference: iCloud *does* have an API where App Groups does not. `POST
+/v1/bundleIdCapabilities` with `capabilityType: ICLOUD` and `ICLOUD_VERSION:
+XCODE_6` against bundle id `D696FS7JD3` returns 201. Key-value storage needs no
+iCloud *container*, so there is nothing to create and nothing to assign, and only
+the app target is affected — the appex reads favourites out of the App Group,
+never out of KVS. Done 2026-08-23: the app bundle id now reads `IN_APP_PURCHASE,
+APP_GROUPS, ICLOUD`, and "Slackwater App Store" was re-minted (`CN6WHP3433`,
+UUID `5c858630-7d48-4bea-a803-8bf938b4ec43`) so it carries
+`com.apple.developer.ubiquity-kvstore-identifier => R3H8DPTV9C.*`. The widgets
+profile is untouched; the appex gained no entitlement. Proven rather than
+assumed this time: `xcodebuild archive` succeeded on the new profile and the
+signed app carries `com.apple.developer.ubiquity-kvstore-identifier =>
+R3H8DPTV9C.org.openwaters.slackwater` (`codesign -d --entitlements`). That is
+the check the merge gate cannot do for you.
+
+**Delete the old file when you re-mint, or the name stops identifying a profile.**
+Two profiles named "Slackwater App Store" were installed side by side until this
+one — `ab3c7463…` (carrying the App Group) and `fb99187e…` (the 2026-07-30
+predecessor, which did not). `PROVISIONING_PROFILE_SPECIFIER` matches on *name*,
+so with a duplicate installed which one an archive picks is not something this
+repo controls, and the failure looks like a missing entitlement rather than a
+stale file. Both are backed up in `~/.naturali/profile-backups/2026-08-23/`. The
+`security cms -D` loop above prints one line per installed profile; a repeated
+name in that output is the bug.
+
 ## Cadence
 
 Per-release procedure lives in the `releasing-to-testflight` skill

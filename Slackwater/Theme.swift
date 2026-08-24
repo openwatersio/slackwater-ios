@@ -810,11 +810,25 @@ final class RecentsStore: ObservableObject {
 
 // MARK: - Favorites (current-detail spec §9; prototype TidesApp savedIds)
 
-/// Starred stations, insertion order, persisted. Toggled by the detail-header
-/// star and the list swipe actions.
+/// Starred stations, in star order, persisted on the device and in iCloud (#134).
+///
+/// Storage only: `ids`, `contains`, `toggle`, `forget` and `replace` are what
+/// they were before the cloud existed. The App Group copy stays this device's
+/// own truth — it is what the widget reads (`WidgetStationLoader
+/// .defaultStationID`) and what a device without iCloud falls back to — while
+/// `FavoritesCloud` carries the same list between devices.
+///
+/// ponytail: RecentsStore keeps the same shape and stays device-local on
+/// purpose. Recents are a record of what you did on *this* device; favourites
+/// are the list you curated. Sync them if that ever stops being true.
 final class FavoritesStore: ObservableObject {
     static let shared = FavoritesStore()
     private static let key = AppGroup.favoritesKey
+    /// Set once this device's list has been written out as per-station cloud
+    /// keys. Until then the cloud has never heard of these stars and must be
+    /// merged with rather than adopted — adopting an empty cloud is exactly
+    /// how an upgrading user loses the six gates they starred.
+    private static let migratedKey = "slackwater.favorites.cloudMigrated"
 
     @Published private(set) var ids: [String]
 
@@ -833,6 +847,16 @@ final class FavoritesStore: ObservableObject {
                 CommandLine.arguments[i + 1].split(separator: ",").map(String.init), forKey: Self.key)
         }
         ids = AppGroup.defaults.stringArray(forKey: Self.key) ?? []
+
+        // Nil under both kinds of test, so those hooks stay device-local
+        // (FavoritesCloud.store).
+        guard let cloud = FavoritesCloud.store else { return }
+        NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud, queue: .main
+        ) { [weak self] note in self?.cloudChanged(note, cloud) }
+        cloud.synchronize()
+        adopt(cloud)
     }
 
     func contains(_ id: String) -> Bool { ids.contains(id) }
@@ -840,12 +864,14 @@ final class FavoritesStore: ObservableObject {
     func toggle(_ id: String) {
         if let i = ids.firstIndex(of: id) {
             ids.remove(at: i)
+            unstar(id)
             // Spec §9: unfavoriting re-files to Recents, never data loss.
             RecentsStore.shared.record(id)
         } else {
             ids.append(id)
+            star(id)
         }
-        AppGroup.defaults.set(ids, forKey: Self.key)
+        persist()
         // A widget's default station is "first favorite" (WidgetStationLoader
         // .defaultStationID) — starring/unstarring can change what an
         // unconfigured widget shows, so its timeline must not wait for the
@@ -859,7 +885,8 @@ final class FavoritesStore: ObservableObject {
     func forget(_ id: String) {
         guard ids.contains(id) else { return }
         ids.removeAll { $0 == id }
-        AppGroup.defaults.set(ids, forKey: Self.key)
+        unstar(id)
+        persist()
     }
 
     /// Swap a removed station for the replacement the user picked, in place —
@@ -868,12 +895,60 @@ final class FavoritesStore: ObservableObject {
     func replace(_ old: String, with new: String) {
         guard let i = ids.firstIndex(of: old) else { return }
         ids.remove(at: i)
-        if !ids.contains(new) { ids.insert(new, at: i) }
-        AppGroup.defaults.set(ids, forKey: Self.key)
+        let inserted = !ids.contains(new)
+        if inserted { ids.insert(new, at: i) }
+        // The replacement inherits the dead station's *stamp* as well as its
+        // slot, or the next device to sync would sort it to the end.
+        let stamp = FavoritesCloud.store?.double(forKey: FavoritesCloud.prefix + old) ?? 0
+        unstar(old)
+        if inserted { star(new, at: stamp > 0 ? stamp : nil) }
+        persist()
     }
 
     var items: [StationItem] {
         ids.compactMap { id in StationItem.all.first { $0.id == id } }
+    }
+
+    // MARK: - iCloud (see FavoritesCloud)
+
+    private func persist() { AppGroup.defaults.set(ids, forKey: Self.key) }
+
+    private func star(_ id: String, at stamp: Double? = nil) {
+        FavoritesCloud.store?.set(stamp ?? Date().timeIntervalSince1970,
+                                  forKey: FavoritesCloud.prefix + id)
+    }
+
+    private func unstar(_ id: String) {
+        FavoritesCloud.store?.removeObject(forKey: FavoritesCloud.prefix + id)
+    }
+
+    private func cloudChanged(_ note: Notification, _ cloud: NSUbiquitousKeyValueStore) {
+        // Signing in or out of iCloud hands us a different store, usually an
+        // empty one. Adopting that erases a list the user can still see on this
+        // device, so treat the new account as never-migrated and let this
+        // device's stars seed it instead.
+        if note.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+            == NSUbiquitousKeyValueStoreAccountChange {
+            AppGroup.defaults.set(false, forKey: Self.migratedKey)
+        }
+        adopt(cloud)
+    }
+
+    /// Reconcile with the cloud. Everything that can lose a star lives in
+    /// `FavoritesCloud.reconcile`, which is a pure function; this is its I/O.
+    private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
+        let migrated = AppGroup.defaults.bool(forKey: Self.migratedKey)
+        let (next, writes) = FavoritesCloud.reconcile(
+            local: ids,
+            cloud: FavoritesCloud.stamps(cloud.dictionaryRepresentation),
+            migrated: migrated,
+            now: Date().timeIntervalSince1970)
+        for (id, stamp) in writes { cloud.set(stamp, forKey: FavoritesCloud.prefix + id) }
+        if !migrated { AppGroup.defaults.set(true, forKey: Self.migratedKey) }
+        guard next != ids else { return }
+        ids = next
+        persist()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 
