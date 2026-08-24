@@ -82,7 +82,10 @@ final class ScreenshotTests: XCTestCase {
     /// mid-test relaunches on an existing app stay inline.
     private func launch(_ args: String...) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = args
+        // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
+        // the simulator's copy outlives the run, and a test that stars a gate
+        // would otherwise leak it into the next test's "clean" device.
+        app.launchArguments = args + ["-noCloudSync"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         return app
@@ -2583,7 +2586,7 @@ final class ScreenshotTests: XCTestCase {
             // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
             // lazy singleton, so a relaunch that stops at the first-run gate
             // never touches it and the reset never happens.
-            app.launchArguments = ["-seedGate", "-resetFavorites"]
+            app.launchArguments = ["-seedGate", "-resetFavorites", "-noCloudSync"]
             app.launch()
         }
 
@@ -2640,7 +2643,7 @@ final class ScreenshotTests: XCTestCase {
             // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
             // lazy singleton, so a relaunch that stops at the first-run gate
             // never touches it and the reset never happens.
-            app.launchArguments = ["-seedGate", "-resetFavorites"]
+            app.launchArguments = ["-seedGate", "-resetFavorites", "-noCloudSync"]
             app.launch()
         }
 
