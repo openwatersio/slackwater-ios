@@ -3,7 +3,7 @@
     {
       "identity" : "slackwater-engine",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/sailingnaturali/slackwater-engine",
+      "location" : "https://github.com/openwatersio/slackwater-engine",
       "state" : {
         "revision" : "58b2c54d023d7e40c440650bd171129df1e839b4",
         "version" : "0.3.0"
