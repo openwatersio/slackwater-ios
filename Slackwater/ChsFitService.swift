@@ -91,6 +91,8 @@ final class ChsFitService: ObservableObject {
 
     private var started = false
     private var running = false
+    /// Online gates this launch has already tried to prefetch (`prefetchOnlineGates`).
+    private var attempted: Set<String> = []
 
     /// What downloads WITHOUT being asked for.
     ///
@@ -145,6 +147,31 @@ final class ChsFitService: ObservableObject {
         }
         return jobs.filter { fitOnly?.contains($0.id) ?? true }
     }()
+
+    /// The online (fit-reject) gates a fix fetches on its own.
+    ///
+    /// These are the other half of "what downloads without being asked", and
+    /// until #178 there was no such half: `candidates` excludes them at the
+    /// source, so they can never be queued, `onlineGateStatus` renders
+    /// `.notDownloaded` while no window is on disk, and the ONLY thing that
+    /// ever fetched one was opening its detail. Tillicum Bridge is 3.4 km from
+    /// downtown Victoria and Second Narrows is in Vancouver harbour — both land
+    /// in Near Me on a first run and both said "Tap to download" forever.
+    ///
+    /// Same budget shape as the fitted gates deliberately: nearest first, at
+    /// most `autoFitGates`, and only within `autoFitGateRadiusKm` so a Halifax
+    /// first run fetches no Salish passes. Far cheaper than the fitted set —
+    /// one `Timeline.onlineFetchDays` window each, not a 60-to-210-day fit.
+    static func autoPrefetchGates(lat: Double, lon: Double) -> [ChsCurrentGateInfo] {
+        ChsCurrentGateInfo.all
+            .filter { $0.isOnline && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitGateRadiusKm }
+            .sorted {
+                let a = distanceKm($0.latitude, $0.longitude, lat, lon)
+                let b = distanceKm($1.latitude, $1.longitude, lat, lon)
+                return a == b ? $0.id < $1.id : a < b
+            }
+            .prefix(autoFitGates).map { $0 }
+    }
 
     /// The stations a fix downloads on its own: the nearest ports, and the
     /// nearest gates that are actually near.
@@ -301,6 +328,38 @@ final class ChsFitService: ObservableObject {
     func prioritize(lat: Double, lon: Double) {
         adopt(lat: lat, lon: lon)
         pump()
+        prefetchOnlineGates(lat: lat, lon: lon)
+    }
+
+    /// Fetch the nearby online gates once per launch (#178).
+    ///
+    /// Serial, in one task: `IwlsFetcher` paces itself per instance, and each
+    /// fetch here builds its own — running three at once would be three
+    /// unpaced request streams alongside the fit queue's. `attempted` is what
+    /// keeps this to once per gate: `prioritize` fires on every fix update,
+    /// and a gate that failed must not re-fetch on every GPS twitch.
+    ///
+    /// Offline marks nothing, so a launch in airplane mode doesn't spend the
+    /// one attempt on a fetch that could never have worked — the next fix
+    /// update (or the next launch) tries again. This is also the kill switch:
+    /// `Connectivity` reports offline under `-networkKillSwitch` by
+    /// construction, so UI tests' airplane mode stays honest here for free.
+    /// ponytail: per-launch, per-gate. Opening the gate's detail is still the
+    /// manual retry, and the manager's retry-all is still queue-only.
+    private func prefetchOnlineGates(lat: Double, lon: Double) {
+        guard Connectivity.shared.online else { return }
+        let due = Self.autoPrefetchGates(lat: lat, lon: lon).filter { !attempted.contains($0.id) }
+        guard !due.isEmpty else { return }
+        for gate in due { attempted.insert(gate.id) }
+        Task {
+            for gate in due {
+                // A covering window already on disk is the common case after
+                // the first launch — nothing to fetch, and the fetch is the
+                // expensive part, so check before spending it.
+                if ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil { continue }
+                _ = try? await Self.fetchOnlineWindow(for: gate, from: nil)
+            }
+        }
     }
 
     /// The station the user just opened jumps the queue — ahead of proximity

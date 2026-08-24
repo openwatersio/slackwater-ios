@@ -460,6 +460,65 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
+    /// #178, second half: what the first screen SHOWS and what a first run
+    /// DOWNLOADS have to be the same stations. The hero and the four Near Me
+    /// rows are the entire first screen of a Canadian first run, and every CHS
+    /// entry in them must be covered — by the fit queue if it can be fitted, by
+    /// the online prefetch if it cannot. An uncovered one sits on "Tap to
+    /// download" with nothing on its way, which is the reported bug.
+    ///
+    /// The online half is why this is not just a restatement of `autoFitSet`:
+    /// Tillicum Bridge is 3.4 km from downtown Victoria and Second Narrows is
+    /// in Vancouver harbour, and `candidates` excludes both at the source.
+    @MainActor
+    func testFirstScreenIsEntirelyCoveredByWhatTheFirstRunDownloads() {
+        // `StationListView.locatedSections`: hero is `ranked.first`, Near Me is
+        // the next four when there is a fix.
+        let firstScreen = 5
+        for (place, fix) in [("Victoria", firstRunFix),
+                             ("Vancouver", (lat: 49.2867, lon: -123.1120)),
+                             ("Nanaimo", (lat: 49.1659, lon: -123.9401))] {
+            let (ranked, _) = RankedStations.near(lat: fix.lat, lon: fix.lon)
+            let covered = Set(ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon).map(\.id))
+                .union(ChsFitService.autoPrefetchGates(lat: fix.lat, lon: fix.lon).map(\.id))
+            for item in ranked.prefix(firstScreen) {
+                switch item {
+                // Bundled: constituents ship in the app, the card renders a
+                // number on frame one and never shows a status strip at all.
+                case .tide, .current: continue
+                // A derived gate rides its reference port's fit, so what has
+                // to be covered is that port, not this id.
+                case .chsGate(let gate):
+                    XCTAssertTrue(covered.contains(gate.reference),
+                                  "\(place): \(gate.name) is on the first screen, its reference port is not downloading")
+                case .chs, .chsCurrent:
+                    XCTAssertTrue(covered.contains(item.id),
+                                  "\(place): \(item.name) is on the first screen and nothing downloads it")
+                }
+            }
+        }
+    }
+
+    /// The online prefetch keeps the auto-fit budget's shape — nearest first,
+    /// capped, and radius-limited — so it cannot become the bulk download M53
+    /// removed. Halifax is the check that matters: the nearest online gate is
+    /// a coast away and a Nova Scotian must fetch none of them.
+    @MainActor
+    func testOnlinePrefetchIsBoundedLikeTheFitBudget() {
+        let victoria = ChsFitService.autoPrefetchGates(lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertFalse(victoria.isEmpty, "Victoria's nearest pass is 3.4 km away and must not be left to a tap")
+        XCTAssertEqual(victoria.first?.id, "chs-tillicum-bridge",
+                       "nearest first, like every other download decision")
+        XCTAssertLessThanOrEqual(victoria.count, ChsFitService.autoFitGates)
+        XCTAssertTrue(victoria.allSatisfy(\.isOnline), "a fittable gate belongs in the queue, not here")
+        for gate in victoria {
+            XCTAssertLessThanOrEqual(distanceKm(gate.latitude, gate.longitude, firstRunFix.lat, firstRunFix.lon),
+                                     ChsFitService.autoFitGateRadiusKm)
+        }
+        XCTAssertTrue(ChsFitService.autoPrefetchGates(lat: 44.65, lon: -63.57).isEmpty,
+                      "Halifax fetches no Salish passes")
+    }
+
     /// A Canadian station outside the auto-fit set is visible, searchable, says
     /// the thing that is actually true about it — and downloading it is one tap.
     @MainActor
