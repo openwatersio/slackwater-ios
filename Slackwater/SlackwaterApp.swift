@@ -484,12 +484,21 @@ struct StationListView: View {
                 openSearch()
             }
         }
-        // First connected launch: every Canadian station downloads in the
-        // background, nearest-first (M48 — no region UX; "all of Canada" is
-        // the default, and a future which-regions option is a filter on this
-        // one queue). Partial failure retries from the manager or next launch.
+        // First connected launch: the auto-fit set around where this list is
+        // ranked downloads in the background, nearest-first, and the nearby
+        // online gates prefetch (M53 budget, `ChsFitService.autoFitSet` /
+        // `autoPrefetchGates`). Partial failure retries from the manager or
+        // the next launch.
+        //
+        // `anchor`, not `fix` (#178): the list ranks from `rankingAnchor` —
+        // fix, then last-opened, then Victoria — but this used to adopt only
+        // on a live fix, so a user who denied location, or whose fix had not
+        // landed yet, got a Near Me list ranked around one place and a
+        // download set built around another. Every row on the first screen
+        // then read "Tap to download". `adopt` is accretive and `prioritize`
+        // re-sorts, so a real fix landing later still wins on `.onChange`.
         .task {
-            if let fix { ChsFitService.shared.prioritize(lat: fix.lat, lon: fix.lon) }
+            ChsFitService.shared.prioritize(lat: anchor.lat, lon: anchor.lon)
             ChsFitService.shared.startIfNeeded()
         }
         // A fix landing (or moving) re-orders what is still queued.
