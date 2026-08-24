@@ -158,9 +158,10 @@ jobs:
       # by hand on this machine expects it to exist.
       - name: CI-only simulators
         run: |
-          xcrun simctl list devices | grep -q 'SlackwaterCI-iPhone' \
+          latest_ios=$(xcrun simctl list runtimes | sed -n 's/^\(iOS [0-9.]*\).*/\1/p' | tail -1)
+          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPhone' \
             || xcrun simctl create 'SlackwaterCI-iPhone' 'iPhone 17'
-          xcrun simctl list devices | grep -q 'SlackwaterCI-iPad' \
+          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPad' \
             || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
 
       # Runs xcodegen, then the fast suite on the iPhone simulator. Two things
