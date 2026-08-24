@@ -237,6 +237,13 @@ varies it. `TimelineScrubber.updateUIView` still resizes the host frame and
 chart the one time it was missing, and stays in place even though an anchor pick alone
 can no longer trigger it.
 
+## A scrubber change has three consumers
+
+Review every scrubber presentation change in `TideDetailView`, `CurrentDetailView`,
+and `DerivedGateDetailView`. The derived gate is easy to miss because it carries
+slack timing and a schematic current shape, not a predicted magnitude. Online CHS
+gates are an additional current-data path, not a fourth presentation design.
+
 ## The archive signs differently from everything you tested
 
 Two release-blocking defects in 1.4.0 shared one shape: **the thing that breaks is

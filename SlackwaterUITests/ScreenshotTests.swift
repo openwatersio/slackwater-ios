@@ -1137,6 +1137,8 @@ final class ScreenshotTests: XCTestCase {
 
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10),
                   "seeded reference fit did not render the derived-gate detail")
+        XCTAssert(app.staticTexts["LARGE-TIDE CONTEXT"].waitForExistence(timeout: 5),
+                  "derived gate kept the redundant time/date row instead of magnitude context")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
                   "slack rows missing from the schedule")

@@ -36,6 +36,7 @@ struct DerivedGateDetailView: View {
                             onReturn: returnToNow,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            scrubSummary: { _ in gate.magnitudeNote.map { ("Large-tide context", $0) } },
                             above: { EmptyView() },
                             card: { tl in
                                 readout

@@ -13,6 +13,7 @@
   "reference": "chs-point-atkinson",
   "referenceName": "Point Atkinson",
   "hwLagMinutes": 25,
-  "lwLagMinutes": 35
+  "lwLagMinutes": 35,
+  "magnitudeNote": "9 kn flood & ebb"
  }
 ]

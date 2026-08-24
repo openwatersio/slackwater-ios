@@ -219,7 +219,8 @@
   "tideReference": "chs-point-atkinson",
   "fitDays": 0,
   "online": true,
-  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids."
+  "onlineNote": "Slackwater's on-device model missed the published slacks here by up to ~40 minutes in testing, so it won't guess at Sechelt Rapids.",
+  "magnitudeNote": "16.5 kn flood · 16 kn ebb"
  },
  {
   "id": "chs-juan-de-fuca-east",

@@ -25,6 +25,7 @@ struct ChsGateInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let referenceName: String
     let hwLagMinutes: Double
     let lwLagMinutes: Double
+    let magnitudeNote: String?
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
@@ -80,4 +81,3 @@ extension DerivedPhase {
         }
     }
 }
-
