@@ -6,6 +6,20 @@ import TideEngine
 /// with the widget and map, and falls back safely when a stored value is bad.
 let defaultSlackThresholdKn = 0.5
 let slackThresholdRange = 0.1...10.0
+let currentSpeedRampAnchorsKn: [Double] = [0.5, 3, 8, 12]
+
+/// Absolute capability scale shared by the full scrubber and its widget.
+/// The same speed must never change colour with station or day.
+func widgetSpeedRampT(_ speedKn: Double) -> Double {
+    let step = 1.0 / Double(currentSpeedRampAnchorsKn.count - 1)
+    if speedKn <= currentSpeedRampAnchorsKn[0] { return 0 }
+    for i in 0..<(currentSpeedRampAnchorsKn.count - 1)
+        where speedKn <= currentSpeedRampAnchorsKn[i + 1] {
+        return (Double(i) + (speedKn - currentSpeedRampAnchorsKn[i])
+                / (currentSpeedRampAnchorsKn[i + 1] - currentSpeedRampAnchorsKn[i])) * step
+    }
+    return 1
+}
 
 func normalizedSlackThresholdKn(_ value: Double) -> Double {
     slackThresholdRange.contains(value) ? value : defaultSlackThresholdKn

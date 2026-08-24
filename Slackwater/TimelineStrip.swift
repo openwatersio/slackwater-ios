@@ -82,13 +82,13 @@ enum Timeline {
     /// rather than a computed hazard call: an anchor wrong by half a knot moves
     /// a colour, not a decision.
     ///
-    static let speedRampAnchorsKn: [Double] = [0.5, 3, 8, 12]
+    static let speedRampAnchorsKn = currentSpeedRampAnchorsKn
 
     /// Position on the speed ramp for `kn`, piecewise-linear between the
     /// anchors and clamped at both ends. Above the ceiling everything is the
     /// top colour — "beyond the top of the scale" is not a distinction worth
     /// resolving.
-    static func rampT(forSpeedKn kn: Double) -> Double { rampT(kn, anchors: speedRampAnchorsKn) }
+    static func rampT(forSpeedKn kn: Double) -> Double { widgetSpeedRampT(kn) }
 
     /// Tide change is a separate measurement from current speed, but uses the
     /// same global warning palette. The red ceiling is 1.8 m/hr (about
