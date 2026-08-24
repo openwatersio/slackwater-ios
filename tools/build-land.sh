@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Build Resources/land-usca.pmtiles — the CONTINENTAL land floor: OSM coastline
-# land polygons for the US (states + territories) and Canada, z0-9.
+# Build both bundled OSM coastline land floors:
+# land-usca.pmtiles (US + Canada, z0-9) and land.pmtiles (Salish Sea, z0-14).
 #
 # The app ships TWO land tilesets, and the split is the whole basemap decision
 # (M53). One artifact cannot do both jobs:
 #
-#   land.pmtiles       Salish Sea, z0-14, 4.8 MB — built by slackwater-web's
-#                      scripts/build-land.sh, the web's exact artifact. Home
-#                      water, where a station hero at z12.5 has to look right.
-#   land-usca.pmtiles  US + Canada, z0-9, ~14.5 MB — this file. Everywhere
+#   land.pmtiles       Salish Sea, z0-14. Home water, where a station hero at
+#                      z12.5 has to look right.
+#   land-usca.pmtiles  US + Canada, z0-9, ~21 MB — this file. Everywhere
 #                      else: never blank, coarse when you zoom past z9.
 #
 # Why not one:
@@ -34,7 +33,7 @@ cd "$(dirname "$0")/.."
 
 WORK=${LAND_WORK:-$(mktemp -d)}
 mkdir -p "$WORK"
-SRC_URL="https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip"
+SRC_URL="https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip"
 # GDAL's arg parser reads a leading "-180" as an option, so the clip goes in as
 # WKT rather than four bare numbers (an empty tileset is the silent failure).
 CLIP_WKT="MULTIPOLYGON(\
@@ -43,6 +42,7 @@ CLIP_WKT="MULTIPOLYGON(\
 ((143 12,147 12,147 17,143 17,143 12)),\
 ((165 18,168 18,168 20,165 20,165 18)),\
 ((-172 -16,-168 -16,-168 -12,-172 -12,-172 -16)))"
+SALISH_CLIP_WKT="POLYGON((-125.5 47,-122 47,-122 50.5,-125.5 50.5,-125.5 47))"
 
 if [ ! -f "$WORK/land_polygons.shp" ]; then
   curl -fL "$SRC_URL" -o "$WORK/land.zip"
@@ -54,8 +54,25 @@ fi
 # MultiPolygon feature ("Mismatched geometry type").
 [ -f "$WORK/usca-land.fgb" ] || ogr2ogr -f FlatGeobuf -nlt PROMOTE_TO_MULTI \
   -clipsrc "$CLIP_WKT" "$WORK/usca-land.fgb" "$WORK/land_polygons.shp"
+[ -f "$WORK/salish-land.fgb" ] || ogr2ogr -f FlatGeobuf -nlt PROMOTE_TO_MULTI \
+  -clipsrc "$SALISH_CLIP_WKT" "$WORK/salish-land.fgb" "$WORK/land_polygons.shp"
+# A line layer over clipped polygons strokes the artificial closing edge across
+# water (#108). Derive boundaries from the unsplit source first, then clip the
+# lines so they simply stop at tile and region edges.
+[ -f "$WORK/usca-coast.fgb" ] || ogr2ogr -f FlatGeobuf -nlt PROMOTE_TO_MULTI \
+  -clipsrc "$CLIP_WKT" -dialect SQLite \
+  -sql 'SELECT ST_Boundary(geometry) AS geometry FROM land_polygons' \
+  "$WORK/usca-coast.fgb" "$WORK/land_polygons.shp"
+[ -f "$WORK/salish-coast.fgb" ] || ogr2ogr -f FlatGeobuf -nlt PROMOTE_TO_MULTI \
+  -clipsrc "$SALISH_CLIP_WKT" -dialect SQLite \
+  -sql 'SELECT ST_Boundary(geometry) AS geometry FROM land_polygons' \
+  "$WORK/salish-coast.fgb" "$WORK/land_polygons.shp"
 
-tippecanoe -Z0 -z9 -S 8 -l land --coalesce-densest-as-needed --force \
-  -o Slackwater/Resources/land-usca.pmtiles "$WORK/usca-land.fgb"
+tippecanoe -Z0 -z9 -S 8 --coalesce-densest-as-needed --force \
+  -L land:"$WORK/usca-land.fgb" -L coast:"$WORK/usca-coast.fgb" \
+  -o Slackwater/Resources/land-usca.pmtiles
+tippecanoe -Z0 -z14 --coalesce-densest-as-needed --force \
+  -L land:"$WORK/salish-land.fgb" -L coast:"$WORK/salish-coast.fgb" \
+  -o Slackwater/Resources/land.pmtiles
 
-ls -la Slackwater/Resources/land-usca.pmtiles
+ls -la Slackwater/Resources/land-usca.pmtiles Slackwater/Resources/land.pmtiles
