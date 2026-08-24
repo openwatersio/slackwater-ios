@@ -40,6 +40,8 @@ struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable, StationIdentity {
     /// Plain-words measured error for the honesty card — this gate's own
     /// number, never a generic hedge. Present only when `online`.
     var onlineNote: String? = nil
+    /// Sourced maximum-current context, never a prediction for this pass.
+    var magnitudeNote: String? = nil
 
     /// A fit-reject backed by official CHS predictions fetched on demand —
     /// never fitted, never queued (online-gates spec §1). Bundled entries

@@ -122,6 +122,12 @@ struct OnlineGateDetailView: View {
                                 if let port = pairedTide { TideAtPortLink(port: port) }
                             },
                             bottom: {
+                                if let note = gate.magnitudeNote {
+                                    Text("Large-tide context: \(note). Not a prediction for this pass.")
+                                        .font(.caption2)
+                                        .foregroundStyle(SN.foam.opacity(0.7))
+                                        .multilineTextAlignment(.center)
+                                }
                                 if timeline != nil, let window {
                                     provenance(window)
                                 } else {

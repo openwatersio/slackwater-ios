@@ -17,6 +17,8 @@ final class DerivedGateTests: XCTestCase {
         XCTAssertEqual(gate.reference, "chs-point-atkinson")
         XCTAssertEqual(gate.hwLagMinutes, 25)
         XCTAssertEqual(gate.lwLagMinutes, 35)
+        XCTAssertEqual(gate.magnitudeNote,
+                       "9 kn flood & ebb")
         // The reference must be a bundled CHS port the app can actually fit.
         XCTAssert(ChsStationInfo.all.contains { $0.id == gate.reference },
                   "reference port not in chs-stations.json")

@@ -536,6 +536,8 @@ final class ChsCurrentGateTests: XCTestCase {
     func testSecheltIsSearchable() throws {
         let sechelt = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
         XCTAssert(sechelt.isOnline)
+        XCTAssertEqual(sechelt.magnitudeNote,
+                       "16.5 kn flood · 16 kn ebb")
         for query in ["sechelt", "skookumchuck"] {
             XCTAssert(StationItem.search(query, near: firstRunFix).contains { $0.id == sechelt.id },
                       "search '\(query)' did not find Sechelt Rapids")
