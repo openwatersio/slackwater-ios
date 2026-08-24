@@ -134,7 +134,7 @@ extension ChsStationInfo {
         TideStationRecord(
             id: id, name: name, region: region, aliases: aliases,
             latitude: latitude, longitude: longitude, timezone: timezone,
-            chartDatum: "Chart",  // heights are above CHS chart datum
+            chartDatum: "LLWLT",  // CHS chart datum: Lower Low Water, Large Tide
             datumOffset: model.offset,
             constituents: model.constituents)
     }

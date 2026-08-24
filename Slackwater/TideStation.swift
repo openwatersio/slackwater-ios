@@ -40,6 +40,12 @@ struct CardState {
 }
 
 extension TideStationRecord {
+    var detailsDatum: String {
+        if isChs { return "LLWLT (CHS chart datum)" }
+        if id.hasPrefix("noaa/") { return "\(chartDatum) (NOAA chart datum)" }
+        return "\(chartDatum) chart datum"
+    }
+
     func cardState(at now: Date) -> CardState {
         let station = engineStation
         // 30h forward guarantees a "next" exists (web predicts ±30h for the same reason).
