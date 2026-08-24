@@ -201,6 +201,25 @@ final class ScreenshotTests: XCTestCase {
         save(app, "tide-readout-rate-range.png")
     }
 
+    /// #170: provenance stays out of the primary tide-reading flow until the
+    /// sailor asks for it, then exposes the support/debugging facts in place.
+    func testStationDetailsAreCollapsedUntilOpened() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+
+        let details = app.buttons["Station details"].firstMatch
+        XCTAssert(details.waitForExistence(timeout: 10), "no Station details disclosure")
+        XCTAssertFalse(app.staticTexts["noaa/9449880"].exists,
+                       "station details should start collapsed")
+
+        details.tap()
+        XCTAssert(app.staticTexts["noaa/9449880"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["MLLW (NOAA chart datum)"].exists)
+        XCTAssert(app.staticTexts["48.545°N, 123.013°W"].exists)
+        XCTAssert(app.staticTexts["America/Los_Angeles"].exists)
+        save(app, "station-details-expanded.png")
+    }
+
     /// #95: the tide fill carries |dh/dt| on an absolute ramp. The strip must
     /// still draw — the rate stops replaced the fixed gradient, and an empty
     /// stops array would render a hollow track (this repo's blank-chart

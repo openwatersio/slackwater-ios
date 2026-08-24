@@ -16,6 +16,7 @@ struct TideDetailView: View {
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = appNow()
     @State private var timeline: TimelineData?
+    @State private var chsFittedAt: Date?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
@@ -73,13 +74,21 @@ struct TideDetailView: View {
                                     .padding(.top, 12)
                             },
                             links: { EmptyView() },
-                            bottom: { footer })
+                            bottom: {
+                                VStack(spacing: 14) {
+                                    footer
+                                    stationDetails
+                                }
+                            })
             .onAppear {
                 if timeline == nil {
                     anchor = todayLocal(tz)
                     rebuild()
                 }
                 RecentsStore.shared.record(record.id)
+                if record.isChs {
+                    chsFittedAt = ChsModelStore.load(record.id)?.fittedAt
+                }
             }
     }
 
@@ -138,14 +147,55 @@ struct TideDetailView: View {
     private var footer: some View {
         DetailFooter {
             if record.isChs {
-                Text("Chart datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
+                Text("\(record.chartDatum) datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
-            } else {
+            } else if record.id.hasPrefix("noaa/") {
                 Text("\(record.chartDatum) datum · NOAA harmonic prediction")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+            } else {
+                Text("\(record.chartDatum) datum · TICON-4 harmonic prediction")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
         }
+    }
+
+    private var stationDetails: some View {
+        DisclosureGroup("Station details") {
+            VStack(alignment: .leading, spacing: 10) {
+                detailRow("Datum", record.detailsDatum)
+                Text("Heights are measured above chart datum. A negative height means there is that much less water than the charted depth shows.")
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.55))
+                detailRow("Station", record.id)
+                detailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
+                detailRow("Time zone", record.timezone)
+                detailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
+                if let chsFittedAt {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Downloaded")
+                        Spacer()
+                        Text(chsFittedAt, style: .relative)
+                    }
+                    .font(.caption)
+                }
+            }
+            .padding(.top, 8)
+        }
+        .font(.subheadline)
+        .foregroundStyle(SN.foam.opacity(0.7))
+        .tint(SN.foam.opacity(0.55))
+        .padding(.horizontal, 24)
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer()
+            Text(value)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.caption)
     }
 
     // MARK: - Data
