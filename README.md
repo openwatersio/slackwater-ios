@@ -26,7 +26,7 @@ their own waters fixing the data.
 
 | Piece | What | Where |
 |---|---|---|
-| Engine | Pure-Swift harmonic tide/current engine, a port of [Neaps](https://github.com/openwatersio/neaps), validated against Neaps + NOAA | [`slackwater-engine`](https://github.com/sailingnaturali/slackwater-engine) |
+| Engine | Pure-Swift harmonic tide/current engine, a port of [Neaps](https://github.com/openwatersio/neaps), validated against Neaps + NOAA | [`slackwater-engine`](https://github.com/openwatersio/slackwater-engine) |
 | Web app | The free GPL reference implementation — and the honest answer to "is there an Android version" | [`slackwater-web`](https://github.com/sailingnaturali/slackwater-web) |
 | **This repo** | The iOS app — same free core, nicer everything, plus the paid planning tier | here |
 
