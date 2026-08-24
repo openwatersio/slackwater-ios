@@ -24,14 +24,6 @@ const res = join(here, "..", "Slackwater", "Resources");
 const registry = stationData("registry.json");
 const ports = JSON.parse(readFileSync(join(res, "chs-stations.json"), "utf8"));
 
-// Canadian Sailing Directions PAC 201 (2023/03), paragraphs 224 and 246.
-const MAGNITUDE_NOTES = new Map([
-  ["chs-malibu-rapids",
-    "9 kn flood & ebb"],
-  ["chs-sechelt-rapids",
-    "16.5 kn flood · 16 kn ebb"],
-]);
-
 const gates = [];
 for (const [id, e] of Object.entries(registry)) {
   if (!e.derived) continue;
@@ -52,7 +44,7 @@ for (const [id, e] of Object.entries(registry)) {
     referenceName: port.name,
     hwLagMinutes: e.derived.hwLagMinutes,
     lwLagMinutes: e.derived.lwLagMinutes,
-    magnitudeNote: MAGNITUDE_NOTES.get(id),
+    magnitudeNote: e.magnitudeNote,
   });
 }
 
@@ -217,7 +209,7 @@ for (const [id, { onlineNote }] of ONLINE) {
     fitDays: 0,
     online: true,
     onlineNote,
-    magnitudeNote: MAGNITUDE_NOTES.get(id),
+    magnitudeNote: e.magnitudeNote,
   });
 }
 
