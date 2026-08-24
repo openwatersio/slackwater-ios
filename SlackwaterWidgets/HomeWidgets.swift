@@ -62,20 +62,9 @@ struct DayCurveWidget: Widget {
 struct DayCurveView: View {
     let entry: SlackwaterEntry
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let s = entry.snapshot {
-                HStack {
-                    Text(s.stationName).font(.caption).lineLimit(1)
-                    Spacer()
-                    if let next = s.next {
-                        Image(systemName: next.symbol).font(.caption2)
-                        Text(next.time, style: .time)
-                            .font(.caption.weight(.semibold).monospacedDigit())
-                            .environment(\.timeZone, s.tz)
-                        Text(next.label).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                }
-                SparklineView(values: s.sparkline, nowFraction: s.nowFraction)
+        Group {
+            if let snapshot = entry.snapshot {
+                DayCurveContentView(snapshot: snapshot)
             } else {
                 Text("Open Slackwater to prepare this station")
                     .font(.caption).foregroundStyle(.secondary)
@@ -83,28 +72,6 @@ struct DayCurveView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(deepLink(entry))
-    }
-}
-
-struct SparklineView: View {
-    let values: [Double]
-    let nowFraction: Double
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width, h = geo.size.height
-            ZStack {
-                Path { p in
-                    for (i, v) in values.enumerated() {
-                        let pt = CGPoint(x: w * CGFloat(i) / CGFloat(values.count - 1),
-                                         y: h * (1 - CGFloat(v)))
-                        i == 0 ? p.move(to: pt) : p.addLine(to: pt)
-                    }
-                }
-                .stroke(.tint, lineWidth: 2)
-                Rectangle().fill(.secondary).frame(width: 1)
-                    .position(x: w * CGFloat(nowFraction), y: h / 2)
-            }
-        }
     }
 }
 

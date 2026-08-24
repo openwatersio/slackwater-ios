@@ -1,10 +1,12 @@
 // Slackwater — GPL v3. The render-ready value a widget entry carries: next
-// event, its slack window, and today's normalized curve. Pure function of
+// event, current state, and today's render-ready curve. Pure function of
 // (station, now) — deterministic, offline, engine-only.
 import Foundation
 import TideEngine
 
 struct WidgetSnapshot: Equatable {
+    enum CurveKind: Equatable { case tide, current, schematic }
+
     struct Event: Equatable {
         let time: Date
         let label: String
@@ -16,11 +18,17 @@ struct WidgetSnapshot: Equatable {
     let window: (start: Date, end: Date)?
     let sparkline: [Double]
     let nowFraction: Double
+    let curveKind: CurveKind
+    let threshold: Double?
+    let state: String
+    let value: String
 
     static func == (a: Self, b: Self) -> Bool {
         a.stationName == b.stationName && a.tz == b.tz && a.next == b.next
             && a.window?.start == b.window?.start && a.window?.end == b.window?.end
             && a.sparkline == b.sparkline && a.nowFraction == b.nowFraction
+            && a.curveKind == b.curveKind && a.threshold == b.threshold
+            && a.state == b.state && a.value == b.value
     }
 
     static func build(_ station: WidgetStation, now: Date) -> WidgetSnapshot {
@@ -52,6 +60,7 @@ struct WidgetSnapshot: Equatable {
         switch station {
         case .tide(let s, _, let name):
             let heights = s.heights(from: dayStart, to: dayEnd, step: 900).map(\.height)
+            let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
             let ext = s.extremes(from: now, to: now.addingTimeInterval(172_800))
                 .first { $0.time > now }
             let next = ext.map {
@@ -61,10 +70,14 @@ struct WidgetSnapshot: Equatable {
                       symbol: $0.kind == .high ? "arrow.up" : "arrow.down")
             }
             return .init(stationName: name, tz: tz, next: next, window: nil,
-                         sparkline: normalize(heights), nowFraction: nowFraction)
+                         sparkline: normalize(heights), nowFraction: nowFraction,
+                         curveKind: .tide, threshold: nil,
+                         state: ext?.kind == .high ? "Rising" : "Falling",
+                         value: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))")
 
         case .current(let s, _, let name):
             let pts = s.speeds(from: dayStart, to: dayEnd, step: 900)
+            let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             let ev = s.events(from: now, to: now.addingTimeInterval(172_800))
                 .first { $0.time > now }
             var window: (Date, Date)?
@@ -85,8 +98,10 @@ struct WidgetSnapshot: Equatable {
                 }
             }
             return .init(stationName: name, tz: tz, next: next, window: window,
-                         sparkline: normalize(pts.map { abs($0.speed) }),
-                         nowFraction: nowFraction)
+                         sparkline: pts.map(\.speed), nowFraction: nowFraction,
+                         curveKind: .current, threshold: slackThresholdKn,
+                         state: currentPhase(signed: signed).word,
+                         value: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
 
         case .derived(let s, _, let name):
             // Backward pad comfortably over one semidiurnal period (~12h25m):
@@ -107,13 +122,16 @@ struct WidgetSnapshot: Equatable {
             // exactly 97 samples on a 23/25-hour DST day.
             let step = dayLength / 96
             let samples = (0...96).map {
-                abs(s.schematicSigned(at: dayStart.addingTimeInterval(Double($0) * step),
-                                      slacks: slacks))
+                s.schematicSigned(at: dayStart.addingTimeInterval(Double($0) * step),
+                                  slacks: slacks)
             }
             // No window for a derived gate — a window measured off a schematic
             // shape would be fiction (TimelineData precedent).
             return .init(stationName: name, tz: tz, next: next, window: nil,
-                         sparkline: normalize(samples), nowFraction: nowFraction)
+                         sparkline: samples, nowFraction: nowFraction,
+                         curveKind: .schematic, threshold: nil,
+                         state: s.phase(at: now, slacks: slacks).word,
+                         value: "Timing only")
         }
     }
 }
