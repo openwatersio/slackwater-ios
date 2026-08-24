@@ -358,9 +358,9 @@ private let landLayers: [[String: Any]] = [
      "paint": ["fill-color": LAND_TONE]],
     ["id": "land", "type": "fill", "source": "land", "source-layer": "land",
      "paint": ["fill-color": LAND_TONE]],
-    ["id": "land-usca-coast", "type": "line", "source": "land-usca", "source-layer": "land",
+    ["id": "land-usca-coast", "type": "line", "source": "land-usca", "source-layer": "coast",
      "paint": COASTLINE],
-    ["id": "land-coast", "type": "line", "source": "land", "source-layer": "land",
+    ["id": "land-coast", "type": "line", "source": "land", "source-layer": "coast",
      "paint": COASTLINE],
 ]
 

@@ -41,11 +41,28 @@ final class WorldDefaultsTests: XCTestCase {
     /// fall back to a fixed coordinate on a genuinely first run.
     @MainActor
     func testFallbackAnchorPrefersTheLastOpenedStation() throws {
+        let service = LocationService.shared
+        let oldStatus = service.status
+        let oldLocation = service.location
+        let recents = RecentsStore.shared
+        let oldIDs = recents.ids
+        let oldSkip = recents.skipNextRecordID
+        service.status = .denied
+        service.location = nil
+        recents.skipNextRecordID = nil
+        defer {
+            service.status = oldStatus
+            service.location = oldLocation
+            recents.ids.forEach { recents.remove($0) }
+            oldIDs.reversed().forEach { recents.record($0) }
+            recents.skipNextRecordID = oldSkip
+        }
+
         // RecentsStore has no clear() — seed it by recording, and read back
         // through `items`, which is the accessor the app already uses.
         let pompey = try XCTUnwrap(TideStationRecord.all.first {
             $0.name == "Portsmouth" && $0.latitude > 50 && $0.longitude < 0 })
-        RecentsStore.shared.record(pompey.id)
+        recents.record(pompey.id)
 
         let last = try XCTUnwrap(RecentsStore.shared.lastOpened,
                                  "lastOpened must follow the most recent record()")
@@ -59,12 +76,6 @@ final class WorldDefaultsTests: XCTestCase {
         XCTAssertNotEqual(anchor.lat, firstRunFix.lat, accuracy: 0.001,
                           "Victoria Harbour is the first-run value only")
 
-        // Ends clean — RecentsStore is UserDefaults-backed and SHARED across
-        // every test in the process. Task 5's map-camera bug was exactly a
-        // RecentsStore value leaking between test methods; a test written to
-        // prove that fix must not re-arm it (UnitsAndGroupsTests does the same
-        // at its FavoritesStore round trip).
-        RecentsStore.shared.remove(pompey.id)
     }
 
     /// The wedge is currents, and currents don't ship worldwide — only NOAA

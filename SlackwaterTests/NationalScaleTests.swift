@@ -310,6 +310,18 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertNotNil(sources["land"], "the Salish detail layer is missing")
     }
 
+    /// #108: stroking a clipped polygon ring draws its tile-edge closure as a
+    /// ruled line across water. Coastline linestrings simply end at that edge.
+    func testLandCoastlinesReadLineGeometryNotPolygonRings() throws {
+        let layers = try XCTUnwrap(localFallbackStyle(landUrl: "", uscaUrl: "")["layers"]
+            as? [[String: Any]])
+        for id in ["land-usca-coast", "land-coast"] {
+            let layer = try XCTUnwrap(layers.first { ($0["id"] as? String) == id })
+            XCTAssertEqual(layer["source-layer"] as? String, "coast",
+                           "\(id) must not stroke clipped polygon rings")
+        }
+    }
+
     /// Bathymetry offline (openwatersio/seascape#121). Depth used to be the one
     /// thing that vanished with the signal: the app composed the remote
     /// Seascape style when it could reach it, so you got soundings in the
