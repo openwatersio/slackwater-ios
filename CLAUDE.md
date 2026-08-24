@@ -61,6 +61,12 @@ annotation. A plan asserted the web rule as iOS law; an implementer read all 267
 
 Before enforcing a "rule", find it in *this* repo's tests or code.
 
+## Generated resource files are not source files
+
+The station and gate JSON files listed in `Slackwater/Resources/README.md` are
+committed generated artifacts. Do not edit them directly. Change their canonical
+source or generator, then regenerate them with the documented command.
+
 ## Editing `chs-stations.json` changes `stations.json` too
 
 The generators are not independent. `gen-tides.mjs` reads the **committed**
