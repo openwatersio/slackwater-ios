@@ -12,7 +12,7 @@ final class PhaseGlossTests: XCTestCase {
     func testGlossWords() {
         XCTAssertEqual(CurrentPhase.flood.gloss, "incoming")
         XCTAssertEqual(CurrentPhase.ebb.gloss, "outgoing")
-        // Slack needs no gloss word — it always carries "under 0.5 kn".
+        // Slack is already plain language and needs no gloss word.
         XCTAssertNil(CurrentPhase.slack.gloss)
         // The derived-gate phase glosses identically.
         XCTAssertEqual(DerivedPhase.flood.gloss, "incoming")

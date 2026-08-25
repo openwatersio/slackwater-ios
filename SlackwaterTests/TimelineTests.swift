@@ -691,6 +691,38 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(timeline.snapTimes.contains(window.end))
     }
 
+    func testSlackWindowContainingTimeIncludesBothEdges() throws {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let window = (slack: t0.addingTimeInterval(1_200),
+                      start: t0.addingTimeInterval(300),
+                      end: t0.addingTimeInterval(2_400))
+        let timeline = TimelineData(tz: .gmt, anchor: t0, today: t0, start: t0,
+                                    end: t0.addingTimeInterval(3_600), days: [],
+                                    tidePoints: [], tideRates: [], tideExtremes: [],
+                                    currentPoints: [], currentEvents: [], snapTimes: [],
+                                    slackWindows: [window])
+
+        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.start)).slack,
+                       window.slack)
+        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.slack)).slack,
+                       window.slack)
+        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.end)).slack,
+                       window.slack)
+        XCTAssertNil(timeline.containingSlackWindow(at: window.start.addingTimeInterval(-1)))
+        XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
+    }
+
+    func testSlackWindowTimingShowsFullDurationAndSpan() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .gmt
+        let start = cal.date(from: DateComponents(year: 2026, month: 8, day: 25,
+                                                  hour: 11, minute: 25))!
+        let end = start.addingTimeInterval(35 * 60)
+
+        XCTAssertEqual(slackWindowTiming(start: start, end: end, tz: .gmt),
+                       "35 min, 11:25 → 12:00")
+    }
+
     /// Adjacent slack windows that touch or overlap merge into one green
     /// column, so only the first slack of the run labels itself (#56 —
     /// Race Rocks Aug 11, a 0.1 kn blip between two slacks).

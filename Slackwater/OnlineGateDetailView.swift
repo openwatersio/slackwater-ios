@@ -68,6 +68,9 @@ struct OnlineGateDetailView: View {
 
     private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }
     private var phase: CurrentPhase { currentPhase(signed: scrubSigned) }
+    private var activeSlackWin: (slack: Date, start: Date, end: Date)? {
+        timeline?.containingSlackWindow(at: scrubTime)
+    }
     private var nextSlack: CurrentEvent? {
         timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
     }
@@ -223,10 +226,10 @@ struct OnlineGateDetailView: View {
     private func readout(_ window: ChsOnlineWindow) -> some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
-                if phase == .slack {
+                if let win = activeSlackWin {
                     Text("Slack").font(.title2.weight(.medium))
-                        .foregroundStyle(CurrentDetailView.phaseColor(phase))
-                    Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        .foregroundStyle(CurrentDetailView.phaseColor(.slack))
+                    Text(slackWindowTiming(start: win.start, end: win.end, tz: tz))
                         .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                 } else {
                     Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")

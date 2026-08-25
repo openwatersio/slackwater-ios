@@ -63,6 +63,9 @@ struct CurrentDetailView: View {
     private var tz: TimeZone { record.tz }
     private var scrubSigned: Double { exactSigned(at: scrubTime) }
     private var phase: CurrentPhase { currentPhase(signed: scrubSigned) }
+    private var activeSlackWin: (slack: Date, start: Date, end: Date)? {
+        timeline?.containingSlackWindow(at: scrubTime)
+    }
     private var nextSlack: CurrentEvent? {
         timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
     }
@@ -142,11 +145,12 @@ struct CurrentDetailView: View {
     private var readout: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
-                if phase == .slack {
+                if let win = activeSlackWin {
                     Text("Slack").font(.title2.weight(.medium))
-                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
-                    Text("under \(formatSpeed(slackKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
+                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(.slack) : SN.amber)
+                    Text("\(tilde)\(slackWindowTiming(start: win.start, end: win.end, tz: tz))")
+                        .font(.title3.monospacedDigit())
+                        .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                 } else {
                     Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
                         .font(.title2.weight(.medium))
