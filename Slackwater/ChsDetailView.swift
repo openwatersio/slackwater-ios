@@ -2,8 +2,8 @@
 // result, map pin — lands here, fitted or not: a tap must never be a dead tap.
 //
 // Fitted, this is a pass-through to the ordinary detail view (identical
-// surface, identical provenance footer). Unfitted, it is the warning that used
-// to be missing: what is happening, where the station sits in the queue,
+// surface, identical provenance footer). Unfitted, it is the status card that
+// used to be missing: what is happening, where the station sits in the queue,
 // roughly how long, and that it only ever happens once. Viewing a station also
 // jumps it to the FRONT of the download queue — the thing you are looking at
 // downloads first — and the page fills in live the moment its fit lands.
@@ -103,7 +103,7 @@ struct ChsDetailView: View {
 }
 
 /// The unfitted station page: the ordinary map header (so it is recognisably
-/// this station, and back/favourite work), then the ⚠️ explanation in place of
+/// this station, and back/favourite work), then the live status in place of
 /// the chart. Never an empty chart, never a spinner to nothing.
 struct ChsWaitingView: View {
     let jobID: String
@@ -136,13 +136,13 @@ struct ChsWaitingView: View {
             ScrollView {
                 // spacing 0: the hero→card seam is flush (2026-08-03 spec §2
                 // "Flush"), same as the four scrubbable details' scaffold. The
-                // amber card's own interior `.padding(.vertical, 18)` is the
+                // status card's own interior `.padding(.vertical, 18)` is the
                 // inset the pill sits on — inside the tinted card, like the
                 // scrub card's interior 14 — so the seam doesn't double up.
                 VStack(spacing: 0) {
                     MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
                               favoriteId: favoriteId, topSafeInset: geo.safeAreaInsets.top)
-                    warningCard
+                    statusCard
                     footer
                 }
                 .padding(.bottom, 42)
@@ -154,10 +154,41 @@ struct ChsWaitingView: View {
         }
     }
 
-    private var warningCard: some View {
-        ChsAmberCard(title: "No predictions yet", headline: headline, expectation: expectation,
-                     action: job?.status == .failed ? "Retry in Downloads" : "See all downloads",
-                     identifier: "chs-waiting-warning") { showDownloads = true }
+    private var status: CardStatus {
+        if !net.online { return .offline }
+        switch job?.status {
+        case .failed: return .failed
+        case .downloading: return .downloading
+        default: return .queued
+        }
+    }
+
+    private var title: String {
+        switch status {
+        case .downloading: "Downloading…"
+        case .queued: "Waiting"
+        case .offline: "Waiting for signal"
+        case .failed: "Download failed"
+        default: status.label
+        }
+    }
+
+    private var statusCard: some View {
+        VStack(spacing: 8) {
+            ChsAmberCard(title: title, headline: headline, expectation: expectation,
+                         action: status == .failed ? "Retry" : "See all downloads",
+                         identifier: "chs-waiting-warning", status: status) {
+                if status == .failed { service.promote(jobID) }
+                else { showDownloads = true }
+            }
+            if status == .failed {
+                Button("See all downloads") { showDownloads = true }
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, 20)
+            }
+        }
     }
 
     /// The one-line "what is happening". The established plain register is
@@ -180,8 +211,11 @@ struct ChsWaitingView: View {
     /// What to expect: where it sits in the queue, roughly how long, and that
     /// it is once-and-for-all.
     private var expectation: String {
-        guard net.online, job?.status != .failed else {
+        guard net.online else {
             return "Nothing downloads without a connection. Once it does, this station works offline — with no signal — for good."
+        }
+        if job?.status == .failed {
+            return "Try this station again here. Once it downloads, it works offline — with no signal — for good."
         }
         let queued = service.queue.position(jobID).map { at -> String in
             at <= 1 ? "It's first in line — moved to the front because you opened it."
@@ -211,6 +245,7 @@ struct ChsAmberCard: View {
     let action: String
     let identifier: String
     var icon = "exclamationmark.triangle.fill"
+    var status: CardStatus? = nil
     let onAction: () -> Void
 
     /// Tracks the icon's own `.title3` so the tile keeps containing the
@@ -222,13 +257,13 @@ struct ChsAmberCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 13) {
-                Image(systemName: icon)
+                Image(systemName: status?.icon ?? icon)
                     .font(.title3)
-                    .foregroundStyle(SN.amber)
+                    .foregroundStyle(status?.tint ?? SN.amber)
                     .frame(width: iconTileSize, height: iconTileSize)
-                    .background(SN.amber.opacity(0.16),
+                    .background((status?.tint ?? SN.amber).opacity(0.16),
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .accessibilityLabel("Warning")
+                    .accessibilityLabel(status?.accessibilityLabel ?? "Warning")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.title3.weight(.semibold))
@@ -238,6 +273,11 @@ struct ChsAmberCard: View {
                         .foregroundStyle(SN.foam.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            if status == .downloading {
+                ProgressView()
+                    .tint(status?.tint ?? SN.leaf)
             }
 
             if let expectation {
@@ -255,7 +295,7 @@ struct ChsAmberCard: View {
                     Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(SN.amber)
+                .foregroundStyle(status?.tint ?? SN.amber)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .buttonStyle(.plain)
@@ -263,10 +303,10 @@ struct ChsAmberCard: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SN.amber.opacity(0.1),
+        .background(status == nil ? SN.amber.opacity(0.1) : SN.cardFill,
                     in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(SN.amber.opacity(0.35), lineWidth: 0.5))
+            .strokeBorder(status == nil ? SN.amber.opacity(0.35) : SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
         .accessibilityIdentifier(identifier)
     }
