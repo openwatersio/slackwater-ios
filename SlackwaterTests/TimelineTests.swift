@@ -125,6 +125,15 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(strip.contains("detail-return-now"))
     }
 
+    func testOnlineGatesShareTheDownloadSurfaceAndCopy() throws {
+        let manager = try repoSource("Slackwater/OfflineDownloads.swift")
+        let detail = try repoSource("Slackwater/OnlineGateDetailView.swift")
+        XCTAssertTrue(manager.contains("case .online(let gate): onlineRow(gate)"))
+        XCTAssertTrue(manager.contains(".onChange(of: net.online)"))
+        XCTAssertTrue(detail.contains("Button(\"Refresh\")"))
+        XCTAssertFalse(detail.contains("No offline prediction here"))
+    }
+
     /// `now:` used to be a dead parameter — `today` was always derived from the
     /// real clock (`todayLocal(tz)`) regardless of what was passed in. A caller
     /// simulating a different day (a test, or a future date-picker caller) must

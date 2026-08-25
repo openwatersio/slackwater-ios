@@ -6,6 +6,31 @@ import XCTest
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
+    func testDownloadPriorityOrdersActivityThenUrgency() {
+        let states: [(String, ManagedDownloadState, Int?)] = [
+            ("permanent", .permanent, nil),
+            ("valid-20", .available, 20),
+            ("expired", .expired, 0),
+            ("not-downloaded", .notDownloaded, nil),
+            ("queued", .queued, nil),
+            ("valid-5", .available, 5),
+            ("failed", .failed, nil),
+            ("expiring", .available, 2),
+            ("downloading", .downloading, nil),
+        ]
+
+        XCTAssertEqual(states.enumerated().sorted {
+            let left = downloadSortRank($0.element.1, remainingDays: $0.element.2)
+            let right = downloadSortRank($1.element.1, remainingDays: $1.element.2)
+            return left == right ? $0.offset < $1.offset : left < right
+        }.map(\.element.0),
+        ["downloading", "queued", "expired", "not-downloaded", "failed", "expiring",
+         "valid-5", "valid-20", "permanent"])
+        XCTAssert(downloadIsReady(.permanent))
+        XCTAssert(downloadIsReady(.available))
+        XCTAssertFalse(downloadIsReady(.expired))
+        XCTAssertFalse(downloadIsReady(.failed))
+    }
     private func job(_ id: String, _ lat: Double, _ lon: Double,
                      current: Bool = false, days: Double = 60) -> ChsJob {
         ChsJob(id: id, name: id, region: "test", isCurrent: current,
