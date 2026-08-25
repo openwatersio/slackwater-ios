@@ -93,6 +93,10 @@ final class ChsFitService: ObservableObject {
     private var running = false
     /// Online gates this launch has already tried to prefetch (`prefetchOnlineGates`).
     private var attempted: Set<String> = []
+    private var onlinePending: [ChsCurrentGateInfo] = []
+    private var onlinePreferred: [String] = []
+    private var onlineOrigin: (lat: Double, lon: Double)?
+    private var onlineRunning = false
 
     /// What downloads WITHOUT being asked for.
     ///
@@ -188,6 +192,31 @@ final class ChsFitService: ObservableObject {
             $0.isCurrent && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitGateRadiusKm
         }
         return nearest(ports, autoFitPorts) + nearest(gates, autoFitGates)
+    }
+
+    /// The CHS artifacts behind favorite rows. NOAA rows are bundled; derived
+    /// gates ride their reference port; online gates need a fetched window.
+    static func favoriteDownloads(_ ids: [String])
+        -> (jobIDs: [String], online: [ChsCurrentGateInfo]) {
+        var jobIDs: [String] = []
+        var online: [ChsCurrentGateInfo] = []
+        for id in ids {
+            guard let item = StationItem.byId[id] else { continue }
+            switch item {
+            case .tide, .current: continue
+            case .chs(let port):
+                if !jobIDs.contains(port.id) { jobIDs.append(port.id) }
+            case .chsGate(let gate):
+                if !jobIDs.contains(gate.reference) { jobIDs.append(gate.reference) }
+            case .chsCurrent(let gate):
+                if gate.isOnline {
+                    if !online.contains(where: { $0.id == gate.id }) { online.append(gate) }
+                } else if !jobIDs.contains(gate.id) {
+                    jobIDs.append(gate.id)
+                }
+            }
+        }
+        return (jobIDs, online)
     }
 
     private init() {
@@ -325,10 +354,31 @@ final class ChsFitService: ObservableObject {
 
     /// A fix landed (or moved): take the nearest stations there into the
     /// download set, and re-order what is still queued closest-first.
-    func prioritize(lat: Double, lon: Double) {
+    func prioritize(lat: Double, lon: Double, favorites: [String]? = nil,
+                    visibleID: String? = nil) {
         adopt(lat: lat, lon: lon)
+        onlineOrigin = (lat, lon)
+        let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
         pump()
-        prefetchOnlineGates(lat: lat, lon: lon)
+        prefetchOnlineGates(favoriteGates + Self.autoPrefetchGates(lat: lat, lon: lon))
+    }
+
+    /// Queue the visible station, then favorites, before the nearby tail.
+    /// Called again when iCloud delivers a newer list after launch.
+    func prioritizeFavorites(_ ids: [String], after visibleID: String?) {
+        let online = applyFavorites(ids, after: visibleID)
+        pump()
+        prefetchOnlineGates(online)
+    }
+
+    private func applyFavorites(_ ids: [String], after visibleID: String?) -> [ChsCurrentGateInfo] {
+        let downloads = Self.favoriteDownloads(visibleID.map { [$0] + ids } ?? ids)
+        for id in downloads.jobIDs {
+            if let job = Self.candidates.first(where: { $0.id == id }) { queue.add(job) }
+        }
+        queue.prefer(downloads.jobIDs)
+        onlinePreferred = downloads.online.map(\.id)
+        return downloads.online
     }
 
     /// Fetch the nearby online gates once per launch (#178).
@@ -346,19 +396,38 @@ final class ChsFitService: ObservableObject {
     /// construction, so UI tests' airplane mode stays honest here for free.
     /// ponytail: per-launch, per-gate. Opening the gate's detail is still the
     /// manual retry, and the manager's retry-all is still queue-only.
-    private func prefetchOnlineGates(lat: Double, lon: Double) {
+    private func prefetchOnlineGates(_ gates: [ChsCurrentGateInfo]) {
         guard Connectivity.shared.online else { return }
-        let due = Self.autoPrefetchGates(lat: lat, lon: lon).filter { !attempted.contains($0.id) }
-        guard !due.isEmpty else { return }
-        for gate in due { attempted.insert(gate.id) }
+        var due: [ChsCurrentGateInfo] = []
+        for gate in gates where !attempted.contains(gate.id) {
+            if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
+        }
+        for gate in due { onlinePending.removeAll { $0.id == gate.id } }
+        onlinePending.append(contentsOf: due)
+        let preferred = onlinePreferred.compactMap { id in onlinePending.first { $0.id == id } }
+        var tail = onlinePending.filter { !onlinePreferred.contains($0.id) }
+        if let onlineOrigin {
+            tail.sort {
+                let a = distanceKm($0.latitude, $0.longitude, onlineOrigin.lat, onlineOrigin.lon)
+                let b = distanceKm($1.latitude, $1.longitude, onlineOrigin.lat, onlineOrigin.lon)
+                return a == b ? $0.id < $1.id : a < b
+            }
+        }
+        onlinePending = preferred + tail
+        guard !onlinePending.isEmpty else { return }
+        guard !onlineRunning else { return }
+        onlineRunning = true
         Task {
-            for gate in due {
+            while !onlinePending.isEmpty {
+                let gate = onlinePending.removeFirst()
+                attempted.insert(gate.id)
                 // A covering window already on disk is the common case after
                 // the first launch — nothing to fetch, and the fetch is the
                 // expensive part, so check before spending it.
                 if ChsModelStore.loadOnline(gate.id)?.block(covering: todayLocal(gate.tz)) != nil { continue }
                 _ = try? await Self.fetchOnlineWindow(for: gate, from: nil)
             }
+            onlineRunning = false
         }
     }
 

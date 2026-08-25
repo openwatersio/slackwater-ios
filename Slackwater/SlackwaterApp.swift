@@ -498,8 +498,14 @@ struct StationListView: View {
         // then read "Tap to download". `adopt` is accretive and `prioritize`
         // re-sorts, so a real fix landing later still wins on `.onChange`.
         .task {
-            ChsFitService.shared.prioritize(lat: anchor.lat, lon: anchor.lon)
+            ChsFitService.shared.prioritize(lat: anchor.lat, lon: anchor.lon,
+                                             favorites: favorites.ids,
+                                             visibleID: firstListItem?.id)
             ChsFitService.shared.startIfNeeded()
+        }
+        // iCloud can deliver favorites after the first task has run.
+        .onChange(of: favorites.ids) { _, ids in
+            ChsFitService.shared.prioritizeFavorites(ids, after: firstListItem?.id)
         }
         // A fix landing (or moving) re-orders what is still queued.
         .onChange(of: loc.location) { _, new in
