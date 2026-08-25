@@ -393,7 +393,7 @@ final class ScreenshotTests: XCTestCase {
         // not enough: `app.scrollViews.firstMatch` resolves to whichever scroll
         // view the query walks first, which is the list BEHIND the overlay, so
         // the wait returned on some other station's card and the test opened a
-        // Victoria with no model — "No predictions yet", four assertions down.
+        // Victoria with no model — the waiting page, four assertions down.
         // The pending card carrying Victoria's own id is the unambiguous signal:
         // it exists while the fit is outstanding and goes away when it lands.
         XCTAssert(pending.waitForNonExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
@@ -1239,8 +1239,8 @@ final class ScreenshotTests: XCTestCase {
         let far = app.staticTexts["Weynton Passage"].firstMatch
         XCTAssert(far.waitForExistence(timeout: 5))
         far.tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 5),
-                  "tapping an unfitted station from search did not open the warning detail")
+        XCTAssert(app.staticTexts["Waiting"].waitForExistence(timeout: 5),
+                  "a queued station must say it is waiting")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Canadian current predictions'")).firstMatch.exists,
                   "warning is missing the plain-register download line")
@@ -1466,8 +1466,8 @@ final class ScreenshotTests: XCTestCase {
 
         // Dead centre: the camera is on the station, so the pin is the middle.
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 8),
-                  "a map pin on an unfitted station must still open its detail")
+        XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 8),
+                  "an offline station must headline what it is waiting for")
         XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
 
         // Offline: the established honest register, and no bogus ETA.
@@ -1818,7 +1818,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "tofino")
         app.staticTexts["Tofino"].firstMatch.tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 10))
         let t0 = Date()
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
@@ -1925,7 +1925,7 @@ final class ScreenshotTests: XCTestCase {
         // (c) the CHS waiting page — no chart at all, held there by the kill switch.
         openSearch(app, "victoria")
         app.staticTexts["Victoria"].firstMatch.tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 10))
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
                   "edge swipe did not pop the CHS waiting page")
@@ -1933,7 +1933,7 @@ final class ScreenshotTests: XCTestCase {
         // (d) a derived gate — Malibu Rapids, likewise pending offline.
         openSearch(app, "malibu")
         app.staticTexts["Malibu Rapids"].firstMatch.tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 10))
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
                   "edge swipe did not pop the derived-gate detail")
@@ -2242,7 +2242,7 @@ final class ScreenshotTests: XCTestCase {
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
         app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch.tap()
 
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 8),
+        XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 8),
                   "opening an undownloaded Canadian station must explain itself")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists)
@@ -2278,7 +2278,7 @@ final class ScreenshotTests: XCTestCase {
         // search overlay is accessibility-hidden but still queryable, so
         // `staticTexts["Halifax"].firstMatch` can resolve to the hidden one.
         pending.tap()
-        XCTAssert(app.staticTexts["No predictions yet"].waitForExistence(timeout: 20))
+        XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 20))
 
         // Promotion yields the running auto-fit job at its next chunk (~2.5 s),
         // then one 60-day tide fit: ~30 s of paced requests.
