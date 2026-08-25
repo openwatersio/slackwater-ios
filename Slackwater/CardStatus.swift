@@ -175,6 +175,26 @@ func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool) -> CardStatus {
     return window == nil ? .notDownloaded : .expired
 }
 
+/// Calendar-day copy for cached official predictions. The station's data
+/// source is irrelevant here; people only need to know how long the local
+/// copy remains useful.
+func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current) -> String {
+    guard end > now else { return "Offline download expired" }
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
+                                       to: calendar.startOfDay(for: end)).day ?? 0
+    if days <= 0 { return "Expires today" }
+    if days <= 3 { return "Expires in \(days) day\(days == 1 ? "" : "s")" }
+    return "Available offline for \(days) more days"
+}
+
+extension ChsOnlineWindow {
+    /// Last day the ordinary forward-looking strip is fully backed by this
+    /// download, rather than the last raw sample in the file.
+    var offlineValidUntil: Date {
+        end.addingTimeInterval(-Timeline.forwardHours * 3600)
+    }
+}
+
 /// Icon + two words, one line, in place of the paragraph a pending card used to
 /// carry. Sits below the identity row at full card width.
 struct CardStatusStrip: View {

@@ -227,6 +227,25 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .offline)
     }
 
+    func testOnlineDownloadValidityUsesRelativeCalendarDays() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/Vancouver")!
+        let now = cal.date(from: DateComponents(year: 2026, month: 8, day: 25, hour: 13))!
+
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 36, to: now)!,
+                                              now: now, calendar: cal),
+                       "Available offline for 36 more days")
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 3, to: now)!,
+                                              now: now, calendar: cal),
+                       "Expires in 3 days")
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .day, value: 1, to: now)!,
+                                              now: now, calendar: cal),
+                       "Expires in 1 day")
+        XCTAssertEqual(onlineDownloadValidity(end: cal.date(byAdding: .hour, value: -1, to: now)!,
+                                              now: now, calendar: cal),
+                       "Offline download expired")
+    }
+
     // MARK: - Merging (the 30-day fetch, unioned on save)
 
     /// A window whose bounds are exactly its own samples — the shape a fetch

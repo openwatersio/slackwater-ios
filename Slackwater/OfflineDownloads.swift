@@ -22,6 +22,37 @@
 import SwiftUI
 import Network
 
+enum ManagedDownloadState: Equatable {
+    case downloading, queued, failed, expired, notDownloaded, available, permanent
+}
+
+func downloadSortRank(_ state: ManagedDownloadState, remainingDays: Int?) -> Int {
+    switch state {
+    case .downloading: 0
+    case .queued: 100_000
+    case .failed, .expired, .notDownloaded: 200_000
+    case .available where (remainingDays ?? 0) <= 3: 200_000
+    case .available: 300_000 + (remainingDays ?? 0)
+    case .permanent: 400_000
+    }
+}
+
+func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
+    state == .available || state == .permanent
+}
+
+private enum ManagedDownload: Identifiable {
+    case fitted(ChsJob)
+    case online(ChsCurrentGateInfo)
+
+    var id: String {
+        switch self {
+        case .fitted(let job): "fitted-\(job.id)"
+        case .online(let gate): "online-\(gate.id)"
+        }
+    }
+}
+
 /// Is there a network path right now. Its own tiny observable so the indicator
 /// can say offline/online without any of it leaking into the fit service.
 @MainActor
@@ -155,10 +186,21 @@ struct OfflineManagerList: View {
     @ObservedObject private var net = Connectivity.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openChsRoute) private var openChsRoute
+    @State private var fetchingOnline: Set<String> = []
+    @State private var failedOnline: Set<String> = []
     // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
     // scales with type, the slot scales with it so it can't overflow the row.
 
     private var queue: ChsQueue { service.queue }
+    private var onlineGates: [ChsCurrentGateInfo] { ChsCurrentGateInfo.all.filter(\.isOnline) }
+    private var downloads: [ManagedDownload] {
+        let items = queue.jobs.map(ManagedDownload.fitted) + onlineGates.map(ManagedDownload.online)
+        return items.enumerated().sorted { lhs, rhs in
+            let left = sortRank(lhs.element)
+            let right = sortRank(rhs.element)
+            return left == right ? lhs.offset < rhs.offset : left < right
+        }.map(\.element)
+    }
 
     var body: some View {
         ScrollView {
@@ -169,30 +211,46 @@ struct OfflineManagerList: View {
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
                 summary
-                ForEach(queue.jobs) { row($0) }
+                ForEach(downloads) { download in
+                    switch download {
+                    case .fitted(let job): row(job)
+                    case .online(let gate): onlineRow(gate)
+                    }
+                }
             }
             .padding(16)
             .padding(.bottom, 30)
         }
         .background(SN.page.ignoresSafeArea())
         .accessibilityIdentifier("downloads-manager")
+        .onChange(of: net.online) { _, online in
+            guard online else { return }
+            for id in Array(failedOnline) {
+                if let gate = onlineGates.first(where: { $0.id == id }) { fetch(gate) }
+            }
+        }
     }
 
     // MARK: Summary
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: "\(queue.ready) of \(queue.total) ready")
-            ProgressView(value: Double(queue.ready), total: Double(max(queue.total, 1)))
-                .tint(queue.failed > 0 ? SN.amber : SN.leaf)
+            MonoLabel(text: "\(readyCount) of \(downloads.count) ready")
+            ProgressView(value: Double(readyCount), total: Double(max(downloads.count, 1)))
+                .tint(failedCount > 0 ? SN.amber : SN.leaf)
             Text(summaryLine)
                 .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
-            if queue.failed > 0 {
-                Button { service.retryFailed() } label: {
-                    Text("Retry \(queue.failed) failed")
+            if failedCount > 0 {
+                Button {
+                    service.retryFailed()
+                    for id in Array(failedOnline) {
+                        if let gate = onlineGates.first(where: { $0.id == id }) { fetch(gate) }
+                    }
+                } label: {
+                    Text("Retry \(failedCount) failed")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(SN.amber)
                 }
@@ -211,13 +269,13 @@ struct OfflineManagerList: View {
     /// are on the device — and the sentence has to say, every time, that the
     /// rest of Canada is one tap away rather than missing.
     private var summaryLine: String {
-        if queue.complete {
-            return "The Canadian stations nearest you are on this device. Slackwater works with no signal.\(onDemandLine)"
+        if readyCount == downloads.count, !downloads.isEmpty {
+            return "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.\(onDemandLine)"
         }
         if !net.online {
-            return "Waiting for signal. Downloading Canadian tidal and current predictions resumes as soon as you're connected — each station downloads once, then works offline for good.\(onDemandLine)"
+            return "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.\(onDemandLine)"
         }
-        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. Usually \(durationPhrase(remainingSeconds)) for the rest.\(onDemandLine)"
+        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. Usually \(durationPhrase(remainingSeconds)) for the rest. Expiring downloads can be refreshed below.\(onDemandLine)"
     }
 
     private var onDemandLine: String {
@@ -231,6 +289,9 @@ struct OfflineManagerList: View {
             .reduce(0) { $0 + $1.estimatedSeconds }
     }
 
+    private var readyCount: Int { downloads.filter { downloadIsReady(managedState($0).state) }.count }
+    private var failedCount: Int { queue.failed + failedOnline.count }
+
     // MARK: Rows
 
     /// Web OfflineManager STATUS_TEXT, verbatim — except for the gate that is
@@ -240,7 +301,7 @@ struct OfflineManagerList: View {
         switch job.status {
         case .pending: return "Waiting"
         case .downloading: return "Downloading…"
-        case .ready: return "Offline ✓"
+        case .ready: return "Available offline"
         case .failed: return "Failed"
         }
     }
@@ -253,6 +314,109 @@ struct OfflineManagerList: View {
         case .ready: return SN.leaf
         case .failed: return SN.amber
         }
+    }
+
+    private func onlineWindow(_ gate: ChsCurrentGateInfo) -> ChsOnlineWindow? {
+        ChsModelStore.loadOnline(gate.id)?.blocks.last
+    }
+
+    private func remainingDays(_ gate: ChsCurrentGateInfo) -> Int? {
+        guard let window = onlineWindow(gate) else { return nil }
+        let calendar = gateCalendar(gate)
+        return calendar.dateComponents([.day], from: calendar.startOfDay(for: appNow()),
+                                       to: calendar.startOfDay(for: window.offlineValidUntil)).day
+    }
+
+    private func managedState(_ download: ManagedDownload) -> (state: ManagedDownloadState, days: Int?) {
+        switch download {
+        case .fitted(let job):
+            if job.status == .downloading || service.isProvisional(job.id) { return (.downloading, nil) }
+            if job.status == .pending { return (.queued, nil) }
+            if job.status == .failed { return (.failed, nil) }
+            return (.permanent, nil)
+        case .online(let gate):
+            if fetchingOnline.contains(gate.id) { return (.downloading, nil) }
+            if failedOnline.contains(gate.id) { return (.failed, nil) }
+            guard onlineWindow(gate) != nil else { return (.notDownloaded, nil) }
+            let days = remainingDays(gate) ?? 0
+            return (days < 0 ? .expired : .available, days)
+        }
+    }
+
+    private func sortRank(_ download: ManagedDownload) -> Int {
+        let value = managedState(download)
+        return downloadSortRank(value.state, remainingDays: value.days)
+    }
+
+    private func onlineStatus(_ gate: ChsCurrentGateInfo) -> String {
+        if fetchingOnline.contains(gate.id) { return "Downloading…" }
+        if failedOnline.contains(gate.id) { return "Download failed" }
+        guard let window = onlineWindow(gate) else { return "Not downloaded" }
+        return onlineDownloadValidity(end: window.offlineValidUntil, calendar: gateCalendar(gate))
+    }
+
+    private func gateCalendar(_ gate: ChsCurrentGateInfo) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = gate.tz
+        return calendar
+    }
+
+    private func fetch(_ gate: ChsCurrentGateInfo) {
+        guard net.online, !fetchingOnline.contains(gate.id) else { return }
+        fetchingOnline.insert(gate.id)
+        failedOnline.remove(gate.id)
+        Task { @MainActor in
+            do {
+                _ = try await ChsFitService.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz))
+            } catch {
+                failedOnline.insert(gate.id)
+            }
+            fetchingOnline.remove(gate.id)
+        }
+    }
+
+    private func onlineRow(_ gate: ChsCurrentGateInfo) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(gate.name)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(SN.paper)
+                    .lineLimit(1)
+                Text("Current · \(gate.region)")
+                    .font(.caption)
+                    .foregroundStyle(SN.foam.opacity(0.55))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(onlineStatus(gate))
+                    .font(.footnote)
+                    .foregroundStyle(failedOnline.contains(gate.id) ? SN.amber : SN.leaf)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+                if fetchingOnline.contains(gate.id) {
+                    ProgressView().tint(SN.leaf)
+                } else {
+                    Button { fetch(gate) } label: {
+                        Text(onlineWindow(gate) == nil ? "Download" : "Refresh")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!net.online)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            dismiss()
+            openChsRoute(.currentGate(gate))
+        }
+        .accessibilityIdentifier("download-row-\(gate.id)")
     }
 
     /// This job's navigation target — a job is identity only (ChsJob's doc

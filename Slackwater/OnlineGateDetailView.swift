@@ -29,6 +29,11 @@ struct OnlineGateDetailView: View {
     @State private var fetchFailed = false
 
     private var tz: TimeZone { gate.tz }
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = tz
+        return calendar
+    }
 
     /// The paired reference port, same lookup `CurrentStationRecord.pairedTide`
     /// does — this gate has no `CurrentStationRecord` of its own to hang it off.
@@ -156,6 +161,9 @@ struct OnlineGateDetailView: View {
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
+            }
+            .onChange(of: net.online) { _, online in
+                if online, timeline == nil { fetchNow(from: anchor) }
             }
     }
 
@@ -288,21 +296,49 @@ struct OnlineGateDetailView: View {
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("online-provenance")
+            Text(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))
+                .font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
+            Button("Refresh") { fetchNow(from: todayLocal(tz)) }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
+                .disabled(fetching || !net.online)
         }
     }
 
-    // MARK: - Unfetched/expired/fetch-failed: the honesty card
+    // MARK: - Download status
 
     private var honestyCard: some View {
-        // `fetching` already makes a tap during the auto-fetch a no-op
-        // (fetchNow's own `guard !fetching`) — but "Try again" during that
-        // window reads as broken, not busy. Smallest fix: say so. (No
-        // wall-clock figure here on purpose: the 30-day fetch is five or six
-        // weekly chunks × two series, up from the old 7.5-day window's two or
-        // three, and nobody has timed the new one.)
-        ChsAmberCard(title: "No offline prediction here", headline: gate.onlineNote ?? "",
-                     expectation: expectation, action: fetching ? "Fetching…" : "Try again",
-                     identifier: "online-honesty-card") { fetchNow(from: anchor) }
+        ChsAmberCard(title: downloadTitle, headline: gate.onlineNote ?? "",
+                     expectation: expectation, action: downloadAction,
+                     identifier: "online-honesty-card", status: downloadStatus) {
+            fetchNow(from: anchor)
+        }
+    }
+
+    private var downloadStatus: CardStatus {
+        if fetching { return .downloading }
+        if fetchFailed { return .failed }
+        return onlineGateStatus(window, online: net.online)
+    }
+
+    private var downloadTitle: String {
+        switch downloadStatus {
+        case .downloading: "Downloading"
+        case .failed: "Download failed"
+        case .offline: "Waiting for signal"
+        case .expired: "Offline download expired"
+        default: "Download for offline use"
+        }
+    }
+
+    private var downloadAction: String {
+        switch downloadStatus {
+        case .downloading: "Downloading…"
+        case .failed: "Retry"
+        case .expired: "Download"
+        case .offline: "Connect to download"
+        default: "Download"
+        }
     }
 
     private var expectation: String {
@@ -311,12 +347,12 @@ struct OnlineGateDetailView: View {
         // views up prints the real covers-to date, and the two lines sat on
         // one screen contradicting each other.
         var text = net.online
-            ? "Slackwater fetches CHS's official predictions when you're connected — they cover about a month ahead."
-            : "Connect for a moment and Slackwater fetches CHS's official predictions — they cover about a month ahead."
+            ? "Downloads cover about a month and can be refreshed at any time."
+            : "Connect for a moment to download about a month of predictions."
         // Deliberate: a disk read per body evaluation, but this only renders
         // on the honesty path — re-pick into state if it ever shows in a trace.
-        if let end = ChsModelStore.loadOnline(gate.id)?.blocks.last?.end {
-            text += " Last fetch covered to \(monthDay(end, tz))."
+        if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
+            text += " \(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))."
         }
         if fetchFailed {
             text += " The last attempt didn't finish."
