@@ -201,6 +201,11 @@ func countdown(from: Date, to target: Date) -> String {
     return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
 }
 
+func slackWindowTiming(start: Date, end: Date, tz: TimeZone) -> String {
+    let minutes = max(Int((end.timeIntervalSince(start) / 60).rounded()), 0)
+    return "\(minutes) min, \(clockTime(start, tz)) → \(clockTime(end, tz))"
+}
+
 /// The web's CompassArrow: ↑ rotated to a true bearing, "sets this way".
 struct CompassArrow: View {
     let deg: Double

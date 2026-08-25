@@ -478,6 +478,10 @@ struct TimelineData {
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
 
+    func containingSlackWindow(at time: Date) -> (slack: Date, start: Date, end: Date)? {
+        slackWindows.first { $0.start <= time && time <= $0.end }
+    }
+
     /// The list's window: the anchor's own midnight → +7d. Deliberately
     /// NARROWER than `start…end` — the strip carries `Timeline.centerPad` more
     /// so the last listed event can still park under the centerline.
