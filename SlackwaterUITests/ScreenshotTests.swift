@@ -1239,8 +1239,10 @@ final class ScreenshotTests: XCTestCase {
         let far = app.staticTexts["Weynton Passage"].firstMatch
         XCTAssert(far.waitForExistence(timeout: 5))
         far.tap()
-        XCTAssert(app.staticTexts["Waiting"].waitForExistence(timeout: 5),
-                  "a queued station must say it is waiting")
+        XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label == 'Waiting' OR label == 'Downloading…'"
+        )).firstMatch.waitForExistence(timeout: 5),
+                  "a queued station must expose its live queue state")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Canadian current predictions'")).firstMatch.exists,
                   "warning is missing the plain-register download line")

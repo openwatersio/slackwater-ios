@@ -5,11 +5,12 @@
 // prioritisation happens — safely, mid-run, because a worker that has already
 // claimed a job is unaffected by a re-sort.
 //
-// Two orderings, in this precedence:
+// Three orderings, in this precedence:
 //   1. `promote(id)` — the station the user is LOOKING AT goes to the front.
 //      Sticky, unlike the web's plain re-sort: a later prioritize() must not
 //      demote it the moment a GPS fix moves.
-//   2. `prioritize(lat:lon:)` — everything else closest-first from the fix
+//   2. `prefer(ids)` — favorites, in their saved order.
+//   3. `prioritize(lat:lon:)` — everything else closest-first from the fix
 //      (web offlineSync.prioritize), so the water you can see out the window
 //      downloads before the far end of the coast.
 //
@@ -54,6 +55,8 @@ struct ChsQueue {
     private(set) var jobs: [ChsJob]
     /// Ids the user opened, most recent first — pinned to the head of the queue.
     private var promoted: [String] = []
+    /// Cloud favorites, in saved order, after anything the user is viewing.
+    private var preferred: [String] = []
     private var origin: (lat: Double, lon: Double)?
 
     init(_ jobs: [ChsJob] = []) { self.jobs = jobs }
@@ -132,6 +135,13 @@ struct ChsQueue {
         reorder()
     }
 
+    /// Put favorites ahead of proximity without giving them opened-station
+    /// yield semantics. Missing ids are ignored; the service adds their jobs.
+    mutating func prefer(_ ids: [String]) {
+        preferred = ids
+        reorder()
+    }
+
     /// Closest-first from the fix (web offlineSync.prioritize).
     mutating func prioritize(lat: Double, lon: Double) {
         origin = (lat, lon)
@@ -146,7 +156,11 @@ struct ChsQueue {
 
     private mutating func reorder() {
         let head = promoted.compactMap { id in jobs.first { $0.id == id } }
-        var tail = jobs.filter { !promoted.contains($0.id) }
+        let favorites: [ChsJob] = preferred.compactMap { id in
+            guard !promoted.contains(id) else { return nil }
+            return jobs.first { $0.id == id }
+        }
+        var tail = jobs.filter { !promoted.contains($0.id) && !preferred.contains($0.id) }
         if let origin {
             // Ties break on id so the order is total — two stations at the
             // same distance must not shuffle between re-sorts.
@@ -156,6 +170,6 @@ struct ChsQueue {
                 return a == b ? $0.id < $1.id : a < b
             }
         }
-        jobs = head + tail
+        jobs = head + favorites + tail
     }
 }

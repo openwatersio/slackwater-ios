@@ -41,6 +41,32 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertEqual(q.jobs.map(\.id), ["far", "near", "mid"])
     }
 
+    func testFavoritesSitBetweenTheViewedStationAndNearbyStations() {
+        var q = queue()
+        q.prioritize(lat: 48.4235, lon: -123.3705)
+        q.prefer(["mid", "far"])
+        q.promote("near")
+        XCTAssertEqual(q.jobs.map(\.id), ["near", "mid", "far"])
+
+        q.prefer(["far", "mid"])
+        XCTAssertEqual(q.jobs.map(\.id), ["near", "far", "mid"],
+                       "a later iCloud reconciliation preserves the new favorite order")
+    }
+
+    @MainActor
+    func testFavoriteDownloadsMapToTheirRequiredArtifacts() throws {
+        let port = try XCTUnwrap(ChsStationInfo.all.first)
+        let derived = try XCTUnwrap(ChsGateInfo.all.first)
+        let online = try XCTUnwrap(ChsCurrentGateInfo.all.first(where: \.isOnline))
+        let noaa = try XCTUnwrap(StationItem.all.first { if case .tide = $0 { true } else { false } })
+
+        let downloads = ChsFitService.favoriteDownloads(
+            [port.id, derived.id, online.id, noaa.id, derived.id])
+
+        XCTAssertEqual(downloads.jobIDs, [port.id, derived.reference])
+        XCTAssertEqual(downloads.online.map(\.id), [online.id])
+    }
+
     func testPromotingAFailedStationRequeuesIt() {
         var q = queue()
         q.set("far", .failed)
