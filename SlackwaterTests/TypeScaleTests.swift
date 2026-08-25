@@ -112,6 +112,8 @@ extension TypeScaleTests {
             // actually computes, not what a real parser would say.
             "WidgetSnapshot.swift:normalize",
         ]
+        // Numeric speech is not rendered as Text, so typography cannot apply.
+        let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
         // assumption about a file this loop may not even visit that line of
@@ -178,7 +180,8 @@ extension TypeScaleTests {
                 let window = lines[lo..<hi].joined(separator: "\n")
                 if windowTokens.contains(where: window.contains) { continue }
                 if let owner = enclosingDeclaration(lines, n),
-                   knownIndirections.contains("\(name):\(owner)") { continue }
+                   knownIndirections.contains("\(name):\(owner)")
+                    || knownNonVisual.contains("\(name):\(owner)") { continue }
                 offenders.append("\(name):\(n + 1): \(trimmed)")
             }
         }
