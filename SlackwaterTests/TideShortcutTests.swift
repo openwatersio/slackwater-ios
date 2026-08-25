@@ -2,7 +2,7 @@
 import XCTest
 @testable import Slackwater
 
-final class TideShortcutTests: XCTestCase {
+@MainActor final class TideShortcutTests: XCTestCase {
     func testQueryReturnsTheRequestedTideKind() throws {
         let savedUnits = AppGroup.defaults.object(forKey: unitsKey)
         defer { AppGroup.defaults.set(savedUnits, forKey: unitsKey) }
@@ -33,37 +33,42 @@ final class TideShortcutTests: XCTestCase {
         XCTAssertNotEqual(utc.spoken, kiritimati.spoken)
     }
 
-    func testDefaultQuerySkipsASelectedCurrentStation() throws {
-        let savedFavorites = AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey)
-        let savedRecents = AppGroup.defaults.stringArray(forKey: AppGroup.recentsKey)
-        defer {
-            AppGroup.defaults.set(savedFavorites, forKey: AppGroup.favoritesKey)
-            AppGroup.defaults.set(savedRecents, forKey: AppGroup.recentsKey)
+    func testNearestStationSeparatesTidesFromCurrents() throws {
+        let tide = try XCTUnwrap(TideStationRecord.all.first {
+            $0.id == TideStationRecord.fridayHarborID
+        })
+        let nearestTide = try XCTUnwrap(LocalStationQuery.nearest(
+            .tide, to: (tide.latitude, tide.longitude)))
+        guard case .tide(_, _, let tideName) = nearestTide else {
+            return XCTFail("expected a tide station")
         }
-        AppGroup.defaults.set(["current:" + CurrentStationRecord.all.first!.id],
-                              forKey: AppGroup.favoritesKey)
-        AppGroup.defaults.set([TideStationRecord.fridayHarborID],
-                              forKey: AppGroup.recentsKey)
+        XCTAssertEqual(tideName, tide.name)
 
-        let result = try XCTUnwrap(TideShortcutQuery.next(.low,
-            after: Date(timeIntervalSince1970: 1_755_800_000)))
-
-        XCTAssertEqual(result.stationName, "Friday Harbor")
+        let current = CurrentStationRecord.all.first!
+        let nearestCurrent = try XCTUnwrap(LocalStationQuery.nearest(
+            .current, to: (current.latitude, current.longitude)))
+        guard case .current(_, _, let currentName) = nearestCurrent else {
+            return XCTFail("expected a current station")
+        }
+        XCTAssertEqual(currentName, current.name)
     }
 
-    func testDefaultQueryFallsBackToFridayHarbor() throws {
-        let savedFavorites = AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey)
-        let savedRecents = AppGroup.defaults.stringArray(forKey: AppGroup.recentsKey)
-        defer {
-            AppGroup.defaults.set(savedFavorites, forKey: AppGroup.favoritesKey)
-            AppGroup.defaults.set(savedRecents, forKey: AppGroup.recentsKey)
-        }
-        AppGroup.defaults.removeObject(forKey: AppGroup.favoritesKey)
-        AppGroup.defaults.removeObject(forKey: AppGroup.recentsKey)
+    func testSlackQueryReturnsTheNextMeasuredWindow() throws {
+        let record = CurrentStationRecord.all.first!
+        let station = WidgetStation.current(record.engineStation, tz: record.tz, name: record.name)
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
 
-        let result = try XCTUnwrap(TideShortcutQuery.next(.high,
-            after: Date(timeIntervalSince1970: 1_755_800_000)))
+        let result = try XCTUnwrap(SlackWindowShortcutQuery.next(at: station, after: now))
 
-        XCTAssertEqual(result.stationName, "Friday Harbor")
+        XCTAssertLessThan(result.start, result.slack.time)
+        XCTAssertGreaterThan(result.end, result.slack.time)
+        XCTAssertTrue(result.spoken.contains("slack window at \(record.name)"))
+        XCTAssertTrue(result.spoken.contains("starts in"))
+
+        let active = SlackWindowShortcutResult(
+            slack: result.slack, start: result.start, end: result.end,
+            stationName: result.stationName, timeZone: result.timeZone,
+            queriedAt: result.start.addingTimeInterval(60))
+        XCTAssertTrue(active.spoken.contains("is open now"))
     }
 }
