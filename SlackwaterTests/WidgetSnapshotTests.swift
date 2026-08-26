@@ -68,13 +68,17 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertFalse(s.value.isEmpty)
     }
 
-    func testMediumWidgetPresentsStateCurveAndCountdown() throws {
+    func testMediumWidgetPresentsSlackWindowBeforeItsCountdown() throws {
         let source = try repoSource("Slackwater/MiniScrubberView.swift")
 
         XCTAssert(source.contains("Text(snapshot.state.uppercased())"))
         XCTAssert(source.contains("Text(snapshot.value)"))
         XCTAssert(source.contains("MiniScrubberView(snapshot: snapshot)"))
-        XCTAssert(source.contains("Text(next.time, style: .relative)"))
+        XCTAssert(source.contains("Text(window.start, style: .time)"))
+        XCTAssert(source.contains("Text(window.end, style: .time)"))
+        XCTAssert(source.contains("Text(window.start, style: .relative)"))
+        XCTAssert(source.contains("Image(systemName: \"arrow.right\")"))
+        XCTAssert(source.contains("\\(windowMinutes) min"))
         XCTAssert(source.contains("accessibilityLabel"))
         XCTAssert(source.contains("accessibilityValue"))
     }
