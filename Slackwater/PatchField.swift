@@ -155,6 +155,29 @@ final class PatchField {
             .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed
     }
 
+    private func vector(signedKn: Double, scale: Double, bearingDeg: Double) -> CurrentVector {
+        CurrentVector(
+            speedKn: abs(signedKn) * scale,
+            bearingDeg: signedKn >= 0
+                ? bearingDeg
+                : (bearingDeg + 180).truncatingRemainder(dividingBy: 360))
+    }
+
+    /// The vector at one coordinate, or nil where no resolved patch covers it.
+    /// Containment is tested before resolving an anchor so this evaluates only
+    /// the matched patch.
+    func sample(at coordinate: CLLocationCoordinate2D, time: Date) -> CurrentVector? {
+        patches: for patch in header.patches {
+            for k in 0..<patch.cellCount {
+                let cell = rawCell(patchOffset: patch.offset, k: k)
+                guard triangleContains(coordinate, vertices: cell.verts) else { continue }
+                guard let signed = anchorSpeed(patch.anchor, at: time) else { continue patches }
+                return vector(signedKn: signed, scale: cell.scale, bearingDeg: cell.bearingDeg)
+            }
+        }
+        return nil
+    }
+
     /// All shipped cells at `date`, optionally culled to `bbox` (see
     /// `FillBBox.overlaps(verts:)`). Each patch's anchor is evaluated once
     /// per call, not once per cell. `speedKn = |signed| × scale`;
@@ -168,11 +191,8 @@ final class PatchField {
             for k in 0..<patch.cellCount {
                 let cell = rawCell(patchOffset: patch.offset, k: k)
                 if let bbox, !bbox.overlaps(verts: cell.verts) { continue }
-                let speedKn = abs(signed) * cell.scale
-                let bearingDeg = signed >= 0
-                    ? cell.bearingDeg
-                    : (cell.bearingDeg + 180).truncatingRemainder(dividingBy: 360)
-                out.append(FillCell(polygon: cell.verts, speedKn: speedKn, bearingDeg: bearingDeg))
+                let vector = vector(signedKn: signed, scale: cell.scale, bearingDeg: cell.bearingDeg)
+                out.append(FillCell(polygon: cell.verts, speedKn: vector.speedKn, bearingDeg: vector.bearingDeg))
             }
         }
         return out

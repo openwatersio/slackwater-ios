@@ -5,6 +5,7 @@
 // produce the real `fill-salish` bundle, so this is the third reader against
 // pack.py's one normative layout (the second is test_pack.py's own
 // `_read_bundle`).
+import CoreLocation
 import XCTest
 import TideEngine
 @testable import Slackwater
@@ -58,6 +59,38 @@ final class FillFieldTests: XCTestCase {
         let insideOnly = FillBBox(minLon: -122.998, minLat: 48.702, maxLon: -122.996, maxLat: 48.704)
         let cells = field.cells(at: Date(timeIntervalSince1970: 1_787_000_000), in: insideOnly)
         XCTAssertEqual(cells.count, 1, "a bbox inside element 0's triangle must still return it")
+    }
+
+    func testTriangleContainsInteriorAndEdges() {
+        let triangle = [
+            CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            CLLocationCoordinate2D(latitude: 0, longitude: 1),
+            CLLocationCoordinate2D(latitude: 1, longitude: 0),
+        ]
+        XCTAssertTrue(triangleContains(.init(latitude: 0.25, longitude: 0.25), vertices: triangle))
+        XCTAssertTrue(triangleContains(triangle[0], vertices: triangle))
+        XCTAssertFalse(triangleContains(.init(latitude: 1, longitude: 1), vertices: triangle))
+    }
+
+    func testSampleReturnsFixtureVectorOnlyInsideTriangle() throws {
+        let field = try loadFixture()
+        let date = Date(timeIntervalSince1970: 1_787_000_000)
+        let u = try XCTUnwrap(CurrentStation(
+            constituents: [HarmonicConstituent(name: "M2", amplitude: 1.2001953125, phase: 360)],
+            floodDirection: 0, ebbDirection: 180, offset: 0.5)
+            .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
+        let v = try XCTUnwrap(CurrentStation(
+            constituents: [HarmonicConstituent(name: "K1", amplitude: 0.60009765625, phase: 0.0999755859375)],
+            floodDirection: 0, ebbDirection: 180, offset: -0.300048828125)
+            .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
+        let coordinate = try XCTUnwrap(field.cells(at: date).first?.polygon.first)
+        let vector = try XCTUnwrap(field.sample(at: coordinate, time: date))
+        XCTAssertEqual(vector.speedKn, hypot(u, v), accuracy: 1e-9)
+        let rawBearing = atan2(u, v) * 180 / .pi
+        XCTAssertEqual(vector.bearingDeg,
+                       (rawBearing.truncatingRemainder(dividingBy: 360) + 360)
+                           .truncatingRemainder(dividingBy: 360), accuracy: 1e-9)
+        XCTAssertNil(field.sample(at: .init(latitude: 10, longitude: 10), time: date))
     }
 
     // (b) Synthetic golden: fixture element 0 carries one constituent per
