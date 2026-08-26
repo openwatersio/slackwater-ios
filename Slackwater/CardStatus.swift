@@ -30,12 +30,6 @@ enum CardStatus: Equatable {
     /// this gate's own measured slack tolerance ("±35 min") — the number the
     /// ⚠️ badge it replaced could only gesture at.
     case refining(tolerance: String?)
-    /// Tides ship worldwide; the bundled current stations are NOAA (US) and
-    /// CHS (Canada) only. Outside that footprint the absence must be STATED
-    /// — an empty currents list where a mariner expects a reading reads as
-    /// "the water is slack here", which is false and dangerous (#T6).
-    case noCurrentCoverage
-
     var icon: String {
         switch self {
         case .downloading: "arrow.down.circle"
@@ -45,7 +39,6 @@ enum CardStatus: Equatable {
         case .notDownloaded: "arrow.down.circle.dotted"
         case .failed: "exclamationmark.triangle.fill"
         case .refining: "brain"
-        case .noCurrentCoverage: "slash.circle"
         }
     }
 
@@ -59,7 +52,6 @@ enum CardStatus: Equatable {
         case .notDownloaded: "Tap to download"
         case .failed: "Download failed"
         case .refining(let tolerance): tolerance.map { "Refining · \($0)" } ?? "Refining"
-        case .noCurrentCoverage: "Current predictions not available here"
         }
     }
 
@@ -79,8 +71,6 @@ enum CardStatus: Equatable {
         case .refining(let tolerance):
             let howWrong = tolerance.map { ", slack accurate to \($0)" } ?? ""
             return "Refining — showing the fast answer\(howWrong). The full model is still downloading."
-        case .noCurrentCoverage:
-            return "Current predictions not available here — the bundled current stations cover NOAA and Canada's CHS waters only. Tide predictions are unaffected."
         }
     }
 
@@ -93,60 +83,10 @@ enum CardStatus: Equatable {
     var tint: Color {
         switch self {
         case .downloading: SN.leaf
-        case .expired, .failed, .refining, .noCurrentCoverage: SN.amber
+        case .expired, .failed, .refining: SN.amber
         case .queued, .offline, .notDownloaded: SN.foam.opacity(0.85)
         }
     }
-}
-
-/// How close a current station has to be before the app will claim it
-/// describes THIS water. See `hasCurrentCoverage` below for why 20 km, and why
-/// it is one constant rather than a literal in the function and five tests.
-let currentCoverageKm = 20.0
-
-/// NOT a political box (US/Canada) — currents are hyper-local (even a 1.5km
-/// ocean model can't resolve a tidal gate, per the currents research this app
-/// is built on), so a station 100km away describes different water, not this
-/// water, regardless of whose waters it's in. A political-box reading of
-/// "coverage" put San Diego Bay Entrance (25.8km) inside "coverage" for
-/// Tijuana and Lake Worth Inlet (135.8km) inside "coverage" for Freeport,
-/// Bahamas — both dishonest silences the political framing produced.
-///
-/// 20km is measured, not guessed: it sits between the bundled network's own
-/// p90 (16.1km) and p95 (22.5km) nearest-neighbor spacing — i.e. inside the
-/// gap where 90-95% of real stations sit relative to their closest neighbor,
-/// the normal spacing of a genuinely local cluster (Golden Gate 0.6km,
-/// Deception Pass 0.7km, NY Narrows 0.7km, Sidney BC 12.3km, Long Island
-/// Sound mid-channel 10.8km — all real, all under 13km). Every cross-border
-/// reach case measured (Tijuana 25.8km, Ensenada 108.3km, Freeport 135.8km,
-/// Havana 161.1km, Nassau 289.4km) clears 20km by 29%+, so there is no
-/// ambiguous middle ground between "same water" and "reaching for a stranger's
-/// water" in the data actually checked.
-///
-/// This also, correctly, reports "not available" inside real US/Canada gaps
-/// where the network has nothing hyper-local to offer (Desolation Sound BC —
-/// ~30km from the nearest gate, Beazley Passage; central Oregon coast
-/// ~258km) — silence there is honest, not a regression, because the app
-/// genuinely cannot describe that water either.
-///
-/// Checks all three current sources the app ships, the same three
-/// `StationItem.all` (`CurrentStation.swift`) treats as "the currents we
-/// have": NOAA (`CurrentStationRecord`), validated CHS gates
-/// (`ChsCurrentGateInfo` — Seymour Narrows, Active Pass, Dodd Narrows and 19
-/// more), and the one derived gate (`ChsGateInfo`). An earlier version of
-/// this function checked NOAA only, so it told a mariner at Seymour Narrows —
-/// one of this coast's fiercest tidal passes, and a gate the app ships a
-/// validated model for — that predictions were "not available here". A
-/// missed source is the same class of dishonest silence as a missed radius.
-///
-/// The radius is `currentCoverageKm`, not a literal — the number is restated by
-/// this comment and by five tests, and three copies of "20" is how a measured
-/// value quietly becomes three different values.
-func hasCurrentCoverage(latitude: Double, longitude: Double) -> Bool {
-    func near<T: StationIdentity>(_ items: [T]) -> Bool {
-        items.contains { distanceKm(latitude, longitude, $0.latitude, $0.longitude) < currentCoverageKm }
-    }
-    return near(CurrentStationRecord.all) || near(ChsCurrentGateInfo.all) || near(ChsGateInfo.all)
 }
 
 /// Where a fittable CHS station stands, in precedence order: what is happening

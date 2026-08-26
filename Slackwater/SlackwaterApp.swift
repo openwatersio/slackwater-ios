@@ -796,19 +796,6 @@ struct StationListView: View {
         }
 
         sectionLabel("Near Me")
-        // The wedge is currents, and an empty currents list reads as "the
-        // water is slack" unless it's stated otherwise (T6). A per-card check
-        // (does a current item happen to rank into the visible top-4/5) would
-        // still misfire inside real coverage: dense CHS tide-station clusters
-        // alone (not the new worldwide stations — verified across 10 Salish
-        // Sea anchors) crowd every slot in 2 of 10 cases, e.g. Sidney BC and
-        // Desolation Sound. So this checks the current bundle directly against
-        // the anchor, once, independent of what happened to rank into view.
-        if !hasCurrentCoverage(latitude: anchor.lat, longitude: anchor.lon) {
-            CardStatusStrip(status: .noCurrentCoverage)
-                .padding(.horizontal, 26)
-                .padding(.bottom, 8)
-        }
         ForEach(items(groups.nearMe)) { item in
             VStack(spacing: 0) {
                 itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
