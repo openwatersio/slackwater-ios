@@ -136,7 +136,7 @@ if (cmd === 'create-cert') {
 } else if (cmd === 'create-profile') {
   const [bundleIdRes, certId, outPath, profileName = 'Slackwater App Store'] = args;
   // filter[identifier] is a PREFIX match, not an exact one: it returns both
-  // org.openwaters.slackwater and org.openwaters.slackwater.widgets, and the
+  // io.openwaters.slackwater and io.openwaters.slackwater.widgets, and the
   // appex sorts FIRST. Taking data[0] therefore bound the app's own profile to
   // the widget's bundle id — silently, since the profile still builds and is
   // still named "Slackwater App Store". Match the identifier exactly.

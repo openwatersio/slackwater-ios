@@ -64,8 +64,8 @@ cat > build/exportUpload.plist <<'EOF'
        fails the export AFTER a successful archive. -->
   <key>provisioningProfiles</key>
   <dict>
-    <key>org.openwaters.slackwater</key><string>Slackwater App Store</string>
-    <key>org.openwaters.slackwater.widgets</key><string>Slackwater Widgets App Store</string>
+    <key>io.openwaters.slackwater</key><string>Slackwater App Store</string>
+    <key>io.openwaters.slackwater.widgets</key><string>Slackwater Widgets App Store</string>
   </dict>
 </dict>
 </plist>

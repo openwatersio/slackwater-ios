@@ -13,7 +13,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "org.openwaters.slackwater.premium.lifetime",
+      "productID" : "io.openwaters.slackwater.premium.lifetime",
       "referenceName" : "Premium Lifetime",
       "type" : "NonConsumable"
     }
@@ -38,7 +38,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "org.openwaters.slackwater.premium.yearly",
+          "productID" : "io.openwaters.slackwater.premium.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Premium Yearly",
           "subscriptionGroupID" : "6D31BE8A-0000-4000-8000-5A6C6B770003",
