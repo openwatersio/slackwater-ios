@@ -20,7 +20,7 @@ struct SlackwaterApp: App {
         // compiles ChsModelStore.save — never triggers its own reload.
         WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
         // Chart packs download whether or not the map is ever opened.
-        ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL)
+        DispatchQueue.main.async { ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL) }
         // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
         // gate; -seedGate skips it (arguments-domain values would mask the
         // in-app write, so tests set persisted state explicitly instead).

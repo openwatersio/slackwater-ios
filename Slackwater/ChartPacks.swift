@@ -71,6 +71,8 @@ private let AREA_MAX_Z = 8.0
 private let STATION_MIN_Z = 9.0
 private let STATION_MAX_Z = 12.0
 private let STATION_RADIUS_KM = 20.0
+/// How long to wait before asking again after a pack creation fails.
+private let PACK_RETRY_S: TimeInterval = 60
 
 /// One desired offline pack: identity (`key`), region, zoom range. Bounds are
 /// plain degrees so specs stay Hashable and testable.
@@ -101,16 +103,33 @@ func desiredChartPacks(fix: (lat: Double, lon: Double)?,
                                    minZoom: Double(AREA_GRID_Z), maxZoom: AREA_MAX_Z))
     }
     for s in stations {
-        // ±20 km box; longitude widens with latitude. Overlapping boxes cost
-        // nothing extra: the offline database stores a shared tile once.
-        let dLat = STATION_RADIUS_KM / 111.0
-        let dLon = STATION_RADIUS_KM / (111.0 * max(0.2, cos(s.lat * .pi / 180)))
-        specs.insert(ChartPackSpec(key: "station/\(s.id)",
-                                   south: max(-ChartGrid.maxLat, s.lat - dLat), west: s.lon - dLon,
-                                   north: min(ChartGrid.maxLat, s.lat + dLat), east: s.lon + dLon,
-                                   minZoom: STATION_MIN_Z, maxZoom: STATION_MAX_Z))
+        for spec in stationSpecs(id: s.id, lat: s.lat, lon: s.lon) { specs.insert(spec) }
     }
     return specs
+}
+
+/// A station's detail box: ±20 km, longitude widening with latitude.
+/// Overlapping boxes cost nothing extra — the offline database stores a
+/// shared tile once. A box crossing the antimeridian becomes TWO packs:
+/// `MLNCoordinateBounds` cannot express a span that wraps, and a longitude
+/// outside ±180 silently downloads the wrong ground.
+func stationSpecs(id: String, lat: Double, lon: Double) -> [ChartPackSpec] {
+    let dLat = STATION_RADIUS_KM / 111.0
+    let dLon = STATION_RADIUS_KM / (111.0 * max(0.2, cos(lat * .pi / 180)))
+    let south = max(-ChartGrid.maxLat, lat - dLat)
+    let north = min(ChartGrid.maxLat, lat + dLat)
+    func spec(_ key: String, _ west: Double, _ east: Double) -> ChartPackSpec {
+        ChartPackSpec(key: key, south: south, west: west, north: north, east: east,
+                      minZoom: STATION_MIN_Z, maxZoom: STATION_MAX_Z)
+    }
+    let west = lon - dLon, east = lon + dLon
+    if west < -180 {
+        return [spec("station/\(id)", -180, east), spec("station/\(id)/wrap", west + 360, 180)]
+    }
+    if east > 180 {
+        return [spec("station/\(id)", west, 180), spec("station/\(id)/wrap", -180, east - 360)]
+    }
+    return [spec("station/\(id)", west, east)]
 }
 
 // MARK: - The manager
@@ -118,8 +137,21 @@ func desiredChartPacks(fix: (lat: Double, lon: Double)?,
 /// Reconciles MLNOfflineStorage against `desiredChartPacks` whenever the fix
 /// or the favorites change. Owns only packs whose context carries its
 /// "chart" key — anything else in the store is left alone.
-final class ChartPackManager: NSObject {
+/// What the offline manager shows for the chart tiers. Areas, not tiles: a
+/// pack is one piece of ground, which is the unit a user can reason about.
+struct ChartPackSummary: Equatable {
+    var total = 0
+    var ready = 0
+    var failed = 0
+    var bytes: Int64 = 0
+    var downloading: Bool { ready < total }
+}
+
+@MainActor
+final class ChartPackManager: NSObject, ObservableObject {
     static let shared = ChartPackManager()
+
+    @Published private(set) var summary = ChartPackSummary()
 
     private var styleURL: URL?
     private var packsObservation: NSKeyValueObservation?
@@ -128,6 +160,7 @@ final class ChartPackManager: NSObject {
     /// until its creation lands, and two startup signals reconcile back to
     /// back, so without this every launch double-creates the world pack.
     private var creating: Set<String> = []
+    private var retryScheduled = false
 
     /// Idempotent. No-op under -networkKillSwitch / -chartPacksOff so tests
     /// never start real downloads.
@@ -141,9 +174,26 @@ final class ChartPackManager: NSObject {
         // `packs` is nil until the store loads it — reconcile then, and again
         // on every later signal.
         packsObservation = MLNOfflineStorage.shared.observe(\.packs, options: [.initial]) { [weak self] _, _ in
-            DispatchQueue.main.async { self?.reconcile() }
+            Task { @MainActor in self?.reconcile() }
+        }
+        for name in [NSNotification.Name.MLNOfflinePackProgressChanged,
+                     NSNotification.Name.MLNOfflinePackError] {
+            NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.publishSummary() }
+            }
         }
         FavoritesStore.shared.$ids
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.reconcile() }
+            .store(in: &cancellables)
+        // The CHS download set is the other half of "starred or downloaded":
+        // a station whose model is on disk gets chart coverage too, so the
+        // map matches the data wherever the user has chosen to work offline.
+        ChsFitService.shared.$queue
+            .map { $0.jobs.filter { $0.status == .ready }.map(\.id) }
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.reconcile() }
@@ -163,13 +213,22 @@ final class ChartPackManager: NSObject {
 
     private func reconcile() {
         guard let styleURL, let packs = MLNOfflineStorage.shared.packs else { return }
-        let fix = LocationService.shared.location.map {
-            (lat: $0.coordinate.latitude, lon: $0.coordinate.longitude)
-        }
-        let stations = FavoritesStore.shared.ids.compactMap { id -> (String, Double, Double)? in
-            guard let item = StationItem.byId[id] else { return nil }
-            return (id, item.latitude, item.longitude)
-        }
+        // Only while the fix is ours to use: LocationService keeps its last
+        // location after permission is revoked, and holding a 3×3 of cells
+        // around where the user used to be is not coverage they asked for.
+        let fix = LocationService.shared.authorized
+            ? LocationService.shared.location.map {
+                (lat: $0.coordinate.latitude, lon: $0.coordinate.longitude)
+              }
+            : nil
+        let downloaded = ChsFitService.shared.queue.jobs
+            .filter { $0.status == .ready }
+            .map(\.id)
+        let stations = Set(FavoritesStore.shared.ids + downloaded)
+            .compactMap { id -> (String, Double, Double)? in
+                guard let item = StationItem.byId[id] else { return nil }
+                return (id, item.latitude, item.longitude)
+            }
         let desired = desiredChartPacks(fix: fix, stations: stations)
         let desiredByKey = Dictionary(uniqueKeysWithValues: desired.map { ($0.key, $0) })
 
@@ -185,9 +244,11 @@ final class ChartPackManager: NSObject {
             }
             existing[key] = pack
         }
+        for pack in existing.values { pack.requestProgress() }
         for (key, pack) in existing where desiredByKey[key] == nil {
             MLNOfflineStorage.shared.removePack(pack, withCompletionHandler: nil)
         }
+        defer { publishSummary() }
         for (key, spec) in desiredByKey {
             if creating.contains(key) { continue }
             if let pack = existing[key] {
@@ -205,10 +266,59 @@ final class ChartPackManager: NSObject {
                 fromZoomLevel: spec.minZoom, toZoomLevel: spec.maxZoom)
             guard let context = try? JSONSerialization.data(withJSONObject:
                 ["chart": key, "style": styleURL.absoluteString]) else { continue }
-            MLNOfflineStorage.shared.addPack(for: region, withContext: context) { [weak self] pack, _ in
-                DispatchQueue.main.async { self?.creating.remove(key) }
-                pack?.resume()  // errors are retried by the next reconcile
+            MLNOfflineStorage.shared.addPack(for: region, withContext: context) { [weak self] pack, error in
+                Task { @MainActor in
+                    self?.creating.remove(key)
+                    // Nothing else will ask again: a failed creation leaves
+                    // `packs` unchanged, so without this the world pack can
+                    // stay missing for a whole session on a launch-time blip.
+                    if error != nil { self?.scheduleRetry() }
+                }
+                pack?.resume()
             }
+        }
+    }
+
+    /// Recomputed from the store rather than tracked incrementally — pack
+    /// state changes in more ways than this class starts (a resumed download,
+    /// a failure, a pack the user's other session removed).
+    private func publishSummary() {
+        let ours = (MLNOfflineStorage.shared.packs ?? []).filter { Self.chartContext(of: $0) != nil }
+        var next = ChartPackSummary(total: ours.count)
+        for pack in ours {
+            let progress = pack.progress
+            if progress.countOfResourcesExpected > 0,
+               progress.countOfResourcesCompleted >= progress.countOfResourcesExpected {
+                next.ready += 1
+            }
+            next.bytes += Int64(progress.countOfBytesCompleted)
+            // An inactive pack that never completed is one nothing is
+            // retrying — the manager offers the user that retry.
+            if pack.state == .inactive, progress.countOfResourcesExpected > 0,
+               progress.countOfResourcesCompleted < progress.countOfResourcesExpected {
+                next.failed += 1
+            }
+        }
+        summary = next
+    }
+
+    /// The manager's "refresh": ask every chart pack to re-validate what it
+    /// holds, so a sailor can top the charts up before leaving signal.
+    func refresh() {
+        guard let packs = MLNOfflineStorage.shared.packs else { return }
+        for pack in packs where Self.chartContext(of: pack) != nil {
+            pack.requestProgress()
+            pack.resume()
+        }
+        reconcile()
+    }
+
+    private func scheduleRetry() {
+        guard !retryScheduled else { return }
+        retryScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + PACK_RETRY_S) { [weak self] in
+            self?.retryScheduled = false
+            self?.reconcile()
         }
     }
 

@@ -184,6 +184,7 @@ struct OfflineManagerView: View {
 struct OfflineManagerList: View {
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
+    @ObservedObject private var charts = ChartPackManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openChsRoute) private var openChsRoute
     @State private var fetchingOnline: Set<String> = []
@@ -211,6 +212,7 @@ struct OfflineManagerList: View {
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
                 summary
+                chartsCard
                 ForEach(downloads) { download in
                     switch download {
                     case .fitted(let job): row(job)
@@ -262,6 +264,59 @@ struct OfflineManagerList: View {
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+    }
+
+    /// The map's own downloads. One card, not a row per pack: the tiers are
+    /// automatic, so the only questions a user has here are whether the chart
+    /// is ready and how to top it up before leaving signal.
+    private var chartsCard: some View {
+        let state = charts.summary
+        return VStack(alignment: .leading, spacing: 10) {
+            MonoLabel(text: state.total == 0 ? "CHARTS" : "CHARTS · \(state.ready) of \(state.total) ready")
+            if state.total > 0 {
+                ProgressView(value: Double(state.ready), total: Double(max(state.total, 1)))
+                    .tint(state.failed > 0 ? SN.amber : SN.leaf)
+            }
+            Text(chartsLine(state))
+                .font(.footnote)
+                .lineSpacing(3)
+                .foregroundStyle(SN.foam.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+            if net.online {
+                Button { charts.refresh() } label: {
+                    Text(state.failed > 0 ? "Retry \(state.failed) unfinished" : "Refresh charts")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(state.failed > 0 ? SN.amber : SN.leaf)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("charts-refresh")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+    }
+
+    private func chartsLine(_ state: ChartPackSummary) -> String {
+        let held = state.bytes > 0
+            ? " Holding \(ByteCountFormatter.string(fromByteCount: state.bytes, countStyle: .file))."
+            : ""
+        if state.total == 0 {
+            return net.online
+                ? "Preparing the map for offline use…"
+                : "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected."
+        }
+        if state.failed > 0 {
+            return "Some map areas didn't finish.\(held) They resume on their own when you're connected."
+        }
+        if state.downloading {
+            return net.online
+                ? "Downloading map areas — the world, the water around you, and your saved stations.\(held)"
+                : "Waiting for signal. Areas already downloaded keep working offline.\(held)"
+        }
+        return "The map works offline here: the world, the water around you, and your saved stations.\(held)"
     }
 
     /// What the manager is honest about at national scale (M53): this list is

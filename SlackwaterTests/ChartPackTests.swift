@@ -88,6 +88,24 @@ final class ChartPackTests: XCTestCase {
         XCTAssertEqual(packs.filter { $0.key.hasPrefix("station/") }.count, 2)
     }
 
+    /// A detail box that crosses ±180 becomes two packs: MLNCoordinateBounds
+    /// cannot express a wrapping span, and an out-of-range longitude
+    /// downloads the wrong ground rather than failing loudly.
+    func testStationBoxCrossingTheAntimeridianSplitsIntoTwoValidPacks() {
+        for lon in [179.9, -179.9] {
+            let specs = stationSpecs(id: "x", lat: -17.5, lon: lon)
+            XCTAssertEqual(specs.count, 2, "a box crossing ±180 at lon \(lon) must split")
+            for spec in specs {
+                XCTAssertGreaterThanOrEqual(spec.west, -180, "west out of range: \(spec)")
+                XCTAssertLessThanOrEqual(spec.east, 180, "east out of range: \(spec)")
+                XCTAssertLessThan(spec.west, spec.east, "a split half must not itself wrap")
+            }
+            XCTAssertEqual(Set(specs.map(\.key)).count, 2, "both halves need their own pack key")
+        }
+        // Well inside the antimeridian, one pack as before.
+        XCTAssertEqual(stationSpecs(id: "x", lat: 48.4, lon: -122.6).count, 1)
+    }
+
     func testStationBoxIsTwentyKilometresAndInsideMercator() throws {
         let packs = desiredChartPacks(fix: nil, stations: [(id: "x", lat: 48.406, lon: -122.643)])
         let box = try XCTUnwrap(packs.first { $0.key == "station/x" })
