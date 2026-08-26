@@ -44,7 +44,32 @@ struct DayCurveContentView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("24-hour curve")
                 .accessibilityValue(curveAccessibilityValue)
-            if let next = snapshot.next {
+            if let window = snapshot.window {
+                let windowMinutes = Int((window.end.timeIntervalSince(window.start) / 60).rounded())
+                HStack(alignment: .top, spacing: 8) {
+                    Text("SLACK")
+                        .font(.caption.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 3) {
+                            Text(window.start, style: .time)
+                            Text("–")
+                            Text(window.end, style: .time)
+                        }
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .environment(\.timeZone, snapshot.tz)
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.right")
+                            Text(window.start, style: .relative)
+                            Text("·").foregroundStyle(.tertiary)
+                            Text("\(windowMinutes) min")
+                        }
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Slack window")
+            } else if let next = snapshot.next {
                 HStack(spacing: 4) {
                     Image(systemName: next.symbol)
                         .font(.caption2.weight(.semibold))
