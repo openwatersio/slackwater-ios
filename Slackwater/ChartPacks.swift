@@ -161,6 +161,9 @@ final class ChartPackManager: NSObject, ObservableObject {
     /// back, so without this every launch double-creates the world pack.
     private var creating: Set<String> = []
     private var retryScheduled = false
+    /// Packs MapLibre reported an error for, cleared the moment one makes
+    /// progress again. The only honest source of "didn't finish".
+    private var errored: Set<String> = []
 
     /// Idempotent. No-op under -networkKillSwitch / -chartPacksOff so tests
     /// never start real downloads.
@@ -176,12 +179,27 @@ final class ChartPackManager: NSObject, ObservableObject {
         packsObservation = MLNOfflineStorage.shared.observe(\.packs, options: [.initial]) { [weak self] _, _ in
             Task { @MainActor in self?.reconcile() }
         }
-        for name in [NSNotification.Name.MLNOfflinePackProgressChanged,
-                     NSNotification.Name.MLNOfflinePackError] {
-            NotificationCenter.default.addObserver(
-                forName: name, object: nil, queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.publishSummary() }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.MLNOfflinePackProgressChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                // Progress means this pack is alive again, whatever it did before.
+                if let pack = note.object as? MLNOfflinePack,
+                   let key = Self.chartContext(of: pack)?["chart"] {
+                    self?.errored.remove(key)
+                }
+                self?.publishSummary()
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.MLNOfflinePackError, object: nil, queue: .main
+        ) { [weak self] note in
+            MainActor.assumeIsolated {
+                if let pack = note.object as? MLNOfflinePack,
+                   let key = Self.chartContext(of: pack)?["chart"] {
+                    self?.errored.insert(key)
+                }
+                self?.publishSummary()
             }
         }
         FavoritesStore.shared.$ids
@@ -285,20 +303,24 @@ final class ChartPackManager: NSObject, ObservableObject {
     private func publishSummary() {
         let ours = (MLNOfflineStorage.shared.packs ?? []).filter { Self.chartContext(of: $0) != nil }
         var next = ChartPackSummary(total: ours.count)
+        var live: Set<String> = []
         for pack in ours {
             let progress = pack.progress
-            if progress.countOfResourcesExpected > 0,
-               progress.countOfResourcesCompleted >= progress.countOfResourcesExpected {
+            if let key = Self.chartContext(of: pack)?["chart"] { live.insert(key) }
+            if pack.state == .complete
+                || (progress.countOfResourcesExpected > 0
+                    && progress.countOfResourcesCompleted >= progress.countOfResourcesExpected) {
                 next.ready += 1
             }
             next.bytes += Int64(progress.countOfBytesCompleted)
-            // An inactive pack that never completed is one nothing is
-            // retrying — the manager offers the user that retry.
-            if pack.state == .inactive, progress.countOfResourcesExpected > 0,
-               progress.countOfResourcesCompleted < progress.countOfResourcesExpected {
-                next.failed += 1
-            }
         }
+        // Failure is what MapLibre REPORTED, never what a state looks like
+        // mid-flight: a pack sits `.inactive` between being added and being
+        // resumed, and reading that as "didn't finish" made the card flash a
+        // retry prompt every time a batch of packs was created.
+        errored.formIntersection(live)
+        next.failed = errored.count
+        guard next != summary else { return }   // progress fires per resource
         summary = next
     }
 
@@ -306,6 +328,7 @@ final class ChartPackManager: NSObject, ObservableObject {
     /// holds, so a sailor can top the charts up before leaving signal.
     func refresh() {
         guard let packs = MLNOfflineStorage.shared.packs else { return }
+        errored.removeAll()
         for pack in packs where Self.chartContext(of: pack) != nil {
             pack.requestProgress()
             pack.resume()
