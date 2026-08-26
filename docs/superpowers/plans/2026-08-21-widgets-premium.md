@@ -14,7 +14,7 @@
 - The Xcode project is **generated** — edit `project.yml` only, never `Slackwater.xcodeproj` (regenerate with `xcodegen generate`; `./scripts/test.sh` runs it for you).
 - Tests: `./scripts/test.sh` (fast) / `./scripts/test.sh --full` before an upload. **Never run a bare `xcodebuild build` while a test run is in flight** — the script's lock comment warns it swaps `Slackwater.app` under live UI tests. To just check compilation, wait for the lock or run `./scripts/test.sh`.
 - Every source file starts with the repo's header-comment style: `// Slackwater — GPL v3. <one-line purpose>`.
-- App Group id: `group.org.openwaters.slackwater`. Widget bundle id: `org.openwaters.slackwater.widgets`. Product ids: `org.openwaters.slackwater.premium.yearly`, `org.openwaters.slackwater.premium.lifetime`.
+- App Group id: `group.io.openwaters.slackwater`. Widget bundle id: `io.openwaters.slackwater.widgets`. Product ids: `io.openwaters.slackwater.premium.yearly`, `io.openwaters.slackwater.premium.lifetime`.
 - Shared-defaults keys (exact): favorites `slackwater.favorites`, recents `slackwater.recents`, premium flag `slackwater.premium`, migration marker `slackwater.appgroup.migrated`.
 - Copy rules (spec §3, §5): the tier sheet leads with "Everything you use today stays free, forever…"; locked widget shows a wave glyph + "Premium" — no data, no exclamation marks, no urgency language anywhere. Upsell surfaces are ONLY: Settings row, Widgets gallery page, locked-widget tap-through.
 - Slack-window threshold everywhere: **0.5 kn** (matches `speedRampAnchorsKn[0]`).
@@ -90,7 +90,7 @@ final class AppGroupTests: XCTestCase {
 import Foundation
 
 enum AppGroup {
-    static let id = "group.org.openwaters.slackwater"
+    static let id = "group.io.openwaters.slackwater"
 
     static let defaults: UserDefaults = {
         let d = UserDefaults(suiteName: id) ?? .standard
@@ -129,7 +129,7 @@ enum AppGroup {
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.openwaters.slackwater</string>
+		<string>group.io.openwaters.slackwater</string>
 	</array>
 </dict>
 </plist>
@@ -591,7 +591,7 @@ struct WidgetSnapshot: Equatable {
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.widgets
         CODE_SIGN_ENTITLEMENTS: SlackwaterWidgets/SlackwaterWidgets.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C
@@ -925,7 +925,7 @@ In `SlackwaterWidgetsBundle.body` add `SlackInlineWidget(); SlackCircularWidget(
 
 - [ ] **Step 2: Build** — `./scripts/test.sh` → green.
 
-- [ ] **Step 3: Manual verification** — simulator: add all three to the lock screen. With `slackwater.premium` unset they must all show the wave + "Premium" state. Then `xcrun simctl spawn booted defaults write group.org.openwaters.slackwater slackwater.premium -bool YES` (or temporarily set it in app code), reload timelines (re-add a widget or relaunch), confirm real data renders, window line included on a current station. Unset again.
+- [ ] **Step 3: Manual verification** — simulator: add all three to the lock screen. With `slackwater.premium` unset they must all show the wave + "Premium" state. Then `xcrun simctl spawn booted defaults write group.io.openwaters.slackwater slackwater.premium -bool YES` (or temporarily set it in app code), reload timelines (re-add a widget or relaunch), confirm real data renders, window line included on a current station. Unset again.
 
 - [ ] **Step 4: Commit** — `git add SlackwaterWidgets && git commit -m "feat: Premium accessory widgets with quiet locked state"`
 
@@ -946,8 +946,8 @@ In `SlackwaterWidgetsBundle.body` add `SlackInlineWidget(); SlackCircularWidget(
 ```swift
 @MainActor final class PremiumStore: ObservableObject {
     static let shared = PremiumStore()
-    static let yearlyID = "org.openwaters.slackwater.premium.yearly"
-    static let lifetimeID = "org.openwaters.slackwater.premium.lifetime"
+    static let yearlyID = "io.openwaters.slackwater.premium.yearly"
+    static let lifetimeID = "io.openwaters.slackwater.premium.lifetime"
     @Published private(set) var isPremium: Bool
     @Published private(set) var products: [Product]   // loaded on demand
     static func isPremium(owned: Set<String>) -> Bool          // pure, tested
@@ -1003,8 +1003,8 @@ import WidgetKit
 @MainActor
 final class PremiumStore: ObservableObject {
     static let shared = PremiumStore()
-    static let yearlyID = "org.openwaters.slackwater.premium.yearly"
-    static let lifetimeID = "org.openwaters.slackwater.premium.lifetime"
+    static let yearlyID = "io.openwaters.slackwater.premium.yearly"
+    static let lifetimeID = "io.openwaters.slackwater.premium.lifetime"
     private static let ids = [yearlyID, lifetimeID]
     static let premiumKey = "slackwater.premium"
 
@@ -1084,7 +1084,7 @@ final class PremiumStore: ObservableObject {
           "locale" : "en_US"
         }
       ],
-      "productID" : "org.openwaters.slackwater.premium.lifetime",
+      "productID" : "io.openwaters.slackwater.premium.lifetime",
       "referenceName" : "Premium Lifetime",
       "type" : "NonConsumable"
     }
@@ -1109,7 +1109,7 @@ final class PremiumStore: ObservableObject {
               "locale" : "en_US"
             }
           ],
-          "productID" : "org.openwaters.slackwater.premium.yearly",
+          "productID" : "io.openwaters.slackwater.premium.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Premium Yearly",
           "subscriptionGroupID" : "6D31BE8A-0000-4000-8000-5A6C6B770003",
@@ -1255,7 +1255,7 @@ and `.sheet(isPresented: $showPremium) { PremiumView() }` on the same view the o
 
 ```yaml
         CFBundleURLTypes:
-          - CFBundleURLName: org.openwaters.slackwater
+          - CFBundleURLName: io.openwaters.slackwater
             CFBundleURLSchemes: [slackwater]
 ```
 
@@ -1382,7 +1382,7 @@ func deepLink(_ entry: SlackwaterEntry) -> URL? {
 - [ ] **Step 4: Commit + push branch** — plan checkboxes updated, PR description gains the screenshot set.
 
 - [ ] **Step 5: Manual/ASC checklist (Bryan or asc.mjs, NOT automatable here; some items blocked):**
-  1. Developer portal: register App Group `group.org.openwaters.slackwater`; add it to the `org.openwaters.slackwater` identifier; create identifier `org.openwaters.slackwater.widgets` with the group.
+  1. Developer portal: register App Group `group.io.openwaters.slackwater`; add it to the `io.openwaters.slackwater` identifier; create identifier `io.openwaters.slackwater.widgets` with the group.
   2. Regenerate the pinned Release profile `"Slackwater App Store"` (it must now carry the group) and create `"Slackwater Widgets App Store"`; add the widget target's Release manual-signing block to `project.yml` mirroring the app's (same identity SHA-1, new specifier) — until then TestFlight uploads will fail signing, expected.
   3. ASC: create the subscription group "Slackwater Premium" + yearly sub + lifetime IAP with the two product ids, final prices from the band. **Blocked on the Open Waters seller-entity/revenue-split agreement (spec §8) — do not submit the paid tier before it's resolved.**
   4. TestFlight release: `releasing-to-testflight` skill as usual.

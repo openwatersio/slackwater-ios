@@ -1,6 +1,6 @@
 name: Slackwater
 options:
-  bundleIdPrefix: org.openwaters
+  bundleIdPrefix: io.openwaters
   # iOS 26: Liquid Glass chrome (MapHeader) with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
@@ -74,11 +74,11 @@ targets:
         # Widgets already emit both (Task 5/6); StationListView.onOpenURL
         # (SlackwaterApp.swift) is the receiving end.
         CFBundleURLTypes:
-          - CFBundleURLName: org.openwaters.slackwater
+          - CFBundleURLName: io.openwaters.slackwater
             CFBundleURLSchemes: [slackwater]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Slackwater/Slackwater.entitlements
         DEVELOPMENT_TEAM: R3H8DPTV9C
@@ -138,7 +138,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: org.openwaters.slackwater.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.widgets
         CODE_SIGN_ENTITLEMENTS: SlackwaterWidgets/SlackwaterWidgets.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: R3H8DPTV9C

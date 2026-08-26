@@ -88,7 +88,7 @@ scattered through Settings.
 
 ## 6. Technical shape
 
-- **App Group** `group.org.openwaters.slackwater` — the prerequisite migration:
+- **App Group** `group.io.openwaters.slackwater` — the prerequisite migration:
   - `FavoritesStore` / `RecentsStore` move from standard `UserDefaults` to the shared
     suite (one-time migration on first launch; keys unchanged).
   - Offline station data the widget needs (bundled catalogs ship in the extension via the

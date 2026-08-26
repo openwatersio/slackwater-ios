@@ -5,7 +5,7 @@
 import Foundation
 
 enum AppGroup {
-    static let id = "group.org.openwaters.slackwater"
+    static let id = "group.io.openwaters.slackwater"
 
     /// The shared suite, with NO migration side effect — touching this must
     /// be safe from either process regardless of which one runs first. A

@@ -8,9 +8,9 @@ to archive + upload; everything below is the one-time state it relies on, and ho
 | Piece | Where | Notes |
 |---|---|---|
 | ASC API key | `~/.appstoreconnect/private_keys/AuthKey_VM6W5HP585.p8` (Key ID `VM6W5HP585`, Issuer `69a6de81-5896-47e3-e053-5b8c7c11a4d1`, role App Manager) | Signs API requests + authenticates the upload. Re-mint at App Store Connect → Users and Access → Integrations |
-| Bundle ID (app) | `org.openwaters.slackwater` (ASC id `D696FS7JD3`) | Registered in ASC (one-time, 2026-07) |
-| Bundle ID (appex) | `org.openwaters.slackwater.widgets` (ASC id `BC99FA5V78`) | Registered 2026-08-23 for the widget extension. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
-| App Group | `group.org.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Created in the developer.apple.com UI — `/v1/appGroups` is a 404, App Groups are not in the ASC API at all** |
+| Bundle ID (app) | `io.openwaters.slackwater` (ASC id `D696FS7JD3`) | Registered in ASC (one-time, 2026-07) |
+| Bundle ID (appex) | `io.openwaters.slackwater.widgets` (ASC id `BC99FA5V78`) | Registered 2026-08-23 for the widget extension. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
+| App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Created in the developer.apple.com UI — `/v1/appGroups` is a 404, App Groups are not in the ASC API at all** |
 | Distribution identity | `slackwater-ci.keychain-db` — "Apple Distribution: Bryan Clark (R3H8DPTV9C)", expires 2027-07-30 (cert `D5456R8W23`) | Key generated locally (openssl CSR → `asc.mjs create-cert`); keychain password in `~/.appstoreconnect/ci-keychain-pass` |
 | Provisioning profiles | "Slackwater App Store" (`JZRK3RW824`) **and** "Slackwater Widgets App Store" (`8395577WG2`), both re-minted 2026-08-23 and installed in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` under their UUID filename | `asc.mjs create-profile <bundleIdentifier> D5456R8W23 <out> [profileName]` — the name defaults to "Slackwater App Store", so the appex **must** pass its own or it deletes the app's profile and mints a duplicate wearing the app's name. **Both are needed**, and both must post-date the App Groups capability: a profile minted before a capability was added carries an empty `application-groups` array and the archive fails with entitlement errors. The predecessor `LF393ZYMCC` (2026-07-30) was replaced because it predated widgets |
 | Signing config | `project.yml`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
@@ -79,8 +79,8 @@ done
 ```
 
 **Check `application-identifier`, not just the name.** `filter[identifier]` on
-`/v1/bundleIds` is a **prefix** match: it returns `org.openwaters.slackwater` *and*
-`org.openwaters.slackwater.widgets`, appex first. `create-profile` took `data[0]`,
+`/v1/bundleIds` is a **prefix** match: it returns `io.openwaters.slackwater` *and*
+`io.openwaters.slackwater.widgets`, appex first. `create-profile` took `data[0]`,
 so the first mint after the appex was registered produced a profile **named**
 "Slackwater App Store" and **bound to the widget's bundle id** — success message,
 right name, wrong profile. Fixed by matching the identifier exactly; the check
@@ -100,7 +100,7 @@ UUID `5c858630-7d48-4bea-a803-8bf938b4ec43`) so it carries
 profile is untouched; the appex gained no entitlement. Proven rather than
 assumed this time: `xcodebuild archive` succeeded on the new profile and the
 signed app carries `com.apple.developer.ubiquity-kvstore-identifier =>
-R3H8DPTV9C.org.openwaters.slackwater` (`codesign -d --entitlements`). That is
+R3H8DPTV9C.io.openwaters.slackwater` (`codesign -d --entitlements`). That is
 the check the merge gate cannot do for you.
 
 **Delete the old file when you re-mint, or the name stops identifying a profile.**
