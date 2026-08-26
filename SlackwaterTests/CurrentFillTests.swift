@@ -38,6 +38,9 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertNil(sources[CurrentFillRenderer.sourceID])
         let layers = style["layers"] as? [[String: Any]] ?? []
         XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
+        XCTAssertNil(sources[CurrentStreakAnimator.sourceID])
+        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.tailLayerID })
+        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.headLayerID })
     }
 
     /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
@@ -63,6 +66,26 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
     }
 
+    func testStreakStyleSitsAbovePatchesWithFoamTailsAndRampHeads() throws {
+        var style: [String: Any] = ["sources": [String: Any](),
+                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
+        addFillStyle(&style)
+        let layers = style["layers"] as? [[String: Any]] ?? []
+        let ids = layers.map { $0["id"] as? String ?? "" }
+        let patch = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchSourceID))
+        let tail = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.tailLayerID))
+        let head = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.headLayerID))
+        XCTAssertEqual(tail, patch + 1)
+        XCTAssertEqual(head, tail + 1)
+        XCTAssertLessThan(head, try XCTUnwrap(ids.firstIndex(of: "land-usca")))
+        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentStreakAnimator.sourceID])
+        XCTAssertEqual((layers[tail]["paint"] as? [String: Any])?["line-color"] as? String,
+                       mapHex(SN.foamHex))
+        XCTAssertEqual((layers[head]["paint"] as? [String: Any])?["circle-color"] as? [String],
+                       ["get", "colour"])
+        XCTAssertFalse(String(describing: layers).contains(String(describing: PIN_STATE_COLOUR)))
+    }
+
     /// The fill layer sits UNDER the land layers — SSCOFS elements cross the
     /// shoreline, and land drawn over the fill clips them to water — and
     /// colours per feature from the "colour" attribute.
@@ -72,8 +95,8 @@ final class CurrentFillTests: XCTestCase {
         addFillStyle(&style)
         let layers = style["layers"] as? [[String: Any]] ?? []
         XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[2]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 4)
+        XCTAssertEqual(layers[4]["id"] as? String, "land-usca")
+        XCTAssertEqual(layers.count, 6)
         let paint = layers.first?["paint"] as? [String: Any]
         XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
         XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)

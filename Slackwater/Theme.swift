@@ -32,7 +32,8 @@ enum SN {
     static let leaf = Color(hex: 0x88B868)
     static let steelHex: UInt32 = 0x5888A8
     static let steel = Color(hex: steelHex)
-    static let foam = Color(hex: 0xE4F0E4)
+    static let foamHex: UInt32 = 0xE4F0E4
+    static let foam = Color(hex: foamHex)
     static let paper = Color(hex: 0xFCFCFC)
     // Direction is one signed diverging axis (colourblind-safe amber/blue);
     // green means only slack — never colour anything by station kind.

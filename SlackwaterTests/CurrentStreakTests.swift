@@ -54,4 +54,86 @@ final class CurrentStreakTests: XCTestCase {
         XCTAssertEqual(first.latitude, second.latitude, accuracy: 1e-12)
         XCTAssertEqual(first.longitude, second.longitude, accuracy: 1e-12)
     }
+
+    func testAnimatorSamplesPatchBeforeFill() {
+        let origin = CLLocationCoordinate2D(latitude: 49.1344, longitude: -123.8171)
+        let animator = CurrentStreakAnimator(
+            certifiedSeeds: [origin],
+            patchSample: { _, _ in CurrentVector(speedKn: 2, bearingDeg: 90) },
+            fillSample: { _, _ in CurrentVector(speedKn: 2, bearingDeg: 0) },
+            doddFlow: { _ in nil })
+
+        _ = animator.advance(at: fixtureDate, elapsed: 1, reduceMotion: false)
+
+        XCTAssertGreaterThan(animator.certifiedParticles[0].head.longitude, origin.longitude)
+        XCTAssertEqual(animator.certifiedParticles[0].head.latitude, origin.latitude, accuracy: 1e-7)
+    }
+
+    func testAnimatorKeepsCurvedHistoryBounded() {
+        let origin = CLLocationCoordinate2D(latitude: 49.1344, longitude: -123.8171)
+        var call = 0
+        let animator = CurrentStreakAnimator(
+            certifiedSeeds: [origin],
+            patchSample: { _, _ in nil },
+            fillSample: { _, _ in
+                defer { call += 1 }
+                return CurrentVector(speedKn: 1, bearingDeg: call == 0 ? 90 : 0)
+            },
+            doddFlow: { _ in nil })
+
+        for _ in 0..<(STREAK_HISTORY_LIMIT + 3) {
+            _ = animator.advance(at: fixtureDate, elapsed: 1, reduceMotion: false)
+        }
+
+        let particle = animator.certifiedParticles[0]
+        XCTAssertEqual(particle.history.count, STREAK_HISTORY_LIMIT)
+        XCTAssertGreaterThan(particle.head.latitude, origin.latitude)
+        XCTAssertGreaterThan(particle.head.longitude, origin.longitude)
+    }
+
+    func testAnimatorRecyclesMissingCertifiedCoverage() {
+        let origin = CLLocationCoordinate2D(latitude: 49.1344, longitude: -123.8171)
+        let animator = CurrentStreakAnimator(
+            certifiedSeeds: [origin], patchSample: { _, _ in nil }, fillSample: { _, _ in nil },
+            doddFlow: { _ in nil })
+
+        _ = animator.advance(at: fixtureDate, elapsed: 1, reduceMotion: false)
+
+        let particle = animator.certifiedParticles[0]
+        XCTAssertEqual(particle.head.latitude, origin.latitude, accuracy: 1e-12)
+        XCTAssertEqual(particle.head.longitude, origin.longitude, accuracy: 1e-12)
+        XCTAssertEqual(particle.history.count, 1)
+    }
+
+    func testAnimatorRecyclesDoddParticlesAtEnvelope() {
+        let flow = StationMapFlow(
+            center: CLLocationCoordinate2D(latitude: fixtureGate.latitude, longitude: fixtureGate.longitude),
+            speedKn: 1_000, bearingDeg: 21)
+        let animator = CurrentStreakAnimator(
+            certifiedSeeds: [], patchSample: { _, _ in nil }, fillSample: { _, _ in nil },
+            doddFlow: { _ in flow })
+
+        _ = animator.advance(at: fixtureDate, elapsed: 1, reduceMotion: false)
+
+        XCTAssertEqual(animator.doddParticles.count, DODD_STREAK_COUNT)
+        XCTAssertTrue(animator.doddParticles.allSatisfy {
+            doddEnvelopeContains($0.head, center: flow.center, bearingDeg: flow.bearingDeg)
+        })
+    }
+
+    func testAnimatorReduceMotionKeepsHeadsAndFeatures() {
+        let origin = CLLocationCoordinate2D(latitude: 49.1344, longitude: -123.8171)
+        let animator = CurrentStreakAnimator(
+            certifiedSeeds: [origin],
+            patchSample: { _, _ in CurrentVector(speedKn: 2, bearingDeg: 90) },
+            fillSample: { _, _ in nil }, doddFlow: { _ in nil })
+        _ = animator.advance(at: fixtureDate, elapsed: 1, reduceMotion: false)
+        let before = animator.certifiedParticles[0].head
+
+        let features = animator.advance(at: fixtureDate, elapsed: 10, reduceMotion: true)
+
+        XCTAssertEqual(animator.certifiedParticles[0].head.latitude, before.latitude, accuracy: 1e-12)
+        XCTAssertEqual(animator.certifiedParticles[0].head.longitude, before.longitude, accuracy: 1e-12)
+        XCTAssertFalse(features.isEmpty)
+    }
 }
