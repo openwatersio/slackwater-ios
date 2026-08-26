@@ -166,9 +166,13 @@ final class ChartPackManager: NSObject, ObservableObject {
     private var errored: Set<String> = []
 
     /// Idempotent. No-op under -networkKillSwitch / -chartPacksOff so tests
-    /// never start real downloads.
+    /// never start real downloads — and never under XCTest at all: unit tests
+    /// run in the app host and end with `exit()`, which finalizes MapLibre's
+    /// statics while its DatabaseFileSource thread is still mid-download. That
+    /// races into a SIGSEGV that looks like a test failure and isn't.
     func start(styleURL: URL) {
         guard !networkKillSwitch, !CommandLine.arguments.contains("-chartPacksOff"),
+              ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
               self.styleURL == nil else { return }
         self.styleURL = styleURL
         // Far above the three tiers' combined worst case; the default ~6k
