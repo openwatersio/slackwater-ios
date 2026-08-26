@@ -41,6 +41,18 @@ Prefer small PRs. A PR that changes generated data (`Slackwater/Resources/*`)
 should say what the numbers went from and to, because the diff itself is one
 enormous line of JSON and reviewing it any other way is not possible.
 
+A PR with a visual change must upload before and after screenshots in its
+description so the reviewer can see the change without checking out the branch.
+Present them side by side:
+
+```md
+| Before | After |
+|---|---|
+| ![Before](uploaded-image-url) | ![After](uploaded-image-url) |
+```
+
+Non-visual changes do not need screenshots.
+
 ## CI
 
 Two jobs, both defined in `.github/workflows/ci.yml`:
