@@ -64,6 +64,7 @@ func addFillStyle(_ style: inout [String: Any]) {
     ]
     sources[CurrentFillRenderer.sourceID] = empty
     sources[CurrentFillRenderer.patchSourceID] = empty
+    sources[CurrentStreakAnimator.sourceID] = empty
     style["sources"] = sources
     let layer: [String: Any] = [
         "id": CurrentFillRenderer.sourceID, "type": "fill",
@@ -91,11 +92,26 @@ func addFillStyle(_ style: inout [String: Any]) {
     var patch = layer
     patch["id"] = CurrentFillRenderer.patchSourceID
     patch["source"] = CurrentFillRenderer.patchSourceID
+    let tail: [String: Any] = [
+        "id": CurrentStreakAnimator.tailLayerID, "type": "line",
+        "source": CurrentStreakAnimator.sourceID,
+        "minzoom": STREAK_MIN_ZOOM,
+        "filter": ["==", ["geometry-type"], "LineString"],
+        "layout": ["line-cap": "round", "line-join": "round"],
+        "paint": ["line-color": mapHex(SN.foamHex), "line-width": 2.0, "line-opacity": 0.8],
+    ]
+    let head: [String: Any] = [
+        "id": CurrentStreakAnimator.headLayerID, "type": "circle",
+        "source": CurrentStreakAnimator.sourceID,
+        "minzoom": STREAK_MIN_ZOOM,
+        "filter": ["==", ["geometry-type"], "Point"],
+        "paint": ["circle-radius": 2.0, "circle-color": ["get", "colour"], "circle-opacity": 0.9],
+    ]
     let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
     let anchor = landIdx
         ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
         ?? layers.count
-    layers.insert(contentsOf: [layer, patch], at: anchor)
+    layers.insert(contentsOf: [layer, patch, tail, head], at: anchor)
     style["layers"] = layers
 }
 
@@ -119,8 +135,12 @@ final class CurrentFillRenderer {
     private var patches: PatchField?
     private var timer: Timer?
     private var evaluating = false
+    private let streaks = CurrentStreakAnimator()
 
-    deinit { timer?.invalidate() }
+    deinit {
+        timer?.invalidate()
+        streaks.stop()
+    }
 
     func attach(to style: MLNStyle, map: MLNMapView) {
         self.map = map
@@ -128,6 +148,7 @@ final class CurrentFillRenderer {
         patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
         if field == nil { field = FillField() }
         if patches == nil { patches = PatchField() }
+        streaks.attach(to: style, map: map, fillField: field, patchField: patches)
         refresh()
         guard timer == nil, field != nil || patches != nil else { return }
         let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in self?.refresh() }
