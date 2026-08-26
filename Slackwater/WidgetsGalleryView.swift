@@ -38,10 +38,10 @@ struct WidgetsGalleryView: View {
                 .padding(20)
                 .padding(.bottom, 30)
             }
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .navigationTitle("Widgets")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(SN.page, for: .navigationBar)
+            .toolbarBackground(SN.canvas, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

@@ -148,7 +148,7 @@ struct ChsWaitingView: View {
                 .padding(.bottom, 42)
             }
             .ignoresSafeArea(edges: .top)
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         }

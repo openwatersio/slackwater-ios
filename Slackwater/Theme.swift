@@ -27,9 +27,8 @@ extension Color {
 
 enum SN {
     static let navyDeep = Color(hex: 0x00183C)
-    static let canvas = Color(hex: 0x05122A)      // list canvas
-    static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of list
-    static let page = Color(hex: 0x00121F)        // 1b Modular detail page
+    static let canvas = Color(hex: 0x05122A)
+    static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of a screen
     static let leaf = Color(hex: 0x88B868)
     static let steelHex: UInt32 = 0x5888A8
     static let steel = Color(hex: steelHex)
@@ -61,6 +60,10 @@ enum SN {
     static let amber = Color(hex: 0xEF6F4A)
     static let sunrise = Color(hex: 0xF0D890)      // prototype "☀ Rise" pill
     static let sunset = Color(hex: 0xC8A86A)       // prototype "☀ Set" pill
+    static let shadow = Color(hex: 0x001432)       // every drop shadow; sites pick the opacity
+    static let moonLimb = Color(hex: 0x00122C, opacity: 0.92)  // the moon's dark limb, glyph and strip
+    // The gate screen's pin tile (prototype gradient), top-leading to bottom-trailing.
+    static let gateTile = [Color(hex: 0x3A6D98), Color(hex: 0x184870), Color(hex: 0x083058)]
 
     // MARK: - Speed magnitude (#97)
 
@@ -98,7 +101,7 @@ enum SN {
         return Color(red: c.r / 255, green: c.g / 255, blue: c.b / 255)
     }
 
-    /// Ink for a label drawn ON the ramp fill — whichever of white or `page`
+    /// Ink for a label drawn ON the ramp fill — whichever of white or `canvas`
     /// has more contrast against it. Chosen from the ramp position rather
     /// than from how far the label sits off the zero line: the curve's shape
     /// stays auto-fitted, so a quiet station puts a label deep inside a dark
@@ -110,11 +113,22 @@ enum SN {
             return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
         }
         let l = 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
-        // `page` is 0x00121F — relative luminance 0.00532, so 0.05532 is its
-        // contrast denominator. The crossover lands at t ≈ 0.68, where both
-        // inks measure 4.47:1; that is the ramp's worst point and it clears
+        // `canvas` is 0x05122A — relative luminance 0.00632, so 0.05632 is its
+        // contrast denominator. The crossover lands at t ≈ 0.90, where both
+        // inks measure ≈4.3:1; that is the ramp's worst point and it clears
         // WCAG's 3:1 for the 14pt semibold mark this styles.
-        return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.05532) ? .white : page
+        return (1.05 / (l + 0.05)) >= ((l + 0.05) / 0.05632) ? .white : canvas
+    }
+}
+
+/// The one full-screen background: canvas navy with the prototype's radial
+/// glow falling from the top. Use it for whole screens; flat `SN.canvas` is
+/// for toolbars, pills and scrims that sit on it.
+struct CanvasBackground: View {
+    var body: some View {
+        RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
+                       startRadius: 0, endRadius: 500)
+            .ignoresSafeArea()
     }
 }
 
@@ -236,7 +250,7 @@ struct MoonGlyph: View {
         let shift = moonLimbShift(fraction: fraction, waxing: waxing, radius: r)
         ZStack {
             Circle().fill(SN.foam)
-            Circle().fill(Color(hex: 0x00122C, opacity: 0.92)).offset(x: shift)
+            Circle().fill(SN.moonLimb).offset(x: shift)
         }
         .frame(width: 2 * r, height: 2 * r)
         .clipShape(Circle())
@@ -464,7 +478,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 .padding(.bottom, 42)
             }
             .ignoresSafeArea(edges: .top)
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .environment(\.timeZone, tz)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPicker) {
@@ -618,7 +632,7 @@ struct WeekPickerSheet: View {
                     .accessibilityIdentifier("week-picker")
                 Spacer()
             }
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .navigationTitle("Choose a date")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

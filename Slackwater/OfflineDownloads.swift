@@ -168,7 +168,7 @@ struct OfflineManagerView: View {
             OfflineManagerList()
                 .navigationTitle("Downloads")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(SN.page, for: .navigationBar)
+                .toolbarBackground(SN.canvas, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
@@ -221,7 +221,7 @@ struct OfflineManagerList: View {
             .padding(16)
             .padding(.bottom, 30)
         }
-        .background(SN.page.ignoresSafeArea())
+        .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
         .onChange(of: net.online) { _, online in
             guard online else { return }

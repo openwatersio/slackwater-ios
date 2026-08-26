@@ -116,6 +116,6 @@ struct StationCard<Trailing: View>: View {
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: Color(hex: 0x001432, opacity: 0.24), radius: 12, y: 10)
+        .shadow(color: SN.shadow.opacity(0.24), radius: 12, y: 10)
     }
 }

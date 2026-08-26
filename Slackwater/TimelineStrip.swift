@@ -961,7 +961,7 @@ struct TimelineCanvas: View {
                     l.clip(to: Path(ellipseIn: disc))
                     l.fill(Path(ellipseIn: disc), with: .color(Color(hex: 0xEEF4FF)))
                     l.fill(Path(ellipseIn: disc.offsetBy(dx: shift, dy: 0)),
-                           with: .color(Color(hex: 0x000E22, opacity: 0.94)))
+                           with: .color(SN.moonLimb))
                 }
                 ctx.stroke(Path(ellipseIn: disc), with: .color(.white.opacity(0.3)), lineWidth: 0.6)
             }
@@ -1458,7 +1458,7 @@ struct TimelineScrubStrip: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(SN.foam.opacity(0.8))
                         .padding(.horizontal, 10).padding(.vertical, 7)
-                        .background(SN.page.opacity(0.68), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .background(SN.canvas.opacity(0.68), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
                             .stroke(SN.steel.opacity(0.35), lineWidth: 1))
                 }
@@ -1491,7 +1491,7 @@ struct TimelineScrubStrip: View {
             .foregroundStyle(SN.foam)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(SN.page.opacity(0.92), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(SN.canvas.opacity(0.92), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(SN.steel.opacity(0.55), lineWidth: 1))
             .position(x: proxy.size.width / 2, y: floatingReadoutY(pointY: pointY, geo: geo))
@@ -1544,7 +1544,7 @@ struct TimelineScrubStrip: View {
     /// numbers wash out on a spring high.
     private var tideAxis: some View {
         ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [SN.page.opacity(0.9), SN.page.opacity(0)],
+            LinearGradient(colors: [SN.canvas.opacity(0.9), SN.canvas.opacity(0)],
                            startPoint: .leading, endPoint: .trailing)
                 .frame(width: 60)
             ForEach(axisTicks(lo: geo.tideMid - geo.tideSpan, hi: geo.tideMid + geo.tideSpan,
@@ -1562,7 +1562,7 @@ struct TimelineScrubStrip: View {
     /// user's current-speed setting.
     private var currentAxis: some View {
         ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [SN.page.opacity(0.9), SN.page.opacity(0)],
+            LinearGradient(colors: [SN.canvas.opacity(0.9), SN.canvas.opacity(0)],
                            startPoint: .leading, endPoint: .trailing)
                 .frame(width: 60)
             let threshold = data.slackThreshold
