@@ -108,13 +108,13 @@ struct MapHeader: View {
             // to two — the middle stops were tuned for the old 420pt hero
             // and read as a flat wash at a third).
             LinearGradient(stops: [
-                .init(color: Color(hex: 0x05122A, opacity: 0.80), location: 0),
-                .init(color: Color(hex: 0x05122A, opacity: 0.35), location: 1),
+                .init(color: SN.canvas.opacity(0.80), location: 0),
+                .init(color: SN.canvas.opacity(0.35), location: 1),
             ], startPoint: .top, endPoint: .bottom)
             .allowsHitTesting(false)
         }
         .clipped()
-        .background(Color(hex: 0x05122A))
+        .background(SN.canvas)
         // Every detail type is built on this header, so arming the edge-swipe
         // here arms it for all four (tide, current, derived gate, CHS waiting).
         .background(InteractivePopEnabler())

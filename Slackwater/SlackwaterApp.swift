@@ -181,9 +181,7 @@ struct GateView: View {
 
     var body: some View {
         ZStack {
-            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
-                           startRadius: 0, endRadius: 500)
-                .ignoresSafeArea()
+            CanvasBackground()
             // The gate is one screenful of fixed copy, and since the type
             // scales (Task 1) that screenful stops fitting at the top
             // accessibility sizes. Task 6 measured it at AX5 on both devices:
@@ -220,10 +218,10 @@ struct GateView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .fill(LinearGradient(
-                                colors: [Color(hex: 0x3A6D98), Color(hex: 0x184870), Color(hex: 0x083058)],
+                                colors: SN.gateTile,
                                 startPoint: .topLeading, endPoint: .bottomTrailing))
                             .frame(width: 96, height: 96)
-                            .shadow(color: Color(hex: 0x001432, opacity: 0.4), radius: 20, y: 16)
+                            .shadow(color: SN.shadow.opacity(0.4), radius: 20, y: 16)
                         Image(systemName: "mappin.and.ellipse")
                             .font(.system(size: 40, weight: .light))
                             .foregroundStyle(SN.foam)
@@ -593,9 +591,7 @@ struct StationListView: View {
     /// The content pane before any pick — same canvas, an invitation, not blank.
     private var detailPlaceholder: some View {
         ZStack {
-            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
-                           startRadius: 0, endRadius: 500)
-                .ignoresSafeArea()
+            CanvasBackground()
             VStack(spacing: 14) {
                 Image(systemName: "water.waves")
                     .font(.system(size: 40, weight: .light))
@@ -615,9 +611,7 @@ struct StationListView: View {
     /// moved to the floating button (M4.5) — no top bar.
     private var listPane: some View {
             ZStack {
-                RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
-                               startRadius: 0, endRadius: 500)
-                    .ignoresSafeArea()
+                CanvasBackground()
                 // A List (not ScrollView) so the group rows carry native
                 // .swipeActions (current-detail spec §9) — restyled to the
                 // same canvas: clear rows, no separators, no insets.
@@ -698,11 +692,11 @@ struct StationListView: View {
                 .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(SN.page.opacity(0.82), in: Capsule())
+                .background(SN.canvas.opacity(0.82), in: Capsule())
                 .accessibilityIdentifier("map-disclaimer")
                 .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
         }
-        .background(SN.page.ignoresSafeArea())
+        .background(SN.canvas.ignoresSafeArea())
     }
 
     /// Show a station picked anywhere (row tap in regular, map pin tap in
@@ -1078,7 +1072,7 @@ struct StationListView: View {
                 .foregroundStyle(SN.foam)
                 .frame(width: Self.fabSize, height: Self.fabSize)
                 .glassEffect(.regular.interactive(), in: Circle())
-                .shadow(color: Color(hex: 0x000C1E, opacity: 0.4), radius: 10, y: 6)
+                .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
         }
         .accessibilityLabel(label)
     }
@@ -1093,9 +1087,7 @@ struct StationListView: View {
 
     private var searchOverlay: some View {
         ZStack {
-            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
-                           startRadius: 0, endRadius: 500)
-                .ignoresSafeArea()
+            CanvasBackground()
             VStack(spacing: 0) {
                 ScrollView {
                     let results = StationItem.search(query, near: anchor)
@@ -1281,9 +1273,7 @@ struct StationChooserSheet: View {
 
     var body: some View {
         ZStack {
-            RadialGradient(colors: [SN.canvasGlow, SN.canvas], center: .top,
-                           startRadius: 0, endRadius: 400)
-                .ignoresSafeArea()
+            CanvasBackground()
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 3) {

@@ -140,12 +140,12 @@ final class ColourAndFormTests: XCTestCase {
     /// The applicable floor is WCAG's 3:1 — the mark is a 14pt semibold speed,
     /// which is large text. 4:1 is asserted instead because that is what the
     /// ramp actually delivers at its worst point (the white↔ink crossover at
-    /// t ≈ 0.68, where both options measure 4.47:1). A stop edit that pushes
+    /// t ≈ 0.90, where both options measure ≈4.3:1). A stop edit that pushes
     /// it below 4 has changed something worth looking at.
     func testSpeedInkStaysReadableOnItsOwnFill() {
         for i in 0...40 {
             let t = Double(i) / 40
-            let ink = rgb(SN.speedInk(t)) == rgb(.white) ? "FFFFFF" : "00121F"
+            let ink = rgb(SN.speedInk(t)) == rgb(.white) ? "FFFFFF" : "05122A"
             XCTAssertGreaterThan(contrast(ink, rampHex(t)), 4,
                                  "label ink is unreadable on the fill at t=\(t)")
         }
@@ -191,6 +191,9 @@ final class ColourAndFormTests: XCTestCase {
             "#8fd0a0",    // map kind-green
             "#7fb3d5",    // map kind-blue
             "#c0d8e4",    // map chs-kind tone
+            "0x00121F",   // the detail-page blue SN.canvas replaced
+            "0x000E22",   // the strip's own moon limb, folded into SN.moonLimb
+            "0x000C1E",   // the FAB's own shadow blue, folded into SN.shadow
         ]
         var offenders: [String] = []
         for (name, source) in try appSources() {
@@ -202,6 +205,20 @@ final class ColourAndFormTests: XCTestCase {
         }
         XCTAssertTrue(offenders.isEmpty,
                       "retired colour literal still in source:\n" + offenders.joined(separator: "\n"))
+    }
+
+    func testColourLiteralsLiveInTheme() throws {
+        let allowed: Set<String> = ["Theme.swift", "TimelineStrip.swift"]
+        var offenders: [String] = []
+        for (name, source) in try appSources() where !allowed.contains(name) {
+            for (n, line) in source.components(separatedBy: .newlines).enumerated()
+            where codeOnly(line).contains("Color(hex:") {
+                offenders.append("\(name):\(n + 1)")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+                      "hex colour literal outside \(allowed.sorted().joined(separator: ", ")) — use or add an SN token:\n"
+                      + offenders.joined(separator: "\n"))
     }
 
     /// The one surviving list-card state→tone binding. Every colour defect on

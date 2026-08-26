@@ -75,10 +75,10 @@ struct PremiumView: View {
                 }
                 .padding(20)
             }
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .navigationTitle("Slackwater Premium")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(SN.page, for: .navigationBar)
+            .toolbarBackground(SN.canvas, for: .navigationBar)
             .toolbar { ToolbarItem(placement: .cancellationAction) {
                 Button("Done") { dismiss() }
                     .foregroundStyle(SN.leaf)

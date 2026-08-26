@@ -61,7 +61,7 @@ struct SettingsView: View {
                             OfflineManagerList()
                                 .navigationTitle("Downloads")
                                 .navigationBarTitleDisplayMode(.inline)
-                                .toolbarBackground(SN.page, for: .navigationBar)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
                         } label: {
                             HStack {
                                 Text("\(chs.queue.ready) of \(chs.queue.total) nearby Canadian stations on this device")
@@ -130,10 +130,10 @@ struct SettingsView: View {
                 .padding(20)
                 .padding(.bottom, 30)
             }
-            .background(SN.page.ignoresSafeArea())
+            .background(CanvasBackground())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(SN.page, for: .navigationBar)
+            .toolbarBackground(SN.canvas, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
