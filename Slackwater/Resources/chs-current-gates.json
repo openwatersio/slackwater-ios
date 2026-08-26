@@ -26,8 +26,8 @@
   "name": "Dodd Narrows",
   "region": "Nanaimo",
   "aliases": [],
-  "latitude": 49.1344,
-  "longitude": -123.8171,
+  "latitude": 49.13546639419797,
+  "longitude": -123.81735084108287,
   "timezone": "America/Vancouver",
   "fitDays": 210,
   "provisionalSlackMinutes": 35
