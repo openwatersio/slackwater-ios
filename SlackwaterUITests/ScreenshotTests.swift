@@ -85,7 +85,7 @@ final class ScreenshotTests: XCTestCase {
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = args + ["-noCloudSync"]
+        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         return app
