@@ -7,6 +7,20 @@ import XCTest
 @testable import Slackwater
 
 final class WorldDefaultsTests: XCTestCase {
+    func testNearestWidgetStationCacheChangesOnlyWhenStationChanges() throws {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let portsmouth = try XCTUnwrap(TideStationRecord.all.first {
+            $0.name == "Portsmouth" && $0.latitude > 50 && $0.longitude < 0
+        })
+
+        XCTAssertTrue(LocationService.cacheNearestWidgetStation(
+            lat: portsmouth.latitude, lon: portsmouth.longitude, defaults: d))
+        XCTAssertEqual(d.string(forKey: AppGroup.currentLocationStationKey),
+                       portsmouth.id)
+        XCTAssertFalse(LocationService.cacheNearestWidgetStation(
+            lat: portsmouth.latitude, lon: portsmouth.longitude, defaults: d))
+    }
 
     /// Friday Harbor was pinned to the head of the station list. That is a
     /// home-water courtesy that reads as a bug from anywhere else.
