@@ -31,7 +31,9 @@ struct WidgetSnapshot: Equatable {
             && a.state == b.state && a.value == b.value
     }
 
-    static func build(_ station: WidgetStation, now: Date) -> WidgetSnapshot {
+    static func build(
+        _ station: WidgetStation, now: Date, stationNamePrefix: String? = nil
+    ) -> WidgetSnapshot {
         // Read once, here — not per format call — so `build` stays a pure
         // function of (station, now) (H2): the setting is an input, same as
         // the other two.
@@ -59,6 +61,7 @@ struct WidgetSnapshot: Equatable {
 
         switch station {
         case .tide(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             let heights = s.heights(from: dayStart, to: dayEnd, step: 900).map(\.height)
             let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
             let ext = s.extremes(from: now, to: now.addingTimeInterval(172_800))
@@ -76,6 +79,7 @@ struct WidgetSnapshot: Equatable {
                          value: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))")
 
         case .current(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             let pts = s.speeds(from: dayStart, to: dayEnd, step: 900)
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             let ev = s.events(from: now, to: now.addingTimeInterval(172_800))
@@ -104,6 +108,7 @@ struct WidgetSnapshot: Equatable {
                          value: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
 
         case .derived(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             // Backward pad comfortably over one semidiurnal period (~12h25m):
             // schematicSigned reads 0 before slacks[0], so an unpadded fetch
             // starting at dayStart leaves the sparkline flat from midnight to

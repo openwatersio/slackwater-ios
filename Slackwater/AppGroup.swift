@@ -34,6 +34,8 @@ enum AppGroup {
 
     static let favoritesKey = "slackwater.favorites"
     static let recentsKey = "slackwater.recents"
+    static let currentLocationStationKey = "slackwater.currentLocationStation"
+    static let currentLocationStationID = "slackwater:current-location"
     static let premiumKey = "slackwater.premium"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
 

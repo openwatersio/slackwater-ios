@@ -29,6 +29,11 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssert(s.next!.label.hasPrefix("High") || s.next!.label.hasPrefix("Low"))
     }
 
+    func testCurrentLocationSnapshotNamesResolvedStationHonestly() {
+        let s = WidgetSnapshot.build(friday, now: Date(), stationNamePrefix: "Current Location")
+        XCTAssertEqual(s.stationName, "Current Location · Friday Harbor")
+    }
+
     /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
     /// app's own Settings choice, so a metric-only label shipped to every
     /// imperial user. Setting imperial explicitly (rather than relying on
