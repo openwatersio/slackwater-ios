@@ -73,6 +73,8 @@ private let STATION_MAX_Z = 12.0
 private let STATION_RADIUS_KM = 20.0
 /// How long to wait before asking again after a pack creation fails.
 private let PACK_RETRY_S: TimeInterval = 60
+/// How long to let reconcile triggers pile up before acting on them.
+private let RECONCILE_DEBOUNCE_S: TimeInterval = 1.0
 
 /// One desired offline pack: identity (`key`), region, zoom range. Bounds are
 /// plain degrees so specs stay Hashable and testable.
@@ -161,6 +163,7 @@ final class ChartPackManager: NSObject, ObservableObject {
     /// back, so without this every launch double-creates the world pack.
     private var creating: Set<String> = []
     private var retryScheduled = false
+    private var reconcilePending = false
     /// Packs MapLibre reported an error for, cleared the moment one makes
     /// progress again. The only honest source of "didn't finish".
     private var errored: Set<String> = []
@@ -181,7 +184,7 @@ final class ChartPackManager: NSObject, ObservableObject {
         // `packs` is nil until the store loads it — reconcile then, and again
         // on every later signal.
         packsObservation = MLNOfflineStorage.shared.observe(\.packs, options: [.initial]) { [weak self] _, _ in
-            Task { @MainActor in self?.reconcile() }
+            Task { @MainActor in self?.setNeedsReconcile() }
         }
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name.MLNOfflinePackProgressChanged, object: nil, queue: .main
@@ -209,7 +212,7 @@ final class ChartPackManager: NSObject, ObservableObject {
         FavoritesStore.shared.$ids
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.reconcile() }
+            .sink { [weak self] _ in self?.setNeedsReconcile() }
             .store(in: &cancellables)
         // The CHS download set is the other half of "starred or downloaded":
         // a station whose model is on disk gets chart coverage too, so the
@@ -218,7 +221,7 @@ final class ChartPackManager: NSObject, ObservableObject {
             .map { $0.jobs.filter { $0.status == .ready }.map(\.id) }
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.reconcile() }
+            .sink { [weak self] _ in self?.setNeedsReconcile() }
             .store(in: &cancellables)
         LocationService.shared.$location
             .compactMap { $0 }
@@ -229,8 +232,20 @@ final class ChartPackManager: NSObject, ObservableObject {
                 ChartGrid.tileX(lon: a.coordinate.longitude, z: AREA_GRID_Z) == ChartGrid.tileX(lon: b.coordinate.longitude, z: AREA_GRID_Z)
                     && ChartGrid.tileY(lat: a.coordinate.latitude, z: AREA_GRID_Z) == ChartGrid.tileY(lat: b.coordinate.latitude, z: AREA_GRID_Z)
             }
-            .sink { [weak self] _ in self?.reconcile() }
+            .sink { [weak self] _ in self?.setNeedsReconcile() }
             .store(in: &cancellables)
+    }
+
+    /// Coalesces a burst of triggers into one pass: a pack being added, a
+    /// station finishing its download and a fix arriving can all land in the
+    /// same second, and each one used to walk every pack.
+    private func setNeedsReconcile() {
+        guard !reconcilePending else { return }
+        reconcilePending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + RECONCILE_DEBOUNCE_S) { [weak self] in
+            self?.reconcilePending = false
+            self?.reconcile()
+        }
     }
 
     private func reconcile() {
@@ -266,7 +281,10 @@ final class ChartPackManager: NSObject, ObservableObject {
             }
             existing[key] = pack
         }
-        for pack in existing.values { pack.requestProgress() }
+        // Only ask a pack whose state we don't know yet: state is `.unknown`
+        // until the first request lands, and asking again on every reconcile
+        // is pure churn.
+        for pack in existing.values where pack.state == .unknown { pack.requestProgress() }
         for (key, pack) in existing where desiredByKey[key] == nil {
             MLNOfflineStorage.shared.removePack(pack, withCompletionHandler: nil)
         }
@@ -274,9 +292,13 @@ final class ChartPackManager: NSObject, ObservableObject {
         for (key, spec) in desiredByKey {
             if creating.contains(key) { continue }
             if let pack = existing[key] {
-                // Resume state doesn't persist across launches; nudging a
-                // complete pack is a no-op.
-                pack.resume()
+                // Resume only what is not already done. `resume()` on a
+                // complete pack re-activates it and re-validates everything it
+                // holds — with a reconcile per pack added and per station
+                // downloaded, that had every pack re-checking itself over and
+                // over. Topping up finished packs is `refresh()`'s job, on the
+                // user's say-so.
+                if pack.state != .complete { pack.resume() }
                 continue
             }
             creating.insert(key)
