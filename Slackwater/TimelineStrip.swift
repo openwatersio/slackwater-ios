@@ -490,7 +490,9 @@ struct TimelineData {
     /// were computing it identically off `today`, and the anchor change would
     /// otherwise have to land correctly in four places.
     var scheduleRange: ClosedRange<Date> {
-        anchor...anchor.addingTimeInterval(Timeline.scheduleHours * 3600)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return anchor...cal.date(byAdding: .day, value: Int(Timeline.scheduleDays), to: anchor)!
     }
 
     /// Is `t` inside the drawn window? The guard on anything positioned by

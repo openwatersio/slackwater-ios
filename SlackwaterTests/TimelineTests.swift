@@ -247,15 +247,19 @@ final class TimelineTests: XCTestCase {
         XCTAssertNotEqual(relativeDayLabel(firstDay.start, tz, today: today), "Today")
     }
 
-    /// The list runs the anchor's 00:00 → +7d, and it is strictly inside the strip
-    /// — the centerPad is what lets the last row scrub under the centerline.
-    func testScheduleRangeIsAWeekInsideTheStrip() {
-        let today = todayLocal(friday.tz)
-        let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: today)
-        XCTAssertEqual(d.scheduleRange.lowerBound, today)
-        XCTAssertEqual(d.scheduleRange.upperBound, today.addingTimeInterval(168 * 3600))
-        XCTAssertLessThan(d.scheduleRange.upperBound, d.end,
-                          "the strip must outrun the list by the centerPad")
+    /// The list runs the anchor's 00:00 → +7 local calendar days, and it is
+    /// strictly inside the strip — even when DST makes that week 167h or 169h.
+    func testScheduleRangeIsSevenLocalDaysAcrossDST() {
+        let tz = friday.tz
+        for (anchor, hours) in [(vancouverMidnight(2026, 3, 8), 167.0),
+                                (vancouverMidnight(2026, 11, 1), 169.0)] {
+            let d = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: anchor)
+            XCTAssertEqual(d.scheduleRange.lowerBound, anchor)
+            XCTAssertEqual(d.scheduleRange.upperBound, addingDays(7, to: anchor, in: tz))
+            XCTAssertEqual(d.scheduleRange.upperBound.timeIntervalSince(anchor) / 3600, hours)
+            XCTAssertLessThan(d.scheduleRange.upperBound, d.end,
+                              "the strip must outrun the list by the centerPad")
+        }
     }
 
     /// Seven day-groups, and the first is the anchor's own day.
