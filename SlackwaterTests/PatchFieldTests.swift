@@ -49,6 +49,45 @@ final class PatchFieldTests: XCTestCase {
         XCTAssertEqual(cells[0].bearingDeg, expected0, accuracy: 0.1)
     }
 
+    func testSampleReturnsMatchedAnchorVector() throws {
+        let (bin, header) = fixture()
+        let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
+        let anchor = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/PUG1701" })
+        let date = Date(timeIntervalSince1970: 1_787_000_000)
+        let signed = try XCTUnwrap(anchor.engineStation
+            .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed)
+        let coordinate = try XCTUnwrap(field.cells(at: date).first?.polygon.first)
+        let vector = try XCTUnwrap(field.sample(at: coordinate, time: date))
+        XCTAssertEqual(vector.speedKn, abs(signed) * 0.5, accuracy: 1e-9)
+        XCTAssertEqual(vector.bearingDeg, signed >= 0 ? 90 : 270, accuracy: 0.1)
+    }
+
+    func testSampleReturnsNilOutsideCoverageOrWithoutAnchor() throws {
+        let (bin, header) = fixture()
+        let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
+        XCTAssertNil(field.sample(at: .init(latitude: 10, longitude: 10), time: Date()))
+
+        let (missingBin, missingHeader) = fixture(anchorId: "NO-SUCH-STATION")
+        let missing = try XCTUnwrap(PatchField(bin: missingBin, headerJSON: missingHeader))
+        let coordinate = try XCTUnwrap(field.cells(at: Date()).first?.polygon.first)
+        XCTAssertNil(missing.sample(at: coordinate, time: Date()))
+    }
+
+    func testSampleUsesReciprocalBearingForEbb() throws {
+        let (bin, header) = fixture()
+        let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
+        let anchor = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/PUG1701" })
+        let ebbDate = try XCTUnwrap((0...48).lazy.map {
+            Date(timeIntervalSince1970: 1_787_000_000 + Double($0 * 1_800))
+        }.first { date in
+            anchor.engineStation
+                .speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed ?? 0 < 0
+        })
+        let coordinate = try XCTUnwrap(field.cells(at: ebbDate).first?.polygon.first)
+        let vector = try XCTUnwrap(field.sample(at: coordinate, time: ebbDate))
+        XCTAssertEqual(vector.bearingDeg, 270, accuracy: 0.1)
+    }
+
     func testUnresolvableAnchorVendsNothing() throws {
         let (bin, header) = fixture(anchorId: "NO-SUCH-STATION")
         let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))

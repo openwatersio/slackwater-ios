@@ -32,6 +32,23 @@ struct FillCell {
     let bearingDeg: Double
 }
 
+struct CurrentVector {
+    let speedKn: Double
+    let bearingDeg: Double
+}
+
+func triangleContains(_ point: CLLocationCoordinate2D,
+                      vertices: [CLLocationCoordinate2D]) -> Bool {
+    guard vertices.count == 3 else { return false }
+    func cross(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D,
+               _ c: CLLocationCoordinate2D) -> Double {
+        (a.longitude - c.longitude) * (b.latitude - c.latitude)
+            - (b.longitude - c.longitude) * (a.latitude - c.latitude)
+    }
+    let sides = vertices.indices.map { cross(point, vertices[$0], vertices[($0 + 1) % 3]) }
+    return !(sides.contains { $0 < 0 } && sides.contains { $0 > 0 })
+}
+
 /// Lon/lat bounding box for a `cells(at:in:)` visibility filter. Field order
 /// mirrors the header's own `bbox` (minLon, minLat, maxLon, maxLat) — no
 /// MapKit/MapLibre type fits here (this app draws with MapLibre, not MapKit,
@@ -199,6 +216,27 @@ final class FillField {
         return station.speeds(from: date, to: date.addingTimeInterval(1), step: 1).first?.speed ?? 0
     }
 
+    private func vector(u: Double, v: Double) -> CurrentVector {
+        let rawBearing = atan2(u, v) * 180 / .pi
+        return CurrentVector(
+            speedKn: hypot(u, v),
+            bearingDeg: (rawBearing.truncatingRemainder(dividingBy: 360) + 360)
+                .truncatingRemainder(dividingBy: 360))
+    }
+
+    /// The vector at one coordinate, or nil where the field has no triangle.
+    /// Geometry is tested before harmonic evaluation so one lookup evaluates
+    /// only its matching element.
+    func sample(at coordinate: CLLocationCoordinate2D, time: Date) -> CurrentVector? {
+        for k in 0..<header.elementCount {
+            guard let el = element(at: k), triangleContains(coordinate, vertices: el.verts) else { continue }
+            return vector(
+                u: evaluate(el.u, offset: el.offsetU, at: time),
+                v: evaluate(el.v, offset: el.offsetV, at: time))
+        }
+        return nil
+    }
+
     /// All shipped cells at `date`, optionally culled to `bbox` via an
     /// interval-overlap test against each triangle's own extent (see
     /// `FillBBox.overlaps(verts:)` — not "any vertex inside `bbox`", which
@@ -215,10 +253,8 @@ final class FillField {
             }
             let u = evaluate(el.u, offset: el.offsetU, at: date)
             let v = evaluate(el.v, offset: el.offsetV, at: date)
-            let speed = hypot(u, v)
-            let rawBearing = atan2(u, v) * 180 / .pi
-            let bearing = (rawBearing.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-            out.append(FillCell(polygon: el.verts, speedKn: speed, bearingDeg: bearing))
+            let vector = vector(u: u, v: v)
+            out.append(FillCell(polygon: el.verts, speedKn: vector.speedKn, bearingDeg: vector.bearingDeg))
         }
         return out
     }
