@@ -113,6 +113,7 @@ targets:
       - Slackwater/Units.swift
       - Slackwater/DeepLink.swift
       - Slackwater/SlackWindow.swift
+      - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/WidgetSnapshot.swift
       - Slackwater/MiniScrubberView.swift
