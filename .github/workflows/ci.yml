@@ -4,7 +4,7 @@ name: CI
 # so GitHub offers neither branch protection nor rulesets here — nothing can
 # reject a push to main server-side. CI reports; the policy it backs is in
 # CONTRIBUTING.md and holds by agreement. If the org ever moves to Team, turn
-# these two jobs into required checks and the policy stops being voluntary.
+# these jobs into required checks and the policy stops being voluntary.
 
 on:
   pull_request:

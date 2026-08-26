@@ -114,39 +114,11 @@ draft, nothing submitted; screenshots and a support URL are the remaining blocke
 Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
 are generated, not committed).
 
-## Branching (agents: read this)
+## Contributing
 
-**No direct pushes to `main`** — branch, then pull request. Nothing on GitHub enforces
-this (a private repo in a free org gets neither branch protection nor rulesets), so it
-holds by agreement. An agent may open a PR and push to its branch, but never merges its
-own. Full policy, including why the macOS CI lane is self-hosted, in `CONTRIBUTING.md`.
-
-## Testing (agents: read this)
-
-One checked-in test plan (`TestPlans/Slackwater.xctestplan`), driven by
-`scripts/test.sh`. `--full` does not switch plans — it adds the iPad simulator and
-exports `TEST_RUNNER_SLACKWATER_FULL`, and the live-IWLS tests skip themselves
-without it:
-
-```sh
-./scripts/test.sh          # FAST (default) — iPhone only, ~15 min. Use this while iterating.
-./scripts/test.sh --full   # FULL — both sims + live IWLS, 35 min+ and variable. Before every upload.
-```
-
-**Fast is iPhone-only on purpose.** The iPad leg is 1169 s and is the only place
-three tests run (100 s between them); everything else it runs is a second rendering
-of what the iPhone leg just proved. That trade is worth making before an upload, not
-on every commit.
-
-Those are idle-machine figures. With the self-hosted CI runner competing for the same
-Mac, budget more — and see `CLAUDE.md` for what contention does to live-network tests.
-
-Fast is everything that runs on stored or mocked state. Full adds the nine UI tests that
-fetch live from CHS IWLS and fit harmonics on-device — that is the entire difference, it
-runs at the IWLS client's 2.5 s-per-request pacing, and it is the only coverage of the
-network path. **Iterate on fast; go full before `scripts/testflight.sh`.** Every
-`xcodebuild` invocation, by hand or by script, needs
-`-clonedSourcePackagesDirPath build/SourcePackages`. Details in `docs/testflight.md`.
+Branching, review, CI, and how to run the tests are in `CONTRIBUTING.md` — read it before
+your first change. Short version: no direct pushes to `main`, and `./scripts/test.sh` while
+iterating, `./scripts/test.sh --full` before an upload. Agents: `CLAUDE.md` too.
 
 ## Known issues
 

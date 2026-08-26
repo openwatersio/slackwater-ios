@@ -1,45 +1,70 @@
-# Contributing to Slackwater iOS
+# Contributing
 
-This is a shared repo now. The rules below are short because they are meant to
-be followed, not consulted.
+Slackwater is a tide and current app that runs its predictions on the device. Bug reports, data corrections, and pull requests are all welcome.
 
-## Branch and merge
+## Getting started
 
-**No direct pushes to `main`.** Work happens on a branch and lands through a
-pull request.
+You need **Xcode 26** or later (the app targets iOS 26) and **XcodeGen** (`brew install xcodegen`). The `.xcodeproj` and `Info.plist` are generated rather than committed, so generate them first:
+
+```sh
+xcodegen generate
+open Slackwater.xcodeproj
+```
+
+Build and run the `Slackwater` scheme. There is no other setup — the app ships its station data, so it works offline from first launch.
+
+Changing the bundled data additionally needs **Node 24** and a `npm install` in `tools/`.
+
+## Running the tests
+
+One test plan, driven by `scripts/test.sh`:
+
+```sh
+./scripts/test.sh          # ~15 min, iPhone simulator. Use this while iterating.
+./scripts/test.sh --full   # adds the iPad simulator and the live-network tests. Before a release.
+```
+
+Fast is everything that runs on stored or mocked state. `--full` adds nine UI tests that fetch live from the CHS IWLS API and fit harmonics on-device, which is the only coverage of the network path — they skip themselves without it. It takes 35 minutes and up, mostly because the API is paced at 2.5 s per request.
+
+Every `xcodebuild` invocation, by hand or by script, needs `-clonedSourcePackagesDirPath build/SourcePackages`.
+
+Tests for the bundled data are separate and fast: `cd tools && node --test`. (`npm test` regenerates everything first, including the generator that needs network access.)
+
+## Reporting bugs
+
+Open an issue. For a wrong prediction, include the station, the date and time, what the app showed, and what the official source (NOAA or CHS) showed — that is usually enough to tell a data problem from an engine problem. For anything else, the device and iOS version help.
+
+## Pull requests
+
+Work on a branch and open a pull request.
 
 ```sh
 git switch -c <area>/<short-description>    # e.g. tides/ticon-licence-gate
-# ... work, commit ...
 git push -u origin HEAD
 gh pr create --fill
 ```
 
-Nothing on GitHub's side enforces this. `openwatersio` is a free organisation
-and this repo is private, which is the one combination where GitHub offers
-neither branch protection rules nor rulesets — the API returns *"Upgrade to
-GitHub Pro or make this repository public"* for both. So the policy holds by
-agreement, and a slip is a mistake rather than a rejected push. If the org moves
-to Team ($4/user/month), turn the two CI jobs into required checks and this
-section stops being voluntary.
+Before you open it, run `./scripts/test.sh` and say in the description what you changed and why. Small PRs get reviewed faster. Rebase or squash rather than merge-commit, and never force-push `main` — your own branches, freely.
 
-Two consequences of that, worth naming:
+**Docs-only changes don't need a PR.** CI's macOS lane is a single shared machine, and a PR books about fifteen minutes of it. If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
 
-- **Force-pushing `main` is now off the table.** It was survivable when one
-  person worked here. It is not survivable with two, and nothing will stop you.
-  Force-push your own feature branches freely.
-- **Rebase or squash, don't merge-commit.** Keeps `main` readable, which is the
-  only reason the terse-commit habit works.
+```sh
+git push -u origin docs/<topic>
+```
 
-## Review
+CI skips the app lane for those automatically, so opening one is not expensive — it's just rarely useful when there's nothing to review.
 
-A PR needs one approval before merge. The exception is a PR that only touches
-your own in-progress branch work or a revert of your own breakage — take those
-yourself and say so in the description.
+## Changing bundled station data
 
-Prefer small PRs. A PR that changes generated data (`Slackwater/Resources/*`)
-should say what the numbers went from and to, because the diff itself is one
-enormous line of JSON and reviewing it any other way is not possible.
+The JSON files in `Slackwater/Resources/` are generated artifacts, not source. Edit the generator or its upstream input, then regenerate:
+
+```sh
+cd tools && npm run build:data
+```
+
+The generators run as a chain — CHS stations, then tides, then NOAA currents, then CHS gates — and each reads the one before it, so a change anywhere means regenerating all of them and committing every changed artifact together. CI regenerates `stations.json` and `currents.json` and fails if the committed copies differ.
+
+Because the diff is one enormous line of JSON, say in the PR description what the counts went from and to. Nothing checks what the diff _means_, so read it: dropping a tide station can silently unpair the current stations that referenced it.
 
 A PR with a visual change must upload before and after screenshots in its
 description so the reviewer can see the change without checking out the branch.
@@ -55,76 +80,18 @@ Non-visual changes do not need screenshots.
 
 ## CI
 
-Two jobs, both defined in `.github/workflows/ci.yml`:
+Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
 
-| Job | Where | What it does |
-|-----|-------|--------------|
-| Data generators | GitHub-hosted Ubuntu | `npm ci`, regenerates the two offline bundles, checks the committed artefacts still match, runs the bundle invariants |
-| App tests | Self-hosted, Mac Studio | `scripts/test.sh` — xcodegen plus the fast test plan on the iPhone simulator |
+| Job             | Where           | What it does                                                  |
+| --------------- | --------------- | ------------------------------------------------------------- |
+| What changed    | GitHub-hosted   | Decides whether the app lane needs to run                     |
+| Data generators | GitHub-hosted   | Regenerates the bundles and checks the committed copies match |
+| App tests       | Self-hosted Mac | `scripts/test.sh` on the iPhone simulator                     |
 
-The macOS lane is self-hosted because GitHub-hosted macOS bills at **10× on a
-private repo**. The fast lane is ~15 minutes of wall clock, so ~150 billable
-minutes per run — roughly thirteen runs against the free 2,000-minute monthly
-allowance. (It was ~25 min across both simulators until the iPad leg moved to
-`--full`: it cost 19 minutes and was the only place three tests ran.) The Studio is already the always-on
-scheduled-job host, so it runs the lane for free and faster, off a warm SPM
-cache.
+The macOS lane is self-hosted because GitHub-hosted macOS bills at 10× on a private repo, which would exhaust the monthly allowance in about thirteen runs. It is the same machine used for local test runs, so expect queuing — and see `CLAUDE.md` for what that contention does to live-network tests.
 
-`gen-chs-stations.mjs` is deliberately not in CI: it is the only generator that
-needs the network (the DFO IWLS API), so its artefact is trusted as committed.
-The other two are regenerated on every run, which is what makes the drift check
-meaningful.
+`gen-chs-stations.mjs` stays out of CI because it is the only generator that needs the network; its artifact is trusted as committed.
 
-### A PR books the Studio. Docs-only work should not open one.
+## AI agents
 
-CI runs on `pull_request` for **any** branch, but on `push` only for `main`. So
-pushing a branch costs nothing and opening a PR books ~15 minutes of the Mac
-Studio — the same machine the scheduled jobs and everyone's local
-`./scripts/test.sh` share. There is one macOS lane, so a PR that does not need
-it puts every other session in a queue behind it.
-
-**A change that touches no Swift, no `project.yml`, and no generated bundle —
-a spec, a plan, a note, a README edit — goes on a branch and stops there.**
-Push it so it is shareable and reviewable by URL, and say so rather than
-opening a PR:
-
-```sh
-git push -u origin docs/<topic>          # shareable, no CI, no queue
-# then link the branch or its compare URL; do NOT `gh pr create`
-```
-
-It merges by whatever route suits — fast-forward, or a PR opened later when the
-runner is idle. This rule exists because `docs/cross-flow-check-spec` — two
-markdown files, zero code — consumed a full 25-minute App-tests run, and a
-later PR from the same session queued behind two others while a third session
-waited.
-
-**CI now enforces this too**, so the habit is belt and braces rather than the
-only defence. The `What changed` job diffs the PR and skips the App-tests lane
-when *every* changed path is under `docs/` or is a top-level `.md`. It is
-fail-safe by construction: a path nobody anticipated runs the suite. It gates
-the job rather than the workflow (`on: paths-ignore`) so the free Ubuntu lane
-still runs, and so a required check — if this repo ever gets them — is
-satisfied by a skip instead of hanging forever on a workflow that never
-started.
-
-Opening a docs PR is therefore no longer expensive. Prefer a branch anyway when
-there is nothing to review; use a PR when someone actually needs to comment.
-
-## Testing before you open the PR
-
-See the *Testing* section of `README.md`. Short version: `./scripts/test.sh`
-while iterating, `./scripts/test.sh --full` before an upload — the full plan is
-the only coverage of the live CHS network path.
-
-## Agents
-
-Claude Code and other agents work here under the same policy, with two additions:
-**an agent never merges its own PR** — it may open one, push to its branch, and
-respond to review; the merge is a human decision — and **an agent does not open
-a PR for docs-only work** (see *A PR books the Studio* above). Agents write a
-lot of specs and plans into `docs/superpowers/`, so this rule bites them far
-more often than it bites a human.
-
-Agent-facing context lives in the `(agents: read this)` sections of `README.md`
-and in the workspace `CLAUDE.md` / `AGENTS.md` one directory up.
+Agents work here under the same policy as everyone else, with two additions: an agent never merges its own PR, and an agent doesn't open a PR for docs-only work. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.
