@@ -449,7 +449,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     MapHeader(name: name, region: region,
                               latitude: latitude, longitude: longitude,
                               favoriteId: favoriteId,
-                              topSafeInset: geo.safeAreaInsets.top)
+                              topSafeInset: geo.safeAreaInsets.top,
+                              minHeight: (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) / 3)
                     above()
                     if let timeline {
                         scrubCard(timeline)
