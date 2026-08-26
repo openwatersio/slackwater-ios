@@ -10,6 +10,40 @@ final class CurrentStreakTests: XCTestCase {
         latitude: 49.1344, longitude: -123.8171, timezone: "America/Vancouver",
         floodDirection: 21, ebbDirection: 201, meanFlow: 0, tideReference: nil, constituents: [])
 
+    func testReleasedDoddPeakPinsCentreColourDirectionAndMotion() throws {
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" })
+        XCTAssertEqual(gate.latitude, 49.13546639419797, accuracy: 1e-12)
+        XCTAssertEqual(gate.longitude, -123.81735084108287, accuracy: 1e-12)
+
+        let fittedGate = CurrentStationRecord(
+            id: gate.id, name: gate.name, region: gate.region, aliases: gate.aliases,
+            latitude: gate.latitude, longitude: gate.longitude, timezone: gate.timezone,
+            floodDirection: 21, ebbDirection: 201, meanFlow: 0, tideReference: gate.tideReference,
+            constituents: [])
+        for (signedKn, expectedBearing, northward, eastward) in [
+            (9.43, 21.0, true, true),
+            (-9.43, 201.0, false, false),
+        ] {
+            let flow = try XCTUnwrap(DoddMapFlowProvider(
+                gate: fittedGate, signedSpeed: { _ in signedKn }).flow(at: fixtureDate))
+            XCTAssertEqual(flow.center.latitude, gate.latitude, accuracy: 1e-12)
+            XCTAssertEqual(flow.center.longitude, gate.longitude, accuracy: 1e-12)
+            XCTAssertEqual(flow.speedKn, 9.43, accuracy: 1e-12)
+            XCTAssertEqual(flow.bearingDeg, expectedBearing, accuracy: 1e-12)
+            XCTAssertEqual(fillColourHex(forSpeedKn: flow.speedKn), "#dd6138")
+
+            let next = advanceCurrentCoordinate(
+                flow.center, vector: .init(speedKn: flow.speedKn, bearingDeg: flow.bearingDeg),
+                dt: 1, speedScale: STREAK_SPEED_SCALE)
+            XCTAssertGreaterThan(
+                CLLocation(latitude: flow.center.latitude, longitude: flow.center.longitude)
+                    .distance(from: CLLocation(latitude: next.latitude, longitude: next.longitude)),
+                1)
+            XCTAssertEqual(next.latitude > flow.center.latitude, northward)
+            XCTAssertEqual(next.longitude > flow.center.longitude, eastward)
+        }
+    }
+
     func testProviderUsesAbsoluteEbbSpeedAndReciprocalBearing() throws {
         var evaluations = 0
         let provider = DoddMapFlowProvider(gate: fixtureGate, signedSpeed: { _ in
