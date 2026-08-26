@@ -47,7 +47,8 @@ position. It consumes the fitted Dodd signed current model directly:
 - evaluate signed speed once per minute;
 - use the fitted flood direction for positive flow and its reciprocal for negative flow;
 - constrain roughly 12 deterministic streaks to a 300–400 m long, narrow visual envelope;
-- use the existing speed ramp on each streak head, reaching `#c93a32` at the high-speed
+- use the existing absolute speed ramp on each streak head; Dodd's 9.43-knot peak is
+  `#dd6138`, while `#c93a32` remains the 12-knot ceiling
   ceiling, with a short foam-white tail showing motion direction;
 - scale legible animation speed from current magnitude, while making no wall-clock travel
   claim;
@@ -77,7 +78,8 @@ current fill and below land/station labels. Tide markers remain static.
 - Pure advection follows local bearing, retains bounded curved history, and recycles on nil.
 - Dodd fallback evaluates its fitted model once, reverses on ebb, stays inside its visual
   envelope, and disappears without a model.
-- At a pinned Dodd peak, the head color is `#c93a32` and one animation step moves along the
+- At a pinned 9.43-knot Dodd peak, the head color is `#dd6138`, matching the detail curve's
+  absolute ramp, and one animation step moves along the
   expected set direction.
 - Reduce Motion freezes advancement without hiding the direction marks.
 - Toggle-off style remains free of streak sources/layers; no state-pin color expression is

@@ -281,7 +281,7 @@ Assert `chs-dodd-narrows` resolves to `[49.13546639419797, -123.81735084108287]`
 
 - [ ] **Step 2: Add the pinned Dodd acceptance test**
 
-With an injected `+9.43` knot fixture, assert the cluster center is the regenerated gate coordinate, head color is `#c93a32`, bearing is flood; repeat with `-9.43` and assert reciprocal bearing. Advance one second at scale 40 and assert movement exceeds one metre along the expected set.
+With an injected `+9.43` knot fixture, assert the cluster center is the regenerated gate coordinate, head color is `#dd6138` from the existing absolute curve ramp, and bearing is flood; repeat with `-9.43` and assert reciprocal bearing. Advance one second at scale 40 and assert movement exceeds one metre along the expected set. The ramp's `#c93a32` ceiling remains fixed at 12 knots, so Dodd and faster water do not collapse to one color.
 
 - [ ] **Step 3: Run focused and full verification**
 
