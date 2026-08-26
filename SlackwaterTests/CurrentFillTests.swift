@@ -1,10 +1,15 @@
 // Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
 // spec §2): style additions, the colour transfer, and the toggle contract —
 // on by default, off is byte-identical to the pre-fill style.
+import MapLibre
 import XCTest
 @testable import Slackwater
 
 final class CurrentFillTests: XCTestCase {
+    private func source(_ id: String) -> MLNShapeSource {
+        MLNShapeSource(identifier: id, shape: nil, options: nil)
+    }
+
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: currentFillKey)
         super.tearDown()
@@ -15,9 +20,6 @@ final class CurrentFillTests: XCTestCase {
     func testFillShipsOnByDefault() {
         UserDefaults.standard.removeObject(forKey: currentFillKey)
         XCTAssertTrue(currentFillEnabled)
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertTrue(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
     }
 
     /// A launch-argument override arrives as a STRING ("-showCurrentFill NO"),
@@ -28,85 +30,60 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertFalse(currentFillEnabled)
     }
 
-    /// Toggle off, the builders must emit exactly what they emitted before
-    /// the fill existed — no source, no layer.
-    func testToggleOffAddsNothingToTheStyle() {
-        UserDefaults.standard.set(false, forKey: currentFillKey)
-        XCTAssertFalse(currentFillEnabled)
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let sources = style["sources"] as? [String: Any] ?? [:]
-        XCTAssertNil(sources[CurrentFillRenderer.sourceID])
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
-        XCTAssertNil(sources[CurrentStreakAnimator.sourceID])
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.tailLayerID })
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.headLayerID })
+    /// The runtime fill layers: identical paint minus the source binding
+    /// (one ramp, one opacity law, one no-green rule for both providers), a
+    /// per-feature colour, antialias off, and an opacity that rides speed but
+    /// never reaches zero — certified coverage must stay distinguishable from
+    /// true no-data (spec §1). Patch-above-fill ordering is `attach`'s add
+    /// order, checked on the identifiers here.
+    func testFillLayersSharePaintAndColourPerFeature() {
+        let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
+                                     patch: source(CurrentFillRenderer.patchSourceID),
+                                     streaks: source(CurrentStreakAnimator.sourceID))
+        XCTAssertEqual(layers.fill.identifier, CurrentFillRenderer.sourceID)
+        XCTAssertEqual(layers.patch.identifier, CurrentFillRenderer.patchSourceID)
+        for layer in [layers.fill, layers.patch] {
+            // The getter normalizes to a colour cast around the key path —
+            // the invariant is that the "colour" attribute drives the paint.
+            XCTAssertTrue(String(describing: layer.fillColor).contains("colour"),
+                          "\(layer.identifier) must colour per feature")
+            XCTAssertEqual(layer.fillAntialiased.constantValue as? Bool, false,
+                           "\(layer.identifier) must keep antialias off or the mesh redraws as seams")
+        }
+        XCTAssertEqual(layers.fill.fillColor, layers.patch.fillColor,
+                       "one colour law for both providers")
+        XCTAssertEqual(layers.fill.fillOpacity, layers.patch.fillOpacity,
+                       "one opacity law for both providers")
+        XCTAssertTrue(String(describing: layers.fill.fillOpacity).contains("\(FILL_OPACITY_FLOOR)"),
+                      "the opacity floor left the paint — no-data and slack water become indistinguishable")
     }
 
-    /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
-    /// order, and feature order within one source does NOT guarantee paint
-    /// order — so patches get their own layer, directly above the fill's
-    /// (grown-patches spec §5; the ordering rule lives here by agreement).
-    func testPatchLayerSitsDirectlyAboveFillWithIdenticalPaint() {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        let ids = layers.map { $0["id"] as? String ?? "" }
-        let fill = ids.firstIndex(of: CurrentFillRenderer.sourceID)
-        let patch = ids.firstIndex(of: CurrentFillRenderer.patchSourceID)
-        XCTAssertNotNil(fill); XCTAssertNotNil(patch)
-        XCTAssertEqual(patch, fill.map { $0 + 1 }, "patches must draw directly above the fill")
-        XCTAssertLessThan(patch ?? 99, ids.firstIndex(of: "land-usca") ?? -1,
-                          "both layers stay under land")
-        // Identical paint minus the source binding: one ramp, one opacity law,
-        // one no-green rule for both providers.
-        var a = layers[fill!], b = layers[patch!]
-        XCTAssertEqual(a["paint"] as? NSDictionary, b["paint"] as? NSDictionary)
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
-    }
-
-    func testStreakStyleSitsAbovePatchesWithFoamTailsAndRampHeads() throws {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        let ids = layers.map { $0["id"] as? String ?? "" }
-        let patch = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchSourceID))
-        let tail = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.tailLayerID))
-        let head = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.headLayerID))
-        XCTAssertEqual(tail, patch + 1)
-        XCTAssertEqual(head, tail + 1)
-        XCTAssertLessThan(head, try XCTUnwrap(ids.firstIndex(of: "land-usca")))
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentStreakAnimator.sourceID])
-        XCTAssertEqual((layers[tail]["paint"] as? [String: Any])?["line-color"] as? String,
-                       mapHex(SN.foamHex))
-        XCTAssertEqual((layers[head]["paint"] as? [String: Any])?["circle-color"] as? [String],
-                       ["get", "colour"])
-        XCTAssertFalse(String(describing: layers).contains(String(describing: PIN_STATE_COLOUR)))
-    }
-
-    /// The fill layer sits UNDER the land layers — SSCOFS elements cross the
-    /// shoreline, and land drawn over the fill clips them to water — and
-    /// colours per feature from the "colour" attribute.
-    func testFillLayerInsertsUnderLandAndColoursPerFeature() {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[4]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 6)
-        let paint = layers.first?["paint"] as? [String: Any]
-        XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
-        XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)
-        // Opacity rides speed but never reaches zero — certified coverage
-        // must stay distinguishable from true no-data (spec §1).
-        let opacity = paint?["fill-opacity"] as? [Any]
-        XCTAssertEqual(opacity?.first as? String, "interpolate")
-        XCTAssertEqual(opacity?[4] as? Double, FILL_OPACITY_FLOOR)
-        XCTAssertGreaterThan(FILL_OPACITY_FLOOR, 0)
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.sourceID])
+    /// Streaks ride above both fill providers (the add order in `attach`),
+    /// tails are foam and heads take the #97 ramp per feature — the state
+    /// palette must never reach this channel. Tails and heads share one
+    /// source, so each layer takes only the geometry it draws: a circle layer
+    /// given a tail would dot every vertex of it.
+    func testStreakLayersRideAboveTheFillWithFoamTailsAndRampHeads() {
+        let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
+                                     patch: source(CurrentFillRenderer.patchSourceID),
+                                     streaks: source(CurrentStreakAnimator.sourceID))
+        XCTAssertEqual(layers.streakTail.identifier, CurrentStreakAnimator.tailLayerID)
+        XCTAssertEqual(layers.streakHead.identifier, CurrentStreakAnimator.headLayerID)
+        // Compared by description: two UIColors built the same way are not
+        // `==` unless they share a colour space.
+        XCTAssertEqual((layers.streakTail.lineColor.constantValue as? UIColor)?.description,
+                       hexColor(mapHex(SN.foamHex)).description,
+                       "tails are foam, not the ramp")
+        XCTAssertTrue(String(describing: layers.streakHead.circleColor).contains("colour"),
+                      "streak heads must take the ramp colour their features carry")
+        XCTAssertFalse(String(describing: layers.streakHead.circleColor)
+                        .contains(String(describing: PIN_STATE_COLOUR)),
+                       "the pin state palette must never reach the streak channel")
+        for layer in [layers.streakTail as MLNVectorStyleLayer, layers.streakHead] {
+            XCTAssertNotNil(layer.predicate,
+                            "\(layer.identifier) must take only its own geometry")
+            XCTAssertEqual(layer.minimumZoomLevel, Float(STREAK_MIN_ZOOM))
+        }
     }
 
     /// The colour transfer is the composition of the two shipped #97 pieces —

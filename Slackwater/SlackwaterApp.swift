@@ -19,6 +19,8 @@ struct SlackwaterApp: App {
         // until the app assigns it, so the widget extension — which also
         // compiles ChsModelStore.save — never triggers its own reload.
         WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
+        // Chart packs download whether or not the map is ever opened.
+        ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL)
         // UI-test hooks, like -chsResetModels: -resetGate forces the first-run
         // gate; -seedGate skips it (arguments-domain values would mask the
         // in-app write, so tests set persisted state explicitly instead).
@@ -679,15 +681,11 @@ struct StationListView: View {
             .onAppear { mapFocus = nil }
             .ignoresSafeArea()
 
-            // Was "Depths not reduced to chart datum — not for navigation."
-            // The depths half stopped being true: the offline chart carries no
-            // bathymetry at all (Seascape's depth shading is a `color-relief`
-            // layer MapLibre Native rejects, and its contours and soundings are
-            // separate online-only sources), so the map was disclaiming a
-            // reading it never shows. The navigation half stays — it is not
-            // decoration here, `docs/appstore-metadata.md` tells the reviewer
-            // this app marks "not for navigation" on every detail footer AND
-            // the map, and that claim has to remain true on this surface.
+            // Satellite imagery shows no depths, so there is no chart-datum
+            // claim to disclaim. The navigation half is not decoration:
+            // `docs/appstore-metadata.md` tells the reviewer this app marks
+            // "not for navigation" on every detail footer AND the map, and
+            // that claim has to remain true on this surface.
             Text("Not for navigation.")
                 .font(.caption2)
                 .foregroundStyle(SN.foam.opacity(0.85))

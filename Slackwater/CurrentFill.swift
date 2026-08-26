@@ -52,80 +52,62 @@ func fillColourHex(forSpeedKn kn: Double) -> String {
     return String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
 }
 
-/// Style-build side: an empty GeoJSON source and one fill layer coloured per
-/// feature, inserted UNDER the first pin layer so stations always draw over
-/// the wash. Outline matches the fill so a cell's own triangulation seams
-/// vanish while the outer certified/uncertified edge stays a hard step.
-func addFillStyle(_ style: inout [String: Any]) {
-    var sources = style["sources"] as? [String: Any] ?? [:]
-    let empty: [String: Any] = [
-        "type": "geojson",
-        "data": ["type": "FeatureCollection", "features": [] as [Any]],
-    ]
-    sources[CurrentFillRenderer.sourceID] = empty
-    sources[CurrentFillRenderer.patchSourceID] = empty
-    sources[CurrentStreakAnimator.sourceID] = empty
-    style["sources"] = sources
-    let layer: [String: Any] = [
-        "id": CurrentFillRenderer.sourceID, "type": "fill",
-        "source": CurrentFillRenderer.sourceID,
+/// The runtime layers for both fill providers and the streak channel,
+/// coloured per feature, added under the pin layers so stations always draw
+/// over the wash.
+/// Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
+/// mouth fringe is draw order and nothing else (grown-patches spec §5), and
+/// feature order within one source does not guarantee paint order — layer
+/// order does. Identical paint: one ramp, one opacity law, one no-green rule
+/// for both providers. The streaks ride above both.
+func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource, streaks: MLNShapeSource)
+        -> (fill: MLNFillStyleLayer, patch: MLNFillStyleLayer,
+            streakTail: MLNLineStyleLayer, streakHead: MLNCircleStyleLayer) {
+    func configure(_ layer: MLNFillStyleLayer) {
+        layer.fillColor = NSExpression(mglJSONObject: ["get", "colour"])
         // antialias false: adjacent triangles' antialiased half-covered edge
         // pixels sum under translucency and redraw the whole mesh as seams.
         // Off, interiors fuse; the outer certified/uncertified edge stays a
         // hard step (which the spec wants visible).
-        "paint": ["fill-color": ["get", "colour"],
-                  "fill-antialias": false,
-                  "fill-opacity": ["interpolate", ["linear"], ["get", "kn"],
-                                   0.5, FILL_OPACITY_FLOOR,
-                                   6, FILL_OPACITY_TOP]],
-    ]
-    var layers = style["layers"] as? [[String: Any]] ?? []
-    // Under the LAND, not just under the pins: SSCOFS elements legitimately
-    // cross the shoreline, and land drawn over the fill clips them to water
-    // for free — no geometry clipping. ponytail: if the depth relief above
-    // proves opaque enough to bury the fill, this anchor moves back up.
-    // Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
-    // mouth fringe is draw order and nothing else (grown-patches spec §5),
-    // and feature order within one source does not guarantee paint order —
-    // layer order does. Same paint dict: one ramp, one opacity law, one
-    // no-green rule for both providers.
-    var patch = layer
-    patch["id"] = CurrentFillRenderer.patchSourceID
-    patch["source"] = CurrentFillRenderer.patchSourceID
-    let tail: [String: Any] = [
-        "id": CurrentStreakAnimator.tailLayerID, "type": "line",
-        "source": CurrentStreakAnimator.sourceID,
-        "minzoom": STREAK_MIN_ZOOM,
-        "filter": ["==", ["geometry-type"], "LineString"],
-        "layout": ["line-cap": "round", "line-join": "round"],
-        "paint": ["line-color": mapHex(SN.foamHex), "line-width": 2.0, "line-opacity": 0.8],
-    ]
-    let head: [String: Any] = [
-        "id": CurrentStreakAnimator.headLayerID, "type": "circle",
-        "source": CurrentStreakAnimator.sourceID,
-        "minzoom": STREAK_MIN_ZOOM,
-        "filter": ["==", ["geometry-type"], "Point"],
-        "paint": ["circle-radius": 2.0, "circle-color": ["get", "colour"], "circle-opacity": 0.9],
-    ]
-    let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
-    let anchor = landIdx
-        ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
-        ?? layers.count
-    layers.insert(contentsOf: [layer, patch, tail, head], at: anchor)
-    style["layers"] = layers
+        layer.fillAntialiased = NSExpression(forConstantValue: false)
+        layer.fillOpacity = NSExpression(mglJSONObject:
+            ["interpolate", ["linear"], ["get", "kn"],
+             0.5, FILL_OPACITY_FLOOR, 6, FILL_OPACITY_TOP])
+    }
+    let fillLayer = MLNFillStyleLayer(identifier: CurrentFillRenderer.sourceID, source: fill)
+    let patchLayer = MLNFillStyleLayer(identifier: CurrentFillRenderer.patchSourceID, source: patch)
+    configure(fillLayer)
+    configure(patchLayer)
+
+    // Tails and heads share one source, so each layer takes the geometry it
+    // draws: a circle layer given a tail would dot every vertex of it.
+    let tail = MLNLineStyleLayer(identifier: CurrentStreakAnimator.tailLayerID, source: streaks)
+    tail.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "LineString"])
+    tail.minimumZoomLevel = Float(STREAK_MIN_ZOOM)
+    tail.lineCap = NSExpression(forConstantValue: "round")
+    tail.lineJoin = NSExpression(forConstantValue: "round")
+    tail.lineColor = NSExpression(forConstantValue: hexColor(mapHex(SN.foamHex)))
+    tail.lineWidth = NSExpression(forConstantValue: 2.0)
+    tail.lineOpacity = NSExpression(forConstantValue: 0.8)
+
+    let head = MLNCircleStyleLayer(identifier: CurrentStreakAnimator.headLayerID, source: streaks)
+    head.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "Point"])
+    head.minimumZoomLevel = Float(STREAK_MIN_ZOOM)
+    head.circleRadius = NSExpression(forConstantValue: 2.0)
+    head.circleColor = NSExpression(mglJSONObject: ["get", "colour"])
+    head.circleOpacity = NSExpression(forConstantValue: 0.9)
+
+    return (fillLayer, patchLayer, tail, head)
 }
 
 /// Owns the fill bundle and the refresh timer. One instance per `MapStyler`;
-/// `attach` re-runs on every style load (fallback, then Seascape) because the
+/// `attach` re-runs on every style load because the
 /// source object belongs to the style that loaded it.
 final class CurrentFillRenderer {
     static let sourceID = "current-fill"
     static let patchSourceID = "current-fill-patches"
 
     private weak var map: MLNMapView?
-    /// Strong on purpose — same MapLibre gotcha the particle spike hit: a
-    /// source looked up out of a JSON-declared style is a fresh wrapper the
-    /// style does NOT retain.
     private var source: MLNShapeSource?
     private var patchSource: MLNShapeSource?
     /// Both providers vend the same FillCell shape (the frozen seam); the
@@ -144,8 +126,27 @@ final class CurrentFillRenderer {
 
     func attach(to style: MLNStyle, map: MLNMapView) {
         self.map = map
-        source = style.source(withIdentifier: Self.sourceID) as? MLNShapeSource
-        patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
+        // The basemap is a style URL this app does not own — the fill's
+        // sources and layers go in through the runtime API, per style load.
+        if let existing = style.source(withIdentifier: Self.sourceID) as? MLNShapeSource {
+            source = existing
+            patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
+        } else {
+            let fill = MLNShapeSource(identifier: Self.sourceID, shape: nil, options: nil)
+            let patch = MLNShapeSource(identifier: Self.patchSourceID, shape: nil, options: nil)
+            let streakSource = MLNShapeSource(identifier: CurrentStreakAnimator.sourceID,
+                                              shape: nil, options: nil)
+            style.addSource(fill)
+            style.addSource(patch)
+            style.addSource(streakSource)
+            let layers = fillStyleLayers(fill: fill, patch: patch, streaks: streakSource)
+            style.addLayer(layers.fill)
+            style.addLayer(layers.patch)
+            style.addLayer(layers.streakTail)
+            style.addLayer(layers.streakHead)
+            source = fill
+            patchSource = patch
+        }
         if field == nil { field = FillField() }
         if patches == nil { patches = PatchField() }
         streaks.attach(to: style, map: map, fillField: field, patchField: patches)

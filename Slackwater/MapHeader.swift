@@ -166,8 +166,7 @@ struct InteractivePopEnabler: UIViewControllerRepresentable {
 }
 
 /// The header's map: centered on the station, station zoom, non-interactive.
-/// Same style pipeline as the discovery map (land PMTiles floor, Seascape
-/// composed in when reachable).
+/// Same style pipeline as the discovery map.
 private struct StationMapView: UIViewRepresentable {
     let latitude: Double
     let longitude: Double
@@ -184,7 +183,7 @@ private struct StationMapView: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         context.coordinator.styler = MapStyler(
-            map: map, cacheName: "header",
+            map: map,
             center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
             zoom: stationZoom)
         return map

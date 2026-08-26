@@ -99,8 +99,8 @@ targets:
     sources:
       - SlackwaterWidgets
       # Explicit station catalogs only — NOT the whole Resources folder. That
-      # folder also holds ~98 MB of map tiles (pmtiles) and chart sprites that
-      # nothing in this appex reads; bundling it inflated every widget build.
+      # folder also holds resources (fill bundles, glyphs) that nothing in
+      # this appex reads; bundling it all inflated every widget build.
       # Keep this list in sync with the `bundled("...")` calls in the model
       # files below (grep bundled\( to verify).
       - path: Slackwater/Resources/stations.json
