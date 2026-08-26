@@ -93,7 +93,7 @@ enum Timeline {
     /// Tide change is a separate measurement from current speed, but uses the
     /// same global warning palette. The red ceiling is 1.8 m/hr (about
     /// 6 ft/hr), so Fundy-scale movement reaches the warning colour.
-    static let tideRateRampAnchorsMHr: [Double] = [0.6, 1.0, 1.5, 1.8]
+    static let tideRateRampAnchorsMHr = tideMovementRampAnchorsMHr
     static func rampT(forTideRateMHr rate: Double) -> Double {
         rampT(rate, anchors: tideRateRampAnchorsMHr)
     }
@@ -333,40 +333,6 @@ func currentExcessSegments(_ points: [CurrentPoint], threshold: Double) -> [[Cur
     }
     finish()
     return segments
-}
-
-/// Each rising or falling run gets one curve-following motion cue, placed at
-/// its fastest point. Repeating it along the whole curve turns motion into
-/// texture, especially at Fundy-scale stations.
-func tideFlowArrows(_ rates: [TideRatePoint]) -> [TideRatePoint] {
-    var peaks: [TideRatePoint] = []
-    var run: [TideRatePoint] = []
-    var direction = 0
-
-    func finishRun() {
-        if let peak = run.max(by: { abs($0.rate) < abs($1.rate) }), abs(peak.rate) >= 0.6 {
-            peaks.append(peak)
-        }
-        run = []
-    }
-
-    for point in rates {
-        guard abs(point.rate) >= 0.0001 else { finishRun(); direction = 0; continue }
-        let nextDirection = point.rate.sign == .minus ? -1 : point.rate.sign == .plus ? 1 : 0
-        if direction != 0, nextDirection != direction { finishRun() }
-        direction = nextDirection
-        run.append(point)
-    }
-    finishRun()
-    return peaks
-}
-
-func tideRateSeverity(_ rate: Double) -> String? {
-    let rate = abs(rate)
-    guard rate >= Timeline.tideRateRampAnchorsMHr[0] else { return nil }
-    if rate >= Timeline.tideRateRampAnchorsMHr[2] { return "🚨 Extreme" }
-    if rate >= Timeline.tideRateRampAnchorsMHr[1] { return "‼️ Very fast" }
-    return "⚠️ Fast"
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

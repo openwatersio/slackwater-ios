@@ -34,6 +34,45 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(s.stationName, "Current Location · Friday Harbor")
     }
 
+    func testTideSnapshotCarriesNextHighAndLow() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let s = WidgetSnapshot.build(friday, now: now)
+
+        let high = try XCTUnwrap(s.nextHigh)
+        let low = try XCTUnwrap(s.nextLow)
+        XCTAssertGreaterThan(high.time, now)
+        XCTAssertGreaterThan(low.time, now)
+        XCTAssertTrue(high.label.hasPrefix("High "))
+        XCTAssertTrue(low.label.hasPrefix("Low "))
+    }
+
+    func testTideSnapshotCarriesScrubberMovement() {
+        let station = Station(
+            constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
+            offset: 6)
+        let tide = WidgetStation.tide(station, tz: TimeZone(identifier: "UTC")!,
+                                      name: "Fast Tide")
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let s = WidgetSnapshot.build(tide, now: now)
+
+        XCTAssertFalse(s.tideMovements.isEmpty)
+        XCTAssertNotNil(s.tideRate)
+        XCTAssert(s.tideMovements.allSatisfy { (0...1).contains($0.fraction) })
+    }
+
+    func testQuietTideAccessibilityDoesNotAnnounceMovementChevrons() {
+        let station = Station(
+            constituents: [HarmonicConstituent(name: "M2", amplitude: 0.1, phase: 0)],
+            offset: 1)
+        let snapshot = WidgetSnapshot.build(
+            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "Quiet Tide"),
+            now: Date(timeIntervalSince1970: 1_755_800_000))
+
+        XCTAssertTrue(snapshot.tideMovements.isEmpty)
+        XCTAssertFalse(DayCurveContentView(snapshot: snapshot).curveAccessibilityValue
+            .contains("Movement chevrons"))
+    }
+
     /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
     /// app's own Settings choice, so a metric-only label shipped to every
     /// imperial user. Setting imperial explicitly (rather than relying on
@@ -76,7 +115,7 @@ final class WidgetSnapshotTests: XCTestCase {
     func testMediumWidgetPresentsSlackWindowBeforeItsCountdown() throws {
         let source = try repoSource("Slackwater/MiniScrubberView.swift")
 
-        XCTAssert(source.contains("Text(snapshot.state.uppercased())"))
+        XCTAssert(source.contains("Text(tideWarning ?? snapshot.state.uppercased())"))
         XCTAssert(source.contains("Text(snapshot.value)"))
         XCTAssert(source.contains("MiniScrubberView(snapshot: snapshot)"))
         XCTAssert(source.contains("Text(window.start, style: .time)"))
@@ -125,6 +164,45 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertGreaterThan(orangeInk, 100, "current curve rendered without warm-water ink")
         let attachment = XCTAttachment(image: image)
         attachment.name = "medium-widget-current"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testMiniScrubberRendersTideMovementInk() throws {
+        let station = Station(
+            constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
+            offset: 6)
+        let seed = Date(timeIntervalSince1970: 1_755_800_000)
+        let now = try XCTUnwrap(station.rates(from: seed,
+                                              to: seed.addingTimeInterval(12 * 3600))
+            .max { abs($0.rate) < abs($1.rate) }).time
+        let snapshot = WidgetSnapshot.build(
+            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "Fast Tide"),
+            now: now)
+        let renderer = ImageRenderer(content: DayCurveContentView(snapshot: snapshot)
+            .padding(16)
+            .frame(width: 338, height: 158)
+            .background(Color.white))
+        let image = try XCTUnwrap(renderer.uiImage)
+        let cg = try XCTUnwrap(image.cgImage)
+        let width = cg.width, height = cg.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        CIContext().render(CIImage(cgImage: cg), toBitmap: &pixels,
+                           rowBytes: width * 4,
+                           bounds: CGRect(x: 0, y: 0, width: width, height: height),
+                           format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+        let chartRows = 30..<(height - 30)
+        let warmInk = chartRows.reduce(into: 0) { count, y in
+            for x in 12..<(width - 12) {
+                let i = (y * width + x) * 4
+                if pixels[i] > 180, pixels[i + 1] > 40,
+                   pixels[i + 1] < 210, pixels[i + 2] < 120 { count += 1 }
+            }
+        }
+        XCTAssertGreaterThan(warmInk, 100, "tide curve rendered without movement warning ink")
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "medium-widget-fast-tide"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
