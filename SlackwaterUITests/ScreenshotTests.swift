@@ -2143,20 +2143,12 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
     }
 
-    /// T6 acceptance case for the whole world-coverage plan: the Solent, the
-    /// water that started it (`firstRunFix`'s doc comment — the app once
-    /// opened here and ranked from Vancouver Island). No NOAA or CHS current
-    /// station is within `currentCoverageKm` of Portsmouth, so Near Me must say so in words
-    /// rather than just show an empty currents list — an empty list here
-    /// reads as "the water is slack", which is false and dangerous.
-    func testM53NoCurrentCoverageNoticeAtPortsmouth() throws {
+    func testM53DoesNotShowNoCurrentCoverageNoticeAtPortsmouth() throws {
         let app = launch("-seedGate", "-resetRecents", "-fixLat", "50.80", "-fixLon", "-1.11")
 
         let notice = app.staticTexts["Current predictions not available here"].firstMatch
-        XCTAssert(notice.waitForExistence(timeout: 5),
-                  "Portsmouth has no NOAA or CHS current station within reach — Near Me must say so")
-        scrollTo(notice, in: app)
-        save(app, "m53-portsmouth-no-current-coverage.png")
+        XCTAssertFalse(notice.waitForExistence(timeout: 2),
+                       "Near Me must not show an unactionable current-coverage warning")
     }
 
     /// Search at 3,125 stations: bounded, nearest-first, and honest about what
