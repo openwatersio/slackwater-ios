@@ -86,11 +86,38 @@ extension ChsModelStore {
     /// pre-#67): each fails cleanly on the other's bytes (`blocks` vs
     /// `times`/`speeds` are required keys), so the order is just preference.
     /// The first save rewrites the file in the store shape.
+    ///
+    /// Decoded stores are memoized because callers treat this as a cheap
+    /// getter — the downloads manager reads it inside a sort comparator, per
+    /// row, per body evaluation — while the file behind it can reach ~1MB
+    /// (`saveOnline`'s no-forward-cap note). Uncached, one render was
+    /// hundreds of main-thread decodes and the scene-update watchdog killed
+    /// the app at 10s (0x8BADF00D, build 31). The entry is validated by the
+    /// file's mtime+size rather than invalidated at call sites, so every
+    /// writer and deleter — `saveOnline`, the orphan prune, `-chsResetModels`,
+    /// tests using raw FileManager — stays correct without knowing a cache
+    /// exists.
     static func loadOnline(_ stationID: String) -> ChsOnlineStore? {
-        if let store: ChsOnlineStore = load(stationID, suffix: "-online") { return store }
-        guard let legacy: ChsOnlineWindow = load(stationID, suffix: "-online") else { return nil }
-        return ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: onlineUrl(stationID).path),
+              let mtime = attrs[.modificationDate] as? Date,
+              let size = attrs[.size] as? Int else { return nil }
+        onlineCacheLock.lock()
+        defer { onlineCacheLock.unlock() }
+        if let hit = onlineCache[stationID], hit.mtime == mtime, hit.size == size { return hit.store }
+        let store: ChsOnlineStore?
+        if let s: ChsOnlineStore = load(stationID, suffix: "-online") {
+            store = s
+        } else if let legacy: ChsOnlineWindow = load(stationID, suffix: "-online") {
+            store = ChsOnlineStore(stationID: legacy.stationID, blocks: [legacy])
+        } else {
+            store = nil
+        }
+        if let store { onlineCache[stationID] = (mtime, size, store) }
+        return store
     }
+
+    private static var onlineCache: [String: (mtime: Date, size: Int, store: ChsOnlineStore)] = [:]
+    private static let onlineCacheLock = NSLock()
 }
 
 /// Where the next speculative fetch starts: the local midnight at the stored
