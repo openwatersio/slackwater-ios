@@ -172,6 +172,12 @@ final class ChsCurrentGateTests: XCTestCase {
         try ChsModelStore.saveOnline(window)
         let url = ChsModelStore.onlineUrl(window.stationID)
         defer { try? FileManager.default.removeItem(at: url) }
+        // A pinned whole-second mtime, not the stat-read one: Date → timespec
+        // → Date loses ~240 ns of Double precision on a real "now", so forging
+        // "the same mtime" from a stat read races that rounding (it failed on
+        // CI, passed locally). A whole second survives every conversion.
+        let stamp = Date(timeIntervalSince1970: 1_000_000)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
         let first = try XCTUnwrap(ChsModelStore.loadOnline(window.stationID))
 
         // Corrupt the file while forging identical mtime+size — only the memo
@@ -179,9 +185,8 @@ final class ChsCurrentGateTests: XCTestCase {
         // (the main-thread decode storm behind the build-31 watchdog kills).
         let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
         let size = try XCTUnwrap(attrs[.size] as? Int)
-        let mtime = try XCTUnwrap(attrs[.modificationDate] as? Date)
         try Data(repeating: 0x7B, count: size).write(to: url)
-        try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: url.path)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
         XCTAssertEqual(ChsModelStore.loadOnline(window.stationID)?.blocks.first?.times,
                        first.blocks.first?.times,
                        "unchanged mtime+size serves the memoized store without touching the bytes")
