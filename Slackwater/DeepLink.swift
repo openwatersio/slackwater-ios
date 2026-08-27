@@ -26,3 +26,14 @@ func deepLink(forStationID id: String?) -> URL? {
     else { return URL(string: "slackwater://premium") }
     return URL(string: "slackwater://station/\(encoded)")
 }
+
+/// The station id back out of a `slackwater://station/<id>` URL — the inverse
+/// of `deepLink(forStationID:)`, and the only safe read of it. The id IS the
+/// whole path and nearly every id carries a "/" ("noaa/9449880"), so take the
+/// path whole and let it decode: a componentwise read (`pathComponents`,
+/// `lastPathComponent`) splits on that "/" once the escape is resolved and
+/// hands back "noaa", which matches no station and dies as a lookup miss
+/// (#167). This works whichever way the URL arrives, escaped or resolved.
+func stationID(from url: URL) -> String {
+    String(url.path(percentEncoded: false).dropFirst())
+}

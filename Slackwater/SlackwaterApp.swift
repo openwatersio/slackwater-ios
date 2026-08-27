@@ -164,10 +164,25 @@ struct RootView: View {
     @AppStorage(seenGateKey) private var seenGate = false
 
     var body: some View {
-        if seenGate {
-            StationListView()
-        } else {
-            GateView()
+        Group {
+            if seenGate {
+                StationListView()
+            } else {
+                GateView()
+            }
+        }
+        // A widget can be added from the gallery before the app is ever
+        // opened, so a station link can arrive while the gate is still up —
+        // and the handler that acts on it lives in the list, which does not
+        // exist yet, so the URL would land on nothing. A link IS a station
+        // chosen, which is the only thing the gate asks: resolve it and hand
+        // the URL to the list's first appear, the handoff `gateSearchHandoff`
+        // already rides. Past the gate this does nothing and the list's own
+        // handler takes the URL directly.
+        .onOpenURL { url in
+            guard !seenGate, url.scheme == "slackwater", url.host == "station" else { return }
+            pendingDeepLink = url
+            seenGate = true
         }
     }
 }
@@ -297,6 +312,10 @@ struct GateView: View {
 /// Set by the gate's "or search" bypass, consumed by the list's first appear —
 /// the bypass lands straight in the search experience.
 var gateSearchHandoff = false
+
+/// Set by a widget deep link that arrives before the gate is answered (RootView),
+/// consumed by the list's first appear — same handoff, one screen later.
+var pendingDeepLink: URL?
 
 struct StationListView: View {
     @State private var path = NavigationPath()
@@ -453,19 +472,7 @@ struct StationListView: View {
         // reads no custom environment key. If it ever grows a station link, mind
         // the reforwarding gotcha those two sheets document.
         .sheet(isPresented: $showWidgetsGallery) { WidgetsGalleryView() }
-        // The app's first URL scheme (project.yml CFBundleURLTypes). Widgets
-        // emit both routes: locked accessory widgets → premium (Task 6), home
-        // widgets and the free ones' deepLink → station/<id> (HomeWidgets.swift).
-        .onOpenURL { url in
-            guard url.scheme == "slackwater" else { return }
-            switch url.host {
-            case "premium": showWidgetsGallery = true
-            case "station":
-                let id = url.pathComponents.dropFirst().first ?? ""
-                if let item = StationItem.byId[id] { open(item) }
-            default: break
-            }
-        }
+        .onOpenURL(perform: handleDeepLink)
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,
                                 anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in
@@ -480,6 +487,10 @@ struct StationListView: View {
             if gateSearchHandoff {
                 gateSearchHandoff = false
                 openSearch()
+            }
+            if let url = pendingDeepLink {
+                pendingDeepLink = nil
+                handleDeepLink(url)
             }
         }
         // First connected launch: the auto-fit set around where this list is
@@ -697,6 +708,22 @@ struct StationListView: View {
                 .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
         }
         .background(SN.canvas.ignoresSafeArea())
+    }
+
+    /// The app's first URL scheme (project.yml CFBundleURLTypes). Widgets emit
+    /// both routes: locked accessory widgets → premium (Task 6), home widgets
+    /// and the free ones' deepLink → station/<id> (HomeWidgets.swift). Named
+    /// rather than inline because RootView's pre-gate handoff replays the URL
+    /// through it on first appear.
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "slackwater" else { return }
+        switch url.host {
+        case "premium": showWidgetsGallery = true
+        // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
+        case "station":
+            if let item = StationItem.byId[stationID(from: url)] { open(item) }
+        default: break
+        }
     }
 
     /// Show a station picked anywhere (row tap in regular, map pin tap in
