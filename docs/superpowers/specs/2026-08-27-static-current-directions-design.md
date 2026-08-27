@@ -28,8 +28,10 @@ The current layer contains no animation timer and performs no per-frame GeoJSON 
   sampling system.
 - Where the fitted Dodd model is available, evaluate it on the same one-minute cadence and
   emit one station-local direction point. Do not draw an area or imply certified coverage.
-- The existing Currents toggle owns fill and arrows. Current pins remain independent, as they
-  are elsewhere on the map. Add no setting, dependency, or data format.
+- Fill and arrows are always visible with the map. Remove the user-facing Currents toggle and
+  its persisted preference; retain `-currentFillOff` only as a deterministic test override.
+  Current pins remain independent, as they are elsewhere on the map. Add no setting,
+  dependency, or data format.
 - Reduce Motion needs no separate behavior because the renderer is static.
 
 Patch direction is authoritative where patch and backdrop cells overlap. Omit a backdrop
@@ -62,7 +64,8 @@ measured fix. Do not reintroduce per-frame work.
 - Patch direction wins over backdrop direction in overlap.
 - Dodd emits one arrow with the fitted flood bearing on positive flow, the reciprocal on
   negative flow, and nothing without a fitted model.
-- Toggle off adds no current sources or layers.
+- The map has no user-facing current-layer toggle or persisted current-layer preference.
+- The `-currentFillOff` test override adds no current sources or layers.
 - Existing fill colour, no-green, layer-order, and field-sampling tests remain green.
 
 Prove the regression assertion red against the animation implementation before removing it,
