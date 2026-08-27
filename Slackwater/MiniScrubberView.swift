@@ -2,6 +2,17 @@
 // shared with the app target so its actual Canvas output can be tested.
 import SwiftUI
 
+func widgetStationPresentation(_ stationName: String) -> (name: String, isCurrentLocation: Bool) {
+    let prefix = "Current Location · "
+    guard stationName.hasPrefix(prefix) else { return (stationName, false) }
+    return (String(stationName.dropFirst(prefix.count)), true)
+}
+
+func tideEventValue(_ label: String) -> String {
+    let prefix = ["High ", "Low "].first { label.hasPrefix($0) }
+    return prefix.map { String(label.dropFirst($0.count)) } ?? label
+}
+
 struct DayCurveContentView: View {
     let snapshot: WidgetSnapshot
 
@@ -41,9 +52,16 @@ struct DayCurveContentView: View {
     }
 
     var body: some View {
+        let station = widgetStationPresentation(snapshot.stationName)
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(snapshot.stationName)
+                if station.isCurrentLocation {
+                    Image(systemName: "location.north.fill")
+                        .font(.caption2.weight(.semibold))
+                        .rotationEffect(.degrees(45))
+                        .accessibilityLabel("Current location")
+                }
+                Text(station.name)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                 Spacer()
@@ -117,7 +135,8 @@ struct DayCurveContentView: View {
             HStack(spacing: 4) {
                 Image(systemName: event.symbol)
                     .font(.caption2.weight(.semibold))
-                Text(event.label)
+                    .accessibilityLabel(event.label.hasPrefix("High ") ? "High tide" : "Low tide")
+                Text(tideEventValue(event.label))
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .lineLimit(1)
                 Text(event.time, style: .time)
