@@ -46,6 +46,18 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertTrue(low.label.hasPrefix("Low "))
     }
 
+    func testCurrentLocationWidgetPresentsIconAndResolvedStationName() {
+        let presentation = widgetStationPresentation("Current Location · North Vancouver")
+
+        XCTAssertTrue(presentation.isCurrentLocation)
+        XCTAssertEqual(presentation.name, "North Vancouver")
+    }
+
+    func testTideWidgetPresentsHeightWithoutRedundantHighLowText() {
+        XCTAssertEqual(tideEventValue("High 15.5 ft"), "15.5 ft")
+        XCTAssertEqual(tideEventValue("Low 4.2 ft"), "4.2 ft")
+    }
+
     func testTideSnapshotCarriesScrubberMovement() {
         let station = Station(
             constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
@@ -178,8 +190,8 @@ final class WidgetSnapshotTests: XCTestCase {
                                               to: seed.addingTimeInterval(12 * 3600))
             .max { abs($0.rate) < abs($1.rate) }).time
         let snapshot = WidgetSnapshot.build(
-            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "Fast Tide"),
-            now: now)
+            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "North Vancouver"),
+            now: now, stationNamePrefix: "Current Location")
         let renderer = ImageRenderer(content: DayCurveContentView(snapshot: snapshot)
             .padding(16)
             .frame(width: 338, height: 158)
@@ -202,7 +214,7 @@ final class WidgetSnapshotTests: XCTestCase {
         }
         XCTAssertGreaterThan(warmInk, 100, "tide curve rendered without movement warning ink")
         let attachment = XCTAttachment(image: image)
-        attachment.name = "medium-widget-fast-tide"
+        attachment.name = "medium-widget-current-location-tide"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
