@@ -192,7 +192,31 @@ struct OfflineManagerList: View {
     // scales with type, the slot scales with it so it can't overflow the row.
 
     private var queue: ChsQueue { service.queue }
-    private var onlineGates: [ChsCurrentGateInfo] { ChsCurrentGateInfo.all.filter(\.isOnline) }
+    /// The online (fit-reject) gates that belong in this manager: the ones a
+    /// fix would prefetch, plus any already on disk.
+    ///
+    /// Bounded by the same radius as the prefetch itself (#205), because a row
+    /// here is a promise the app can keep. `autoPrefetchGates` refuses a gate
+    /// beyond `autoFitRadiusKm`, and all nine online gates are Salish or BC
+    /// coast — so listing them from, say, Massachusetts adds nine rows that
+    /// can never become ready and a denominator the progress bar can never
+    /// reach. The radius, not `autoPrefetchGates` itself: that caps at
+    /// `autoFitGates`, and a Victoria fix has more online gates in reach than
+    /// the prefetch budget spends. In range and un-fetched is a legitimate
+    /// row — it says "Not downloaded" and a tap fetches it.
+    ///
+    /// The on-disk half keeps a gate the user opened by hand and then sailed
+    /// away from: its window is real, expires like any other, and the manager
+    /// is the only place to refresh it. The disk read costs nothing new —
+    /// `sortRank` already loads every online row's window on every render.
+    private var onlineGates: [ChsCurrentGateInfo] {
+        let anchor = LocationService.shared.rankingAnchor
+        return ChsCurrentGateInfo.all.filter {
+            guard $0.isOnline else { return false }
+            let km = distanceKm($0.latitude, $0.longitude, anchor.lat, anchor.lon)
+            return km <= ChsFitService.autoFitRadiusKm || onlineWindow($0) != nil
+        }
+    }
     private var downloads: [ManagedDownload] {
         let items = queue.jobs.map(ManagedDownload.fitted) + onlineGates.map(ManagedDownload.online)
         return items.enumerated().sorted { lhs, rhs in
@@ -235,9 +259,15 @@ struct OfflineManagerList: View {
 
     private var summary: some View {
         VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: "\(readyCount) of \(downloads.count) ready")
-            ProgressView(value: Double(readyCount), total: Double(max(downloads.count, 1)))
-                .tint(failedCount > 0 ? SN.amber : SN.leaf)
+            // A counter and a bar are progress through a download set. With no
+            // set they are "0 of 0 ready" over an empty track, which reads as a
+            // stalled download rather than as nothing to do (#205) — the
+            // sentence below carries the whole state on its own.
+            if !downloads.isEmpty {
+                MonoLabel(text: "\(readyCount) of \(downloads.count) ready")
+                ProgressView(value: Double(readyCount), total: Double(downloads.count))
+                    .tint(failedCount > 0 ? SN.amber : SN.leaf)
+            }
             Text(summaryLine)
                 .font(.footnote)
                 .lineSpacing(3)
@@ -269,7 +299,17 @@ struct OfflineManagerList: View {
     /// are on the device — and the sentence has to say, every time, that the
     /// rest of Canada is one tap away rather than missing.
     private var summaryLine: String {
-        if readyCount == downloads.count, !downloads.isEmpty {
+        // Nothing in reach (#205). Every other branch below describes a
+        // download set, and away from Canadian water there isn't one — the
+        // radius means a US or inland fix legitimately has zero rows, and
+        // "Downloading Canadian tidal and current predictions…" over an empty
+        // list is the sentence that started this. Says what is true and what
+        // the app can still do, which for that user is everything: the NOAA
+        // and TICON stations they are actually near are bundled.
+        if downloads.isEmpty {
+            return "No Canadian predictions to download here — you're outside the range where they'd be useful. Stations near you work offline already.\(onDemandLine)"
+        }
+        if readyCount == downloads.count {
             return "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.\(onDemandLine)"
         }
         if !net.online {

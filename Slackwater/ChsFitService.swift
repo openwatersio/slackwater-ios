@@ -114,7 +114,7 @@ final class ChsFitService: ObservableObject {
     ///
     /// So the two series are budgeted separately, and the numbers are measured
     /// against the fetcher's 2.5 s pacing:
-    ///   - 6 tide ports, ~25 s each => ~2.5 min, anywhere in the country.
+    ///   - 6 tide ports, ~25 s each => ~2.5 min, anywhere in reach.
     ///   - 3 current gates, 52 s (60-day) to 158 s (210-day) => ~4-6 min in
     ///     the Salish, and a 210-day gate publishes its usable fast answer
     ///     partway through rather than at the end.
@@ -122,9 +122,26 @@ final class ChsFitService: ObservableObject {
     /// the gates. The nearest tide port is still usable at ~30 s — the number
     /// that matters most, and it does not move.
     ///
-    /// The radius is what keeps a Halifax first run honest: the nearest CHS
-    /// current gate is 4,430 km away, and downloading Salish passes for a Nova
-    /// Scotian is pure waste. 150 km is about a long day's passage at 6 knots.
+    /// The radius guards BOTH series, and it is what keeps a first run honest
+    /// away from Canadian water (#205). Gating only the gates would look
+    /// sufficient from a Canadian fix — a Nova Scotian's nearest gate is
+    /// 305 km off, so they fit no Salish passes either way — and is not
+    /// sufficient anywhere else: unguarded ports adopt the nearest 6 from any
+    /// fix on Earth, which from Massachusetts is three St. Lawrence river
+    /// gauges at Montréal plus three Bay of Fundy stations across the Gulf of
+    /// Maine, ~400 km off, in a list whose nearest entry is NOAA Boston
+    /// Harbor at 1 km. 150 km is about a long day's passage at 6 knots.
+    ///
+    /// The radius cannot starve a real user: it only ever drops stations
+    /// further away than every station that outranks them, so nothing it drops
+    /// could have reached Near Me, and #178's "the first screen is covered by
+    /// what the first run downloads" still holds. Ports inside the radius,
+    /// measured against the shipped bundle: Nanaimo 129, Vancouver 106,
+    /// Victoria 94, Charlottetown 74, Saint John 71, Halifax 61, Prince Rupert
+    /// 51, Québec 42, St John's 38, Montréal 10, Iqaluit 5 — and Bellingham
+    /// 84, Port Angeles 80, Seattle 28, so a Puget Sound sailor keeps Gulf
+    /// Islands coverage. Boston, Portland ME, Toronto, Ottawa, Winnipeg,
+    /// Calgary and Whitehorse get zero, which is the point.
     ///
     /// Everything else stays visible, searchable and one tap from downloading:
     /// opening a station adds it to this set and jumps it to the front.
@@ -132,7 +149,7 @@ final class ChsFitService: ObservableObject {
     /// asks — a region picker is the thing nobody has asked for.
     static let autoFitPorts = 6
     static let autoFitGates = 3
-    static let autoFitGateRadiusKm = 150.0
+    static let autoFitRadiusKm = 150.0
 
     /// Every CHS station the app could fit, ports and validated gates. The 7
     /// online (fit-reject) gates are excluded here, at the source every job —
@@ -163,12 +180,12 @@ final class ChsFitService: ObservableObject {
     /// in Near Me on a first run and both said "Tap to download" forever.
     ///
     /// Same budget shape as the fitted gates deliberately: nearest first, at
-    /// most `autoFitGates`, and only within `autoFitGateRadiusKm` so a Halifax
+    /// most `autoFitGates`, and only within `autoFitRadiusKm` so a Halifax
     /// first run fetches no Salish passes. Far cheaper than the fitted set —
     /// one `Timeline.onlineFetchDays` window each, not a 60-to-210-day fit.
     static func autoPrefetchGates(lat: Double, lon: Double) -> [ChsCurrentGateInfo] {
         ChsCurrentGateInfo.all
-            .filter { $0.isOnline && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitGateRadiusKm }
+            .filter { $0.isOnline && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitRadiusKm }
             .sorted {
                 let a = distanceKm($0.latitude, $0.longitude, lat, lon)
                 let b = distanceKm($1.latitude, $1.longitude, lat, lon)
@@ -177,8 +194,8 @@ final class ChsFitService: ObservableObject {
             .prefix(autoFitGates).map { $0 }
     }
 
-    /// The stations a fix downloads on its own: the nearest ports, and the
-    /// nearest gates that are actually near.
+    /// The stations a fix downloads on its own: the nearest ports and the
+    /// nearest gates, out of those inside `autoFitRadiusKm`.
     static func autoFitSet(lat: Double, lon: Double) -> [ChsJob] {
         func nearest(_ jobs: [ChsJob], _ count: Int) -> [ChsJob] {
             jobs.sorted {
@@ -187,10 +204,11 @@ final class ChsFitService: ObservableObject {
                 return a == b ? $0.id < $1.id : a < b
             }.prefix(count).map { $0 }
         }
-        let ports = candidates.filter { !$0.isCurrent }
-        let gates = candidates.filter {
-            $0.isCurrent && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitGateRadiusKm
+        let near = candidates.filter {
+            distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitRadiusKm
         }
+        let ports = near.filter { !$0.isCurrent }
+        let gates = near.filter { $0.isCurrent }
         return nearest(ports, autoFitPorts) + nearest(gates, autoFitGates)
     }
 
@@ -247,10 +265,16 @@ final class ChsFitService: ObservableObject {
         queue = ChsQueue(jobs)
         // Never an arbitrary order, even before a fix lands: the prototype's
         // Victoria fallback anchors the first sort, and a real fix re-sorts.
-        adopt(lat: firstRunFix.lat, lon: firstRunFix.lon)
-        // After adopt(), so a `-chsFailOnly` id not already in the auto-fit
-        // set (added by adopt() above) still gets marked.
-        for id in Self.failOnly { queue.set(id, .failed) }
+        //
+        // Sorts ONLY (#205). `adopt` would also enqueue Victoria's auto-fit
+        // set, and this runs on every device on Earth before any fix is known
+        // — 6 Salish ports and 3 Salish gates, the gates being the 60-to-210
+        // day fits, downloaded for someone who may be 4,000 km away. Jobs
+        // accrete and nothing prunes them, so a real fix landing later cannot
+        // take them back. `.task` in the list adopts the ranking anchor a
+        // moment later, which is the call that is allowed to add work.
+        queue.prioritize(lat: firstRunFix.lat, lon: firstRunFix.lon)
+        markFailOnly()
         Self.sweepOrphans(files)
     }
 
@@ -310,6 +334,18 @@ final class ChsFitService: ObservableObject {
     private func adopt(lat: Double, lon: Double) {
         for job in Self.autoFitSet(lat: lat, lon: lon) { queue.add(job) }
         queue.prioritize(lat: lat, lon: lon)
+        markFailOnly()
+    }
+
+    /// Re-assert the `-chsFailOnly` hook over whatever is now in the queue.
+    /// The hook means "these ids are failed for this whole launch", and a job
+    /// it names may join the queue at any adopt — `queue.set` is a no-op on an
+    /// id that is not there yet, so marking once at init would only cover the
+    /// jobs already on disk. `chs-victoria-harbour`, the seeded id in
+    /// `testDownloadsRowRetryButtonWinsOverRowTap`, arrives with the list's
+    /// first adopt and would otherwise render `.pending` with no Retry button.
+    private func markFailOnly() {
+        for id in Self.failOnly { queue.set(id, .failed) }
     }
 
     func state(_ id: String) -> ChsState {
