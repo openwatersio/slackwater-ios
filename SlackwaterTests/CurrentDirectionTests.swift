@@ -49,6 +49,13 @@ final class CurrentDirectionTests: XCTestCase {
         XCTAssertEqual(flow.center.longitude, gate.longitude, accuracy: 1e-12)
     }
 
+    func testDoddUsesFloodBearingForPositiveFlow() throws {
+        let flow = try XCTUnwrap(DoddMapFlowProvider(
+            gate: gate, signedSpeed: { _ in 6 }).flow(at: date))
+        XCTAssertEqual(flow.speedKn, 6)
+        XCTAssertEqual(flow.bearingDeg, 21)
+    }
+
     func testDoddOmitsMissingModel() {
         XCTAssertNil(DoddMapFlowProvider(gate: gate, signedSpeed: { _ in nil }).flow(at: date))
     }

@@ -611,7 +611,8 @@ private let nativeLayerTypes: Set<String> = [
 
 /// Seascape, made ours (web composeStyle): OSM raster out (licence), our land
 /// in above the relief, pins on top. Missing anchors degrade to appending.
-func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -> [String: Any] {
+func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String,
+                  arguments: [String] = CommandLine.arguments) -> [String: Any] {
     var style = seascape
     var layers = (seascape["layers"] as? [[String: Any]] ?? [])
         .filter { ($0["id"] as? String) != "osm-base" }
@@ -638,7 +639,7 @@ func composeStyle(_ seascape: [String: Any], landUrl: String, uscaUrl: String) -
     let font = (sample?["layout"] as? [String: Any])?["text-font"] as? [String]
         ?? ["Open Sans Regular", "Arial Unicode MS Regular"]
     style["layers"] = layers + pinLayers(hasGlyphs: hasGlyphs, labelFont: font)
-    if currentFillEnabled() { addFillStyle(&style) }
+    if currentFillEnabled(arguments: arguments) { addFillStyle(&style) }
     return style
 }
 

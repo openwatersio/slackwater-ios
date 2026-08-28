@@ -1,17 +1,13 @@
-// Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
-// spec docs/superpowers/specs/2026-08-22-fill-graduation-design.md §2): the
-// speed-only current fill. FillField's certified triangles, each coloured by
-// the #97 speed ramp at its own evaluated speed, drawn under the land — the
-// colour raster half of the two-channel render the composite spec adopted
-// (2026-08-20-current-field-composite-design.md §1). Cells are drawn blocky,
-// unsmoothed, per that spec: smoothing would repaint colour across the
-// certification-mask edge.
+// Slackwater — GPL v3. Static current speed and direction renderer. FillField
+// and PatchField each populate one existing GeoJSON source with unchanged
+// certified speed polygons plus centroid direction points. MapLibre draws the
+// fill and map-aligned, collision-managed arrow symbols below land.
 //
-// Mechanism mirrors the #57 particle spike: the style build gets an EMPTY
-// GeoJSON source + one layer dict; everything live happens post-load on a
-// timer. The ramp is SN.speedRampStops via Timeline.rampT — the strip's own
-// transfer function, one meaning one value; no green by construction (#97
-// ruling, spec §1 status block). Flag off, nothing is added anywhere.
+// Both fields are evaluated off-main on the existing one-minute cadence; the
+// main thread assigns each completed shape collection once. Pan, zoom, and
+// frame rendering perform no current-data computation or source replacement.
+// The speed ramp remains Timeline.rampT → SN.speedRGB, with no green by
+// construction. `-currentFillOff` omits the sources and layers in tests.
 import CoreLocation
 import Foundation
 import MapLibre
