@@ -985,6 +985,9 @@ final class ScreenshotTests: XCTestCase {
         // icon, and no chrome sits over the map.
         app.buttons["Map"].tap()
         XCTAssert(app.otherElements["map-canvas"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["currents-toggle"].exists)
+        XCTAssertFalse(app.buttons["Hide currents"].exists)
+        XCTAssertFalse(app.buttons["Show currents"].exists)
         XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header")
         XCTAssert(app.buttons["List"].exists, "toggle did not flip to the list icon")
 

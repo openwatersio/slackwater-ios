@@ -16,20 +16,9 @@ import CoreLocation
 import Foundation
 import MapLibre
 
-let currentFillKey = "showCurrentFill"
-
-/// On by default (graduation spec §2). The stored toggle is the user's map
-/// switch; `-currentFillOff` is the UI-test override, same pattern as
-/// `-networkKillSwitch` — it wins over the stored value so a test's style
-/// baseline can never depend on simulator state.
-var currentFillEnabled: Bool {
-    if CommandLine.arguments.contains("-currentFillOff") { return false }
-    let defaults = UserDefaults.standard
-    guard defaults.object(forKey: currentFillKey) != nil else { return true }
-    // bool(forKey:), not object as? Bool: a launch-argument value ("-showCurrentFill
-    // NO") arrives as a STRING, which the cast rejects while AppStorage coerces —
-    // the toggle read "off" and the layer still drew. bool(forKey:) coerces both.
-    return defaults.bool(forKey: currentFillKey)
+/// On by default (graduation spec §2). `-currentFillOff` is a UI-test override.
+func currentFillEnabled(arguments: [String] = CommandLine.arguments) -> Bool {
+    !arguments.contains("-currentFillOff")
 }
 
 /// Re-evaluation cadence. Tidal speed moves at most ~a knot per half hour;
@@ -64,7 +53,6 @@ func addFillStyle(_ style: inout [String: Any]) {
     ]
     sources[CurrentFillRenderer.sourceID] = empty
     sources[CurrentFillRenderer.patchSourceID] = empty
-    sources[CurrentStreakAnimator.sourceID] = empty
     style["sources"] = sources
     let layer: [String: Any] = [
         "id": CurrentFillRenderer.sourceID, "type": "fill",
@@ -92,26 +80,11 @@ func addFillStyle(_ style: inout [String: Any]) {
     var patch = layer
     patch["id"] = CurrentFillRenderer.patchSourceID
     patch["source"] = CurrentFillRenderer.patchSourceID
-    let tail: [String: Any] = [
-        "id": CurrentStreakAnimator.tailLayerID, "type": "line",
-        "source": CurrentStreakAnimator.sourceID,
-        "minzoom": STREAK_MIN_ZOOM,
-        "filter": ["==", ["geometry-type"], "LineString"],
-        "layout": ["line-cap": "round", "line-join": "round"],
-        "paint": ["line-color": mapHex(SN.foamHex), "line-width": 2.0, "line-opacity": 0.8],
-    ]
-    let head: [String: Any] = [
-        "id": CurrentStreakAnimator.headLayerID, "type": "circle",
-        "source": CurrentStreakAnimator.sourceID,
-        "minzoom": STREAK_MIN_ZOOM,
-        "filter": ["==", ["geometry-type"], "Point"],
-        "paint": ["circle-radius": 2.0, "circle-color": ["get", "colour"], "circle-opacity": 0.9],
-    ]
     let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
     let anchor = landIdx
         ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
         ?? layers.count
-    layers.insert(contentsOf: [layer, patch, tail, head], at: anchor)
+    layers.insert(contentsOf: [layer, patch], at: anchor)
     style["layers"] = layers
 }
 
@@ -135,11 +108,8 @@ final class CurrentFillRenderer {
     private var patches: PatchField?
     private var timer: Timer?
     private var evaluating = false
-    private let streaks = CurrentStreakAnimator()
-
     deinit {
         timer?.invalidate()
-        streaks.stop()
     }
 
     func attach(to style: MLNStyle, map: MLNMapView) {
@@ -148,7 +118,6 @@ final class CurrentFillRenderer {
         patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
         if field == nil { field = FillField() }
         if patches == nil { patches = PatchField() }
-        streaks.attach(to: style, map: map, fillField: field, patchField: patches)
         refresh()
         guard timer == nil, field != nil || patches != nil else { return }
         let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in self?.refresh() }
