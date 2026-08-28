@@ -1,5 +1,4 @@
-// Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
-// spec §2): style additions and the colour transfer.
+// Slackwater — GPL v3. Static current fill and direction style behavior.
 import XCTest
 @testable import Slackwater
 
