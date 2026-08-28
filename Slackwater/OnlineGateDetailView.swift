@@ -235,9 +235,11 @@ struct OnlineGateDetailView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 if let win = activeSlackWin {
-                    Text("Slack").font(.title2.weight(.medium))
+                    let timing = slackWindowTiming(start: win.start, end: win.end, tz: tz)
+                    Text("Slack" + (timing.duration.map { " · \($0)" } ?? ""))
+                        .font(.title2.weight(.medium))
                         .foregroundStyle(CurrentDetailView.phaseColor(.slack))
-                    Text(slackWindowTiming(start: win.start, end: win.end, tz: tz))
+                    Text(timing.span)
                         .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
                 } else {
                     Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")

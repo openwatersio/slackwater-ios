@@ -146,9 +146,11 @@ struct CurrentDetailView: View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 if let win = activeSlackWin {
-                    Text("Slack").font(.title2.weight(.medium))
+                    let timing = slackWindowTiming(start: win.start, end: win.end, tz: tz)
+                    Text("Slack" + (timing.duration.map { " · \($0)" } ?? ""))
+                        .font(.title2.weight(.medium))
                         .foregroundStyle(provisionalGate == nil ? Self.phaseColor(.slack) : SN.amber)
-                    Text("\(tilde)\(slackWindowTiming(start: win.start, end: win.end, tz: tz))")
+                    Text("\(tilde)\(timing.span)")
                         .font(.title3.monospacedDigit())
                         .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                 } else {
