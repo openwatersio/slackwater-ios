@@ -1,46 +1,32 @@
 // Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
-// spec §2): style additions, the colour transfer, and the toggle contract —
-// on by default, off is byte-identical to the pre-fill style.
+// spec §2): style additions and the colour transfer.
 import XCTest
 @testable import Slackwater
 
 final class CurrentFillTests: XCTestCase {
-    override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: currentFillKey)
-        super.tearDown()
+    func testFillIsOnExceptForTestLaunchOverride() {
+        XCTAssertTrue(currentFillEnabled(arguments: []))
+        XCTAssertFalse(currentFillEnabled(arguments: ["-currentFillOff"]))
+
+        // A value left by a released build must not remain a hidden user setting.
+        UserDefaults.standard.set(false, forKey: "showCurrentFill")
+        XCTAssertTrue(currentFillEnabled(arguments: []))
+        UserDefaults.standard.removeObject(forKey: "showCurrentFill")
     }
 
-    /// The layer ships ON: a clean install draws the fill without any setting
-    /// being touched (graduation spec §2 — default on).
-    func testFillShipsOnByDefault() {
-        UserDefaults.standard.removeObject(forKey: currentFillKey)
-        XCTAssertTrue(currentFillEnabled)
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertTrue(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
-    }
+    func testCurrentStyleContainsNoAnimationSourceOrLayers() {
+        var style: [String: Any] = [
+            "sources": [String: Any](),
+            "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]],
+        ]
+        addFillStyle(&style)
 
-    /// A launch-argument override arrives as a STRING ("-showCurrentFill NO"),
-    /// not a Bool — the read must coerce it the same way AppStorage does, or
-    /// the FAB shows off while the layer still draws (caught on screen).
-    func testStringValuedDefaultReadsAsOff() {
-        UserDefaults.standard.set("NO", forKey: currentFillKey)
-        XCTAssertFalse(currentFillEnabled)
-    }
-
-    /// Toggle off, the builders must emit exactly what they emitted before
-    /// the fill existed — no source, no layer.
-    func testToggleOffAddsNothingToTheStyle() {
-        UserDefaults.standard.set(false, forKey: currentFillKey)
-        XCTAssertFalse(currentFillEnabled)
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
         let sources = style["sources"] as? [String: Any] ?? [:]
-        XCTAssertNil(sources[CurrentFillRenderer.sourceID])
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentFillRenderer.sourceID })
-        XCTAssertNil(sources[CurrentStreakAnimator.sourceID])
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.tailLayerID })
-        XCTAssertFalse(layers.contains { ($0["id"] as? String) == CurrentStreakAnimator.headLayerID })
+        let ids = (style["layers"] as? [[String: Any]] ?? [])
+            .compactMap { $0["id"] as? String }
+        XCTAssertNil(sources["current-streaks"])
+        XCTAssertFalse(ids.contains("current-streak-tails"))
+        XCTAssertFalse(ids.contains("current-streak-heads"))
     }
 
     /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
@@ -66,26 +52,6 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
     }
 
-    func testStreakStyleSitsAbovePatchesWithFoamTailsAndRampHeads() throws {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        let ids = layers.map { $0["id"] as? String ?? "" }
-        let patch = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchSourceID))
-        let tail = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.tailLayerID))
-        let head = try XCTUnwrap(ids.firstIndex(of: CurrentStreakAnimator.headLayerID))
-        XCTAssertEqual(tail, patch + 1)
-        XCTAssertEqual(head, tail + 1)
-        XCTAssertLessThan(head, try XCTUnwrap(ids.firstIndex(of: "land-usca")))
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentStreakAnimator.sourceID])
-        XCTAssertEqual((layers[tail]["paint"] as? [String: Any])?["line-color"] as? String,
-                       mapHex(SN.foamHex))
-        XCTAssertEqual((layers[head]["paint"] as? [String: Any])?["circle-color"] as? [String],
-                       ["get", "colour"])
-        XCTAssertFalse(String(describing: layers).contains(String(describing: PIN_STATE_COLOUR)))
-    }
-
     /// The fill layer sits UNDER the land layers — SSCOFS elements cross the
     /// shoreline, and land drawn over the fill clips them to water — and
     /// colours per feature from the "colour" attribute.
@@ -95,8 +61,8 @@ final class CurrentFillTests: XCTestCase {
         addFillStyle(&style)
         let layers = style["layers"] as? [[String: Any]] ?? []
         XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[4]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 6)
+        XCTAssertEqual(layers[2]["id"] as? String, "land-usca")
+        XCTAssertEqual(layers.count, 4)
         let paint = layers.first?["paint"] as? [String: Any]
         XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
         XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)

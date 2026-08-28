@@ -337,10 +337,6 @@ struct StationListView: View {
     /// push/pop. Distinct from the coordinate so re-focusing the SAME
     /// station twice still counts.
     @State private var mapFocusToken = 0
-    /// The currents-fill map switch (graduation spec §2) — stored under the
-    /// same key `currentFillEnabled` reads, so the style builders and this
-    /// toggle can never disagree.
-    @AppStorage(currentFillKey) private var showFill = true
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
@@ -648,8 +644,8 @@ struct StationListView: View {
             .toolbar(.hidden, for: .navigationBar)
     }
 
-    /// The in-place map surface (prototype READY·MAP): no header, no close —
-    /// the toggle FAB is the only way back.
+    /// The in-place map surface (prototype READY·MAP): no header or close;
+    /// the List FAB is the way back.
     private var mapPane: some View {
         // `mapFocus` wins when set (header-title tap, issue #32): centers on
         // that station at its own detail zoom rather than the fix/discovery
@@ -679,10 +675,7 @@ struct StationListView: View {
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
             }
-            // The fill toggle joins the remount key: flipping it rebuilds the
-            // style, which is how the layer appears/disappears — rare, user
-            // -initiated, and far simpler than mutating a live style.
-            .id("\(mapFocusToken)-\(showFill)-\(slackWindowSpeed)")
+            .id("\(mapFocusToken)-\(slackWindowSpeed)")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
@@ -1050,21 +1043,13 @@ struct StationListView: View {
         .padding(.top, 6)
     }
 
-    // MARK: - Floating toolbar (prototype showToggle: search bottom-left,
-    // list ⇄ map toggle bottom-right, both persistent over list AND map)
+    // MARK: - Floating toolbar (search bottom-left, list ⇄ map bottom-right,
+    // both persistent over list AND map)
 
     private var fabBar: some View {
         HStack {
             fab("magnifyingglass", label: "Search") { openSearch() }
             Spacer()
-            // Beside the list toggle, not centered — bottom-center belongs to
-            // the "Not for navigation" pill.
-            if showMap {
-                fab(showFill ? "water.waves" : "water.waves.slash",
-                    label: showFill ? "Hide currents" : "Show currents") { showFill.toggle() }
-                    .accessibilityIdentifier("currents-toggle")
-                    .padding(.trailing, 12)
-            }
             fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
                 showMap.toggle()
                 // Regular width: opening the map replaces the shown detail;
