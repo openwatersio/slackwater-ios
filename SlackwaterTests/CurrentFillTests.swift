@@ -29,6 +29,36 @@ final class CurrentFillTests: XCTestCase {
         XCTAssertFalse(ids.contains("current-streak-heads"))
     }
 
+    func testDirectionLayersAreNativeMapAlignedSymbolsBelowLand() throws {
+        var style: [String: Any] = [
+            "sources": [String: Any](),
+            "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]],
+        ]
+        addFillStyle(&style)
+        let layers = style["layers"] as? [[String: Any]] ?? []
+        let ids = layers.compactMap { $0["id"] as? String }
+        let fill = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.sourceID))
+        let patch = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchSourceID))
+        let direction = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.directionLayerID))
+        let patchDirection = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchDirectionLayerID))
+        let land = try XCTUnwrap(ids.firstIndex(of: "land-usca"))
+        XCTAssertEqual([fill, patch, direction, patchDirection], [0, 1, 2, 3])
+        XCTAssertLessThan(patchDirection, land)
+
+        for index in [direction, patchDirection] {
+            XCTAssertEqual(layers[index]["type"] as? String, "symbol")
+            XCTAssertEqual(layers[index]["minzoom"] as? Double, CURRENT_DIRECTION_MIN_ZOOM)
+            let filter = try XCTUnwrap(layers[index]["filter"] as? NSArray)
+            XCTAssertEqual(filter, ["==", ["geometry-type"], "Point"] as NSArray)
+            let layout = try XCTUnwrap(layers[index]["layout"] as? [String: Any])
+            XCTAssertEqual(layout["icon-image"] as? String, CurrentFillRenderer.directionImageID)
+            XCTAssertEqual(layout["icon-rotate"] as? NSArray, ["get", "bearing"] as NSArray)
+            XCTAssertEqual(layout["icon-rotation-alignment"] as? String, "map")
+            XCTAssertEqual(layout["icon-pitch-alignment"] as? String, "map")
+            XCTAssertEqual(layout["icon-allow-overlap"] as? Bool, false)
+        }
+    }
+
     /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
     /// order, and feature order within one source does NOT guarantee paint
     /// order — so patches get their own layer, directly above the fill's
@@ -47,7 +77,7 @@ final class CurrentFillTests: XCTestCase {
                           "both layers stay under land")
         // Identical paint minus the source binding: one ramp, one opacity law,
         // one no-green rule for both providers.
-        var a = layers[fill!], b = layers[patch!]
+        let a = layers[fill!], b = layers[patch!]
         XCTAssertEqual(a["paint"] as? NSDictionary, b["paint"] as? NSDictionary)
         XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
     }
@@ -61,8 +91,8 @@ final class CurrentFillTests: XCTestCase {
         addFillStyle(&style)
         let layers = style["layers"] as? [[String: Any]] ?? []
         XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[2]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 4)
+        XCTAssertEqual(layers[4]["id"] as? String, "land-usca")
+        XCTAssertEqual(layers.count, 6)
         let paint = layers.first?["paint"] as? [String: Any]
         XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
         XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)

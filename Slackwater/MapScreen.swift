@@ -731,6 +731,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // tide-pin icon must be re-registered each time or the swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
+        style.setImage(currentDirectionImage(),
+                       forName: CurrentFillRenderer.directionImageID)
         applyChsTones(to: style)
         fill?.attach(to: style, map: mapView)
     }

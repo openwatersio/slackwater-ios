@@ -41,9 +41,8 @@ func fillColourHex(forSpeedKn kn: Double) -> String {
     return String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
 }
 
-/// Style-build side: an empty GeoJSON source and one fill layer coloured per
-/// feature, inserted UNDER the first pin layer so stations always draw over
-/// the wash. Outline matches the fill so a cell's own triangulation seams
+/// Style-build side: two empty GeoJSON sources with fill and direction layers
+/// below land. Outline matches the fill so a cell's own triangulation seams
 /// vanish while the outer certified/uncertified edge stays a hard step.
 func addFillStyle(_ style: inout [String: Any]) {
     var sources = style["sources"] as? [String: Any] ?? [:]
@@ -80,11 +79,33 @@ func addFillStyle(_ style: inout [String: Any]) {
     var patch = layer
     patch["id"] = CurrentFillRenderer.patchSourceID
     patch["source"] = CurrentFillRenderer.patchSourceID
+    let direction: [String: Any] = [
+        "id": CurrentFillRenderer.directionLayerID,
+        "type": "symbol",
+        "source": CurrentFillRenderer.sourceID,
+        "minzoom": CURRENT_DIRECTION_MIN_ZOOM,
+        "filter": ["==", ["geometry-type"], "Point"],
+        "layout": [
+            "icon-image": CurrentFillRenderer.directionImageID,
+            "icon-rotate": ["get", "bearing"],
+            "icon-rotation-alignment": "map",
+            "icon-pitch-alignment": "map",
+            "icon-allow-overlap": false,
+            "icon-ignore-placement": false,
+            "icon-padding": 8,
+        ],
+        "paint": [
+            "icon-color": mapHex(SN.foamHex),
+        ],
+    ]
+    var patchDirection = direction
+    patchDirection["id"] = CurrentFillRenderer.patchDirectionLayerID
+    patchDirection["source"] = CurrentFillRenderer.patchSourceID
     let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
     let anchor = landIdx
         ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
         ?? layers.count
-    layers.insert(contentsOf: [layer, patch], at: anchor)
+    layers.insert(contentsOf: [layer, patch, direction, patchDirection], at: anchor)
     style["layers"] = layers
 }
 
@@ -94,6 +115,9 @@ func addFillStyle(_ style: inout [String: Any]) {
 final class CurrentFillRenderer {
     static let sourceID = "current-fill"
     static let patchSourceID = "current-fill-patches"
+    static let directionLayerID = "current-directions"
+    static let patchDirectionLayerID = "current-directions-patches"
+    static let directionImageID = "current-direction-arrow"
 
     private weak var map: MLNMapView?
     /// Strong on purpose — same MapLibre gotcha the particle spike hit: a
@@ -106,6 +130,7 @@ final class CurrentFillRenderer {
     /// certification collapsed (Deception) vends zero cells and costs nothing.
     private var field: FillField?
     private var patches: PatchField?
+    private let dodd = DoddMapFlowProvider()
     private var timer: Timer?
     private var evaluating = false
     deinit {
@@ -136,18 +161,17 @@ final class CurrentFillRenderer {
         let when = appNow()
         let field = self.field
         let patches = self.patches
-        func features(_ cells: [FillCell]) -> [MLNPolygonFeature] {
-            cells.map { cell in
-                var coords = cell.polygon
-                let f = MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
-                f.attributes = ["colour": fillColourHex(forSpeedKn: cell.speedKn),
-                                "kn": cell.speedKn]
-                return f
-            }
-        }
+        let dodd = self.dodd
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let fillFeatures = features(field?.cells(at: when) ?? [])
-            let patchFeatures = features(patches?.cells(at: when) ?? [])
+            let fillCells = field?.cells(at: when) ?? []
+            let patchCells = patches?.cells(at: when) ?? []
+            let fillFeatures = currentCellFeatures(
+                fillCells, excludingDirectionsIn: patchCells)
+            var patchFeatures = currentCellFeatures(patchCells)
+            if let flow = dodd.flow(at: when) {
+                patchFeatures.append(currentDirectionFeature(
+                    at: flow.center, bearingDeg: flow.bearingDeg))
+            }
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.evaluating = false
