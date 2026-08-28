@@ -725,15 +725,37 @@ final class TimelineTests: XCTestCase {
         XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
     }
 
-    func testSlackWindowTimingShowsFullDurationAndSpan() {
+    func testSlackWindowTimingHumanizesOnlyUsefulDurations() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = .gmt
         let start = cal.date(from: DateComponents(year: 2026, month: 8, day: 25,
                                                   hour: 11, minute: 25))!
-        let end = start.addingTimeInterval(35 * 60)
 
-        XCTAssertEqual(slackWindowTiming(start: start, end: end, tz: .gmt),
-                       "35 min, 11:25 → 12:00")
+        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(35 * 60), tz: .gmt).duration,
+                       "35 min")
+        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(89 * 60), tz: .gmt).duration,
+                       "~1 hr")
+        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(134 * 60), tz: .gmt).duration,
+                       "~2 hrs")
+        XCTAssertNil(slackWindowTiming(start: start, end: start.addingTimeInterval(150 * 60), tz: .gmt).duration)
+    }
+
+    func testSlackWindowTimingMarksLaterDays() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .gmt
+        let start = cal.date(from: DateComponents(year: 2026, month: 8, day: 25,
+                                                  hour: 21, minute: 35))!
+        let end = { (day: Int) in
+            cal.date(byAdding: DateComponents(day: day, minute: 19),
+                     to: cal.startOfDay(for: start))!
+        }
+
+        XCTAssertEqual(slackWindowTiming(start: start, end: end(1), tz: .gmt).span,
+                       "21:35 → 00:19⁺¹")
+        XCTAssertEqual(slackWindowTiming(start: start, end: end(9), tz: .gmt).span,
+                       "21:35 → 00:19⁺⁹")
+        XCTAssertEqual(slackWindowTiming(start: start, end: end(10), tz: .gmt).span,
+                       "21:35 → 00:19⁺⁺")
     }
 
     /// Adjacent slack windows that touch or overlap merge into one green
