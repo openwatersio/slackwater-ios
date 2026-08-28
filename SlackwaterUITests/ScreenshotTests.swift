@@ -645,6 +645,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["NEAR ME"].exists)
     }
 
+    func testM41AuthorizedLocationKeepsItsSlotWhileWaitingForAFix() throws {
+        let app = launch("-seedGate", "-resetRecents", "-locAuthorizedNoFix")
+        XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Finding your location…"].exists)
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        save(app, "m41-location-pending.png")
+    }
+
     // M4.2: the continuous scrub — a fixed centerline with the multi-day strip
     // panning underneath. Scrubbing across midnight lands on the next day's
     // events; the schedule shows several days under day headers; a row tap

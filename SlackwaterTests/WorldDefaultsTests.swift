@@ -3,10 +3,28 @@
 // Bryan opened it in the Solent and got a Vancouver Island camera and a Near
 // Me list ranked from Victoria Harbour.
 
+import CoreLocation
 import XCTest
 @testable import Slackwater
 
 final class WorldDefaultsTests: XCTestCase {
+    func testCachedLocationMustBeRecentAndValid() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let recent = CLLocation(coordinate: .init(latitude: 48.42, longitude: -123.37),
+                                altitude: 0, horizontalAccuracy: 100, verticalAccuracy: 100,
+                                timestamp: now.addingTimeInterval(-599))
+        let stale = CLLocation(coordinate: recent.coordinate,
+                               altitude: 0, horizontalAccuracy: 100, verticalAccuracy: 100,
+                               timestamp: now.addingTimeInterval(-601))
+        let invalid = CLLocation(coordinate: recent.coordinate,
+                                 altitude: 0, horizontalAccuracy: -1, verticalAccuracy: 100,
+                                 timestamp: now)
+
+        XCTAssertEqual(LocationService.recentLocation(recent, now: now), recent)
+        XCTAssertNil(LocationService.recentLocation(stale, now: now))
+        XCTAssertNil(LocationService.recentLocation(invalid, now: now))
+    }
+
     func testNearestWidgetStationCacheChangesOnlyWhenStationChanges() throws {
         let d = UserDefaults(suiteName: #function)!
         defer { d.removePersistentDomain(forName: #function) }
