@@ -163,6 +163,44 @@ final class ChsCurrentGateTests: XCTestCase {
         XCTAssertNil(ChsModelStore.load("chs-test-online"))
     }
 
+    func testLoadOnlineCachesDecodedStore() throws {
+        let window = ChsOnlineWindow(
+            stationID: "chs-test-cache", iwlsName: "Test Cache Station",
+            timezone: "America/Vancouver", fetchedAt: .now,
+            start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 1_000_000),
+            floodDirection: 45, ebbDirection: 225, times: [0, 900], speeds: [1.5, -1.5])
+        try ChsModelStore.saveOnline(window)
+        let url = ChsModelStore.onlineUrl(window.stationID)
+        defer { try? FileManager.default.removeItem(at: url) }
+        // A pinned whole-second mtime, not the stat-read one: Date → timespec
+        // → Date loses ~240 ns of Double precision on a real "now", so forging
+        // "the same mtime" from a stat read races that rounding (it failed on
+        // CI, passed locally). A whole second survives every conversion.
+        let stamp = Date(timeIntervalSince1970: 1_000_000)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        let first = try XCTUnwrap(ChsModelStore.loadOnline(window.stationID))
+
+        // Corrupt the file while forging identical mtime+size — only the memo
+        // can still answer, so this fails if loadOnline re-decodes every call
+        // (the main-thread decode storm behind the build-31 watchdog kills).
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        let size = try XCTUnwrap(attrs[.size] as? Int)
+        try Data(repeating: 0x7B, count: size).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: stamp], ofItemAtPath: url.path)
+        XCTAssertEqual(ChsModelStore.loadOnline(window.stationID)?.blocks.first?.times,
+                       first.blocks.first?.times,
+                       "unchanged mtime+size serves the memoized store without touching the bytes")
+
+        // A genuine change invalidates: the junk bytes now decode as nothing.
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+        XCTAssertNil(ChsModelStore.loadOnline(window.stationID),
+                     "a changed file is re-read, never served from the memo")
+
+        try FileManager.default.removeItem(at: url)
+        XCTAssertNil(ChsModelStore.loadOnline(window.stationID),
+                     "a deleted file is gone immediately, never served from the memo")
+    }
+
     func testOnlineWindowCoversStrip() throws {
         let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
         var cal = Calendar(identifier: .gregorian)

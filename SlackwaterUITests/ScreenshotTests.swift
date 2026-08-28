@@ -896,7 +896,12 @@ final class ScreenshotTests: XCTestCase {
     // asserted the same string under identical launch args in two tests and
     // two cold launches.
     func testChsPendingCopy() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
+        // Victoria fix: the pending copy is what a QUEUED station says, and the
+        // queue is built from the ranking anchor. Without an explicit fix the
+        // anchor is whatever station the previous test opened, which decides
+        // whether Victoria is in the download set at all.
+        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
         // #93 took the sentence off the visible card — it is an icon and two
         // words now — but the plain-language copy still has to reach VoiceOver,
         // which is the reader with the LEAST context, not the most.
@@ -1293,14 +1298,15 @@ final class ScreenshotTests: XCTestCase {
     /// the sheet and opens the station's own detail via `openChsRoute`
     /// (Theme.swift), the same generalized closure the online-gate honesty
     /// card's nearest-shipped link now shares. `-chsResetModels` wipes the
-    /// model store so the whole queue starts `.pending`; no `-fixLat`/`-fixLon`
-    /// needed because `ChsFitService.init` unconditionally adopts the
-    /// `firstRunFix` (Victoria) before any real fix can land (its own doc
-    /// comment: "never an arbitrary order, even before a fix lands"), and
-    /// Victoria itself is distance zero from that anchor — so it is always the
-    /// queue's first job, deterministic without a location launch argument.
+    /// model store so the whole queue starts `.pending`, and the Victoria fix
+    /// puts Victoria itself at distance zero from the ranking anchor — so it is
+    /// the queue's first job, deterministically. The fix is not optional: the
+    /// queue is adopted from the anchor and nothing else seeds it, so without
+    /// one this test inherits whatever station the previous test opened
+    /// (#205 — `init` sorts around the fallback, it does not adopt it).
     func testDownloadsRowOpensDetail() throws {
-        let app = launch("-seedGate", "-chsResetModels")
+        let app = launch("-seedGate", "-chsResetModels",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
         app.buttons["offline-status"].firstMatch.tap()
         XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
@@ -1346,8 +1352,8 @@ final class ScreenshotTests: XCTestCase {
     ///
     /// Seeded on Victoria HARBOUR, deliberately NOT plain Victoria: at regular
     /// width the split layout auto-selects a first detail on `.onAppear`
-    /// (SlackwaterApp.swift), and with no fix that's the nearest station to
-    /// the Victoria fallback — chs-victoria itself. `ChsDetailView.onAppear`
+    /// (SlackwaterApp.swift), and under this test's Victoria fix that is the
+    /// nearest station — chs-victoria itself. `ChsDetailView.onAppear`
     /// unconditionally promotes whatever route it shows, so seeding
     /// chs-victoria as `.failed` was self-defeating on iPad: auto-select
     /// opened it and silently un-failed it before this test ever touched the
@@ -1358,7 +1364,8 @@ final class ScreenshotTests: XCTestCase {
     /// `.failed` until this test's own tap.
     func testDownloadsRowRetryButtonWinsOverRowTap() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
-                         "-chsFailOnly", "chs-victoria-harbour")
+                         "-chsFailOnly", "chs-victoria-harbour",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
         app.buttons["offline-status"].firstMatch.tap()
         XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
@@ -1402,6 +1409,35 @@ final class ScreenshotTests: XCTestCase {
             XCTAssertFalse(header.staticTexts["Victoria Harbour"].firstMatch.exists,
                            "no detail should have opened — the button, not the row, must have handled the tap")
         }
+    }
+
+    /// #205: far from Canadian water, nothing downloads and the manager is
+    /// empty. This is the reported bug end to end — the reporter opened this
+    /// sheet from Massachusetts and found 30 Canadian downloads in flight.
+    ///
+    /// Boston is the fix because it is the reported one and because it is the
+    /// case the unit budget tests structurally cannot see: they exercise
+    /// Victoria and Halifax, which sit on Canadian water, where an unguarded
+    /// port budget and a guarded one produce the same six ports. Its nearest
+    /// CHS port is Montréal Jetée #1 at 402 km — a river gauge — while its
+    /// nearest station of any source is NOAA Boston at 1 km.
+    ///
+    /// Both halves are asserted here because they fail independently: a fitted
+    /// row means the port radius let a far station through, and an online-gate
+    /// row means the manager listed a Salish pass it can never fetch.
+    func testFarFromCanadaDownloadsNothing() throws {
+        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+                         "-fixLat", "42.3601", "-fixLon", "-71.0589")  // Boston
+
+        app.buttons["offline-status"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+                  "the indicator did not open the downloads manager")
+        save(app, "downloads-boston.png")
+
+        let rows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'download-row-'"))
+        XCTAssertEqual(rows.count, 0,
+                       "a Boston fix must download no Canadian station: \(rows.count) rows")
     }
 
     /// Issue #32: the map-header title jumps to the map, focused on the
@@ -2160,20 +2196,12 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
     }
 
-    /// T6 acceptance case for the whole world-coverage plan: the Solent, the
-    /// water that started it (`firstRunFix`'s doc comment — the app once
-    /// opened here and ranked from Vancouver Island). No NOAA or CHS current
-    /// station is within `currentCoverageKm` of Portsmouth, so Near Me must say so in words
-    /// rather than just show an empty currents list — an empty list here
-    /// reads as "the water is slack", which is false and dangerous.
-    func testM53NoCurrentCoverageNoticeAtPortsmouth() throws {
+    func testM53DoesNotShowNoCurrentCoverageNoticeAtPortsmouth() throws {
         let app = launch("-seedGate", "-resetRecents", "-fixLat", "50.80", "-fixLon", "-1.11")
 
         let notice = app.staticTexts["Current predictions not available here"].firstMatch
-        XCTAssert(notice.waitForExistence(timeout: 5),
-                  "Portsmouth has no NOAA or CHS current station within reach — Near Me must say so")
-        scrollTo(notice, in: app)
-        save(app, "m53-portsmouth-no-current-coverage.png")
+        XCTAssertFalse(notice.waitForExistence(timeout: 2),
+                       "Near Me must not show an unactionable current-coverage warning")
     }
 
     /// Search at 3,125 stations: bounded, nearest-first, and honest about what

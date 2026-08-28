@@ -56,11 +56,25 @@ enum WidgetStationLoader {
         return info.record(with: model)
     }
 
-    /// First favorite, else most-recent, else Friday Harbor — the widget's
-    /// default when unconfigured.
+    static func resolvedStationID(
+        _ id: String, defaults: UserDefaults = AppGroup.defaults
+    ) -> String {
+        guard id == AppGroup.currentLocationStationID else { return id }
+        if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
+           StationItem.byId[cached] != nil { return cached }
+        return fallbackStationID(defaults: defaults)
+    }
+
+    /// Current Location follows the app's latest fix and is the widget's
+    /// zero-configuration default.
     static func defaultStationID() -> String {
-        AppGroup.defaults.stringArray(forKey: AppGroup.favoritesKey)?.first
-            ?? AppGroup.defaults.stringArray(forKey: AppGroup.recentsKey)?.first
+        AppGroup.currentLocationStationID
+    }
+
+    /// No fix: first favorite, else most-recent, else Friday Harbor.
+    static func fallbackStationID(defaults: UserDefaults = AppGroup.defaults) -> String {
+        defaults.stringArray(forKey: AppGroup.favoritesKey)?.first
+            ?? defaults.stringArray(forKey: AppGroup.recentsKey)?.first
             ?? TideStationRecord.fridayHarborID
     }
 }

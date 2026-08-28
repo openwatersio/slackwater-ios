@@ -12,11 +12,19 @@ struct WidgetSnapshot: Equatable {
         let label: String
         let symbol: String
     }
+    struct TideMovement: Equatable {
+        let fraction: Double
+        let rate: Double
+    }
     let stationName: String
     let tz: TimeZone
     let next: Event?
+    let nextHigh: Event?
+    let nextLow: Event?
     let window: (start: Date, end: Date)?
     let sparkline: [Double]
+    let tideMovements: [TideMovement]
+    let tideRate: Double?
     let nowFraction: Double
     let curveKind: CurveKind
     let threshold: Double?
@@ -25,13 +33,17 @@ struct WidgetSnapshot: Equatable {
 
     static func == (a: Self, b: Self) -> Bool {
         a.stationName == b.stationName && a.tz == b.tz && a.next == b.next
+            && a.nextHigh == b.nextHigh && a.nextLow == b.nextLow
             && a.window?.start == b.window?.start && a.window?.end == b.window?.end
-            && a.sparkline == b.sparkline && a.nowFraction == b.nowFraction
+            && a.sparkline == b.sparkline && a.tideMovements == b.tideMovements
+            && a.tideRate == b.tideRate && a.nowFraction == b.nowFraction
             && a.curveKind == b.curveKind && a.threshold == b.threshold
             && a.state == b.state && a.value == b.value
     }
 
-    static func build(_ station: WidgetStation, now: Date) -> WidgetSnapshot {
+    static func build(
+        _ station: WidgetStation, now: Date, stationNamePrefix: String? = nil
+    ) -> WidgetSnapshot {
         // Read once, here — not per format call — so `build` stays a pure
         // function of (station, now) (H2): the setting is an input, same as
         // the other two.
@@ -59,23 +71,35 @@ struct WidgetSnapshot: Equatable {
 
         switch station {
         case .tide(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             let heights = s.heights(from: dayStart, to: dayEnd, step: 900).map(\.height)
             let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
-            let ext = s.extremes(from: now, to: now.addingTimeInterval(172_800))
-                .first { $0.time > now }
-            let next = ext.map {
-                Event(time: $0.time,
-                      label: ($0.kind == .high ? "High" : "Low")
-                          + " \(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
-                      symbol: $0.kind == .high ? "arrow.up" : "arrow.down")
+            let extremes = s.extremes(from: now, to: now.addingTimeInterval(172_800))
+                .filter { $0.time > now }
+            let event = { (extreme: TideExtreme) in
+                Event(time: extreme.time,
+                      label: (extreme.kind == .high ? "High" : "Low")
+                          + " \(formatHeight(extreme.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
+                      symbol: extreme.kind == .high ? "arrow.up" : "arrow.down")
             }
-            return .init(stationName: name, tz: tz, next: next, window: nil,
-                         sparkline: normalize(heights), nowFraction: nowFraction,
+            let next = extremes.first.map(event)
+            let nextHigh = extremes.first { $0.kind == .high }.map(event)
+            let nextLow = extremes.first { $0.kind == .low }.map(event)
+            let movements = tideFlowArrows(s.rates(from: dayStart, to: dayEnd, step: 900))
+                .map { TideMovement(fraction: $0.time.timeIntervalSince(dayStart) / dayLength,
+                                    rate: $0.rate) }
+                .filter { (0...1).contains($0.fraction) }
+            let rate = s.rateOfChange(at: now)
+            return .init(stationName: name, tz: tz, next: next,
+                         nextHigh: nextHigh, nextLow: nextLow, window: nil,
+                         sparkline: normalize(heights), tideMovements: movements,
+                         tideRate: rate, nowFraction: nowFraction,
                          curveKind: .tide, threshold: nil,
-                         state: ext?.kind == .high ? "Rising" : "Falling",
+                         state: extremes.first?.kind == .high ? "Rising" : "Falling",
                          value: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))")
 
         case .current(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             let pts = s.speeds(from: dayStart, to: dayEnd, step: 900)
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             let ev = s.events(from: now, to: now.addingTimeInterval(172_800))
@@ -97,13 +121,16 @@ struct WidgetSnapshot: Equatable {
                                     symbol: "arrow.down.right")
                 }
             }
-            return .init(stationName: name, tz: tz, next: next, window: window,
-                         sparkline: pts.map(\.speed), nowFraction: nowFraction,
+            return .init(stationName: name, tz: tz, next: next,
+                         nextHigh: nil, nextLow: nil, window: window,
+                         sparkline: pts.map(\.speed), tideMovements: [], tideRate: nil,
+                         nowFraction: nowFraction,
                          curveKind: .current, threshold: slackThresholdKn,
                          state: currentPhase(signed: signed).word,
                          value: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
 
         case .derived(let s, _, let name):
+            let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
             // Backward pad comfortably over one semidiurnal period (~12h25m):
             // schematicSigned reads 0 before slacks[0], so an unpadded fetch
             // starting at dayStart leaves the sparkline flat from midnight to
@@ -127,8 +154,10 @@ struct WidgetSnapshot: Equatable {
             }
             // No window for a derived gate — a window measured off a schematic
             // shape would be fiction (TimelineData precedent).
-            return .init(stationName: name, tz: tz, next: next, window: nil,
-                         sparkline: samples, nowFraction: nowFraction,
+            return .init(stationName: name, tz: tz, next: next,
+                         nextHigh: nil, nextLow: nil, window: nil,
+                         sparkline: samples, tideMovements: [], tideRate: nil,
+                         nowFraction: nowFraction,
                          curveKind: .schematic, threshold: nil,
                          state: s.phase(at: now, slacks: slacks).word,
                          value: "Timing only")

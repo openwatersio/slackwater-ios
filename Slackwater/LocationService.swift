@@ -2,6 +2,7 @@
 // (tide-app spec §5f).
 import Foundation
 import CoreLocation
+import WidgetKit
 
 let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
 
@@ -81,6 +82,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         location = locations.last
+        if let coordinate = location?.coordinate,
+           Self.cacheNearestWidgetStation(lat: coordinate.latitude, lon: coordinate.longitude) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         locating = false
     }
 
@@ -90,6 +95,17 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 }
 
 extension LocationService {
+    static func cacheNearestWidgetStation(
+        lat: Double, lon: Double, defaults: UserDefaults = AppGroup.defaults
+    ) -> Bool {
+        guard let id = StationItem.all.min(by: {
+            $0.km(fromLat: lat, lon: lon) < $1.km(fromLat: lat, lon: lon)
+        })?.id,
+        defaults.string(forKey: AppGroup.currentLocationStationKey) != id else { return false }
+        defaults.set(id, forKey: AppGroup.currentLocationStationKey)
+        return true
+    }
+
     /// What Near Me ranks distances from: a real fix first, then the station
     /// the user last opened, and only a fixed coordinate on a genuine first
     /// run with neither. Not Optional: the last branch always returns, so an

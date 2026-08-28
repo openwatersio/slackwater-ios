@@ -2,23 +2,48 @@
 // shared with the app target so its actual Canvas output can be tested.
 import SwiftUI
 
+func widgetStationPresentation(_ stationName: String) -> (name: String, isCurrentLocation: Bool) {
+    let prefix = "Current Location · "
+    guard stationName.hasPrefix(prefix) else { return (stationName, false) }
+    return (String(stationName.dropFirst(prefix.count)), true)
+}
+
+func tideEventValue(_ label: String) -> String {
+    let prefix = ["High ", "Low "].first { label.hasPrefix($0) }
+    return prefix.map { String(label.dropFirst($0.count)) } ?? label
+}
+
 struct DayCurveContentView: View {
     let snapshot: WidgetSnapshot
 
+    private var tideWarning: String? {
+        guard let rate = snapshot.tideRate,
+              let severity = tideRateSeverity(rate) else { return nil }
+        return "\(severity) \(rate >= 0 ? "rising" : "falling")"
+    }
+
     private var stateColor: Color {
+        if let rate = snapshot.tideRate, tideRateSeverity(rate) != nil {
+            if abs(rate) >= tideMovementRampAnchorsMHr[2] { return .red }
+            if abs(rate) >= tideMovementRampAnchorsMHr[1] { return .orange }
+            return .yellow
+        }
         switch snapshot.state {
-        case "Slack": .green
-        case "Flooding": .blue
-        case "Ebbing": .orange
-        default: .secondary
+        case "Slack": return .green
+        case "Flooding": return .blue
+        case "Ebbing": return .orange
+        default: return .secondary
         }
     }
 
-    private var curveAccessibilityValue: String {
+    var curveAccessibilityValue: String {
         let now = "Now is \(Int((snapshot.nowFraction * 100).rounded())) percent through today."
         switch snapshot.curveKind {
         case .tide:
-            return "\(snapshot.state), \(snapshot.value). \(now)"
+            let warning = tideWarning.map { " \($0)." } ?? ""
+            let movement = snapshot.tideMovements.isEmpty
+                ? "" : " Movement chevrons mark the fastest rise and fall."
+            return "\(snapshot.state), \(snapshot.value).\(warning) \(now)\(movement)"
         case .current:
             return "\(snapshot.state), \(snapshot.value). \(now) Green band marks the usable current threshold; orange and red mark stronger water."
         case .schematic:
@@ -27,15 +52,23 @@ struct DayCurveContentView: View {
     }
 
     var body: some View {
+        let station = widgetStationPresentation(snapshot.stationName)
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(snapshot.stationName)
+                if station.isCurrentLocation {
+                    Image(systemName: "location.north.fill")
+                        .font(.caption2.weight(.semibold))
+                        .rotationEffect(.degrees(45))
+                        .accessibilityLabel("Current location")
+                }
+                Text(station.name)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
                 Spacer()
-                Text(snapshot.state.uppercased())
+                Text(tideWarning ?? snapshot.state.uppercased())
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(stateColor)
+                    .lineLimit(1)
                 Text(snapshot.value)
                     .font(.caption.weight(.semibold).monospacedDigit())
                     .lineLimit(1)
@@ -69,6 +102,13 @@ struct DayCurveContentView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Slack window")
+            } else if snapshot.curveKind == .tide {
+                HStack(spacing: 12) {
+                    tideEvent(snapshot.nextHigh)
+                    Spacer(minLength: 4)
+                    tideEvent(snapshot.nextLow)
+                }
+                .accessibilityElement(children: .combine)
             } else if let next = snapshot.next {
                 HStack(spacing: 4) {
                     Image(systemName: next.symbol)
@@ -85,6 +125,24 @@ struct DayCurveContentView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tideEvent(_ event: WidgetSnapshot.Event?) -> some View {
+        if let event {
+            HStack(spacing: 4) {
+                Image(systemName: event.symbol)
+                    .font(.caption2.weight(.semibold))
+                    .accessibilityLabel(event.label.hasPrefix("High ") ? "High tide" : "Low tide")
+                Text(tideEventValue(event.label))
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .lineLimit(1)
+                Text(event.time, style: .time)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .environment(\.timeZone, snapshot.tz)
             }
         }
     }
@@ -128,6 +186,16 @@ struct MiniScrubberView: View {
                     zero.move(to: CGPoint(x: 0, y: y(0)))
                     zero.addLine(to: CGPoint(x: size.width, y: y(0)))
                     context.stroke(zero, with: .color(.secondary.opacity(0.35)), lineWidth: 0.75)
+                } else {
+                    var area = Path()
+                    area.move(to: CGPoint(x: 0, y: y(snapshot.sparkline[0])))
+                    for i in 1..<snapshot.sparkline.count {
+                        area.addLine(to: CGPoint(x: x(i), y: y(snapshot.sparkline[i])))
+                    }
+                    area.addLine(to: CGPoint(x: size.width, y: size.height))
+                    area.addLine(to: CGPoint(x: 0, y: size.height))
+                    area.closeSubpath()
+                    context.fill(area, with: .color(.blue.opacity(0.12)))
                 }
 
                 for i in 1..<snapshot.sparkline.count {
@@ -160,6 +228,27 @@ struct MiniScrubberView: View {
                     segment.addLine(to: CGPoint(x: x(i), y: y(b)))
                     context.stroke(segment, with: .color(color),
                                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                }
+
+                for movement in snapshot.tideMovements {
+                    let position = movement.fraction * Double(snapshot.sparkline.count - 1)
+                    let lower = min(max(Int(position), 0), snapshot.sparkline.count - 2)
+                    let fraction = position - Double(lower)
+                    let value = snapshot.sparkline[lower]
+                        + (snapshot.sparkline[lower + 1] - snapshot.sparkline[lower]) * fraction
+                    let angle = atan2(y(snapshot.sparkline[lower + 1]) - y(snapshot.sparkline[lower]),
+                                      x(lower + 1) - x(lower))
+                    let magnitude = abs(movement.rate)
+                    let color: Color = magnitude >= tideMovementRampAnchorsMHr[2] ? .red
+                        : magnitude >= tideMovementRampAnchorsMHr[1] ? .orange : .yellow
+                    var layer = context
+                    layer.translateBy(x: size.width * movement.fraction, y: y(value))
+                    layer.rotate(by: .radians(Double(angle)))
+                    layer.draw(Text("››››")
+                        .font(.system(size: 18, weight: .black))
+                        .tracking(-3)
+                        .foregroundStyle(color),
+                               at: .zero, anchor: .center)
                 }
 
                 let position = snapshot.nowFraction * Double(snapshot.sparkline.count - 1)

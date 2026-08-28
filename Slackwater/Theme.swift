@@ -216,9 +216,19 @@ func countdown(from: Date, to target: Date) -> String {
     return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
 }
 
-func slackWindowTiming(start: Date, end: Date, tz: TimeZone) -> String {
+func slackWindowTiming(start: Date, end: Date, tz: TimeZone) -> (duration: String?, span: String) {
     let minutes = max(Int((end.timeIntervalSince(start) / 60).rounded()), 0)
-    return "\(minutes) min, \(clockTime(start, tz)) → \(clockTime(end, tz))"
+    let hours = Int((Double(minutes) / 60).rounded())
+    let duration = minutes < 60 ? "\(minutes) min"
+        : hours <= 2 ? "~\(hours) \(hours == 1 ? "hr" : "hrs")"
+        : nil
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = tz
+    let days = max(calendar.dateComponents([.day], from: calendar.startOfDay(for: start),
+                                           to: calendar.startOfDay(for: end)).day ?? 0, 0)
+    let digits = ["", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"]
+    let suffix = days == 0 ? "" : days < 10 ? "⁺\(digits[days])" : "⁺⁺"
+    return (duration, "\(clockTime(start, tz)) → \(clockTime(end, tz))\(suffix)")
 }
 
 /// The web's CompassArrow: ↑ rotated to a true bearing, "sets this way".

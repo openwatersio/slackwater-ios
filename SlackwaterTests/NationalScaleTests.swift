@@ -335,16 +335,19 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(service.queue.total, 60,
                           "the queue is the download set, not the 1,097-station catalog")
         XCTAssertGreaterThan(service.notQueued, 1_000, "the rest of Canada is on demand, not gone")
-        for (place, fix, gates) in [("Victoria", firstRunFix, 3),
-                                    ("Halifax", (lat: 44.65, lon: -63.57), 0)] {
+        for (place, fix, ports, gates) in [("Victoria", firstRunFix, 6, 3),
+                                           ("Halifax", (lat: 44.65, lon: -63.57), 6, 0),
+                                           ("Boston", (lat: 42.3601, lon: -71.0589), 0, 0),
+                                           ("Detroit", (lat: 42.3314, lon: -83.0458), 0, 0)] {
             let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon)
             let seconds = set.reduce(0) { $0 + $1.estimatedSeconds }
             let far = set.map { distanceKm($0.latitude, $0.longitude, fix.lat, fix.lon) }.max() ?? 0
             print(String(format: "M53 auto-fit from %@: %d ports + %d gates, ~%.1f min, within %.0f km",
                          place, set.filter { !$0.isCurrent }.count, set.filter(\.isCurrent).count,
                          seconds / 60, far))
-            XCTAssertEqual(set.filter { !$0.isCurrent }.count, ChsFitService.autoFitPorts)
-            // Halifax is still 0, and now for the honest reason rather than the
+            XCTAssertEqual(set.filter { !$0.isCurrent }.count, ports,
+                           "\(place) auto-fits only the ports within reach of the fix")
+            // Halifax's gate count is 0 for the honest reason rather than the
             // accidental one: since M55 there IS a CHS gate on the Atlantic
             // (Great Bras d'Or), it is simply ~305 km away and the auto-fit
             // radius is 150 km. Distance decides this, not an ocean the bundle
@@ -352,7 +355,56 @@ final class NationalScaleTests: XCTestCase {
             XCTAssertEqual(set.filter(\.isCurrent).count, gates,
                            "\(place) auto-fits only the passes within reach of the fix")
             XCTAssertLessThan(seconds, 10 * 60, "\(place)'s first run must not be an afternoon")
+            XCTAssertLessThanOrEqual(far, ChsFitService.autoFitRadiusKm,
+                                     "\(place) downloads nothing beyond the radius")
         }
+    }
+
+    /// #205: the radius guards ports as well as gates. Boston and Detroit are
+    /// the cases the Victoria/Halifax pair above cannot see, because both of
+    /// those fixes sit on top of Canadian water — an unguarded port budget
+    /// looks identical to a guarded one from inside the country.
+    ///
+    /// Boston is the reported fix. Its nearest CHS ports are Montréal Jetée #1
+    /// at 402 km — a river gauge 400 km inland — and Seal Cove NB across the
+    /// Gulf of Maine, while the nearest station in its ranked list is NOAA
+    /// Boston at 1 km. Downloading Canada there is pure waste, and the ranking
+    /// proves it can never be seen: the first CHS entry is ~385th.
+    @MainActor
+    func testFarFromCanadaDownloadsNothing() {
+        for (place, fix) in [("Boston", (lat: 42.3601, lon: -71.0589)),
+                             ("Detroit", (lat: 42.3314, lon: -83.0458)),
+                             ("Denver", (lat: 39.7392, lon: -104.9903)),
+                             ("Austin", (lat: 30.2672, lon: -97.7431))] {
+            XCTAssertTrue(ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon).isEmpty,
+                          "\(place) is far from every CHS station and must fit none of them")
+            XCTAssertTrue(ChsFitService.autoPrefetchGates(lat: fix.lat, lon: fix.lon).isEmpty,
+                          "\(place) must fetch no online gate windows either")
+            let (ranked, _) = RankedStations.near(lat: fix.lat, lon: fix.lon)
+            let firstChs = ranked.prefix(5).contains { item in
+                switch item {
+                case .chs, .chsCurrent, .chsGate: return true
+                case .tide, .current: return false
+                }
+            }
+            XCTAssertFalse(firstChs, "\(place): no CHS row reaches the first screen, so none is left uncovered")
+        }
+    }
+
+    /// A US fix near the border is the case the radius must NOT break: a Puget
+    /// Sound sailor works Canadian water daily, and Bellingham has 84 CHS ports
+    /// and Boundary Pass inside 150 km.
+    @MainActor
+    func testBorderFixKeepsCanadianCoverage() {
+        for (place, fix) in [("Bellingham", (lat: 48.7519, lon: -122.4787)),
+                             ("Port Angeles", (lat: 48.1181, lon: -123.4307)),
+                             ("Eastport ME", (lat: 44.9062, lon: -66.9899))] {
+            let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon)
+            XCTAssertEqual(set.filter { !$0.isCurrent }.count, ChsFitService.autoFitPorts,
+                           "\(place) is inside the radius and must still get its ports")
+        }
+        XCTAssertFalse(ChsFitService.autoFitSet(lat: 48.7519, lon: -122.4787).filter(\.isCurrent).isEmpty,
+                       "Bellingham has Salish passes in reach and must fit them")
     }
 
     /// #178, second half: what the first screen SHOWS and what a first run
@@ -408,7 +460,7 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertTrue(victoria.allSatisfy(\.isOnline), "a fittable gate belongs in the queue, not here")
         for gate in victoria {
             XCTAssertLessThanOrEqual(distanceKm(gate.latitude, gate.longitude, firstRunFix.lat, firstRunFix.lon),
-                                     ChsFitService.autoFitGateRadiusKm)
+                                     ChsFitService.autoFitRadiusKm)
         }
         XCTAssertTrue(ChsFitService.autoPrefetchGates(lat: 44.65, lon: -63.57).isEmpty,
                       "Halifax fetches no Salish passes")

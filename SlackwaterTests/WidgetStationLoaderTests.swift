@@ -30,11 +30,47 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertNil(WidgetStationLoader.load(id: "nope:missing"))
     }
 
-    func testDefaultFollowsFavorites() {
+    func testDefaultUsesCurrentLocation() {
+        XCTAssertEqual(WidgetStationLoader.defaultStationID(), AppGroup.currentLocationStationID)
+    }
+
+    func testCurrentLocationResolvesCachedStation() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        d.set(TideStationRecord.fridayHarborID, forKey: AppGroup.currentLocationStationKey)
+
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: d),
+            TideStationRecord.fridayHarborID)
+    }
+
+    func testCurrentLocationFallsBackWhenCacheIsInvalid() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let favorite = TideStationRecord.fridayHarborID
+        d.set("missing", forKey: AppGroup.currentLocationStationKey)
+        d.set([favorite], forKey: AppGroup.favoritesKey)
+
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: d), favorite)
+    }
+
+    func testConcreteStationDoesNotResolveAgain() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        d.set("missing", forKey: AppGroup.currentLocationStationKey)
+
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            TideStationRecord.fridayHarborID, defaults: d),
+            TideStationRecord.fridayHarborID)
+    }
+
+    func testFallbackFollowsFavorites() {
         let d = AppGroup.defaults
         let saved = d.stringArray(forKey: AppGroup.favoritesKey)
         defer { d.set(saved, forKey: AppGroup.favoritesKey) }
         d.set([TideStationRecord.fridayHarborID], forKey: AppGroup.favoritesKey)
-        XCTAssertEqual(WidgetStationLoader.defaultStationID(), TideStationRecord.fridayHarborID)
+        XCTAssertEqual(WidgetStationLoader.fallbackStationID(defaults: d),
+                       TideStationRecord.fridayHarborID)
     }
 }

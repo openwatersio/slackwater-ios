@@ -13,9 +13,14 @@ struct SlackwaterEntry: TimelineEntry {
 
 struct StationProvider: AppIntentTimelineProvider {
     private func entry(_ intent: StationConfigIntent, at date: Date) -> SlackwaterEntry {
-        let id = intent.station?.id ?? WidgetStationLoader.defaultStationID()
+        let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
+        let id = WidgetStationLoader.resolvedStationID(selectedID)
         let snapshot = WidgetStationLoader.load(id: id)
-            .map { WidgetSnapshot.build($0, now: date) }
+            .map { WidgetSnapshot.build(
+                $0, now: date,
+                stationNamePrefix: selectedID == AppGroup.currentLocationStationID
+                    ? "Current Location" : nil)
+            }
         return SlackwaterEntry(date: date, snapshot: snapshot,
                                premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
                                stationID: id)
