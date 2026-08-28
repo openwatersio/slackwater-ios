@@ -14,6 +14,22 @@ final class CurrentFillTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "showCurrentFill")
     }
 
+    func testComposedStyleOmitsCurrentSourcesAndLayersForLaunchOverride() {
+        let style = composeStyle(
+            ["sources": [String: Any](), "layers": [[String: Any]]()],
+            landUrl: "", uscaUrl: "", arguments: ["-currentFillOff"])
+        let sources = style["sources"] as? [String: Any] ?? [:]
+        XCTAssertNil(sources[CurrentFillRenderer.sourceID])
+        XCTAssertNil(sources[CurrentFillRenderer.patchSourceID])
+
+        let ids = (style["layers"] as? [[String: Any]] ?? [])
+            .compactMap { $0["id"] as? String }
+        XCTAssertFalse(ids.contains(CurrentFillRenderer.sourceID))
+        XCTAssertFalse(ids.contains(CurrentFillRenderer.patchSourceID))
+        XCTAssertFalse(ids.contains(CurrentFillRenderer.directionLayerID))
+        XCTAssertFalse(ids.contains(CurrentFillRenderer.patchDirectionLayerID))
+    }
+
     func testCurrentStyleContainsNoAnimationSourceOrLayers() {
         var style: [String: Any] = [
             "sources": [String: Any](),
