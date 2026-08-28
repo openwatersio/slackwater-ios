@@ -379,6 +379,29 @@ final class ChsFitService: ObservableObject {
     /// the manager needs to say what "all done" actually means.
     var notQueued: Int { Self.candidates.count - queue.total }
 
+    /// Every Canadian current gate the fix's radius leaves out, and what they
+    /// cost — the manager's bulk action, and the reason currents need no
+    /// region model (#8).
+    ///
+    /// Gates are the series a bulk download is affordable for. There are 13
+    /// fittable ones in the whole country and 9 online windows, against 1,058
+    /// tide ports: fitting every gate is about 25 minutes, fitting every port
+    /// is about 4.4 hours. So the passes a passage crosses are selectable as
+    /// one set, and "the Gulf Islands" never has to become a place you pick.
+    /// ponytail: no region picker, no route parsing — all of them, once.
+    var gatesToDownload: [ChsJob] {
+        Self.candidates.filter { $0.isCurrent && queue.job($0.id) == nil }
+    }
+
+    /// Take every Canadian gate into the download set. Nearest still runs
+    /// first: these join the queue's proximity order rather than jumping it,
+    /// so the passes you are actually near stay ahead of the rest.
+    func downloadAllGates() {
+        for job in gatesToDownload { queue.add(job) }
+        pump()
+        prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
+    }
+
     /// Start the download run: nearest-first, one station at a time. Partial
     /// failure is fine — whatever fit is stored; the rest are retryable from
     /// the manager and retry on the next connected launch.
