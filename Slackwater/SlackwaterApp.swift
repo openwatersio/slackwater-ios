@@ -773,19 +773,30 @@ struct StationListView: View {
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 
-        // My Location slot: the hero tile, or the amber card in its place.
-        if let fix, let nearest = heroItem {
-            VStack(spacing: 0) {
-                MyLocationTile(item: nearest, fix: fix, imperial: imperial) {
-                    itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
+        // My Location slot: the hero tile, its locating state, or the amber
+        // denied card. Keep the slot mounted while Core Location finds a fix.
+        Group {
+            if let fix, let nearest = heroItem {
+                VStack(spacing: 0) {
+                    MyLocationTile(item: nearest, fix: fix, imperial: imperial) {
+                        itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
+                    }
+                    matchingButton(nearest, places)
                 }
-                matchingButton(nearest, places)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .transition(.opacity)
+            } else if loc.authorized {
+                MyLocationLoadingTile()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .transition(.opacity)
+            } else if loc.denied {
+                unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
             }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-        } else if loc.denied {
-            unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
         }
+        .animation(.easeInOut(duration: 0.25),
+                   value: fix.map { formatCoord(lat: $0.lat, lon: $0.lon) })
 
         // Favorites: starred stations, insertion order (spec §9 swipe-to-manage).
         // Iterated by ID, not by resolved item: a favorite whose station has
@@ -1241,6 +1252,36 @@ struct MyLocationTile<Card: View>: View {
             .foregroundStyle(SN.foam.opacity(0.9))
             .padding(.horizontal, 6)
             card(item)
+        }
+        .padding(8)
+        .background(Color.white.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
+            .strokeBorder(SN.leaf.opacity(0.22), lineWidth: 0.5))
+    }
+}
+
+struct MyLocationLoadingTile: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "location.north.fill")
+                    .font(.caption2)
+                    .rotationEffect(.degrees(45))
+                MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
+            }
+            .padding(.horizontal, 6)
+
+            HStack(spacing: 12) {
+                ProgressView().tint(SN.leaf)
+                Text("Finding your location…")
+                    .font(.callout)
+                    .foregroundStyle(SN.foam.opacity(0.7))
+                Spacer()
+            }
+            .frame(minHeight: 96)
+            .padding(.horizontal, 20)
+            .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .padding(8)
         .background(Color.white.opacity(0.04),
