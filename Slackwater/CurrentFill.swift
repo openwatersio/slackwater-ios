@@ -12,7 +12,7 @@ import CoreLocation
 import Foundation
 import MapLibre
 
-/// On by default (graduation spec §2). `-currentFillOff` is a UI-test override.
+/// On by default. `-currentFillOff` is a UI-test override.
 func currentFillEnabled(arguments: [String] = CommandLine.arguments) -> Bool {
     !arguments.contains("-currentFillOff")
 }
