@@ -71,6 +71,8 @@ final class CurrentFillTests: XCTestCase {
             XCTAssertEqual(layout["icon-rotation-alignment"] as? String, "map")
             XCTAssertEqual(layout["icon-pitch-alignment"] as? String, "map")
             XCTAssertEqual(layout["icon-allow-overlap"] as? Bool, false)
+            let paint = try XCTUnwrap(layers[index]["paint"] as? [String: Any])
+            XCTAssertEqual(paint["icon-color"] as? String, "#0b1a2b")
         }
     }
 

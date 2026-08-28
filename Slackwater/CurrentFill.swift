@@ -91,7 +91,7 @@ func addFillStyle(_ style: inout [String: Any]) {
             "icon-padding": 8,
         ],
         "paint": [
-            "icon-color": mapHex(SN.foamHex),
+            "icon-color": CHART_INK,
         ],
     ]
     var patchDirection = direction
