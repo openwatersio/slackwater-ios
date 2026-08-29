@@ -616,6 +616,31 @@ final class ScreenshotTests: XCTestCase {
         }
     }
 
+    /// The list as a first-time reader meets it: located, no permission card,
+    /// every row carrying a real number. Every other list capture in this walk
+    /// launches without a fix and so leads with "Location unavailable" — true
+    /// of the test, wrong as the App Store's and slackwater.xyz's first
+    /// impression. Its own test rather than a `save()` inside
+    /// testM41GroupedListAndRecents because that one's Victoria fix is load-
+    /// bearing for the group-order assertions, and Victoria's neighbours are
+    /// CHS stations that read "Queued" until a live IWLS fit lands.
+    ///
+    /// Friday Harbor instead: NOAA stations answer straight from the bundle,
+    /// so the rows show heights and speeds with nothing in flight and no
+    /// network. Feet because the units setting persists on the simulator and
+    /// an earlier test in the walk may have left it in metres.
+    func testLocatedListCapture() throws {
+        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+                         "-fixLat", "48.5453", "-fixLon", "-123.0125")
+        setUnits(app, "Feet")
+        XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        XCTAssertFalse(app.staticTexts["Location unavailable"].exists,
+                       "the located list must not show the permission card")
+        sleep(2)  // let the rows settle on their numbers
+        save(app, "list-located.png")
+    }
+
     // M4.1: the detail header is the station map with the title overlaid, the
     // day header carries the sun times, and the scrubber wears the moon
     // with its phase name.
