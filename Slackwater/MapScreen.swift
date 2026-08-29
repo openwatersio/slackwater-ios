@@ -39,7 +39,7 @@ private let WATER_TONE = "#e9f7ff"
 /// Pin fills fail WCAG's 3:1 on pale water, so the contrast lives on the
 /// stroke — every pin carries this ink outline (asserted in
 /// `testEveryPinOutlineClearsTheContrastFloorOnBothGrounds`).
-private let CHART_INK = "#0b1a2b"
+let CHART_INK = "#0b1a2b"
 // A pin's COLOUR is the water's state, never the station's kind — kind is the
 // pin's SHAPE: circle for current, square for tide. `chs` is provenance, not
 // kind — it draws the same square a NOAA tide station does.
@@ -446,7 +446,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private weak var map: MLNMapView?
     private let center: CLLocationCoordinate2D
     private let zoom: Double
-    private let fill = currentFillEnabled ? CurrentFillRenderer() : nil
+    private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
 
     init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
         self.map = map
@@ -484,6 +484,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // re-registers here or a style swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
+        style.setImage(currentDirectionImage(),
+                       forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below
         // land on top of it.
         fill?.attach(to: style, map: mapView)

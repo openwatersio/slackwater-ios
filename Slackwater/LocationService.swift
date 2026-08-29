@@ -25,7 +25,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private let manager = CLLocationManager()
 
     // UI-test hooks, deterministic in any simulator: `-fixLat x -fixLon y`
-    // renders the located list; `-locDenied` renders the denied amber card.
+    // renders the located list; the other two cover the no-fix slot states.
     private static let testFix: CLLocation? = {
         guard let i = CommandLine.arguments.firstIndex(of: "-fixLat"),
               let j = CommandLine.arguments.firstIndex(of: "-fixLon"),
@@ -35,26 +35,32 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         return CLLocation(latitude: lat, longitude: lon)
     }()
     private static let testDenied = CommandLine.arguments.contains("-locDenied")
+    private static let testAuthorizedNoFix = CommandLine.arguments.contains("-locAuthorizedNoFix")
 
     override private init() {
         status = manager.authorizationStatus
         super.init()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        if let fix = Self.testFix { location = fix }
+        if let fix = Self.testFix {
+            location = fix
+        } else if authorized {
+            location = Self.recentLocation(manager.location)
+        }
     }
 
     var authorized: Bool {
-        Self.testFix != nil
+        Self.testFix != nil || Self.testAuthorizedNoFix
             || status == .authorizedWhenInUse || status == .authorizedAlways
     }
     var denied: Bool {
-        Self.testDenied || (Self.testFix == nil && (status == .denied || status == .restricted))
+        Self.testDenied || (!Self.testAuthorizedNoFix && Self.testFix == nil
+            && (status == .denied || status == .restricted))
     }
 
     /// The gate's "Use My Location": ask, or refresh if already authorized.
     func request() {
-        guard Self.testFix == nil && !Self.testDenied else { return }
+        guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix else { return }
         locating = true
         if status == .notDetermined {
             manager.requestWhenInUseAuthorization()
@@ -67,11 +73,14 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Silent refresh on later launches — never prompts.
     func refreshIfAuthorized() {
-        guard Self.testFix == nil else { return }
-        if authorized { manager.requestLocation() }
+        guard Self.testFix == nil && !Self.testAuthorizedNoFix && authorized else { return }
+        location = Self.recentLocation(manager.location) ?? location
+        locating = location == nil
+        manager.requestLocation()
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard !Self.testAuthorizedNoFix else { return }
         status = manager.authorizationStatus
         if authorized {
             manager.requestLocation()
@@ -95,6 +104,12 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 }
 
 extension LocationService {
+    static func recentLocation(_ location: CLLocation?, now: Date = .now) -> CLLocation? {
+        guard let location, location.horizontalAccuracy >= 0,
+              abs(location.timestamp.timeIntervalSince(now)) <= 600 else { return nil }
+        return location
+    }
+
     static func cacheNearestWidgetStation(
         lat: Double, lon: Double, defaults: UserDefaults = AppGroup.defaults
     ) -> Bool {

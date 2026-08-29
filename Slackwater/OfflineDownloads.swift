@@ -275,6 +275,17 @@ struct OfflineManagerList: View {
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
+            if !allGates.isEmpty {
+                // The cost is on the button because there is no pause and no
+                // cancel: tapping this is a commitment, so it says how long.
+                Button { service.downloadAllGates() } label: {
+                    Text("Download all \(allGates.count) Canadian currents · \(durationPhrase(allGatesSeconds))")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(SN.leaf)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("download-all-currents")
+            }
             if failedCount > 0 {
                 Button {
                     service.retryFailed()
@@ -383,6 +394,9 @@ struct OfflineManagerList: View {
         queue.jobs.filter { $0.status == .pending || $0.status == .downloading }
             .reduce(0) { $0 + $1.estimatedSeconds }
     }
+
+    private var allGates: [ChsJob] { service.gatesToDownload }
+    private var allGatesSeconds: Double { allGates.reduce(0) { $0 + $1.estimatedSeconds } }
 
     private var readyCount: Int { downloads.filter { downloadIsReady(managedState($0).state) }.count }
     private var failedCount: Int { queue.failed + failedOnline.count }

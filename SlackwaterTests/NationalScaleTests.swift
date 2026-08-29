@@ -391,6 +391,32 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
+    /// The manager's bulk currents action, and why #8 needs no region picker.
+    ///
+    /// The radius is right for ports and leaves gates stranded: Great Bras
+    /// d'Or is 305 km from Halifax, so an Atlantic fix auto-fits zero passes,
+    /// and a passage planned from the dock crosses gates well past 150 km.
+    /// Every fittable gate in the country is 13 stations and minutes — the
+    /// 1,058 ports are hours — so the whole set is the selection, and "the
+    /// Gulf Islands" never has to become a place you pick.
+    @MainActor
+    func testEveryCanadianGateIsOneAffordableDownload() {
+        let service = ChsFitService.shared
+        let offered = service.gatesToDownload
+        XCTAssertTrue(offered.allSatisfy(\.isCurrent),
+                      "the bulk action is currents only — ports are the hours-long series")
+        let everyGate = offered + service.queue.jobs.filter(\.isCurrent)
+        XCTAssertEqual(Set(everyGate.map(\.id)),
+                       Set(ChsCurrentGateInfo.all.filter { !$0.isOnline }.map(\.id)),
+                       "every fittable gate is either already queued or one tap from it")
+        XCTAssertTrue(everyGate.contains { $0.id == "chs-great-bras-dor" },
+                      "the Atlantic gate no fix is ever within 150 km of is the point of this")
+        let seconds = everyGate.reduce(0) { $0 + $1.estimatedSeconds }
+        XCTAssertLessThan(seconds, 30 * 60,
+                          "all of Canada's gates must stay minutes, not an afternoon")
+        print(String(format: "#8 bulk currents: %d gates, ~%.0f min", everyGate.count, seconds / 60))
+    }
+
     /// A US fix near the border is the case the radius must NOT break: a Puget
     /// Sound sailor works Canadian water daily, and Bellingham has 84 CHS ports
     /// and Boundary Pass inside 150 km.

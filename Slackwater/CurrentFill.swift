@@ -1,35 +1,20 @@
-// Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
-// spec docs/superpowers/specs/2026-08-22-fill-graduation-design.md §2): the
-// speed-only current fill. FillField's certified triangles, each coloured by
-// the #97 speed ramp at its own evaluated speed, drawn under the land — the
-// colour raster half of the two-channel render the composite spec adopted
-// (2026-08-20-current-field-composite-design.md §1). Cells are drawn blocky,
-// unsmoothed, per that spec: smoothing would repaint colour across the
-// certification-mask edge.
+// Slackwater — GPL v3. Static current speed and direction renderer. FillField
+// and PatchField each populate one existing GeoJSON source with unchanged
+// certified speed polygons plus centroid direction points. MapLibre draws the
+// fill and map-aligned, collision-managed arrow symbols under the pins.
 //
-// Mechanism mirrors the #57 particle spike: the style build gets an EMPTY
-// GeoJSON source + one layer dict; everything live happens post-load on a
-// timer. The ramp is SN.speedRampStops via Timeline.rampT — the strip's own
-// transfer function, one meaning one value; no green by construction (#97
-// ruling, spec §1 status block). Flag off, nothing is added anywhere.
+// Both fields are evaluated off-main on the existing one-minute cadence; the
+// main thread assigns each completed shape collection once. Pan, zoom, and
+// frame rendering perform no current-data computation or source replacement.
+// The speed ramp remains Timeline.rampT → SN.speedRGB, with no green by
+// construction. `-currentFillOff` omits the sources and layers in tests.
 import CoreLocation
 import Foundation
 import MapLibre
 
-let currentFillKey = "showCurrentFill"
-
-/// On by default (graduation spec §2). The stored toggle is the user's map
-/// switch; `-currentFillOff` is the UI-test override, same pattern as
-/// `-networkKillSwitch` — it wins over the stored value so a test's style
-/// baseline can never depend on simulator state.
-var currentFillEnabled: Bool {
-    if CommandLine.arguments.contains("-currentFillOff") { return false }
-    let defaults = UserDefaults.standard
-    guard defaults.object(forKey: currentFillKey) != nil else { return true }
-    // bool(forKey:), not object as? Bool: a launch-argument value ("-showCurrentFill
-    // NO") arrives as a STRING, which the cast rejects while AppStorage coerces —
-    // the toggle read "off" and the layer still drew. bool(forKey:) coerces both.
-    return defaults.bool(forKey: currentFillKey)
+/// On by default. `-currentFillOff` is a UI-test override.
+func currentFillEnabled(arguments: [String] = CommandLine.arguments) -> Bool {
+    !arguments.contains("-currentFillOff")
 }
 
 /// Re-evaluation cadence. Tidal speed moves at most ~a knot per half hour;
@@ -52,17 +37,18 @@ func fillColourHex(forSpeedKn kn: Double) -> String {
     return String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
 }
 
-/// The runtime layers for both fill providers and the streak channel,
-/// coloured per feature, added under the pin layers so stations always draw
-/// over the wash.
+/// The runtime layers for both fill providers, coloured per feature, added
+/// under the pin layers so stations always draw over the wash.
 /// Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
 /// mouth fringe is draw order and nothing else (grown-patches spec §5), and
 /// feature order within one source does not guarantee paint order — layer
 /// order does. Identical paint: one ramp, one opacity law, one no-green rule
-/// for both providers. The streaks ride above both.
-func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource, streaks: MLNShapeSource)
+/// for both providers. Each source also carries centroid direction points; a
+/// symbol layer per source draws them as map-aligned, collision-managed
+/// arrows above the wash.
+func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource)
         -> (fill: MLNFillStyleLayer, patch: MLNFillStyleLayer,
-            streakTail: MLNLineStyleLayer, streakHead: MLNCircleStyleLayer) {
+            direction: MLNSymbolStyleLayer, patchDirection: MLNSymbolStyleLayer) {
     func configure(_ layer: MLNFillStyleLayer) {
         layer.fillColor = NSExpression(mglJSONObject: ["get", "colour"])
         // antialias false: adjacent triangles' antialiased half-covered edge
@@ -79,25 +65,25 @@ func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource, streaks: MLNSh
     configure(fillLayer)
     configure(patchLayer)
 
-    // Tails and heads share one source, so each layer takes the geometry it
-    // draws: a circle layer given a tail would dot every vertex of it.
-    let tail = MLNLineStyleLayer(identifier: CurrentStreakAnimator.tailLayerID, source: streaks)
-    tail.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "LineString"])
-    tail.minimumZoomLevel = Float(STREAK_MIN_ZOOM)
-    tail.lineCap = NSExpression(forConstantValue: "round")
-    tail.lineJoin = NSExpression(forConstantValue: "round")
-    tail.lineColor = NSExpression(forConstantValue: hexColor(mapHex(SN.foamHex)))
-    tail.lineWidth = NSExpression(forConstantValue: 2.0)
-    tail.lineOpacity = NSExpression(forConstantValue: 0.8)
-
-    let head = MLNCircleStyleLayer(identifier: CurrentStreakAnimator.headLayerID, source: streaks)
-    head.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "Point"])
-    head.minimumZoomLevel = Float(STREAK_MIN_ZOOM)
-    head.circleRadius = NSExpression(forConstantValue: 2.0)
-    head.circleColor = NSExpression(mglJSONObject: ["get", "colour"])
-    head.circleOpacity = NSExpression(forConstantValue: 0.9)
-
-    return (fillLayer, patchLayer, tail, head)
+    // Fills and direction points share one source, so each layer takes the
+    // geometry it draws.
+    func directionLayer(_ id: String, source: MLNShapeSource) -> MLNSymbolStyleLayer {
+        let layer = MLNSymbolStyleLayer(identifier: id, source: source)
+        layer.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "Point"])
+        layer.minimumZoomLevel = Float(CURRENT_DIRECTION_MIN_ZOOM)
+        layer.iconImageName = NSExpression(forConstantValue: CurrentFillRenderer.directionImageID)
+        layer.iconRotation = NSExpression(mglJSONObject: ["get", "bearing"])
+        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
+        layer.iconPitchAlignment = NSExpression(forConstantValue: "map")
+        layer.iconAllowsOverlap = NSExpression(forConstantValue: false)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
+        layer.iconPadding = NSExpression(forConstantValue: 8)
+        layer.iconColor = NSExpression(forConstantValue: hexColor(CHART_INK))
+        return layer
+    }
+    return (fillLayer, patchLayer,
+            directionLayer(CurrentFillRenderer.directionLayerID, source: fill),
+            directionLayer(CurrentFillRenderer.patchDirectionLayerID, source: patch))
 }
 
 /// Owns the fill bundle and the refresh timer. One instance per `MapStyler`;
@@ -106,6 +92,9 @@ func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource, streaks: MLNSh
 final class CurrentFillRenderer {
     static let sourceID = "current-fill"
     static let patchSourceID = "current-fill-patches"
+    static let directionLayerID = "current-directions"
+    static let patchDirectionLayerID = "current-directions-patches"
+    static let directionImageID = "current-direction-arrow"
 
     private weak var map: MLNMapView?
     private var source: MLNShapeSource?
@@ -115,13 +104,11 @@ final class CurrentFillRenderer {
     /// certification collapsed (Deception) vends zero cells and costs nothing.
     private var field: FillField?
     private var patches: PatchField?
+    private let dodd = DoddMapFlowProvider()
     private var timer: Timer?
     private var evaluating = false
-    private let streaks = CurrentStreakAnimator()
-
     deinit {
         timer?.invalidate()
-        streaks.stop()
     }
 
     func attach(to style: MLNStyle, map: MLNMapView) {
@@ -134,22 +121,18 @@ final class CurrentFillRenderer {
         } else {
             let fill = MLNShapeSource(identifier: Self.sourceID, shape: nil, options: nil)
             let patch = MLNShapeSource(identifier: Self.patchSourceID, shape: nil, options: nil)
-            let streakSource = MLNShapeSource(identifier: CurrentStreakAnimator.sourceID,
-                                              shape: nil, options: nil)
             style.addSource(fill)
             style.addSource(patch)
-            style.addSource(streakSource)
-            let layers = fillStyleLayers(fill: fill, patch: patch, streaks: streakSource)
+            let layers = fillStyleLayers(fill: fill, patch: patch)
             style.addLayer(layers.fill)
             style.addLayer(layers.patch)
-            style.addLayer(layers.streakTail)
-            style.addLayer(layers.streakHead)
+            style.addLayer(layers.direction)
+            style.addLayer(layers.patchDirection)
             source = fill
             patchSource = patch
         }
         if field == nil { field = FillField() }
         if patches == nil { patches = PatchField() }
-        streaks.attach(to: style, map: map, fillField: field, patchField: patches)
         refresh()
         guard timer == nil, field != nil || patches != nil else { return }
         let t = Timer(timeInterval: FILL_REFRESH_S, repeats: true) { [weak self] _ in self?.refresh() }
@@ -168,18 +151,17 @@ final class CurrentFillRenderer {
         let when = appNow()
         let field = self.field
         let patches = self.patches
-        func features(_ cells: [FillCell]) -> [MLNPolygonFeature] {
-            cells.map { cell in
-                var coords = cell.polygon
-                let f = MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
-                f.attributes = ["colour": fillColourHex(forSpeedKn: cell.speedKn),
-                                "kn": cell.speedKn]
-                return f
-            }
-        }
+        let dodd = self.dodd
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let fillFeatures = features(field?.cells(at: when) ?? [])
-            let patchFeatures = features(patches?.cells(at: when) ?? [])
+            let fillCells = field?.cells(at: when) ?? []
+            let patchCells = patches?.cells(at: when) ?? []
+            let fillFeatures = currentCellFeatures(
+                fillCells, excludingDirectionsIn: patchCells)
+            var patchFeatures = currentCellFeatures(patchCells)
+            if let flow = dodd.flow(at: when) {
+                patchFeatures.append(currentDirectionFeature(
+                    at: flow.center, bearingDeg: flow.bearingDeg))
+            }
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.evaluating = false

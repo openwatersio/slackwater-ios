@@ -662,6 +662,14 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["NEAR ME"].exists)
     }
 
+    func testM41AuthorizedLocationKeepsItsSlotWhileWaitingForAFix() throws {
+        let app = launch("-seedGate", "-resetRecents", "-locAuthorizedNoFix")
+        XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Finding your location…"].exists)
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        save(app, "m41-location-pending.png")
+    }
+
     // M4.2: the continuous scrub — a fixed centerline with the multi-day strip
     // panning underneath. Scrubbing across midnight lands on the next day's
     // events; the schedule shows several days under day headers; a row tap
@@ -994,6 +1002,9 @@ final class ScreenshotTests: XCTestCase {
         // icon, and no chrome sits over the map.
         app.buttons["Map"].tap()
         XCTAssert(app.otherElements["map-canvas"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["currents-toggle"].exists)
+        XCTAssertFalse(app.buttons["Hide currents"].exists)
+        XCTAssertFalse(app.buttons["Show currents"].exists)
         XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header")
         XCTAssert(app.buttons["List"].exists, "toggle did not flip to the list icon")
 

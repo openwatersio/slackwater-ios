@@ -1,6 +1,6 @@
-// Slackwater — GPL v3. The current fill layer (#57 channel 1, graduation
-// spec §2): style additions, the colour transfer, and the toggle contract —
-// on by default, off is byte-identical to the pre-fill style.
+// Slackwater — GPL v3. Static current fill and direction style behavior —
+// the runtime layers both fill providers and the direction arrows draw
+// through, the colour transfer, and the launch-override contract.
 import MapLibre
 import XCTest
 @testable import Slackwater
@@ -10,36 +10,25 @@ final class CurrentFillTests: XCTestCase {
         MLNShapeSource(identifier: id, shape: nil, options: nil)
     }
 
-    override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: currentFillKey)
-        super.tearDown()
-    }
+    func testFillIsOnExceptForTestLaunchOverride() {
+        XCTAssertTrue(currentFillEnabled(arguments: []))
+        XCTAssertFalse(currentFillEnabled(arguments: ["-currentFillOff"]))
 
-    /// The layer ships ON: a clean install draws the fill without any setting
-    /// being touched (graduation spec §2 — default on).
-    func testFillShipsOnByDefault() {
-        UserDefaults.standard.removeObject(forKey: currentFillKey)
-        XCTAssertTrue(currentFillEnabled)
-    }
-
-    /// A launch-argument override arrives as a STRING ("-showCurrentFill NO"),
-    /// not a Bool — the read must coerce it the same way AppStorage does, or
-    /// the FAB shows off while the layer still draws (caught on screen).
-    func testStringValuedDefaultReadsAsOff() {
-        UserDefaults.standard.set("NO", forKey: currentFillKey)
-        XCTAssertFalse(currentFillEnabled)
+        // A value left by a released build must not remain a hidden user setting.
+        UserDefaults.standard.set(false, forKey: "showCurrentFill")
+        XCTAssertTrue(currentFillEnabled(arguments: []))
+        UserDefaults.standard.removeObject(forKey: "showCurrentFill")
     }
 
     /// The runtime fill layers: identical paint minus the source binding
     /// (one ramp, one opacity law, one no-green rule for both providers), a
     /// per-feature colour, antialias off, and an opacity that rides speed but
     /// never reaches zero — certified coverage must stay distinguishable from
-    /// true no-data (spec §1). Patch-above-fill ordering is `attach`'s add
+    /// true no-data (spec §1). Patch-above-fill ordering is `attach`’s add
     /// order, checked on the identifiers here.
     func testFillLayersSharePaintAndColourPerFeature() {
         let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
-                                     patch: source(CurrentFillRenderer.patchSourceID),
-                                     streaks: source(CurrentStreakAnimator.sourceID))
+                                     patch: source(CurrentFillRenderer.patchSourceID))
         XCTAssertEqual(layers.fill.identifier, CurrentFillRenderer.sourceID)
         XCTAssertEqual(layers.patch.identifier, CurrentFillRenderer.patchSourceID)
         for layer in [layers.fill, layers.patch] {
@@ -58,32 +47,35 @@ final class CurrentFillTests: XCTestCase {
                       "the opacity floor left the paint — no-data and slack water become indistinguishable")
     }
 
-    /// Streaks ride above both fill providers (the add order in `attach`),
-    /// tails are foam and heads take the #97 ramp per feature — the state
-    /// palette must never reach this channel. Tails and heads share one
-    /// source, so each layer takes only the geometry it draws: a circle layer
-    /// given a tail would dot every vertex of it.
-    func testStreakLayersRideAboveTheFillWithFoamTailsAndRampHeads() {
+    /// The static direction channel: one map-aligned, collision-managed
+    /// symbol layer per source, rotated per feature from the "bearing"
+    /// attribute, ink-tinted, and gated to detail zooms. The animation
+    /// channel is gone — these four layers are everything the current
+    /// renderer adds.
+    func testDirectionLayersAreMapAlignedSymbolsAndNoStreaksRemain() {
         let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
-                                     patch: source(CurrentFillRenderer.patchSourceID),
-                                     streaks: source(CurrentStreakAnimator.sourceID))
-        XCTAssertEqual(layers.streakTail.identifier, CurrentStreakAnimator.tailLayerID)
-        XCTAssertEqual(layers.streakHead.identifier, CurrentStreakAnimator.headLayerID)
-        // Compared by description: two UIColors built the same way are not
-        // `==` unless they share a colour space.
-        XCTAssertEqual((layers.streakTail.lineColor.constantValue as? UIColor)?.description,
-                       hexColor(mapHex(SN.foamHex)).description,
-                       "tails are foam, not the ramp")
-        XCTAssertTrue(String(describing: layers.streakHead.circleColor).contains("colour"),
-                      "streak heads must take the ramp colour their features carry")
-        XCTAssertFalse(String(describing: layers.streakHead.circleColor)
-                        .contains(String(describing: PIN_STATE_COLOUR)),
-                       "the pin state palette must never reach the streak channel")
-        for layer in [layers.streakTail as MLNVectorStyleLayer, layers.streakHead] {
+                                     patch: source(CurrentFillRenderer.patchSourceID))
+        XCTAssertEqual(layers.direction.identifier, CurrentFillRenderer.directionLayerID)
+        XCTAssertEqual(layers.patchDirection.identifier, CurrentFillRenderer.patchDirectionLayerID)
+        for layer in [layers.direction, layers.patchDirection] {
             XCTAssertNotNil(layer.predicate,
-                            "\(layer.identifier) must take only its own geometry")
-            XCTAssertEqual(layer.minimumZoomLevel, Float(STREAK_MIN_ZOOM))
+                            "\(layer.identifier) must take only the point geometry")
+            XCTAssertEqual(layer.minimumZoomLevel, Float(CURRENT_DIRECTION_MIN_ZOOM))
+            XCTAssertEqual(layer.iconImageName?.constantValue as? String,
+                           CurrentFillRenderer.directionImageID)
+            XCTAssertTrue(String(describing: layer.iconRotation).contains("bearing"),
+                          "\(layer.identifier) must rotate per feature")
+            XCTAssertEqual(layer.iconRotationAlignment.constantValue as? String, "map")
+            XCTAssertEqual(layer.iconPitchAlignment.constantValue as? String, "map")
+            XCTAssertEqual(layer.iconAllowsOverlap.constantValue as? Bool, false,
+                           "arrows are collision-managed, never a solid sheet")
+            XCTAssertEqual((layer.iconColor.constantValue as? UIColor)?.description,
+                           hexColor(CHART_INK).description)
         }
+        let ids = [layers.fill, layers.patch, layers.direction, layers.patchDirection]
+            .map(\.identifier)
+        XCTAssertFalse(ids.contains { $0.contains("streak") },
+                       "the animation channel is gone — nothing may recreate it")
     }
 
     /// The colour transfer is the composition of the two shipped #97 pieces —
@@ -92,7 +84,7 @@ final class CurrentFillTests: XCTestCase {
     func testFillColourIsTheSharedRampAndNeverGreen() {
         XCTAssertEqual(fillColourHex(forSpeedKn: 0), "#f5c96b")     // threshold yellow
         XCTAssertEqual(fillColourHex(forSpeedKn: 99), "#c93a32")    // clamped red ceiling
-        // Mid-anchor: kn=3 is exactly t=1/3 by the strip's own anchors.
+        // Mid-anchor: kn=3 is exactly t=1/3 by the strip’s own anchors.
         let c = SN.speedRGB(Timeline.rampT(forSpeedKn: 3))
         XCTAssertEqual(fillColourHex(forSpeedKn: 3),
                        String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded())))

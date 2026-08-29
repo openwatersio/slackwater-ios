@@ -115,6 +115,11 @@ struct SettingsView: View {
                         Text("Prediction engine: slackwater-engine, a port of Neaps (MIT).")
                     }
 
+                    section("Privacy") {
+                        Link("Privacy Policy", destination: URL(string: "https://slackwater.xyz/privacy")!)
+                            .foregroundStyle(SN.leaf)
+                    }
+
                     section("License") {
                         Text("The Slackwater engine and web app are open source (MIT / GPL). This iOS app's own license is still being worked out — a copyleft structure that holds together with paid distribution — and will be published when it is.")
                     }
