@@ -58,8 +58,8 @@ extension TypeScaleTests {
     ///    distance limit on where you can call a function. Five real sites
     ///    are exactly this shape and are hand-verified into
     ///    `knownIndirections` below rather than silently passing unseen:
-    ///      - `CurrentCardView.nextLine(_:)` (SlackwaterApp.swift)
-    ///      - `RecentRowLabel.reading` (SlackwaterApp.swift)
+    ///      - `CurrentCardView.nextLine(_:)` (StationCard.swift)
+    ///      - `RecentRowLabel.reading` (StationCard.swift)
     ///      - `scheduleEntries()` in the four detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
@@ -87,8 +87,8 @@ extension TypeScaleTests {
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
         // See blind spot 2 above — "File.swift:declaringSymbol".
         let knownIndirections: Set<String> = [
-            "SlackwaterApp.swift:nextLine",
-            "SlackwaterApp.swift:reading",
+            "StationCard.swift:nextLine",
+            "StationCard.swift:reading",
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
@@ -169,7 +169,7 @@ extension TypeScaleTests {
                 // no call site does this today, but the ordinary one-arg-per-line
                 // convention would produce exactly that shape the first time one
                 // did). This is a bare substring test, not scoped to a `StationCard(`
-                // call — `SlackwaterApp.swift`'s `} detail: {` (NavigationSplitView's
+                // call — `StationListView.swift`'s `} detail: {` (NavigationSplitView's
                 // unrelated trailing-closure label) shares the literal token with no
                 // formatter anywhere near it today, so the false-positive risk is
                 // theoretical, not live; tightening past that would need a real
@@ -231,7 +231,7 @@ extension TypeScaleTests {
         // removal, and on an empty `sites` the subscript CRASHED the whole
         // test bundle instead — a fail, but the kind that takes the run's
         // other results with it.
-        XCTAssertTrue(sites.first?.hasPrefix("SlackwaterApp.swift:") == true,
+        XCTAssertTrue(sites.first?.hasPrefix("StationListView.swift:") == true,
                       "the survivor must be the wordmark, found \(sites)")
     }
 
@@ -272,7 +272,7 @@ extension TypeScaleTests {
     /// one retired literal — `height: 100` sailed straight through. A ban on
     /// one string is not a guarantee about the surviving code.
     func testFabClearanceScales() throws {
-        let appLines = try repoSource("Slackwater/SlackwaterApp.swift")
+        let appLines = try repoSource("Slackwater/StationListView.swift")
             .components(separatedBy: .newlines)
         let spacers = appLines.filter {
             !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")

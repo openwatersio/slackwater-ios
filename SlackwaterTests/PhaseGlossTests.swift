@@ -34,7 +34,7 @@ final class PhaseGlossTests: XCTestCase {
         }
         // Both list cards (OnlineGateCardView, CurrentCardView) lead with
         // arrow + cardinal.
-        let cards = try repoSource("Slackwater/SlackwaterApp.swift")
+        let cards = try repoSource("Slackwater/StationCard.swift")
         XCTAssertGreaterThanOrEqual(cards.components(separatedBy: "compass16(").count - 1, 2,
                                     "list cards lost their direction-first cardinal (#59)")
         XCTAssertTrue(try repoSource("Slackwater/TimelineStrip.swift").contains("compass16("),

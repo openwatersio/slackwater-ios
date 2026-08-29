@@ -1160,7 +1160,7 @@ final class ScreenshotTests: XCTestCase {
     // (Point Atkinson) before ChsFitService's one-time directory read, so the
     // same detail renders with no network; `-networkKillSwitch` keeps it
     // honest. No `-chsResetModels`: the seed hook wipes the store itself
-    // (combining them would delete the seed — SlackwaterApp.init's comment).
+    // (combining them would delete the seed — TestSeeds.swift's comment).
     func testM46MalibuDerivedGateSeededOffline() throws {
         let app = launch("-seedGate", "-networkKillSwitch",
                          "-seedTideModel", "chs-point-atkinson")
@@ -1346,7 +1346,7 @@ final class ScreenshotTests: XCTestCase {
     ///
     /// Seeded on Victoria HARBOUR, deliberately NOT plain Victoria: at regular
     /// width the split layout auto-selects a first detail on `.onAppear`
-    /// (SlackwaterApp.swift), and under this test's Victoria fix that is the
+    /// (StationListView.swift), and under this test's Victoria fix that is the
     /// nearest station — chs-victoria itself. `ChsDetailView.onAppear`
     /// unconditionally promotes whatever route it shows, so seeding
     /// chs-victoria as `.failed` was self-defeating on iPad: auto-select
@@ -1435,7 +1435,7 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// Issue #32: the map-header title jumps to the map, focused on the
-    /// detail's own station (SlackwaterApp.swift `openMapFocused`/`mapFocus`,
+    /// detail's own station (StationListView.swift `openMapFocused`/`mapFocus`,
     /// MapHeader.swift's title pill). No accessibility surface exposes an
     /// `MLNMapView`'s live center/zoom to XCUITest — nothing in this file
     /// reads one — so this proves the navigation contract (map up, detail
@@ -2345,7 +2345,7 @@ final class ScreenshotTests: XCTestCase {
     /// up for the length of the test — without it, `OnlineGateDetailView.onAppear`
     /// fires a REAL IWLS fetch the moment the honesty card would otherwise be
     /// asserted, and a fetch that lands mid-test would swap it for the fetched
-    /// detail out from under the assertions (SlackwaterApp.swift's
+    /// detail out from under the assertions (TestSeeds.swift's
     /// `seedOnlineWindow` doc comment covers the other half of this same
     /// coverage question). The nearest-gate-link push is NOT a list-driven
     /// reset (`OpenChsRouteKey`'s doc comment, Theme.swift): it
@@ -2430,7 +2430,7 @@ final class ScreenshotTests: XCTestCase {
         // `-chsResetModels` so the seed is the ONLY window on disk: it writes
         // through the merging `saveOnline`, and the live-fetch test leaves a
         // real window for this same gate. Passing by test ordering is not
-        // passing. (The reset runs first — SlackwaterApp.init touches
+        // passing. (The reset runs first — the seed hook touches
         // ChsFitService.shared before seeding, precisely for this.)
         let app = launch("-seedGate", "-chsResetModels",
                          "-seedOnlineWindow", "chs-sechelt-rapids",
