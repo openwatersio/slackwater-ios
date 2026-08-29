@@ -2,7 +2,7 @@
  * Generate Resources/currents.json — every bundled NOAA tidal-current station.
  *
  * Source: data/noaa-currents.json, the national extract vendored from
- * @openwaters/noaa-current-stations (its `currents.min.json`; the package ships
+ * @openwaters/noaa-current-stations (its `currents.json`; the package ships
  * the extractor and schema on npm but not the data, so it is vendored here the
  * same way slackwater-web vendors its Salish subset — see that repo's README to
  * re-extract). NOAA CO-OPS data is public domain.
