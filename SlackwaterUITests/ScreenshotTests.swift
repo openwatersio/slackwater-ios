@@ -164,7 +164,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Not for navigation."].exists,
                   "the settings sheet lost its disclaimer")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenStreetMap'")).firstMatch.exists,
+            NSPredicate(format: "label CONTAINS 'VersaTiles'")).firstMatch.exists,
                   "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
@@ -447,6 +447,23 @@ final class ScreenshotTests: XCTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.textFields.firstMatch.exists,
                        "search must not reopen on relaunch — the handoff is one-shot")
+    }
+
+    /// The chart-pack card in the offline manager: automatic downloads have
+    /// to be visible, or a sailor cannot tell whether the map is ready before
+    /// leaving signal.
+    func testChartPackCardShowsStateAndOffersRefresh() throws {
+        let app = launch("-seedGate", "-fixLat", "48.406", "-fixLon", "-122.643")
+        app.buttons["offline-status"].firstMatch.tap()
+        // The state line is the card: a VStack identifier does not surface as
+        // its own element, so assert on what the user actually reads.
+        let state = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'CHARTS'")).firstMatch
+        XCTAssert(state.waitForExistence(timeout: 10),
+                  "the downloads manager must say what state the map is in")
+        save(app, "chart-packs-manager.png")
+        XCTAssert(app.buttons["charts-refresh"].firstMatch.exists,
+                  "a sailor must be able to top the charts up before departure")
     }
 
     // M4: pin map — opens from the floating button, land + pins render, and a
