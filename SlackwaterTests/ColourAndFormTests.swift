@@ -318,7 +318,7 @@ final class ColourAndFormTests: XCTestCase {
     /// can actually render (above the threshold — below it the pin is go),
     /// and must never read green: green is the window's, exclusively.
     func testPinRampClearsContrastAndNeverGreen() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         let match = try XCTUnwrap(
             source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
             "LAND_TONE must stay a plain hex literal this test can read")
@@ -345,7 +345,10 @@ final class ColourAndFormTests: XCTestCase {
     }
 
     func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        // The feature builder and the layers that colour it live in two files;
+        // the rule spans both, so it is scanned as one text.
+        let source = try repoSource("Slackwater/MapPinState.swift")
+            + repoSource("Slackwater/MapStyleBuilder.swift")
         // Every pin feature must declare a state, defaulting to unknown.
         XCTAssertTrue(source.contains("\"state\""), "pin features must carry a state property")
         // Colour must be matched against state, never kind.
@@ -386,7 +389,7 @@ final class ColourAndFormTests: XCTestCase {
     /// now, and a test that demanded otherwise would be demanding the palette
     /// go back to navy.
     func testEveryPinOutlineClearsTheContrastFloorOnBothGrounds() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
             // of a hex literal), which closes a single-hash raw string.
@@ -423,7 +426,7 @@ final class ColourAndFormTests: XCTestCase {
     /// than a list of expected colours, so a new state cannot ship an
     /// unmeasured fill.
     func testEveryPinStateFillClearsTheContrastFloorOnLand() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         let match = try XCTUnwrap(
             source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
             "LAND_TONE must stay a plain hex literal this test can read")
