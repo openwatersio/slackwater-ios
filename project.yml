@@ -81,7 +81,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Slackwater/Slackwater.entitlements
-        DEVELOPMENT_TEAM: R3H8DPTV9C
+        DEVELOPMENT_TEAM: Z59BQLF5VQ
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
       configs:
