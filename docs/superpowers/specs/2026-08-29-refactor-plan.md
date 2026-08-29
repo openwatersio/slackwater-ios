@@ -71,7 +71,7 @@ The following is in good shape, some of it hard-won, and no stage touches it:
 - `TimelineScrubber`'s nudge/magnet coordinator.
 - `PinFeaturesCache`'s lock discipline — its own comment explains why it is not an actor.
 - `AppGroup`, `DeepLink`, `FavoritesCloud`, `ChsQueue`, `chunkPlan`'s absolute 7-day cache grid.
-- `scripts/test.sh`'s lock-based serialization. `ScreenshotTests`' assertions also stay as they are — stage 0 splits the class only so XCTest can distribute it, and moves tests verbatim.
+- `scripts/test.sh`'s lock-based serialization. The UI tests' assertions and method names also stay as they are — stage 0 splits the class only so XCTest can distribute it; test bodies move unchanged, and their comments get the same hygiene pass as any other move.
 
 ## Related issues
 
