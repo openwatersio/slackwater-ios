@@ -1,16 +1,9 @@
-// Slackwater — GPL v3. First-run connected fetch → fit → stored model for the
-// Canadian Salish tide ports (milestones spec M3). No region UX — Salish
-// auto-fits in the background; each station lands as its fit completes.
-//
-// The M0 spike's carry-forwards, honoured here:
-//   - JSContext.exceptionHandler is set (JS errors are silent without it)
-//   - no fetch inside JSCore — IWLS via URLSession, JSON strings + epoch-ms bridge
-//   - BASIS + SA/SSA constituent list (in chs-glue.js)
-//   - wlp is 1-min native → decimated to 15-min before bridging; 7-day request
-//     cap; queries by resolved Mongo id, never station code
+// Slackwater — GPL v3. The CHS fit orchestrator: what downloads without being
+// asked, the download queue that runs it, and the fetch → fit → stored model
+// run itself. No region UX — the stations near a fix auto-fit in the
+// background; each one lands as its fit completes.
 import CoreLocation
 import Foundation
-import JavaScriptCore
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
 /// stand-in: every IWLS request throws before the socket).
@@ -60,7 +53,7 @@ final class ChsFitService: ObservableObject {
     /// stale disk read (opened before the fetch, still on screen after)
     /// reloads off this the same way a fitted card re-renders off
     /// `currentRecords` changing.
-    @Published private(set) var onlineFetchStamp = 0
+    @Published var onlineFetchStamp = 0
 
     /// The online fetch in flight for each gate, so a gate never has two.
     /// Keyed by gate id rather than one global handle: two gates' fetches are
@@ -68,7 +61,7 @@ final class ChsFitService: ObservableObject {
     /// window — and a single handle would both serialise them and hand gate B's
     /// caller gate A's window. Read and written only on the main actor, which
     /// is what makes the check-and-set atomic. See `fetchOnlineWindow`.
-    private var onlineFetches: [String: Task<ChsOnlineWindow, Error>] = [:]
+    var onlineFetches: [String: Task<ChsOnlineWindow, Error>] = [:]
 
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
@@ -100,8 +93,8 @@ final class ChsFitService: ObservableObject {
 
     /// What downloads WITHOUT being asked for.
     ///
-    /// Until M53 the answer was "every Canadian station" — true and affordable
-    /// at 21 Salish stations, and neither at 1,097 nationally: bulk-downloading
+    /// Not "every Canadian station" — affordable at 21 stations and not at
+    /// 1,097: bulk-downloading
     /// Canada is about 4.4 hours of politely paced IWLS requests, which is not
     /// a thing to do to somebody's first run or their cellular plan.
     ///
@@ -371,7 +364,7 @@ final class ChsFitService: ObservableObject {
     func isProvisional(_ id: String) -> Bool { provisional.contains(id) }
 
     /// Is this station in the download set at all? Outside it, "pending" means
-    /// "open it and it downloads", not "wait your turn" (M53) — a different
+    /// "open it and it downloads", not "wait your turn" — a different
     /// sentence, and the only honest one for the other 1,000-odd stations.
     func isQueued(_ id: String) -> Bool { queue.job(id) != nil }
 
@@ -491,7 +484,7 @@ final class ChsFitService: ObservableObject {
     }
 
     /// The station the user just opened jumps the queue — ahead of proximity
-    /// order — and retries if it had failed. Since M53 it also JOINS the queue
+    /// order — and retries if it had failed. It also JOINS the queue
     /// if it wasn't in it: outside the auto-fit set, opening a station is how
     /// it gets downloaded, and a tap must never be a dead tap.
     /// Kicks the loop in case it had run dry (every job done or failed).
@@ -586,8 +579,8 @@ final class ChsFitService: ObservableObject {
         await MainActor.run { self.running = false }
     }
 
-    /// 60 d @ 15 min ending yesterday — the window the M0 spike validated, and
-    /// unchanged by M51: the per-gate window work is currents-only.
+    /// 60 d @ 15 min ending yesterday — a validated fit window. Deliberately
+    /// not per-gate: per-gate windows are a currents-only concern.
     nonisolated static let tideFitDays = 60.0
 
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
@@ -740,134 +733,6 @@ final class ChsFitService: ObservableObject {
     }
 }
 
-// MARK: - Online gates: fetched, never fitted
-
-extension ChsFitService {
-    /// The span one fetch covers: `Timeline.window`'s start for the anchor —
-    /// back-padded like every window (#67 item 1), never re-derived here — and
-    /// `Timeline.onlineFetchDays` forward of it, four strips' worth, so ordinary
-    /// paging lands in cache instead of on the network.
-    ///
-    /// Split out of `fetchOnlineWindow` only so it can be tested: everything
-    /// around it in that function needs IWLS, which would leave the anchored
-    /// branch — the one a date picker will use — shipping unexercised.
-    nonisolated static func onlineFetchSpan(anchor: Date?, today: Date) -> (start: Date, end: Date) {
-        let from = anchor ?? today
-        return (Timeline.window(anchor: from).start,
-                from.addingTimeInterval(Timeline.onlineFetchDays * 86_400))
-    }
-
-    /// The 7 fit-reject gates (online-gates spec §1) get no on-device fit —
-    /// only official wcsp1/wcdp1 predictions, `Timeline.onlineFetchDays` forward
-    /// of `anchor` (today unless a caller says otherwise) and back-padded like
-    /// the strip, resolved/projected exactly like `fitCurrent` (:345-363) but served as
-    /// fetched samples rather than harmonic constituents. No queue, no yield
-    /// point: these gates never join the fit queue, so there is nothing to
-    /// step aside for — a throw here is the whole story, and Task 5's caller
-    /// shows the honesty card on it.
-    ///
-    /// Persists the window itself (never just returns it for the caller to
-    /// save) and bumps `onlineFetchStamp` on a successful save — one seam,
-    /// so every caller, today's and any future one, gets the same
-    /// "the fetch landed" signal without re-deriving it.
-    ///
-    /// Returns the stored block this fetch merged into — never narrower than
-    /// the disk's copy of this span. Only a failed disk write falls back to
-    /// the bare fetched block.
-    ///
-    /// ONE fetch per gate at a time. The picker's speculative prefetch and the
-    /// user's own fetch of the week they landed on are both fetches of the same
-    /// file, and run concurrently they interleave a read-modify-write: the
-    /// store no longer loses a block to that race (disjoint blocks coexist on
-    /// disk since #67 item 4), but two concurrent read-modify-writes of one
-    /// file still lose ONE of the two fetches. A second caller joins the fetch
-    /// already running instead of starting its own, which also spares the
-    /// duplicate 30-day round trip — and is what the coalescing below is
-    /// actually still for.
-    ///
-    /// ponytail: coalescing is by gate, NOT by gate+span — a joiner gets the
-    /// span the in-flight fetch asked for, which may not cover it. That path
-    /// ends on the honesty card whose "Try again" fetches the parked anchor,
-    /// so it is recoverable; key the span in too if that ever reads as a bug.
-    nonisolated static func fetchOnlineWindow(for gate: ChsCurrentGateInfo,
-                                             from anchor: Date?) async throws -> ChsOnlineWindow {
-        try await MainActor.run { shared.onlineFetchTask(for: gate, from: anchor) }.value
-    }
-
-    /// The check-and-set, on the main actor so it is atomic: an existing handle
-    /// is joined, otherwise one is registered before this returns. The task
-    /// clears its own entry on the way out — success, failure or throw.
-    @MainActor
-    private func onlineFetchTask(for gate: ChsCurrentGateInfo,
-                                 from anchor: Date?) -> Task<ChsOnlineWindow, Error> {
-        if let existing = onlineFetches[gate.id] { return existing }
-        let task = Task { @MainActor in
-            defer { ChsFitService.shared.onlineFetches[gate.id] = nil }
-            return try await ChsFitService.runOnlineFetch(for: gate, from: anchor)
-        }
-        onlineFetches[gate.id] = task
-        return task
-    }
-
-    /// The fetch itself. Private: everything goes through `fetchOnlineWindow`,
-    /// which is where the one-per-gate rule lives.
-    private nonisolated static func runOnlineFetch(for gate: ChsCurrentGateInfo,
-                                                  from anchor: Date?) async throws -> ChsOnlineWindow {
-        let fetcher = IwlsFetcher()
-        let list = try await fetcher.stationList()
-        let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
-                                       series: "wcsp1", in: list)
-        let meta = try await fetcher.metadata(stationID: station.id)
-        guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-            throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
-        }
-        let (start, end) = Self.onlineFetchSpan(anchor: anchor, today: todayLocal(gate.tz))
-        // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
-        // fetched span in days, ending at its own end, gives exactly the chunk
-        // set covering start…end (up to 7 days of slop at the grid boundary,
-        // same tradeoff the fit path already makes).
-        let plan = Self.chunkPlan(days: end.timeIntervalSince(start) / 86_400, end: end)
-        var speeds: [ChsSample] = [], dirs: [ChsSample] = []
-        for chunk in plan {
-            speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
-            dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
-        }
-        let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
-        // IWLS can 200 with an empty series (a quiet chunk boundary, no error
-        // to catch). Saving anyway would fall through to the requested
-        // start/end below and stick forever — a zero-sample window that
-        // still reads as "covers the strip". Fail the fetch instead: the
-        // caller already turns any thrown error into the honesty card + retry.
-        guard !projected.isEmpty else { throw ChsError.failed("\(gate.name): IWLS returned an empty series") }
-        // A chunk IWLS truncates mid-series (a short response, a gap at one
-        // edge) must not be saved under the full requested start/end — that
-        // would make `covers` pass on a window with a hole in it and
-        // render a strip with a dead zone. Clamp to what actually came back,
-        // symmetrically, so a truncated fetch honestly fails coverage instead.
-        let sampleStart = projected.first.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? start
-        let sampleEnd = projected.last.map { Date(timeIntervalSince1970: $0.t / 1000) } ?? end
-        let window = ChsOnlineWindow(
-            stationID: gate.id, iwlsName: station.officialName, timezone: gate.timezone,
-            fetchedAt: .now, start: max(start, sampleStart), end: min(end, sampleEnd),
-            floodDirection: flood, ebbDirection: ebb,
-            times: projected.map { $0.t / 1000 }, speeds: projected.map { $0.v })
-        do {
-            // The MERGED window goes back to the caller, not `window`: the
-            // fetched block is only the part that was missing, and a caller
-            // rendering it alone would have less on screen than it has on disk
-            // (`saveOnline`'s doc comment).
-            let merged = try ChsModelStore.saveOnline(window)
-            await MainActor.run { shared.onlineFetchStamp += 1 }
-            return merged
-        } catch {
-            // ponytail: a local disk-write failure on an already-fetched
-            // window isn't worth failing the whole fetch over — the caller
-            // still gets `window` to render; only the reload-elsewhere signal
-            // (the stamp) and next launch's offline copy are what's lost.
-        }
-        return window
-    }
-}
 
 enum ChsError: Error {
     case networkDisabled
@@ -877,173 +742,6 @@ enum ChsError: Error {
     /// Anything terminal for this job. No catch site reads the string; it is
     /// for the thrown error's description only.
     case failed(String)
-}
-
-// MARK: - IWLS client (Swift/URLSession — never JSCore)
-
-struct IwlsStation: Decodable {
-    struct Series: Decodable { let code: String }
-    let id: String
-    let officialName: String
-    let latitude: Double
-    let longitude: Double
-    let timeSeries: [Series]
-}
-
-struct IwlsSample: Decodable { let eventDate: String; let value: Double }
-
-/// A decimated sample as bridged to JS: epoch-ms + metres.
-struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
-
-/// One request's worth of series: a 7-day slot on the absolute epoch grid.
-struct ChsChunk: Equatable { let start: Date; let end: Date }
-
-/// Fetched chunks, on disk, keyed by what identifies them and nothing else —
-/// so a job that stepped aside mid-download resumes where it stopped instead of
-/// paying for the same bytes twice. Purged per station once its final fit lands
-/// (the harmonic model is the artifact; the samples were only scaffolding).
-enum ChsChunkStore {
-    static let dir: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return base.appendingPathComponent("ChsChunks", isDirectory: true)
-    }()
-
-    static func url(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> URL {
-        dir.appendingPathComponent("\(stationID)-\(code)-\(Int(chunk.start.timeIntervalSince1970)).json")
-    }
-
-    static func load(_ stationID: String, _ code: String, _ chunk: ChsChunk) -> [ChsSample]? {
-        guard let data = try? Data(contentsOf: url(stationID, code, chunk)) else { return nil }
-        return try? JSONDecoder().decode([ChsSample].self, from: data)
-    }
-
-    static func save(_ samples: [ChsSample], _ stationID: String, _ code: String, _ chunk: ChsChunk) {
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? JSONEncoder().encode(samples).write(to: url(stationID, code, chunk), options: .atomic)
-    }
-
-    static func purge(_ stationID: String) {
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        for f in files where f.hasPrefix(stationID + "-") {
-            try? FileManager.default.removeItem(at: dir.appendingPathComponent(f))
-        }
-    }
-}
-
-/// Polite serial IWLS client: one request at a time, 2.5 s apart (~24/min,
-/// safely under the documented 3/s and 30/min caps), 7-day chunks.
-final class IwlsFetcher {
-    static let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
-    private let killSwitch: Bool
-    private var lastRequest = Date.distantPast
-
-    init(killSwitch: Bool = networkKillSwitch) {
-        self.killSwitch = killSwitch
-    }
-
-    private func get(_ path: String) async throws -> Data {
-        guard !killSwitch else { throw ChsError.networkDisabled }
-        let wait = 2.5 - Date.now.timeIntervalSince(lastRequest)
-        if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
-        lastRequest = .now
-        let (data, response) = try await URLSession.shared.data(from: URL(string: Self.base + path)!)
-        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard code == 200 else { throw ChsError.failed("HTTP \(code)") }
-        return data
-    }
-
-    func stationList() async throws -> [IwlsStation] {
-        try JSONDecoder().decode([IwlsStation].self, from: try await get("/stations"))
-    }
-
-    struct Metadata: Decodable { let floodDirection: Double?; let ebbDirection: Double? }
-
-    /// Per-station metadata — the only place IWLS serves the flood/ebb axis
-    /// (the /stations list entries carry none).
-    func metadata(stationID: String) async throws -> Metadata {
-        try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
-    }
-
-    /// A natively 15-minute series (wcsp1/wcdp1) for one chunk. Cached on disk,
-    /// so this costs a request exactly once — including across a job that
-    /// stepped aside and came back, and across days (the grid is absolute).
-    func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
-        try await cached(code, stationID: stationID, chunk: chunk) { $0 }
-    }
-
-    /// wlp for one chunk, decimated from its 1-min native rate to the 15-min
-    /// grid the fit wants (M0 spike carry-forward).
-    func wlp(stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
-        try await cached("wlp", stationID: stationID, chunk: chunk) {
-            $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
-        }
-    }
-
-    private func cached(_ code: String, stationID: String, chunk: ChsChunk,
-                        _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
-        if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
-        let iso = ISO8601DateFormatter()
-        let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
-            "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"
-        let raw = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
-        var out: [ChsSample] = []
-        for s in raw {
-            guard let date = iso.date(from: s.eventDate) else { continue }
-            let ms = date.timeIntervalSince1970 * 1000
-            if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
-        }
-        let samples = transform(out)
-        // Only whole grid chunks are cached: the newest one runs to "now" and
-        // would be a different chunk tomorrow.
-        if chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
-            ChsChunkStore.save(samples, stationID, code, chunk)
-        }
-        return samples
-    }
-}
-
-// MARK: - JSCore fitter
-
-struct ChsFitResult: Decodable {
-    let fitMs: Double
-    let offset: Double
-    let rms: Double
-    let constituents: [Con]
-}
-
-/// Runs chs-bundle.js + chs-glue.js in JavaScriptCore, off the main thread.
-/// One context, reused across stations within a fit run.
-final class ChsFitter {
-    private var context: JSContext?
-    private var jsError: String?
-
-    private func makeContext() throws -> JSContext {
-        if let context { return context }
-        let ctx = JSContext()!
-        ctx.exceptionHandler = { [weak self] _, exc in self?.jsError = exc?.toString() }
-        // JSCore has no console; shim it so a stray log can't crash the fit.
-        ctx.evaluateScript("var console = {log:function(){},warn:function(){},error:function(){},info:function(){},debug:function(){}};")
-        for name in ["chs-bundle", "chs-glue"] {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "js") else {
-                throw ChsError.failed("\(name).js missing from bundle")
-            }
-            ctx.evaluateScript(try String(contentsOf: url, encoding: .utf8))
-            if let e = jsError { throw ChsError.failed("\(name).js: \(e)") }
-        }
-        context = ctx
-        return ctx
-    }
-
-    func fit(samples: [ChsSample]) async throws -> ChsFitResult {
-        let json = String(data: try JSONEncoder().encode(samples), encoding: .utf8)!
-        let ctx = try makeContext()
-        jsError = nil
-        guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [json]),
-              jsError == nil, let str = out.toString() else {
-            throw ChsError.failed(jsError ?? "fitTides returned nothing")
-        }
-        return try JSONDecoder().decode(ChsFitResult.self, from: Data(str.utf8))
-    }
 }
 
 extension CurrentStationRecord {
@@ -1066,69 +764,5 @@ extension ChsModelStore {
         guard CommandLine.arguments.contains("-chsResetModels") else { return }
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
-    }
-
-    /// The prune cut is bounded backward retention (#67 item 6): blocks age out
-    /// at the first save after they fall behind today − onlineRetentionDays. The
-    /// min(_, window.start) guard is unchanged from the single-window days — the
-    /// cut never discards data the incoming fetch itself covers, or a picked old
-    /// week would be deleted by its own save and refetch forever.
-    ///
-    // ponytail: no forward cap. A 30-day block is ~2880 samples (~90KB JSON);
-    // someone who pages a year out accumulates ~1MB on a gate they evidently
-    // care about, and -chsResetModels already clears it. Add a cap when a real
-    // file gets big.
-    @discardableResult
-    static func saveOnline(_ window: ChsOnlineWindow) throws -> ChsOnlineWindow {
-        let tz = TimeZone(identifier: window.timezone) ?? .current
-        let cut = min(todayLocal(tz).addingTimeInterval(-Timeline.onlineRetentionDays * 86_400),
-                      window.start)
-        let store = (loadOnline(window.stationID)
-                     ?? ChsOnlineStore(stationID: window.stationID, blocks: []))
-            .inserting(window, prunedBefore: cut)
-        try save(store, id: window.stationID, suffix: "-online")
-        return store.block(spanning: window) ?? window
-    }
-}
-
-extension ChsOnlineWindow {
-    /// Does the stored window cover the FULL strip `Timeline` would build for
-    /// `anchor`? The window is computed by `Timeline.window`, never re-derived
-    /// here — a second derivation drifts, and the failure mode is this
-    /// returning true for a window with a hole in it, which renders as a
-    /// strip with a dead zone.
-    func covers(anchor: Date) -> Bool {
-        let need = Timeline.window(anchor: anchor)
-        return start <= need.start && end >= need.end
-    }
-
-    /// The list/search card's reading: nearest 15-min sample to `now` (a card
-    /// tolerates the ≤7.5 min slop; `OnlineGateDetailView`'s scrub is where
-    /// interpolating the drawn curve earns its keep), and the next event from
-    /// the same fetched series `sampleEvents` scans — the same shape
-    /// `CurrentStationRecord.cardState(at:)` returns for a fitted gate, so the
-    /// card rendering doesn't need to know which kind of gate it's reading.
-    func cardState(at now: Date) -> CurrentCardState {
-        let signed = points.min { abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now)) }?.speed ?? 0
-        let next = sampleEvents(points).first { $0.time > now }
-        return CurrentCardState(signed: signed, next: next)
-    }
-}
-
-extension ChsOnlineStore {
-    /// The one block covering `anchor`'s whole strip, or nil — never a stitch
-    /// across a gap.
-    func block(covering anchor: Date) -> ChsOnlineWindow? {
-        blocks.first { $0.covers(anchor: anchor) }
-    }
-}
-
-extension ChsCurrentGateInfo {
-    /// Offline, "stay connected" is advice you can't act on — say what's true
-    /// instead, without implying a wait in progress.
-    func provisionalExpectation(online: Bool) -> String {
-        online
-            ? "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap."
-            : "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full \(Int(fitDays))-day model — nothing to tap."
     }
 }
