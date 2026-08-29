@@ -31,7 +31,8 @@ their own waters fixing the data.
 | **This repo** | The iOS app — same free core, nicer everything, plus the paid planning tier | here |
 
 Station data and shared libraries live in the Open Waters / Neaps ecosystem
-(`current-stations`, `chs-constituents`, `station-corrections`, `@neaps/tide-database`).
+([`noaa-current-stations`](https://github.com/openwatersio/noaa-current-stations),
+`chs-constituents`, `station-corrections`, `@neaps/tide-database`).
 
 ## The free / paid line
 
