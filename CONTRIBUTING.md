@@ -7,6 +7,7 @@ Slackwater is a tide and current app that runs its predictions on the device. Bu
 You need **Xcode 26** or later (the app targets iOS 26) and **XcodeGen** (`brew install xcodegen`). The `.xcodeproj` and `Info.plist` are generated rather than committed, so generate them first:
 
 ```sh
+git config core.hooksPath .githooks   # regenerates the project after every pull
 xcodegen generate
 open Slackwater.xcodeproj
 ```
