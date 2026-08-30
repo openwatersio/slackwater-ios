@@ -53,7 +53,7 @@ final class ChsFitService: ObservableObject {
     /// stale disk read (opened before the fetch, still on screen after)
     /// reloads off this the same way a fitted card re-renders off
     /// `currentRecords` changing.
-    @Published var onlineFetchStamp = 0
+    @Published private(set) var onlineFetchStamp = 0
 
     /// The online fetch in flight for each gate, so a gate never has two.
     /// Keyed by gate id rather than one global handle: two gates' fetches are
@@ -61,7 +61,17 @@ final class ChsFitService: ObservableObject {
     /// window — and a single handle would both serialise them and hand gate B's
     /// caller gate A's window. Read and written only on the main actor, which
     /// is what makes the check-and-set atomic. See `fetchOnlineWindow`.
-    var onlineFetches: [String: Task<ChsOnlineWindow, Error>] = [:]
+    private var onlineFetches: [String: Task<ChsOnlineWindow, Error>] = [:]
+
+    /// The accessors the online-gate coalescing rides (`fetchOnlineWindow`,
+    /// OnlineGates.swift) — methods rather than direct access, so the stored
+    /// state stays private to this file and every touch stays on the main
+    /// actor by construction.
+    func onlineFetch(for id: String) -> Task<ChsOnlineWindow, Error>? { onlineFetches[id] }
+    func setOnlineFetch(_ task: Task<ChsOnlineWindow, Error>?, for id: String) {
+        onlineFetches[id] = task
+    }
+    func bumpOnlineFetchStamp() { onlineFetchStamp += 1 }
 
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.

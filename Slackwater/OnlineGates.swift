@@ -60,12 +60,12 @@ extension ChsFitService {
     @MainActor
     private func onlineFetchTask(for gate: ChsCurrentGateInfo,
                                  from anchor: Date?) -> Task<ChsOnlineWindow, Error> {
-        if let existing = onlineFetches[gate.id] { return existing }
+        if let existing = onlineFetch(for: gate.id) { return existing }
         let task = Task { @MainActor in
-            defer { ChsFitService.shared.onlineFetches[gate.id] = nil }
+            defer { ChsFitService.shared.setOnlineFetch(nil, for: gate.id) }
             return try await ChsFitService.runOnlineFetch(for: gate, from: anchor)
         }
-        onlineFetches[gate.id] = task
+        setOnlineFetch(task, for: gate.id)
         return task
     }
 
@@ -117,7 +117,7 @@ extension ChsFitService {
             // rendering it alone would have less on screen than it has on disk
             // (`saveOnline`'s doc comment).
             let merged = try ChsModelStore.saveOnline(window)
-            await MainActor.run { shared.onlineFetchStamp += 1 }
+            await MainActor.run { shared.bumpOnlineFetchStamp() }
             return merged
         } catch {
             // ponytail: a local disk-write failure on an already-fetched

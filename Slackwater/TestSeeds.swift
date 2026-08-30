@@ -107,13 +107,17 @@ private func seedOnlineFarWindow(stationID: String) {
 
 /// nil offset = today's real window (`Timeline.window(anchor: today)`); an
 /// offset seeds [today+offset, today+offset+span] instead.
-private func seedOnline(stationID: String, offsetDays: Double?, spanDays: Double?) {
+private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
     let today = todayLocal(gate.tz)
     let start: Date, end: Date
     if let offsetDays, let spanDays {
-        start = today.addingTimeInterval(offsetDays * 86_400)
-        end = start.addingTimeInterval(spanDays * 86_400)
+        // Calendar days in the gate's zone, not seconds — a seeded window a
+        // fixed 86,400 s off drifts an hour across a DST boundary.
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = gate.tz
+        start = cal.date(byAdding: .day, value: offsetDays, to: today)!
+        end = cal.date(byAdding: .day, value: spanDays, to: start)!
     } else {
         let w = Timeline.window(anchor: today)
         start = w.start; end = w.end

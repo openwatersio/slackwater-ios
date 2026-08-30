@@ -164,11 +164,6 @@ struct RecentRowLabel: View {
         .task { if tide == nil && current == nil && gate == nil { load() } }
     }
 
-    private var rawId: String {
-        if case .current(let s) = item { return s.id }
-        return item.id
-    }
-
     private var reading: String {
         if let gate { return gate.phase.word.lowercased() }
         if let current {
