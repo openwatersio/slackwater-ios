@@ -24,6 +24,7 @@
       }
     },
     {
+      "parallelizable" : true,
       "target" : {
         "containerPath" : "container:Slackwater.xcodeproj",
         "identifier" : "474F7563FE2CB219785DD847",

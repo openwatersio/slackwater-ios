@@ -44,12 +44,13 @@ MODE=fast
 if [[ "${1:-}" == "--full" ]]; then
   MODE=full
   # TEST_RUNNER_ prefix (same mechanism as M1_SHOT_DIR below): reaches
-  # ScreenshotTests.skipUnlessFull, which otherwise skips the live-IWLS tests.
+  # ScreenshotTestCase.skipUnlessFull, which otherwise skips the live-IWLS
+  # tests — all of them in LiveFetchTests.
   export TEST_RUNNER_SLACKWATER_FULL=1
 fi
 
 # TEST_RUNNER_ prefix: xcodebuild strips it and sets the rest on the UI-test
-# RUNNER process, which is where ScreenshotTests reads M1_SHOT_DIR. A bare
+# RUNNER process, which is where ScreenshotTestCase reads M1_SHOT_DIR. A bare
 # M1_SHOT_DIR in this shell never reaches it (the tests fall back to /tmp).
 export TEST_RUNNER_M1_SHOT_DIR="${SHOT_DIR:-/tmp/slackwater-shots}"
 mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
@@ -89,8 +90,20 @@ for sim in "${sims[@]}"; do
   rm -rf "$bundle"   # xcodebuild refuses to overwrite one
   # -clonedSourcePackagesDirPath: repo-local SPM cache, never the Xcode GUI's
   # (docs/testflight.md — two resolvers on the MapLibre artifact corrupt it).
+  #
+  # SlackwaterUITests is parallelizable in the plan, so xcodebuild clones the
+  # simulator and distributes the UI-test CLASSES across the clones. All the
+  # live-IWLS tests sit in one class (LiveFetchTests) so they stay sequential.
+  # The clones live inside this one xcodebuild, so the lock above still covers
+  # the whole run. Worker count is a MEMORY budget, not a core count: a booted
+  # iOS simulator clone costs ~2.2 GB, and on a 16 GB machine with a normal
+  # desktop running, four clones push swap past physical RAM — load average
+  # then counts thousands of page-in-blocked threads (430 observed, CPU 89%
+  # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit;
+  # raise SLACKWATER_WORKERS on machines with more memory (CI).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
+    -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
     "${skip[@]}" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \

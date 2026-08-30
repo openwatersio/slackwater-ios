@@ -147,7 +147,7 @@ that procedure sits on.
 
 One XCTestPlan (`TestPlans/Slackwater.xctestplan`), checked in and wired into the
 scheme by `project.yml`. The live-IWLS / on-device-fit UI tests carry
-`skipUnlessFull()` (ScreenshotTests) and skip themselves unless `SLACKWATER_FULL`
+`skipUnlessFull()` (ScreenshotTestCase) and skip themselves unless `SLACKWATER_FULL`
 reaches the UI-test runner — `scripts/test.sh --full` sets
 `TEST_RUNNER_SLACKWATER_FULL=1`, the same `TEST_RUNNER_` route as `M1_SHOT_DIR`
 below. Drive it with `scripts/test.sh`, which prints a per-sim wall clock.
@@ -207,8 +207,8 @@ the whole 151-test unit target is **21 s**, of which
 every bundled station, so it rides `--full` — `scripts/test.sh` skips it by name
 in fast mode).
 
-The eleven the fast run skips (each carries `try skipUnlessFull()` at the top —
-grep ScreenshotTests.swift for the current list) fetch live from IWLS
+The eleven the fast run skips are the whole of `LiveFetchTests` (each carries
+`try skipUnlessFull()` at the top). They fetch live from IWLS
 (`api-iwls.dfo-mpo.gc.ca`) at the fetcher's 2.5 s pacing and then fit harmonics in
 JavaScriptCore (or, for `testOnlineGateLiveFetch`, fetch CHS-published predictions),
 so each costs minutes, not seconds.
@@ -224,7 +224,7 @@ IWLS and with simulator state; 21 min is a good run, not a ceiling.
 run is also the only thing that exercises the network path at all, so a green fast run
 says nothing about IWLS resolution, chunk caching, or the provisional→final refinement.
 
-Screenshots: `ScreenshotTests` reads `M1_SHOT_DIR` **inside the UI-test runner process**, so
+Screenshots: `ScreenshotTestCase` reads `M1_SHOT_DIR` **inside the UI-test runner process**, so
 the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix and sets the
 rest on the runner. A bare `M1_SHOT_DIR` in the invoking shell never arrives and the tests
 silently fall back to `/tmp`.

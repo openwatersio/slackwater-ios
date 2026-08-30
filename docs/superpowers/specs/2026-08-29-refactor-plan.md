@@ -6,7 +6,7 @@
 
 A staged plan for restructuring the app target so the code is easier to understand and change, for people and for agents. The logic itself is in good shape — the comments encode real incidents, the invariants (like `Timeline.window(anchor:)` being the window's only definition) hold, and the test suite asserts real behavior. What gets in the way is organization: four files carry 44% of the app's ~12,500 lines and are also the four highest-churn files of the last six months, the card and detail layer repeats itself structurally, and app-wide state has no seams for tests or previews.
 
-The plan is ordered so every stage stands alone: the test lane gets fast first (every later stage runs it repeatedly), mechanical file moves next, behavior-preserving deduplication after that, state management last and only when it earns its cost. Bug fixes discovered along the way are filed as issues #230–#235 and are deliberately not part of these stages — they can land in any order, independently.
+The plan is ordered so every stage stands alone: mechanical file moves first, then a fast test lane (the stages after it run the suite repeatedly), behavior-preserving deduplication after that, state management last and only when it earns its cost. Bug fixes discovered along the way are filed as issues #230–#235 and are deliberately not part of these stages — they can land in any order, independently.
 
 **Ground rules for every stage:**
 
@@ -15,15 +15,6 @@ The plan is ordered so every stage stands alone: the test lane gets fast first (
 - Three tests scan sources by literal path (`TypeScaleTests`, `PhaseGlossTests`, `ColourAndFormTests` via `repoSource`/`appSources`) — any split updates them in the same commit.
 - `project.yml` globs `Slackwater/` for the app target, so new files need no project edits; the widget target lists files explicitly, so check it before moving anything a widget compiles.
 - Each split is compile-checked (`build-for-testing`), and the fast suite runs once per stage.
-
-## Stage 0: speed up the fast test lane
-
-First, because every checkbox below pays the suite's cost: each remaining stage runs the fast suite at least once, and stage 2 runs it after every extraction. Measured on CI run 33256671094 (2026-08-29): the fast lane is 1128s of wall clock, of which the 42 executed `ScreenshotTests` are 1041s (92%) — the unit suite is ~31s and the warm build ~56s. Each UI test averages ~25s: a fresh app launch, `waitForExistence` navigation, and hard `sleep()`s. The suite's contents are sound — it is a real assertion suite that also saves screenshots — so the work here is distribution and waiting, not coverage.
-
-- [ ] Parallelize the UI tests across simulator clones, as its own commit with one green baseline run before any further stage work — this suite is stage 2's guard, so it gets proven stable before it starts guarding. XCTest distributes parallel work **per class**, and all 55 UI tests live in one `ScreenshotTests` class — so the test plan's `parallelizable` flag alone changes nothing. Split the class into ~4 similarly weighted classes (the helpers move to a shared base class or extension, tests move verbatim), then set `"parallelizable": true` on `SlackwaterUITests` in `TestPlans/Slackwater.xctestplan`. With 4 workers, ~1041s becomes roughly 300s and the fast lane lands near 7 minutes. The clones are managed inside one `xcodebuild` invocation, so the `/tmp/slackwater-test.lock` serialization is unchanged — this is not the two-xcodebuild SIGKILL trap. Cap the worker count (or keep that leg serial) for the live-IWLS tests in `--full`, so clones do not hit the API in parallel.
-- [ ] Replace the hard `sleep(n)` calls in `ScreenshotTests.swift` (91 literal seconds, some in helpers called once per invocation, like `openSearch`) with predicate waits on the thing each sleep is actually waiting for. Saves ~1.5–2 minutes serial and removes the sleeps tuned for an idle machine that break first under load on the shared Studio. Land it right after the split, then watch a couple of runs before relying on the suite as a guard — a subtly wrong wait shows up as intermittent failures, the worst thing to have in the guard mid-refactor. If it flakes, revert and defer; parallelization delivers most of the win alone.
-- [ ] Fallback if 4 simulator clones prove too heavy for the shared Mac: batch tests that launch with the same seed into single launch-then-walk-through journeys — 42 fresh launches are ~4–5 minutes of pure launch overhead. Skip this if parallelization lands; it trades per-test granularity for time the clones already recover.
-- [ ] Longer term, and in no stage's way: migrate render assertions ("this view shows X") to snapshot tests in the unit target — `WidgetSnapshotTests` already proves the pattern here, and each migrated test goes from ~25s to milliseconds. Gradual, one test at a time.
 
 ## Stage 1: split the app and service files
 
@@ -34,7 +25,17 @@ Pure file moves, no signature or access-level changes. The one sanctioned behavi
 - [x] `ChsFitService.swift` (1,134 lines) → the orchestrator stays (queue, fit loop, auto-fit policy, 768 lines); `IwlsClient.swift` (`IwlsFetcher`, `ChsChunkStore`, the IWLS sample types), `ChsFitter.swift` (the JavaScriptCore bridge), and `OnlineGates.swift` (the online-gate fetch extension and its store helpers). None of the extracted types touch the service's actor-isolated state; the file is app-target-only.
 - [x] `MapScreen.swift` (837 lines) → `MapPinState.swift` (pin tone derivation + `PinFeaturesCache`, covered by `NationalScaleTests`), `MapStyleBuilder.swift` (the style-JSON builders and the map palette), keeping the delegate and representable as `MapScreen.swift` (224 lines).
 
-## Stage 2: deduplicate the cards and detail views
+## Stage 2: speed up the fast test lane
+
+Before the deduplication work, because stage 3 runs the fast suite after every extraction and every later stage runs it at least once. Measured on CI run 33256671094 (2026-08-29): the fast lane is 1128s of wall clock, of which the 42 executed `ScreenshotTests` are 1041s (92%) — the unit suite is ~31s and the warm build ~56s. Each UI test averages ~25s: a fresh app launch, `waitForExistence` navigation, and hard `sleep()`s. The suite's contents are sound — it is a real assertion suite that also saves screenshots — so the work here is distribution and waiting, not coverage.
+
+- [x] Parallelize the UI tests across simulator clones, as its own commit with one green baseline run before any further stage work — this suite is stage 3's guard, so it gets proven stable before it starts guarding. XCTest distributes parallel work **per class**, and all 55 UI tests live in one `ScreenshotTests` class — so the test plan's `parallelizable` flag alone changes nothing. Split the class into ~4 similarly weighted classes (the helpers move to a shared base class or extension, tests move verbatim), then set `"parallelizable": true` on `SlackwaterUITests` in `TestPlans/Slackwater.xctestplan`. With 4 workers, ~1041s becomes roughly 300s and the fast lane lands near 7 minutes. The clones are managed inside one `xcodebuild` invocation, so the `/tmp/slackwater-test.lock` serialization is unchanged — this is not the two-xcodebuild SIGKILL trap. Cap the worker count (or keep that leg serial) for the live-IWLS tests in `--full`, so clones do not hit the API in parallel.
+- [x] Replace the hard `sleep(n)` calls in the UI tests (91 literal seconds, some in helpers called once per invocation, like `openSearch`) with predicate waits on the thing each sleep is actually waiting for. Saves ~1.5–2 minutes serial and removes sleeps tuned for an idle machine that break first under load. Land it right after the split, then watch a couple of runs before relying on the suite as a guard — a subtly wrong wait shows up as intermittent failures, the worst thing to have in the guard mid-refactor. If it flakes, revert and defer; parallelization delivers most of the win alone.
+- [ ] Migrate render assertions ("this view shows X") to snapshot tests in the unit target — each migrated test goes from ~25s to milliseconds; the hosted-view precedent is `HeroChromeTests`/`ScrubWhenTests`, not `WidgetSnapshotTests` (mostly value assertions). Classify first, then move: a migrated test loses the real launch, navigation, and accessibility tree, so only assertions about what a view draws qualify; interaction and navigation contracts stay in the UI target. Re-measure every ink threshold against `ImageRenderer` output — the device-calibrated 0.05 does not transfer, and reusing it can pass on a blank chart. Detail-view content renders through `ScrubDetailScaffold` (the renderer runs no `onAppear`), which puts two migrations behind stage 3's extractions.
+- [ ] The App Store screenshot sets are planned to come from the UI-test walk (docs/appstore-metadata.md), so migration must not strip the store screens' full-device capture. Deferred until a migration actually removes a shot-saving test: today every store-relevant shot still has a living UI test (the blocked migrations stayed put), so a store-walk would duplicate walks that exist. When stage 3's extractions unblock those migrations, the walk absorbs their shots — an assertion-light launch per seed saving the device-frame images. General journey-batching beyond that walk is dropped — measured at ~55s (under 5%) against real state-coupling risk, it does not pay.
+- [x] Split `testM43FavoritesSwipesAndSpeedUnits` (194s, 17% of the UI suite): the favorites/swipes half and the speed-unit half each launch once, and the four scroll-to-Recents round trips go. Returns more time than journey batching would, without the coupling.
+
+## Stage 3: deduplicate the cards and detail views
 
 Behavior-preserving extraction of the copy-paste layer. The screenshot suite is the guard: one mechanical extraction per component, full suite after each. Accessibility identifiers the UI tests key on (`chs-pending-*`, `provisional-reading-badge`, `slack-window`, the card strips) must survive each extraction unchanged.
 
@@ -44,15 +45,15 @@ Behavior-preserving extraction of the copy-paste layer. The screenshot suite is 
 - [ ] `ScrubWindow`, an observable owning `live`/`scrubTime`/`anchor` and the one `returnToNow()`, replacing four verbatim copies across the detail views. This turns the "anchor drives geometry, today drives language" rule from a four-file review checklist into a type.
 - [ ] Generic `ChsFitState<Record>` replacing the twin `ChsState`/`ChsCurrentState` enums and their duplicate `state(_:)`/`currentState(_:)` accessors. Callers spell only the method names, never the enum types, so the blast radius is the three files that call them.
 
-## Stage 3: split the timeline and theme files
+## Stage 4: split the timeline and theme files
 
-After stage 2, so the dedup diffs stay readable. Pure moves plus deletion of code nothing ships.
+After stage 3, so the dedup diffs stay readable. Pure moves plus deletion of code nothing ships.
 
 - [ ] Out of `TimelineStrip.swift` (1,724 lines): the current-series analysis (`sampleEvents`, the two segment functions, `currentPeakToPeakRange`) moves beside `SlackWindow.swift`, merging `slackFillSegments`/`currentExcessSegments` — 36-line twins differing by one predicate — into one function; `SchedulePill`/`ScheduleEntry`/`MultiDaySchedule` move to `MultiDaySchedule.swift`. Leaves the file the strip: `Timeline`, `TimelineData`, `TimelineGeo`, `TimelineCanvas`, `TimelineScrubber`, `TimelineScrubStrip`.
 - [ ] Out of `Theme.swift` (1,085 lines): `ScrubDetailScaffold` + `ScrubWhen` + `ReturnToNowSlot` + `WeekRangeBar` + `WeekPickerSheet` + `DetailFooter` move to `ScrubDetailScaffold.swift`, giving the shared detail anatomy a filename that says so; `RecentsStore` + `FavoritesStore` move to `Stores.swift`. Leaves the file tokens, the clock, and formatting.
 - [ ] Delete dead code: `SN.speedInk` and its test (zero app callers), `currentFillStops`' non-schematic branch and the four tests pinning it (the app always passes `schematic: true`; if the ramp fill is intended to return, keep it and say so where it lives), and the `Timeline.speedRampAnchorsKn` alias (its rationale moves to `currentSpeedRampAnchorsKn`).
 
-## Stage 4: state and seams
+## Stage 5: state and seams
 
 Deferred until the work above lands, and worth doing only when the pain is felt. This is also the on-ramp to Swift 6 language mode, where the global mutable state (`gateSearchHandoff`, `pendingDeepLink`, `WidgetReload.trigger`) stops compiling.
 
@@ -67,11 +68,11 @@ The following is in good shape, some of it hard-won, and no stage touches it:
 
 - `Timeline.window(anchor:)` and the anchor/today split — the one-definition rule holds everywhere; keep it that way.
 - The `FillField`/`PatchField` binary decoders and their byte-layout documentation.
-- `ScrubDetailScaffold`'s slot design (stage 3 only renames its file).
+- `ScrubDetailScaffold`'s slot design (stage 4 only renames its file).
 - `TimelineScrubber`'s nudge/magnet coordinator.
 - `PinFeaturesCache`'s lock discipline — its own comment explains why it is not an actor.
 - `AppGroup`, `DeepLink`, `FavoritesCloud`, `ChsQueue`, `chunkPlan`'s absolute 7-day cache grid.
-- `scripts/test.sh`'s lock-based serialization. `ScreenshotTests`' assertions also stay as they are — stage 0 splits the class only so XCTest can distribute it, and moves tests verbatim.
+- `scripts/test.sh`'s lock-based serialization. The UI tests' assertions and method names also stay as they are — stage 2 splits the class only so XCTest can distribute it; test bodies move unchanged, and their comments get the same hygiene pass as any other move.
 
 ## Related issues
 
