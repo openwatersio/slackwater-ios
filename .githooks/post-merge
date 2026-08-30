@@ -1,0 +1,8 @@
+#!/bin/sh
+# Regenerate Slackwater.xcodeproj after a pull — the project is gitignored and
+# a pull can add source files that XcodeGen's folder globs need to pick up.
+# ponytail: no change detection, xcodegen is ~1s. Add a `git diff --name-only`
+# guard if it ever gets slow.
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+command -v xcodegen >/dev/null || { echo "post-merge: xcodegen not found, skipping"; exit 0; }
+exec xcodegen generate
