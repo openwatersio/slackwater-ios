@@ -314,20 +314,15 @@ final class ColourAndFormTests: XCTestCase {
                           "a moving pin must never read go")
     }
 
-    /// The darkened pin ramp must clear the 3:1 land floor at every speed it
-    /// can actually render (above the threshold — below it the pin is go),
-    /// and must never read green: green is the window's, exclusively.
-    func testPinRampClearsContrastAndNeverGreen() throws {
-        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
-        let match = try XCTUnwrap(
-            source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
-            "LAND_TONE must stay a plain hex literal this test can read")
-        let land = String(source[match].suffix(8).prefix(7))
+    /// The pin ramp must never read green at any speed it can actually render
+    /// (above the threshold — below it the pin is go): green is the window's,
+    /// exclusively. Contrast over the satellite imagery can't be asserted
+    /// from a constant — the ink outline is what guarantees legibility there
+    /// (see the outline test below).
+    func testPinRampNeverReadsGreen() {
         var kn = slackThresholdKn + 0.01
         while kn <= 17 {
             let hex = pinRampHex(forSpeedKn: kn)
-            XCTAssertGreaterThanOrEqual(contrast(hex, land), 3.0,
-                                        "pin ramp at \(kn) kn (\(hex)) is under 3:1 on land")
             let v = UInt32(hex.dropFirst(), radix: 16) ?? 0
             let (r, g, b) = (Double((v >> 16) & 0xFF), Double((v >> 8) & 0xFF), Double(v & 0xFF))
             XCTAssertFalse(g > r && g > b, "pin ramp at \(kn) kn reads green — green means go")
@@ -354,7 +349,7 @@ final class ColourAndFormTests: XCTestCase {
         // Colour must be matched against state, never kind.
         XCTAssertNotNil(source.range(of: #"\["get", "state"\]"#, options: .regularExpression),
                         "colour must be driven by state")
-        XCTAssertNil(source.range(of: #"(circle-color|icon-color)[^\n]*\["get", "kind"\]"#,
+        XCTAssertNil(source.range(of: #"(circleColor|iconColor)[^\n]*"kind""#,
                                   options: .regularExpression),
                      "colour must never be matched against kind")
     }
@@ -387,8 +382,10 @@ final class ColourAndFormTests: XCTestCase {
     ///
     /// Asserts on the outline, NOT on the fills — the fills legitimately fail
     /// now, and a test that demanded otherwise would be demanding the palette
-    /// go back to navy.
-    func testEveryPinOutlineClearsTheContrastFloorOnBothGrounds() throws {
+    /// go back to navy. The water tone is the style's only constant ground
+    /// (satellite imagery underneath is arbitrary), so it is the one floor a
+    /// test can hold.
+    func testEveryPinOutlineClearsTheContrastFloorOnTheWaterTone() throws {
         let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
@@ -400,38 +397,30 @@ final class ColourAndFormTests: XCTestCase {
         }
         let ink = try literal("CHART_INK")
         let water = try literal("WATER_TONE")
-        let land = try literal("LAND_TONE")
-        for (ground, hex) in [("water", water), ("land", land)] {
-            XCTAssertGreaterThanOrEqual(
-                contrast(ink, hex), 3.0,
-                "the pin outline is under 3:1 on the \(ground) — every pin state relies on it")
-        }
+        XCTAssertGreaterThanOrEqual(
+            contrast(ink, water), 3.0,
+            "the pin outline is under 3:1 on the water tone — every pin state relies on it")
         // Both kinds must actually draw that outline, and the square's comes
         // from a backing plate because MapLibre Native renders no icon-halo on
         // its template image. One kind outlined and the other not is how this
         // regressed the first time.
-        XCTAssertNotNil(source.range(of: #""circle-stroke-color": CHART_INK"#),
+        XCTAssertTrue(source.contains("hexColor(CHART_INK)"),
+                      "the ink expression must derive from CHART_INK, never a hand-copied colour")
+        XCTAssertNotNil(source.range(of: #"circleStrokeColor = ink"#),
                         "the circle pin lost its ink stroke")
-        XCTAssertNotNil(source.range(of: #""icon-color": CHART_INK"#),
+        XCTAssertNotNil(source.range(of: #"tidePinPlate\.iconColor = ink"#, options: .regularExpression),
                         "the tide square lost its ink backing plate")
         XCTAssertTrue(source.contains("pin-square-plate"),
                       "the backing-plate image must be registered, or the plate layer draws nothing")
     }
 
-    /// Issue #13: a pin FILL must clear WCAG 1.4.11's 3:1 over the cream land
-    /// polygons on its own. The outline test above covers pale water, where
-    /// the fills legitimately lean on the ink stroke — but over land the fill
-    /// is what says the state, and the raw tokens washed out there (flood
-    /// 2.47, ebb 1.83, go 1.96). Walks the actual match expression rather
-    /// than a list of expected colours, so a new state cannot ship an
-    /// unmeasured fill.
-    func testEveryPinStateFillClearsTheContrastFloorOnLand() throws {
-        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
-        let match = try XCTUnwrap(
-            source.range(of: ##"let LAND_TONE = "#[0-9a-fA-F]{6}""##, options: .regularExpression),
-            "LAND_TONE must stay a plain hex literal this test can read")
-        let land = String(source[match].suffix(8).prefix(7))
-
+    /// The state palette's integrity: the two direction ends, slack and the
+    /// neutral must stay four tellable-apart fills. Walks the actual match
+    /// expression rather than a list of expected colours, so a new state
+    /// cannot ship unexamined. Contrast against a constant ground is not
+    /// assertable here — satellite imagery is arbitrary, so the ink outline
+    /// is the legibility guarantee, asserted above.
+    func testPinStatePaletteStaysFourDistinctFills() throws {
         let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]
         var i = 2   // past "match" and ["get", "state"]
@@ -440,14 +429,6 @@ final class ColourAndFormTests: XCTestCase {
                 try XCTUnwrap(stateMatch[i + 1] as? String)
             i += 2
         }
-        for (state, hex) in fills {
-            XCTAssertGreaterThanOrEqual(
-                contrast(hex, land), 3.0,
-                "the \(state) pin fill \(hex) is under 3:1 on the land tone \(land)")
-        }
-        // Darkening must not collapse the hues: the two direction ends, slack
-        // and the neutral must stay four tellable-apart fills, not just four
-        // fills that each clear the floor.
         XCTAssertEqual(Set(fills.values).count, 4,
                        "the pin palette must keep four distinct fills: \(fills)")
     }

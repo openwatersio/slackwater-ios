@@ -2,9 +2,9 @@
 // portion only — no particle field, no universal scrub yet): the station's map
 // is the hero surface, scrim-darkened so the overlaid title reads (spec §5a/§7
 // legibility risk), with the prototype's back / title-pill chrome
-// (TidesApp.dc.html detail hero). Cropped to intrinsic height — pill +
-// clearances — per the hero-crop-and-scrub-order spec (2026-08-03); return-to-now
-// lives in the scrub card's readout row now (ReturnToNowSlot, Theme.swift).
+// (TidesApp.dc.html detail hero). Height: a caller-supplied screen-third
+// floor, growing past it when the pill + clearances need more (Dynamic Type);
+// return-to-now lives in the scrub card's readout row (ReturnToNowSlot, Theme.swift).
 import SwiftUI
 import UIKit
 import MapLibre
@@ -29,6 +29,10 @@ struct MapHeader: View {
     /// the device's actual inset (issue #50: a Dynamic Island literal floated
     /// the pill low on SE-class phones and iPad split-view panes).
     let topSafeInset: CGFloat
+    /// Floor on the hero's height — callers pass a third of the screen. A
+    /// minimum, not a fixed height, so the chrome still fits when Dynamic
+    /// Type or a short landscape pane makes the intrinsic content taller.
+    let minHeight: CGFloat
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -100,7 +104,7 @@ struct MapHeader: View {
         // top margin term; the 24 below is the spec's bottom margin.
         .padding(.top, topSafeInset)
         .padding(.bottom, 24) // map band below the pill — the border the name sits on
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .top)
         .background {
             StationMapView(latitude: latitude, longitude: longitude)
             // Scrim: dark at the top for the title pill, lighter into the
@@ -166,8 +170,7 @@ struct InteractivePopEnabler: UIViewControllerRepresentable {
 }
 
 /// The header's map: centered on the station, station zoom, non-interactive.
-/// Same style pipeline as the discovery map (land PMTiles floor, Seascape
-/// composed in when reachable).
+/// Same style pipeline as the discovery map.
 private struct StationMapView: UIViewRepresentable {
     let latitude: Double
     let longitude: Double
@@ -184,7 +187,7 @@ private struct StationMapView: UIViewRepresentable {
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         context.coordinator.styler = MapStyler(
-            map: map, cacheName: "header",
+            map: map,
             center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
             zoom: stationZoom)
         return map

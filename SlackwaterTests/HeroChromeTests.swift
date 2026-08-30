@@ -22,25 +22,26 @@ final class HeroChromeTests: XCTestCase {
                       + offenders.joined(separator: "\n"))
     }
 
-    /// The "a third, not a half" claim, executable: at default type the hero is
-    /// title-pill + clearances, well under 200pt. At AX3 it must GROW — a fixed
-    /// crop that clips the region line is the defect class the Dynamic Type pass
-    /// just cleared (2026-08-02 note).
+    /// The "a third of the screen" claim, executable: callers pass screen/3 as
+    /// the hero's minHeight floor, so at default type the hero fills exactly
+    /// that. It is a floor, not a crop: larger type must still be able to grow
+    /// past it — a fixed crop that clips the region line is the defect class
+    /// the Dynamic Type pass cleared (2026-08-02 note).
     @MainActor
-    func testHeroIsAThirdAtDefaultTypeAndGrowsAtAX3() {
+    func testHeroFillsAThirdAndGrowsWithType() {
+        let screenThird: CGFloat = 852.0 / 3 // iPhone 17 portrait
         func height(at size: DynamicTypeSize) -> CGFloat {
             let host = UIHostingController(rootView:
                 MapHeader(name: "Sesuit Harbor", region: "EAST DENNIS",
                           latitude: 41.75, longitude: -70.15, favoriteId: "test",
-                          topSafeInset: 62)
+                          topSafeInset: 62, minHeight: screenThird)
                     .environment(\.dynamicTypeSize, size))
             return host.sizeThatFits(in: CGSize(width: 393, height: CGFloat.greatestFiniteMagnitude)).height
         }
-        let base = height(at: .large)
-        XCTAssertLessThan(base, 200, "hero must be a third of the screen, not half")
-        XCTAssertGreaterThan(base, 100, "hero must still clear the status bar + pill")
-        XCTAssertGreaterThan(height(at: .accessibility5), base,
-                             "the hero grows with type — it never crops the pill")
+        XCTAssertEqual(height(at: .large), screenThird, accuracy: 0.5,
+                       "hero fills the third-of-screen floor at default type")
+        XCTAssertGreaterThanOrEqual(height(at: .accessibility5), screenThird,
+                                    "minHeight is a floor — large type never crops the pill")
     }
 
     /// Issue #50: the status-bar clearance was a Dynamic Island literal (62),
@@ -51,9 +52,11 @@ final class HeroChromeTests: XCTestCase {
     func testHeaderClearanceTracksSafeAreaInset() {
         func height(inset: CGFloat) -> CGFloat {
             let host = UIHostingController(rootView:
+                // minHeight 0: this test measures the intrinsic clearance
+                // derivation, not the screen-third floor.
                 MapHeader(name: "Sesuit Harbor", region: "EAST DENNIS",
                           latitude: 41.75, longitude: -70.15, favoriteId: "test",
-                          topSafeInset: inset))
+                          topSafeInset: inset, minHeight: 0))
             return host.sizeThatFits(in: CGSize(width: 393, height: CGFloat.greatestFiniteMagnitude)).height
         }
         XCTAssertEqual(height(inset: 62) - height(inset: 20), 42, accuracy: 0.5,

@@ -165,7 +165,7 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssert(app.staticTexts["Not for navigation."].exists,
                   "the settings sheet lost its disclaimer")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenStreetMap'")).firstMatch.exists,
+            NSPredicate(format: "label CONTAINS 'VersaTiles'")).firstMatch.exists,
                   "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()

@@ -141,7 +141,8 @@ struct ChsWaitingView: View {
                 // scrub card's interior 14 — so the seam doesn't double up.
                 VStack(spacing: 0) {
                     MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
-                              favoriteId: favoriteId, topSafeInset: geo.safeAreaInsets.top)
+                              favoriteId: favoriteId, topSafeInset: geo.safeAreaInsets.top,
+                              minHeight: (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) / 3)
                     statusCard
                     footer
                 }
