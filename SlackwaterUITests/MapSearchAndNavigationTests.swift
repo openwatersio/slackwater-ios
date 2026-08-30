@@ -88,7 +88,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
             XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
             sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
-            save(app, "m41-map-zoom.png")
+            // One map shot, not one per pin — the second lap would overwrite it.
+            if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
             XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
                       "map pin tap did not open a station detail")

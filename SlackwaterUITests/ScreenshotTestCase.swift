@@ -280,8 +280,12 @@ class ScreenshotTestCase: XCTestCase {
                    withVelocity: .default, thenHoldForDuration: 0)
     }
 
-    /// The reading the strip's centerline is parked on ("1:42 PM").
-    func scrubClock(_ app: XCUIApplication) -> String? {
+    /// The reading the strip's centerline is parked on ("1:42 PM"). Never nil:
+    /// a missing readout is a hard test failure inside the query itself. One
+    /// resolve on purpose — an `exists` pre-check is a second snapshot, and
+    /// callers read this mid-deceleration, where the extra round trip lands
+    /// the read after the moment the assertion is about.
+    func scrubClock(_ app: XCUIApplication) -> String {
         app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$"))
             .firstMatch.label
