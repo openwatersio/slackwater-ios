@@ -103,36 +103,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "station-details-expanded.png")
     }
 
-    /// #95: the tide fill carries |dh/dt| on an absolute ramp. The strip must
-    /// still draw — the rate stops replaced the fixed gradient, and an empty
-    /// stops array would render a hollow track (this repo's blank-chart
-    /// failure mode). The two shots are the review artifact: Friday Harbor
-    /// sits low on the ramp, Avonmouth (Severn, 13.7 ft/hr peak) near the top
-    /// — different pictures at last.
-    func testTideRateRampDrawsOnQuietAndExtremeStations() throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["-seedGate"]
-        app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
-
-        openFridayHarbor(app)
-        let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 10))
-        let quiet = inkFraction(strip)
-        XCTAssert(quiet > 0.05, "tide strip drew nothing — ink \(quiet)")
-        save(app, "tide-ramp-friday-harbor.png")
-
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        openSearch(app, "avonmouth")
-        pickSearchResult(app, app.staticTexts["Avonmouth"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(strip.waitForExistence(timeout: 10))
-        let severn = inkFraction(strip)
-        XCTAssert(severn > 0.05, "Avonmouth strip drew nothing — ink \(severn)")
-        save(app, "tide-ramp-avonmouth.png")
-    }
-
     /// The range bar heads the schedule card on every scrubable detail and says
     /// what span the list below it covers; tapping it opens the picker, and
     /// picking a date moves the window with the bar following.

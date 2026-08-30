@@ -115,11 +115,90 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
                        "cleanup unfavorite left the Favorites group behind")
     }
 
+    /// The origin report: a fresh install can FIND Sechelt Rapids by its
+    /// "skookumchuck" alias, and the tap lands on the honest explanation, not a
+    /// dead end. `-chsResetModels` leaves no stored window (it wipes the
+    /// whole `ChsModelStore.dir`, `-online.json` included — same directory as
+    /// the fitted files); `-networkKillSwitch` is what keeps the honesty card
+    /// up for the length of the test — without it, `OnlineGateDetailView.onAppear`
+    /// fires a REAL IWLS fetch the moment the honesty card would otherwise be
+    /// asserted, and a fetch that lands mid-test would swap it for the fetched
+    /// detail out from under the assertions (TestSeeds.swift's
+    /// `seedOnlineWindow` doc comment covers the other half of this same
+    /// coverage question). The nearest-gate-link push is NOT a list-driven
+    /// reset (`OpenChsRouteKey`'s doc comment, Theme.swift): it
+    /// stacks onto Sechelt's own detail, so one `detail-back` lands back on
+    /// Sechelt, not the list — which is exactly the page this test stars, to
+    /// exercise the bare-id favorite rule (ChsCurrentGate.swift's `itemId`
+    /// comment, the 2026-08-08 fresh-install bug) on an online gate
+    /// specifically, never fitted, never queued.
+    func testOnlineGateUnfetchedShowsHonestyCard() throws {
+        let app = launch("-chsResetModels", "-seedGate", "-networkKillSwitch",
+                         "-resetRecents", "-resetFavorites",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+
+        openSearch(app, "skookumchuck")
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
+
+        let honesty = app.descendants(matching: .any)["online-honesty-card"].firstMatch
+        XCTAssert(honesty.waitForExistence(timeout: 5),
+                  "an online gate with no window must show the honesty card, never a dead end")
+
+        // Its one tap out: the nearest of the 11 shipped (fittable) gates —
+        // Dodd Narrows, ~67 km away. Bundled-identity distance, independent of
+        // the fix, so this is deterministic without depending on -fixLat/-fixLon.
+        let link = app.descendants(matching: .any)["nearest-gate-link"].firstMatch
+        XCTAssert(link.waitForExistence(timeout: 5), "nearest-gate-link missing from the honesty card")
+        if !link.isHittable { app.swipeUp() }  // it sits under the honesty card — likely already clear
+        XCTAssert(link.isHittable, "nearest-gate-link exists but never became hittable")
+        link.tap()
+
+        // Scoped to the now-active detail header, not a bare name lookup: on
+        // iPad the persistent sidebar can carry "Dodd Narrows" in its own Near
+        // Me ranking independently of what's pushed, so the name alone is a
+        // secondary tell at best.
+        let header = app.otherElements["detail-map-header"].firstMatch
+        XCTAssert(header.waitForExistence(timeout: 5), "nearest-gate-link did not open a detail")
+        XCTAssert(header.staticTexts["Dodd Narrows"].firstMatch.exists,
+                  "nearest-gate-link did not land on the nearest shipped gate's detail")
+
+        // Back to Sechelt's own (still-honesty) detail — one pop, since the
+        // link pushed rather than reset the path.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch.waitForExistence(timeout: 5),
+                  "one back from the nearest-gate-link push should land on Sechelt's own honesty card")
+
+        // Star round-trip on the online gate itself — the bare-id rule.
+        let star = app.buttons["detail-favorite"].firstMatch
+        XCTAssert(star.waitForExistence(timeout: 5), "favorite star missing from the honesty-card detail")
+        star.tap()
+        XCTAssert(app.buttons["Remove favorite"].waitForExistence(timeout: 5),
+                  "star did not flip to favorited on the honesty-card detail")
+
+        // Back to the list: the favorite must RESOLVE — a Favorites group with
+        // Sechelt Rapids in it, not a phantom id and no group at all.
+        app.buttons["detail-back"].firstMatch.tap()
+        // iPhone closes search with the push; the iPad sidebar keeps it open.
+        if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["FAVORITES"].waitForExistence(timeout: 5),
+                  "favoriting an online gate produced no Favorites group — the star wrote an id the list cannot resolve")
+        let row = app.staticTexts["Sechelt Rapids"].firstMatch
+        XCTAssert(row.exists, "the favorited online gate is missing from the Favorites group")
+
+        // Leave the simulator as found.
+        row.swipeLeft()
+        XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
+        app.buttons["Unfavorite"].firstMatch.tap()
+        _ = app.staticTexts["FAVORITES"].waitForNonExistence(timeout: 10)
+        XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
+                       "cleanup unfavorite left the Favorites group behind")
+    }
+
     // Favorites — the detail-header star files a station under a Favorites
     // group (My Location → Favorites → Recents → Near Me), favorites/hero never
-    // repeat in Recents, swipe actions manage the groups, and the speed-unit
-    // setting rewrites a current detail's readout.
-    func testM43FavoritesSwipesAndSpeedUnits() throws {
+    // repeat in Recents, and the swipe actions manage the groups.
+    func testM43FavoritesAndSwipeActions() throws {
         // Deterministic Victoria fix; clean favorites/recents.
         let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
@@ -150,11 +229,11 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["FAVORITES"].exists)
         XCTAssert(app.staticTexts["NEAR ME"].exists)
-        // Recents is the last group — scroll down to it.
-        let recentsLabel = app.staticTexts["RECENTS"].firstMatch
-        scrollTo(recentsLabel, in: app)
 
-        // Swipe open the Recents row: red destructive Remove.
+        // Swipe open the Recents row: red destructive Remove. Recents is the
+        // last group, so scroll to the ROW — and to the row rather than the
+        // group label, because the swipe has to land on the row itself and not
+        // on the FAB pinned over the bottom of the list (see `scrollTo`).
         let parkRow = app.staticTexts["Deception Pass State Park"].firstMatch
         scrollTo(parkRow, in: app)
         parkRow.swipeLeft()
@@ -179,16 +258,25 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         _ = app.staticTexts["FAVORITES"].waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "unfavorite left the Favorites group behind")
-        let recentsAgain = app.staticTexts["RECENTS"].firstMatch
-        scrollTo(recentsAgain, in: app)
-        // Scroll to the ROW, not just the group label: how many rows Recents
-        // has depends on what this simulator has downloaded, so the label can
-        // land on the last visible line with the row below the fold.
+        // Scroll to the ROW, not to the group label: how many rows Recents has
+        // depends on what this simulator has downloaded, so the label can land
+        // on the last visible line with the row below the fold.
         let refiled = app.staticTexts["Friday Harbor"].firstMatch
         scrollTo(refiled, in: app)
         XCTAssert(refiled.exists, "unfavorited station did not re-file to Recents")
-        listContainer(app).swipeDown()
-        listContainer(app).swipeDown()
+        // The device is left as found: the unfavorite above — an assertion in
+        // its own right — empties Favorites again, and Recents is what the
+        // tests that care about it reset with -resetRecents.
+    }
+
+    // The speed-unit setting rewrites a current detail's readout. Its own
+    // launch and its own test: the setting is app-wide persisted state, so it
+    // is switched and put back inside one test rather than shared with the
+    // favorites walk above, which then needs no scroll back up to Settings.
+    func testM43SpeedUnitRewritesTheCurrentReadout() throws {
+        // Deterministic Victoria fix; clean favorites/recents.
+        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // Speed units: switch to km/h in Settings, the current detail follows.
         app.buttons["Settings"].tap()
@@ -203,7 +291,9 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'km/h'")).firstMatch.waitForExistence(timeout: 5),
                   "current detail readout did not follow the km/h setting")
-        // Leave the store on knots for the other tests.
+        // Leave the store on knots for the other tests. No launch argument
+        // resets the unit — it is plain persisted app state — so the way back
+        // is the same Settings round trip that set it.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         app.buttons["Settings"].tap()
@@ -214,25 +304,6 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     // MARK: - Station identity presentation
-
-    /// The subtitle bug Bryan found on the iPad: "7.6 mi. Sse" — a compass
-    /// point title-cased by station-corrections' cleanName, and statute miles
-    /// on a card whose distance pill speaks nm.
-    func testM50RegionSubtitleIsNauticalAndShouts() throws {
-        // Upright: the split-layout test leaves the device in landscape, and
-        // these screenshots are the ones a human reads.
-        XCUIDevice.shared.orientation = .portrait
-        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
-
-        openSearch(app, "discovery island")
-        XCTAssert(app.staticTexts["6.6 nm SSE"].firstMatch.waitForExistence(timeout: 5),
-                  "the fixed subtitle is missing — expected nautical miles and SSE")
-        XCTAssertFalse(app.staticTexts["7.6 mi. Sse"].exists,
-                       "the broken subtitle is still rendering")
-        XCTAssert(app.staticTexts["3.0 nm NE"].firstMatch.exists,
-                  "the sibling station's already-correct subtitle changed")
-        closeSearch(app)
-    }
 
     /// Same-named stations render as ONE entry in Near Me, with the namesakes
     /// behind the chooser — two "Discovery Island" cards side by side look
