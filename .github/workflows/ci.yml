@@ -175,3 +175,18 @@ jobs:
       - run: ./scripts/test.sh
         env:
           SLACKWATER_SIMS: SlackwaterCI-iPhone
+
+      # `cancel-in-progress` above kills the step's process group, but
+      # xcodebuild's helpers detach into their own groups and survive — still
+      # holding the inherited descriptor that locks /tmp/slackwater-test.lock,
+      # so the next run queues behind a ghost of the cancelled one. Kill only
+      # lock holders whose working directory is this checkout: a local run (or
+      # waiter) on this machine has a different cwd and is left alone.
+      - name: Release the test lock on cancellation
+        if: cancelled()
+        run: |
+          for pid in $(lsof -t /tmp/slackwater-test.lock 2>/dev/null); do
+            if lsof -a -p "$pid" -d cwd 2>/dev/null | grep -qF "$GITHUB_WORKSPACE"; then
+              kill -9 "$pid" 2>/dev/null || true
+            fi
+          done
