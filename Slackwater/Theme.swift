@@ -37,8 +37,9 @@ enum SN {
     static let paper = Color(hex: 0xFCFCFC)
     // Direction is one signed diverging axis (colourblind-safe amber/blue);
     // green means only slack — never colour anything by station kind.
-    // Raw hexes too: MapLibre style dicts hold strings, so MapScreen formats
-    // these into "#rrggbb" rather than hand-maintaining a second palette.
+    // Raw hexes too: MapLibre style dicts hold strings, so MapStyleBuilder
+    // formats these into "#rrggbb" rather than hand-maintaining a second
+    // palette.
     static let floodHex: UInt32 = 0x4A9FD8
     static let ebbHex: UInt32 = 0xE8A33D
     static let goHex: UInt32 = 0x88B868
@@ -459,7 +460,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     MapHeader(name: name, region: region,
                               latitude: latitude, longitude: longitude,
                               favoriteId: favoriteId,
-                              topSafeInset: geo.safeAreaInsets.top)
+                              topSafeInset: geo.safeAreaInsets.top,
+                              minHeight: (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) / 3)
                     above()
                     if let timeline {
                         scrubCard(timeline)

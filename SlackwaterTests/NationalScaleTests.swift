@@ -10,6 +10,7 @@
 //   3. The CANADA rule — the download set is the nearest few plus what you
 //      opened, and it has to fit in a first run somebody will sit through,
 //      from any fix.
+import MapLibre
 import XCTest
 @testable import Slackwater
 
@@ -167,7 +168,7 @@ final class NationalScaleTests: XCTestCase {
     /// edge, tight enough that a future 2×+ regression still trips it.
     func testPinLayerBuildsInsideAFrame() {
         PinFeaturesCache.shared.resetForTesting()
-        let build = elapsed { _ = localFallbackStyle(landUrl: "", uscaUrl: "") }
+        let build = elapsed { _ = stationShapeSource() }
         print(String(format: "M53 pin source · %d stations: %.1f ms", StationItem.all.count, build * 1000))
         XCTAssertLessThan(build, 0.75)
     }
@@ -292,141 +293,35 @@ final class NationalScaleTests: XCTestCase {
     /// Clustering is what makes 3,125 pins a map rather than a smear — and the
     /// zoom it stops at is what keeps the discovery view tappable.
     func testStationSourceClustersOnlyBelowTheDiscoveryZoom() throws {
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
-        let stations = try XCTUnwrap(sources["stations"] as? [String: Any])
-        XCTAssertEqual(stations["cluster"] as? Bool, true)
-        let maxZoom = try XCTUnwrap(stations["clusterMaxZoom"] as? Int)
-        XCTAssertLessThan(Double(maxZoom), SALISH_ZOOM,
-                          "the discovery camera must open on tappable stations, not clusters")
-        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
-        XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-clusters" })
-        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-current" }?["filter"],
+        // The clustering ceiling and the opening camera are separate constants
+        // whose relationship is the invariant: the discovery camera must open
+        // on tappable stations, not clusters.
+        XCTAssertLessThan(Double(CLUSTER_MAX_ZOOM), SALISH_ZOOM)
+    }
+
+    /// The runtime pin layers (offline-chart-packs spec §1/§5: the basemap is
+    /// a style URL the app does not own; pins go in through the runtime API).
+    /// Both tap layers must exclude clusters, or every cluster draws twice —
+    /// and the tap handler hit-tests these exact identifiers.
+    func testRuntimePinLayersCarryTheTapContract() throws {
+        let layers = stationPinLayers(source: stationShapeSource())
+        let byId = Dictionary(uniqueKeysWithValues: layers.map { ($0.identifier, $0) })
+        for id in ["station-clusters", "station-cluster-count", "station-pins-current",
+                   "station-pins-tide-plate", "station-pins-tide", "station-labels"] {
+            XCTAssertNotNil(byId[id], "\(id) missing from the runtime pin layers")
+        }
+        XCTAssertNotNil((byId["station-pins-current"] as? MLNVectorStyleLayer)?.predicate,
                         "the current-pin layer must exclude clusters, or every cluster draws twice")
-        XCTAssertNotNil(layers.first { ($0["id"] as? String) == "station-pins-tide" }?["filter"],
+        XCTAssertNotNil((byId["station-pins-tide"] as? MLNVectorStyleLayer)?.predicate,
                         "the tide-pin layer must exclude clusters, or every cluster draws twice")
-        // Both land tilesets, or somewhere in the covered area is blank water.
-        XCTAssertNotNil(sources["land-usca"], "the continental land floor is missing")
-        XCTAssertNotNil(sources["land"], "the Salish detail layer is missing")
-    }
-
-    /// #108: stroking a clipped polygon ring draws its tile-edge closure as a
-    /// ruled line across water. Coastline linestrings simply end at that edge.
-    func testLandCoastlinesReadLineGeometryNotPolygonRings() throws {
-        let layers = try XCTUnwrap(localFallbackStyle(landUrl: "", uscaUrl: "")["layers"]
-            as? [[String: Any]])
-        for id in ["land-usca-coast", "land-coast"] {
-            let layer = try XCTUnwrap(layers.first { ($0["id"] as? String) == id })
-            XCTAssertEqual(layer["source-layer"] as? String, "coast",
-                           "\(id) must not stroke clipped polygon rings")
-        }
-    }
-
-    /// Bathymetry offline (openwatersio/seascape#121). Depth used to be the one
-    /// thing that vanished with the signal: the app composed the remote
-    /// Seascape style when it could reach it, so you got soundings in the
-    /// marina and lost them offshore, which is backwards from where they
-    /// matter. `seascape.pmtiles` puts the Salish box in the bundle.
-    ///
-    /// Draw order is the assertion that earns its keep: depth is UNDER the
-    /// seamap marks and OVER the land floor. A buoy hidden behind a depth-area
-    /// fill is a chart that lies about what is there.
-    func testFallbackStyleCarriesBathymetryUnderTheChart() throws {
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
-        let seascape = try XCTUnwrap(sources["seascape-vector"] as? [String: Any],
-                                     "no bundled bathymetry: run tools/build-seascape.sh")
-        XCTAssertTrue((seascape["url"] as? String)?.hasPrefix("pmtiles://") == true,
-                      "bathymetry must read the bundle, not the network")
-
-        let ids = try XCTUnwrap(style["layers"] as? [[String: Any]]).map { $0["id"] as? String ?? "" }
-        let depth = try XCTUnwrap(ids.firstIndex(of: "depth-areas"), "depth areas are not drawn")
-        let contours = try XCTUnwrap(ids.firstIndex(of: "contour-lines"), "contours are not drawn")
-        XCTAssertLessThan(depth, contours, "contours must draw over the depth fill, not under it")
-        let land = try XCTUnwrap(ids.firstIndex(of: "land-usca"), "the continental floor is missing")
-        XCTAssertLessThan(land, depth, "depth must draw over the land floor")
-        let seamapIds = Set((offlineLayers("seamap", sprite: "freenauticalchart",
-                                           attribution: "© Open Waters: Seamap © OpenStreetMap contributors")?.layers ?? [])
-            .compactMap { $0["id"] as? String })
-        if let firstMark = ids.firstIndex(where: { seamapIds.contains($0) }) {
-            XCTAssertLessThan(contours, firstMark, "the chart marks must draw over bathymetry")
-        }
-        let pins = try XCTUnwrap(ids.firstIndex(of: "station-clusters"))
-        XCTAssertLessThan(contours, pins, "station pins must stay on top")
-    }
-
-    /// #29: the offline chart carries its own fontstack, so seamap labels and
-    /// station names render with no network at all. The invariant that earns
-    /// its keep is the last loop: every fontstack any offline layer references
-    /// must have its glyph PBFs in the bundle — a slice regenerated with a new
-    /// font, or a deleted PBF, fails here instead of shipping silent blank
-    /// labels.
-    func testFallbackStyleBundlesGlyphsForItsLabels() throws {
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let glyphs = try XCTUnwrap(style["glyphs"] as? String,
-                                   "no bundled fontstack: run tools/build-seamap.sh")
-        XCTAssertTrue(glyphs.hasPrefix("file://"),
-                      "offline glyphs must read the bundle, not the network")
-        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
-        XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-labels" },
-                      "with glyphs bundled, station-name labels must be on")
-        XCTAssertTrue(layers.contains { ($0["id"] as? String) == "station-cluster-count" },
-                      "with glyphs bundled, clusters must carry their count")
-        let seamarkLabel = try XCTUnwrap(layers.first { ($0["id"] as? String) == "seamark-label" },
-                                         "the seamap slice is missing its label layer")
-        XCTAssertNotNil((seamarkLabel["layout"] as? [String: Any])?["text-field"],
-                        "the slice must keep text-* now that glyphs ship")
-        for layer in layers {
-            guard let font = (layer["layout"] as? [String: Any])?["text-font"] as? [String]
-            else { continue }
-            for stack in font {
-                XCTAssertNotNil(Bundle.main.url(forResource: "\(stack)-0-255", withExtension: "pbf"),
-                                "\(layer["id"] ?? "?") wants \(stack) but its glyphs are not bundled")
-            }
-        }
-    }
-
-    /// #30: the chart and the bathymetry used to stop at the Salish box, so a
-    /// station in Puget Sound opened onto seamarks and depth and one in San
-    /// Francisco onto bare land. Four tilesets now — the same shape as the two
-    /// land ones, twice over: seamap national z9 under Salish z12, seascape
-    /// national z6 under Salish z12.
-    ///
-    /// The assertion that earns its keep is the draw order. Both cuts of each
-    /// pair carry home water, and the detailed one has to be on top, or the
-    /// Salish Sea takes its chart from the coarse tileset — two thirds of its
-    /// rocks gone, with nothing on screen to say so.
-    func testFallbackStyleCarriesTheChartPastTheSalishBox() throws {
-        let style = localFallbackStyle(landUrl: "", uscaUrl: "")
-        let sources = try XCTUnwrap(style["sources"] as? [String: Any])
-        let layers = try XCTUnwrap(style["layers"] as? [[String: Any]])
-        let drawn = { (source: String) in
-            layers.indices.filter { (layers[$0]["source"] as? String) == source }
-        }
-        let floor = try XCTUnwrap(layers.firstIndex { ($0["id"] as? String) == "land-usca" })
-
-        for (wide, detailed, script) in [("seamap-natl", "seamap", "build-seamap.sh"),
-                                         ("seascape-natl", "seascape-vector", "build-seascape.sh")] {
-            let source = try XCTUnwrap(sources[wide] as? [String: Any],
-                                       "no national \(wide): run tools/\(script)")
-            XCTAssertTrue((source["url"] as? String)?.hasPrefix("pmtiles://") == true,
-                          "\(wide) must read the bundle, not the network")
-            let national = drawn(wide), salish = drawn(detailed)
-            let lastNational = try XCTUnwrap(national.max(), "\(wide) draws nothing")
-            let firstSalish = try XCTUnwrap(salish.min(), "\(detailed) draws nothing")
-            XCTAssertLessThan(lastNational, firstSalish,
-                              "home water must draw \(detailed) over \(wide), not under it")
-            XCTAssertLessThan(floor, lastNational, "\(wide) must draw over the land floor")
-
-            // Neither seamap artifact carries the `land` source-layer — the app
-            // draws land from its own two tilesets, and seamap's was 92% of the
-            // national extract for a second, coarser copy of what land.pmtiles
-            // already has.
-            for i in national + salish {
-                XCTAssertNotEqual(layers[i]["source-layer"] as? String, "land",
-                                  "\(layers[i]["id"] ?? "?") reads a source-layer the extract does not have")
-            }
-        }
+        // The labels ride the basemap's own fontstack, so offline packs cache
+        // its glyph ranges as part of the style's needs. A stack of our own
+        // here would be blank offline.
+        // The getter normalizes the constant to an aggregate expression, so
+        // assert on the stack's presence rather than expression equality.
+        let labels = try XCTUnwrap(byId["station-labels"] as? MLNSymbolStyleLayer)
+        XCTAssertTrue(String(describing: labels.textFontNames).contains("noto_sans_bold"),
+                      "station labels must use the basemap style's own fontstack")
     }
 
     // MARK: - Canada on demand

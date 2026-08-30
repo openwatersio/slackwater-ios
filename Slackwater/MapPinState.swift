@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. What colour a station's map pin takes: the tide and
-// current tone derivations, and the cache the style builder sources pins from.
+// current tone derivations, and the cache the pin source is built from.
 import Foundation
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
@@ -151,9 +151,8 @@ private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
 /// pin that never turns.
 ///
 /// Internal, not `private`, and its cache is lock-protected rather than
-/// actor-isolated: `stationSource()` runs on whatever thread builds a style —
-/// main for the fallback, a `URLSession` callback thread for Seascape
-/// (`fetchSeascape`/`composeStyle`) — and `applyChsTones` writes from its own
+/// actor-isolated: `stationSource()` runs on whatever thread builds a style,
+/// and `applyChsTones` writes from its own
 /// detached task, so real cross-thread access exists; a lock around a few
 /// dictionary reads is the smaller fix than moving every caller onto an
 /// actor. Internal (not private) so `NationalScaleTests` can exercise the

@@ -2,7 +2,7 @@
  * Generate Resources/currents.json — every bundled NOAA tidal-current station.
  *
  * Source: data/noaa-currents.json, the national extract vendored from
- * @sailingnaturali/current-stations (its `currents.min.json`; the package ships
+ * @openwaters/noaa-current-stations (its `currents.json`; the package ships
  * the extractor and schema on npm but not the data, so it is vendored here the
  * same way slackwater-web vendors its Salish subset — see that repo's README to
  * re-extract). NOAA CO-OPS data is public domain.
@@ -126,7 +126,7 @@ if (worstNeighbour > REGION_SANITY_KM) {
 // CROSS-FLOW. Every station here is modelled as one signed speed along a fixed
 // flood axis. NOAA also publishes the flow PERPENDICULAR to that axis, which
 // runs at all times including slack, and the extract summarises it in a
-// bundle-level census (@sailingnaturali/current-stations >= 0.3.0). None of it
+// bundle-level census (@openwaters/noaa-current-stations >= 0.4.0). None of it
 // is shipped per station — bundling the minor axis was measured and rejected in
 // #102 (worth a median 4% of peak, and a 2D magnitude never crosses zero, so
 // slack detection silently returns nothing). We re-assert the bound here so a
@@ -137,8 +137,8 @@ const CROSS_FLOW_RATIO_MAX = 0.5;
 const cf = bundle.crossFlow;
 if (!cf?.worstRatio) {
   throw new Error("the vendored extract carries no crossFlow census — re-vendor from " +
-    "current-stations >= 0.3.0 (gh release download v0.3.0 --repo sailingnaturali/" +
-    "current-stations --pattern currents.json --output data/noaa-currents.json)");
+    "noaa-current-stations >= 0.4.0 (gh release download v0.4.0 --repo openwatersio/" +
+    "noaa-current-stations --pattern currents.json --output data/noaa-currents.json)");
 }
 if (cf.worstRatio.ratio > CROSS_FLOW_RATIO_MAX) {
   throw new Error(`cross-flow ratio ${cf.worstRatio.ratio} at ${cf.worstRatio.id} exceeds ` +

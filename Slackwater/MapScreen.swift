@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. The discovery map: its camera, the MapLibre delegate
-// that loads and re-loads the style, and the tap-to-detail view hosting it.
+// that loads the satellite style and re-registers the app's own runtime
+// layers, and the tap-to-detail view hosting it.
 import SwiftUI
 import MapLibre
 
@@ -32,63 +33,24 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
 
 // MARK: - Shared style loading + camera assertion
 
-/// Loads the fallback style immediately and Seascape when its fetch lands
-/// (web MapScreen, Open Waters offline.md: no error banner — the map renders
-/// what it can reach), and re-asserts the camera after each style load. The
-/// camera must be asserted post-layout: a zoomLevel set on a zero-frame view
-/// converts through a degenerate altitude and the map opened continent-wide.
+/// Points the map at the chart style (no error banner — the map renders what
+/// the packs and the network can reach) and re-asserts the camera after each
+/// style load. The camera must be asserted post-layout: a zoomLevel set on a
+/// zero-frame view converts through a degenerate altitude and the map opened
+/// continent-wide.
 final class MapStyler: NSObject, MLNMapViewDelegate {
     private weak var map: MLNMapView?
-    private let cacheName: String
     private let center: CLLocationCoordinate2D
     private let zoom: Double
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
 
-    init(map: MLNMapView, cacheName: String, center: CLLocationCoordinate2D, zoom: Double) {
+    init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
         self.map = map
-        self.cacheName = cacheName
         self.center = center
         self.zoom = zoom
         super.init()
         map.delegate = self
-        setStyle(localFallbackStyle(landUrl: landUrl, uscaUrl: uscaUrl), name: "\(cacheName)-fallback")
-        fetchSeascape()
-    }
-
-    private func pmtilesUrl(_ name: String) -> String {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "pmtiles") else { return "" }
-        return "pmtiles://\(url.absoluteString)"  // pmtiles://file:///…/land.pmtiles
-    }
-
-    private var landUrl: String { pmtilesUrl("land") }
-    private var uscaUrl: String { pmtilesUrl("land-usca") }
-
-    /// MLN loads styles by URL — write the composed JSON next to the caches.
-    private func setStyle(_ style: [String: Any], name: String) {
-        guard let data = try? JSONSerialization.data(withJSONObject: style),
-              let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-        else { return }
-        let url = dir.appendingPathComponent("map-style-\(name).json")
-        guard (try? data.write(to: url, options: .atomic)) != nil else { return }
-        DispatchQueue.main.async { self.map?.styleURL = url }
-    }
-
-    private func fetchSeascape() {
-        guard !networkKillSwitch else { return }
-        // Not .standard: Settings' unit toggle now writes to the App Group
-        // (H2), so a plain .standard read here would freeze at whatever the
-        // one-time migration copied and never see a later change.
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
-        guard let url = URL(string: "https://tiles.openwaters.io/seascape/style.json?unit=\(imperial ? "ft" : "m")")
-        else { return }
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, _ in
-            guard let self, let data,
-                  (response as? HTTPURLResponse)?.statusCode == 200,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return }  // offline or upstream down: the fallback style is already up
-            self.setStyle(composeStyle(json, landUrl: self.landUrl, uscaUrl: self.uscaUrl),
-                          name: "\(self.cacheName)-seascape")
-        }.resume()
+        map.styleURL = BASEMAP_STYLE_URL
     }
 
     /// A filled square at equal AREA with the 5pt circle pins (side r·√π —
@@ -111,25 +73,30 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         return image.withRenderingMode(.alwaysTemplate)
     }
 
-    // ponytail: re-asserts on every style load, so a Seascape arriving late
-    // recenters a user who already panned; track interaction if it annoys.
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
         mapView.setCenter(center, zoomLevel: zoom, animated: false)
-        // Fires on every style load (local fallback, then Seascape) — the
-        // tide-pin icon must be re-registered each time or the swap loses it.
+        // Fires on every style load — everything runtime-added (images,
+        // sources, layers) belongs to the style that loaded, so it all
+        // re-registers here or a style swap loses it.
         style.setImage(squarePinImage(), forName: "pin-square")
         style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
-        applyChsTones(to: style)
+        // Fill under the pins: added first, so the pin layers appended below
+        // land on top of it.
         fill?.attach(to: style, map: mapView)
+        if style.source(withIdentifier: "stations") == nil {
+            let source = stationShapeSource()
+            style.addSource(source)
+            for layer in stationPinLayers(source: source) { style.addLayer(layer) }
+        }
+        applyChsTones(to: style)
     }
 
     /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
     /// stored. Runs here, per style load, because that is the only place it
     /// can survive: setting a style rebuilds every source, discarding anything
-    /// pushed into the old one — and this map styles twice (fallback, then
-    /// Seascape). After paint by construction, so the style-construction path
+    /// pushed into the old one. After paint by construction, so the style-construction path
     /// `testPinLayerBuildsInsideAFrame` budgets pays nothing; the 3,125-pin
     /// source rebuild runs off the main thread. Cache only, never a fetch —
     /// `chsPinTones` takes the stored records and nothing else.
@@ -190,8 +157,7 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
             self.map = map
-            styler = MapStyler(map: map, cacheName: "discovery",
-                               center: center, zoom: zoom)
+            styler = MapStyler(map: map, center: center, zoom: zoom)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }

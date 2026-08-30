@@ -1,8 +1,15 @@
-// Slackwater — GPL v3. Static current fill and direction style behavior.
+// Slackwater — GPL v3. Static current fill and direction style behavior —
+// the runtime layers both fill providers and the direction arrows draw
+// through, the colour transfer, and the launch-override contract.
+import MapLibre
 import XCTest
 @testable import Slackwater
 
 final class CurrentFillTests: XCTestCase {
+    private func source(_ id: String) -> MLNShapeSource {
+        MLNShapeSource(identifier: id, shape: nil, options: nil)
+    }
+
     func testFillIsOnExceptForTestLaunchOverride() {
         XCTAssertTrue(currentFillEnabled(arguments: []))
         XCTAssertFalse(currentFillEnabled(arguments: ["-currentFillOff"]))
@@ -13,113 +20,62 @@ final class CurrentFillTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "showCurrentFill")
     }
 
-    func testComposedStyleOmitsCurrentSourcesAndLayersForLaunchOverride() {
-        let style = composeStyle(
-            ["sources": [String: Any](), "layers": [[String: Any]]()],
-            landUrl: "", uscaUrl: "", arguments: ["-currentFillOff"])
-        let sources = style["sources"] as? [String: Any] ?? [:]
-        XCTAssertNil(sources[CurrentFillRenderer.sourceID])
-        XCTAssertNil(sources[CurrentFillRenderer.patchSourceID])
-
-        let ids = (style["layers"] as? [[String: Any]] ?? [])
-            .compactMap { $0["id"] as? String }
-        XCTAssertFalse(ids.contains(CurrentFillRenderer.sourceID))
-        XCTAssertFalse(ids.contains(CurrentFillRenderer.patchSourceID))
-        XCTAssertFalse(ids.contains(CurrentFillRenderer.directionLayerID))
-        XCTAssertFalse(ids.contains(CurrentFillRenderer.patchDirectionLayerID))
-    }
-
-    func testCurrentStyleContainsNoAnimationSourceOrLayers() {
-        var style: [String: Any] = [
-            "sources": [String: Any](),
-            "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]],
-        ]
-        addFillStyle(&style)
-
-        let sources = style["sources"] as? [String: Any] ?? [:]
-        let ids = (style["layers"] as? [[String: Any]] ?? [])
-            .compactMap { $0["id"] as? String }
-        XCTAssertNil(sources["current-streaks"])
-        XCTAssertFalse(ids.contains("current-streak-tails"))
-        XCTAssertFalse(ids.contains("current-streak-heads"))
-    }
-
-    func testDirectionLayersAreNativeMapAlignedSymbolsBelowLand() throws {
-        var style: [String: Any] = [
-            "sources": [String: Any](),
-            "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]],
-        ]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        let ids = layers.compactMap { $0["id"] as? String }
-        let fill = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.sourceID))
-        let patch = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchSourceID))
-        let direction = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.directionLayerID))
-        let patchDirection = try XCTUnwrap(ids.firstIndex(of: CurrentFillRenderer.patchDirectionLayerID))
-        let land = try XCTUnwrap(ids.firstIndex(of: "land-usca"))
-        XCTAssertEqual([fill, patch, direction, patchDirection], [0, 1, 2, 3])
-        XCTAssertLessThan(patchDirection, land)
-
-        for index in [direction, patchDirection] {
-            XCTAssertEqual(layers[index]["type"] as? String, "symbol")
-            XCTAssertEqual(layers[index]["minzoom"] as? Double, CURRENT_DIRECTION_MIN_ZOOM)
-            let filter = try XCTUnwrap(layers[index]["filter"] as? NSArray)
-            XCTAssertEqual(filter, ["==", ["geometry-type"], "Point"] as NSArray)
-            let layout = try XCTUnwrap(layers[index]["layout"] as? [String: Any])
-            XCTAssertEqual(layout["icon-image"] as? String, CurrentFillRenderer.directionImageID)
-            XCTAssertEqual(layout["icon-rotate"] as? NSArray, ["get", "bearing"] as NSArray)
-            XCTAssertEqual(layout["icon-rotation-alignment"] as? String, "map")
-            XCTAssertEqual(layout["icon-pitch-alignment"] as? String, "map")
-            XCTAssertEqual(layout["icon-allow-overlap"] as? Bool, false)
-            let paint = try XCTUnwrap(layers[index]["paint"] as? [String: Any])
-            XCTAssertEqual(paint["icon-color"] as? String, "#0b1a2b")
+    /// The runtime fill layers: identical paint minus the source binding
+    /// (one ramp, one opacity law, one no-green rule for both providers), a
+    /// per-feature colour, antialias off, and an opacity that rides speed but
+    /// never reaches zero — certified coverage must stay distinguishable from
+    /// true no-data (spec §1). Patch-above-fill ordering is `attach`’s add
+    /// order, checked on the identifiers here.
+    func testFillLayersSharePaintAndColourPerFeature() {
+        let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
+                                     patch: source(CurrentFillRenderer.patchSourceID))
+        XCTAssertEqual(layers.fill.identifier, CurrentFillRenderer.sourceID)
+        XCTAssertEqual(layers.patch.identifier, CurrentFillRenderer.patchSourceID)
+        for layer in [layers.fill, layers.patch] {
+            // The getter normalizes to a colour cast around the key path —
+            // the invariant is that the "colour" attribute drives the paint.
+            XCTAssertTrue(String(describing: layer.fillColor).contains("colour"),
+                          "\(layer.identifier) must colour per feature")
+            XCTAssertEqual(layer.fillAntialiased.constantValue as? Bool, false,
+                           "\(layer.identifier) must keep antialias off or the mesh redraws as seams")
         }
+        XCTAssertEqual(layers.fill.fillColor, layers.patch.fillColor,
+                       "one colour law for both providers")
+        XCTAssertEqual(layers.fill.fillOpacity, layers.patch.fillOpacity,
+                       "one opacity law for both providers")
+        XCTAssertTrue(String(describing: layers.fill.fillOpacity).contains("\(FILL_OPACITY_FLOOR)"),
+                      "the opacity floor left the paint — no-data and slack water become indistinguishable")
     }
 
-    /// Patch cells outrank backdrop cells at the mouth fringe purely by draw
-    /// order, and feature order within one source does NOT guarantee paint
-    /// order — so patches get their own layer, directly above the fill's
-    /// (grown-patches spec §5; the ordering rule lives here by agreement).
-    func testPatchLayerSitsDirectlyAboveFillWithIdenticalPaint() {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        let ids = layers.map { $0["id"] as? String ?? "" }
-        let fill = ids.firstIndex(of: CurrentFillRenderer.sourceID)
-        let patch = ids.firstIndex(of: CurrentFillRenderer.patchSourceID)
-        XCTAssertNotNil(fill); XCTAssertNotNil(patch)
-        XCTAssertEqual(patch, fill.map { $0 + 1 }, "patches must draw directly above the fill")
-        XCTAssertLessThan(patch ?? 99, ids.firstIndex(of: "land-usca") ?? -1,
-                          "both layers stay under land")
-        // Identical paint minus the source binding: one ramp, one opacity law,
-        // one no-green rule for both providers.
-        let a = layers[fill!], b = layers[patch!]
-        XCTAssertEqual(a["paint"] as? NSDictionary, b["paint"] as? NSDictionary)
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.patchSourceID])
-    }
-
-    /// The fill layer sits UNDER the land layers — SSCOFS elements cross the
-    /// shoreline, and land drawn over the fill clips them to water — and
-    /// colours per feature from the "colour" attribute.
-    func testFillLayerInsertsUnderLandAndColoursPerFeature() {
-        var style: [String: Any] = ["sources": [String: Any](),
-                                    "layers": [["id": "land-usca"], ["id": "station-clusters"]] as [[String: Any]]]
-        addFillStyle(&style)
-        let layers = style["layers"] as? [[String: Any]] ?? []
-        XCTAssertEqual(layers.first?["id"] as? String, CurrentFillRenderer.sourceID)
-        XCTAssertEqual(layers[4]["id"] as? String, "land-usca")
-        XCTAssertEqual(layers.count, 6)
-        let paint = layers.first?["paint"] as? [String: Any]
-        XCTAssertEqual(paint?["fill-color"] as? [String], ["get", "colour"])
-        XCTAssertEqual(paint?["fill-antialias"] as? Bool, false)
-        // Opacity rides speed but never reaches zero — certified coverage
-        // must stay distinguishable from true no-data (spec §1).
-        let opacity = paint?["fill-opacity"] as? [Any]
-        XCTAssertEqual(opacity?.first as? String, "interpolate")
-        XCTAssertEqual(opacity?[4] as? Double, FILL_OPACITY_FLOOR)
-        XCTAssertGreaterThan(FILL_OPACITY_FLOOR, 0)
-        XCTAssertNotNil((style["sources"] as? [String: Any])?[CurrentFillRenderer.sourceID])
+    /// The static direction channel: one map-aligned, collision-managed
+    /// symbol layer per source, rotated per feature from the "bearing"
+    /// attribute, ink-tinted, and gated to detail zooms. The animation
+    /// channel is gone — these four layers are everything the current
+    /// renderer adds.
+    func testDirectionLayersAreMapAlignedSymbolsAndNoStreaksRemain() {
+        let layers = fillStyleLayers(fill: source(CurrentFillRenderer.sourceID),
+                                     patch: source(CurrentFillRenderer.patchSourceID))
+        XCTAssertEqual(layers.direction.identifier, CurrentFillRenderer.directionLayerID)
+        XCTAssertEqual(layers.patchDirection.identifier, CurrentFillRenderer.patchDirectionLayerID)
+        for layer in [layers.direction, layers.patchDirection] {
+            XCTAssertNotNil(layer.predicate,
+                            "\(layer.identifier) must take only the point geometry")
+            XCTAssertEqual(layer.minimumZoomLevel, Float(CURRENT_DIRECTION_MIN_ZOOM))
+            XCTAssertEqual(layer.iconImageName?.constantValue as? String,
+                           CurrentFillRenderer.directionImageID)
+            XCTAssertTrue(String(describing: layer.iconRotation).contains("bearing"),
+                          "\(layer.identifier) must rotate per feature")
+            XCTAssertEqual(layer.iconRotationAlignment.constantValue as? String, "map")
+            XCTAssertEqual(layer.iconPitchAlignment.constantValue as? String, "map")
+            XCTAssertEqual(layer.iconAllowsOverlap.constantValue as? Bool, false,
+                           "arrows are collision-managed, never a solid sheet")
+            XCTAssertEqual((layer.iconColor.constantValue as? UIColor)?.description,
+                           hexColor(CHART_INK).description)
+        }
+        let ids = [layers.fill, layers.patch, layers.direction, layers.patchDirection]
+            .map(\.identifier)
+        XCTAssertFalse(ids.contains { $0.contains("streak") },
+                       "the animation channel is gone — nothing may recreate it")
     }
 
     /// The colour transfer is the composition of the two shipped #97 pieces —
@@ -128,7 +84,7 @@ final class CurrentFillTests: XCTestCase {
     func testFillColourIsTheSharedRampAndNeverGreen() {
         XCTAssertEqual(fillColourHex(forSpeedKn: 0), "#f5c96b")     // threshold yellow
         XCTAssertEqual(fillColourHex(forSpeedKn: 99), "#c93a32")    // clamped red ceiling
-        // Mid-anchor: kn=3 is exactly t=1/3 by the strip's own anchors.
+        // Mid-anchor: kn=3 is exactly t=1/3 by the strip’s own anchors.
         let c = SN.speedRGB(Timeline.rampT(forSpeedKn: 3))
         XCTAssertEqual(fillColourHex(forSpeedKn: 3),
                        String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded())))

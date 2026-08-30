@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Static current speed and direction renderer. FillField
 // and PatchField each populate one existing GeoJSON source with unchanged
 // certified speed polygons plus centroid direction points. MapLibre draws the
-// fill and map-aligned, collision-managed arrow symbols below land.
+// fill and map-aligned, collision-managed arrow symbols under the pins.
 //
 // Both fields are evaluated off-main on the existing one-minute cadence; the
 // main thread assigns each completed shape collection once. Pan, zoom, and
@@ -37,76 +37,57 @@ func fillColourHex(forSpeedKn kn: Double) -> String {
     return String(format: "#%02x%02x%02x", Int(c.r.rounded()), Int(c.g.rounded()), Int(c.b.rounded()))
 }
 
-/// Style-build side: two empty GeoJSON sources with fill and direction layers
-/// below land. Outline matches the fill so a cell's own triangulation seams
-/// vanish while the outer certified/uncertified edge stays a hard step.
-func addFillStyle(_ style: inout [String: Any]) {
-    var sources = style["sources"] as? [String: Any] ?? [:]
-    let empty: [String: Any] = [
-        "type": "geojson",
-        "data": ["type": "FeatureCollection", "features": [] as [Any]],
-    ]
-    sources[CurrentFillRenderer.sourceID] = empty
-    sources[CurrentFillRenderer.patchSourceID] = empty
-    style["sources"] = sources
-    let layer: [String: Any] = [
-        "id": CurrentFillRenderer.sourceID, "type": "fill",
-        "source": CurrentFillRenderer.sourceID,
+/// The runtime layers for both fill providers, coloured per feature, added
+/// under the pin layers so stations always draw over the wash.
+/// Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
+/// mouth fringe is draw order and nothing else (grown-patches spec §5), and
+/// feature order within one source does not guarantee paint order — layer
+/// order does. Identical paint: one ramp, one opacity law, one no-green rule
+/// for both providers. Each source also carries centroid direction points; a
+/// symbol layer per source draws them as map-aligned, collision-managed
+/// arrows above the wash.
+func fillStyleLayers(fill: MLNShapeSource, patch: MLNShapeSource)
+        -> (fill: MLNFillStyleLayer, patch: MLNFillStyleLayer,
+            direction: MLNSymbolStyleLayer, patchDirection: MLNSymbolStyleLayer) {
+    func configure(_ layer: MLNFillStyleLayer) {
+        layer.fillColor = NSExpression(mglJSONObject: ["get", "colour"])
         // antialias false: adjacent triangles' antialiased half-covered edge
         // pixels sum under translucency and redraw the whole mesh as seams.
         // Off, interiors fuse; the outer certified/uncertified edge stays a
         // hard step (which the spec wants visible).
-        "paint": ["fill-color": ["get", "colour"],
-                  "fill-antialias": false,
-                  "fill-opacity": ["interpolate", ["linear"], ["get", "kn"],
-                                   0.5, FILL_OPACITY_FLOOR,
-                                   6, FILL_OPACITY_TOP]],
-    ]
-    var layers = style["layers"] as? [[String: Any]] ?? []
-    // Under the LAND, not just under the pins: SSCOFS elements legitimately
-    // cross the shoreline, and land drawn over the fill clips them to water
-    // for free — no geometry clipping. ponytail: if the depth relief above
-    // proves opaque enough to bury the fill, this anchor moves back up.
-    // Patches draw DIRECTLY ABOVE the fill: "patch outranks backdrop" at the
-    // mouth fringe is draw order and nothing else (grown-patches spec §5),
-    // and feature order within one source does not guarantee paint order —
-    // layer order does. Same paint dict: one ramp, one opacity law, one
-    // no-green rule for both providers.
-    var patch = layer
-    patch["id"] = CurrentFillRenderer.patchSourceID
-    patch["source"] = CurrentFillRenderer.patchSourceID
-    let direction: [String: Any] = [
-        "id": CurrentFillRenderer.directionLayerID,
-        "type": "symbol",
-        "source": CurrentFillRenderer.sourceID,
-        "minzoom": CURRENT_DIRECTION_MIN_ZOOM,
-        "filter": ["==", ["geometry-type"], "Point"],
-        "layout": [
-            "icon-image": CurrentFillRenderer.directionImageID,
-            "icon-rotate": ["get", "bearing"],
-            "icon-rotation-alignment": "map",
-            "icon-pitch-alignment": "map",
-            "icon-allow-overlap": false,
-            "icon-ignore-placement": false,
-            "icon-padding": 8,
-        ],
-        "paint": [
-            "icon-color": CHART_INK,
-        ],
-    ]
-    var patchDirection = direction
-    patchDirection["id"] = CurrentFillRenderer.patchDirectionLayerID
-    patchDirection["source"] = CurrentFillRenderer.patchSourceID
-    let landIdx = layers.firstIndex { ["land-usca", "land"].contains($0["id"] as? String ?? "") }
-    let anchor = landIdx
-        ?? layers.firstIndex { ($0["id"] as? String) == "station-clusters" }
-        ?? layers.count
-    layers.insert(contentsOf: [layer, patch, direction, patchDirection], at: anchor)
-    style["layers"] = layers
+        layer.fillAntialiased = NSExpression(forConstantValue: false)
+        layer.fillOpacity = NSExpression(mglJSONObject:
+            ["interpolate", ["linear"], ["get", "kn"],
+             0.5, FILL_OPACITY_FLOOR, 6, FILL_OPACITY_TOP])
+    }
+    let fillLayer = MLNFillStyleLayer(identifier: CurrentFillRenderer.sourceID, source: fill)
+    let patchLayer = MLNFillStyleLayer(identifier: CurrentFillRenderer.patchSourceID, source: patch)
+    configure(fillLayer)
+    configure(patchLayer)
+
+    // Fills and direction points share one source, so each layer takes the
+    // geometry it draws.
+    func directionLayer(_ id: String, source: MLNShapeSource) -> MLNSymbolStyleLayer {
+        let layer = MLNSymbolStyleLayer(identifier: id, source: source)
+        layer.predicate = NSPredicate(mglJSONObject: ["==", ["geometry-type"], "Point"])
+        layer.minimumZoomLevel = Float(CURRENT_DIRECTION_MIN_ZOOM)
+        layer.iconImageName = NSExpression(forConstantValue: CurrentFillRenderer.directionImageID)
+        layer.iconRotation = NSExpression(mglJSONObject: ["get", "bearing"])
+        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
+        layer.iconPitchAlignment = NSExpression(forConstantValue: "map")
+        layer.iconAllowsOverlap = NSExpression(forConstantValue: false)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
+        layer.iconPadding = NSExpression(forConstantValue: 8)
+        layer.iconColor = NSExpression(forConstantValue: hexColor(CHART_INK))
+        return layer
+    }
+    return (fillLayer, patchLayer,
+            directionLayer(CurrentFillRenderer.directionLayerID, source: fill),
+            directionLayer(CurrentFillRenderer.patchDirectionLayerID, source: patch))
 }
 
 /// Owns the fill bundle and the refresh timer. One instance per `MapStyler`;
-/// `attach` re-runs on every style load (fallback, then Seascape) because the
+/// `attach` re-runs on every style load because the
 /// source object belongs to the style that loaded it.
 final class CurrentFillRenderer {
     static let sourceID = "current-fill"
@@ -116,9 +97,6 @@ final class CurrentFillRenderer {
     static let directionImageID = "current-direction-arrow"
 
     private weak var map: MLNMapView?
-    /// Strong on purpose — same MapLibre gotcha the particle spike hit: a
-    /// source looked up out of a JSON-declared style is a fresh wrapper the
-    /// style does NOT retain.
     private var source: MLNShapeSource?
     private var patchSource: MLNShapeSource?
     /// Both providers vend the same FillCell shape (the frozen seam); the
@@ -135,8 +113,24 @@ final class CurrentFillRenderer {
 
     func attach(to style: MLNStyle, map: MLNMapView) {
         self.map = map
-        source = style.source(withIdentifier: Self.sourceID) as? MLNShapeSource
-        patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
+        // The basemap is a style URL this app does not own — the fill's
+        // sources and layers go in through the runtime API, per style load.
+        if let existing = style.source(withIdentifier: Self.sourceID) as? MLNShapeSource {
+            source = existing
+            patchSource = style.source(withIdentifier: Self.patchSourceID) as? MLNShapeSource
+        } else {
+            let fill = MLNShapeSource(identifier: Self.sourceID, shape: nil, options: nil)
+            let patch = MLNShapeSource(identifier: Self.patchSourceID, shape: nil, options: nil)
+            style.addSource(fill)
+            style.addSource(patch)
+            let layers = fillStyleLayers(fill: fill, patch: patch)
+            style.addLayer(layers.fill)
+            style.addLayer(layers.patch)
+            style.addLayer(layers.direction)
+            style.addLayer(layers.patchDirection)
+            source = fill
+            patchSource = patch
+        }
         if field == nil { field = FillField() }
         if patches == nil { patches = PatchField() }
         refresh()
