@@ -43,8 +43,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // The pending card carrying Victoria's own id is the unambiguous signal:
         // it exists while the fit is outstanding and goes away when it lands.
         XCTAssert(pending.waitForNonExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
-        sleep(1)
-        app.staticTexts["Victoria"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         // The provenance marking (device-computed vs authoritative-harmonic).
         XCTAssert(app.staticTexts.matching(
@@ -62,7 +61,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         let offlinePending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssertFalse(offlinePending.waitForExistence(timeout: 3),
                        "stored model did not survive relaunch — Victoria is pending again")
-        app.staticTexts["Victoria"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.waitForExistence(timeout: 5)
                   || app.staticTexts["⤓ LOW"].firstMatch.waitForExistence(timeout: 5))
@@ -97,7 +96,7 @@ final class LiveFetchTests: ScreenshotTestCase {
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
         XCTAssert(fitted.waitForExistence(timeout: 480), "Dodd Narrows never fitted — IWLS unreachable?")
 
-        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         // Full current-detail anatomy: the slack countdown and the CHS
         // provenance footer (device-computed, not CHS-published). Dodd is
         // a 210-day gate, so the card above lands on its 60-day fast answer —
@@ -116,7 +115,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
-        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
     }
 
@@ -139,9 +138,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // and opening it moves that port to the front of the queue, so the
         // page fills in live with no second tap and no back-and-forth.
         openSearch(app, "malibu")
-        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
-                  "search did not find Malibu Rapids")
-        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
         XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
                   "tapping the gate did not open a detail")
         // ~5 min ceiling: the in-flight station finishes, then the promoted
@@ -189,18 +186,18 @@ final class LiveFetchTests: ScreenshotTestCase {
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 5))
-        sleep(4)  // tiles
+        sleep(4)  // tiles: MLNMapView surfaces no load state to XCUITest
         // Malibu (50.16, -123.85) sits north-west of the camera — drag the
         // map content south-east to bring the pin into the frame's middle
         // (one full drag + one short one; two full drags left it at the edge).
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
             .press(forDuration: 0.1, thenDragTo:
                 map.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.8)))
-        sleep(1)
+        sleep(1)  // the pan's own inertia, before the second drag starts
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.35))
             .press(forDuration: 0.1, thenDragTo:
                 map.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.62)))
-        sleep(3)
+        sleep(3)  // the newly exposed tiles, for the shot — again, no predicate
         save(app, "m46-malibu-map.png")
     }
 
@@ -223,7 +220,8 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1, "indicator must sit beside the gear")
         XCTAssertEqual(indicator.frame.midY, gear.frame.midY, accuracy: 2,
                        "indicator must share the gear's row")
-        sleep(3)  // let the first download start, so the state is 'downloading'
+        // the indicator's own value flips to "Downloading, x of y ready" once a job is claimed
+        waitFor(indicator, "value BEGINSWITH 'Downloading'", timeout: 30)
 
         // Tapping it opens the manager directly (not Settings).
         indicator.tap()
@@ -259,9 +257,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // the queue and has nothing to show — tapping it still opens a detail,
         // and that detail explains itself.
         openSearch(app, "weynton")
-        let far = app.staticTexts["Weynton Passage"].firstMatch
-        XCTAssert(far.waitForExistence(timeout: 5))
-        far.tap()
+        pickSearchResult(app, app.staticTexts["Weynton Passage"].firstMatch)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label == 'Waiting' OR label == 'Downloading…'"
         )).firstMatch.waitForExistence(timeout: 5),
@@ -307,8 +303,8 @@ final class LiveFetchTests: ScreenshotTestCase {
         // says "Canadian tidal predictions", and "victoria" matches several.
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.waitForExistence(timeout: 15), "no CHS Victoria card in the results")
-        var waited = 0
-        while pending.exists, waited < 240 { sleep(2); waited += 2 }
+        // timed below: wait on the card itself, not a poll grid that lands in the number
+        _ = pending.waitForNonExistence(timeout: 240)
         XCTAssertFalse(pending.exists, "Victoria never fitted — IWLS unreachable?")
         report("nearest tide port (60 d)", t0)
         XCTAssert(app.scrollViews.firstMatch.staticTexts.matching(
@@ -334,7 +330,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists,
                        "a gate validated at 60 d must go straight to final — no provisional marking")
-        app.staticTexts["Active Pass"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Active Pass"].firstMatch)
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'can be off by up to'")).firstMatch.exists,
@@ -379,7 +375,7 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "the tilde stays: the reading itself must still say it is not exact")
 
         // …and in the detail: the ⚠️ family, with the real number in it.
-        app.staticTexts["Dodd Narrows"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         let warning = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'")).firstMatch
         XCTAssert(warning.waitForExistence(timeout: 10),
@@ -392,8 +388,7 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "the footer must say how much of the model is actually here")
 
         // The refinement lands under the open page: same station, final model.
-        var waited = 0
-        while warning.exists, waited < 300 { sleep(5); waited += 5 }
+        _ = warning.waitForNonExistence(timeout: 300)
         XCTAssertFalse(warning.exists, "the fast answer never refined to the full model")
         report("nearest 210-day gate → FINAL", t0)
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.exists, "the refined page is still a live detail")
@@ -413,8 +408,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(dodd.waitForExistence(timeout: 10))
-        var waited = 0
-        while !dodd.label.contains("Refining"), waited < 300 { sleep(5); waited += 5 }
+        waitFor(dodd, "label CONTAINS 'Refining'", timeout: 300)
         XCTAssert(dodd.label.contains("Refining"),
                   "the manager never showed the usable-but-unfinished state")
         XCTAssert(dodd.label.contains("FAST ANSWER ±35 MIN"),
@@ -443,7 +437,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // Open the far tide port — the promotion the queue has to honour NOW.
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "tofino")
-        app.staticTexts["Tofino"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
         XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 10))
         let t0 = Date()
         app.buttons["detail-back"].firstMatch.tap()
@@ -459,10 +453,11 @@ final class LiveFetchTests: ScreenshotTestCase {
         // 300 s deadline the surrounding loops use. The print below still
         // reports the time it actually took.
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
-        var waited = 0
-        while !tofino.label.contains("Downloading"), waited < 300 { sleep(1); waited += 1 }
+        let yieldStart = Date()
+        waitFor(tofino, "label CONTAINS 'Downloading'", timeout: 300)
         XCTAssert(tofino.label.contains("Downloading"),
-                  "opening a station did not interrupt the gate in flight (waited \(waited) s)")
+                  "opening a station did not interrupt the gate in flight "
+                  + "(waited \(Int(-yieldStart.timeIntervalSinceNow)) s)")
         XCTAssert(app.descendants(matching: .any)["download-row-chs-dodd-narrows"]
             .firstMatch.label.contains("Waiting"), "the yielded gate must go back to waiting, not fail")
         print("M51 interrupt: promoted station started \(String(format: "%.1f", -t0.timeIntervalSinceNow)) s after the open")
@@ -471,8 +466,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // from its cached chunks (never re-fetching them — ChsProvisionalTests).
         // Same deadline as above: this clock covers Tofino's whole download,
         // which load stretches just as much as the yield (#65).
-        waited = 0
-        while !dodd.label.contains("Downloading"), waited < 300 { sleep(2); waited += 2 }
+        waitFor(dodd, "label CONTAINS 'Downloading'", timeout: 300)
         XCTAssert(dodd.label.contains("Downloading"), "the yielded gate never resumed")
         app.buttons["Done"].tap()
     }
@@ -486,14 +480,13 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         openSearch(app, "halifax")
         // Deliberately UNSCOPED: the point is that Halifax is not in the
-        // auto-fit set, so the set is downloading in the background throughout.
-        let pending = app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch
-        XCTAssert(pending.waitForExistence(timeout: 15),
-                  "it should start with nothing — nothing auto-downloads Nova Scotia")
-        // Tap the CARD, not the name: at regular width the sidebar behind the
-        // search overlay is accessibility-hidden but still queryable, so
-        // `staticTexts["Halifax"].firstMatch` can resolve to the hidden one.
-        pending.tap()
+        // auto-fit set, so the set is downloading in the background throughout
+        // — it should start with nothing, since nothing auto-downloads Nova
+        // Scotia. Tap the CARD, not the name: at regular width the sidebar
+        // behind the search overlay is accessibility-hidden but still
+        // queryable, so `staticTexts["Halifax"].firstMatch` can resolve to
+        // the hidden one.
+        pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
         XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 20))
 
         // Promotion yields the running auto-fit job at its next chunk (~2.5 s),
@@ -523,10 +516,7 @@ final class LiveFetchTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
-        let result = app.staticTexts["Sechelt Rapids"].firstMatch
-        XCTAssert(result.waitForExistence(timeout: 5),
-                  "search did not find Sechelt Rapids by its alias")
-        result.tap()
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
         // Generous ceiling: a live IWLS fetch, not a seeded window.
         let provenance = app.staticTexts["online-provenance"].firstMatch

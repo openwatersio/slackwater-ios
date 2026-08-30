@@ -57,9 +57,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-seedTideModel", "chs-point-atkinson")
 
         openSearch(app, "malibu")
-        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
-                  "search did not find Malibu Rapids")
-        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
 
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10),
                   "seeded reference fit did not render the derived-gate detail")
@@ -84,7 +82,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(strip.waitForExistence(timeout: 5), "derived-gate strip missing")
         let ink = inkFraction(strip)
         XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
-        sleep(1)
+        sleep(1)  // the header's offline tile floor; MLNMapView reports nothing
         save(app, "m46-derived-gate-seeded.png")
     }
 
@@ -176,7 +174,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         if !retry.isHittable { app.swipeUp() }
         XCTAssert(retry.isHittable, "Retry button exists but never became hittable")
         retry.tap()
-        sleep(1)  // the queue re-sort/re-render isn't instant
+        waitFor(row, "label CONTAINS 'YOU OPENED' AND label CONTAINS 'Waiting'")
 
         // Promote's own visible effect proves the BUTTON's action ran: the
         // failed row flips to promoted+pending — "YOU OPENED" and "Waiting"
@@ -243,9 +241,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-networkKillSwitch")
 
         openSearch(app, "boston")
-        let boston = app.staticTexts["Boston"].firstMatch
-        XCTAssert(boston.waitForExistence(timeout: 5), "Boston is not in the bundle")
-        boston.tap()
+        pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
 
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10),
                   "an east-coast station did not open a real detail")
@@ -257,16 +253,14 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                        "no height readings on the Boston detail")
         XCTAssertGreaterThanOrEqual(scheduleValues(app, "\\b\\d{2}:\\d{2}\\b").count, 3,
                                     "no schedule on the Boston detail")
-        sleep(3)  // header map tiles — the continental land floor, offline
+        sleep(3)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m53-us-station.png")
 
         // And the west coast, through the same path.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "san francisco")
-        let sf = app.staticTexts["San Francisco (Golden Gate)"].firstMatch
-        XCTAssert(sf.waitForExistence(timeout: 5), "San Francisco is not in the bundle")
-        sf.tap()
+        pickSearchResult(app, app.staticTexts["San Francisco (Golden Gate)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
     }
 
@@ -285,7 +279,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Tap to download"].firstMatch.exists,
                   "an unqueued station must not claim to be queued")
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
-        app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch.tap()
+        pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
 
         XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 8),
                   "opening an undownloaded Canadian station must explain itself")
@@ -335,10 +329,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
-        let result = app.staticTexts["Sechelt Rapids"].firstMatch
-        XCTAssert(result.waitForExistence(timeout: 5),
-                  "search did not find Sechelt Rapids by its alias")
-        result.tap()
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
         let honesty = app.descendants(matching: .any)["online-honesty-card"].firstMatch
         XCTAssert(honesty.waitForExistence(timeout: 5),
@@ -390,7 +381,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         row.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
-        sleep(1)
+        _ = app.staticTexts["FAVORITES"].waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "cleanup unfavorite left the Favorites group behind")
     }
@@ -412,10 +403,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
-        let result = app.staticTexts["Sechelt Rapids"].firstMatch
-        XCTAssert(result.waitForExistence(timeout: 5),
-                  "search did not find Sechelt Rapids by its alias")
-        result.tap()
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "the seeded window did not render the fetched strip")
@@ -446,7 +434,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // strip and nothing ever looked at it.
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
         XCTAssert(ink > 0.05, "the online-gate strip drew nothing — ink \(ink)")
-        sleep(1)
+        sleep(1)  // the header's tile floor; MLNMapView reports nothing
         save(app, "online-gate-seeded.png")
     }
 
@@ -464,10 +452,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
-        let result = app.staticTexts["Sechelt Rapids"].firstMatch
-        XCTAssert(result.waitForExistence(timeout: 5),
-                  "search did not find Sechelt Rapids by its alias")
-        result.tap()
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "the seeded window should render before we page off it")
 
@@ -514,9 +499,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "skookumchuck")
-        let result = app.staticTexts["Sechelt Rapids"].firstMatch
-        XCTAssert(result.waitForExistence(timeout: 5))
-        result.tap()
+        pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "today's block must survive the far seed's save (single-window: it did not)")

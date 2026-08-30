@@ -17,23 +17,27 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         setUnits(app, "Feet")
 
         openFridayHarbor(app)
-        sleep(2)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        _ = strip.waitForExistence(timeout: 10)
+        settleLayout(strip)  // the push animation is still moving the strip
 
         // Scrub: pan the strip under the fixed centerline (drag left = later),
         // release — the readout keeps the scrubbed time.
         scrubStrip(app)
-        sleep(1)
+        settleScrub(app)
         save(app, "m1-detail-scrubbed.png")
 
         // Back to the station list (search closed itself on the pick).
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        sleep(1)
+        settleLayout(app.staticTexts["Slackwater"].firstMatch)  // the pop slides the list in
         save(app, "m1-list.png")
 
         // Search mid-query: name + region substring both match (bottom input).
         openSearch(app, "pass")
-        sleep(1)
+        // the truncation notice is the app's own "results are rendered" signal
+        _ = app.descendants(matching: .any)["search-truncated"].firstMatch
+            .waitForExistence(timeout: 10)
         save(app, "m1-search.png")
         // "pass" matches 139 stations nationally and results are ranked by
         // DISTANCE, not name — Active Pass sits eighth, not first
@@ -50,7 +54,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // Metres via Settings, then open Friday Harbor in metric.
         setUnits(app, "Meters")
         openFridayHarbor(app)
-        sleep(2)
+        // the rate line re-rendered in metres is the unit switch landing
+        _ = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'm/hr'"))
+            .firstMatch.waitForExistence(timeout: 10)
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
         app.buttons["detail-back"].firstMatch.tap()
@@ -119,9 +125,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "avonmouth")
-        let card = app.staticTexts["Avonmouth"].firstMatch
-        XCTAssert(card.waitForExistence(timeout: 5))
-        card.tap()
+        pickSearchResult(app, app.staticTexts["Avonmouth"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(strip.waitForExistence(timeout: 10))
         let severn = inkFraction(strip)
@@ -210,16 +214,14 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
                   "moon phase name missing from the scrub readout")
-        sleep(6)  // let the header map tiles come in
+        sleep(6)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m41-detail-mapheader.png")
 
         // The map header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "deception")
-        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(gate.waitForExistence(timeout: 5))
-        gate.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
                   "map header missing from current detail")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
@@ -246,7 +248,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Pan the strip: the centerline readout moves off "now".
         scrubStrip(app)
-        sleep(1)
         XCTAssert(app.buttons["Return to now"].waitForExistence(timeout: 5),
                   "return-to-now affordance missing after scrubbing away")
 
@@ -264,7 +265,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         var tries = 0
         while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
             app.swipeUp()
-            sleep(1)
+            settleLayout(tomorrowRow)  // deceleration, before the frame is read again
             tries += 1
         }
         tomorrowRow.tap()
@@ -322,7 +323,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertFalse(now.exists, "return-to-now must not show before a scrub")
 
         scrubStrip(app)
-        sleep(1)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
         // The 44pt slot this guards is fixed by construction, but re-reading
         // star/now/header/back live below would still be racy (settled — see
@@ -356,7 +356,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // And it still does its job — back to now, and gone again.
         now.tap()
-        sleep(1)
+        _ = now.waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.buttons["detail-return-now"].firstMatch.exists,
                        "return-to-now did not clear after returning to now")
         XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,

@@ -11,20 +11,21 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // Deception Pass and scrub the signed velocity curve.
     func testM2Currents() throws {
         let app = launch("-seedGate")
-        sleep(2)
+        // wait (briefly) for a reading — screenshot only; an undownloaded list shows none
+        _ = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
+            .firstMatch.waitForExistence(timeout: 5)
         save(app, "m2-list-mixed.png")
 
         // Search finds the current station; its detail is the signed curve.
         openSearch(app, "deception")
-        let card = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(card.waitForExistence(timeout: 5))
-        card.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))  // MonoLabel uppercases
 
         // Scrub: pan the combined tide+current strip, release.
         scrubStrip(app)
-        sleep(1)
+        settleScrub(app)
         save(app, "m2-current-scrubbed.png")
     }
 
@@ -42,7 +43,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.buttons["Or search for a harbor, bay, or channel."].tap()
         let field = app.textFields.firstMatch
         XCTAssert(field.waitForExistence(timeout: 5), "gate bypass did not open search")
-        sleep(1)
+        XCTAssert(waitFor(field, "hasKeyboardFocus == true"),
+                  "the gate's search field did not take keyboard focus")
         field.typeText("friday")  // works only if the field auto-focused
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.waitForExistence(timeout: 5))
         closeSearch(app)
@@ -85,7 +87,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
             XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
-            sleep(5)  // let tiles (and Seascape, when reachable) come in
+            sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
             save(app, "m41-map-zoom.png")
             tapPin(map, lat, lon)
             XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
@@ -101,9 +103,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         let app = launch("-seedGate")
 
         openSearch(app, "deception")
-        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(gate.waitForExistence(timeout: 5))
-        gate.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
 
         // Nothing tide-shaped on the gate detail.
@@ -119,7 +119,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
             .firstMatch.waitForExistence(timeout: 5),
                   "slack window missing under Next slack")
-        sleep(1)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        _ = strip.waitForExistence(timeout: 10)
+        settleLayout(strip)  // the chart is most of this picture
         save(app, "m4-gate-detail.png")
 
         // The link opens the port's own detail with its schedule. Tide rows
@@ -162,12 +164,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
         // A second pick replaces the detail (no stacking) — web sidebar behavior.
         openSearch(app, "deception")
-        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(gate.waitForExistence(timeout: 5))
-        gate.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5),
                   "row tap did not replace the detail pane")
-        sleep(5)  // header map tiles
+        sleep(5)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m44-ipad-landscape.png")
 
         // Regular width: the FABs live in the sidebar column; the map
@@ -183,7 +183,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                   "toggle back did not land on the placeholder")
 
         XCUIDevice.shared.orientation = .portrait
-        sleep(2)
+        settleLayout(app.windows.firstMatch)  // the rotation, by the window it resizes
         XCTAssert(app.staticTexts["Slackwater"].exists, "portrait dropped the sidebar")
         save(app, "m44-ipad-portrait.png")
     }
@@ -282,7 +282,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 5))
-        sleep(5)  // tiles
+        sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
                   "the pin tap did not open a detail")
@@ -303,7 +303,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 5))
-        sleep(5)  // tiles
+        sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
 
         // Dead centre: the camera is on the station, so the pin is the middle.
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -338,7 +338,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
         let before = scrubClock(app)
         scrubStrip(app)
-        sleep(1)
+        settleScrub(app)  // read the parked time, not one mid-deceleration
         XCTAssert(app.otherElements["timeline-strip"].exists,
                   "a drag inside the strip popped the detail — the edge gesture is too greedy")
         XCTAssertNotEqual(scrubClock(app), before,
@@ -350,9 +350,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // (b) current detail.
         openSearch(app, "deception")
-        let current = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(current.waitForExistence(timeout: 5))
-        current.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10))
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
@@ -360,7 +358,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // (c) the CHS waiting page — no chart at all, held there by the kill switch.
         openSearch(app, "victoria")
-        app.staticTexts["Victoria"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 10))
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
@@ -368,7 +366,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // (d) a derived gate — Malibu Rapids, likewise pending offline.
         openSearch(app, "malibu")
-        app.staticTexts["Malibu Rapids"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 10))
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
@@ -397,7 +395,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Don't fight the user: a deliberate pick stands, and coming back to
         // the list does not re-run the auto-select.
         openSearch(app, "friday")
-        app.staticTexts["Friday Harbor"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Friday Harbor"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists,
                   "the auto-selection overrode a deliberate pick")
@@ -428,7 +426,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Narrowing removes the truncation notice — the list is complete again.
         app.textFields.firstMatch.typeText(" townsend")
-        sleep(1)
+        _ = app.descendants(matching: .any)["search-truncated"].firstMatch
+            .waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.descendants(matching: .any)["search-truncated"].firstMatch.exists,
                        "a narrow query must not claim to be truncated")
         closeSearch(app)
@@ -447,7 +446,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.waitForExistence(timeout: 15))
-        sleep(6)  // the coarse land tiles, then the clusters
+        sleep(6)  // tiles + clustering must settle before the TIMED pinches; neither reaches XCUITest
         save(app, "m53-map-continental.png")
 
         // Then the interaction cost, timed: zooming the clustered source at the

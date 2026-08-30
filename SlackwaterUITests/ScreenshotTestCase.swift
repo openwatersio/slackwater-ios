@@ -19,17 +19,28 @@ import XCTest
 class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
 
+    /// Wait for a condition `waitForExistence` cannot express — hittability,
+    /// keyboard focus, a label the app rewrites when the work behind it lands.
+    /// Generous by default: on a machine running parallel simulator clones a
+    /// wait that passes costs nothing, while one that is too short costs an
+    /// intermittent failure, the worst thing a guard suite can carry.
+    /// Returns rather than asserts — the caller's own assertion, taken after
+    /// the wait, is what reports the failure and names it.
+    @discardableResult
+    func waitFor(_ element: XCUIElement, _ condition: String,
+                 timeout: TimeInterval = 10) -> Bool {
+        let met = XCTNSPredicateExpectation(predicate: NSPredicate(format: condition),
+                                            object: element)
+        return XCTWaiter().wait(for: [met], timeout: timeout) == .completed
+    }
+
     /// Search lives behind the bottom-left FAB. Opens it and types with
     /// NO field tap — typeText throws unless the field already has keyboard
     /// focus, so every use doubles as the keyboard-up-immediately assertion.
     func openSearch(_ app: XCUIApplication, _ text: String) {
         let fab = app.buttons["Search"].firstMatch
         XCTAssert(fab.waitForExistence(timeout: 10), "search FAB did not appear")
-        // Tap, and retap if the overlay does not follow: under parallel-clone
-        // load a tap synthesized while the app is still settling its first
-        // frames is silently dropped. Retapping cannot double-open — once
-        // search is up the base surface (this FAB included) is
-        // accessibility-hidden, so the query stops matching it.
+        // retap if dropped — once search opens the FAB is a11y-hidden, so no double-fire
         let field = app.textFields.firstMatch
         var opened = false
         for _ in 0..<3 {
@@ -37,14 +48,28 @@ class ScreenshotTestCase: XCTestCase {
             if field.waitForExistence(timeout: 5) { opened = true; break }
         }
         XCTAssert(opened, "search input did not appear")
-        // Wait on the auto-focus itself, not a fixed beat — a loaded machine
-        // (parallel clones) lands it late, and a fixed sleep is either too
-        // short there or wasted everywhere else.
         let focused = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hasKeyboardFocus == true"), object: field)
         XCTAssert(XCTWaiter().wait(for: [focused], timeout: 10) == .completed,
                   "search field did not take keyboard focus")
         field.typeText(text)
+    }
+
+    /// Tap a search result and confirm the pick actually landed. The overlay
+    /// closes itself on a successful pick, so the search field disappearing
+    /// IS the landed signal — and the one queryable thing a dropped tap
+    /// leaves unchanged. Same dropped-tap mechanism and bounded retap as
+    /// openSearch's FAB: under clone load a tap can land mid-refilter (each
+    /// keystroke re-ranks the results) and die silently. Retapping cannot
+    /// double-fire — once the overlay closes, the result card is gone.
+    func pickSearchResult(_ app: XCUIApplication, _ result: XCUIElement) {
+        XCTAssert(result.waitForExistence(timeout: 10), "search result did not appear")
+        let field = app.textFields.firstMatch
+        for _ in 0..<3 {
+            if result.exists, result.isHittable { result.tap() }
+            if field.waitForNonExistence(timeout: 5) { return }
+        }
+        XCTFail("tap on a search result never closed the search overlay")
     }
 
     /// The X glass circle beside the bottom input.
@@ -151,9 +176,7 @@ class ScreenshotTestCase: XCTestCase {
     /// closes itself on the pick).
     func openFridayHarbor(_ app: XCUIApplication) {
         openSearch(app, "friday")
-        let card = app.staticTexts["Friday Harbor"].firstMatch
-        XCTAssert(card.waitForExistence(timeout: 5))
-        card.tap()
+        pickSearchResult(app, app.staticTexts["Friday Harbor"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
     }
 
@@ -211,12 +234,15 @@ class ScreenshotTestCase: XCTestCase {
         // Top of the detail, under the status bar clearance — should be
         // hittable the moment the header renders, no scroll needed.
         let title = app.descendants(matching: .any)["map-header-title"].firstMatch
-        XCTAssert(title.waitForExistence(timeout: 5), "map-header-title missing")
-        XCTAssert(title.isHittable, "map-header-title exists but never became hittable")
-        title.tap()
-
-        XCTAssert(app.otherElements["map-canvas"].firstMatch.waitForExistence(timeout: 5),
-                  "the title tap did not show the map")
+        XCTAssert(title.waitForExistence(timeout: 10), "map-header-title missing")
+        // bounded retap (see pickSearchResult); a landed tap pops the title with the detail
+        let canvas = app.otherElements["map-canvas"].firstMatch
+        var shown = false
+        for _ in 0..<3 {
+            if title.exists, title.isHittable { title.tap() }
+            if canvas.waitForExistence(timeout: 5) { shown = true; break }
+        }
+        XCTAssert(shown, "the title tap did not show the map")
         XCTAssertFalse(app.otherElements["detail-map-header"].exists,
                        "the title tap must pop the detail, not layer the map over it")
     }
@@ -335,6 +361,20 @@ class ScreenshotTestCase: XCTestCase {
         }
         return snapshot
     }
+
+    /// A transition — a push, a pop, a rotation, a swipe's deceleration — ends
+    /// with no accessibility signal of any kind, so settle a frame the
+    /// transition actually moves and carry on from there. Two consecutive
+    /// agreeing reads (`settled`) is the animation having stopped.
+    func settleLayout(_ element: XCUIElement) { _ = settled { element.frame } }
+
+    /// The strip parked. A scrub's time lands in two steps — the scroll
+    /// decelerates, then the magnet snaps to the nearest stop and writes
+    /// `scrubTime` when ITS animation ends (TimelineStrip's scroll
+    /// coordinator) — and neither step exposes an element to wait on. The
+    /// centerline reading moves with every frame of both, so settling it
+    /// settles them.
+    func settleScrub(_ app: XCUIApplication) { _ = settled { scrubClock(app) } }
 
     /// ChsAmberCard's action renders as a `.plain` Button whose label is an
     /// HStack; whether XCUI surfaces it as a button or a static text has

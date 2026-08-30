@@ -85,9 +85,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "dodd")
-        let gate = app.staticTexts["Dodd Narrows"].firstMatch
-        XCTAssert(gate.waitForExistence(timeout: 5), "search did not find Dodd Narrows")
-        gate.tap()
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
 
         // The pending detail still carries the header star — tap it.
         let star = app.buttons["detail-favorite"].firstMatch
@@ -112,7 +110,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         row.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
-        sleep(1)
+        _ = app.staticTexts["FAVORITES"].waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "cleanup unfavorite left the Favorites group behind")
     }
@@ -145,9 +143,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Visit a second station so Recents renders too — all four groups.
         openSearch(app, "deception")
-        let port = app.staticTexts["Deception Pass State Park"].firstMatch
-        XCTAssert(port.waitForExistence(timeout: 5))
-        port.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass State Park"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
@@ -165,7 +161,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.buttons["Remove"].waitForExistence(timeout: 5),
                   "trailing swipe did not reveal the Recents remove action")
         app.buttons["Remove"].firstMatch.tap()
-        sleep(1)
+        _ = app.staticTexts["Deception Pass State Park"].waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.staticTexts["Deception Pass State Park"].exists,
                        "remove-from-recents left the row behind")
 
@@ -180,7 +176,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.buttons["Unfavorite"].waitForExistence(timeout: 5),
                   "trailing swipe did not reveal the favorites remove action")
         app.buttons["Unfavorite"].firstMatch.tap()
-        sleep(1)
+        _ = app.staticTexts["FAVORITES"].waitForNonExistence(timeout: 10)
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "unfavorite left the Favorites group behind")
         let recentsAgain = app.staticTexts["RECENTS"].firstMatch
@@ -202,9 +198,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         app.buttons["Done"].tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "deception")
-        let gate = app.staticTexts["Deception Pass (Narrows)"].firstMatch
-        XCTAssert(gate.waitForExistence(timeout: 5))
-        gate.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'km/h'")).firstMatch.waitForExistence(timeout: 5),
@@ -317,9 +311,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         for name in ["Deception Pass (Narrows)", "Deception Pass State Park"] {
             openSearch(app, "deception")
-            let card = app.staticTexts[name].firstMatch
-            XCTAssert(card.waitForExistence(timeout: 5), "\(name) missing from search")
-            card.tap()
+            pickSearchResult(app, app.staticTexts[name].firstMatch)
             XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
             app.buttons["detail-back"].firstMatch.tap()
             XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
@@ -376,7 +368,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openSearch(app, "discovery island")
-        app.staticTexts["3.0 nm NE"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["3.0 nm NE"].firstMatch)
         XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch.exists,
                        "an unpaired current station has no reference port to link")
@@ -386,7 +378,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Second station, same kind — in the split layout this replaces the
         // detail pane without a pop.
         openSearch(app, "deception pass (n")
-        app.staticTexts["Deception Pass (Narrows)"].firstMatch.tap()
+        pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Deception Pass (Narrows)"].firstMatch
             .waitForExistence(timeout: 8))
         XCTAssert(app.descendants(matching: .any).matching(identifier: "tide-at-port")
@@ -488,10 +480,13 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         title.swipeLeft()
         let remove = app.buttons["Remove"].firstMatch
         XCTAssert(remove.waitForExistence(timeout: 5), "no swipe action on the removed-station row")
-        remove.tap()
-        sleep(1)
-        XCTAssertFalse(app.staticTexts["North Galiano"].firstMatch.exists,
-                       "the removed favorite came back")
+        // bounded retap (see pickSearchResult); once the tap lands the button is gone
+        let row = app.staticTexts["North Galiano"].firstMatch
+        for _ in 0..<3 {
+            if remove.exists, remove.isHittable { remove.tap() }
+            if row.waitForNonExistence(timeout: 5) { break }
+        }
+        XCTAssertFalse(row.exists, "the removed favorite came back")
         XCTAssertFalse(app.staticTexts["FAVORITES"].exists,
                        "the only favorite is gone — the group should be too")
     }

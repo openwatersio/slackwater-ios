@@ -95,13 +95,15 @@ for sim in "${sims[@]}"; do
   # simulator and distributes the UI-test CLASSES across the clones. All the
   # live-IWLS tests sit in one class (LiveFetchTests) so they stay sequential.
   # The clones live inside this one xcodebuild, so the lock above still covers
-  # the whole run. Capped at 4 workers: xcodebuild's default of 5 clones
-  # saturates this shared Mac — one starved clone stretched a 28s test to 20
-  # minutes and timed out short element waits across three others. Four matches
-  # the four weight-balanced UI classes; lower it before turning the flag off.
+  # the whole run. Worker count is a MEMORY budget, not a core count: a booted
+  # iOS simulator clone costs ~2.2 GB, and on a 16 GB machine with a normal
+  # desktop running, four clones push swap past physical RAM — load average
+  # then counts thousands of page-in-blocked threads (430 observed, CPU 89%
+  # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit;
+  # raise SLACKWATER_WORKERS on machines with more memory (CI).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
-    -parallel-testing-worker-count 4 \
+    -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
     "${skip[@]}" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
