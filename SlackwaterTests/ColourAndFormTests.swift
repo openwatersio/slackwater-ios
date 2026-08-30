@@ -340,7 +340,10 @@ final class ColourAndFormTests: XCTestCase {
     }
 
     func testPinFeaturesCarryStateAndBothLayersShareOneColourExpression() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        // The feature builder and the layers that colour it live in two files;
+        // the rule spans both, so it is scanned as one text.
+        let source = try repoSource("Slackwater/MapPinState.swift")
+            + repoSource("Slackwater/MapStyleBuilder.swift")
         // Every pin feature must declare a state, defaulting to unknown.
         XCTAssertTrue(source.contains("\"state\""), "pin features must carry a state property")
         // Colour must be matched against state, never kind.
@@ -383,7 +386,7 @@ final class ColourAndFormTests: XCTestCase {
     /// (satellite imagery underneath is arbitrary), so it is the one floor a
     /// test can hold.
     func testEveryPinOutlineClearsTheContrastFloorOnTheWaterTone() throws {
-        let source = try repoSource("Slackwater/MapScreen.swift")
+        let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
             // of a hex literal), which closes a single-hash raw string.
@@ -414,9 +417,9 @@ final class ColourAndFormTests: XCTestCase {
     /// The state palette's integrity: the two direction ends, slack and the
     /// neutral must stay four tellable-apart fills. Walks the actual match
     /// expression rather than a list of expected colours, so a new state
-    /// cannot ship unexamined. (Constant-ground contrast floors retired with
-    /// the chart's cream land — over satellite imagery the ink outline is the
-    /// legibility guarantee, asserted above.)
+    /// cannot ship unexamined. Contrast against a constant ground is not
+    /// assertable here — satellite imagery is arbitrary, so the ink outline
+    /// is the legibility guarantee, asserted above.
     func testPinStatePaletteStaysFourDistinctFills() throws {
         let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]

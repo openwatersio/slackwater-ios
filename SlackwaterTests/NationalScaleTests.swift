@@ -157,7 +157,7 @@ final class NationalScaleTests: XCTestCase {
     /// rebuilt this whole pass from scratch on every single pin focus
     /// (`.id(mapFocusToken)` remounts `MapViewRepresentable` on every tap) —
     /// paid again and again in one map session, not once. `PinFeaturesCache`
-    /// (`MapScreen.swift`) now caches across those remounts, invalidating on
+    /// (`MapPinState.swift`) now caches across those remounts, invalidating on
     /// a real `chsTones` change or a moved time bucket; this test forces a
     /// cold build via `resetForTesting()` so it keeps measuring the one-call
     /// cost that regressed, not a cache hit.
