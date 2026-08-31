@@ -1059,48 +1059,18 @@ struct TimelineCanvas: View {
                     startPoint: CGPoint(x: 0, y: thresholdY),
                     endPoint: CGPoint(x: 0, y: positive ? geo.curTop : geo.curBottom)))
             }
-            for speed in [-data.slackThreshold, data.slackThreshold] {
-                var threshold = Path()
-                threshold.move(to: CGPoint(x: 0, y: geo.curY(speed)))
-                threshold.addLine(to: CGPoint(x: data.totalWidth, y: geo.curY(speed)))
-                ctx.stroke(threshold, with: .color(SN.go.opacity(0.85)), lineWidth: 1)
-            }
-            for segment in slackFillSegments(data.currentPoints, threshold: data.slackThreshold) {
-                var slackArea = Path()
-                for (i, point) in segment.enumerated() {
-                    let p = CGPoint(x: data.x(point.time), y: geo.curY(point.speed))
-                    i == 0 ? slackArea.move(to: p) : slackArea.addLine(to: p)
-                }
-                slackArea.addLine(to: CGPoint(x: data.x(segment.last!.time), y: geo.zeroY))
-                slackArea.addLine(to: CGPoint(x: data.x(segment[0].time), y: geo.zeroY))
-                slackArea.closeSubpath()
-                let startX = data.x(segment[0].time)
-                let endX = data.x(segment.last!.time)
-                // A sine envelope avoids a bright rectangular plateau while
-                // retaining enough green through short usable windows.
-                ctx.fill(slackArea, with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: SN.go.opacity(0), location: 0),
-                        .init(color: SN.go.opacity(0.37), location: 0.125),
-                        .init(color: SN.go.opacity(0.68), location: 0.25),
-                        .init(color: SN.go.opacity(0.89), location: 0.375),
-                        .init(color: SN.go.opacity(0.98), location: 0.5),
-                        .init(color: SN.go.opacity(0.89), location: 0.625),
-                        .init(color: SN.go.opacity(0.68), location: 0.75),
-                        .init(color: SN.go.opacity(0.37), location: 0.875),
-                        .init(color: SN.go.opacity(0), location: 1),
-                    ]),
-                    startPoint: CGPoint(x: startX, y: 0), endPoint: CGPoint(x: endX, y: 0)))
-            }
-            for window in data.slackWindows {
-                for time in [window.start, window.end] {
-                    var rail = Path()
-                    rail.move(to: CGPoint(x: data.x(time), y: geo.curBottom))
-                    rail.addLine(to: CGPoint(x: data.x(time), y: geo.curY(data.velocityAt(time))))
-                    ctx.stroke(rail, with: .color(SN.go.opacity(0.7)),
-                               style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                }
-            }
+            // Slack reads as SPACE, not as area under the curve. The old
+            // fill was bounded above by the sine, so an identical window drew
+            // a tall lens at one station and a sliver at the next. Now it is
+            // one flat green strip at +/-threshold across the WHOLE width:
+            // the slack-speed setting, visible everywhere at once. WHEN the
+            // water is actually slack is carried by the curve itself, below.
+            // ponytail: opacity is an eyeball value; tune here.
+            let bandGreen = 0.56
+            let bandTop = geo.curY(data.slackThreshold)
+            let bandHeight = geo.curY(-data.slackThreshold) - bandTop
+            ctx.fill(Path(CGRect(x: 0, y: bandTop, width: data.totalWidth, height: bandHeight)),
+                     with: .color(SN.go.opacity(bandGreen)))
         } else {
             var area = line
             area.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
@@ -1120,6 +1090,27 @@ struct TimelineCanvas: View {
         }
         ctx.stroke(line, with: .color(Color(hex: 0xDFEEE0)),
                    style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        // The window is a property of the WATER, so it is drawn on the curve
+        // rather than behind it: the pale track goes slack-green and thickens
+        // between the crossings. The band behind says what "slack" is set to;
+        // this says when it is happening, and the two can't drift apart
+        // because both come off `slackThreshold`.
+        // ponytail: colour/width are eyeball values; tune here.
+        let slackInk = SN.go, slackInkWidth: CGFloat = 4
+        for window in data.slackWindows {
+            var run = Path()
+            // Endpoints are interpolated crossings, so the green starts and
+            // ends exactly on the band edge instead of at the nearest sample.
+            run.move(to: CGPoint(x: data.x(window.start),
+                                 y: geo.curY(data.velocityAt(window.start))))
+            for p in data.currentPoints where p.time > window.start && p.time < window.end {
+                run.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            run.addLine(to: CGPoint(x: data.x(window.end),
+                                    y: geo.curY(data.velocityAt(window.end))))
+            ctx.stroke(run, with: .color(slackInk),
+                       style: StrokeStyle(lineWidth: slackInkWidth, lineCap: .round, lineJoin: .round))
+        }
         let margin = 0.3 * 3600
         let filteredEvents = data.currentEvents.filter { e in
             e.time >= data.start.addingTimeInterval(margin)
@@ -1147,9 +1138,15 @@ struct TimelineCanvas: View {
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
                 }
                 if !suppressesSlackLabel(data.slackWindows, at: e.time) {
+                    // Same weight as the max times under the track. The 18pt
+                    // semibold foam this replaces was sized when the exact
+                    // zero crossing was the answer; the green band and the
+                    // thickened curve now carry the window, which is what you
+                    // actually plan around, so the instant demotes to a
+                    // caption instead of shouting over its own window.
                     ctx.draw(Text(chartTime(e.time, data.tz))
-                                .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(SN.foam),
+                                .font(.system(size: 12).monospaced())
+                                .foregroundStyle(.white.opacity(0.6)),
                              at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
                 }
             case .maxFlood, .maxEbb:
