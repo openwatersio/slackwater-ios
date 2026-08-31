@@ -392,6 +392,17 @@ struct StationListView: View {
     /// rather than inline because RootView's pre-gate handoff replays the URL
     /// through it on first appear.
     private func handleDeepLink(_ url: URL) {
+        // A universal link arrives here too, not through a separate callback.
+        if let link = stationLink(from: url) {
+            // Resolving a slug to a station needs the published slug table
+            // bundled - station-metadata ships it as data/slugs.json, and the
+            // generators here are still on the release before it. Until that
+            // lands there is nothing to look up, and the app simply opens where
+            // it was: no crash, no wrong station, and the link is no longer
+            // handed to Safari.
+            _ = link
+            return
+        }
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         case "premium": showWidgetsGallery = true

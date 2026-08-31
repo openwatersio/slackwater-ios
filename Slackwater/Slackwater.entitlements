@@ -8,5 +8,19 @@
 	<array>
 		<string>group.org.openwaters.slackwater</string>
 	</array>
+	<!-- Universal links. The matching apple-app-site-association is served by
+	     the slackwater.xyz Worker; neither half does anything without the
+	     other. Apex only: the Worker owns the apex and www as custom domains,
+	     and a shared link is written against the apex.
+
+	     Release signs manually (project.yml sets CODE_SIGN_STYLE: Manual with
+	     PROVISIONING_PROFILE_SPECIFIER "Slackwater App Store"), so this key
+	     does not take effect until Associated Domains is enabled on the App ID
+	     and that profile is regenerated. Until then a Release build fails to
+	     sign rather than silently shipping without it. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:slackwater.xyz</string>
+	</array>
 </dict>
 </plist>
