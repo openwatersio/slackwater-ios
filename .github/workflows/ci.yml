@@ -16,11 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Gates the Studio lane below. There is ONE self-hosted macOS runner, shared
-  # with the scheduled jobs and with everyone's local ./scripts/test.sh, and the
-  # lane is ~15 minutes — so a docs-only change that books it puts every other
-  # session in a queue behind it. Measured: PRs whose entire diff was CLAUDE.md,
-  # or two markdown files, each took a full run.
+  # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
+  # public-repo macOS pools can queue at peak — a docs-only change should not
+  # book one. Measured: PRs whose entire diff was CLAUDE.md, or two markdown
+  # files, each took a full run.
   #
   # This is a JOB-level gate, not `on: paths-ignore`, for two reasons: the free
   # Ubuntu lane below should still run, and a workflow that never starts leaves
@@ -139,54 +138,51 @@ jobs:
   app:
     name: App tests
     needs: changes
-    if: needs.changes.outputs.app == 'true'
-    # Self-hosted on the Mac Studio. GitHub-hosted macOS bills at 10x on a
-    # private repo, and the fast lane is ~15 min of wall clock — about 150
-    # billable minutes, which would exhaust the monthly allowance in roughly
-    # thirteen runs. The Studio is already the always-on scheduled-job host
-    # and keeps a warm SPM cache. See CONTRIBUTING.md.
-    runs-on: [self-hosted, macOS]
+    # `&& false` disables the lane while the repo is private: GitHub-hosted
+    # macOS bills at 10x there, and the fast lane is ~15 min of wall clock —
+    # about 150 billable minutes per run. Once the repo is public, hosted
+    # runners are free: delete that one line and the lane runs.
+    if: >-
+      needs.changes.outputs.app == 'true'
+      && false
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The runner is the Mac we develop on, so CI gets its own simulator
-      # devices — same device types, different instances. Sharing a device with
-      # a local `xcodebuild` run makes the two SIGKILL each other's test runner,
-      # which reads as a real test failure and is not one.
-      # Created on first run; kept afterwards. The iPad device is still created
-      # here even though the fast lane no longer uses it: a `--full` run driven
-      # by hand on this machine expects it to exist.
-      - name: CI-only simulators
-        run: |
-          latest_ios=$(xcrun simctl list runtimes | sed -n 's/^\(iOS [0-9.]*\).*/\1/p' | tail -1)
-          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPhone' \
-            || xcrun simctl create 'SlackwaterCI-iPhone' 'iPhone 17'
-          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPad' \
-            || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
+      - run: brew install xcodegen
 
-      # Runs xcodegen, then the fast suite on the iPhone simulator. Two things
-      # stay out of this lane and ride `scripts/test.sh --full`, run by hand
-      # before an upload: the live-IWLS UI tests (they skip themselves unless
-      # SLACKWATER_FULL is set) and the iPad leg.
+      # MapLibre is a binary download, not a compile — the cache saves the
+      # fetch, not a build. The generated xcodeproj and its Package.resolved
+      # are not committed, so key on project.yml, where the package pins live.
+      - uses: actions/cache@v6
+        with:
+          path: build/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # Runs xcodegen, then the fast suite on the image's stock iPhone
+      # simulator. Two things stay out of this lane and ride
+      # `scripts/test.sh --full`, run by hand before an upload: the live-IWLS
+      # UI tests (they skip themselves unless SLACKWATER_FULL is set) and the
+      # iPad leg. SLACKWATER_SIMS must name ONE device — it overrides the
+      # script's fast/full device list outright.
       #
-      # SLACKWATER_SIMS must name ONE device here. It overrides the script's own
-      # fast/full device list outright, so leaving the iPad in it would silently
-      # undo the split and keep booking the shared runner for ~34 minutes.
+      # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
+      # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
+      # image's default Xcode ever drifts from what the project needs, pin
+      # DEVELOPER_DIR here.
       - run: ./scripts/test.sh
         env:
-          SLACKWATER_SIMS: SlackwaterCI-iPhone
+          SLACKWATER_SIMS: iPhone 17
+          SLACKWATER_WORKERS: 1
 
-      # `cancel-in-progress` above kills the step's process group, but
-      # xcodebuild's helpers detach into their own groups and survive — still
-      # holding the inherited descriptor that locks /tmp/slackwater-test.lock,
-      # so the next run queues behind a ghost of the cancelled one. Kill only
-      # lock holders whose working directory is this checkout: a local run (or
-      # waiter) on this machine has a different cwd and is left alone.
-      - name: Release the test lock on cancellation
-        if: cancelled()
-        run: |
-          for pid in $(lsof -t /tmp/slackwater-test.lock 2>/dev/null); do
-            if lsof -a -p "$pid" -d cwd 2>/dev/null | grep -qF "$GITHUB_WORKSPACE"; then
-              kill -9 "$pid" 2>/dev/null || true
-            fi
-          done
+      # There is no runner to ssh into, so the evidence has to travel.
+      - name: Upload screenshots and results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence
+          path: |
+            /tmp/slackwater-shots
+            build/*.xcresult
+          if-no-files-found: ignore

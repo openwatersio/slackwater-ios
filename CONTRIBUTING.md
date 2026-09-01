@@ -89,13 +89,13 @@ Non-visual changes do not need screenshots.
 
 Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
 
-| Job             | Where           | What it does                                                  |
-| --------------- | --------------- | ------------------------------------------------------------- |
-| What changed    | GitHub-hosted   | Decides whether the app lane needs to run                     |
-| Data generators | GitHub-hosted   | Regenerates the bundles and checks the committed copies match |
-| App tests       | Self-hosted Mac | `scripts/test.sh` on the iPhone simulator                     |
+| Job             | Where         | What it does                                                  |
+| --------------- | ------------- | ------------------------------------------------------------- |
+| What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
+| Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
+| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator                     |
 
-The macOS lane is self-hosted because GitHub-hosted macOS bills at 10× on a private repo, which would exhaust the monthly allowance in about thirteen runs. It is the same machine used for local test runs, so expect queuing — and see `CLAUDE.md` for what that contention does to live-network tests.
+Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 
 `gen-chs-stations.mjs` stays out of CI because it is the only generator that needs the network; its artifact is trusted as committed.
 
