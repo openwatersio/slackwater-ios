@@ -104,8 +104,12 @@ struct StationCard<Trailing: View>: View {
             ZStack {
                 SN.cardFill
                 // Top inset clears the two identity rows and the current
-                // reading, so the curve owns the card's lower band.
-                if let graph { graph.padding(.top, 54) }
+                // reading, so the curve owns the card's lower band. The
+                // negative horizontal padding renders the canvas 3pt wider
+                // than the card each side; the clipShape trims it, so the
+                // curve exits through the edge on its own slope no matter
+                // where any builder's last sample lands.
+                if let graph { graph.padding(.top, 54).padding(.horizontal, -3) }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -549,6 +553,22 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
     func value(_ h: Double) -> Double { sin((h + phase) / swing * .pi) * scale + offset }
     let extremeHours = (-2...3).map { swing * (0.5 + Double($0)) - phase }
         .filter { (-backH...forwardH).contains($0) }
+    // Analytic slack windows for the sine: |A·sin| = threshold solves to a
+    // half-width of swing/π·asin(t/A) around each zero crossing. Spelled as
+    // a plain loop with explicit types — the closure-chain form sent the
+    // type-checker into the weeds.
+    var windows: [StationCardGraph.Window] = []
+    if includesZero {
+        let ratio: Double = min(1.0, defaultSlackThresholdKn / scale)
+        let halfW: Double = swing / Double.pi * asin(ratio)
+        for k in -1...3 {
+            let z: Double = swing * Double(k) - phase
+            guard z >= -backH, z <= forwardH else { continue }
+            let start = now.addingTimeInterval((z - halfW) * 3600)
+            let end = now.addingTimeInterval((z + halfW) * 3600)
+            windows.append(StationCardGraph.Window(start: start, end: end))
+        }
+    }
     return StationCardGraph(
         points: stride(from: -backH, through: forwardH, by: 0.25).map {
             .init(time: now.addingTimeInterval($0 * 3600), value: value($0))
@@ -563,7 +583,8 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
                          deg: includesZero ? (value(h) > offset ? 140 : 320) : nil)
         },
         now: now,
-        includesZero: includesZero)
+        includesZero: includesZero,
+        windows: windows)
 }
 
 #Preview {

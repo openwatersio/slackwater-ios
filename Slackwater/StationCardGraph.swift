@@ -16,6 +16,7 @@ struct StationCardGraph: View {
     /// Sampling interval for the builders' point series.
     static let sampleStep: TimeInterval = 600
 
+
     /// Shorthands for the theme's curve tokens (SN doc comment: the Neaps
     /// dark-mode palette, full saturation for the card's hero element).
     private static let line = SN.graphLine
@@ -44,24 +45,23 @@ struct StationCardGraph: View {
     /// The line left of now, and the labels of moments already passed.
     private static let pastLineOpacity = 0.35
     private static let pastLabelFade = 0.45
-    /// Extreme and slack dots; the now dot is its own size.
+    /// Extreme dots; the now dot is its own size.
     private static let dotRadius: CGFloat = 2.5
     private static let nowDotDiameter: CGFloat = 7
     /// The background-punched ring beyond a dot's edge.
     private static let haloGap: CGFloat = 2.5
-    /// An extreme closer than this to a card edge keeps its dot but drops
-    /// its labels; slack axis times use their own, tighter margin.
+    /// An extreme closer than this to a card edge keeps its dot and axis
+    /// time but drops its value label; every axis time — extreme or slack
+    /// crossing — uses the tighter margin.
     private static let labelEdgeMargin: CGFloat = 34
     private static let axisEdgeMargin: CGFloat = 20
     /// The pointer icon's distance from the value on the band.
     private static let pointerOffset: CGFloat = 18
-    private static let valueFontSize: CGFloat = 13
-    private static let pointerFontSize: CGFloat = 13
-    private static let tideTimeFontSize: CGFloat = 10
-    private static let slackTimeFontSize: CGFloat = 9
+    private static let valueFontSize: CGFloat = 15
+    private static let pointerFontSize: CGFloat = 15
+    private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
-    private static let tideTimeBaseline: CGFloat = 10
-    private static let slackTimeBaseline: CGFloat = 8
+    private static let timeBaseline: CGFloat = 10
 
     struct Point {
         let time: Date
@@ -73,8 +73,8 @@ struct StationCardGraph: View {
         let value: Double
         let valueText: String
         let timeText: String
-        /// High tide / max flood (vs low / max ebb) — picks the label color
-        /// (teal vs amber) and the pointer direction.
+        /// High tide / max flood (vs low / max ebb) — picks the dot and
+        /// pointer tint (teal vs amber) and the pointer direction.
         let high: Bool
         /// A current extreme's set bearing. When present the pointer is the
         /// app's CompassArrow (↑ rotated to the bearing, "water goes this
@@ -92,6 +92,15 @@ struct StationCardGraph: View {
     /// Formats the slack-crossing times computed inside the canvas; the
     /// extremes arrive with their times already formatted.
     var tz: TimeZone = .current
+    /// The usable slack windows (current-charts spec §4), computed by the
+    /// builders from the SHARED `slackWindow` predicate against the
+    /// effective threshold — never re-derived in the canvas (§6.1). Only
+    /// signed current curves carry them.
+    struct Window {
+        let start: Date
+        let end: Date
+    }
+    var windows: [Window] = []
 
     var body: some View {
         Canvas { context, size in
@@ -150,9 +159,6 @@ struct StationCardGraph: View {
                     ]),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: size.height)))
-                // The slack datum, dotted like Neaps' zero reference line —
-                // and the one mark that says "current, not tide" at a glance.
-                referenceLine(at: baseY)
             } else {
                 // A tide's intensity is the water level itself, so the fade
                 // stays vertical (Neaps TideGraphChart): strongest at the
@@ -213,16 +219,22 @@ struct StationCardGraph: View {
                 let text = SN.foam.opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
                 let isCurrent = e.deg != nil
-                // Tide extremes are moments (a dot on the curve, a time on
-                // the axis). A current extreme is just the peak of a run of
-                // moving water — the slack dots already mark the moments
-                // that matter — so it keeps only its value and set arrow.
                 if !isCurrent {
                     dot(at: dotAt, color: tint)
                 }
-                // An extreme hugging the card edge keeps its dot but drops
-                // its labels — a shifted label detaches from its dot and
-                // reads as belonging to the wrong spot.
+                // The extreme's time joins the bottom axis under the axis's
+                // own edge rule — the same one the slack crossing times use.
+                if !isCurrent, dotAt.x >= Self.axisEdgeMargin,
+                   dotAt.x <= size.width - Self.axisEdgeMargin {
+                    context.draw(Text(e.timeText)
+                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(text),
+                                 at: CGPoint(x: dotAt.x, y: size.height - Self.timeBaseline))
+                }
+                // An extreme hugging the card edge keeps its dot and axis
+                // time but drops its value label — a shifted label detaches
+                // from its dot and reads as belonging to the wrong spot.
                 guard dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
                 // The values form one rail across the vertical middle, with
@@ -231,15 +243,12 @@ struct StationCardGraph: View {
                 let labelX = dotAt.x
                 // The band rides the zero line on a signed curve — flood and
                 // ebb rarely peak equally, so zero is not the canvas middle.
-                let bandY = includesZero ? baseY : size.height / 2
-                let pointerAt = CGPoint(x: labelX,
-                                        y: bandY + (e.high ? -Self.pointerOffset : Self.pointerOffset))
+                let bandY = includesZero ? baseY : plotHeight / 2
                 if let deg = e.deg {
-                    // Current extreme: the set arrow (CompassArrow's idea,
-                    // ↑ rotated to the bearing), not the tide high/low mark.
                     // The SF Symbol, not the "↑" text glyph — a text arrow
-                    // at the same point size renders visibly smaller than
-                    // the sibling arrow.up.to.line symbol.
+                    // at the same point size renders visibly smaller.
+                    let pointerAt = CGPoint(x: labelX,
+                                            y: bandY + (e.high ? -Self.pointerOffset : Self.pointerOffset))
                     var rotated = context
                     rotated.translateBy(x: pointerAt.x, y: pointerAt.y)
                     rotated.rotate(by: .degrees(deg))
@@ -247,29 +256,65 @@ struct StationCardGraph: View {
                                     .font(.system(size: Self.pointerFontSize, weight: .bold))
                                     .foregroundStyle(tint),
                                  at: .zero)
-                } else {
-                    context.draw(Text(Image(systemName: e.high ? "arrow.up.to.line" : "arrow.down.to.line"))
-                                    .font(.system(size: Self.pointerFontSize, weight: .bold))
-                                    .foregroundStyle(tint),
-                                 at: pointerAt)
                 }
                 context.draw(Text(e.valueText)
                                 .font(.system(size: Self.valueFontSize, weight: .bold).monospacedDigit())
                                 .foregroundStyle(text),
                              at: CGPoint(x: labelX, y: bandY))
-                if !isCurrent {
-                    context.draw(Text(e.timeText)
-                                    .font(.system(size: Self.tideTimeFontSize).monospacedDigit())
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(text),
-                                 at: CGPoint(x: labelX, y: size.height - Self.tideTimeBaseline))
-                }
             }
 
-            // Slack: a green dot at each zero crossing (interpolated between
-            // the bracketing samples) — the moment this app is named after,
-            // in the green the SLACK pill already speaks
-            // (testSlackIsGreenWhereverItAppears).
+            // Slack: the line itself turns the go colour for each window's
+            // duration — the run computed by the builders from the SHARED
+            // slackWindow predicate, never re-derived here — wearing the
+            // same halo the dots wear. Each run is a REAL sub-path of the
+            // curve (interpolated endpoints), stroked round-capped: the
+            // wider round-capped eraser under it is what leaves a rounded
+            // clear seam at both ends instead of a slanted clip cut.
+            func valueAt(_ t: Date) -> Double {
+                var prev = points[0]
+                for p in points {
+                    if p.time >= t {
+                        let span = p.time.timeIntervalSince(prev.time)
+                        guard span > 0 else { return p.value }
+                        let f = t.timeIntervalSince(prev.time) / span
+                        return prev.value + (p.value - prev.value) * f
+                    }
+                    prev = p
+                }
+                return points[points.count - 1].value
+            }
+            for w in windows {
+                guard w.end > w.start else { continue }
+                var seg = Path()
+                seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
+                for p in points where p.time > w.start && p.time < w.end {
+                    seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+                }
+                seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
+
+                var eraser = context
+                eraser.blendMode = .destinationOut
+                eraser.stroke(seg, with: .color(.black),
+                              style: StrokeStyle(lineWidth: Self.lineWidth + Self.haloGap * 2,
+                                                 lineCap: .round))
+                // The past/future fade still splits by clip — an opacity
+                // seam mid-run, never a shape cut. Clips reach one stroke
+                // width past the ends so they can't shave the round caps.
+                func strokeGo(from a: CGFloat, to b: CGFloat, opacity: Double) {
+                    guard b > a else { return }
+                    var c = context
+                    c.clip(to: Path(CGRect(x: a, y: 0, width: b - a, height: size.height)))
+                    c.stroke(seg, with: .color(SN.go.opacity(opacity)),
+                             style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
+                }
+                let x0 = x(w.start), x1 = x(w.end)
+                strokeGo(from: x0 - Self.lineWidth, to: min(x1 + Self.lineWidth, nowX),
+                         opacity: Self.pastLineOpacity)
+                strokeGo(from: max(x0 - Self.lineWidth, nowX), to: x1 + Self.lineWidth,
+                         opacity: 1)
+            }
+
+            // Each crossing's time still joins the bottom axis.
             if includesZero {
                 for i in 1..<points.count {
                     let a = points[i - 1], b = points[i]
@@ -279,15 +324,13 @@ struct StationCardGraph: View {
                     let when = a.time.addingTimeInterval(
                         b.time.timeIntervalSince(a.time) * TimeInterval(f))
                     let fade = when < now ? Self.pastLabelFade : 1.0
-                    dot(at: CGPoint(x: cx, y: baseY), color: SN.go.opacity(fade))
-                    // Its time joins the bottom axis; the green dot above it
-                    // already says slack.
                     guard cx >= Self.axisEdgeMargin,
                           cx <= size.width - Self.axisEdgeMargin else { continue }
                     context.draw(Text(cardTime(when, tz))
-                                    .font(.system(size: Self.slackTimeFontSize).monospacedDigit())
+                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
+                                    .fontWeight(.medium)
                                     .foregroundStyle(SN.foam.opacity(fade)),
-                                 at: CGPoint(x: cx, y: size.height - Self.slackTimeBaseline))
+                                 at: CGPoint(x: cx, y: size.height - Self.timeBaseline))
                 }
             }
 
@@ -307,6 +350,22 @@ struct StationCardGraph: View {
         .accessibilityValue(extremes.map { "\($0.valueText) at \($0.timeText)" }
             .joined(separator: ", "))
     }
+}
+
+/// The card's slack windows: one per slack event, from the SHARED
+/// `slackWindow` predicate against the effective threshold. Touching or
+/// overlapping windows merge into one run (spec §4.3).
+func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [StationCardGraph.Window] {
+    var windows: [StationCardGraph.Window] = []
+    for slack in slacks {
+        guard let w = slackWindow(points, around: slack, threshold: threshold) else { continue }
+        if let last = windows.last, w.start <= last.end {
+            windows[windows.count - 1] = .init(start: last.start, end: max(last.end, w.end))
+        } else {
+            windows.append(.init(start: w.start, end: w.end))
+        }
+    }
+    return windows
 }
 
 extension TideStationRecord {
@@ -334,10 +393,11 @@ extension CurrentStationRecord {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let s = engineStation
+        let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
+        let events = s.events(from: start, to: end)
         return StationCardGraph(
-            points: s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
-                .map { .init(time: $0.time, value: $0.speed) },
-            extremes: s.events(from: start, to: end)
+            points: raw.map { .init(time: $0.time, value: $0.speed) },
+            extremes: events
                 .filter { $0.kind != .slack }
                 .map {
                     .init(time: $0.time, value: $0.speed,
@@ -348,7 +408,9 @@ extension CurrentStationRecord {
                 },
             now: now,
             includesZero: true,
-            tz: tz)
+            tz: tz,
+            windows: cardWindows(points: raw,
+                                 slacks: events.filter { $0.kind == .slack }.map(\.time)))
     }
 }
 
@@ -357,11 +419,12 @@ extension ChsOnlineWindow {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let tz = TimeZone(identifier: timezone) ?? .current
+        let raw = points.filter { $0.time >= start && $0.time <= end }
+        let events = sampleEvents(points).filter { $0.time >= start && $0.time <= end }
         return StationCardGraph(
-            points: points.filter { $0.time >= start && $0.time <= end }
-                .map { .init(time: $0.time, value: $0.speed) },
-            extremes: sampleEvents(points)
-                .filter { $0.kind != .slack && $0.time >= start && $0.time <= end }
+            points: raw.map { .init(time: $0.time, value: $0.speed) },
+            extremes: events
+                .filter { $0.kind != .slack }
                 .map {
                     .init(time: $0.time, value: $0.speed,
                           valueText: "\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
@@ -371,6 +434,8 @@ extension ChsOnlineWindow {
                 },
             now: now,
             includesZero: true,
-            tz: tz)
+            tz: tz,
+            windows: cardWindows(points: raw,
+                                 slacks: events.filter { $0.kind == .slack }.map(\.time)))
     }
 }
