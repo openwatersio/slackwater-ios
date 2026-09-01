@@ -87,8 +87,15 @@ extension TypeScaleTests {
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
         // See blind spot 2 above — "File.swift:declaringSymbol".
         let knownIndirections: Set<String> = [
-            "StationCard.swift:nextLine",
             "StationCard.swift:reading",
+            // The card curve: the builders format extreme/axis strings whose
+            // one renderer (the Canvas draw code) applies the mono trait.
+            "StationCardGraph.swift:cardGraph",
+            // previewGraph and the #Preview cards feed that same renderer
+            // with synthetic data. The #Preview label closures resolve here
+            // too: a `#Preview {` line is no declaration, so the walk climbs
+            // to the nearest one above it — previewGraph.
+            "StationCard.swift:previewGraph",
             "TideDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",

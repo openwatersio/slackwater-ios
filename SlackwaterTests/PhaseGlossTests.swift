@@ -32,11 +32,15 @@ final class PhaseGlossTests: XCTestCase {
             XCTAssertTrue(try repoSource("Slackwater/\(hero)").contains(".gloss"),
                           "\(hero): detail hero lost its plain-word gloss (#59)")
         }
-        // Both list cards (OnlineGateCardView, CurrentCardView) lead with
-        // arrow + cardinal.
+        // The list cards lead with arrow + cardinal, rendered once for every
+        // card kind by ConditionsItem's `.current` case — a single call site
+        // by design, so this asserts presence, not a count.
         let cards = try repoSource("Slackwater/StationCard.swift")
-        XCTAssertGreaterThanOrEqual(cards.components(separatedBy: "compass16(").count - 1, 2,
-                                    "list cards lost their direction-first cardinal (#59)")
+        XCTAssertTrue(cards.contains("compass16("),
+                      "list cards lost their direction-first cardinal (#59)")
+        XCTAssertTrue(cards.contains("struct ConditionsItem"),
+                      "the single shared reading renderer is gone — if the cards' "
+                      + "direction rows have split up again, restore the ≥2 count here")
         XCTAssertTrue(try repoSource("Slackwater/TimelineStrip.swift").contains("compass16("),
                       "schedule pills lost their direction-first cardinal (#59)")
     }
