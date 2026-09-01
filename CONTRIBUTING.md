@@ -47,7 +47,7 @@ gh pr create --fill
 
 Before you open it, run `./scripts/test.sh` and say in the description what you changed and why. Small PRs get reviewed faster. Rebase or squash rather than merge-commit, and never force-push `main` — your own branches, freely.
 
-**Docs-only changes don't need a PR.** CI's macOS lane is a single shared machine, and a PR books about fifteen minutes of it. If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
+**Docs-only changes don't need a PR.** If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
 
 ```sh
 git push -u origin docs/<topic>

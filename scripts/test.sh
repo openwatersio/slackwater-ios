@@ -57,11 +57,10 @@ mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 
 xcodegen generate
 
-# SLACKWATER_SIMS overrides the device list outright — CI names one device
-# (see .github/workflows/ci.yml), and any machine shared between sessions can
-# use it to keep runs off each other's devices: two xcodebuild runs booting the
-# same simulator device SIGKILL each other's test runner, and the failures read
-# as "Test crashed with signal kill" with results bleeding across sessions.
+# SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
+# ONE device so the fast lane stays iPhone-only (see .github/workflows/ci.yml).
+# It is not concurrency protection: separate devices don't stop concurrent runs
+# from killing each other (see the lock comment at the top), the lock does.
 #
 # Fast is iPhone-only. Measured on build 27: the iPad leg costs 1169 s and is
 # the ONLY place three tests run (testM44IPadSplit,
