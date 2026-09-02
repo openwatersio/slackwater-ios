@@ -129,8 +129,9 @@ struct StationCard<Trailing: View>: View {
 ///
 /// `.tide`: current height plus the rising/falling indicator.
 ///
-/// `.current`: signed velocity — speed + set arrow + Flooding/Ebbing, or the
-/// green SLACK pill at slack. `tilde` marks a provisional (60-day) reading.
+/// `.current`: signed velocity — speed + set arrow + word, Slack in the go
+/// colour inside a window; `countdownTo` swaps the speed for a timer on
+/// counting surfaces. `tilde` marks a provisional (60-day) reading.
 ///
 /// `.gate`: a derived gate's phase pill — the web's words, flood / ebb /
 /// slack; no speed exists to show (`DerivedGateCardState`). Slack takes
@@ -140,7 +141,7 @@ struct StationCard<Trailing: View>: View {
 struct ConditionsItem: View {
     enum Reading {
         case tide(CardState, imperial: Bool)
-        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false)
+        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, countdownTo: Date? = nil)
         case gate(DerivedPhase)
     }
     let reading: Reading
@@ -160,32 +161,46 @@ struct ConditionsItem: View {
                 Text(state.rising ? "▲" : "▼").font(.caption)
             }.foregroundStyle(tint)
 
-        case .current(let signed, let deg, let unit, let tilde):
+        case .current(let signed, let deg, let unit, let tilde, let countdownTo):
+            // Always the speed and the set (current-charts §15.2): a pill
+            // states a phase without either. Inside a window a counting
+            // surface (the widget) shows the time to the closing instead of
+            // the speed (§15.3); the list passes no countdown.
             let phase = currentPhase(signed: signed)
-            if phase == .slack {
-                // SN.go, not a neutral chip — see the `.gate` comment above.
-                Text("SLACK")
-                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                    .foregroundStyle(SN.navyDeep)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(SN.go, in: Capsule())
+            if let end = countdownTo {
+                if end.timeIntervalSinceNow > 7_200 {
+                    Text("> 2 hrs")
+                        .font(.title3.monospacedDigit()).fontWeight(.bold)
+                        .foregroundStyle(.white)
+                } else {
+                    Text(timerInterval: Date.now...end, countsDown: true)
+                        .font(.title3.monospacedDigit()).fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
             } else {
                 (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
                     .font(.title3.monospacedDigit()).fontWeight(.bold)
                  + Text(" \(speedUnitLabel(unit))")
                     .font(.body))
                     .foregroundStyle(.white)
-                // Direction-first (#59): a novice reads the arrow + cardinal;
-                // the flood/ebb word demotes to a dimmer label. Kept as its
-                // own Text — the screenshot tests match its exact label.
-                let tint = phase == .flood ? SN.flood : SN.ebb
-                HStack(spacing: 4) {
-                    Text(phase.word).font(.caption2)
-                        .foregroundStyle(tint.opacity(0.6))
+            }
+            // Direction-first (#59): a novice reads the arrow + cardinal;
+            // the word demotes to a dimmer label. "Slack" wears the go
+            // colour — the same meaning it has everywhere else. Under
+            // 0.05 kn the set gives way to a neutral mark of the same
+            // footprint so the header never resizes.
+            let tint = phase == .slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
+            HStack(spacing: 4) {
+                Text(phase.word).font(.caption2)
+                    .foregroundStyle(tint.opacity(phase == .slack ? 1 : 0.6))
+                if abs(signed) < 0.05 {
+                    Text("•").font(.caption2).foregroundStyle(SN.foam.opacity(0.4))
+                        .frame(width: 30)
+                } else {
                     Text(compass16(deg)).font(.caption2).foregroundStyle(tint)
                     CompassArrow(deg: deg).font(.caption2).foregroundStyle(tint)
-                }.foregroundStyle(tint)
-            }
+                }
+            }.foregroundStyle(tint)
         case .gate(let phase):
             Text(phase == .flood ? "FLOOD" : phase == .ebb ? "EBB" : "SLACK")
                 .font(.caption2.monospaced().weight(.medium)).tracking(1)
