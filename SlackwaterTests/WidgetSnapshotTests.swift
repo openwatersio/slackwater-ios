@@ -223,6 +223,39 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(end.timeIntervalSince1970, window.end.timeIntervalSince1970, accuracy: 1.0)
     }
 
+    /// A widget explicitly configured to a CHS tide port builds that
+    /// station's own card, not the current-location fallback — the data-path
+    /// half of the widget's Station-picker bug: a chosen station must resolve
+    /// to itself and carry no location mark.
+    func testChosenChsTidePortBuildsItsOwnWidgetCard() throws {
+        let id = "chs-narvaez-bay"
+        guard ChsModelStore.load(id) == nil else {
+            throw XCTSkip("\(id) already has a fitted model on this device")
+        }
+        let info = try XCTUnwrap(ChsStationInfo.all.first { $0.id == id })
+        let model = ChsModel(
+            stationID: id, iwlsID: "iwls-test", iwlsName: info.name,
+            fittedAt: .now, fitStartMs: 0, fitEndMs: 1,
+            offset: 1, rms: 0,
+            constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
+        try ChsModelStore.save(model)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.url(id)) }
+
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id))
+        guard case .tide = record else {
+            return XCTFail("expected a .tide record for a CHS tide port")
+        }
+        let card = WidgetCard.build(record, now: Date(timeIntervalSince1970: 1_755_800_000))
+        XCTAssertEqual(card.name, info.name)
+        XCTAssertFalse(card.locationMark)
+        XCTAssertNotNil(card.graph)
+        guard case .tide = card.reading else {
+            return XCTFail("expected a .tide reading")
+        }
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(id), id,
+                       "a concrete choice must never resolve to the current location")
+    }
+
     func testSparklineShape() {
         let s = WidgetSnapshot.build(friday, now: Date())
         XCTAssertEqual(s.sparkline.count, 97)
