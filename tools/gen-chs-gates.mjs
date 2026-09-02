@@ -17,7 +17,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { currentGates as selectCurrentGates } from "@sailingnaturali/station-corrections";
+import { currentGates as selectCurrentGates } from "@openwaters/station-metadata";
 import { here, stationData } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");

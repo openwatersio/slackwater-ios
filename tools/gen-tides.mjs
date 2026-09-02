@@ -51,7 +51,7 @@
  * definition.
  *
  * NAMING. Same enrichment path as the Salish bundle: names, contexts and
- * aliases come from @sailingnaturali/station-corrections so the iOS app, the
+ * aliases come from @openwaters/station-metadata so the iOS app, the
  * web app and the MCP fleet all say the same thing. Two guards the
  * Salish-sized bundle never needed, both in NORTH_AMERICA/upstreamRegion
  * below: the resolver's fourth tier is "nearest place from the bundled
@@ -202,7 +202,7 @@ const untrail = (name, ...regions) => {
   return name;
 };
 
-/** The state/province code a region line ends in — "~LaSalle, ON" -> "ON". */
+/** The state/province code a region line ends in — "LaSalle, ON" -> "ON". */
 const trailingCode = (region) => region.match(/\b([A-Z]{2})$/)?.[1];
 
 const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
@@ -348,6 +348,10 @@ const servedByChs = (s) =>
 
 let dropped = 0;
 let failedDatum = 0;
+// Ids whose region came from the derived nearest-town tier (station-metadata
+// 5.0.0 dropped the "~" that used to mark this in the region string itself —
+// see `region` inside buildStation — so it has to be tracked here instead).
+const derivedTownIds = new Set();
 const stations = shippable
   .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
   .filter((s) => (servedByChs(s) ? (cededToChs++, false) : true))
@@ -408,27 +412,30 @@ function buildStation(s) {
     // because the gazetteer behind it held 19 Salish towns and nationally
     // produced "San Francisco · near Olympia, WA"; station-corrections 2.8.0
     // derives from a national places list instead, capped at 40 km, so
-    // "~Bellingham, WA" beats the bare "WA" it replaces — it says the same
+    // "Bellingham, WA" beats the bare "WA" it replaces — it says the same
     // thing and more. That gazetteer is still North-American places only
     // (see NORTH_AMERICA above), so a derived context is trusted only there;
     // everywhere else the upstream region field is both correct and the
     // presentation the source authority itself uses ("Scotland", not
-    // "~Portsmouth Heights, VA").
+    // "Portsmouth Heights, VA").
     const region =
       (na || !r.derived ? undangle(r.context) : "") ||
       (na ? code : upstreamRegion(s)) ||
       countryOf(s);
+    // Track the derived-town tier ourselves — station-metadata 5.0.0 no
+    // longer marks it with a "~" in `region` itself, only with `r.derived`.
+    if (na && r.derived && undangle(r.context)) derivedTownIds.add(s.id);
     return {
       id: s.id,
       // Trailing-state cleanup keys on the CODE, not the region line for the
       // North American case — those parted company when a derived context
       // started winning: "Abercorn Creek near Savannah Ga" reads beside
-      // "~Savannah, GA", and passing the label here would stop stripping the
+      // "Savannah, GA", and passing the label here would stop stripping the
       // "Ga" on 571 cards. `region` itself is also tried, unconditionally: for
       // a non-North-American station it now IS the word that can double back
       // ("Praia Cape Verde · Cape Verde"), and for the North American case
       // it's a harmless miss (`region` there is either the same code
-      // `trailingCode` already extracted, or a derived "~Town, XX" that never
+      // `trailingCode` already extracted, or a derived "Town, XX" that never
       // matches a bare name ending).
       name: untrail(r.name, code, trailingCode(region), region),
       region,
@@ -476,7 +483,7 @@ if (allStations.some((s) => ids.has(s.id) && s.license?.commercial_use !== true)
 // is about to show two of them.
 // Canadian by the SOURCE's country, not by the region line reading like a
 // province code. The line stopped being a reliable carrier of that the moment
-// a derived context could win it ("~Sidney, BC"), and this guard failing open
+// a derived context could win it ("Sidney, BC"), and this guard failing open
 // is how two Victorias reach the map — so it reads the fact, not the label.
 const canadianIds = new Set(allStations.filter((s) => countryOf(s) === "Canada").map((s) => s.id));
 const canadian = stations.filter((s) => canadianIds.has(s.id));
@@ -489,7 +496,7 @@ if (contested.length) {
 }
 
 const size = writeBundle(out, stations);
-const towns = stations.filter((s) => s.region.startsWith("~")).length;
+const towns = stations.filter((s) => derivedTownIds.has(s.id)).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
 console.log(
   `${stations.length} reference tide stations, ${size} ` +

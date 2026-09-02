@@ -4,15 +4,15 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { createPlacesResolver } from "@sailingnaturali/station-corrections";
+import { createPlacesResolver } from "@openwaters/station-metadata";
 
 /** tools/ — every generator resolves its paths from here. */
 export const here = dirname(fileURLToPath(import.meta.url));
 
 const require = createRequire(import.meta.url);
-/** A @sailingnaturali/station-corrections data file, parsed. */
+/** A @openwaters/station-metadata data file, parsed. */
 export const stationData = (file) =>
-  JSON.parse(readFileSync(require.resolve(`@sailingnaturali/station-corrections/data/${file}`), "utf8"));
+  JSON.parse(readFileSync(require.resolve(`@openwaters/station-metadata/data/${file}`), "utf8"));
 
 /** The places resolver every generator names stations with. */
 export const placesResolver = () => createPlacesResolver(stationData("places.json"));

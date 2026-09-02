@@ -43,7 +43,7 @@ final class ChsCurrentGateTests: XCTestCase {
         let dodd = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-dodd-narrows" },
                                  "Dodd Narrows missing from chs-current-gates.json")
         XCTAssertEqual(dodd.name, "Dodd Narrows")
-        for query in ["dodd", "nanaimo"] {
+        for query in ["dodd", "northumberland"] {
             XCTAssert(StationItem.search(query, near: firstRunFix).contains { $0.id == dodd.id },
                       "search '\(query)' did not find Dodd Narrows")
         }
