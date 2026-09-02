@@ -89,4 +89,19 @@ final class SlackWindowTests: XCTestCase {
         let moments = currentAxisMoments(runs: runs, slacks: [s(76), s(188), s(600), s(999)])
         XCTAssertEqual(moments, [s(50), s(500), s(999)])
     }
+
+    /// The opening is the major point while the run is ahead; once inside
+    /// the run the closing is (current-charts §5.4.1). The minor one draws
+    /// at half strength; a past run fades both under the past rule.
+    func testWindowDotOpacitiesSwapInsideTheRun() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let run = WindowRun(start: t0.addingTimeInterval(600), end: t0.addingTimeInterval(1_800))
+        let ahead = windowDotOpacities(run: run, now: t0)
+        XCTAssertEqual(ahead.opening, 1); XCTAssertEqual(ahead.closing, 0.5)
+        let inside = windowDotOpacities(run: run, now: t0.addingTimeInterval(1_000))
+        XCTAssertEqual(inside.opening, 0.5); XCTAssertEqual(inside.closing, 1)
+        let past = windowDotOpacities(run: run, now: t0.addingTimeInterval(3_600))
+        XCTAssertEqual(past.opening, CurveStyle.pastLabelFade * 0.5)
+        XCTAssertEqual(past.closing, CurveStyle.pastLabelFade)
+    }
 }

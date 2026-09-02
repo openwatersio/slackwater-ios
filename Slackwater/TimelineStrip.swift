@@ -1036,12 +1036,13 @@ struct TimelineCanvas: View {
         // The run is the mark (spec §5.2): the line itself turns the go
         // colour between each run's interpolated edges, over a wider
         // round-capped eraser so the seam at both ends is a clear ring, not
-        // a slanted cut. The run's opening gets the track's only dot; its
-        // time goes on the bottom row. Erasers for every run go first, in
-        // their own pass, so a later run's round cap can never bite an
-        // earlier run's green tail or dot when two runs sit close together
-        // (§4.2's own example, ~17 minutes apart against a 7.5pt/~12-minute
-        // eraser).
+        // a slanted cut. The run's two edges get the dots — the opening at
+        // full strength while the run is ahead, the closing at full once
+        // inside it (§5.4.1); their times go on the bottom row. Erasers for
+        // every run go first, in their own pass, so a later run's round cap
+        // can never bite an earlier run's green tail or dot when two runs
+        // sit close together (§4.2's own example, ~17 minutes apart against
+        // a 7.5pt/~12-minute eraser).
         let segs = runs.map { run -> Path in
             var seg = Path()
             seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
@@ -1060,8 +1061,11 @@ struct TimelineCanvas: View {
         }
         for (run, seg) in zip(runs, segs) {
             strokeSplitAtNow(ctx, seg, with: .color(SN.go))
+            let o = windowDotOpacities(run: run, now: now)
             dot(ctx, at: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))),
-                color: SN.go.opacity(fade(run.start)))
+                color: SN.go.opacity(o.opening))
+            dot(ctx, at: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))),
+                color: SN.go.opacity(o.closing))
         }
 
         let margin = 0.3 * 3600

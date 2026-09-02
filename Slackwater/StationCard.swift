@@ -390,6 +390,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
             let t = now.addingTimeInterval(h * 3600)
             return .init(time: t, value: value(h),
                          valueText: label(value(h)),
+                         spokenText: label(value(h)),
                          timeText: cardTime(t, .current),
                          high: value(h) > offset,
                          // Signed preview curves are currents: opposing sets.

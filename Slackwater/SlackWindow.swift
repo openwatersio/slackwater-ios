@@ -99,6 +99,16 @@ func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
     return (runs.map(\.start) + bare).sorted()
 }
 
+/// The window's two edges are the points of interest (current-charts
+/// §5.4.1): the opening is major while the run is ahead, the closing is
+/// major once inside it; the other draws at half strength. A run already
+/// passed fades both like any past mark, keeping the same ratio.
+func windowDotOpacities(run: WindowRun, now: Date) -> (opening: Double, closing: Double) {
+    if now < run.start { return (1, 0.5) }
+    if now <= run.end { return (0.5, 1) }
+    return (CurveStyle.pastLabelFade * 0.5, CurveStyle.pastLabelFade)
+}
+
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
     guard points.count > 1 else { return [] }
     var events: [CurrentEvent] = []

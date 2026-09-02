@@ -42,11 +42,6 @@ struct StationCardGraph: View {
     private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
     private static let timeBaseline: CGFloat = 10
-    /// The pointer glyph's distance from the value on the band. One consumer
-    /// (this card), so it lives here rather than on the shared CurveStyle.
-    private static let pointerOffset: CGFloat = 18
-    private static let valueFontSize: CGFloat = 15
-    private static let pointerFontSize: CGFloat = 15
 
     struct Point {
         let time: Date
@@ -56,7 +51,10 @@ struct StationCardGraph: View {
     struct Extreme {
         let time: Date
         let value: Double
+        /// The bare number for the curve; the unit prints once in the card's reading.
         let valueText: String
+        /// The number with its unit, for VoiceOver only.
+        let spokenText: String
         let timeText: String
         /// High tide / max flood (vs low / max ebb) — picks the dot and
         /// pointer tint (teal vs amber) and the pointer direction.
@@ -221,30 +219,32 @@ struct StationCardGraph: View {
                 // from its dot and reads as belonging to the wrong spot.
                 guard dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
-                // The values form one rail across the vertical middle, with
-                // each extreme's icon on the dot's side of its number —
-                // above for high/flood, below for low/ebb.
-                let labelX = dotAt.x
-                // The band rides the zero line on a signed curve — flood and
-                // ebb rarely peak equally, so zero is not the canvas middle.
-                let bandY = includesZero ? baseY : plotHeight / 2
+                // The reading hangs off the turn toward the plot middle with
+                // its pointer under it — the same rule the detail strip
+                // follows (current-charts §15.1). No unit: the card's
+                // reading states it once.
+                let toward: CGFloat = e.high ? 1 : -1
+                let cy = dotAt.y + toward * CurveStyle.hangOffset
+                context.draw(Text(e.valueText)
+                                .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(text),
+                             at: CGPoint(x: dotAt.x, y: cy - CurveStyle.hangValueRise))
                 if let deg = e.deg {
                     // The SF Symbol, not the "↑" text glyph — a text arrow
                     // at the same point size renders visibly smaller.
-                    let pointerAt = CGPoint(x: labelX,
-                                            y: bandY + (e.high ? -Self.pointerOffset : Self.pointerOffset))
                     var rotated = context
-                    rotated.translateBy(x: pointerAt.x, y: pointerAt.y)
+                    rotated.translateBy(x: dotAt.x, y: cy + CurveStyle.hangGlyphDrop)
                     rotated.rotate(by: .degrees(deg))
                     rotated.draw(Text(Image(systemName: "arrow.up"))
-                                    .font(.system(size: Self.pointerFontSize, weight: .bold))
+                                    .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .bold))
                                     .foregroundStyle(tint),
                                  at: .zero)
+                } else {
+                    context.draw(Text(e.high ? "⤒" : "⤓")
+                                    .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
+                                    .foregroundStyle(tint),
+                                 at: CGPoint(x: dotAt.x, y: cy + CurveStyle.hangGlyphDrop))
                 }
-                context.draw(Text(e.valueText)
-                                .font(.system(size: Self.valueFontSize, weight: .bold).monospacedDigit())
-                                .foregroundStyle(text),
-                             at: CGPoint(x: labelX, y: bandY))
             }
 
             // Slack: the line itself turns the go colour for each window's
@@ -297,10 +297,12 @@ struct StationCardGraph: View {
                 strokeGo(from: max(x0 - CurveStyle.lineWidth, nowX), to: x1 + CurveStyle.lineWidth,
                          opacity: 1)
 
-                // The run's opening gets the only dot on a current curve: it
-                // is the moment the axis time below names (spec §4 rule 7).
-                let fade = w.start < now ? CurveStyle.pastLabelFade : 1.0
-                dot(at: CGPoint(x: x0, y: y(valueAt(w.start))), color: SN.go.opacity(fade))
+                // The window's edges are the points of interest (§5.4.1):
+                // the opening at full strength while the run is ahead, the
+                // closing at half; inside the run they swap.
+                let o = windowDotOpacities(run: w, now: now)
+                dot(at: CGPoint(x: x0, y: y(valueAt(w.start))), color: SN.go.opacity(o.opening))
+                dot(at: CGPoint(x: x1, y: y(valueAt(w.end))), color: SN.go.opacity(o.closing))
             }
 
             // The axis names each run's opening, and a bare slack only where
@@ -332,7 +334,7 @@ struct StationCardGraph: View {
             }
         }
         .accessibilityLabel("\(Int((Self.window / 3600).rounded()))-hour curve")
-        .accessibilityValue(extremes.map { "\($0.valueText) at \($0.timeText)" }
+        .accessibilityValue(extremes.map { "\($0.spokenText) at \($0.timeText)" }
             .joined(separator: ", "))
     }
 }
@@ -353,7 +355,8 @@ extension TideStationRecord {
                 .map { .init(time: $0.time, value: $0.height) },
             extremes: s.extremes(from: start, to: end).map {
                 .init(time: $0.time, value: $0.height,
-                      valueText: "\(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
+                      valueText: formatHeight($0.height, imperial: imperial),
+                      spokenText: "\(formatHeight($0.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
                       timeText: cardTime($0.time, tz),
                       high: $0.kind == .high)
             },
@@ -377,7 +380,8 @@ extension CurrentStationRecord {
                 .filter { $0.kind != .slack }
                 .map {
                     .init(time: $0.time, value: $0.speed,
-                          valueText: "\(tilde ? "~" : "")\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
+                          valueText: "\(tilde ? "~" : "")\(formatSpeed(abs($0.speed), unit: unit))",
+                          spokenText: "\(tilde ? "~" : "")\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
                           timeText: cardTime($0.time, tz),
                           high: $0.kind == .maxFlood,
                           deg: setDegrees(signed: $0.speed))
@@ -404,7 +408,8 @@ extension ChsOnlineWindow {
                 .filter { $0.kind != .slack }
                 .map {
                     .init(time: $0.time, value: $0.speed,
-                          valueText: "\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
+                          valueText: formatSpeed(abs($0.speed), unit: unit),
+                          spokenText: "\(formatSpeed(abs($0.speed), unit: unit)) \(speedUnitLabel(unit))",
                           timeText: cardTime($0.time, tz),
                           high: $0.kind == .maxFlood,
                           deg: $0.speed >= 0 ? floodDirection : ebbDirection)
