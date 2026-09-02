@@ -456,14 +456,11 @@ struct StationListView: View {
                         itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
                     }
                     matchingButton(nearest, places)
+                        .padding(.horizontal, 16)
                 }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
                     .transition(.opacity)
             } else if loc.authorized {
                 MyLocationLoadingTile()
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
                     .transition(.opacity)
             } else if loc.denied {
                 unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
@@ -919,6 +916,7 @@ struct MyLocationTile<Card: View>: View {
             .padding(.top, 14)
             .padding(.bottom, 4)
             card(item)
+                .padding(.horizontal, 16)
         }
     }
 }
@@ -948,6 +946,7 @@ struct MyLocationLoadingTile: View {
             .frame(minHeight: 96)
             .padding(.horizontal, 20)
             .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.horizontal, 16)
         }
     }
 }
