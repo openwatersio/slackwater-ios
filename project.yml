@@ -111,6 +111,7 @@ targets:
       - path: Slackwater/Resources/chs-tombstones.json
       - Slackwater/AppGroup.swift
       - Slackwater/Units.swift
+      - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
       - Slackwater/SlackWindow.swift
       - Slackwater/TideMovement.swift

@@ -140,12 +140,6 @@ extension LocationService {
 
 // MARK: - Distance + coordinate formatting (prototype NearMe.dc.html semantics)
 
-/// "1.2 nm" / "14 nm" — the prototype's fmtDist.
-func formatNm(_ km: Double) -> String {
-    let nm = km / 1.852
-    return (nm < 10 ? String(format: "%.1f", nm) : "\(Int(nm.rounded()))") + " nm"
-}
-
 /// "48.423°N, 123.371°W" — the prototype's fmtCoord.
 func formatCoord(lat: Double, lon: Double) -> String {
     String(format: "%.3f°%@, %.3f°%@", abs(lat), lat >= 0 ? "N" : "S",

@@ -36,3 +36,11 @@ func formatSpeed(_ knots: Double, unit: String) -> String {
 func speedUnitLabel(_ unit: String) -> String {
     unit == "kmh" ? "km/h" : unit == "ms" ? "m/s" : "kn"
 }
+
+// MARK: - Distance formatting (prototype NearMe.dc.html semantics)
+
+/// "1.2 nm" / "14 nm" — the prototype's fmtDist.
+func formatNm(_ km: Double) -> String {
+    let nm = km / 1.852
+    return (nm < 10 ? String(format: "%.1f", nm) : "\(Int(nm.rounded()))") + " nm"
+}
