@@ -31,34 +31,14 @@ struct StationCardGraph: View {
     /// Strip at the bottom reserved for the time axis; the curve plots above
     /// it so a trough never runs into the labels.
     private static let axisHeight: CGFloat = 6
-    private static let lineWidth: CGFloat = 2.5
-    /// The area gradient at full intensity…
-    private static let fillOpacity = 0.5
-    /// …and the tide fill's floor at the card bottom.
-    private static let tideFillFloor = 0.05
-    /// The dotted zero/datum reference lines.
-    private static let referenceLineOpacity = 0.35
-    private static let referenceLineDash: [CGFloat] = [1, 3]
     /// How close (in data units — metres) a low must come to chart datum
     /// before the datum line appears on a tide card.
     private static let nearDatum = 0.1
-    /// The line left of now, and the labels of moments already passed.
-    private static let pastLineOpacity = 0.35
-    private static let pastLabelFade = 0.45
-    /// Extreme dots; the now dot is its own size.
-    private static let dotRadius: CGFloat = 2.5
-    private static let nowDotDiameter: CGFloat = 7
-    /// The background-punched ring beyond a dot's edge.
-    private static let haloGap: CGFloat = 2.5
     /// An extreme closer than this to a card edge keeps its dot and axis
     /// time but drops its value label; every axis time — extreme or slack
     /// crossing — uses the tighter margin.
     private static let labelEdgeMargin: CGFloat = 34
     private static let axisEdgeMargin: CGFloat = 20
-    /// The pointer icon's distance from the value on the band.
-    private static let pointerOffset: CGFloat = 18
-    private static let valueFontSize: CGFloat = 15
-    private static let pointerFontSize: CGFloat = 15
     private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
     private static let timeBaseline: CGFloat = 10
@@ -131,8 +111,8 @@ struct StationCardGraph: View {
                 var path = Path()
                 path.move(to: CGPoint(x: 0, y: lineY))
                 path.addLine(to: CGPoint(x: size.width, y: lineY))
-                context.stroke(path, with: .color(SN.foam.opacity(Self.referenceLineOpacity)),
-                               style: StrokeStyle(lineWidth: 1, dash: Self.referenceLineDash))
+                context.stroke(path, with: .color(SN.foam.opacity(CurveStyle.referenceLineOpacity)),
+                               style: StrokeStyle(lineWidth: 1, dash: CurveStyle.referenceLineDash))
             }
 
             // The area fill, closed to the zero line for signed curves and
@@ -152,10 +132,10 @@ struct StationCardGraph: View {
                 let zeroStop = baseY / size.height
                 context.fill(area, with: .linearGradient(
                     Gradient(stops: [
-                        .init(color: Self.line.opacity(Self.fillOpacity), location: 0),
+                        .init(color: Self.line.opacity(CurveStyle.fillOpacity), location: 0),
                         .init(color: Self.line.opacity(0), location: zeroStop),
                         .init(color: Self.low.opacity(0), location: zeroStop),
-                        .init(color: Self.low.opacity(Self.fillOpacity), location: 1),
+                        .init(color: Self.low.opacity(CurveStyle.fillOpacity), location: 1),
                     ]),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: size.height)))
@@ -164,8 +144,8 @@ struct StationCardGraph: View {
                 // stays vertical (Neaps TideGraphChart): strongest at the
                 // surface, easing toward the bottom.
                 context.fill(area, with: .linearGradient(
-                    Gradient(colors: [Self.line.opacity(Self.fillOpacity),
-                                      Self.line.opacity(Self.tideFillFloor)]),
+                    Gradient(colors: [Self.line.opacity(CurveStyle.fillOpacity),
+                                      Self.line.opacity(CurveStyle.tideFillFloor)]),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: size.height)))
                 // Chart datum, but only when the water actually gets near
@@ -183,19 +163,19 @@ struct StationCardGraph: View {
             let nowX = x(now)
             var past = context
             past.clip(to: Path(CGRect(x: 0, y: 0, width: nowX, height: size.height)))
-            past.stroke(line, with: .color(Self.line.opacity(Self.pastLineOpacity)),
-                        lineWidth: Self.lineWidth)
+            past.stroke(line, with: .color(Self.line.opacity(CurveStyle.pastLineOpacity)),
+                        lineWidth: CurveStyle.lineWidth)
             var future = context
             future.clip(to: Path(CGRect(x: nowX, y: 0,
                                         width: size.width - nowX, height: size.height)))
-            future.stroke(line, with: .color(Self.line), lineWidth: Self.lineWidth)
+            future.stroke(line, with: .color(Self.line), lineWidth: CurveStyle.lineWidth)
 
             // A halo that truly matches the background: erase the line and
             // fill in a ring around each dot (destinationOut punches through
             // to whatever is behind the Canvas) rather than painting a guess
             // at the card color over them.
             func punchHalo(at p: CGPoint, dotRadius: CGFloat) {
-                let radius = dotRadius + Self.haloGap
+                let radius = dotRadius + CurveStyle.haloGap
                 var eraser = context
                 eraser.blendMode = .destinationOut
                 eraser.fill(Path(ellipseIn: CGRect(x: p.x - radius, y: p.y - radius,
@@ -204,17 +184,17 @@ struct StationCardGraph: View {
             }
 
             func dot(at p: CGPoint, color: Color) {
-                punchHalo(at: p, dotRadius: Self.dotRadius)
-                context.fill(Path(ellipseIn: CGRect(x: p.x - Self.dotRadius,
-                                                    y: p.y - Self.dotRadius,
-                                                    width: Self.dotRadius * 2,
-                                                    height: Self.dotRadius * 2)),
+                punchHalo(at: p, dotRadius: CurveStyle.dotRadius)
+                context.fill(Path(ellipseIn: CGRect(x: p.x - CurveStyle.dotRadius,
+                                                    y: p.y - CurveStyle.dotRadius,
+                                                    width: CurveStyle.dotRadius * 2,
+                                                    height: CurveStyle.dotRadius * 2)),
                              with: .color(color))
             }
 
             for e in extremes {
                 // A past extreme fades like the past line.
-                let fade = e.time < now ? Self.pastLabelFade : 1.0
+                let fade = e.time < now ? CurveStyle.pastLabelFade : 1.0
                 let tint = (e.high ? Self.high : Self.low).opacity(fade)
                 let text = SN.foam.opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
@@ -248,17 +228,17 @@ struct StationCardGraph: View {
                     // The SF Symbol, not the "↑" text glyph — a text arrow
                     // at the same point size renders visibly smaller.
                     let pointerAt = CGPoint(x: labelX,
-                                            y: bandY + (e.high ? -Self.pointerOffset : Self.pointerOffset))
+                                            y: bandY + (e.high ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset))
                     var rotated = context
                     rotated.translateBy(x: pointerAt.x, y: pointerAt.y)
                     rotated.rotate(by: .degrees(deg))
                     rotated.draw(Text(Image(systemName: "arrow.up"))
-                                    .font(.system(size: Self.pointerFontSize, weight: .bold))
+                                    .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
                                     .foregroundStyle(tint),
                                  at: .zero)
                 }
                 context.draw(Text(e.valueText)
-                                .font(.system(size: Self.valueFontSize, weight: .bold).monospacedDigit())
+                                .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
                                 .foregroundStyle(text),
                              at: CGPoint(x: labelX, y: bandY))
             }
@@ -295,7 +275,7 @@ struct StationCardGraph: View {
                 var eraser = context
                 eraser.blendMode = .destinationOut
                 eraser.stroke(seg, with: .color(.black),
-                              style: StrokeStyle(lineWidth: Self.lineWidth + Self.haloGap * 2,
+                              style: StrokeStyle(lineWidth: CurveStyle.lineWidth + CurveStyle.haloGap * 2,
                                                  lineCap: .round))
                 // The past/future fade still splits by clip — an opacity
                 // seam mid-run, never a shape cut. Clips reach one stroke
@@ -305,12 +285,12 @@ struct StationCardGraph: View {
                     var c = context
                     c.clip(to: Path(CGRect(x: a, y: 0, width: b - a, height: size.height)))
                     c.stroke(seg, with: .color(SN.go.opacity(opacity)),
-                             style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round))
+                             style: StrokeStyle(lineWidth: CurveStyle.lineWidth, lineCap: .round))
                 }
                 let x0 = x(w.start), x1 = x(w.end)
-                strokeGo(from: x0 - Self.lineWidth, to: min(x1 + Self.lineWidth, nowX),
-                         opacity: Self.pastLineOpacity)
-                strokeGo(from: max(x0 - Self.lineWidth, nowX), to: x1 + Self.lineWidth,
+                strokeGo(from: x0 - CurveStyle.lineWidth, to: min(x1 + CurveStyle.lineWidth, nowX),
+                         opacity: CurveStyle.pastLineOpacity)
+                strokeGo(from: max(x0 - CurveStyle.lineWidth, nowX), to: x1 + CurveStyle.lineWidth,
                          opacity: 1)
             }
 
@@ -323,7 +303,7 @@ struct StationCardGraph: View {
                     let cx = x(a.time) + (x(b.time) - x(a.time)) * f
                     let when = a.time.addingTimeInterval(
                         b.time.timeIntervalSince(a.time) * TimeInterval(f))
-                    let fade = when < now ? Self.pastLabelFade : 1.0
+                    let fade = when < now ? CurveStyle.pastLabelFade : 1.0
                     guard cx >= Self.axisEdgeMargin,
                           cx <= size.width - Self.axisEdgeMargin else { continue }
                     context.draw(Text(cardTime(when, tz))
@@ -339,7 +319,7 @@ struct StationCardGraph: View {
                 abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now))
             })?.value {
                 let nowDot = CGPoint(x: x(now), y: y(nowValue))
-                let r = Self.nowDotDiameter / 2
+                let r = CurveStyle.nowDotDiameter / 2
                 punchHalo(at: nowDot, dotRadius: r)
                 context.fill(Path(ellipseIn: CGRect(x: nowDot.x - r, y: nowDot.y - r,
                                                     width: r * 2, height: r * 2)),

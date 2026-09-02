@@ -129,6 +129,31 @@ enum SN {
     }
 }
 
+/// The curve as the station cards draw it, shared with the detail strip so
+/// the page a card opens into is the same drawing at larger scale. Every knob
+/// both surfaces read lives here; a value only one of them uses stays local.
+enum CurveStyle {
+    static let lineWidth: CGFloat = 2.5
+    /// The line left of now, and the labels of moments already passed.
+    static let pastLineOpacity = 0.35
+    static let pastLabelFade = 0.45
+    /// Extreme and window-start dots; the now dot is its own size.
+    static let dotRadius: CGFloat = 2.5
+    static let nowDotDiameter: CGFloat = 7
+    /// The background-punched ring beyond a dot's or run's edge.
+    static let haloGap: CGFloat = 2.5
+    /// The area gradient at full intensity, and the tide fill's floor.
+    static let fillOpacity = 0.5
+    static let tideFillFloor = 0.05
+    /// The dotted datum/zero reference line.
+    static let referenceLineOpacity = 0.35
+    static let referenceLineDash: [CGFloat] = [1, 3]
+    /// The pointer glyph's distance from the value on the band.
+    static let pointerOffset: CGFloat = 18
+    static let valueFontSize: CGFloat = 15
+    static let pointerFontSize: CGFloat = 15
+}
+
 /// The one full-screen background: canvas navy with the prototype's radial
 /// glow falling from the top. Use it for whole screens; flat `SN.canvas` is
 /// for toolbars, pills and scrims that sit on it.
