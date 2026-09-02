@@ -887,7 +887,12 @@ struct TimelineCanvas: View {
         let visible = data.visibleDays
         for day in visible {
             let ds = data.x(day.start), de = data.x(data.dayEnd(day))
-            let top = geo.dayY + 4
+            // From the very top: the reading line spans y=8…bodyBottom and
+            // the moon's glow already reaches y=0, so a band starting at
+            // dayY+4 drew a crisp edge two points above the moon disc with
+            // the day row on unshaded ground (#246). The labels sit inside
+            // the night now, the way the moon does.
+            let top: CGFloat = 0
             if let rise = day.sunrise {
                 ctx.fill(Path(CGRect(x: ds, y: top, width: data.x(rise) - ds,
                                      height: geo.bodyBottom - top)),
