@@ -1,11 +1,13 @@
 // Slackwater — GPL v3. Widget configuration: Current Location followed by
 // Favorites and Recents from shared defaults.
 //
-// Compiled into BOTH the app and the widget extension: the system resolves a
-// widget's configured entity against the containing app's App Intents
-// registration, and an entity the app has not compiled fails with "StationChoice
-// is not a registered AppEntity identifier" — every widget then silently shows
-// the default station.
+// Compiled into BOTH the app and the widget extension, as Apple's
+// configurable-widget sample does, so the containing app registers the
+// entity too. In the SIMULATOR the configured station always resolves to
+// nil: linkd cannot read a simulator process's team id, the App Intents
+// runtime then cannot build the entity identifier ("StationChoice is not a
+// registered AppEntity identifier" in the log), and every widget shows the
+// default station. Verify the picker on a device.
 import AppIntents
 import WidgetKit
 
