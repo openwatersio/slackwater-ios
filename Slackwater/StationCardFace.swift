@@ -41,6 +41,10 @@ struct StationCard<Trailing: View>: View {
     /// The list's card heights by default; the widget lets the card fill
     /// its family instead.
     var minHeight: CGFloat? = nil
+    /// The location-arrow glyph before the region, in place of the words
+    /// "Current Location" — the widget has no room to spell it out
+    /// (MyLocationTile carries the same mark in the list).
+    var locationMark = false
     @ViewBuilder var trailing: () -> Trailing
 
     /// The identity row — the only thing `extras` changes, and so the only
@@ -56,10 +60,18 @@ struct StationCard<Trailing: View>: View {
                     .allowsTightening(true)
                     .lineLimit(1)
                 HStack(spacing: 4) {
+                    if locationMark {
+                        Image(systemName: "location.north.fill")
+                            .font(.caption2)
+                            .rotationEffect(.degrees(45))
+                            .foregroundStyle(SN.foam)
+                    }
+                    // The widget has no room for a wrapped region line: caption2, one line.
                     Text(region)
-                        .font(.caption)
+                        .font(chrome ? .caption : .caption2)
                         .foregroundStyle(SN.foam)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(chrome ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: chrome)
                     if extras, let km {
                         Text("•")
                             .font(.caption)
@@ -133,8 +145,7 @@ struct StationCard<Trailing: View>: View {
 /// `.tide`: current height plus the rising/falling indicator.
 ///
 /// `.current`: signed velocity — speed + set arrow + word, Slack in the go
-/// colour inside a window; `countdown` swaps the speed for a timer on
-/// counting surfaces. `tilde` marks a provisional (60-day) reading.
+/// colour inside a window. `tilde` marks a provisional (60-day) reading.
 ///
 /// `.gate`: a derived gate's phase pill — the web's words, flood / ebb /
 /// slack; no speed exists to show (`DerivedGateCardState`). Slack takes
@@ -142,20 +153,9 @@ struct StationCard<Trailing: View>: View {
 /// beside it reads green while this pill reads grey, the exact collision
 /// the detail views guard against (testSlackIsGreenWhereverItAppears).
 struct ConditionsItem: View {
-    /// What a counting surface shows in place of the speed inside a slack
-    /// window, decided at the ENTRY date by whoever builds the reading —
-    /// WidgetKit renders every timeline entry at delivery, so `Date.now` in
-    /// a view body is the generation instant, not the display instant.
-    enum Countdown {
-        /// Under two hours to the closing: a live timer to it.
-        case until(Date)
-        /// More than two hours: the words, not a timer.
-        case beyondTwoHours
-    }
-
     enum Reading {
         case tide(CardState, imperial: Bool)
-        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, inWindow: Bool = false, countdown: Countdown? = nil)
+        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, inWindow: Bool = false)
         case gate(DerivedPhase)
     }
     let reading: Reading
@@ -175,35 +175,19 @@ struct ConditionsItem: View {
                 Text(state.rising ? "▲" : "▼").font(.caption)
             }.foregroundStyle(tint)
 
-        case .current(let signed, let deg, let unit, let tilde, let inWindow, let countdown):
+        case .current(let signed, let deg, let unit, let tilde, let inWindow):
             // Always the speed and the set (current-charts §15.2): a pill
-            // states a phase without either. Inside a window a counting
-            // surface (the widget) shows the time to the closing instead of
-            // the speed (§15.3); the list passes no countdown.
+            // states a phase without either.
             let phase = currentPhase(signed: signed)
             // Inside a slack window — the same run the curve draws green, from
             // the shared predicate (current-charts §6.1, §15.2) — the word is
             // Slack in the go colour whatever the instantaneous phase word says.
             let slack = inWindow || phase == .slack
-            switch countdown {
-            case .until(let end) where end > Date.now:
-                // A live timer counts to the closing at display time; the
-                // range guard keeps a stale entry from building Date.now...end
-                // with end already past — it falls back to the speed instead.
-                Text(timerInterval: Date.now...end, countsDown: true)
-                    .font(.title3.monospacedDigit()).fontWeight(.bold)
-                    .foregroundStyle(.white)
-            case .beyondTwoHours:
-                Text("> 2 hrs")
-                    .font(.title3.monospacedDigit()).fontWeight(.bold)
-                    .foregroundStyle(.white)
-            default:
-                (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
-                    .font(.title3.monospacedDigit()).fontWeight(.bold)
-                 + Text(" \(speedUnitLabel(unit))")
-                    .font(.body))
-                    .foregroundStyle(.white)
-            }
+            (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
+                .font(.title3.monospacedDigit()).fontWeight(.bold)
+             + Text(" \(speedUnitLabel(unit))")
+                .font(.body))
+                .foregroundStyle(.white)
             // Direction-first (#59): a novice reads the arrow + cardinal;
             // the word demotes to a dimmer label. "Slack" wears the go
             // colour — the same meaning it has everywhere else. Under

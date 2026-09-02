@@ -108,15 +108,16 @@ own `DayCurveContentView` becomes a thin wrapper and its sparkline canvas,
 ### 4.1.1 The in-window countdown
 
 When the entry's date is inside a slack window (`containing` window from
-the record's windows at that date), the reading's first line is a live
-timer to the window's end — `Text(timerInterval:countsDown:)`, minutes and
-seconds — in place of the speed, and the second line reads "Slack" with
-the set as §3. When more than two hours remain the line says "> 2 hrs"
-instead of a timer. Outside a window the reading is the card's, unchanged.
-The list card does not count down; only the widget and the detail readout
-answer *how long do I have* (current spec §5.4.1). The timer-versus-"> 2 hrs"
-decision is made at the entry's date when the card is built, because
-WidgetKit renders every entry at delivery; the timer itself is live.
+the record's windows at that date), the reading itself is unchanged — it
+keeps the speed and the set (§3) — and the countdown floats over the
+widget as a separate overlay, bottom-leading, on the faded left swing the
+forecast no longer needs: a "SLACK ENDS" label over a live timer to the
+window's end (`Text(timerInterval:countsDown:)`) or "> 2 hrs" once more
+than two hours remain. Outside a window nothing is overlaid. The list
+does not count down; only the widget answers *how long do I have*
+(current spec §5.4.1). The timer-versus-"> 2 hrs" decision is made at the
+entry's date in `WidgetCard`, because WidgetKit renders every entry at
+delivery; the timer itself is live.
 
 ### 4.2 Data
 
@@ -130,6 +131,9 @@ with `now` at the entry date.
 
 Distance: the widget has no fix; `km` is nil and the region line shows as
 the list does for a card without a distance.
+
+The Current Location station shows the location mark before its region
+instead of the words.
 
 ### 4.3 Sizing
 

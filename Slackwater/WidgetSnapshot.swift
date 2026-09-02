@@ -168,41 +168,53 @@ struct WidgetSnapshot: Equatable {
 /// The list card's inputs, built once per timeline entry so the widget is
 /// the card (current-charts §15) with no second drawing of the curve.
 struct WidgetCard {
+    /// The widget's in-window countdown, decided at the ENTRY date — WidgetKit
+    /// renders every timeline entry at delivery, so a view body's Date.now is
+    /// the generation instant.
+    enum Countdown { case until(Date), beyondTwoHours }
+
     let name: String
     let region: String
     let reading: ConditionsItem.Reading
     let graph: StationCardGraph?
     /// A derived gate's next slack, for its "Slack · time" line.
     let nextSlack: (time: Date, tz: TimeZone)?
+    /// True when the region line should carry the location mark instead of
+    /// its words — the Current Location entry, prefixed by the caller.
+    let locationMark: Bool
+    /// Inside a slack window, the time left before it closes — floated over
+    /// the past swing in the widget (current-charts §15.3); nil otherwise.
+    let countdown: Countdown?
 
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
+        let locationMark = stationNamePrefix != nil
         switch record {
         case .tide(let r):
             let state = r.cardState(at: now)
-            return .init(name: r.name,
-                         region: stationNamePrefix.map { "\($0) · \(r.region)" } ?? r.region,
+            return .init(name: r.name, region: r.region,
                          reading: .tide(state, imperial: imperial),
-                         graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil)
+                         graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil,
+                         locationMark: locationMark, countdown: nil)
         case .current(let r):
             let state = r.cardState(at: now)
             let graph = r.cardGraph(at: now, unit: speedUnit)
             // Inside a window the widget counts down to the closing (§15.3),
             // decided here at the entry date — not later, at render time.
             let inside = graph.windows.first { $0.contains(now) }
-            let countdown: ConditionsItem.Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
-            return .init(name: r.name,
-                         region: stationNamePrefix.map { "\($0) · \(r.region)" } ?? r.region,
+            let countdown: Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
+            return .init(name: r.name, region: r.region,
                          reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
-                                           unit: speedUnit, inWindow: inside != nil, countdown: countdown),
-                         graph: graph, nextSlack: nil)
+                                           unit: speedUnit, inWindow: inside != nil),
+                         graph: graph, nextSlack: nil,
+                         locationMark: locationMark, countdown: countdown)
         case .derived(let r):
             let state = r.cardState(at: now)
-            return .init(name: r.gate.name,
-                         region: stationNamePrefix.map { "\($0) · \(r.gate.region)" } ?? r.gate.region,
+            return .init(name: r.gate.name, region: r.gate.region,
                          reading: .gate(state.phase), graph: nil,
-                         nextSlack: state.nextSlack.map { ($0.time, r.gate.tz) })
+                         nextSlack: state.nextSlack.map { ($0.time, r.gate.tz) },
+                         locationMark: locationMark, countdown: nil)
         }
     }
 }

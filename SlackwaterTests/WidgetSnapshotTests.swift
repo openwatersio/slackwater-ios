@@ -208,9 +208,13 @@ final class WidgetSnapshotTests: XCTestCase {
         let now = window.start.addingTimeInterval(60)
 
         let card = WidgetCard.build(.current(record), now: now)
-        guard case .current(_, _, _, _, _, let countdown) = card.reading,
-              case .until(let end)? = countdown else {
-            return XCTFail("expected a .current reading counting down")
+        guard case .until(let end)? = card.countdown else {
+            return XCTFail("expected a card counting down")
+        }
+        if case .current(_, _, _, _, let inWindow) = card.reading {
+            XCTAssertTrue(inWindow)
+        } else {
+            XCTFail("expected a .current reading")
         }
         // Sub-second tolerance: `end` comes from a graph re-sampled at
         // `now`, `window` from one sampled at the earlier anchor used to
