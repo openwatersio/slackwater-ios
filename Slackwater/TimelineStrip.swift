@@ -695,14 +695,13 @@ struct TimelineData {
 /// making this geometry scale with them — a real chart-layout change, not a
 /// font swap. Until then the labels stay fixed; don't "finish the job" here.
 ///
-/// Each event's reading lives in the fixed band rows on its own side of the
-/// track (`topTimeY`/`topValueY`/`topGlyphY` and the mirror below), leaving
-/// only a coloured dot on the curve; `tideY`/`curY` map data onto these
-/// constants.
+/// The card look (spec §2): day chrome on top, one plot box, one time row
+/// under it. Readings annotate the curve itself, so both tracks share the
+/// same box; `tideY`/`curY` map data onto it.
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
-    let height: CGFloat
+    let height: CGFloat = 284
     let dayY: CGFloat = 20
     let sunY: CGFloat = 34   // also the night moons' centre line
     let tideTop: CGFloat
@@ -715,62 +714,41 @@ struct TimelineGeo {
     let tideSpan: Double     // half-range, padded (prototype amp*1.18)
     let maxAbsCur: Double    // prototype mxv = cur.mx*1.05
 
+    /// The plot box. 60 clears the moon disc (sunY 34 + radius 8) with room
+    /// for a dot's halo; 250 leaves the time row and a margin under it.
+    private static let plotTop: CGFloat = 60
+    private static let plotBottom: CGFloat = 250
+
     init(data: TimelineData) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
         // ONE track box, whichever track fills it. The switch resolves a
         // hypothetical both-tracks input tide-first instead of drawing two
-        // curves through each other. The current box is taller and its canvas
-        // shorter because it spends only two band rows (slack range above,
-        // max time below) — the speeds annotate the curve itself.
+        // curves through each other.
         switch (hasTide, hasCurrent) {
         case (true, _):
-            tideTop = 106; tideBottom = 256; height = 328
+            tideTop = Self.plotTop; tideBottom = Self.plotBottom
             curTop = 0; curBottom = 0
         default:
             tideTop = 0; tideBottom = 0
-            curTop = 80; curBottom = 280; height = 312
+            curTop = Self.plotTop; curBottom = Self.plotBottom
         }
         bodyTop = hasTide ? tideTop : curTop
         bodyBottom = hasCurrent ? curBottom : tideBottom
         let heights = data.tidePoints.map(\.height)
         let mn = heights.min() ?? 0, mx = heights.max() ?? 1
         tideMid = (mn + mx) / 2
-        // 1.06, down from 1.18: the padding existed to keep a turn's stacked
-        // height label off the top and bottom edges, and those labels have left
-        // the curve. What's left only has to clear a 4pt dot.
+        // 1.06: the padding only has to clear a dot and its halo now that the
+        // readings sit on a band across the middle rather than at the turns.
         tideSpan = max((mx - mn) / 2, 0.01) * 1.06
         maxAbsCur = max(data.currentPoints.map { abs($0.speed) }.max() ?? 1, 0.01) * 1.05
     }
 
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
     var curHalf: CGFloat { (curBottom - curTop) / 2 - 3 }
-
-    // MARK: The event bands (NEAPS model), shared by both tracks
-    //
-    // Above the track, reading down toward it: time, value, glyph, then the
-    // event's own dot on the curve. Below the track, the mirror. `height` is
-    // the last row plus a margin.
-    //
-    // Which events take which side is the track's business, not the geometry's:
-    // tide puts highs on top and lows underneath; current puts flood on top and
-    // ebb underneath, matching the side of the zero line each already lives on.
-    // Slack has no side — it takes BOTH, its window's start time on top and its
-    // end time below, which is what stops a short window from printing
-    // "8:17AM–8:33AM" as one unreadable run.
-    // Current-only rows. Deliberately NOT the shared band slots above: the
-    // current track prints one thing over the curve and one under it, so
-    // borrowing tide's three-row grid would leave four empty rows of dead
-    // height on every gate.
-    var slackRangeY: CGFloat { curTop - 18 }
-    var maxTimeY: CGFloat { curBottom + 18 }
-
-    var topGlyphY: CGFloat { bodyTop - 14 }
-    var topValueY: CGFloat { bodyTop - 32 }
-    var topTimeY: CGFloat { bodyTop - 54 }
-    var bottomGlyphY: CGFloat { bodyBottom + 16 }
-    var bottomValueY: CGFloat { bodyBottom + 36 }
-    var bottomTimeY: CGFloat { bodyBottom + 58 }
+    /// The one row of absolute times, under the plot (current spec §5.5:
+    /// one home per surface).
+    var timeY: CGFloat { bodyBottom + 18 }
 
     func tideY(_ h: Double) -> CGFloat {
         tideTop + (1 - CGFloat((h - (tideMid - tideSpan)) / (2 * tideSpan))) * (tideBottom - tideTop)
@@ -847,38 +825,6 @@ struct TimelineCanvas: View {
         nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
         ctx.stroke(nowLine, with: .color(SN.flood.opacity(0.7)),
                    style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-    }
-
-    /// One event's band: glyph, then a `primary` line and an optional
-    /// `secondary` one, in the three fixed rows on one side of the track.
-    /// Both tracks draw through here — one renderer, not two label systems.
-    /// Rows are named by WEIGHT, not content, on purpose: naming them
-    /// `value`/`time` is what once printed the sub-threshold constant six
-    /// times a screen (slack leads with the TIME).
-    private func drawBand(_ ctx: GraphicsContext, x: CGFloat, top: Bool,
-                          glyph: String, primary: String, secondary: String?,
-                          tint: Color, rotateDeg: Double? = nil) {
-        let glyphAt = CGPoint(x: x, y: top ? geo.topGlyphY : geo.bottomGlyphY)
-        let mark = Text(glyph).font(.system(size: 15, weight: .semibold)).foregroundStyle(tint)
-        if let rotateDeg {
-            // Rotate about the glyph's own centre, not the canvas origin — a
-            // bare ctx.rotate would swing the mark somewhere off in the strip.
-            ctx.drawLayer { l in
-                l.translateBy(x: glyphAt.x, y: glyphAt.y)
-                l.rotate(by: .degrees(rotateDeg))
-                l.draw(mark, at: .zero, anchor: .center)
-            }
-        } else {
-            ctx.draw(mark, at: glyphAt, anchor: .center)
-        }
-        ctx.draw(Text(primary).font(.system(size: 18, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(tint),
-                 at: CGPoint(x: x, y: top ? geo.topValueY : geo.bottomValueY), anchor: .center)
-        if let secondary {
-            ctx.draw(Text(secondary).font(.system(size: 12).monospaced())
-                        .foregroundStyle(.white.opacity(0.6)),
-                     at: CGPoint(x: x, y: top ? geo.topTimeY : geo.bottomTimeY), anchor: .center)
-        }
     }
 
     // Night bands, day tint, day labels, sun markers, per-night moons —
@@ -1029,9 +975,10 @@ struct TimelineCanvas: View {
             // longer true at a high. (The current track keeps bare arrows —
             // there flood/ebb really is a direction of travel.) No unit on the
             // value: the fixed axis column carries it once.
-            drawBand(ctx, x: x, top: high, glyph: high ? "⤒" : "⤓",
-                     primary: formatHeight(e.height, imperial: imperial),
-                     secondary: chartTime(e.time, data.tz), tint: tint)
+            ctx.draw(Text(chartTime(e.time, data.tz))
+                        .font(.system(size: 12).monospaced())
+                        .foregroundStyle(.white.opacity(0.6)),
+                     at: CGPoint(x: x, y: geo.timeY), anchor: .center)
         }
     }
 
@@ -1155,7 +1102,7 @@ struct TimelineCanvas: View {
                     ctx.draw(Text(chartTime(e.time, data.tz))
                                 .font(.system(size: 18, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(SN.foam),
-                             at: CGPoint(x: x, y: geo.slackRangeY), anchor: .center)
+                             at: CGPoint(x: x, y: geo.timeY), anchor: .center)
                 }
             case .maxFlood, .maxEbb:
                 let flood = e.kind == .maxFlood
@@ -1193,7 +1140,7 @@ struct TimelineCanvas: View {
                 ctx.draw(Text(chartTime(e.time, data.tz))
                             .font(.system(size: 12).monospaced())
                             .foregroundStyle(.white.opacity(0.6)),
-                         at: CGPoint(x: x, y: geo.maxTimeY), anchor: .center)
+                         at: CGPoint(x: x, y: geo.timeY), anchor: .center)
             }
         }
     }
@@ -1435,7 +1382,7 @@ struct TimelineScrubStrip: View {
                         .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
                             .stroke(SN.steel.opacity(0.35), lineWidth: 1))
                 }
-                .position(x: 52, y: geo.hasTide ? geo.bottomTimeY : geo.maxTimeY)
+                .position(x: 52, y: geo.timeY)
                 .accessibilityLabel("Return to now")
                 .accessibilityIdentifier("detail-return-now")
             }

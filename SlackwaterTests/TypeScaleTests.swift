@@ -102,11 +102,8 @@ extension TypeScaleTests {
             "OnlineGateDetailView.swift:body",
             "TideDetailView.swift:body",
             "DerivedGateDetailView.swift:scheduleEntries",
-            // The NEAPS bands: both tracks format their reading at the
-            // `drawBand(...)` call and the `.monospacedDigit()` lives in
-            // `drawBand`'s own value `Text`, one renderer for the whole chart.
-            // Two entries buy back what the gutter's five separate label
-            // builders used to cost.
+            // Leftover from the deleted NEAPS band renderer; formatHeight is
+            // no longer called from drawTide, so this entry is now inert.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
             // The heuristic's blind spot in miniature: these three calls live

@@ -450,22 +450,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
-    /// The band rows must stay in reading order and inside the canvas, for
-    /// whichever track owns the box. Get one slot backwards and the glyph
-    /// prints over the value with nothing to say so.
-    private func assertBandsAreReadable(_ g: TimelineGeo,
-                                        file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssert(g.topTimeY < g.topValueY && g.topValueY < g.topGlyphY && g.topGlyphY < g.bodyTop,
-                  "top band reads time → value → glyph → curve", file: file, line: line)
-        XCTAssert(g.bodyBottom < g.bottomGlyphY && g.bottomGlyphY < g.bottomValueY
-                    && g.bottomValueY < g.bottomTimeY,
-                  "bottom band reads curve → glyph → value → time", file: file, line: line)
-        XCTAssertGreaterThan(g.topTimeY, g.sunY + 8,
-                             "the top band must clear the sun dots above it", file: file, line: line)
-        XCTAssertLessThan(g.bottomTimeY, g.height - 8,
-                          "the last row must sit inside the canvas", file: file, line: line)
-    }
-
     /// EVERY time the strip prints must be a time the strip can stop on.
     ///
     /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
@@ -507,15 +491,14 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        // NEAPS bands above and below the track, no gutter. Asserted as
-        // structure, not as pixels: the literals that used to sit here
-        // (328/106/256) restated TimelineGeo's own constants back at it, so any
-        // deliberate change to the band grid reddened this test having caught
-        // nothing. assertBandsAreReadable and the body/track identities below
-        // are what actually fail when the geometry breaks.
+        // One plot box for either track (card-look spec §2): the readings
+        // live on the curve and one time row under it, so there is nothing
+        // left to size differently. Asserted as structure, not pixels.
         XCTAssertEqual(tide.bodyTop, tide.tideTop)
         XCTAssertEqual(tide.bodyBottom, tide.tideBottom)
-        assertBandsAreReadable(tide)
+        XCTAssertGreaterThan(tide.bodyTop, tide.sunY + 8 + 8, "the plot clears the moon disc")
+        XCTAssertGreaterThan(tide.timeY, tide.bodyBottom + 8, "the time row sits under the plot")
+        XCTAssertLessThan(tide.timeY, tide.height - 8, "and inside the canvas")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -526,25 +509,12 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-
-        // The tracks diverge again, on purpose. They were briefly one box while
-        // both drew three-row bands; the current strip now prints ONE green
-        // slack time above the curve and ONE small time below it, with the
-        // speeds annotating the curve itself — two rows, not six — so borrowing
-        // tide's grid would leave four rows of dead height on every gate.
-        // Shorter canvas, taller track.
-        XCTAssertLessThan(cur.height, tide.height, "fewer rows, shorter canvas")
-        XCTAssertGreaterThan(cur.curBottom - cur.curTop, tide.tideBottom - tide.tideTop,
-                             "and the reclaimed height goes to the curve")
         XCTAssertEqual(cur.bodyTop, cur.curTop)
         XCTAssertEqual(cur.bodyBottom, cur.curBottom)
-
-        // One row above and one below, both outside the track and inside the
-        // canvas, with the top one clear of the sun chrome.
-        XCTAssertLessThan(cur.slackRangeY, cur.curTop, "the slack time sits above the track")
-        XCTAssertGreaterThan(cur.slackRangeY, cur.sunY + 12, "and clears the sun dots")
-        XCTAssertGreaterThan(cur.maxTimeY, cur.curBottom, "max times sit below the track")
-        XCTAssertLessThan(cur.maxTimeY, cur.height - 8, "and inside the canvas")
+        XCTAssertEqual(cur.height, tide.height, "same canvas for both tracks")
+        XCTAssertEqual(cur.curTop, tide.tideTop, "same plot box for both tracks")
+        XCTAssertEqual(cur.curBottom, tide.tideBottom)
+        XCTAssertEqual(cur.timeY, tide.timeY)
 
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
