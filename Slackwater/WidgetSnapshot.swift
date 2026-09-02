@@ -168,11 +168,6 @@ struct WidgetSnapshot: Equatable {
 /// The list card's inputs, built once per timeline entry so the widget is
 /// the card (current-charts §15) with no second drawing of the curve.
 struct WidgetCard {
-    /// The widget's in-window countdown, decided at the ENTRY date — WidgetKit
-    /// renders every timeline entry at delivery, so a view body's Date.now is
-    /// the generation instant.
-    enum Countdown { case until(Date), beyondTwoHours }
-
     let name: String
     let region: String
     let reading: ConditionsItem.Reading
@@ -182,9 +177,10 @@ struct WidgetCard {
     /// True when the region line should carry the location mark instead of
     /// its words — the Current Location entry, prefixed by the caller.
     let locationMark: Bool
-    /// Inside a slack window, the time left before it closes — floated over
-    /// the past swing in the widget (current-charts §15.3); nil otherwise.
-    let countdown: Countdown?
+    /// The window's closing when under two hours remain at the ENTRY date —
+    /// WidgetKit renders every entry at delivery, so this is decided here,
+    /// not in a view body. Nil otherwise: no countdown, no "> 2 hrs".
+    let countdownEnd: Date?
 
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
@@ -196,25 +192,25 @@ struct WidgetCard {
             return .init(name: r.name, region: r.region,
                          reading: .tide(state, imperial: imperial),
                          graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil,
-                         locationMark: locationMark, countdown: nil)
+                         locationMark: locationMark, countdownEnd: nil)
         case .current(let r):
             let state = r.cardState(at: now)
             let graph = r.cardGraph(at: now, unit: speedUnit)
             // Inside a window the widget counts down to the closing (§15.3),
             // decided here at the entry date — not later, at render time.
             let inside = graph.windows.first { $0.contains(now) }
-            let countdown: Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
+            let countdownEnd = inside.flatMap { $0.end.timeIntervalSince(now) <= 7_200 ? $0.end : nil }
             return .init(name: r.name, region: r.region,
                          reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
                                            unit: speedUnit, inWindow: inside != nil),
                          graph: graph, nextSlack: nil,
-                         locationMark: locationMark, countdown: countdown)
+                         locationMark: locationMark, countdownEnd: countdownEnd)
         case .derived(let r):
             let state = r.cardState(at: now)
             return .init(name: r.gate.name, region: r.gate.region,
                          reading: .gate(state.phase), graph: nil,
                          nextSlack: state.nextSlack.map { ($0.time, r.gate.tz) },
-                         locationMark: locationMark, countdown: nil)
+                         locationMark: locationMark, countdownEnd: nil)
         }
     }
 }

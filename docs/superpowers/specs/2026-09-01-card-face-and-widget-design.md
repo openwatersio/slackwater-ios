@@ -107,17 +107,18 @@ own `DayCurveContentView` becomes a thin wrapper and its sparkline canvas,
 
 ### 4.1.1 The in-window countdown
 
-When the entry's date is inside a slack window (`containing` window from
-the record's windows at that date), the reading itself is unchanged — it
-keeps the speed and the set (§3) — and the countdown floats over the
-widget as a separate overlay, bottom-leading, on the faded left swing the
-forecast no longer needs: a "SLACK ENDS" label over a live timer to the
-window's end (`Text(timerInterval:countsDown:)`) or "> 2 hrs" once more
-than two hours remain. Outside a window nothing is overlaid. The list
-does not count down; only the widget answers *how long do I have*
-(current spec §5.4.1). The timer-versus-"> 2 hrs" decision is made at the
-entry's date in `WidgetCard`, because WidgetKit renders every entry at
-delivery; the timer itself is live.
+When the entry's date is inside a slack window AND under two hours remain
+before it closes, the reading itself is unchanged — it keeps the speed
+and the set (§3) — and a chip floats over the widget as a separate
+overlay, bottom-leading, on the faded left swing the forecast no longer
+needs: a "SLACK ENDS" label over a live timer to the window's end
+(`Text(timerInterval:countsDown:)`). Beyond two hours, or outside a
+window, nothing is overlaid — there is no "> 2 hrs" state. The list does
+not count down; only the widget answers *how long do I have* (current
+spec §5.4.1). The decision — whether the entry's date falls inside that
+under-two-hours stretch — is made at the entry's date in `WidgetCard`,
+because WidgetKit renders every entry at delivery; the timer itself is
+live.
 
 ### 4.2 Data
 

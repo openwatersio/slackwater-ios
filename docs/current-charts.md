@@ -683,12 +683,15 @@ three things the reader came for.
 
 ### 15.3 Counting down
 
-A surface that is refreshed on a clock — the widget — counts. Inside a
-window the reading's first line becomes a timer to the window's closing,
-minutes and seconds, or *> 2 hrs* beyond two hours, because inside the
-window the question has changed to *how long do I have* (§5.4.1). The list
-card, which the reader is looking at rather than glancing at, keeps the
-speed; the countdown is one tap away in the detail readout.
+A surface that is refreshed on a clock — the widget — counts, but only
+once the answer is worth glancing at. Under two hours before a window's
+closing, a chip floats over the card's faded past swing: "SLACK ENDS"
+over a live timer to the closing, minutes and seconds, because inside
+that stretch the question has changed to *how long do I have* (§5.4.1).
+Beyond two hours the corner shows nothing — there is no "> 2 hrs" state —
+and the reading alone, unchanged, says Slack. The list card, which the
+reader is looking at rather than glancing at, never counts down; the
+countdown is one tap away in the detail readout.
 
 ### 15.4 Tides on the same surface
 

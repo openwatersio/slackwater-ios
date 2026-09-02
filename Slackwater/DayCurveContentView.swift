@@ -17,26 +17,30 @@ struct DayCurveContentView: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if let countdown = card.countdown {
+            if let end = card.countdownEnd, end > Date.now {
                 // Inside a window the question is "how long do I have"
                 // (current-charts §15.3). The timer floats over the faded
                 // past swing — space the forecast no longer needs — so the
                 // reading keeps the speed and the set.
                 VStack(alignment: .leading, spacing: 1) {
                     MonoLabel(text: "Slack ends", color: SN.go.opacity(0.7), tracking: 1.2)
-                    switch countdown {
-                    case .until(let end) where end > Date.now:
-                        Text(timerInterval: Date.now...end, countsDown: true)
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
-                    case .beyondTwoHours:
-                        Text("> 2 hrs").font(.subheadline.weight(.semibold).monospacedDigit())
-                    default:
-                        EmptyView()
-                    }
+                    // A live timer Text is greedy in WidgetKit — it takes
+                    // every point it is offered; pin it so the chip hugs
+                    // the text and leaves the forecast visible.
+                    Text(timerInterval: Date.now...end, countsDown: true)
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .fixedSize()
                 }
+                .fixedSize()
                 .foregroundStyle(SN.go)
-                .padding(.leading, 20)
-                .padding(.bottom, 34)   // clear of the axis time row
+                // A chip: the label sits over the faded past swing and its
+                // own value label, and must read at a glance.
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(SN.canvas.opacity(0.85),
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .padding(.leading, 16)
+                .padding(.bottom, 30)   // clear of the axis time row
             }
         }
     }

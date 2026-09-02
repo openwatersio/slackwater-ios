@@ -205,12 +205,15 @@ final class WidgetSnapshotTests: XCTestCase {
             graph = record.cardGraph(at: epoch.addingTimeInterval(86_400), unit: "kn")
         }
         let window = try XCTUnwrap(graph.windows.first)
-        let now = window.start.addingTimeInterval(60)
+        // One hour before the window closes: always under two hours
+        // remaining regardless of how wide the fixture window itself is.
+        let now = window.end.addingTimeInterval(-3_600)
+        guard now >= window.start else {
+            throw XCTSkip("fixture window is under an hour wide")
+        }
 
         let card = WidgetCard.build(.current(record), now: now)
-        guard case .until(let end)? = card.countdown else {
-            return XCTFail("expected a card counting down")
-        }
+        let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
         if case .current(_, _, _, _, let inWindow) = card.reading {
             XCTAssertTrue(inWindow)
         } else {
@@ -219,8 +222,31 @@ final class WidgetSnapshotTests: XCTestCase {
         // Sub-second tolerance: `end` comes from a graph re-sampled at
         // `now`, `window` from one sampled at the earlier anchor used to
         // find it — both interpolate the same crossing off a 10-min grid
-        // offset by the 60s shift between the two anchors.
+        // offset by the shift between the two anchors.
         XCTAssertEqual(end.timeIntervalSince1970, window.end.timeIntervalSince1970, accuracy: 1.0)
+    }
+
+    /// No "> 2 hrs" state (user ruling): more than two hours before a
+    /// window closes, the widget's corner shows nothing at all — the
+    /// reading alone says Slack.
+    func testWidgetCardHasNoCountdownBeyondTwoHours() throws {
+        let epoch = Date(timeIntervalSince1970: 1_755_800_000)
+        var found: (CurrentStationRecord, WindowRun)?
+        outer: for record in CurrentStationRecord.all {
+            for anchor in [epoch, epoch.addingTimeInterval(86_400)] {
+                let graph = record.cardGraph(at: anchor, unit: "kn")
+                if let w = graph.windows.first(where: { $0.end.timeIntervalSince($0.start) > 3 * 3_600 }) {
+                    found = (record, w)
+                    break outer
+                }
+            }
+        }
+        guard let (record, window) = found else {
+            throw XCTSkip("no bundled window over three hours wide")
+        }
+        let now = window.end.addingTimeInterval(-3 * 3_600)
+        let card = WidgetCard.build(.current(record), now: now)
+        XCTAssertNil(card.countdownEnd)
     }
 
     /// A widget explicitly configured to a CHS tide port builds that
