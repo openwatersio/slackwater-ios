@@ -255,6 +255,23 @@ func currentFillStops(_ points: [CurrentPoint], x: (Date) -> CGFloat,
         : stops
 }
 
+/// Stroke stops for the tide line (card-look spec §4). Under the ramp floor
+/// the line is the base colour; from the floor up it takes the absolute
+/// tide-rate ramp, so a fast run climbs yellow to red toward its fastest
+/// point and back. Locations are strip fractions, so the gradient stays put
+/// under `TimelineCanvas`'s per-tile translate.
+func tideRateStops(_ rates: [(time: Date, rate: Double)], x: (Date) -> CGFloat, width: CGFloat) -> [Gradient.Stop] {
+    guard width > 0, !rates.isEmpty else { return [] }
+    let stops = rates.map { p -> Gradient.Stop in
+        let r = abs(p.rate)
+        let colour = r < tideMovementRampAnchorsMHr[0]
+            ? SN.graphLine
+            : SN.speedColour(Timeline.rampT(forTideRateMHr: r))
+        return Gradient.Stop(color: colour, location: min(max(x(p.time) / width, 0), 1))
+    }
+    return stops.count == 1 ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)] : stops
+}
+
 /// The portions of a real current curve that lie within the usable threshold.
 /// Endpoints are interpolated at ±threshold, so the green overlay lands on the
 /// reference lines instead of spilling into faster water between samples.
@@ -815,16 +832,78 @@ struct TimelineCanvas: View {
         drawDayChrome(ctx)
         if geo.hasTide { drawTide(ctx) }
         if geo.hasCurrent { drawCurrent(ctx) }
-        // Real-now faint marker rides the timeline (prototype 'nowt') — but
-        // only when now is ON this timeline. An anchored strip a month out has
-        // no "now" to mark, and drawing it anyway pins a dashed line to
-        // whichever edge the clamp lands on, which reads as a real event.
+    }
+
+    // MARK: Card-look primitives, shared by both tracks
+
+    /// Where `now` falls on the strip: 0 when it is before the window (an
+    /// anchored month out — everything is forecast), the full width when it
+    /// is after it (everything is past).
+    private var nowX: CGFloat {
+        now <= data.start ? 0 : now >= data.end ? data.totalWidth : data.x(now)
+    }
+
+    /// A label or dot for a moment already passed fades like the past line.
+    private func fade(_ t: Date) -> Double { t < now ? CurveStyle.pastLabelFade : 1 }
+
+    /// The past is context, the future is the forecast: the same path drawn
+    /// muted left of now and at full strength right of it, split by clip.
+    private func strokeSplitAtNow(_ ctx: GraphicsContext, _ path: Path,
+                                  with shading: GraphicsContext.Shading,
+                                  lineWidth: CGFloat = CurveStyle.lineWidth) {
+        let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        var past = ctx
+        past.opacity = CurveStyle.pastLineOpacity
+        past.clip(to: Path(CGRect(x: 0, y: 0, width: nowX, height: geo.height)))
+        past.stroke(path, with: shading, style: style)
+        var future = ctx
+        future.clip(to: Path(CGRect(x: nowX, y: 0, width: data.totalWidth - nowX, height: geo.height)))
+        future.stroke(path, with: shading, style: style)
+    }
+
+    /// A halo that truly matches whatever is behind the canvas: erase a ring
+    /// around the dot (destinationOut punches through the fill and the night
+    /// bands alike) rather than paint a guess at the ground colour.
+    private func punchHalo(_ ctx: GraphicsContext, at p: CGPoint, dotRadius: CGFloat) {
+        let radius = dotRadius + CurveStyle.haloGap
+        var eraser = ctx
+        eraser.blendMode = .destinationOut
+        eraser.fill(Path(ellipseIn: CGRect(x: p.x - radius, y: p.y - radius,
+                                           width: radius * 2, height: radius * 2)),
+                    with: .color(.black))
+    }
+
+    private func dot(_ ctx: GraphicsContext, at p: CGPoint, color: Color) {
+        punchHalo(ctx, at: p, dotRadius: CurveStyle.dotRadius)
+        ctx.fill(Path(ellipseIn: CGRect(x: p.x - CurveStyle.dotRadius, y: p.y - CurveStyle.dotRadius,
+                                        width: CurveStyle.dotRadius * 2, height: CurveStyle.dotRadius * 2)),
+                 with: .color(color))
+    }
+
+    /// The card's white now dot, riding the curve. Only when now is on the strip.
+    private func drawNowDot(_ ctx: GraphicsContext, at p: CGPoint) {
         guard data.contains(now) else { return }
-        var nowLine = Path()
-        nowLine.move(to: CGPoint(x: data.x(now), y: geo.hasTide ? geo.tideTop : geo.curTop))
-        nowLine.addLine(to: CGPoint(x: data.x(now), y: geo.bodyBottom))
-        ctx.stroke(nowLine, with: .color(SN.flood.opacity(0.7)),
-                   style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+        let r = CurveStyle.nowDotDiameter / 2
+        punchHalo(ctx, at: p, dotRadius: r)
+        ctx.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
+                 with: .color(SN.paper))
+    }
+
+    /// The dotted datum/zero reference line, full strip width.
+    private func referenceLine(_ ctx: GraphicsContext, at lineY: CGFloat) {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: lineY))
+        path.addLine(to: CGPoint(x: data.totalWidth, y: lineY))
+        ctx.stroke(path, with: .color(SN.foam.opacity(CurveStyle.referenceLineOpacity)),
+                   style: StrokeStyle(lineWidth: 1, dash: CurveStyle.referenceLineDash))
+    }
+
+    /// One axis time on the bottom row, faded when passed.
+    private func axisTime(_ ctx: GraphicsContext, _ t: Date) {
+        ctx.draw(Text(chartTime(t, data.tz))
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .foregroundStyle(SN.foam.opacity(0.7 * fade(t))),
+                 at: CGPoint(x: data.x(t), y: geo.timeY), anchor: .center)
     }
 
     // Night bands, day tint, day labels, sun markers, per-night moons —
@@ -920,66 +999,63 @@ struct TimelineCanvas: View {
         area.addLine(to: CGPoint(x: data.totalWidth, y: geo.tideBottom))
         area.addLine(to: CGPoint(x: 0, y: geo.tideBottom))
         area.closeSubpath()
-        // Tide height stays blue. Motion is carried by chevrons on the curve,
-        // so it reads as rising/falling water rather than current intensity.
-        ctx.fill(area, with: .color(SN.flood.opacity(0.32)))
-        ctx.stroke(line, with: .color(Color(hex: 0xEEF4EE)),
-                   style: StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
-        for flow in tideFlowArrows(data.tideRates) where data.contains(flow.time) {
-            let timeStep: TimeInterval = 5 * 60
-            let before = CGPoint(x: data.x(flow.time.addingTimeInterval(-timeStep)),
-                                 y: geo.tideY(data.heightAt(flow.time.addingTimeInterval(-timeStep))))
-            let after = CGPoint(x: data.x(flow.time.addingTimeInterval(timeStep)),
-                                y: geo.tideY(data.heightAt(flow.time.addingTimeInterval(timeStep))))
-            let angle = atan2(after.y - before.y, after.x - before.x)
-            let mark = Text("››››")
-                .font(.system(size: 30, weight: .black))
-                .tracking(-4)
-                .foregroundStyle(SN.speedColour(Timeline.rampT(forTideRateMHr: abs(flow.rate))))
-            ctx.drawLayer { layer in
-                layer.translateBy(x: data.x(flow.time), y: geo.tideY(data.heightAt(flow.time)))
-                layer.rotate(by: .radians(Double(angle)))
-                layer.draw(mark, at: .zero, anchor: .center)
-            }
-        }
+        // A tide's intensity is the water level itself, so the fade is
+        // vertical (the card, via Neaps): strongest at the surface, easing
+        // toward the bottom of the box.
+        ctx.fill(area, with: .linearGradient(
+            Gradient(colors: [SN.graphLine.opacity(CurveStyle.fillOpacity),
+                              SN.graphLine.opacity(CurveStyle.tideFillFloor)]),
+            startPoint: CGPoint(x: 0, y: geo.tideTop),
+            endPoint: CGPoint(x: 0, y: geo.tideBottom)))
 
-        // Chart datum, the reference every printed height is quoted against —
-        // the axis column names it "0" and this is the line it points at. Drawn
-        // only when datum is actually inside the plotted span; a week where the
-        // tide never drops near it would otherwise get a rule pinned to an edge
-        // it isn't at.
+        // Chart datum, the reference every printed height is quoted against.
+        // Drawn only when datum is inside the plotted span; a week where the
+        // tide never drops near it would otherwise get a rule pinned to an
+        // edge it isn't at.
         if 0 > geo.tideMid - geo.tideSpan && 0 < geo.tideMid + geo.tideSpan {
-            var datum = Path()
-            datum.move(to: CGPoint(x: 0, y: geo.tideY(0)))
-            datum.addLine(to: CGPoint(x: data.totalWidth, y: geo.tideY(0)))
-            ctx.stroke(datum, with: .color(.white.opacity(0.28)),
-                       style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
+            referenceLine(ctx, at: geo.tideY(0))
         }
 
-        // Turns: a coloured dot on the curve, the reading in the fixed band on
-        // the turn's own side (highs up, lows down — kind does the separating
-        // rows used to). Colour is the direction axis, never NEAPS'
-        // green/amber: green here means slack and only slack.
+        // Rate of rise as line colour (#95, card-look spec §4): base blue
+        // under the ramp floor, the absolute tide-rate ramp above it. The
+        // past fade applies on top.
+        // ponytail: one stop per sample (~1,400 across the strip). Thin to
+        // every Nth sample if the canvas ever stalls on an iPad.
+        let stops = tideRateStops(data.tideRates.map { (time: $0.time, rate: $0.rate) },
+                                  x: data.x, width: data.totalWidth)
+        let shading: GraphicsContext.Shading = stops.isEmpty
+            ? .color(SN.graphLine)
+            : .linearGradient(Gradient(stops: stops),
+                              startPoint: .zero, endPoint: CGPoint(x: data.totalWidth, y: 0))
+        strokeSplitAtNow(ctx, line, with: shading)
+
+        // Turns: a dot on the curve, the reading on a band across the middle
+        // of the box with its pointer on the dot's side, the time on the
+        // bottom row. Teal for a high and amber for a low, as on the card.
         let margin = 0.3 * 3600
-        let filteredExtremes = data.tideExtremes.filter { e in
-            e.time >= data.start.addingTimeInterval(margin)
-                && e.time <= data.end.addingTimeInterval(-margin)
-        }
-        for e in filteredExtremes {
+        let bandY = (geo.tideTop + geo.tideBottom) / 2
+        for e in data.tideExtremes where e.time >= data.start.addingTimeInterval(margin)
+                                      && e.time <= data.end.addingTimeInterval(-margin) {
             let x = data.x(e.time), y = geo.tideY(e.height)
             let high = e.kind == .high
-            let tint = high ? SN.floodLabel : SN.ebbLabel
-            ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
-                     with: .color(tint))
+            let f = fade(e.time)
+            let tint = (high ? SN.graphHigh : SN.graphLow).opacity(f)
+            dot(ctx, at: CGPoint(x: x, y: y), color: tint)
             // ⤒ / ⤓ — arrow TO BAR: a plain ↑ says "rising", the one thing no
-            // longer true at a high. (The current track keeps bare arrows —
-            // there flood/ebb really is a direction of travel.) No unit on the
-            // value: the fixed axis column carries it once.
-            ctx.draw(Text(chartTime(e.time, data.tz))
-                        .font(.system(size: 12).monospaced())
-                        .foregroundStyle(.white.opacity(0.6)),
-                     at: CGPoint(x: x, y: geo.timeY), anchor: .center)
+            // longer true at a high.
+            ctx.draw(Text(high ? "⤒" : "⤓")
+                        .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
+                        .foregroundStyle(tint),
+                     at: CGPoint(x: x, y: bandY + (high ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset)),
+                     anchor: .center)
+            ctx.draw(Text("\(formatHeight(e.height, imperial: imperial)) \(heightUnit(imperial: imperial))")
+                        .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(f)),
+                     at: CGPoint(x: x, y: bandY), anchor: .center)
+            axisTime(ctx, e.time)
         }
+
+        drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.tideY(data.heightAt(now))))
     }
 
     /// This station's set for one direction, nil on a derived gate.

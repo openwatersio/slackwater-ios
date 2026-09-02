@@ -533,7 +533,10 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.curTop, 0)
     }
 
-    func testTideTrackUsesBlueFillAndCurveFollowingChevrons() throws {
+    /// The tide track draws the card's curve: the card's blue fill, no
+    /// speed palette in the fill, and the tide-rate ramp carried by the
+    /// LINE COLOUR rather than by chevron glyphs (card-look spec §4).
+    func testTideTrackUsesCardFillAndRateColouredLine() throws {
         let source = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = source.components(separatedBy: .newlines)
         guard let start = lines.firstIndex(where: { $0.contains("private func drawTide(") }),
@@ -541,12 +544,29 @@ final class TimelineTests: XCTestCase {
         else { return XCTFail("drawTide body not found") }
         let body = lines[start..<end].joined(separator: "\n")
 
-        XCTAssertFalse(body.contains("tideFillStops"), "tide fill must not use the current speed palette")
-        XCTAssertTrue(body.contains("SN.flood.opacity"), "tide fill stays light blue")
-        XCTAssertTrue(body.contains("tideFlowArrows"), "fast tide movement needs chevrons")
-        XCTAssertTrue(body.contains("Text(\"››››\")"), "each tide run gets one bold chevron set")
-        XCTAssertTrue(body.contains("rotate(by:"), "chevrons follow the tide curve")
-        XCTAssertTrue(body.contains("rampT(forTideRateMHr:"), "chevrons use an absolute tide-rate scale")
+        XCTAssertFalse(body.contains("currentFillStops"), "tide fill must not use the current speed palette")
+        XCTAssertTrue(body.contains("SN.graphLine.opacity(CurveStyle.fillOpacity)"), "tide fill is the card's blue gradient")
+        XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
+        XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")
+    }
+
+    /// Below the ramp floor the line is the base colour; above it the stroke
+    /// follows the absolute tide-rate ramp, so a lazy tide never leaves blue
+    /// and a Fundy run reaches red.
+    func testTideRateStopsColourOnlyFastWater() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let x = { (t: Date) -> CGFloat in CGFloat(t.timeIntervalSince(t0)) }
+        let lazy = [(time: t0, rate: 0.2), (time: t0.addingTimeInterval(100), rate: -0.5)]
+        XCTAssertTrue(tideRateStops(lazy, x: x, width: 100).allSatisfy { $0.color == SN.graphLine })
+
+        let fundy = [(time: t0, rate: 0.2),
+                     (time: t0.addingTimeInterval(50), rate: 1.8),
+                     (time: t0.addingTimeInterval(100), rate: 0.2)]
+        let stops = tideRateStops(fundy, x: x, width: 100)
+        XCTAssertEqual(stops[0].color, SN.graphLine)
+        XCTAssertEqual(stops[1].color, SN.speedColour(1), "1.8 m/hr is the red ceiling")
+        XCTAssertEqual(stops[2].color, SN.graphLine)
+        XCTAssertEqual(stops[1].location, 0.5, accuracy: 0.001)
     }
 
     /// v falls linearly 2 kn → -2 kn over 2 h (slack at +60 min); |v| < 0.5
