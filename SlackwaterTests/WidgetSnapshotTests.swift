@@ -155,28 +155,37 @@ final class WidgetSnapshotTests: XCTestCase {
 
     /// The medium widget IS the card: a bundled current station's
     /// `WidgetCard` rendered through `DayCurveContentView` — name, reading
-    /// with set, curve with dots and times, no second drawing.
+    /// with set, curve with dots and times, no second drawing. Rendered at
+    /// both live medium-widget sizes: 338×158 (older phones) and 364×170
+    /// (iPhone 15 Pro and later). No extra padding — `containerBackground`
+    /// fills the family with no inset, so this frame IS the widget.
     @MainActor
     func testMediumWidgetRendersTheStationCard() throws {
         let (record, now, graph) = try XCTUnwrap(
             widestWindowCard(among: Array(CurrentStationRecord.all.prefix(30)), near: Date()))
         let card = WidgetCard.build(.current(record), now: now)
+        let scratchpad = "/private/tmp/claude-501/-Users-clarkbw-src-openwaters/e14719b5-f679-43cc-82d8-380e546c96eb/scratchpad/"
 
-        // SN.canvas, not SN.cardFill: the card's own near-transparent fill
-        // (white @ 5%) is meant to sit on the widget's real dark container —
-        // rendered on white, its white name text and SN.go ink both vanish.
-        let renderer = ImageRenderer(content: DayCurveContentView(card: card)
-            .frame(width: 338, height: 158)
-            .background(SN.canvas))
-        let image = try XCTUnwrap(renderer.uiImage)
-        let png = try XCTUnwrap(image.pngData())
-        XCTAssertGreaterThan(png.count, 1_000)
+        func render(_ width: CGFloat, _ height: CGFloat, to name: String) throws -> UIImage {
+            let renderer = ImageRenderer(content: DayCurveContentView(card: card)
+                .frame(width: width, height: height)
+                .background(SN.cardFill))
+            let image = try XCTUnwrap(renderer.uiImage)
+            let png = try XCTUnwrap(image.pngData())
+            XCTAssertGreaterThan(png.count, 1_000)
+            try png.write(to: URL(fileURLWithPath: scratchpad + name))
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            return image
+        }
 
-        let scratchpad = "/private/tmp/claude-501/-Users-clarkbw-src-openwaters/e14719b5-f679-43cc-82d8-380e546c96eb/scratchpad/widget-medium.png"
-        try png.write(to: URL(fileURLWithPath: scratchpad))
+        _ = try render(338, 158, to: "widget-medium-158.png")
+        let image170 = try render(364, 170, to: "widget-medium-170.png")
 
         if !graph.windows.isEmpty {
-            let cg = try XCTUnwrap(image.cgImage)
+            let cg = try XCTUnwrap(image170.cgImage)
             let width = cg.width, height = cg.height
             var pixels = [UInt8](repeating: 0, count: width * height * 4)
             CIContext().render(CIImage(cgImage: cg), toBitmap: &pixels,
@@ -193,11 +202,6 @@ final class WidgetSnapshotTests: XCTestCase {
             }
             XCTAssertGreaterThan(goInk, 100, "expected go-coloured slack window ink")
         }
-
-        let attachment = XCTAttachment(image: image)
-        attachment.name = "medium-widget"
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 
     /// §15.3: inside a slack window the widget's reading counts down to the
