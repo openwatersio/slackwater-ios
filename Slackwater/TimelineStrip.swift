@@ -758,6 +758,11 @@ struct TimelineCanvas: View {
     /// tiles overdrew.
     static let tileWidth: CGFloat = 900
 
+    /// Half-width of the twilight fade on each night band's edges, in hours
+    /// each side of sunset and sunrise. 0.75h ≈ civil twilight plus a
+    /// shoulder; at 18pt/h the whole transition is 27pt.
+    static let twilightHours = 0.75
+
     var body: some View {
         let tiles = Array(0..<max(Int((data.totalWidth / Self.tileWidth).rounded(.up)), 1))
         HStack(spacing: 0) {
@@ -857,30 +862,37 @@ struct TimelineCanvas: View {
     // continuous across midnight (prototype's per-day rects abut exactly).
     private func drawDayChrome(_ ctx: GraphicsContext) {
         let visible = data.visibleDays
-        for day in visible {
-            let ds = data.x(day.start), de = data.x(data.dayEnd(day))
-            // From the very top: the reading line spans y=8…bodyBottom and
-            // the moon's glow already reaches y=0, so a band starting at
-            // dayY+4 drew a crisp edge two points above the moon disc with
-            // the day row on unshaded ground (#246). The labels sit inside
-            // the night now, the way the moon does.
-            let top: CGFloat = 0
-            if let rise = day.sunrise {
-                ctx.fill(Path(CGRect(x: ds, y: top, width: data.x(rise) - ds,
-                                     height: geo.bodyBottom - top)),
-                         with: .color(SN.night.opacity(0.52)))
-            }
-            if let set = day.sunset {
-                ctx.fill(Path(CGRect(x: data.x(set), y: top, width: de - data.x(set),
-                                     height: geo.bodyBottom - top)),
-                         with: .color(SN.night.opacity(0.52)))
-            }
-            if let rise = day.sunrise, let set = day.sunset {
-                ctx.fill(Path(CGRect(x: data.x(rise), y: geo.hasTide ? geo.tideTop : geo.curTop,
-                                     width: data.x(set) - data.x(rise),
-                                     height: geo.bodyBottom - (geo.hasTide ? geo.tideTop : geo.curTop))),
-                         with: .color(Color(hex: 0xA8CAE0).opacity(0.07)))
-            }
+        // Night and day bands span the strip's full height (#246) and fade
+        // into each other across twilight — a hard edge at sunset read as a
+        // rectangle pasted onto the chart. One rect per NIGHT, sunset to the
+        // next day's sunrise straddling midnight (the moon loop below pairs
+        // days the same way), so the fades land on the sun events and
+        // nothing abuts at midnight. `data.days` rather than `visible`: the
+        // night before the first visible sunrise belongs to a day off the
+        // strip, and the tile clip discards what is off-canvas.
+        let fadeW = CGFloat(Self.twilightHours) * Timeline.pph
+        func fadedBand(from a: CGFloat, to b: CGFloat, color: Color, opacity: Double) {
+            guard b > a else { return }
+            let rect = CGRect(x: a - fadeW, y: 0, width: (b - a) + 2 * fadeW, height: geo.bodyBottom)
+            let ramp = min(2 * fadeW / rect.width, 0.5)
+            ctx.fill(Path(rect), with: .linearGradient(
+                Gradient(stops: [
+                    .init(color: color.opacity(0), location: 0),
+                    .init(color: color.opacity(opacity), location: ramp),
+                    .init(color: color.opacity(opacity), location: 1 - ramp),
+                    .init(color: color.opacity(0), location: 1),
+                ]),
+                startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
+        }
+        for day in data.days {
+            guard let set = day.sunset,
+                  let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
+            else { continue }
+            fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.52)
+        }
+        for day in data.days {
+            guard let rise = day.sunrise, let set = day.sunset else { continue }
+            fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.07)
         }
         for day in visible {
             // The night's moon sits mid-night — between this sunset and the
