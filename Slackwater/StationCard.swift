@@ -7,11 +7,11 @@ import TideEngine
 /// `trailing` is the reading block (a big value, a phase pill, or nothing at
 /// all for a pending card). `status` is the strip below it.
 ///
-/// Two layouts, one shed step: distance and detail drop together when the
-/// width can't hold them (the list's grouping already answers "near me", and
-/// "when" is the detail view's job one tap away). The name, region and reading
-/// are load-bearing at every size and render unconditionally — the region is
-/// the one field disambiguating same-named stations, so it must never shed.
+/// Two layouts, one shed step: the distance drops when the width can't hold
+/// it (the list's grouping already answers "near me"). The name, region and
+/// reading are load-bearing at every size and render unconditionally — the
+/// region is the one field disambiguating same-named stations, so it must
+/// never shed.
 ///
 /// No kind mark. A wave or dome glyph is not a universal symbol: it teaches a
 /// new reader nothing, and a returning reader scans the names. Nothing
@@ -22,15 +22,15 @@ struct StationCard<Trailing: View>: View {
     let name: String
     let region: String
     var km: Double? = nil
-    /// A next-event reading (`High 3.2 m · 14:20`) — mono-digit, sits inside
-    /// the identity column beside the glyph.
-    var detail: String? = nil
     /// What this card is waiting on — an icon and two words below the whole
     /// row, at full card width (#93). Kept as its own slot rather than a flag
     /// on `detail`: the two differ in opacity, width, and font treatment, and
     /// conflating them regresses both.
     var status: CardStatus? = nil
     var opacity: Double = 1
+    /// The context curve (`StationCardGraph.window` wide) behind the content; nil
+    /// for pending cards and derived gates (no magnitude to draw).
+    var graph: StationCardGraph? = nil
     @ViewBuilder var trailing: () -> Trailing
 
     /// The identity row — the only thing `extras` changes, and so the only
@@ -41,43 +41,28 @@ struct StationCard<Trailing: View>: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(.white)
-                    // Wrap, never truncate: a `Text` given too little room
-                    // degrades by DROPPING CONTENT ("Vi/ct/…" in the 320pt
-                    // iPad sidebar); `fixedSize(vertical:)` makes it take the
-                    // height it actually needs instead.
-                    .fixedSize(horizontal: false, vertical: true)
-                    // ...but a single word wider than the column still breaks
-                    // MID-WORD, and the My Location hero is the narrowest card
-                    // the app draws (MyLocationTile insets it 8pt a side inside
-                    // the same 16pt gutter every other card gets). In the iPad
-                    // sidebar that renders the first station a UK user opens as
-                    // "Portsmout / h". Tightening buys back the few points that
-                    // costs. NOT `minimumScaleFactor`: TypeScaleTests
-                    // `testOnlyTheWordmarkShrinks` allows exactly one in the
-                    // app and it is the wordmark.
                     .allowsTightening(true)
-                // Unconditional — region never sheds: it is the only thing
-                // separating same-named stations.
-                Text(region)
-                    .font(.footnote)
-                    .foregroundStyle(SN.foam.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
-                if extras, let km {
-                    Text(formatNm(km))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(0.7))
-                }
-                if extras, let detail {
-                    Text(detail)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(0.92))
-                        .padding(.top, 10)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(region)
+                        .font(.caption)
+                        .foregroundStyle(SN.foam)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if extras, let km {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(SN.foam.opacity(0.5))
+                        Text(formatNm(km))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(SN.foam)
+                    }
                 }
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 5) { trailing() }
+            // Same rhythm as the identity column's name/region stack.
+            VStack(alignment: .trailing, spacing: 2) { trailing() }
         }
     }
 
@@ -112,8 +97,21 @@ struct StationCard<Trailing: View>: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
-        .background(SN.cardFill)
+        // A curve card is taller: an identity band up top (the curve's top
+        // inset below), then room for the curve and its extreme labels.
+        .frame(maxWidth: .infinity, minHeight: graph == nil ? 96 : 168, alignment: .topLeading)
+        .background {
+            ZStack {
+                SN.cardFill
+                // Top inset clears the two identity rows and the current
+                // reading, so the curve owns the card's lower band. The
+                // negative horizontal padding renders the canvas 3pt wider
+                // than the card each side; the clipShape trims it, so the
+                // curve exits through the edge on its own slope no matter
+                // where any builder's last sample lands.
+                if let graph { graph.padding(.top, 54).padding(.horizontal, -3) }
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: SN.shadow.opacity(0.24), radius: 12, y: 10)
     }
@@ -200,26 +198,89 @@ struct StationCardView: View {
     let imperial: Bool
     var km: Double? = nil
     @State private var state: CardState?
+    @State private var graph: StationCardGraph?
 
     var body: some View {
-        StationCard(name: record.name, region: record.region, km: km,
-                    detail: state?.next.map { next in
-                        "\(next.kind == .high ? "High" : "Low") \(formatHeight(next.height, imperial: imperial)) \(heightUnit(imperial: imperial)) · \(cardTime(next.time, record.tz))"
-                    }) {
+        StationCard(name: record.name, region: record.region, km: km, graph: graph) {
             if let state {
-                (Text(formatHeight(state.height, imperial: imperial))
-                    .font(.largeTitle.monospacedDigit())
-                 + Text(" \(heightUnit(imperial: imperial))")
-                    .font(.body))
-                    .foregroundStyle(.white)
-                HStack(spacing: 4) {
-                    Text(state.rising ? "▲" : "▼").font(.caption2)
-                    Text(state.rising ? "Rising" : "Falling").font(.caption2)
-                }
-                .foregroundStyle(SN.foam.opacity(0.9))
+                ConditionsItem(reading: .tide(state, imperial: imperial))
             }
         }
-        .task { if state == nil { state = record.cardState(at: appNow()) } }
+        .task {
+            if state == nil { state = record.cardState(at: appNow()) }
+            if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
+        }
+    }
+}
+
+/// The card's trailing reading block, one case per station kind.
+///
+/// `.tide`: current height plus the rising/falling indicator.
+///
+/// `.current`: signed velocity — speed + set arrow + Flooding/Ebbing, or the
+/// green SLACK pill at slack. `tilde` marks a provisional (60-day) reading.
+///
+/// `.gate`: a derived gate's phase pill — the web's words, flood / ebb /
+/// slack; no speed exists to show (`DerivedGateCardState`). Slack takes
+/// SN.go, not the neutral chip flood/ebb still use — otherwise the glyph
+/// beside it reads green while this pill reads grey, the exact collision
+/// the detail views guard against (testSlackIsGreenWhereverItAppears).
+struct ConditionsItem: View {
+    enum Reading {
+        case tide(CardState, imperial: Bool)
+        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false)
+        case gate(DerivedPhase)
+    }
+    let reading: Reading
+
+    var body: some View {
+        switch reading {
+        case .tide(let state, let imperial):
+            let tint = state.rising ? SN.rising : SN.falling
+
+            (Text(formatHeight(state.height, imperial: imperial))
+                .font(.title3.monospacedDigit()).fontWeight(.bold)
+             + Text(" \(heightUnit(imperial: imperial))")
+                .font(.body))
+                .foregroundStyle(.white)
+            HStack(spacing: 4) {
+                Text(state.rising ? "Rising" : "Falling").font(.caption).foregroundStyle(tint.opacity(0.6))
+                Text(state.rising ? "▲" : "▼").font(.caption)
+            }.foregroundStyle(tint)
+
+        case .current(let signed, let deg, let unit, let tilde):
+            let phase = currentPhase(signed: signed)
+            if phase == .slack {
+                // SN.go, not a neutral chip — see the `.gate` comment above.
+                Text("SLACK")
+                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                    .foregroundStyle(SN.navyDeep)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(SN.go, in: Capsule())
+            } else {
+                (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
+                    .font(.title3.monospacedDigit()).fontWeight(.bold)
+                 + Text(" \(speedUnitLabel(unit))")
+                    .font(.body))
+                    .foregroundStyle(.white)
+                // Direction-first (#59): a novice reads the arrow + cardinal;
+                // the flood/ebb word demotes to a dimmer label. Kept as its
+                // own Text — the screenshot tests match its exact label.
+                let tint = phase == .flood ? SN.flood : SN.ebb
+                HStack(spacing: 4) {
+                    Text(phase.word).font(.caption2)
+                        .foregroundStyle(tint.opacity(0.6))
+                    Text(compass16(deg)).font(.caption2).foregroundStyle(tint)
+                    CompassArrow(deg: deg).font(.caption2).foregroundStyle(tint)
+                }.foregroundStyle(tint)
+            }
+        case .gate(let phase):
+            Text(phase == .flood ? "FLOOD" : phase == .ebb ? "EBB" : "SLACK")
+                .font(.caption2.monospaced().weight(.medium)).tracking(1)
+                .foregroundStyle(phase == .slack ? SN.navyDeep : .white)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
+        }
     }
 }
 
@@ -317,21 +378,16 @@ struct ChsGateCardView: View {
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        StationCard(name: gate.name, region: gate.region, km: km,
-                    detail: state?.nextSlack.map { next in
-                        "Slack · \(cardTime(next.time, gate.tz))"
-                    }) {
+        StationCard(name: gate.name, region: gate.region, km: km) {
             if let state {
-                // The web's phase-pill words: flood / ebb / slack. Slack
-                // takes SN.go, not the neutral chip flood/ebb use —
-                // otherwise the glyph beside it reads green while this
-                // pill reads grey, the exact collision the detail views
-                // guard against (testSlackIsGreenWhereverItAppears).
-                Text(state.phase == .flood ? "FLOOD" : state.phase == .ebb ? "EBB" : "SLACK")
-                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                    .foregroundStyle(state.phase == .slack ? SN.navyDeep : .white)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(state.phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
+                ConditionsItem(reading: .gate(state.phase))
+                // A derived gate has no curve to carry the next slack, so
+                // the card keeps its line (M46: pill + next slack).
+                if let next = state.nextSlack {
+                    Text("Slack · \(cardTime(next.time, gate.tz))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.92))
+                }
             }
         }
         .task { if state == nil { state = record.cardState(at: appNow()) } }
@@ -427,39 +483,12 @@ struct OnlineGateCardView: View {
     var body: some View {
         let state = state
         StationCard(name: gate.name, region: gate.region, km: km,
-                    detail: state.next.map { nextLine($0) }) {
-            if currentPhase(signed: state.signed) == .slack {
-                Text("SLACK")
-                    .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                    .foregroundStyle(SN.navyDeep)
-                    .padding(.horizontal, 10).padding(.vertical, 6)
-                    .background(SN.go, in: Capsule())
-            } else {
-                (Text(formatSpeed(abs(state.signed), unit: speedUnit))
-                    .font(.largeTitle.monospacedDigit())
-                 + Text(" \(speedUnitLabel(speedUnit))")
-                    .font(.body))
-                    .foregroundStyle(.white)
-                // Direction-first (#59): a novice reads the arrow + cardinal;
-                // the flood/ebb word demotes to a dimmer label. Kept as its
-                // own Text — the screenshot tests match its exact label.
-                let deg = state.signed >= 0 ? window.floodDirection : window.ebbDirection
-                HStack(spacing: 4) {
-                    CompassArrow(deg: deg).font(.caption2)
-                    Text(compass16(deg)).font(.caption2)
-                    Text(currentPhase(signed: state.signed).word).font(.caption2)
-                        .foregroundStyle(SN.foam.opacity(0.6))
-                }
-                .foregroundStyle(SN.foam.opacity(0.9))
-            }
+                    graph: window.cardGraph(at: appNow(), unit: speedUnit)) {
+            ConditionsItem(reading: .current(
+                signed: state.signed,
+                deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection,
+                unit: speedUnit))
         }
-    }
-
-    private func nextLine(_ next: CurrentEvent) -> String {
-        let when = cardTime(next.time, gate.tz)
-        return next.kind == .slack
-            ? "Slack · \(when)"
-            : "\(next.turnLabel) \(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
     }
 }
 
@@ -477,6 +506,7 @@ struct CurrentCardView: View {
     var provisional: ChsCurrentGateInfo? = nil
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @State private var state: CurrentCardState?
+    @State private var graph: StationCardGraph?
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
     /// a gate that never offered a fast answer has no measured number to show.
@@ -486,52 +516,146 @@ struct CurrentCardView: View {
         }
     }
 
-    /// A tilde marks the NUMBER itself as approximate rather than shouting
-    /// around it; at normal card contrast "~5.8" reads cleanly.
-    private var tilde: String { provisional == nil ? "" : "~" }
-
     var body: some View {
         StationCard(name: record.name, region: record.region, km: km,
-                    detail: state?.next.map { nextLine($0) },
-                    status: status) {
+                    status: status, graph: graph) {
             if let state {
-                let phase = currentPhase(signed: state.signed)
-                if phase == .slack {
-                    // SN.go, not a neutral chip — see the matching
-                    // comment on ChsGateCardView's phase pill.
-                    Text("SLACK")
-                        .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                        .foregroundStyle(SN.navyDeep)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(SN.go, in: Capsule())
-                } else {
-                    (Text(tilde + formatSpeed(abs(state.signed), unit: speedUnit))
-                        .font(.largeTitle.monospacedDigit())
-                     + Text(" \(speedUnitLabel(speedUnit))")
-                        .font(.body))
-                        .foregroundStyle(.white)
-                    // Direction-first (#59) — same treatment as
-                    // OnlineGateCardView's, see the comment there.
-                    let deg = record.setDegrees(signed: state.signed)
-                    HStack(spacing: 4) {
-                        CompassArrow(deg: deg).font(.caption2)
-                        Text(compass16(deg)).font(.caption2)
-                        Text(phase.word).font(.caption2)
-                            .foregroundStyle(SN.foam.opacity(0.6))
-                    }
-                    .foregroundStyle(SN.foam.opacity(0.9))
-                }
+                ConditionsItem(reading: .current(
+                    signed: state.signed,
+                    deg: record.setDegrees(signed: state.signed),
+                    unit: speedUnit,
+                    tilde: provisional != nil))
             }
         }
-        .task { if state == nil { state = record.cardState(at: appNow()) } }
+        .task {
+            if state == nil { state = record.cardState(at: appNow()) }
+            if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
+        }
         // The refinement replaces the record under an open list: recompute.
-        .onChange(of: record) { _, refined in state = refined.cardState(at: appNow()) }
+        .onChange(of: record) { _, refined in
+            state = refined.cardState(at: appNow())
+            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil)
+        }
     }
+}
 
-    private func nextLine(_ next: CurrentEvent) -> String {
-        let when = cardTime(next.time, record.tz)
-        return next.kind == .slack
-            ? "\(tilde)Slack · \(when)"
-            : "\(next.turnLabel) \(tilde)\(formatSpeed(abs(next.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
+/// A clean semidiurnal sine for the preview cards. `phase` slides the wave
+/// under the now mark (one swing in from the left edge): 2 puts extremes at
+/// h ∈ {-5.1, 1.1, 7.3, 13.5}; 3.1 puts a crest exactly at now.
+// One line so TypeScaleTests' enclosingDeclaration walk can own the
+// formatter calls below (it only recognizes a declaration whose line ends
+// with the opening brace).
+private func previewGraph(scale: Double, offset: Double, includesZero: Bool, phase: Double = 2, label: (Double) -> String) -> StationCardGraph {
+    let now = Date()
+    let swing = StationCardGraph.swing / 3600  // hours between extremes
+    let backH = StationCardGraph.backWindow / 3600
+    let forwardH = StationCardGraph.forwardWindow / 3600
+    func value(_ h: Double) -> Double { sin((h + phase) / swing * .pi) * scale + offset }
+    let extremeHours = (-2...3).map { swing * (0.5 + Double($0)) - phase }
+        .filter { (-backH...forwardH).contains($0) }
+    // Analytic slack windows for the sine: |A·sin| = threshold solves to a
+    // half-width of swing/π·asin(t/A) around each zero crossing. Spelled as
+    // a plain loop with explicit types — the closure-chain form sent the
+    // type-checker into the weeds.
+    var windows: [StationCardGraph.Window] = []
+    if includesZero {
+        let ratio: Double = min(1.0, defaultSlackThresholdKn / scale)
+        let halfW: Double = swing / Double.pi * asin(ratio)
+        for k in -1...3 {
+            let z: Double = swing * Double(k) - phase
+            guard z >= -backH, z <= forwardH else { continue }
+            let start = now.addingTimeInterval((z - halfW) * 3600)
+            let end = now.addingTimeInterval((z + halfW) * 3600)
+            windows.append(StationCardGraph.Window(start: start, end: end))
+        }
+    }
+    return StationCardGraph(
+        points: stride(from: -backH, through: forwardH, by: 0.25).map {
+            .init(time: now.addingTimeInterval($0 * 3600), value: value($0))
+        },
+        extremes: extremeHours.map { h in
+            let t = now.addingTimeInterval(h * 3600)
+            return .init(time: t, value: value(h),
+                         valueText: label(value(h)),
+                         timeText: cardTime(t, .current),
+                         high: value(h) > offset,
+                         // Signed preview curves are currents: opposing sets.
+                         deg: includesZero ? (value(h) > offset ? 140 : 320) : nil)
+        },
+        now: now,
+        includesZero: includesZero,
+        windows: windows)
+}
+
+#Preview {
+    ZStack {
+        SN.canvas.ignoresSafeArea()
+        ScrollView {
+            VStack(spacing: 16) {
+            StationCard(
+                name: "Point Atkinson",
+                region: "British Columbia",
+                km: 12.4,
+                graph: previewGraph(scale: 1.4, offset: 1.7, includesZero: false) {
+                    "\(formatHeight($0, imperial: false)) m"
+                }
+            ) {
+                ConditionsItem(reading: .tide(
+                    CardState(height: 3.1, rising: true, next: nil),
+                    imperial: false))
+            }
+            StationCard(
+                name: "First Narrows",
+                region: "Lions Gate Bridge",
+                km: 8.7,
+                graph: previewGraph(scale: 2.2, offset: 0, includesZero: true) {
+                    "\(formatSpeed(abs($0), unit: "kn")) kn"
+                }
+            ) {
+                ConditionsItem(reading: .current(signed: 1.0, deg: 140, unit: "kn"))
+            }
+            // Now exactly at a crest: the now dot and an extreme dot coincide.
+            StationCard(
+                name: "Tofino",
+                region: "British Columbia",
+                km: 41.2,
+                graph: previewGraph(scale: 1.4, offset: 1.7, includesZero: false, phase: 3.1) {
+                    "\(formatHeight($0, imperial: false)) m"
+                }
+            ) {
+                ConditionsItem(reading: .tide(
+                    CardState(height: 3.1, rising: false, next: nil),
+                    imperial: false))
+            }
+            StationCard(
+                name: "Active Pass",
+                region: "British Columbia",
+                km: 22.8,
+                graph: previewGraph(scale: 2.2, offset: 0, includesZero: true, phase: 3.1) {
+                    "\(formatSpeed(abs($0), unit: "kn")) kn"
+                }
+            ) {
+                ConditionsItem(reading: .current(signed: 2.2, deg: 320, unit: "kn"))
+            }
+            StationCard(
+                name: "Taumatawhakatangihangakoauauotamateaturipukakapikimaungahoronukupokaiwhenuakitanatahu",
+                region: "Hawke's Bay",
+                km: 12047.3
+            ) {
+                ConditionsItem(reading: .tide(
+                    CardState(height: 1.2, rising: false, next: nil),
+                    imperial: false))
+            }
+            StationCard(
+                name: "Victoria Harbour",
+                region: "British Columbia",
+                status: .downloading,
+                opacity: 0.82
+            ) {
+                EmptyView()
+            }
+            }
+            .padding()
+        }
     }
 }
