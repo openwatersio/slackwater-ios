@@ -111,12 +111,17 @@ targets:
       - path: Slackwater/Resources/chs-tombstones.json
       - Slackwater/AppGroup.swift
       - Slackwater/Units.swift
+      - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
       - Slackwater/SlackWindow.swift
+      - Slackwater/CardStatus.swift
+      - Slackwater/StationCardFace.swift
+      - Slackwater/StationCardGraph.swift
       - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
+      - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
-      - Slackwater/MiniScrubberView.swift
+      - Slackwater/DayCurveContentView.swift
       - Slackwater/TideStation.swift
       - Slackwater/CurrentStation.swift
       - Slackwater/ChsStation.swift

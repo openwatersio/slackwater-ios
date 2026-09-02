@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { allStations } from "@neaps/tide-database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
+  placesResolver, undangle,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -77,11 +78,21 @@ test("no station outside North America carries a gazetteer-derived region", () =
   // stations.json carries no `country` field — correlate back to the
   // upstream row by id, same as the licence and "reaches beyond North
   // America" tests above.
-  const country = new Map(allStations.map((s) => [s.id, s.country]));
+  const byId = new Map(allStations.map((s) => [s.id, s]));
+  // station-metadata 5.0.0 dropped the "~" a derived context used to carry,
+  // so a derived label can no longer be spotted by its glyph. Ask the same
+  // resolver gen-tides.mjs uses: a station outside North America whose
+  // shipped region is a context the resolver marked `derived` got past the
+  // gate. Non-derived contexts ("Djakarta, Java" -> "Java") are upstream's
+  // own words and are allowed anywhere.
+  const resolve = placesResolver();
   const borrowed = stations
     .filter((s) => {
-      const c = country.get(s.id);
-      return c && !NORTH_AMERICA.has(c) && s.region.startsWith("~");
+      const raw = byId.get(s.id);
+      const c = raw?.country;
+      if (!c || NORTH_AMERICA.has(c)) return false;
+      const r = resolve({ id: raw.id, name: raw.name, latitude: raw.latitude, longitude: raw.longitude });
+      return r.derived && s.region === undangle(r.context);
     })
     .map((s) => `${s.name} · ${s.region}`);
   assert.deepEqual(borrowed, []);
@@ -101,7 +112,7 @@ test("no bundled Canadian station duplicates a CHS station", () => {
   const chs = JSON.parse(readFileSync(
     join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
   // The province code either IS the region line or ends it — "BC" and
-  // "~Sidney, BC" are both Canadian. Matching only the bare code quietly
+  // "Sidney, BC" are both Canadian. Matching only the bare code quietly
   // shrank this check to 25 stations the day nearest-town labels landed, which
   // is the wrong way for a duplicate-detector to fail. Read from the shipped
   // file rather than the generator's own bookkeeping, deliberately: that is

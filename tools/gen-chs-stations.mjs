@@ -32,8 +32,8 @@
  *
  * CONTEXT. IWLS publishes no region, so the label is derived here, in two
  * tiers. First the NEAREST TOWN from station-corrections' national places list
- * ("~Nanaimo, BC") — capped at 40 km and skipped when it would only restate
- * the station's own name, so Halifax does not read "~Halifax, NS". Then, for a
+ * ("Nanaimo, BC") — capped at 40 km and skipped when it would only restate
+ * the station's own name, so Halifax does not read "Halifax, NS". Then, for a
  * station with no town in range, a COARSE COAST label from position,
  * deliberately coarse enough to stay true at every boundary (an Ungava Bay
  * station reading "Atlantic Coast" is a fact about the ocean basin, not a
@@ -96,7 +96,7 @@ const coastOf = (la, lo) => COASTS.find(([, hit]) => hit(la, lo))[0];
  *
  * The raw name goes in because the resolver needs it to suppress a context
  * that only restates it: a station called Halifax must not be labelled
- * "~Halifax, NS". Its cleaned name comes back out unused, deliberately —
+ * "Halifax, NS". Its cleaned name comes back out unused, deliberately —
  * renaming a thousand IWLS stations is a separate change from labelling them.
  */
 function contextOf(id, name, latitude, longitude) {

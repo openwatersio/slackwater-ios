@@ -46,18 +46,6 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertTrue(low.label.hasPrefix("Low "))
     }
 
-    func testCurrentLocationWidgetPresentsIconAndResolvedStationName() {
-        let presentation = widgetStationPresentation("Current Location · North Vancouver")
-
-        XCTAssertTrue(presentation.isCurrentLocation)
-        XCTAssertEqual(presentation.name, "North Vancouver")
-    }
-
-    func testTideWidgetPresentsHeightWithoutRedundantHighLowText() {
-        XCTAssertEqual(tideEventValue("High 15.5 ft"), "15.5 ft")
-        XCTAssertEqual(tideEventValue("Low 4.2 ft"), "4.2 ft")
-    }
-
     func testTideSnapshotCarriesScrubberMovement() {
         let station = Station(
             constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
@@ -70,19 +58,6 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertFalse(s.tideMovements.isEmpty)
         XCTAssertNotNil(s.tideRate)
         XCTAssert(s.tideMovements.allSatisfy { (0...1).contains($0.fraction) })
-    }
-
-    func testQuietTideAccessibilityDoesNotAnnounceMovementChevrons() {
-        let station = Station(
-            constituents: [HarmonicConstituent(name: "M2", amplitude: 0.1, phase: 0)],
-            offset: 1)
-        let snapshot = WidgetSnapshot.build(
-            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "Quiet Tide"),
-            now: Date(timeIntervalSince1970: 1_755_800_000))
-
-        XCTAssertTrue(snapshot.tideMovements.isEmpty)
-        XCTAssertFalse(DayCurveContentView(snapshot: snapshot).curveAccessibilityValue
-            .contains("Movement chevrons"))
     }
 
     /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
@@ -124,19 +99,14 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertFalse(s.value.isEmpty)
     }
 
-    func testMediumWidgetPresentsSlackWindowBeforeItsCountdown() throws {
-        let source = try repoSource("Slackwater/MiniScrubberView.swift")
+    /// The widget IS the list card — no second drawing of the curve.
+    func testMediumWidgetIsTheCardNotASecondDrawing() throws {
+        let source = try repoSource("Slackwater/DayCurveContentView.swift")
 
-        XCTAssert(source.contains("Text(tideWarning ?? snapshot.state.uppercased())"))
-        XCTAssert(source.contains("Text(snapshot.value)"))
-        XCTAssert(source.contains("MiniScrubberView(snapshot: snapshot)"))
-        XCTAssert(source.contains("Text(window.start, style: .time)"))
-        XCTAssert(source.contains("Text(window.end, style: .time)"))
-        XCTAssert(source.contains("Text(window.start, style: .relative)"))
-        XCTAssert(source.contains("Image(systemName: \"arrow.right\")"))
-        XCTAssert(source.contains("\\(windowMinutes) min"))
-        XCTAssert(source.contains("accessibilityLabel"))
-        XCTAssert(source.contains("accessibilityValue"))
+        XCTAssert(source.contains("StationCard(name: card.name"))
+        XCTAssert(source.contains("ConditionsItem(reading: card.reading)"))
+        XCTAssertFalse(source.contains("Canvas {"))
+        XCTAssertFalse(source.contains("sparkline"))
     }
 
     func testWidgetCurrentColourUsesTheAbsoluteSpeedRamp() {
@@ -146,77 +116,170 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(widgetSpeedRampT(12), 1, accuracy: 1e-9)
     }
 
-    @MainActor
-    func testMiniScrubberRendersCurrentInk() throws {
-        let snapshot = WidgetSnapshot.build(current,
-            now: Date())
-        let renderer = ImageRenderer(content: DayCurveContentView(snapshot: snapshot)
-            .padding(16)
-            .frame(width: 338, height: 158)
-            .background(Color.white))
-        let image = try XCTUnwrap(renderer.uiImage)
-        let png = try XCTUnwrap(image.pngData())
-
-        XCTAssertGreaterThan(png.count, 1_000)
-        let cg = try XCTUnwrap(image.cgImage)
-        let width = cg.width, height = cg.height
-        var pixels = [UInt8](repeating: 0, count: width * height * 4)
-        CIContext().render(CIImage(cgImage: cg), toBitmap: &pixels,
-                           rowBytes: width * 4,
-                           bounds: CGRect(x: 0, y: 0, width: width, height: height),
-                           format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
-        let chartRows = 30..<(height - 30)
-        let orangeInk = chartRows.reduce(into: 0) { count, y in
-            for x in 12..<(width - 12) {
-                let i = (y * width + x) * 4
-                if pixels[i] > 190, pixels[i + 1] > 60,
-                   pixels[i + 1] < 190, pixels[i + 2] < 100 { count += 1 }
+    /// The record/instant among `records` whose card graph carries the
+    /// longest slack window near `now` — a weak current sits under
+    /// threshold far longer than a spring ebb, and the render below wants
+    /// a stroke long enough to clear the pixel-count floor, not a blip a
+    /// couple of samples wide. Falls back a day ahead for any record with
+    /// no window in the next 25 hours.
+    private func widestWindowCard(
+        among records: [CurrentStationRecord], near now: Date
+    ) -> (record: CurrentStationRecord, now: Date, graph: StationCardGraph)? {
+        var best: (CurrentStationRecord, Date, StationCardGraph, TimeInterval)?
+        for r in records {
+            var t = now
+            var g = r.cardGraph(at: t, unit: "kn")
+            if g.windows.isEmpty,
+               let w = r.cardGraph(at: now.addingTimeInterval(86_400), unit: "kn").windows.first {
+                t = w.start
+                g = r.cardGraph(at: t, unit: "kn")
             }
+            guard let w = g.windows.first(where: { $0.contains(t) }) ?? g.windows.first else { continue }
+            let duration = w.end.timeIntervalSince(w.start)
+            if best == nil || duration > best!.3 { best = (r, t, g, duration) }
         }
-        XCTAssertGreaterThan(orangeInk, 100, "current curve rendered without warm-water ink")
-        let attachment = XCTAttachment(image: image)
-        attachment.name = "medium-widget-current"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        return best.map { ($0.0, $0.1, $0.2) }
     }
 
+    /// The medium widget IS the card: a bundled current station's
+    /// `WidgetCard` rendered through `DayCurveContentView` — name, reading
+    /// with set, curve with dots and times, no second drawing. Rendered at
+    /// both live medium-widget sizes: 338×158 (older phones) and 364×170
+    /// (iPhone 15 Pro and later). No extra padding — `containerBackground`
+    /// fills the family with no inset, so this frame IS the widget. `now`
+    /// is a fixed epoch, not `Date()` — deterministic, not a flake.
     @MainActor
-    func testMiniScrubberRendersTideMovementInk() throws {
-        let station = Station(
-            constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
-            offset: 6)
-        let seed = Date(timeIntervalSince1970: 1_755_800_000)
-        let now = try XCTUnwrap(station.rates(from: seed,
-                                              to: seed.addingTimeInterval(12 * 3600))
-            .max { abs($0.rate) < abs($1.rate) }).time
-        let snapshot = WidgetSnapshot.build(
-            .tide(station, tz: TimeZone(identifier: "UTC")!, name: "North Vancouver"),
-            now: now, stationNamePrefix: "Current Location")
-        let renderer = ImageRenderer(content: DayCurveContentView(snapshot: snapshot)
-            .padding(16)
-            .frame(width: 338, height: 158)
-            .background(Color.white))
-        let image = try XCTUnwrap(renderer.uiImage)
-        let cg = try XCTUnwrap(image.cgImage)
-        let width = cg.width, height = cg.height
-        var pixels = [UInt8](repeating: 0, count: width * height * 4)
-        CIContext().render(CIImage(cgImage: cg), toBitmap: &pixels,
-                           rowBytes: width * 4,
-                           bounds: CGRect(x: 0, y: 0, width: width, height: height),
-                           format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
-        let chartRows = 30..<(height - 30)
-        let warmInk = chartRows.reduce(into: 0) { count, y in
-            for x in 12..<(width - 12) {
-                let i = (y * width + x) * 4
-                if pixels[i] > 180, pixels[i + 1] > 40,
-                   pixels[i + 1] < 210, pixels[i + 2] < 120 { count += 1 }
+    func testMediumWidgetRendersTheStationCard() throws {
+        let (record, now, graph) = try XCTUnwrap(widestWindowCard(
+            among: Array(CurrentStationRecord.all.prefix(30)),
+            near: Date(timeIntervalSince1970: 1_755_800_000)))
+        let card = WidgetCard.build(.current(record), now: now)
+
+        func render(_ width: CGFloat, _ height: CGFloat, name: String) throws -> UIImage {
+            // SN.canvas: the widget's real containerBackground (the list's
+            // ground) — the card paints its translucent SN.cardFill over it.
+            let renderer = ImageRenderer(content: DayCurveContentView(card: card)
+                .frame(width: width, height: height)
+                .background(SN.canvas))
+            let image = try XCTUnwrap(renderer.uiImage)
+            let png = try XCTUnwrap(image.pngData())
+            XCTAssertGreaterThan(png.count, 1_000)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            return image
+        }
+
+        _ = try render(338, 158, name: "widget-medium-158")
+        let image170 = try render(364, 170, name: "widget-medium-170")
+
+        if !graph.windows.isEmpty {
+            let cg = try XCTUnwrap(image170.cgImage)
+            let width = cg.width, height = cg.height
+            var pixels = [UInt8](repeating: 0, count: width * height * 4)
+            CIContext().render(CIImage(cgImage: cg), toBitmap: &pixels,
+                               rowBytes: width * 4,
+                               bounds: CGRect(x: 0, y: 0, width: width, height: height),
+                               format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+            // SN.go == 0x88B868, ±24/channel.
+            let goInk = (0..<height).reduce(into: 0) { count, y in
+                for x in 0..<width {
+                    let i = (y * width + x) * 4
+                    if abs(Int(pixels[i]) - 0x88) <= 24, abs(Int(pixels[i + 1]) - 0xB8) <= 24,
+                       abs(Int(pixels[i + 2]) - 0x68) <= 24 { count += 1 }
+                }
+            }
+            XCTAssertGreaterThan(goInk, 100, "expected go-coloured slack window ink")
+        }
+    }
+
+    /// §15.3: inside a slack window the widget's reading counts down to the
+    /// window's close instead of showing a speed. Fixed epoch, not `Date()`
+    /// — deterministic, not a flake.
+    func testWidgetCardCountsDownInsideAWindow() throws {
+        let record = CurrentStationRecord.all.first!
+        let epoch = Date(timeIntervalSince1970: 1_755_800_000)
+        var graph = record.cardGraph(at: epoch, unit: "kn")
+        if graph.windows.isEmpty {
+            graph = record.cardGraph(at: epoch.addingTimeInterval(86_400), unit: "kn")
+        }
+        let window = try XCTUnwrap(graph.windows.first)
+        // One hour before the window closes: always under two hours
+        // remaining regardless of how wide the fixture window itself is.
+        let now = window.end.addingTimeInterval(-3_600)
+        guard now >= window.start else {
+            throw XCTSkip("fixture window is under an hour wide")
+        }
+
+        let card = WidgetCard.build(.current(record), now: now)
+        let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
+        if case .current(_, _, _, _, let inWindow) = card.reading {
+            XCTAssertTrue(inWindow)
+        } else {
+            XCTFail("expected a .current reading")
+        }
+        // Sub-second tolerance: `end` comes from a graph re-sampled at
+        // `now`, `window` from one sampled at the earlier anchor used to
+        // find it — both interpolate the same crossing off a 10-min grid
+        // offset by the shift between the two anchors.
+        XCTAssertEqual(end.timeIntervalSince1970, window.end.timeIntervalSince1970, accuracy: 1.0)
+    }
+
+    /// No "> 2 hrs" state (user ruling): more than two hours before a
+    /// window closes, the widget's corner shows nothing at all — the
+    /// reading alone says Slack.
+    func testWidgetCardHasNoCountdownBeyondTwoHours() throws {
+        let epoch = Date(timeIntervalSince1970: 1_755_800_000)
+        var found: (CurrentStationRecord, WindowRun)?
+        outer: for record in CurrentStationRecord.all {
+            for anchor in [epoch, epoch.addingTimeInterval(86_400)] {
+                let graph = record.cardGraph(at: anchor, unit: "kn")
+                if let w = graph.windows.first(where: { $0.end.timeIntervalSince($0.start) > 3 * 3_600 }) {
+                    found = (record, w)
+                    break outer
+                }
             }
         }
-        XCTAssertGreaterThan(warmInk, 100, "tide curve rendered without movement warning ink")
-        let attachment = XCTAttachment(image: image)
-        attachment.name = "medium-widget-current-location-tide"
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        guard let (record, window) = found else {
+            throw XCTSkip("no bundled window over three hours wide")
+        }
+        let now = window.end.addingTimeInterval(-3 * 3_600)
+        let card = WidgetCard.build(.current(record), now: now)
+        XCTAssertNil(card.countdownEnd)
+    }
+
+    /// A widget explicitly configured to a CHS tide port builds that
+    /// station's own card, not the current-location fallback — the data-path
+    /// half of the widget's Station-picker bug: a chosen station must resolve
+    /// to itself and carry no location mark.
+    func testChosenChsTidePortBuildsItsOwnWidgetCard() throws {
+        let id = "chs-narvaez-bay"
+        guard ChsModelStore.load(id) == nil else {
+            throw XCTSkip("\(id) already has a fitted model on this device")
+        }
+        let info = try XCTUnwrap(ChsStationInfo.all.first { $0.id == id })
+        let model = ChsModel(
+            stationID: id, iwlsID: "iwls-test", iwlsName: info.name,
+            fittedAt: .now, fitStartMs: 0, fitEndMs: 1,
+            offset: 1, rms: 0,
+            constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
+        try ChsModelStore.save(model)
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.url(id)) }
+
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id))
+        guard case .tide = record else {
+            return XCTFail("expected a .tide record for a CHS tide port")
+        }
+        let card = WidgetCard.build(record, now: Date(timeIntervalSince1970: 1_755_800_000))
+        XCTAssertEqual(card.name, info.name)
+        XCTAssertFalse(card.locationMark)
+        XCTAssertNotNil(card.graph)
+        guard case .tide = card.reading else {
+            return XCTFail("expected a .tide reading")
+        }
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(id), id,
+                       "a concrete choice must never resolve to the current location")
     }
 
     func testSparklineShape() {

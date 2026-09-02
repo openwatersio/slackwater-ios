@@ -51,6 +51,7 @@ Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit
 
 - The `.storekit` file is wired to the scheme's `run:` action, so StoreKit works in the simulator and silently does not in an archive, where `Product.products(for:)` goes to real App Store Connect. Check `inAppPurchasesV2` and `subscriptionGroups` on the app before writing a word about a purchase.
 - App Groups are not in the App Store Connect API (`/v1/appGroups` is a 404). Creating one is developer.apple.com UI work; budget a human for it.
+- **The widget's station picker never applies in the simulator.** linkd cannot read a simulator process's team id, so the App Intents runtime logs "StationChoice is not a registered AppEntity identifier" and resolves the configured station to nil — every widget shows the default station. Re-signing the simulator build with a real identity does not help. Verify the picker on a device.
 
 ## Working with subagents here
 

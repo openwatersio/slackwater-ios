@@ -92,9 +92,10 @@ final class ColourAndFormTests: XCTestCase {
     /// about the zero line, and the rotated set arrow); this asserts nothing
     /// quietly puts it back on colour.
     ///
-    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide`
-    /// legitimately keeps `SN.rising`/`SN.falling`, which is #95's question,
-    /// not this one's.
+    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide` draws
+    /// no direction colour any more (its turn dots are the card's teal/amber
+    /// tokens); the scope stays on `drawCurrent` because that is the track
+    /// the ramp replaced direction colour on.
     func testCurrentTrackDoesNotSpeakDirectionInColour() throws {
         let source = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = source.components(separatedBy: .newlines)
@@ -182,7 +183,7 @@ final class ColourAndFormTests: XCTestCase {
     /// My Location slot directly above Near Me glyphs drawing the new ebb — the
     /// exact adjacency the split existed to prevent. So this scans everything
     /// and whitelists nothing. A legitimate use is a conversation, not an
-    /// exception: `Theme.swift`'s amber comment was reworded to stop spelling
+    /// exception: `Palette.swift`'s amber comment was reworded to stop spelling
     /// the value rather than being excluded from the scan.
     func testNoSourceFileSpellsARetiredColour() throws {
         let retired = [
@@ -208,7 +209,7 @@ final class ColourAndFormTests: XCTestCase {
     }
 
     func testColourLiteralsLiveInTheme() throws {
-        let allowed: Set<String> = ["Theme.swift", "TimelineStrip.swift"]
+        let allowed: Set<String> = ["Palette.swift", "Theme.swift", "TimelineStrip.swift"]
         var offenders: [String] = []
         for (name, source) in try appSources() where !allowed.contains(name) {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
@@ -260,7 +261,7 @@ final class ColourAndFormTests: XCTestCase {
 
     /// The map's palette must BE the tokens. Its colours are hex strings
     /// (MapLibre style dicts cannot hold a Swift `Color`), and while they were
-    /// hand-maintained nothing tied them to `Theme.swift`: retarget `SN.flood`
+    /// hand-maintained nothing tied them to `Palette.swift`: retarget `SN.flood`
     /// and the map kept the old blue — two blues both meaning flood, and not
     /// one failing test. They are derived from the token hexes now; this
     /// asserts the wiring, i.e. that `rising` reaches flood and not ebb.

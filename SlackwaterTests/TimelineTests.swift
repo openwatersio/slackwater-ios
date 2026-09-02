@@ -450,22 +450,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
-    /// The band rows must stay in reading order and inside the canvas, for
-    /// whichever track owns the box. Get one slot backwards and the glyph
-    /// prints over the value with nothing to say so.
-    private func assertBandsAreReadable(_ g: TimelineGeo,
-                                        file: StaticString = #filePath, line: UInt = #line) {
-        XCTAssert(g.topTimeY < g.topValueY && g.topValueY < g.topGlyphY && g.topGlyphY < g.bodyTop,
-                  "top band reads time → value → glyph → curve", file: file, line: line)
-        XCTAssert(g.bodyBottom < g.bottomGlyphY && g.bottomGlyphY < g.bottomValueY
-                    && g.bottomValueY < g.bottomTimeY,
-                  "bottom band reads curve → glyph → value → time", file: file, line: line)
-        XCTAssertGreaterThan(g.topTimeY, g.sunY + 8,
-                             "the top band must clear the sun dots above it", file: file, line: line)
-        XCTAssertLessThan(g.bottomTimeY, g.height - 8,
-                          "the last row must sit inside the canvas", file: file, line: line)
-    }
-
     /// EVERY time the strip prints must be a time the strip can stop on.
     ///
     /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
@@ -507,15 +491,14 @@ final class TimelineTests: XCTestCase {
         let tideData = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
         let tide = TimelineGeo(data: tideData)
         XCTAssert(tide.hasTide && !tide.hasCurrent)
-        // NEAPS bands above and below the track, no gutter. Asserted as
-        // structure, not as pixels: the literals that used to sit here
-        // (328/106/256) restated TimelineGeo's own constants back at it, so any
-        // deliberate change to the band grid reddened this test having caught
-        // nothing. assertBandsAreReadable and the body/track identities below
-        // are what actually fail when the geometry breaks.
+        // One plot box for either track (card-look spec §2): the readings
+        // live on the curve and one time row under it, so there is nothing
+        // left to size differently. Asserted as structure, not pixels.
         XCTAssertEqual(tide.bodyTop, tide.tideTop)
         XCTAssertEqual(tide.bodyBottom, tide.tideBottom)
-        assertBandsAreReadable(tide)
+        XCTAssertGreaterThan(tide.bodyTop, tide.sunY + 8 + 8, "the plot clears the moon disc")
+        XCTAssertGreaterThan(tide.timeY, tide.bodyBottom + 8, "the time row sits under the plot")
+        XCTAssertLessThan(tide.timeY, tide.height - 8, "and inside the canvas")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -526,25 +509,12 @@ final class TimelineTests: XCTestCase {
             currentPoints: [CurrentPoint(time: t0, speed: 1)], currentEvents: [],
             snapTimes: [], slackWindows: []))
         XCTAssert(!cur.hasTide && cur.hasCurrent)
-
-        // The tracks diverge again, on purpose. They were briefly one box while
-        // both drew three-row bands; the current strip now prints ONE green
-        // slack time above the curve and ONE small time below it, with the
-        // speeds annotating the curve itself — two rows, not six — so borrowing
-        // tide's grid would leave four rows of dead height on every gate.
-        // Shorter canvas, taller track.
-        XCTAssertLessThan(cur.height, tide.height, "fewer rows, shorter canvas")
-        XCTAssertGreaterThan(cur.curBottom - cur.curTop, tide.tideBottom - tide.tideTop,
-                             "and the reclaimed height goes to the curve")
         XCTAssertEqual(cur.bodyTop, cur.curTop)
         XCTAssertEqual(cur.bodyBottom, cur.curBottom)
-
-        // One row above and one below, both outside the track and inside the
-        // canvas, with the top one clear of the sun chrome.
-        XCTAssertLessThan(cur.slackRangeY, cur.curTop, "the slack time sits above the track")
-        XCTAssertGreaterThan(cur.slackRangeY, cur.sunY + 12, "and clears the sun dots")
-        XCTAssertGreaterThan(cur.maxTimeY, cur.curBottom, "max times sit below the track")
-        XCTAssertLessThan(cur.maxTimeY, cur.height - 8, "and inside the canvas")
+        XCTAssertEqual(cur.height, tide.height, "same canvas for both tracks")
+        XCTAssertEqual(cur.curTop, tide.tideTop, "same plot box for both tracks")
+        XCTAssertEqual(cur.curBottom, tide.tideBottom)
+        XCTAssertEqual(cur.timeY, tide.timeY)
 
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
@@ -563,7 +533,10 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.curTop, 0)
     }
 
-    func testTideTrackUsesBlueFillAndCurveFollowingChevrons() throws {
+    /// The tide track draws the card's curve: the card's blue fill, no
+    /// speed palette in the fill, and the tide-rate ramp carried by the
+    /// LINE COLOUR rather than by chevron glyphs (card-look spec §4).
+    func testTideTrackUsesCardFillAndRateColouredLine() throws {
         let source = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = source.components(separatedBy: .newlines)
         guard let start = lines.firstIndex(where: { $0.contains("private func drawTide(") }),
@@ -571,12 +544,29 @@ final class TimelineTests: XCTestCase {
         else { return XCTFail("drawTide body not found") }
         let body = lines[start..<end].joined(separator: "\n")
 
-        XCTAssertFalse(body.contains("tideFillStops"), "tide fill must not use the current speed palette")
-        XCTAssertTrue(body.contains("SN.flood.opacity"), "tide fill stays light blue")
-        XCTAssertTrue(body.contains("tideFlowArrows"), "fast tide movement needs chevrons")
-        XCTAssertTrue(body.contains("Text(\"››››\")"), "each tide run gets one bold chevron set")
-        XCTAssertTrue(body.contains("rotate(by:"), "chevrons follow the tide curve")
-        XCTAssertTrue(body.contains("rampT(forTideRateMHr:"), "chevrons use an absolute tide-rate scale")
+        XCTAssertFalse(body.contains("currentFillStops"), "tide fill must not use the current speed palette")
+        XCTAssertTrue(body.contains("SN.graphLine.opacity(CurveStyle.fillOpacity)"), "tide fill is the card's blue gradient")
+        XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
+        XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")
+    }
+
+    /// Below the ramp floor the line is the base colour; above it the stroke
+    /// follows the absolute tide-rate ramp, so a lazy tide never leaves blue
+    /// and a Fundy run reaches red.
+    func testTideRateStopsColourOnlyFastWater() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let x = { (t: Date) -> CGFloat in CGFloat(t.timeIntervalSince(t0)) }
+        let lazy = [(time: t0, rate: 0.2), (time: t0.addingTimeInterval(100), rate: -0.5)]
+        XCTAssertTrue(tideRateStops(lazy, x: x, width: 100).allSatisfy { $0.color == SN.graphLine })
+
+        let fundy = [(time: t0, rate: 0.2),
+                     (time: t0.addingTimeInterval(50), rate: 1.8),
+                     (time: t0.addingTimeInterval(100), rate: 0.2)]
+        let stops = tideRateStops(fundy, x: x, width: 100)
+        XCTAssertEqual(stops[0].color, SN.graphLine)
+        XCTAssertEqual(stops[1].color, SN.speedColour(1), "1.8 m/hr is the red ceiling")
+        XCTAssertEqual(stops[2].color, SN.graphLine)
+        XCTAssertEqual(stops[1].location, 0.5, accuracy: 0.001)
     }
 
     /// v falls linearly 2 kn → -2 kn over 2 h (slack at +60 min); |v| < 0.5
@@ -638,28 +628,6 @@ final class TimelineTests: XCTestCase {
                      "a slack before the series has no window")
         XCTAssertNil(slackWindow(pts, around: t0.addingTimeInterval(6 * 3600), threshold: 0.5),
                      "a slack after the series must not borrow the trailing run")
-    }
-
-    /// Removing either interpolated endpoint lets the green overlay cross its
-    /// threshold line; including an out-of-window point paints a fast segment
-    /// green. The renderer consumes these exact, clipped paths.
-    func testSlackFillSegmentsClipToInterpolatedThresholdCrossings() {
-        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
-        let points = [
-            CurrentPoint(time: t0, speed: -1),
-            CurrentPoint(time: t0.addingTimeInterval(600), speed: -0.25),
-            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 0.25),
-            CurrentPoint(time: t0.addingTimeInterval(1800), speed: 1),
-        ]
-
-        let segments = slackFillSegments(points, threshold: 0.5)
-
-        XCTAssertEqual(segments.count, 1)
-        XCTAssertEqual(segments[0].map(\.time), [
-            t0.addingTimeInterval(400), t0.addingTimeInterval(600),
-            t0.addingTimeInterval(1200), t0.addingTimeInterval(1400),
-        ])
-        XCTAssertEqual(segments[0].map(\.speed), [-0.5, -0.25, 0.25, 0.5])
     }
 
     func testCurrentExcessSegmentsStartAtTheSlackThreshold() {
@@ -756,29 +724,6 @@ final class TimelineTests: XCTestCase {
                        "21:35 → 00:19⁺⁹")
         XCTAssertEqual(slackWindowTiming(start: start, end: end(10), tz: .gmt).span,
                        "21:35 → 00:19⁺⁺")
-    }
-
-    /// Adjacent slack windows that touch or overlap merge into one green
-    /// column, so only the first slack of the run labels itself (#56 —
-    /// Race Rocks Aug 11, a 0.1 kn blip between two slacks).
-    func testTouchingSlackWindowsLabelOnlyTheFirst() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
-        // overlapping, touching (end == start), then a clear gap
-        let windows = [(slack: s(76), start: s(50), end: s(120)),
-                       (slack: s(188), start: s(110), end: s(220)),
-                       (slack: s(300), start: s(220), end: s(340)),
-                       (slack: s(600), start: s(500), end: s(700))]
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(76)),
-                       "the first slack of a merged run keeps its label")
-        XCTAssert(suppressesSlackLabel(windows, at: s(188)),
-                  "overlap with the previous window suppresses the label")
-        XCTAssert(suppressesSlackLabel(windows, at: s(300)),
-                  "touching (end == start) reads as one column too")
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(600)),
-                       "a gap breaks the run — this slack labels itself")
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(999)),
-                       "a slack with no window (hairline case) is never suppressed")
     }
 
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a

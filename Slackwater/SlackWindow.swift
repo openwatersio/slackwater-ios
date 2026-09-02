@@ -67,3 +67,94 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
     }
     return (start, end)
 }
+
+/// One usable run of slack water. Touching or overlapping windows merge into
+/// one run and carry one label (current-charts spec §4 rule 3); the predicate that
+/// produced each window is unchanged, only the drawing joins them.
+struct WindowRun: Equatable {
+    let start: Date
+    let end: Date
+    func contains(_ t: Date) -> Bool { start <= t && t <= end }
+}
+
+/// Windows in chronological order → runs. Two windows join when the later
+/// one starts at or before the earlier one ends.
+func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
+    var runs: [WindowRun] = []
+    for w in windows {
+        if let last = runs.last, w.start <= last.end {
+            runs[runs.count - 1] = WindowRun(start: last.start, end: max(last.end, w.end))
+        } else {
+            runs.append(WindowRun(start: w.start, end: w.end))
+        }
+    }
+    return runs
+}
+
+/// The moments a current axis prints: each run's opening (the time a planner
+/// is aiming at — spec §4 rule 7), plus the bare instant of any slack no run
+/// covers, which is the hairline case (§5.3). Sorted.
+func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
+    let bare = slacks.filter { t in !runs.contains { $0.contains(t) } }
+    return (runs.map(\.start) + bare).sorted()
+}
+
+/// The window's two edges are the points of interest (current-charts
+/// §5.4.1): the opening is major while the run is ahead, the closing is
+/// major once inside it; the other draws at half strength. A run already
+/// passed fades both like any past mark, keeping the same ratio.
+func windowDotOpacities(run: WindowRun, now: Date) -> (opening: Double, closing: Double) {
+    if now < run.start { return (1, 0.5) }
+    if now <= run.end { return (0.5, 1) }
+    return (CurveStyle.pastLabelFade * 0.5, CurveStyle.pastLabelFade)
+}
+
+func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
+    guard points.count > 1 else { return [] }
+    var events: [CurrentEvent] = []
+    var runStart = 0
+    var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
+    var lastWasZero = false         // true if the previous sample was exactly zero
+
+    func closeRun(_ end: Int) {     // [runStart, end] inclusive
+        guard runStart <= end else { return }  // no-op when run is empty
+        // Collect only nonzero speeds; filter excludes exact-zero samples.
+        let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
+        guard !nonzeroInRun.isEmpty else { return }
+        let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
+        events.append(CurrentEvent(time: peak.time, speed: peak.speed,
+                                   kind: peak.speed > 0 ? .maxFlood : .maxEbb))
+    }
+
+    for i in 0..<points.count {
+        let current = points[i]
+        let sign = current.speed > 0 ? 1 : (current.speed < 0 ? -1 : 0)
+
+        if sign == 0 {
+            // Exact-zero sample: if preceded by nonzero and not consecutive zeros,
+            // this zero IS the slack.
+            if lastNonzeroSign != 0 && !lastWasZero {
+                closeRun(i - 1)
+                events.append(CurrentEvent(time: current.time, speed: 0, kind: .slack))
+                runStart = i + 1
+            }
+            lastWasZero = true
+        } else {
+            // Nonzero sample
+            if lastNonzeroSign != 0 && lastNonzeroSign != sign && !lastWasZero {
+                // Sign opposes last nonzero, no zero between: interpolate crossing.
+                let prev = points[i - 1]
+                let f = abs(prev.speed) / (abs(prev.speed) + abs(current.speed))
+                closeRun(i - 1)
+                events.append(CurrentEvent(
+                    time: prev.time.addingTimeInterval(current.time.timeIntervalSince(prev.time) * f),
+                    speed: 0, kind: .slack))
+                runStart = i
+            }
+            lastNonzeroSign = sign
+            lastWasZero = false
+        }
+    }
+    closeRun(points.count - 1)
+    return events.sorted { $0.time < $1.time }
+}

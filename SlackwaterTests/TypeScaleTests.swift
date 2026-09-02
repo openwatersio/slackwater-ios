@@ -43,7 +43,7 @@ extension TypeScaleTests {
     /// 1. It only recognizes mono treatment within a small ±4-line window
     ///    around the formatter call (plus a same-line-only check for
     ///    `MonoLabel(`, whose own `Text` is hardcoded `.monospaced()` in
-    ///    Theme.swift). A formatter that happens to sit a few lines from an
+    ///    Palette.swift). A formatter that happens to sit a few lines from an
     ///    unrelated Text's mono font — coincidence of source layout, not a
     ///    real connection — would pass exactly as readily as a real one; the
     ///    window can't tell the difference. (An earlier draft of this fix
@@ -102,11 +102,11 @@ extension TypeScaleTests {
             "OnlineGateDetailView.swift:body",
             "TideDetailView.swift:body",
             "DerivedGateDetailView.swift:scheduleEntries",
-            // The NEAPS bands: both tracks format their reading at the
-            // `drawBand(...)` call and the `.monospacedDigit()` lives in
-            // `drawBand`'s own value `Text`, one renderer for the whole chart.
-            // Two entries buy back what the gutter's five separate label
-            // builders used to cost.
+            // Both tracks format their reading inline and apply
+            // .monospacedDigit() on the very next line, so the ±4-line scan
+            // already clears them; the entries are kept only so a future
+            // reformat that splits the call from its modifier fails loudly
+            // here instead of silently.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
             // The heuristic's blind spot in miniature: these three calls live

@@ -93,7 +93,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // but still queryable) list behind it carries the same labels.
         let overlay = app.scrollViews.firstMatch
         let fitted = overlay.staticTexts.matching(
-            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
         XCTAssert(fitted.waitForExistence(timeout: 480), "Dodd Narrows never fitted — IWLS unreachable?")
 
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
@@ -113,7 +113,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         openSearch(app, "dodd")
         let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
-            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
@@ -323,7 +323,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         openSearch(app, "active pass")
         let overlay = app.scrollViews.firstMatch
         let fitted = overlay.staticTexts.matching(
-            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK'")).firstMatch
+            NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
         XCTAssert(fitted.waitForExistence(timeout: 240), "Active Pass never fitted — IWLS unreachable?")
         report("nearest 60-day gate → FINAL", t0)
 

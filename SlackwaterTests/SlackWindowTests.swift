@@ -64,4 +64,44 @@ final class SlackWindowTests: XCTestCase {
         XCTAssertEqual(wins[0].start.timeIntervalSince(t0), 300, accuracy: 1)
         XCTAssertEqual(wins[0].end.timeIntervalSince(t0), 900, accuracy: 1)
     }
+
+    // MARK: - Runs and axis moments (shared by the card and the strip)
+
+    /// Touching or overlapping windows are one run (current-charts spec §4.3);
+    /// a gap keeps two runs apart.
+    func testMergeWindowsJoinsTouchingAndOverlappingRuns() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
+        let runs = mergeWindows([(start: s(50), end: s(120)),
+                                 (start: s(110), end: s(220)),   // overlaps
+                                 (start: s(220), end: s(340)),   // touches
+                                 (start: s(500), end: s(700))])  // gap
+        XCTAssertEqual(runs, [WindowRun(start: s(50), end: s(340)),
+                              WindowRun(start: s(500), end: s(700))])
+    }
+
+    /// The axis prints one time per run, at the run's opening, and the bare
+    /// slack instant only where no run covers a slack (the hairline case).
+    func testCurrentAxisMomentsNameRunStartsAndBareSlacks() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
+        let runs = [WindowRun(start: s(50), end: s(340)), WindowRun(start: s(500), end: s(700))]
+        let moments = currentAxisMoments(runs: runs, slacks: [s(76), s(188), s(600), s(999)])
+        XCTAssertEqual(moments, [s(50), s(500), s(999)])
+    }
+
+    /// The opening is the major point while the run is ahead; once inside
+    /// the run the closing is (current-charts §5.4.1). The minor one draws
+    /// at half strength; a past run fades both under the past rule.
+    func testWindowDotOpacitiesSwapInsideTheRun() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let run = WindowRun(start: t0.addingTimeInterval(600), end: t0.addingTimeInterval(1_800))
+        let ahead = windowDotOpacities(run: run, now: t0)
+        XCTAssertEqual(ahead.opening, 1); XCTAssertEqual(ahead.closing, 0.5)
+        let inside = windowDotOpacities(run: run, now: t0.addingTimeInterval(1_000))
+        XCTAssertEqual(inside.opening, 0.5); XCTAssertEqual(inside.closing, 1)
+        let past = windowDotOpacities(run: run, now: t0.addingTimeInterval(3_600))
+        XCTAssertEqual(past.opening, CurveStyle.pastLabelFade * 0.5)
+        XCTAssertEqual(past.closing, CurveStyle.pastLabelFade)
+    }
 }

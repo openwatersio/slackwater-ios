@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@sailingnaturali/station-corrections": "^2.9.2"
+    "@openwaters/station-metadata": "^5.0.1"
   },
   "devDependencies": {
     "@neaps/tide-database": "^0.9.20260801",

@@ -51,11 +51,14 @@ struct DayCurveWidget: Widget {
         AppIntentConfiguration(kind: "DayCurve", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
             DayCurveView(entry: entry)
-                .containerBackground(.background, for: .widget)
+                // The list's ground; the card paints its translucent fill over it, as on screen.
+                .containerBackground(SN.canvas, for: .widget)
         }
         .configurationDisplayName("Today's Curve")
         .description("Today's tide or current curve, with the next event.")
         .supportedFamilies([.systemMedium])
+        // The card IS the widget: no system inset between the container and the card's own 20/16pt padding.
+        .contentMarginsDisabled()
     }
 }
 
@@ -63,8 +66,8 @@ struct DayCurveView: View {
     let entry: SlackwaterEntry
     var body: some View {
         Group {
-            if let snapshot = entry.snapshot {
-                DayCurveContentView(snapshot: snapshot)
+            if let card = entry.card {
+                DayCurveContentView(card: card)
             } else {
                 Text("Open Slackwater to prepare this station")
                     .font(.caption).foregroundStyle(.secondary)
