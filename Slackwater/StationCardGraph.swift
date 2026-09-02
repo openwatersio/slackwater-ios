@@ -76,11 +76,10 @@ struct StationCardGraph: View {
     /// builders from the SHARED `slackWindow` predicate against the
     /// effective threshold — never re-derived in the canvas (§6.1). Only
     /// signed current curves carry them.
-    struct Window {
-        let start: Date
-        let end: Date
-    }
-    var windows: [Window] = []
+    var windows: [WindowRun] = []
+    /// Every slack instant on the curve, so the axis can print the bare
+    /// instant where no run covers a slack. Only signed current curves.
+    var slacks: [Date] = []
 
     var body: some View {
         Canvas { context, size in
@@ -332,20 +331,10 @@ struct StationCardGraph: View {
     }
 }
 
-/// The card's slack windows: one per slack event, from the SHARED
-/// `slackWindow` predicate against the effective threshold. Touching or
-/// overlapping windows merge into one run (spec §4.3).
-func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [StationCardGraph.Window] {
-    var windows: [StationCardGraph.Window] = []
-    for slack in slacks {
-        guard let w = slackWindow(points, around: slack, threshold: threshold) else { continue }
-        if let last = windows.last, w.start <= last.end {
-            windows[windows.count - 1] = .init(start: last.start, end: max(last.end, w.end))
-        } else {
-            windows.append(.init(start: w.start, end: w.end))
-        }
-    }
-    return windows
+/// The card's runs: one window per slack from the SHARED `slackWindow`
+/// predicate against the effective threshold, merged where they touch.
+func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = slackThresholdKn) -> [WindowRun] {
+    mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
 }
 
 extension TideStationRecord {
@@ -390,7 +379,8 @@ extension CurrentStationRecord {
             includesZero: true,
             tz: tz,
             windows: cardWindows(points: raw,
-                                 slacks: events.filter { $0.kind == .slack }.map(\.time)))
+                                 slacks: events.filter { $0.kind == .slack }.map(\.time)),
+            slacks: events.filter { $0.kind == .slack }.map(\.time))
     }
 }
 
@@ -416,6 +406,7 @@ extension ChsOnlineWindow {
             includesZero: true,
             tz: tz,
             windows: cardWindows(points: raw,
-                                 slacks: events.filter { $0.kind == .slack }.map(\.time)))
+                                 slacks: events.filter { $0.kind == .slack }.map(\.time)),
+            slacks: events.filter { $0.kind == .slack }.map(\.time))
     }
 }

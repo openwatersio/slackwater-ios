@@ -136,8 +136,9 @@ context, everything else after.
   gate there is no set arrow and no speed, as today. Past peaks fade to 0.45.
 - **Axis**: one time per window, at the window's start. Max flood and ebb
   times leave the strip; the schedule table keeps them. A slack with no window
-  prints the slack instant under its hairline. Touching windows are already one
-  run from `TimelineData`, so one label per run falls out.
+  prints the slack instant under its hairline. Touching or overlapping windows
+  are merged into one run by the shared `mergeWindows` before drawing or
+  labelling; `TimelineData.slackWindows` itself stays one window per slack.
 
 ## 6. The card
 

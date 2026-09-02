@@ -557,7 +557,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
     // half-width of swing/π·asin(t/A) around each zero crossing. Spelled as
     // a plain loop with explicit types — the closure-chain form sent the
     // type-checker into the weeds.
-    var windows: [StationCardGraph.Window] = []
+    var windows: [WindowRun] = []
     if includesZero {
         let ratio: Double = min(1.0, defaultSlackThresholdKn / scale)
         let halfW: Double = swing / Double.pi * asin(ratio)
@@ -566,7 +566,7 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
             guard z >= -backH, z <= forwardH else { continue }
             let start = now.addingTimeInterval((z - halfW) * 3600)
             let end = now.addingTimeInterval((z + halfW) * 3600)
-            windows.append(StationCardGraph.Window(start: start, end: end))
+            windows.append(WindowRun(start: start, end: end))
         }
     }
     return StationCardGraph(
