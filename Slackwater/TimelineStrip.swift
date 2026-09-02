@@ -1087,19 +1087,28 @@ struct TimelineCanvas: View {
         // colour between each run's interpolated edges, over a wider
         // round-capped eraser so the seam at both ends is a clear ring, not
         // a slanted cut. The run's opening gets the track's only dot; its
-        // time goes on the bottom row.
-        for run in runs {
+        // time goes on the bottom row. Erasers for every run go first, in
+        // their own pass, so a later run's round cap can never bite an
+        // earlier run's green tail or dot when two runs sit close together
+        // (§4.2's own example, ~17 minutes apart against a 7.5pt/~12-minute
+        // eraser).
+        let segs = runs.map { run -> Path in
             var seg = Path()
             seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
             for p in data.currentPoints where p.time > run.start && p.time < run.end {
                 seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
             }
             seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            return seg
+        }
+        for seg in segs {
             var eraser = ctx
             eraser.blendMode = .destinationOut
             eraser.stroke(seg, with: .color(.black),
                           style: StrokeStyle(lineWidth: CurveStyle.lineWidth + CurveStyle.haloGap * 2,
                                              lineCap: .round))
+        }
+        for (run, seg) in zip(runs, segs) {
             strokeSplitAtNow(ctx, seg, with: .color(SN.go))
             dot(ctx, at: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))),
                 color: SN.go.opacity(fade(run.start)))
