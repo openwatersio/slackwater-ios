@@ -130,10 +130,12 @@ context, everything else after.
   the current track. Its axis time sits directly under it.
 - **Slack instant**: no dot (§5.3). The hairline stays only when a slack has no
   window: a gate the sampling steps over, and every derived gate.
-- **Peaks**: no dot. The speed with unit on the band at the zero line, the
-  compass set arrow (`CompassArrow` rotated to the station's flood or ebb
-  bearing) on the dot's side: above for flood, below for ebb. On a derived
-  gate there is no set arrow and no speed, as today. Past peaks fade to 0.45.
+- **Peaks**: no dot. The speed hangs off the peak inside its lobe, 23pt toward
+  the zero line, with the set arrow (`↑` rotated to the station's flood or ebb
+  bearing) under it — the old detail placement, kept at the user's request
+  because a band on the zero line sat on the threshold hairlines. No unit; the
+  axis column carries it. On a derived gate there is no set arrow and no
+  speed, as today. Past peaks fade to 0.45.
 - **Axis**: one time per window, at the window's start. Max flood and ebb
   times leave the strip; the schedule table keeps them. A slack with no window
   prints the slack instant under its hairline. Touching or overlapping windows

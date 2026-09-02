@@ -1106,29 +1106,30 @@ struct TimelineCanvas: View {
                     ctx.stroke(tick, with: .color(SN.go.opacity(0.35 * fade(e.time))), lineWidth: 1)
                 }
             case .maxFlood, .maxEbb:
-                // Context, not the event (§5.1): no dot. The speed on the
-                // band at the zero line, the set arrow on the peak's side —
-                // above for flood, below for ebb. Foam ink: the warm fill is
-                // a magnitude cue, not a second text-colour system.
+                // Context, not the event (§5.1): no dot. The speed hangs off
+                // the peak inside its lobe, toward the zero line, with the set
+                // arrow under it — off the threshold hairlines and the axis
+                // column's ±threshold labels, which is where a zero-line band
+                // collided. No unit: the fixed axis column carries it once.
                 let flood = e.kind == .maxFlood
                 let f = fade(e.time)
                 let ink = SN.foam.opacity(f)
-                let pointerAt = CGPoint(x: x, y: geo.zeroY + (flood ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset))
+                let toward: CGFloat = flood ? 1 : -1      // toward the zero line
+                let cy = geo.curY(e.speed) + toward * 23
+                if !data.speedsAreSchematic {
+                    ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
+                                .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(ink),
+                             at: CGPoint(x: x, y: cy - 7), anchor: .center)
+                }
                 if let d = deg(flood) {
                     ctx.drawLayer { l in
-                        l.translateBy(x: pointerAt.x, y: pointerAt.y)
+                        l.translateBy(x: x, y: cy + 8)
                         l.rotate(by: .degrees(d))
-                        l.draw(Text(Image(systemName: "arrow.up"))
-                                .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
+                        l.draw(Text("↑").font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(ink),
                                at: .zero, anchor: .center)
                     }
-                }
-                if !data.speedsAreSchematic {
-                    ctx.draw(Text("\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                                .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
-                                .foregroundStyle(ink),
-                             at: CGPoint(x: x, y: geo.zeroY), anchor: .center)
                 }
             }
         }
