@@ -1004,7 +1004,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ```sh
 cd /Users/clarkbw/src/openwaters/slackwater-ios-wt-station-card-graphs
-SHOT_DIR=/private/tmp/claude-501/-Users-clarkbw-src-openwaters/e14719b5-f679-43cc-82d8-380e546c96eb/scratchpad/shots \
+SHOT_DIR=/tmp/slackwater-shots \
   ./scripts/test.sh 2>&1 | tail -40
 ```
 
