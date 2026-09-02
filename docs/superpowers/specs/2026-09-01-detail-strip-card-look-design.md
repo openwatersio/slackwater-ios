@@ -18,8 +18,9 @@ disagreement is listed in §8.
   dot, return-to-now, the schedule rows that scrub the strip. Window entry and
   exit stay snap targets (current spec §4.7).
 - `Timeline.window(anchor:)`, `pph`, tiling, the 228-hour strip.
-- The day chrome: night bands, day tint, "Today / Sep 1" labels, sunrise and
-  sunset dots with their times, the moon. Unchanged, pixel for pixel.
+- The day chrome: day tint, "Today / Sep 1" labels, sunrise and sunset dots
+  with their times, the moon. Unchanged except the night band's top edge
+  (§2.1).
 - The y-axis tick column overlay on both tracks, including the ±threshold pair
   on the current track.
 - The readouts above the strip, the Range summary, the tide-at-port link, the
@@ -51,6 +52,19 @@ the readout inside the strip.
 
 Every number stays a literal point (current spec §7.5: chart labels do not
 scale with Dynamic Type).
+
+### 2.1 Night bands reach the top (#246)
+
+The night rect starts at `dayY + 4` today, 16pt short of the reading line and
+2pt above the moon disc, so a crisp edge runs under the moon and the day row
+sits on unshaded ground. The band now runs from y=0 to `bodyBottom`, the span
+the scrubber's reading line spans, and the day label, date and sun times sit
+inside the night the way the moon already does.
+
+Check in the screenshots: the `Sep 2` sub-label (`SN.foam` at 0.48) against a
+full-strength night, and whether the day tint's top edge should now match.
+A short fade at the band's top is the fallback if a hard 0 reads wrong; the
+default is the hard 0.
 
 ## 3. The curve, both tracks
 
