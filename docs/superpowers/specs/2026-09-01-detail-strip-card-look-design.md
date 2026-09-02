@@ -104,9 +104,10 @@ from there instead of its private statics.
   with `currentFillStops`). The past fade applies on top.
   `tideFlowArrows` stays: `TideDetailView` reads it for the rate warning text.
 - **Extremes**: a dot on the curve, teal for a high and amber for a low, halo
-  punched. The value with unit on a band at the vertical middle of the plot
-  box. The pointer is the to-bar arrow (`⤒` / `⤓`) on the dot's side of the
-  value: above for a high, below for a low. Past extremes fade to 0.45.
+  punched. The reading hangs off the turn 23pt toward the plot middle (down
+  from a high, up from a low) with the to-bar arrow (`⤒` / `⤓`) under it — the
+  same rule the current peaks follow, so it never sits on the axis column's
+  tick row. No unit; the axis column carries it. Past extremes fade to 0.45.
 - **Axis**: each high and low prints its time on the bottom row under its dot.
   Edge rule as today (0.3h in from the strip ends).
 

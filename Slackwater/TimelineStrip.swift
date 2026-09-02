@@ -980,7 +980,6 @@ struct TimelineCanvas: View {
         // of the box with its pointer on the dot's side, the time on the
         // bottom row. Teal for a high and amber for a low, as on the card.
         let margin = 0.3 * 3600
-        let bandY = (geo.tideTop + geo.tideBottom) / 2
         for e in data.tideExtremes where e.time >= data.start.addingTimeInterval(margin)
                                       && e.time <= data.end.addingTimeInterval(-margin) {
             let x = data.x(e.time), y = geo.tideY(e.height)
@@ -988,17 +987,23 @@ struct TimelineCanvas: View {
             let f = fade(e.time)
             let tint = (high ? SN.graphHigh : SN.graphLow).opacity(f)
             dot(ctx, at: CGPoint(x: x, y: y), color: tint)
+            // The reading hangs off the turn toward the plot middle — down
+            // from a high, up from a low — with the to-bar arrow under it:
+            // the same rule the current track's peaks follow, and clear of
+            // the axis column's tick labels. No unit: the fixed axis column
+            // carries it once.
+            let toward: CGFloat = high ? 1 : -1
+            let cy = y + toward * 23
+            ctx.draw(Text(formatHeight(e.height, imperial: imperial))
+                        .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(f)),
+                     at: CGPoint(x: x, y: cy - 7), anchor: .center)
             // ⤒ / ⤓ — arrow TO BAR: a plain ↑ says "rising", the one thing no
             // longer true at a high.
             ctx.draw(Text(high ? "⤒" : "⤓")
-                        .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(tint),
-                     at: CGPoint(x: x, y: bandY + (high ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset)),
-                     anchor: .center)
-            ctx.draw(Text("\(formatHeight(e.height, imperial: imperial)) \(heightUnit(imperial: imperial))")
-                        .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(f)),
-                     at: CGPoint(x: x, y: bandY), anchor: .center)
+                     at: CGPoint(x: x, y: cy + 8), anchor: .center)
             axisTime(ctx, e.time)
         }
 
