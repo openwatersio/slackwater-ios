@@ -4,8 +4,10 @@ How to draw a tidal current. Normative: this is the target, whatever any given
 codebase currently does.
 
 Covers the signed-velocity curve and its annotations, including derived and
-online gates. The map, widgets and cards are out of scope as surfaces, but §5
-and §6 bind them wherever they show current state.
+online gates. §15 covers the low-resolution surfaces — the list card and the
+home-screen widget — which draw the same curve at a size where most of the
+marks below cannot fit. The map is out of scope as a surface, but §5 and §6
+bind it wherever it shows current state.
 
 ---
 
@@ -634,3 +636,61 @@ regressed once. Minimum set:
 - **Source-text tripwires** for retired colour literals and for direction colours
   inside the current-drawing path. These catch the actual failure mode — a
   literal creeping back in — which a rendered-colour test does not.
+
+---
+
+## 15. Low-resolution surfaces: the list card and the widget
+
+A card in the list and a medium widget are the same drawing at about a
+sixth of the detail's width, with no scrubber and no axis. They keep the
+thesis of §1 — *can I go, and when* without reading a speed — and drop
+every mark that only earns its place at scale. The card and the widget are
+**identical**: the widget is the card, rendered on the home screen.
+
+### 15.1 What the curve shows
+
+- **One swing back, three ahead.** Half the M2 period per swing (≈6.2 h);
+  the past faded, the forecast at full strength, a white dot at now.
+- **The window is the only window mark.** The run is drawn on the line in
+  the go colour (§5.2), from the SHARED window predicate (§6.1). The
+  threshold lines are dropped: their job — letting the reader see the margin
+  and overrule the chart (§4.3) — belongs to the detail, one tap away.
+- **The window's edges get the dots** (§5.4.1): the opening at full
+  strength while it is ahead, the closing at half; inside the window they
+  swap. Nothing else on a current curve gets a dot.
+- **Peaks are context** (§5.4): the speed, no unit, and the set arrow hang
+  off the peak inside its lobe. Values near the curve never carry a unit —
+  the reading in the top-right corner states the unit once.
+- **Absolute times have one home** (§5.5): a single row under the curve,
+  one time per run at its opening. Peak times are not shown; they are in
+  the schedule behind the detail.
+- **Colour is state** (§6): the go colour for the run and its dots, the
+  speed ramp for the fill above the threshold where the fill is drawn, and
+  nothing coloured by direction.
+
+### 15.2 The reading
+
+The top-right reading is the surface's readout: the speed with its unit,
+and under it the set — the phase word, the cardinal and the bearing arrow
+by the sign of the velocity. Inside a window the word is *Slack* in the go
+colour and the set still shows; under 0.05 kn the set gives way to a
+neutral mark of the same footprint so the header never changes size. No
+pill: a pill states a phase without a speed or a set, which is two of the
+three things the reader came for.
+
+### 15.3 Counting down
+
+A surface that is refreshed on a clock — the widget — counts. Inside a
+window the reading's first line becomes a timer to the window's closing,
+minutes and seconds, or *> 2 hrs* beyond two hours, because inside the
+window the question has changed to *how long do I have* (§5.4.1). The list
+card, which the reader is looking at rather than glancing at, keeps the
+speed; the countdown is one tap away in the detail readout.
+
+### 15.4 Tides on the same surface
+
+A tide card draws its turns with a dot, the height (no unit) and a to-bar
+arrow hanging off the turn toward the plot middle, and every turn's time on
+the bottom row. It follows the geometry of §15.1, not its thesis: on a tide
+the turns *are* the events (§1).
+
