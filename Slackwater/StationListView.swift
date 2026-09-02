@@ -894,7 +894,7 @@ struct MyLocationTile<Card: View>: View {
     @ViewBuilder let card: (StationItem) -> Card
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
@@ -913,27 +913,30 @@ struct MyLocationTile<Card: View>: View {
                     // row grows.
             }
             .foregroundStyle(SN.foam.opacity(0.9))
-            .padding(.horizontal, 6)
+            // sectionLabel's three paddings (private to this file) — a header
+            // over a plain card, not a box (#253).
+            .padding(.horizontal, 26)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
             card(item)
         }
-        .padding(8)
-        .background(Color.white.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .strokeBorder(SN.leaf.opacity(0.22), lineWidth: 0.5))
     }
 }
 
 struct MyLocationLoadingTile: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
                 MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
             }
-            .padding(.horizontal, 6)
+            // sectionLabel's three paddings (private to this file) — a header
+            // over a plain card, not a box (#253).
+            .padding(.horizontal, 26)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
 
             HStack(spacing: 12) {
                 ProgressView().tint(SN.leaf)
@@ -946,10 +949,5 @@ struct MyLocationLoadingTile: View {
             .padding(.horizontal, 20)
             .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
-        .padding(8)
-        .background(Color.white.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .strokeBorder(SN.leaf.opacity(0.22), lineWidth: 0.5))
     }
 }
