@@ -69,7 +69,7 @@ struct StationCardGraph: View {
     /// Signed current curves keep zero in the domain so flood/ebb read as
     /// above/below the resting line.
     var includesZero = false
-    /// Formats the slack-crossing times computed inside the canvas; the
+    /// Formats the axis times computed inside the canvas; the
     /// extremes arrive with their times already formatted.
     var tz: TimeZone = .current
     /// The usable slack windows (current-charts spec §4), computed by the
@@ -291,17 +291,18 @@ struct StationCardGraph: View {
                          opacity: CurveStyle.pastLineOpacity)
                 strokeGo(from: max(x0 - CurveStyle.lineWidth, nowX), to: x1 + CurveStyle.lineWidth,
                          opacity: 1)
+
+                // The run's opening gets the only dot on a current curve: it
+                // is the moment the axis time below names (spec §4.6).
+                let fade = w.start < now ? CurveStyle.pastLabelFade : 1.0
+                dot(at: CGPoint(x: x0, y: y(valueAt(w.start))), color: SN.go.opacity(fade))
             }
 
-            // Each crossing's time still joins the bottom axis.
+            // The axis names each run's opening, and a bare slack only where
+            // no run covers it — the same moments the detail strip prints.
             if includesZero {
-                for i in 1..<points.count {
-                    let a = points[i - 1], b = points[i]
-                    guard (a.value < 0) != (b.value < 0) else { continue }
-                    let f = a.value / (a.value - b.value)
-                    let cx = x(a.time) + (x(b.time) - x(a.time)) * f
-                    let when = a.time.addingTimeInterval(
-                        b.time.timeIntervalSince(a.time) * TimeInterval(f))
+                for when in currentAxisMoments(runs: windows, slacks: slacks) {
+                    let cx = x(when)
                     let fade = when < now ? CurveStyle.pastLabelFade : 1.0
                     guard cx >= Self.axisEdgeMargin,
                           cx <= size.width - Self.axisEdgeMargin else { continue }
