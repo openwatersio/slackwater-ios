@@ -101,7 +101,7 @@ final class WidgetSnapshotTests: XCTestCase {
 
     /// The widget IS the list card — no second drawing of the curve.
     func testMediumWidgetIsTheCardNotASecondDrawing() throws {
-        let source = try repoSource("Slackwater/MiniScrubberView.swift")
+        let source = try repoSource("Slackwater/DayCurveContentView.swift")
 
         XCTAssert(source.contains("StationCard(name: card.name"))
         XCTAssert(source.contains("ConditionsItem(reading: card.reading)"))
@@ -208,7 +208,7 @@ final class WidgetSnapshotTests: XCTestCase {
         let now = window.start.addingTimeInterval(60)
 
         let card = WidgetCard.build(.current(record), now: now)
-        guard case .current(_, _, _, _, let countdown) = card.reading,
+        guard case .current(_, _, _, _, _, let countdown) = card.reading,
               case .until(let end)? = countdown else {
             return XCTFail("expected a .current reading counting down")
         }

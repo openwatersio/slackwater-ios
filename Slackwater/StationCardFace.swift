@@ -141,21 +141,21 @@ struct StationCard<Trailing: View>: View {
 /// SN.go, not the neutral chip flood/ebb still use — otherwise the glyph
 /// beside it reads green while this pill reads grey, the exact collision
 /// the detail views guard against (testSlackIsGreenWhereverItAppears).
-/// What a counting surface shows in place of the speed inside a slack
-/// window, decided at the ENTRY date by whoever builds the reading —
-/// WidgetKit renders every timeline entry at delivery, so `Date.now` in
-/// a view body is the generation instant, not the display instant.
-enum Countdown {
-    /// Under two hours to the closing: a live timer to it.
-    case until(Date)
-    /// More than two hours: the words, not a timer.
-    case beyondTwoHours
-}
-
 struct ConditionsItem: View {
+    /// What a counting surface shows in place of the speed inside a slack
+    /// window, decided at the ENTRY date by whoever builds the reading —
+    /// WidgetKit renders every timeline entry at delivery, so `Date.now` in
+    /// a view body is the generation instant, not the display instant.
+    enum Countdown {
+        /// Under two hours to the closing: a live timer to it.
+        case until(Date)
+        /// More than two hours: the words, not a timer.
+        case beyondTwoHours
+    }
+
     enum Reading {
         case tide(CardState, imperial: Bool)
-        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, countdown: Countdown? = nil)
+        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, inWindow: Bool = false, countdown: Countdown? = nil)
         case gate(DerivedPhase)
     }
     let reading: Reading
@@ -175,12 +175,16 @@ struct ConditionsItem: View {
                 Text(state.rising ? "▲" : "▼").font(.caption)
             }.foregroundStyle(tint)
 
-        case .current(let signed, let deg, let unit, let tilde, let countdown):
+        case .current(let signed, let deg, let unit, let tilde, let inWindow, let countdown):
             // Always the speed and the set (current-charts §15.2): a pill
             // states a phase without either. Inside a window a counting
             // surface (the widget) shows the time to the closing instead of
             // the speed (§15.3); the list passes no countdown.
             let phase = currentPhase(signed: signed)
+            // Inside a slack window — the same run the curve draws green, from
+            // the shared predicate (current-charts §6.1, §15.2) — the word is
+            // Slack in the go colour whatever the instantaneous phase word says.
+            let slack = inWindow || phase == .slack
             switch countdown {
             case .until(let end) where end > Date.now:
                 // A live timer counts to the closing at display time; the
@@ -205,10 +209,10 @@ struct ConditionsItem: View {
             // colour — the same meaning it has everywhere else. Under
             // 0.05 kn the set gives way to a neutral mark of the same
             // footprint so the header never resizes.
-            let tint = phase == .slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
+            let tint = slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
             HStack(spacing: 4) {
-                Text(phase.word).font(.caption2)
-                    .foregroundStyle(tint.opacity(phase == .slack ? 1 : 0.6))
+                Text(slack ? "Slack" : phase.word).font(.caption2)
+                    .foregroundStyle(tint.opacity(slack ? 1 : 0.6))
                 if abs(signed) < 0.05 {
                     Text("•").font(.caption2).foregroundStyle(SN.foam.opacity(0.4))
                         .frame(width: 30)

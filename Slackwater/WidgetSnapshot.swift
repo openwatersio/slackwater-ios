@@ -178,11 +178,11 @@ struct WidgetCard {
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
-        func named(_ n: String) -> String { [stationNamePrefix, n].compactMap { $0 }.joined(separator: " · ") }
         switch record {
         case .tide(let r):
             let state = r.cardState(at: now)
-            return .init(name: named(r.name), region: r.region,
+            return .init(name: r.name,
+                         region: stationNamePrefix.map { "\($0) · \(r.region)" } ?? r.region,
                          reading: .tide(state, imperial: imperial),
                          graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil)
         case .current(let r):
@@ -191,14 +191,16 @@ struct WidgetCard {
             // Inside a window the widget counts down to the closing (§15.3),
             // decided here at the entry date — not later, at render time.
             let inside = graph.windows.first { $0.contains(now) }
-            let countdown: Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
-            return .init(name: named(r.name), region: r.region,
+            let countdown: ConditionsItem.Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
+            return .init(name: r.name,
+                         region: stationNamePrefix.map { "\($0) · \(r.region)" } ?? r.region,
                          reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
-                                           unit: speedUnit, countdown: countdown),
+                                           unit: speedUnit, inWindow: inside != nil, countdown: countdown),
                          graph: graph, nextSlack: nil)
         case .derived(let r):
             let state = r.cardState(at: now)
-            return .init(name: named(r.gate.name), region: r.gate.region,
+            return .init(name: r.gate.name,
+                         region: stationNamePrefix.map { "\($0) · \(r.gate.region)" } ?? r.gate.region,
                          reading: .gate(state.phase), graph: nil,
                          nextSlack: state.nextSlack.map { ($0.time, r.gate.tz) })
         }

@@ -664,9 +664,12 @@ every mark that only earns its place at scale. The card and the widget are
 - **Absolute times have one home** (§5.5): a single row under the curve,
   one time per run at its opening. Peak times are not shown; they are in
   the schedule behind the detail.
-- **Colour is state** (§6): the go colour for the run and its dots, the
-  speed ramp for the fill above the threshold where the fill is drawn, and
-  nothing coloured by direction.
+- **Colour is state** (§6): the go colour for the run and its dots, and
+  nothing coloured by direction on the line or the marks. The card's fill is
+  the one carry-over from the card's own idiom: anchored at zero, sky above
+  and amber below, intensifying with distance from zero — a card-scale
+  magnitude cue that the detail's absolute ramp replaces at size (a
+  §6.2/§6.4 deviation, recorded in the card-face spec §6).
 
 ### 15.2 The reading
 

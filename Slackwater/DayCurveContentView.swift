@@ -1,6 +1,5 @@
 // Slackwater — GPL v3. The medium widget's content: the list's station card
-// (current-charts §15). The file keeps its old name; project.yml and a
-// source test read it by path.
+// (current-charts §15).
 import SwiftUI
 
 /// The medium widget IS the list card (current-charts §15): same shell,

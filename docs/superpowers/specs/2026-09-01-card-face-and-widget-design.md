@@ -56,11 +56,12 @@ floating readout: always the speed with its unit, and under it the set.
 - Line one: `formatSpeed(abs(signed))` + unit, bold, as today for
   flood/ebb. Tilde for a provisional gate.
 - Line two: phase word, cardinal, compass arrow — the sign of the velocity
-  picks the flood or ebb bearing. Inside a slack window (`currentPhase ==
-  .slack`) the word is "Slack" in the go colour and the cardinal and arrow
-  still show which way the water is setting. Under 0.05 kn the cardinal
-  and arrow give way to a dim neutral mark of the same footprint so the
-  header never resizes.
+  picks the flood or ebb bearing. Inside a slack window — the run
+  containing now from the same `slackWindow` predicate the curve draws,
+  not `currentPhase`'s fixed 0.15 kn — the word is "Slack" in the go
+  colour and the cardinal and arrow still show which way the water is
+  setting. Under 0.05 kn the cardinal and arrow give way to a dim neutral
+  mark of the same footprint so the header never resizes.
 - The derived-gate `.gate(phase)` pill is unchanged: it knows no speed and
   no set (current spec §9).
 - The recents row's "slack" word (`RecentRowLabel.reading`) is unchanged;
@@ -159,15 +160,19 @@ graph; well inside the extension's budget. CHS records still come from
 - A compile of the `SlackwaterWidgets` target is part of every task's
   check (`xcodebuild build-for-testing` builds it as an embedded target).
 - Screenshots: the list (`m2-list-mixed.png`, `m1-list.png`) and the
-  widget gallery (`WidgetsGalleryView` in the app) are opened and checked:
-  values without units near the curve, the current header showing speed
-  and set with no pill, the medium widget indistinguishable from the card.
+  medium widget render from `WidgetSnapshotTests` (the in-app gallery has
+  no preview) are opened and checked: values without units near the curve,
+  the current header showing speed and set with no pill, the medium widget
+  indistinguishable from the card.
 
 ## 6. Deviations
 
 - Current spec §6.4 warns against hue restating direction; the card's tide
   turn dots stay teal/amber as PR #252 shipped them. Tide is not the
   current spec's subject.
+- Current spec §6.2/§6.4: the card's fill is the zero-anchored sky/amber
+  gradient PR #252 shipped, not the absolute ramp, and its hue restates
+  direction. Kept at card scale; the detail strip carries the ramp.
 
 ## 7. Out of scope
 

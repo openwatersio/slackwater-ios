@@ -120,7 +120,7 @@ targets:
       - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/WidgetSnapshot.swift
-      - Slackwater/MiniScrubberView.swift
+      - Slackwater/DayCurveContentView.swift
       - Slackwater/TideStation.swift
       - Slackwater/CurrentStation.swift
       - Slackwater/ChsStation.swift

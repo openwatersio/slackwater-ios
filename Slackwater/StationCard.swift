@@ -295,12 +295,14 @@ struct OnlineGateCardView: View {
 
     var body: some View {
         let state = state
-        StationCard(name: gate.name, region: gate.region, km: km,
-                    graph: window.cardGraph(at: appNow(), unit: speedUnit)) {
+        let now = appNow()
+        let graph = window.cardGraph(at: now, unit: speedUnit)
+        StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
             ConditionsItem(reading: .current(
                 signed: state.signed,
                 deg: state.signed >= 0 ? window.floodDirection : window.ebbDirection,
-                unit: speedUnit))
+                unit: speedUnit,
+                inWindow: graph.windows.contains { $0.contains(now) }))
         }
     }
 }
@@ -337,7 +339,8 @@ struct CurrentCardView: View {
                     signed: state.signed,
                     deg: record.setDegrees(signed: state.signed),
                     unit: speedUnit,
-                    tilde: provisional != nil))
+                    tilde: provisional != nil,
+                    inWindow: graph?.windows.contains { $0.contains(appNow()) } ?? false))
             }
         }
         .task {
