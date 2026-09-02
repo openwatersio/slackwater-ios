@@ -11,42 +11,58 @@ enum WidgetStation {
     case derived(DerivedSlackStation, tz: TimeZone, name: String)
 }
 
+/// One record per catalog kind — the loader's only decision (fitted or not,
+/// which `ChsModelStore` lookup). Everything downstream (`WidgetCard.build`,
+/// `load(id:)`) reads records, never `StationItem` again.
+enum WidgetRecord {
+    case tide(TideStationRecord)
+    case current(CurrentStationRecord)
+    case derived(DerivedGateRecord)
+}
+
 enum WidgetStationLoader {
-    static func load(id: String) -> WidgetStation? {
+    /// One switch over the catalog. `.chs`/`.chsGate`/`.chsCurrent` go
+    /// through `ChsModelStore`'s on-device fitted models — nil when a
+    /// station isn't fitted yet.
+    static func loadRecord(id: String) -> WidgetRecord? {
         guard let item = StationItem.byId[id] else { return nil }
         switch item {
         case .tide(let r):
-            return .tide(r.engineStation, tz: r.tz, name: r.name)
+            return .tide(r)
         case .current(let r):
-            return .current(r.engineStation, tz: r.tz, name: r.name)
+            return .current(r)
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }
-            let r = info.record(with: model)
-            return .tide(r.engineStation, tz: r.tz, name: r.name)
+            return .tide(info.record(with: model))
         case .chsGate(let gate):
             // Mirrors DerivedGateRecord.engineGate (ChsGate.swift:40-43): the
             // reference port's fitted model → DerivedSlackStation(hwLag/lwLag).
             // nil when the reference port isn't fitted yet.
-            return derivedStation(for: gate)
+            return derivedRecord(for: gate)
         case .chsCurrent(let info):
             // Mirrors ChsFitService's fitted-current path (ChsFitService.swift:179-181):
             // the "-current" suffixed model in ChsModelStore → CurrentStationRecord.
             // Online (fit-reject) gates have no "-current" model — nil, same as unfitted.
-            guard let r = fittedCurrentRecord(for: info) else { return nil }
-            return .current(r.engineStation, tz: r.tz, name: r.name)
+            return fittedCurrentRecord(for: info).map { .current($0) }
         }
     }
 
-    /// Mirrors ChsGate.swift's `DerivedGateRecord.engineGate` construction —
-    /// the reference port is itself a CHS tide station, resolved by id and
+    static func load(id: String) -> WidgetStation? {
+        loadRecord(id: id).map { record in
+            switch record {
+            case .tide(let r): .tide(r.engineStation, tz: r.tz, name: r.name)
+            case .current(let r): .current(r.engineStation, tz: r.tz, name: r.name)
+            case .derived(let r): .derived(r.engineGate, tz: r.gate.tz, name: r.gate.name)
+            }
+        }
+    }
+
+    /// The reference port is itself a CHS tide station, resolved by id and
     /// fitted the same way `.chs` above is.
-    private static func derivedStation(for gate: ChsGateInfo) -> WidgetStation? {
+    private static func derivedRecord(for gate: ChsGateInfo) -> WidgetRecord? {
         guard let portInfo = ChsStationInfo.all.first(where: { $0.id == gate.reference }),
               let model = ChsModelStore.load(portInfo.id) else { return nil }
-        let port = portInfo.record(with: model)
-        let derived = DerivedSlackStation(reference: port.engineStation,
-                                          hwLagMinutes: gate.hwLagMinutes, lwLagMinutes: gate.lwLagMinutes)
-        return .derived(derived, tz: gate.tz, name: gate.name)
+        return .derived(DerivedGateRecord(gate: gate, port: portInfo.record(with: model)))
     }
 
     /// Mirrors `ChsCurrentGateInfo.record(with:)` (ChsCurrentGate.swift:306-315),

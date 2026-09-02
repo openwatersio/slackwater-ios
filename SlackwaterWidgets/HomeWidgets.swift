@@ -51,7 +51,7 @@ struct DayCurveWidget: Widget {
         AppIntentConfiguration(kind: "DayCurve", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
             DayCurveView(entry: entry)
-                .containerBackground(.background, for: .widget)
+                .containerBackground(SN.cardFill, for: .widget)
         }
         .configurationDisplayName("Today's Curve")
         .description("Today's tide or current curve, with the next event.")
@@ -63,8 +63,8 @@ struct DayCurveView: View {
     let entry: SlackwaterEntry
     var body: some View {
         Group {
-            if let snapshot = entry.snapshot {
-                DayCurveContentView(snapshot: snapshot)
+            if let card = entry.card {
+                DayCurveContentView(card: card)
             } else {
                 Text("Open Slackwater to prepare this station")
                     .font(.caption).foregroundStyle(.secondary)

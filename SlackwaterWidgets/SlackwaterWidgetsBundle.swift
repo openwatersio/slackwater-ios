@@ -7,6 +7,7 @@ import WidgetKit
 struct SlackwaterEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot?   // nil: unknown/unfitted station
+    let card: WidgetCard?           // the medium widget's inputs
     let premium: Bool
     let stationID: String?          // for the widget's deepLink (Task 9)
 }
@@ -15,13 +16,12 @@ struct StationProvider: AppIntentTimelineProvider {
     private func entry(_ intent: StationConfigIntent, at date: Date) -> SlackwaterEntry {
         let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
         let id = WidgetStationLoader.resolvedStationID(selectedID)
+        let prefix = selectedID == AppGroup.currentLocationStationID ? "Current Location" : nil
         let snapshot = WidgetStationLoader.load(id: id)
-            .map { WidgetSnapshot.build(
-                $0, now: date,
-                stationNamePrefix: selectedID == AppGroup.currentLocationStationID
-                    ? "Current Location" : nil)
-            }
-        return SlackwaterEntry(date: date, snapshot: snapshot,
+            .map { WidgetSnapshot.build($0, now: date, stationNamePrefix: prefix) }
+        let card = WidgetStationLoader.loadRecord(id: id)
+            .map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
+        return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
                                premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
                                stationID: id)
     }

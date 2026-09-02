@@ -164,3 +164,46 @@ struct WidgetSnapshot: Equatable {
         }
     }
 }
+
+/// The list card's inputs, built once per timeline entry so the widget is
+/// the card (current-charts §15) with no second drawing of the curve.
+struct WidgetCard: Equatable {
+    let name: String
+    let region: String
+    let reading: ConditionsItem.Reading
+    let graph: StationCardGraph?
+    /// A derived gate's next slack, for its "Slack · time" line.
+    let nextSlack: (time: Date, tz: TimeZone)?
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.name == b.name && a.region == b.region
+            && a.nextSlack?.time == b.nextSlack?.time && a.nextSlack?.tz == b.nextSlack?.tz
+    }
+
+    static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
+        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
+        func named(_ n: String) -> String { [stationNamePrefix, n].compactMap { $0 }.joined(separator: " · ") }
+        switch record {
+        case .tide(let r):
+            let state = r.cardState(at: now)
+            return .init(name: named(r.name), region: r.region,
+                         reading: .tide(state, imperial: imperial),
+                         graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil)
+        case .current(let r):
+            let state = r.cardState(at: now)
+            let graph = r.cardGraph(at: now, unit: speedUnit)
+            // Inside a window the widget counts down to the closing (§15.3).
+            let inside = graph.windows.first { $0.contains(now) }
+            return .init(name: named(r.name), region: r.region,
+                         reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
+                                           unit: speedUnit, countdownTo: inside?.end),
+                         graph: graph, nextSlack: nil)
+        case .derived(let r):
+            let state = r.cardState(at: now)
+            return .init(name: named(r.gate.name), region: r.gate.region,
+                         reading: .gate(state.phase), graph: nil,
+                         nextSlack: state.nextSlack.map { ($0.time, r.gate.tz) })
+        }
+    }
+}
