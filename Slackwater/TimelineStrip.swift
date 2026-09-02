@@ -1413,8 +1413,23 @@ struct TimelineScrubStrip: View {
                     Text("\(formatHeight(data.heightAt(scrubTime), imperial: imperial)) \(heightUnit(imperial: imperial))")
                         .font(.system(size: 22, weight: .semibold).monospacedDigit())
                 } else {
-                    Text("\(formatSpeed(abs(data.velocityAt(scrubTime)), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                        .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    let v = data.velocityAt(scrubTime)
+                    HStack(spacing: 5) {
+                        Text("\(formatSpeed(abs(v), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                            .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                        // The set, so the reader sees which way the water is
+                        // going as a window opens and closes. A fixed slot:
+                        // at true slack a neutral mark keeps the card one size.
+                        Group {
+                            if abs(v) < 0.05 {
+                                Text("•").foregroundStyle(SN.foam.opacity(0.4))
+                            } else if let d = v >= 0 ? floodDeg : ebbDeg {
+                                CompassArrow(deg: d)
+                            }
+                        }
+                        .font(.system(size: 20, weight: .semibold))
+                        .frame(width: 22)
+                    }
                 }
             }
             .foregroundStyle(SN.foam)

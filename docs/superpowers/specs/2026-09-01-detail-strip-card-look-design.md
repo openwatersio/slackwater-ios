@@ -139,6 +139,12 @@ context, everything else after.
   prints the slack instant under its hairline. Touching or overlapping windows
   are merged into one run by the shared `mergeWindows` before drawing or
   labelling; `TimelineData.slackWindows` itself stays one window per slack.
+- **Readout**: the floating readout prints the set after the speed (`1.5 kn ↗`,
+  the compass arrow rotated to the flood or ebb bearing by the sign of the
+  velocity) in a fixed-width slot, so a reader parked at a window's edge sees
+  which way the water is going as it opens and closes. At true slack (under
+  0.05 kn) the slot holds a dim neutral mark and the card keeps its size.
+  Derived gates keep "Slack timing".
 
 ## 6. The card
 
