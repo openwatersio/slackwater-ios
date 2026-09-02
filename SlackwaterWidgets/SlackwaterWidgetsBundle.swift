@@ -17,10 +17,11 @@ struct StationProvider: AppIntentTimelineProvider {
         let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
         let id = WidgetStationLoader.resolvedStationID(selectedID)
         let prefix = selectedID == AppGroup.currentLocationStationID ? "Current Location" : nil
-        let snapshot = WidgetStationLoader.load(id: id)
-            .map { WidgetSnapshot.build($0, now: date, stationNamePrefix: prefix) }
-        let card = WidgetStationLoader.loadRecord(id: id)
-            .map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
+        // One ChsModelStore lookup, not two: the snapshot's station and the
+        // card both derive from the same loaded record.
+        let record = WidgetStationLoader.loadRecord(id: id)
+        let snapshot = record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
+        let card = record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
         return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
                                premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
                                stationID: id)

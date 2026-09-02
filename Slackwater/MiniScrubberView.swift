@@ -1,17 +1,7 @@
-// Slackwater — GPL v3. Compact, non-interactive form of the detail scrubber,
-// shared with the app target so its actual Canvas output can be tested.
+// Slackwater — GPL v3. The medium widget's content: the list's station card
+// (current-charts §15). The file keeps its old name; project.yml and a
+// source test read it by path.
 import SwiftUI
-
-func widgetStationPresentation(_ stationName: String) -> (name: String, isCurrentLocation: Bool) {
-    let prefix = "Current Location · "
-    guard stationName.hasPrefix(prefix) else { return (stationName, false) }
-    return (String(stationName.dropFirst(prefix.count)), true)
-}
-
-func tideEventValue(_ label: String) -> String {
-    let prefix = ["High ", "Low "].first { label.hasPrefix($0) }
-    return prefix.map { String(label.dropFirst($0.count)) } ?? label
-}
 
 /// The medium widget IS the list card (current-charts §15): same shell,
 /// same reading, same curve. No chrome — the widget's container clips.

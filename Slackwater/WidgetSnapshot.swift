@@ -167,18 +167,13 @@ struct WidgetSnapshot: Equatable {
 
 /// The list card's inputs, built once per timeline entry so the widget is
 /// the card (current-charts §15) with no second drawing of the curve.
-struct WidgetCard: Equatable {
+struct WidgetCard {
     let name: String
     let region: String
     let reading: ConditionsItem.Reading
     let graph: StationCardGraph?
     /// A derived gate's next slack, for its "Slack · time" line.
     let nextSlack: (time: Date, tz: TimeZone)?
-
-    static func == (a: Self, b: Self) -> Bool {
-        a.name == b.name && a.region == b.region
-            && a.nextSlack?.time == b.nextSlack?.time && a.nextSlack?.tz == b.nextSlack?.tz
-    }
 
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
@@ -193,11 +188,13 @@ struct WidgetCard: Equatable {
         case .current(let r):
             let state = r.cardState(at: now)
             let graph = r.cardGraph(at: now, unit: speedUnit)
-            // Inside a window the widget counts down to the closing (§15.3).
+            // Inside a window the widget counts down to the closing (§15.3),
+            // decided here at the entry date — not later, at render time.
             let inside = graph.windows.first { $0.contains(now) }
+            let countdown: Countdown? = inside.map { $0.end.timeIntervalSince(now) > 7_200 ? .beyondTwoHours : .until($0.end) }
             return .init(name: named(r.name), region: r.region,
                          reading: .current(signed: state.signed, deg: r.setDegrees(signed: state.signed),
-                                           unit: speedUnit, countdownTo: inside?.end),
+                                           unit: speedUnit, countdown: countdown),
                          graph: graph, nextSlack: nil)
         case .derived(let r):
             let state = r.cardState(at: now)

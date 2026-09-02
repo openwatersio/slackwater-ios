@@ -133,7 +133,7 @@ struct StationCard<Trailing: View>: View {
 /// `.tide`: current height plus the rising/falling indicator.
 ///
 /// `.current`: signed velocity — speed + set arrow + word, Slack in the go
-/// colour inside a window; `countdownTo` swaps the speed for a timer on
+/// colour inside a window; `countdown` swaps the speed for a timer on
 /// counting surfaces. `tilde` marks a provisional (60-day) reading.
 ///
 /// `.gate`: a derived gate's phase pill — the web's words, flood / ebb /
@@ -141,10 +141,21 @@ struct StationCard<Trailing: View>: View {
 /// SN.go, not the neutral chip flood/ebb still use — otherwise the glyph
 /// beside it reads green while this pill reads grey, the exact collision
 /// the detail views guard against (testSlackIsGreenWhereverItAppears).
+/// What a counting surface shows in place of the speed inside a slack
+/// window, decided at the ENTRY date by whoever builds the reading —
+/// WidgetKit renders every timeline entry at delivery, so `Date.now` in
+/// a view body is the generation instant, not the display instant.
+enum Countdown {
+    /// Under two hours to the closing: a live timer to it.
+    case until(Date)
+    /// More than two hours: the words, not a timer.
+    case beyondTwoHours
+}
+
 struct ConditionsItem: View {
     enum Reading {
         case tide(CardState, imperial: Bool)
-        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, countdownTo: Date? = nil)
+        case current(signed: Double, deg: Double, unit: String, tilde: Bool = false, countdown: Countdown? = nil)
         case gate(DerivedPhase)
     }
     let reading: Reading
@@ -164,24 +175,25 @@ struct ConditionsItem: View {
                 Text(state.rising ? "▲" : "▼").font(.caption)
             }.foregroundStyle(tint)
 
-        case .current(let signed, let deg, let unit, let tilde, let countdownTo):
+        case .current(let signed, let deg, let unit, let tilde, let countdown):
             // Always the speed and the set (current-charts §15.2): a pill
             // states a phase without either. Inside a window a counting
             // surface (the widget) shows the time to the closing instead of
             // the speed (§15.3); the list passes no countdown.
             let phase = currentPhase(signed: signed)
-            // A countdown that has already elapsed by render time (a widget entry outliving its window) falls back to the speed; Date.now...end must never be built with end in the past.
-            if let end = countdownTo, end > Date.now {
-                if end.timeIntervalSinceNow > 7_200 {
-                    Text("> 2 hrs")
-                        .font(.title3.monospacedDigit()).fontWeight(.bold)
-                        .foregroundStyle(.white)
-                } else {
-                    Text(timerInterval: Date.now...end, countsDown: true)
-                        .font(.title3.monospacedDigit()).fontWeight(.bold)
-                        .foregroundStyle(.white)
-                }
-            } else {
+            switch countdown {
+            case .until(let end) where end > Date.now:
+                // A live timer counts to the closing at display time; the
+                // range guard keeps a stale entry from building Date.now...end
+                // with end already past — it falls back to the speed instead.
+                Text(timerInterval: Date.now...end, countsDown: true)
+                    .font(.title3.monospacedDigit()).fontWeight(.bold)
+                    .foregroundStyle(.white)
+            case .beyondTwoHours:
+                Text("> 2 hrs")
+                    .font(.title3.monospacedDigit()).fontWeight(.bold)
+                    .foregroundStyle(.white)
+            default:
                 (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
                     .font(.title3.monospacedDigit()).fontWeight(.bold)
                  + Text(" \(speedUnitLabel(unit))")

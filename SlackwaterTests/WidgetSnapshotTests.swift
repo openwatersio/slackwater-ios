@@ -46,18 +46,6 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertTrue(low.label.hasPrefix("Low "))
     }
 
-    func testCurrentLocationWidgetPresentsIconAndResolvedStationName() {
-        let presentation = widgetStationPresentation("Current Location · North Vancouver")
-
-        XCTAssertTrue(presentation.isCurrentLocation)
-        XCTAssertEqual(presentation.name, "North Vancouver")
-    }
-
-    func testTideWidgetPresentsHeightWithoutRedundantHighLowText() {
-        XCTAssertEqual(tideEventValue("High 15.5 ft"), "15.5 ft")
-        XCTAssertEqual(tideEventValue("Low 4.2 ft"), "4.2 ft")
-    }
-
     func testTideSnapshotCarriesScrubberMovement() {
         let station = Station(
             constituents: [HarmonicConstituent(name: "M2", amplitude: 5, phase: 0)],
@@ -158,15 +146,16 @@ final class WidgetSnapshotTests: XCTestCase {
     /// with set, curve with dots and times, no second drawing. Rendered at
     /// both live medium-widget sizes: 338×158 (older phones) and 364×170
     /// (iPhone 15 Pro and later). No extra padding — `containerBackground`
-    /// fills the family with no inset, so this frame IS the widget.
+    /// fills the family with no inset, so this frame IS the widget. `now`
+    /// is a fixed epoch, not `Date()` — deterministic, not a flake.
     @MainActor
     func testMediumWidgetRendersTheStationCard() throws {
-        let (record, now, graph) = try XCTUnwrap(
-            widestWindowCard(among: Array(CurrentStationRecord.all.prefix(30)), near: Date()))
+        let (record, now, graph) = try XCTUnwrap(widestWindowCard(
+            among: Array(CurrentStationRecord.all.prefix(30)),
+            near: Date(timeIntervalSince1970: 1_755_800_000)))
         let card = WidgetCard.build(.current(record), now: now)
-        let scratchpad = "/private/tmp/claude-501/-Users-clarkbw-src-openwaters/e14719b5-f679-43cc-82d8-380e546c96eb/scratchpad/"
 
-        func render(_ width: CGFloat, _ height: CGFloat, to name: String) throws -> UIImage {
+        func render(_ width: CGFloat, _ height: CGFloat, name: String) throws -> UIImage {
             // SN.canvas: the widget's real containerBackground (the list's
             // ground) — the card paints its translucent SN.cardFill over it.
             let renderer = ImageRenderer(content: DayCurveContentView(card: card)
@@ -175,7 +164,6 @@ final class WidgetSnapshotTests: XCTestCase {
             let image = try XCTUnwrap(renderer.uiImage)
             let png = try XCTUnwrap(image.pngData())
             XCTAssertGreaterThan(png.count, 1_000)
-            try png.write(to: URL(fileURLWithPath: scratchpad + name))
             let attachment = XCTAttachment(image: image)
             attachment.name = name
             attachment.lifetime = .keepAlways
@@ -183,8 +171,8 @@ final class WidgetSnapshotTests: XCTestCase {
             return image
         }
 
-        _ = try render(338, 158, to: "widget-medium-158.png")
-        let image170 = try render(364, 170, to: "widget-medium-170.png")
+        _ = try render(338, 158, name: "widget-medium-158")
+        let image170 = try render(364, 170, name: "widget-medium-170")
 
         if !graph.windows.isEmpty {
             let cg = try XCTUnwrap(image170.cgImage)
@@ -207,21 +195,23 @@ final class WidgetSnapshotTests: XCTestCase {
     }
 
     /// §15.3: inside a slack window the widget's reading counts down to the
-    /// window's close instead of showing a speed.
+    /// window's close instead of showing a speed. Fixed epoch, not `Date()`
+    /// — deterministic, not a flake.
     func testWidgetCardCountsDownInsideAWindow() throws {
         let record = CurrentStationRecord.all.first!
-        var graph = record.cardGraph(at: Date(), unit: "kn")
+        let epoch = Date(timeIntervalSince1970: 1_755_800_000)
+        var graph = record.cardGraph(at: epoch, unit: "kn")
         if graph.windows.isEmpty {
-            graph = record.cardGraph(at: Date().addingTimeInterval(86_400), unit: "kn")
+            graph = record.cardGraph(at: epoch.addingTimeInterval(86_400), unit: "kn")
         }
         let window = try XCTUnwrap(graph.windows.first)
         let now = window.start.addingTimeInterval(60)
 
         let card = WidgetCard.build(.current(record), now: now)
-        guard case .current(_, _, _, _, let countdownTo) = card.reading else {
-            return XCTFail("expected a .current reading")
+        guard case .current(_, _, _, _, let countdown) = card.reading,
+              case .until(let end)? = countdown else {
+            return XCTFail("expected a .current reading counting down")
         }
-        let end = try XCTUnwrap(countdownTo)
         // Sub-second tolerance: `end` comes from a graph re-sampled at
         // `now`, `window` from one sampled at the earlier anchor used to
         // find it — both interpolate the same crossing off a 10-min grid

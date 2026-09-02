@@ -113,7 +113,9 @@ seconds — in place of the speed, and the second line reads "Slack" with
 the set as §3. When more than two hours remain the line says "> 2 hrs"
 instead of a timer. Outside a window the reading is the card's, unchanged.
 The list card does not count down; only the widget and the detail readout
-answer *how long do I have* (current spec §5.4.1).
+answer *how long do I have* (current spec §5.4.1). The timer-versus-"> 2 hrs"
+decision is made at the entry's date when the card is built, because
+WidgetKit renders every entry at delivery; the timer itself is live.
 
 ### 4.2 Data
 

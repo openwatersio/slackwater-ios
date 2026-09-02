@@ -48,12 +48,17 @@ enum WidgetStationLoader {
     }
 
     static func load(id: String) -> WidgetStation? {
-        loadRecord(id: id).map { record in
-            switch record {
-            case .tide(let r): .tide(r.engineStation, tz: r.tz, name: r.name)
-            case .current(let r): .current(r.engineStation, tz: r.tz, name: r.name)
-            case .derived(let r): .derived(r.engineGate, tz: r.gate.tz, name: r.gate.name)
-            }
+        loadRecord(id: id).map(station(from:))
+    }
+
+    /// The engine station a record builds — shared by `load(id:)` and the
+    /// timeline provider, which loads the record once and derives both the
+    /// snapshot's station and the card from it.
+    static func station(from record: WidgetRecord) -> WidgetStation {
+        switch record {
+        case .tide(let r): .tide(r.engineStation, tz: r.tz, name: r.name)
+        case .current(let r): .current(r.engineStation, tz: r.tz, name: r.name)
+        case .derived(let r): .derived(r.engineGate, tz: r.gate.tz, name: r.gate.name)
         }
     }
 
