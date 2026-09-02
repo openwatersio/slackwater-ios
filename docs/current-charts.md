@@ -243,14 +243,26 @@ inside it.
 Slack times still belong in the **schedule table** (§13). A table is where
 absolute times belong; the chart is not a table.
 
-### 5.4 Peaks
+### 5.4 Peaks are not points of interest
 
-A dot on the curve, the speed, and the **true bearing arrow** for the set. Kept
-because they are what the window is measured against — but styled as context,
-not as the event.
+**No dot.** A peak or trough is context — what the window is measured
+against — and a dot would make it a point of interest, which is the
+tide-chart reading this whole chart exists to undo. The speed and the
+**true bearing arrow** for the set hang off the peak inside its lobe, styled
+as context, not as the event.
 
 The arrow states the set. An up/down arrow would only restate which side of zero
-the dot already sits on, which is a channel spent on nothing (§6.4).
+the peak already sits on, which is a channel spent on nothing (§6.4).
+
+### 5.4.1 The window's edges are the points of interest
+
+The **opening** of a slack window is the major point of interest: the moment
+a planner is aiming at (§4 rule 7). It gets the dot, and its time on the
+axis. The **closing** is the minor point — a lesser mark — until the reader
+is inside the window, when it becomes the one that matters: the question has
+changed from *when can I be there* to *how long do I have*. A surface that
+can count (the widget, the readout) counts down to the closing while inside
+the window.
 
 ### 5.5 Absolute time has exactly one home per surface
 

@@ -177,9 +177,7 @@ slack instant where a slack has no window. The strip calls the same function.
 
 ## 8. Deviations from the current spec
 
-- §5.4 says a peak gets a dot. This design draws none on the current track,
-  by product decision: the value and set arrow say what is happening, and a
-  dot invites the tide-chart reading the spec exists to undo.
+- §5.4 once said a peak gets a dot; it was amended on 2026-09-01 to say the opposite (peaks are context, the window's edges are the points of interest), so the current track's peaks draw no dot by rule, not by deviation.
 - §3 says the threshold prints once, not on the strip; §7.1 says the ±threshold
   pair is labelled on the axis. The spec disagrees with itself. The axis column
   is kept as is, so today's behaviour continues.

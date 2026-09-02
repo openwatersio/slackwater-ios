@@ -35,6 +35,12 @@ the detail strip does since its §4 and §5 amendments, using the same
 - **Tide**: dot, value, to-bar arrow (`⤒`/`⤓`) under it, as the detail.
 - **Current**: no dot; the value with the set arrow (the SF `arrow.up`
   rotated to the bearing) under it, as the detail.
+- **Window edges** (current spec §5.4.1, both the card and the detail
+  strip): the run's opening keeps its dot at full strength while it is
+  ahead. The closing gets a dot too, minor — the go colour at half opacity
+  — until `now` is inside the run, when the closing dot draws at full
+  strength and the opening dot drops to half. A past run fades both under
+  the usual past rule.
 - The middle band, `bandY`, and the card's private `pointerOffset`,
   `valueFontSize`, `pointerFontSize` go; the card reads the hang constants.
 - The `labelEdgeMargin` rule (an extreme near the card edge keeps its dot
@@ -62,7 +68,9 @@ floating readout: always the speed with its unit, and under it the set.
 
 ## 4. The medium widget renders the card
 
-"Today's Curve" (`DayCurveWidget`, `.systemMedium`) shows the list card:
+"Today's Curve" (`DayCurveWidget`, `.systemMedium`) shows the list card,
+with one addition the old widget already had and keeps: **inside a slack
+window the reading becomes a countdown to the window's closing**.
 `StationCard(name:region:km:graph:)` with `ConditionsItem` as its trailing
 reading, built from the same record builders the list uses. The widget's
 own `DayCurveContentView` becomes a thin wrapper and its sparkline canvas,
@@ -94,6 +102,17 @@ own `DayCurveContentView` becomes a thin wrapper and its sparkline canvas,
   rounded clip and shadow; the widget passes `false` and supplies
   `SN.cardFill` through `containerBackground(_:for:)` so the widget's own
   rounded corners do the clipping. Nothing else about the card changes.
+
+### 4.1.1 The in-window countdown
+
+When the entry's date is inside a slack window (`containing` window from
+the record's windows at that date), the reading's first line is a live
+timer to the window's end — `Text(timerInterval:countsDown:)`, minutes and
+seconds — in place of the speed, and the second line reads "Slack" with
+the set as §3. When more than two hours remain the line says "> 2 hrs"
+instead of a timer. Outside a window the reading is the card's, unchanged.
+The list card does not count down; only the widget and the detail readout
+answer *how long do I have* (current spec §5.4.1).
 
 ### 4.2 Data
 
@@ -143,8 +162,6 @@ graph; well inside the extension's budget. CHS records still come from
 
 ## 6. Deviations
 
-- Current spec §5.4 asks for a dot at each peak; the card, like the detail,
-  draws none (product decision, recorded in the detail-strip spec §8).
 - Current spec §6.4 warns against hue restating direction; the card's tide
   turn dots stay teal/amber as PR #252 shipped them. Tide is not the
   current spec's subject.
