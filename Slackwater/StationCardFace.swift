@@ -34,7 +34,9 @@ struct StationCard<Trailing: View>: View {
     /// for pending cards and derived gates (no magnitude to draw).
     var graph: StationCardGraph? = nil
     /// The list's rounded clip and shadow. The widget passes false: its own
-    /// container clips, and a shadow inside a widget is a smear.
+    /// container clips, and a shadow inside a widget is a smear. Without
+    /// chrome the card also fills its container, so the widget's family
+    /// sets the height and the curve gets the room under the header.
     var chrome = true
     /// The list's card heights by default; the widget lets the card fill
     /// its family instead.
@@ -107,7 +109,8 @@ struct StationCard<Trailing: View>: View {
         .padding(.vertical, 16)
         // A curve card is taller: an identity band up top (the curve's top
         // inset below), then room for the curve and its extreme labels.
-        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil ? 96 : 168), alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil ? 96 : 168),
+               maxHeight: chrome ? nil : .infinity, alignment: .topLeading)
         .background {
             ZStack {
                 SN.cardFill

@@ -26,6 +26,5 @@ struct DayCurveContentView: View {
                     .foregroundStyle(SN.foam.opacity(0.92))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
