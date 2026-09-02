@@ -69,7 +69,7 @@ func slackWindow(_ points: [CurrentPoint], around slack: Date,
 }
 
 /// One usable run of slack water. Touching or overlapping windows merge into
-/// one run and carry one label (current-charts spec §4.3); the predicate that
+/// one run and carry one label (current-charts spec §4 rule 3); the predicate that
 /// produced each window is unchanged, only the drawing joins them.
 struct WindowRun: Equatable {
     let start: Date
@@ -92,7 +92,7 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
 }
 
 /// The moments a current axis prints: each run's opening (the time a planner
-/// is aiming at — spec §4.6), plus the bare instant of any slack no run
+/// is aiming at — spec §4 rule 7), plus the bare instant of any slack no run
 /// covers, which is the hairline case (§5.3). Sorted.
 func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
     let bare = slacks.filter { t in !runs.contains { $0.contains(t) } }

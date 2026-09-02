@@ -26,8 +26,9 @@ disagreement is listed in §8.
 - The readouts above the strip, the Range summary, the tide-at-port link, the
   footer, the schedule table.
 - Derived gates: schematic ±1 curve, neutral fill, hairlines at slack, no speed
-  marks, no windows (current spec §9). They only pick up the line weight and
-  the past fade from §3.
+  marks, no windows (current spec §9). They only pick up the line weight, the
+  past fade and the white now dot from §3 (the dot replaced the dashed now
+  line they used to draw).
 - `TimelineData.build` and every predicate it calls. This is a drawing change.
 
 ## 2. Geometry (`TimelineGeo`)
@@ -182,6 +183,9 @@ slack instant where a slack has no window. The strip calls the same function.
 - §3 says the threshold prints once, not on the strip; §7.1 says the ±threshold
   pair is labelled on the axis. The spec disagrees with itself. The axis column
   is kept as is, so today's behaviour continues.
+- §3 says the curve is taken from the card verbatim; §4 then gives the tide
+  stroke the rate ramp. §4 is the more specific rule and is what ships; the
+  card's tide line stays a flat blue.
 
 ## 9. Out of scope
 

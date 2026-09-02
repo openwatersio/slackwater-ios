@@ -102,8 +102,11 @@ extension TypeScaleTests {
             "OnlineGateDetailView.swift:body",
             "TideDetailView.swift:body",
             "DerivedGateDetailView.swift:scheduleEntries",
-            // Leftover from the deleted NEAPS band renderer; formatHeight is
-            // no longer called from drawTide, so this entry is now inert.
+            // Both tracks format their reading inline and apply
+            // .monospacedDigit() on the very next line, so the ±4-line scan
+            // already clears them; the entries are kept only so a future
+            // reformat that splits the call from its modifier fails loudly
+            // here instead of silently.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
             // The heuristic's blind spot in miniature: these three calls live

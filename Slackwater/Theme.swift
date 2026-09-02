@@ -148,10 +148,14 @@ enum CurveStyle {
     /// The dotted datum/zero reference line.
     static let referenceLineOpacity = 0.35
     static let referenceLineDash: [CGFloat] = [1, 3]
-    /// The pointer glyph's distance from the value on the band.
-    static let pointerOffset: CGFloat = 18
-    static let valueFontSize: CGFloat = 15
-    static let pointerFontSize: CGFloat = 15
+    /// The reading hangs off a turn or peak toward the plot middle: the
+    /// value this far from the dot, the pointer glyph under it. Both tracks
+    /// read these, so tuning one cannot silently unpair the other.
+    static let hangOffset: CGFloat = 23
+    static let hangValueRise: CGFloat = 7
+    static let hangGlyphDrop: CGFloat = 8
+    static let hangValueFontSize: CGFloat = 14
+    static let hangGlyphFontSize: CGFloat = 12
 }
 
 /// The one full-screen background: canvas navy with the prototype's radial

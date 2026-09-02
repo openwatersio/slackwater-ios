@@ -42,6 +42,11 @@ struct StationCardGraph: View {
     private static let timeFontSize: CGFloat = 10
     /// Axis-label center height above the card bottom.
     private static let timeBaseline: CGFloat = 10
+    /// The pointer glyph's distance from the value on the band. One consumer
+    /// (this card), so it lives here rather than on the shared CurveStyle.
+    private static let pointerOffset: CGFloat = 18
+    private static let valueFontSize: CGFloat = 15
+    private static let pointerFontSize: CGFloat = 15
 
     struct Point {
         let time: Date
@@ -227,17 +232,17 @@ struct StationCardGraph: View {
                     // The SF Symbol, not the "↑" text glyph — a text arrow
                     // at the same point size renders visibly smaller.
                     let pointerAt = CGPoint(x: labelX,
-                                            y: bandY + (e.high ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset))
+                                            y: bandY + (e.high ? -Self.pointerOffset : Self.pointerOffset))
                     var rotated = context
                     rotated.translateBy(x: pointerAt.x, y: pointerAt.y)
                     rotated.rotate(by: .degrees(deg))
                     rotated.draw(Text(Image(systemName: "arrow.up"))
-                                    .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
+                                    .font(.system(size: Self.pointerFontSize, weight: .bold))
                                     .foregroundStyle(tint),
                                  at: .zero)
                 }
                 context.draw(Text(e.valueText)
-                                .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
+                                .font(.system(size: Self.valueFontSize, weight: .bold).monospacedDigit())
                                 .foregroundStyle(text),
                              at: CGPoint(x: labelX, y: bandY))
             }
@@ -293,7 +298,7 @@ struct StationCardGraph: View {
                          opacity: 1)
 
                 // The run's opening gets the only dot on a current curve: it
-                // is the moment the axis time below names (spec §4.6).
+                // is the moment the axis time below names (spec §4 rule 7).
                 let fade = w.start < now ? CurveStyle.pastLabelFade : 1.0
                 dot(at: CGPoint(x: x0, y: y(valueAt(w.start))), color: SN.go.opacity(fade))
             }
@@ -365,6 +370,7 @@ extension CurrentStationRecord {
         let s = engineStation
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
         let events = s.events(from: start, to: end)
+        let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
             extremes: events
@@ -379,9 +385,8 @@ extension CurrentStationRecord {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw,
-                                 slacks: events.filter { $0.kind == .slack }.map(\.time)),
-            slacks: events.filter { $0.kind == .slack }.map(\.time))
+            windows: cardWindows(points: raw, slacks: slackTimes),
+            slacks: slackTimes)
     }
 }
 
@@ -392,6 +397,7 @@ extension ChsOnlineWindow {
         let tz = TimeZone(identifier: timezone) ?? .current
         let raw = points.filter { $0.time >= start && $0.time <= end }
         let events = sampleEvents(points).filter { $0.time >= start && $0.time <= end }
+        let slackTimes = events.filter { $0.kind == .slack }.map(\.time)
         return StationCardGraph(
             points: raw.map { .init(time: $0.time, value: $0.speed) },
             extremes: events
@@ -406,8 +412,7 @@ extension ChsOnlineWindow {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw,
-                                 slacks: events.filter { $0.kind == .slack }.map(\.time)),
-            slacks: events.filter { $0.kind == .slack }.map(\.time))
+            windows: cardWindows(points: raw, slacks: slackTimes),
+            slacks: slackTimes)
     }
 }

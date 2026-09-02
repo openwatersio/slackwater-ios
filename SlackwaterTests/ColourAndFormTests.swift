@@ -92,9 +92,10 @@ final class ColourAndFormTests: XCTestCase {
     /// about the zero line, and the rotated set arrow); this asserts nothing
     /// quietly puts it back on colour.
     ///
-    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide`
-    /// legitimately keeps `SN.rising`/`SN.falling`, which is #95's question,
-    /// not this one's.
+    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide` draws
+    /// no direction colour any more (its turn dots are the card's teal/amber
+    /// tokens); the scope stays on `drawCurrent` because that is the track
+    /// the ramp replaced direction colour on.
     func testCurrentTrackDoesNotSpeakDirectionInColour() throws {
         let source = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = source.components(separatedBy: .newlines)

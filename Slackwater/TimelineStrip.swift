@@ -636,6 +636,10 @@ struct TimelineData {
 
         let sunTimes = days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
+        // The fastest-rate moments stay magnetic: the chevrons that marked
+        // them are gone, but each is now the most saturated point of the
+        // rate-coloured line, and the readout's rate warning fires exactly
+        // there.
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
                               + currentEvents.map(\.time) + sunTimes
                               + windows.flatMap { [$0.start, $0.end] }))
@@ -702,8 +706,9 @@ struct TimelineGeo {
         let heights = data.tidePoints.map(\.height)
         let mn = heights.min() ?? 0, mx = heights.max() ?? 1
         tideMid = (mn + mx) / 2
-        // 1.06: the padding only has to clear a dot and its halo now that the
-        // readings sit on a band across the middle rather than at the turns.
+        // 1.06: the readings hang INWARD from each turn (CurveStyle.hangOffset
+        // toward the plot middle), so the padding only has to clear the
+        // turn's dot and its halo.
         tideSpan = max((mx - mn) / 2, 0.01) * 1.06
         maxAbsCur = max(data.currentPoints.map { abs($0.speed) }.max() ?? 1, 0.01) * 1.05
     }
@@ -758,9 +763,9 @@ struct TimelineCanvas: View {
     /// tiles overdrew.
     static let tileWidth: CGFloat = 900
 
-    /// Half-width of the twilight fade on each night band's edges, in hours
-    /// each side of sunset and sunrise. 0.75h ≈ civil twilight plus a
-    /// shoulder; at 18pt/h the whole transition is 27pt.
+    /// The twilight fade on each night band's edge: this many hours either
+    /// side of sunset and sunrise. 0.75h ≈ civil twilight plus a shoulder;
+    /// at 18pt/h the whole transition is 27pt.
     static let twilightHours = 0.75
 
     var body: some View {
@@ -988,9 +993,10 @@ struct TimelineCanvas: View {
                               startPoint: .zero, endPoint: CGPoint(x: data.totalWidth, y: 0))
         strokeSplitAtNow(ctx, line, with: shading)
 
-        // Turns: a dot on the curve, the reading on a band across the middle
-        // of the box with its pointer on the dot's side, the time on the
-        // bottom row. Teal for a high and amber for a low, as on the card.
+        // Turns: a dot on the curve, the reading hanging off it toward the
+        // plot middle with the to-bar arrow under it — the same rule the
+        // current peaks follow — and the time on the bottom row. Teal for a
+        // high and amber for a low, as on the card.
         let margin = 0.3 * 3600
         for e in data.tideExtremes where e.time >= data.start.addingTimeInterval(margin)
                                       && e.time <= data.end.addingTimeInterval(-margin) {
@@ -1005,17 +1011,17 @@ struct TimelineCanvas: View {
             // the axis column's tick labels. No unit: the fixed axis column
             // carries it once.
             let toward: CGFloat = high ? 1 : -1
-            let cy = y + toward * 23
+            let cy = y + toward * CurveStyle.hangOffset
             ctx.draw(Text(formatHeight(e.height, imperial: imperial))
-                        .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                        .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(f)),
-                     at: CGPoint(x: x, y: cy - 7), anchor: .center)
+                     at: CGPoint(x: x, y: cy - CurveStyle.hangValueRise), anchor: .center)
             // ⤒ / ⤓ — arrow TO BAR: a plain ↑ says "rising", the one thing no
             // longer true at a high.
             ctx.draw(Text(high ? "⤒" : "⤓")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
                         .foregroundStyle(tint),
-                     at: CGPoint(x: x, y: cy + 8), anchor: .center)
+                     at: CGPoint(x: x, y: cy + CurveStyle.hangGlyphDrop), anchor: .center)
             axisTime(ctx, e.time)
         }
 
@@ -1132,18 +1138,18 @@ struct TimelineCanvas: View {
                 let f = fade(e.time)
                 let ink = SN.foam.opacity(f)
                 let toward: CGFloat = flood ? 1 : -1      // toward the zero line
-                let cy = geo.curY(e.speed) + toward * 23
+                let cy = geo.curY(e.speed) + toward * CurveStyle.hangOffset
                 if !data.speedsAreSchematic {
                     ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                                .font(.system(size: 14, weight: .semibold).monospacedDigit())
+                                .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(ink),
-                             at: CGPoint(x: x, y: cy - 7), anchor: .center)
+                             at: CGPoint(x: x, y: cy - CurveStyle.hangValueRise), anchor: .center)
                 }
                 if let d = deg(flood) {
                     ctx.drawLayer { l in
-                        l.translateBy(x: x, y: cy + 8)
+                        l.translateBy(x: x, y: cy + CurveStyle.hangGlyphDrop)
                         l.rotate(by: .degrees(d))
-                        l.draw(Text("↑").font(.system(size: 12, weight: .semibold))
+                        l.draw(Text("↑").font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
                                 .foregroundStyle(ink),
                                at: .zero, anchor: .center)
                     }
