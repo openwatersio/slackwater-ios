@@ -1,5 +1,11 @@
 // Slackwater — GPL v3. Widget configuration: Current Location followed by
 // Favorites and Recents from shared defaults.
+//
+// Compiled into BOTH the app and the widget extension: the system resolves a
+// widget's configured entity against the containing app's App Intents
+// registration, and an entity the app has not compiled fails with "StationChoice
+// is not a registered AppEntity identifier" — every widget then silently shows
+// the default station.
 import AppIntents
 import WidgetKit
 
