@@ -99,8 +99,9 @@ own `DayCurveContentView` becomes a thin wrapper and its sparkline canvas,
   keeps the list-only views: `RecentRowLabel`, `StationCardView`,
   `CurrentCardView`, the derived-gate card, previews.
 - `StationCard` gains one flag, `chrome: Bool = true`. The list keeps the
-  rounded clip and shadow; the widget passes `false` and supplies
-  `SN.cardFill` through `containerBackground(_:for:)` so the widget's own
+  rounded clip and shadow; the widget passes `false` and supplies the list's
+  ground, `SN.canvas`, through `containerBackground(_:for:)`; the card paints
+  its translucent `SN.cardFill` over it as on screen, and the widget's own
   rounded corners do the clipping. Nothing else about the card changes.
 
 ### 4.1.1 The in-window countdown

@@ -167,9 +167,11 @@ final class WidgetSnapshotTests: XCTestCase {
         let scratchpad = "/private/tmp/claude-501/-Users-clarkbw-src-openwaters/e14719b5-f679-43cc-82d8-380e546c96eb/scratchpad/"
 
         func render(_ width: CGFloat, _ height: CGFloat, to name: String) throws -> UIImage {
+            // SN.canvas: the widget's real containerBackground (the list's
+            // ground) — the card paints its translucent SN.cardFill over it.
             let renderer = ImageRenderer(content: DayCurveContentView(card: card)
                 .frame(width: width, height: height)
-                .background(SN.cardFill))
+                .background(SN.canvas))
             let image = try XCTUnwrap(renderer.uiImage)
             let png = try XCTUnwrap(image.pngData())
             XCTAssertGreaterThan(png.count, 1_000)

@@ -51,7 +51,8 @@ struct DayCurveWidget: Widget {
         AppIntentConfiguration(kind: "DayCurve", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
             DayCurveView(entry: entry)
-                .containerBackground(SN.cardFill, for: .widget)
+                // The list's ground; the card paints its translucent fill over it, as on screen.
+                .containerBackground(SN.canvas, for: .widget)
         }
         .configurationDisplayName("Today's Curve")
         .description("Today's tide or current curve, with the next event.")
