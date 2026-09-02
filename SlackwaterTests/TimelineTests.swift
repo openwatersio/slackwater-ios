@@ -630,28 +630,6 @@ final class TimelineTests: XCTestCase {
                      "a slack after the series must not borrow the trailing run")
     }
 
-    /// Removing either interpolated endpoint lets the green overlay cross its
-    /// threshold line; including an out-of-window point paints a fast segment
-    /// green. The renderer consumes these exact, clipped paths.
-    func testSlackFillSegmentsClipToInterpolatedThresholdCrossings() {
-        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
-        let points = [
-            CurrentPoint(time: t0, speed: -1),
-            CurrentPoint(time: t0.addingTimeInterval(600), speed: -0.25),
-            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 0.25),
-            CurrentPoint(time: t0.addingTimeInterval(1800), speed: 1),
-        ]
-
-        let segments = slackFillSegments(points, threshold: 0.5)
-
-        XCTAssertEqual(segments.count, 1)
-        XCTAssertEqual(segments[0].map(\.time), [
-            t0.addingTimeInterval(400), t0.addingTimeInterval(600),
-            t0.addingTimeInterval(1200), t0.addingTimeInterval(1400),
-        ])
-        XCTAssertEqual(segments[0].map(\.speed), [-0.5, -0.25, 0.25, 0.5])
-    }
-
     func testCurrentExcessSegmentsStartAtTheSlackThreshold() {
         let t0 = Date(timeIntervalSince1970: 1_760_000_000)
         let points = [
@@ -746,29 +724,6 @@ final class TimelineTests: XCTestCase {
                        "21:35 → 00:19⁺⁹")
         XCTAssertEqual(slackWindowTiming(start: start, end: end(10), tz: .gmt).span,
                        "21:35 → 00:19⁺⁺")
-    }
-
-    /// Adjacent slack windows that touch or overlap merge into one green
-    /// column, so only the first slack of the run labels itself (#56 —
-    /// Race Rocks Aug 11, a 0.1 kn blip between two slacks).
-    func testTouchingSlackWindowsLabelOnlyTheFirst() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let s = { (m: Double) in t0.addingTimeInterval(m * 60) }
-        // overlapping, touching (end == start), then a clear gap
-        let windows = [(slack: s(76), start: s(50), end: s(120)),
-                       (slack: s(188), start: s(110), end: s(220)),
-                       (slack: s(300), start: s(220), end: s(340)),
-                       (slack: s(600), start: s(500), end: s(700))]
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(76)),
-                       "the first slack of a merged run keeps its label")
-        XCTAssert(suppressesSlackLabel(windows, at: s(188)),
-                  "overlap with the previous window suppresses the label")
-        XCTAssert(suppressesSlackLabel(windows, at: s(300)),
-                  "touching (end == start) reads as one column too")
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(600)),
-                       "a gap breaks the run — this slack labels itself")
-        XCTAssertFalse(suppressesSlackLabel(windows, at: s(999)),
-                       "a slack with no window (hairline case) is never suppressed")
     }
 
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a

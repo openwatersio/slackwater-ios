@@ -152,18 +152,6 @@ func floatingReadoutY(pointY: CGFloat, geo: TimelineGeo) -> CGFloat {
     return min(max(proposed, geo.bodyTop + halfCard), geo.bodyBottom - halfCard)
 }
 
-/// Adjacent slack windows that touch or overlap render as one continuous
-/// green column (Race Rocks Aug 11: a 0.1 kn blip between two slacks), so
-/// only the FIRST slack in the run gets a time label — a second time drawn
-/// on top of the first is unreadable. Windows are chronological by
-/// construction (built from the sorted event list in TimelineData.build).
-func suppressesSlackLabel(_ windows: [(slack: Date, start: Date, end: Date)],
-                          at slack: Date) -> Bool {
-    guard let i = windows.firstIndex(where: { $0.slack == slack }), i > 0
-    else { return false }
-    return windows[i - 1].end >= windows[i].start
-}
-
 /// Round tick values for the tide track's fixed left axis, in DISPLAY units
 /// (feet when imperial, metres otherwise) — the NEAPS "4 m / 3 m / 2 m" column.
 /// `lo`/`hi` come in as metres, the units the geometry works in.
@@ -270,47 +258,6 @@ func tideRateStops(_ rates: [(time: Date, rate: Double)], x: (Date) -> CGFloat, 
         return Gradient.Stop(color: colour, location: min(max(x(p.time) / width, 0), 1))
     }
     return stops.count == 1 ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)] : stops
-}
-
-/// The portions of a real current curve that lie within the usable threshold.
-/// Endpoints are interpolated at ±threshold, so the green overlay lands on the
-/// reference lines instead of spilling into faster water between samples.
-func slackFillSegments(_ points: [CurrentPoint], threshold: Double) -> [[CurrentPoint]] {
-    guard points.count > 1 else { return [] }
-    var segments: [[CurrentPoint]] = []
-    var segment: [CurrentPoint] = []
-
-    func append(_ point: CurrentPoint) {
-        if segment.last?.time == point.time { return }
-        segment.append(point)
-    }
-    func finish() {
-        if segment.count > 1 { segments.append(segment) }
-        segment = []
-    }
-
-    for (a, b) in zip(points, points.dropFirst()) {
-        var cuts = [a]
-        for limit in [-threshold, threshold] where (a.speed - limit) * (b.speed - limit) < 0 {
-            let f = (limit - a.speed) / (b.speed - a.speed)
-            cuts.append(CurrentPoint(time: a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) * f),
-                                     speed: limit))
-        }
-        cuts.append(b)
-        cuts.sort { $0.time < $1.time }
-
-        for (start, end) in zip(cuts, cuts.dropFirst()) {
-            let middle = (start.speed + end.speed) / 2
-            if abs(middle) <= threshold {
-                append(start)
-                append(end)
-            } else {
-                finish()
-            }
-        }
-    }
-    finish()
-    return segments
 }
 
 /// The fast portions of a current curve, clipped to the configured threshold.
@@ -1067,10 +1014,11 @@ struct TimelineCanvas: View {
             let pt = CGPoint(x: data.x(p.time), y: geo.curY(p.speed))
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
+        let runs = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
+
         if !data.speedsAreSchematic {
-            // Hot water starts at the comfort limit, never at zero. The
-            // green interior is the usable window; only the excess rises out
-            // of it toward red.
+            // Hot water starts at the comfort limit, never at zero: only the
+            // excess above the threshold is inked, on the absolute ramp (#97).
             for segment in currentExcessSegments(data.currentPoints, threshold: data.slackThreshold) {
                 let positive = segment[0].speed > 0
                 let thresholdY = geo.curY(positive ? data.slackThreshold : -data.slackThreshold)
@@ -1087,47 +1035,13 @@ struct TimelineCanvas: View {
                     startPoint: CGPoint(x: 0, y: thresholdY),
                     endPoint: CGPoint(x: 0, y: positive ? geo.curTop : geo.curBottom)))
             }
+            // The limit made visible everywhere at once (spec §5.2), quiet:
+            // two hairlines, and no zero stroke while they are drawn (§7.4).
             for speed in [-data.slackThreshold, data.slackThreshold] {
                 var threshold = Path()
                 threshold.move(to: CGPoint(x: 0, y: geo.curY(speed)))
                 threshold.addLine(to: CGPoint(x: data.totalWidth, y: geo.curY(speed)))
-                ctx.stroke(threshold, with: .color(SN.go.opacity(0.85)), lineWidth: 1)
-            }
-            for segment in slackFillSegments(data.currentPoints, threshold: data.slackThreshold) {
-                var slackArea = Path()
-                for (i, point) in segment.enumerated() {
-                    let p = CGPoint(x: data.x(point.time), y: geo.curY(point.speed))
-                    i == 0 ? slackArea.move(to: p) : slackArea.addLine(to: p)
-                }
-                slackArea.addLine(to: CGPoint(x: data.x(segment.last!.time), y: geo.zeroY))
-                slackArea.addLine(to: CGPoint(x: data.x(segment[0].time), y: geo.zeroY))
-                slackArea.closeSubpath()
-                let startX = data.x(segment[0].time)
-                let endX = data.x(segment.last!.time)
-                // A sine envelope avoids a bright rectangular plateau while
-                // retaining enough green through short usable windows.
-                ctx.fill(slackArea, with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: SN.go.opacity(0), location: 0),
-                        .init(color: SN.go.opacity(0.37), location: 0.125),
-                        .init(color: SN.go.opacity(0.68), location: 0.25),
-                        .init(color: SN.go.opacity(0.89), location: 0.375),
-                        .init(color: SN.go.opacity(0.98), location: 0.5),
-                        .init(color: SN.go.opacity(0.89), location: 0.625),
-                        .init(color: SN.go.opacity(0.68), location: 0.75),
-                        .init(color: SN.go.opacity(0.37), location: 0.875),
-                        .init(color: SN.go.opacity(0), location: 1),
-                    ]),
-                    startPoint: CGPoint(x: startX, y: 0), endPoint: CGPoint(x: endX, y: 0)))
-            }
-            for window in data.slackWindows {
-                for time in [window.start, window.end] {
-                    var rail = Path()
-                    rail.move(to: CGPoint(x: data.x(time), y: geo.curBottom))
-                    rail.addLine(to: CGPoint(x: data.x(time), y: geo.curY(data.velocityAt(time))))
-                    ctx.stroke(rail, with: .color(SN.go.opacity(0.7)),
-                               style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                }
+                ctx.stroke(threshold, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
             }
         } else {
             var area = line
@@ -1141,84 +1055,85 @@ struct TimelineCanvas: View {
                     Gradient(stops: fillStops),
                     startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: data.totalWidth, y: 0)))
             }
-            var zero = Path()
-            zero.move(to: CGPoint(x: 0, y: geo.zeroY))
-            zero.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
-            ctx.stroke(zero, with: .color(.white.opacity(0.4)), lineWidth: 1)
-        }
-        ctx.stroke(line, with: .color(Color(hex: 0xDFEEE0)),
-                   style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-        let margin = 0.3 * 3600
-        let filteredEvents = data.currentEvents.filter { e in
-            e.time >= data.start.addingTimeInterval(margin)
-                && e.time <= data.end.addingTimeInterval(-margin)
+            referenceLine(ctx, at: geo.zeroY)
         }
 
-        for e in filteredEvents {
+        strokeSplitAtNow(ctx, line, with: .color(SN.graphLine))
+
+        // The run is the mark (spec §5.2): the line itself turns the go
+        // colour between each run's interpolated edges, over a wider
+        // round-capped eraser so the seam at both ends is a clear ring, not
+        // a slanted cut. The run's opening gets the track's only dot; its
+        // time goes on the bottom row.
+        for run in runs {
+            var seg = Path()
+            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+            for p in data.currentPoints where p.time > run.start && p.time < run.end {
+                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            var eraser = ctx
+            eraser.blendMode = .destinationOut
+            eraser.stroke(seg, with: .color(.black),
+                          style: StrokeStyle(lineWidth: CurveStyle.lineWidth + CurveStyle.haloGap * 2,
+                                             lineCap: .round))
+            strokeSplitAtNow(ctx, seg, with: .color(SN.go))
+            dot(ctx, at: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))),
+                color: SN.go.opacity(fade(run.start)))
+        }
+
+        let margin = 0.3 * 3600
+        let onStrip = { (t: Date) in
+            t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
+        }
+        let slacks = data.currentEvents.filter { $0.kind == .slack }.map(\.time)
+        for t in currentAxisMoments(runs: runs, slacks: slacks) where onStrip(t) {
+            axisTime(ctx, t)
+        }
+
+        for e in data.currentEvents where onStrip(e.time) {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
-                // Foam keeps the exact zero crossing distinct from the green
-                // threshold interval that surrounds it.
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: geo.zeroY - 4,
-                                                width: 8, height: 8)),
-                         with: .color(SN.foam))
-                // The label stays at the slack instant; the dashed rails carry
-                // the interval's start and end.
-                if data.slackWindows.first(where: { $0.slack == e.time }) == nil {
-                    // No window (a violent gate the sampling steps over, every
-                    // derived gate): a hairline rather than a column — a
-                    // zero-width window must not look like a window.
+                // No window (a violent gate the sampling steps over, every
+                // derived gate): a hairline rather than a run — a zero-width
+                // window must not look like a window (§5.3). Where a run
+                // exists, the run is the mark.
+                if !runs.contains(where: { $0.contains(e.time) }) {
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
-                    ctx.stroke(tick, with: .color(SN.go.opacity(0.35)), lineWidth: 1)
-                }
-                if !suppressesSlackLabel(data.slackWindows, at: e.time) {
-                    ctx.draw(Text(chartTime(e.time, data.tz))
-                                .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(SN.foam),
-                             at: CGPoint(x: x, y: geo.timeY), anchor: .center)
+                    ctx.stroke(tick, with: .color(SN.go.opacity(0.35 * fade(e.time))), lineWidth: 1)
                 }
             case .maxFlood, .maxEbb:
+                // Context, not the event (§5.1): no dot. The speed on the
+                // band at the zero line, the set arrow on the peak's side —
+                // above for flood, below for ebb. Foam ink: the warm fill is
+                // a magnitude cue, not a second text-colour system.
                 let flood = e.kind == .maxFlood
-                let y = geo.curY(e.speed)
-                ctx.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 4, width: 8, height: 8)),
-                         with: .color(SN.foam))
-
-                // The speed annotates the CURVE, not a band: inside the fill
-                // when the fill is deep enough to hold it, outside on the dark
-                // ground otherwise. No chip behind it.
-                //
-                // The chart's event labels always use its foam ink; the warm
-                // fill is a magnitude cue, not a second text-colour system.
-                let toward: CGFloat = flood ? 1 : -1      // toward the zero line
-                let cy = y + toward * 23
-                let mark = SN.foam
-                ctx.draw(Text(formatSpeed(abs(e.speed), unit: speedUnit))
-                            .font(.system(size: 14, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(mark),
-                         at: CGPoint(x: x, y: cy - 7), anchor: .center)
-                let arrow = Text(deg(flood) == nil ? (flood ? "↑" : "↓") : "↑")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(mark)
+                let f = fade(e.time)
+                let ink = SN.foam.opacity(f)
+                let pointerAt = CGPoint(x: x, y: geo.zeroY + (flood ? -CurveStyle.pointerOffset : CurveStyle.pointerOffset))
                 if let d = deg(flood) {
                     ctx.drawLayer { l in
-                        l.translateBy(x: x, y: cy + 8)
+                        l.translateBy(x: pointerAt.x, y: pointerAt.y)
                         l.rotate(by: .degrees(d))
-                        l.draw(arrow, at: .zero, anchor: .center)
+                        l.draw(Text(Image(systemName: "arrow.up"))
+                                .font(.system(size: CurveStyle.pointerFontSize, weight: .bold))
+                                .foregroundStyle(ink),
+                               at: .zero, anchor: .center)
                     }
-                } else {
-                    ctx.draw(arrow, at: CGPoint(x: x, y: cy + 8), anchor: .center)
                 }
-
-                // The time drops to the one small row under the track, in the
-                // same weight it had as a band's secondary line.
-                ctx.draw(Text(chartTime(e.time, data.tz))
-                            .font(.system(size: 12).monospaced())
-                            .foregroundStyle(.white.opacity(0.6)),
-                         at: CGPoint(x: x, y: geo.timeY), anchor: .center)
+                if !data.speedsAreSchematic {
+                    ctx.draw(Text("\(formatSpeed(abs(e.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                                .font(.system(size: CurveStyle.valueFontSize, weight: .bold).monospacedDigit())
+                                .foregroundStyle(ink),
+                             at: CGPoint(x: x, y: geo.zeroY), anchor: .center)
+                }
             }
         }
+
+        drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.curY(data.velocityAt(now))))
     }
 }
 
