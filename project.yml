@@ -114,6 +114,9 @@ targets:
       - Slackwater/Palette.swift
       - Slackwater/DeepLink.swift
       - Slackwater/SlackWindow.swift
+      - Slackwater/CardStatus.swift
+      - Slackwater/StationCardFace.swift
+      - Slackwater/StationCardGraph.swift
       - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/WidgetSnapshot.swift

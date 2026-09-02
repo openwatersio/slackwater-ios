@@ -89,32 +89,6 @@ enum CardStatus: Equatable {
     }
 }
 
-/// Where a fittable CHS station stands, in precedence order: what is happening
-/// right now beats what is merely true. Replaces the five sentences
-/// `chsPendingMessage` used to build.
-@MainActor func cardStatus(id: String, fitting: Bool = false, failed: Bool = false) -> CardStatus {
-    if fitting { return .downloading }
-    if failed { return .failed }
-    // Not in the download set at all (M53 — most of Canada). Opening it is what
-    // downloads it, so this is the honest state connected or not; it must not
-    // claim a queue it isn't in.
-    if !ChsFitService.shared.isQueued(id) { return .notDownloaded }
-    return Connectivity.shared.online ? .queued : .offline
-}
-
-/// The 7 online (fit-reject) gates: never queued, never fitted, so the only
-/// question is what is on disk. Called with a window that does NOT cover the
-/// strip on screen — a covering one renders as an ordinary reading.
-///
-/// Pure, and split from the view for it: the nil/stale distinction is the bug
-/// #93 named, and it needs a test that doesn't build a card.
-func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool) -> CardStatus {
-    // Offline first: with no signal, neither tapping nor waiting fetches
-    // anything, so "get online" is the only true thing to say.
-    guard online else { return .offline }
-    return window == nil ? .notDownloaded : .expired
-}
-
 /// Calendar-day copy for cached official predictions. The station's data
 /// source is irrelevant here; people only need to know how long the local
 /// copy remains useful.
@@ -125,14 +99,6 @@ func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar 
     if days <= 0 { return "Expires today" }
     if days <= 3 { return "Expires in \(days) day\(days == 1 ? "" : "s")" }
     return "Available offline for \(days) more days"
-}
-
-extension ChsOnlineWindow {
-    /// Last day the ordinary forward-looking strip is fully backed by this
-    /// download, rather than the last raw sample in the file.
-    var offlineValidUntil: Date {
-        end.addingTimeInterval(-Timeline.forwardHours * 3600)
-    }
 }
 
 /// Icon + two words, one line, in place of the paragraph a pending card used to

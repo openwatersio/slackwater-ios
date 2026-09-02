@@ -299,56 +299,6 @@ func currentExcessSegments(_ points: [CurrentPoint], threshold: Double) -> [[Cur
     return segments
 }
 
-func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {
-    guard points.count > 1 else { return [] }
-    var events: [CurrentEvent] = []
-    var runStart = 0
-    var lastNonzeroSign: Int = 0    // +1, -1, or 0 (no nonzero yet)
-    var lastWasZero = false         // true if the previous sample was exactly zero
-
-    func closeRun(_ end: Int) {     // [runStart, end] inclusive
-        guard runStart <= end else { return }  // no-op when run is empty
-        // Collect only nonzero speeds; filter excludes exact-zero samples.
-        let nonzeroInRun = points[runStart...end].filter { $0.speed != 0 }
-        guard !nonzeroInRun.isEmpty else { return }
-        let peak = nonzeroInRun.max { abs($0.speed) < abs($1.speed) }!
-        events.append(CurrentEvent(time: peak.time, speed: peak.speed,
-                                   kind: peak.speed > 0 ? .maxFlood : .maxEbb))
-    }
-
-    for i in 0..<points.count {
-        let current = points[i]
-        let sign = current.speed > 0 ? 1 : (current.speed < 0 ? -1 : 0)
-
-        if sign == 0 {
-            // Exact-zero sample: if preceded by nonzero and not consecutive zeros,
-            // this zero IS the slack.
-            if lastNonzeroSign != 0 && !lastWasZero {
-                closeRun(i - 1)
-                events.append(CurrentEvent(time: current.time, speed: 0, kind: .slack))
-                runStart = i + 1
-            }
-            lastWasZero = true
-        } else {
-            // Nonzero sample
-            if lastNonzeroSign != 0 && lastNonzeroSign != sign && !lastWasZero {
-                // Sign opposes last nonzero, no zero between: interpolate crossing.
-                let prev = points[i - 1]
-                let f = abs(prev.speed) / (abs(prev.speed) + abs(current.speed))
-                closeRun(i - 1)
-                events.append(CurrentEvent(
-                    time: prev.time.addingTimeInterval(current.time.timeIntervalSince(prev.time) * f),
-                    speed: 0, kind: .slack))
-                runStart = i
-            }
-            lastNonzeroSign = sign
-            lastWasZero = false
-        }
-    }
-    closeRun(points.count - 1)
-    return events.sorted { $0.time < $1.time }
-}
-
 /// The useful current-cycle aggregate: the signed difference between the
 /// adjoining flood and ebb maxima around a reading, expressed in knots.
 func currentPeakToPeakRange(_ events: [CurrentEvent], around time: Date) -> Double? {

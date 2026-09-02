@@ -624,3 +624,11 @@ struct OfflineManagerList: View {
         .accessibilityIdentifier("download-row-\(job.id)")
     }
 }
+
+extension ChsOnlineWindow {
+    /// Last day the ordinary forward-looking strip is fully backed by this
+    /// download, rather than the last raw sample in the file.
+    var offlineValidUntil: Date {
+        end.addingTimeInterval(-Timeline.forwardHours * 3600)
+    }
+}

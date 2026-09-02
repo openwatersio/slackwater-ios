@@ -34,8 +34,10 @@ final class PhaseGlossTests: XCTestCase {
         }
         // The list cards lead with arrow + cardinal, rendered once for every
         // card kind by ConditionsItem's `.current` case — a single call site
-        // by design, so this asserts presence, not a count.
-        let cards = try repoSource("Slackwater/StationCard.swift")
+        // by design, so this asserts presence, not a count. ConditionsItem
+        // moved into StationCardFace.swift so the widget extension can share
+        // it with the list.
+        let cards = try repoSource("Slackwater/StationCardFace.swift")
         XCTAssertTrue(cards.contains("compass16("),
                       "list cards lost their direction-first cardinal (#59)")
         XCTAssertTrue(cards.contains("struct ConditionsItem"),
