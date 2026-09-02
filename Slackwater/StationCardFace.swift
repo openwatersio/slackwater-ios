@@ -167,7 +167,8 @@ struct ConditionsItem: View {
             // surface (the widget) shows the time to the closing instead of
             // the speed (§15.3); the list passes no countdown.
             let phase = currentPhase(signed: signed)
-            if let end = countdownTo {
+            // A countdown that has already elapsed by render time (a widget entry outliving its window) falls back to the speed; Date.now...end must never be built with end in the past.
+            if let end = countdownTo, end > Date.now {
                 if end.timeIntervalSinceNow > 7_200 {
                     Text("> 2 hrs")
                         .font(.title3.monospacedDigit()).fontWeight(.bold)
