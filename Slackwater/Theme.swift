@@ -215,6 +215,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// own it — it lives in the detail view, which is also what makes
     /// `onReturn` caller-owned.
     @Binding var anchor: Date
+    /// Whether the week-range bar stays up when there is no timeline. The
+    /// three constituent-backed details always have somewhere to go; an
+    /// online gate with nothing downloaded yet does not — every week the
+    /// picker can reach lands on the same honesty card (#172).
+    var canPickDate = true
     /// Fired when the picker OPENS, before a date is chosen. Only an online
     /// gate has anything to do here (speculatively fetch the next block); the
     /// other three are constituents and pass a no-op.
@@ -252,11 +257,12 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         scrubCard(timeline)
                         scheduleCard(timeline)
                             .padding(.top, 14)
-                    } else if anchor != .distantPast {
+                    } else if anchor != .distantPast, canPickDate {
                         // #67 item 2: no timeline means the caller is showing its
                         // honesty card below — but the bar (and its picker) need
                         // no timeline, and without them that card is a dead end
-                        // with no way back to a covered week. Guarded on anchor:
+                        // with no way back to a covered week — when there IS one
+                        // (`canPickDate`). Guarded on anchor:
                         // all four details start at .distantPast (real anchor
                         // arrives in onAppear), and weekRangeLabel force-unwraps
                         // a Calendar.date(byAdding:) against it — the pre-onAppear
