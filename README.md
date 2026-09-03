@@ -1,109 +1,55 @@
 # Slackwater for iOS
 
-Tide **and current** predictions that keep working with **no signal**. Open it once, install it,
-and it answers in an anchorage with no bars — the harmonics run on the device, not fetched from
-a server.
+Tide and current predictions that keep working when the signal does not.
+Slackwater computes predictions on your iPhone, so the answer is already there
+before you leave the dock.
 
-The wedge is currents, not tides. Everyone does tide heights. Currents are the actual planning
-problem, and nobody ships *offline + real current predictions + US-and-Canada + modern UX* in
-one app. Offline-first isn't a feature, it's the reason the app exists — if the boat's systems
-die, a phone in your pocket independently runs the same numbers.
+- Tide predictions worldwide
+- Current predictions across the United States and Canada
+- Slack times, speed and direction for tidal currents
+- Offline charts and station search
+- No account, no ads and no tracking
 
-**The US and Canada today, global by design.** Every reference station whose licence permits
-it is bundled — 1,425 tide stations and 842 current stations, coast to coast, offline from
-first launch. That is NOAA's public-domain network plus the cc-by-4.0 half of TICON-4; the
-non-commercial half can never ship. Canada is 1,086 CHS tide stations whose *identity* is
-bundled (visible and searchable everywhere) and whose predictions are fetched per user and
-fitted on the device; the nearest few download on their own, anything you open downloads on
-the spot — plus 49 bundled TICON stations in water CHS does not gauge. Canadian **currents** are every
-pass CHS predicts a current for that a mariner actually times on slack: 22 of them, from Race
-Passage to Great Bras d'Or in Cape Breton. Thirteen fit on the device; the nine the fit cannot
-honestly describe are still findable, and fetch CHS's own predictions instead of guessing —
-coverage stops where we can still tell when the numbers are wrong. The path to accurate-worldwide is open source: people who sail
-their own waters fixing the data.
+Slackwater is free and currently available as a public beta for iOS 26 and
+later.
 
-## The family
+**[Get Slackwater on TestFlight](https://testflight.apple.com/join/FCSS4w8s)**
 
-| Piece | What | Where |
-|---|---|---|
-| Engine | Pure-Swift harmonic tide/current engine, a port of [Neaps](https://github.com/openwatersio/neaps), validated against Neaps + NOAA | [`slackwater-engine`](https://github.com/openwatersio/slackwater-engine) |
-| Web app | The free GPL reference implementation — and the honest answer to "is there an Android version" | [`slackwater-web`](https://github.com/sailingnaturali/slackwater-web) |
-| **This repo** | The iOS app — same free core, nicer everything, plus the paid planning tier | here |
+See screenshots, explore stations and learn how the predictions work at
+**[slackwater.xyz](https://slackwater.xyz)**.
 
-Station data and shared libraries live in the Open Waters / Neaps ecosystem
-([`noaa-current-stations`](https://github.com/openwatersio/noaa-current-stations),
-`chs-constituents`, `station-corrections`, `@neaps/tide-database`).
+> Predictions are not observations. Weather, river flow and local conditions
+> can change the water. Slackwater is not for navigation.
 
-## The free / paid line
+## Coverage and offline use
 
-- **Free forever:** the entire offline core — heights and extremes for any date, currents, slack
-  times, saved locations, and home screen widgets. **The free core never shrinks.** Hard rule.
-- **Premium (one tier):** everything on the **lock screen** — accessory widgets, and the slack
-  Live Activity / Dynamic Island view (the live tile) when it ships — plus local threshold
-  alerts (decided-premium before ever shipping free), boat-relative **go-windows** (tell it
-  your boat and your slack window; it tells you the green spans to transit a gate), and
-  anything needing live observed data (weather, swell, wind overlays and alerts on them).
-  Canonical spec: `docs/superpowers/specs/2026-08-21-widgets-premium-design.md`.
+Slackwater includes thousands of tide and current stations from sources
+including NOAA and the Canadian Hydrographic Service. Most predictions are
+calculated from harmonic constituents on the device. When a source can only be
+used online, or a prediction has lower confidence, the app says so.
 
-## The bar
+The app downloads chart coverage and Canadian station data as you use it.
+Previously downloaded predictions and chart areas remain available without a
+connection.
 
-Native-first, and the ambition is a design award — or at least best in category (low bar for
-marine apps). User experience first, capability of the platform second, technology last.
+## Help improve Slackwater
 
-## Status & license
+Found a bug or a prediction that looks wrong? [Open an
+issue](https://github.com/openwatersio/slackwater-ios/issues/new?template=bug_report.yml).
 
-M4 (M3's tides + currents + CHS fit-on-device, plus: first-run location gate and a
-distance-ranked Near Me list, the offline pin map, the paired current→tide detail on
-gates with a `station-corrections` reference port, settings, a real app icon, and drafted
-App Store metadata in `docs/appstore-metadata.md`) — see the
-[docs index](docs/README.md) and the milestone plan in `slackwater/docs/superpowers/specs/`.
+You can also email [slackwater@openwaters.io](mailto:slackwater@openwaters.io)
+or visit [Slackwater support](https://slackwater.xyz/support/).
 
-M53 took it national: the bundled data is regenerated by `tools/gen-*.mjs`
-(`cd tools && npm install && npm run build:data` — CHS station identity first, then tides,
-NOAA currents and the CHS gates; `gen-tides.mjs` reads the CHS artefact to know which
-Canadian water it should stay out of).
+## Related projects
 
-The map is [VersaTiles](https://versatiles.org) satellite imagery under the app's own
-station pins and current fill — one style, no bundled tiles. Offline coverage comes from
-`ChartPackManager` (`Slackwater/ChartPacks.swift`), which keeps three tiers of MapLibre
-offline packs downloaded automatically: the world at z0–4, the z5 grid cell under the GPS
-fix plus its eight neighbours at z5–8 (a cell also stays alive while a starred station sits
-in it), and a ~20 km box around every starred or downloaded station at z9–12. Each tier
-owns its zoom range outright, so no tile is fetched twice; unstarring a station or sailing
-out of a cell deletes its pack. The design, its measured pack sizes, and the plan to swap
-the satellite style for the full nautical chart stack are in
-`docs/superpowers/specs/2026-08-25-offline-chart-packs-design.md`. The `tools/build-*.sh`
-scripts build the hosted seamap/seascape/land tilesets that chart-stack phase will consume;
-none of their artifacts ship in the app.
-
-The App Store copy in
-`docs/appstore-metadata.md` was rewritten for national coverage on 2026-08-01 — still a
-draft, nothing submitted; screenshots and a support URL are the remaining blockers
-(issues [#4](https://github.com/openwatersio/slackwater-ios/issues/4),
-[#5](https://github.com/openwatersio/slackwater-ios/issues/5)).
-Build: `xcodegen generate`, then build the `Slackwater` scheme (`.xcodeproj` and `Info.plist`
-are generated, not committed).
+- [Slackwater Engine](https://github.com/openwatersio/slackwater-engine) — the
+  Swift harmonic prediction engine used by the app
+- [Slackwater Web](https://github.com/sailingnaturali/slackwater-web) — a free
+  web app and the best option for Android users
+- [Open Waters](https://openwaters.io) — the organization behind Slackwater
 
 ## Contributing
 
-Branching, review, CI, and how to run the tests are in `CONTRIBUTING.md` — read it before
-your first change. Short version: no direct pushes to `main`, and `./scripts/test.sh` while
-iterating, `./scripts/test.sh --full` before an upload. Agents: `CLAUDE.md` too.
-
-## Known issues
-
-Tracked in [the issue list](https://github.com/openwatersio/slackwater-ios/issues), not
-here — a second copy in the README only rots. Agents: check open issues before starting,
-and file what you deliberately leave behind rather than burying it in a report.
-
-One rule that isn't an issue because it never closes: **`docs/appstore-metadata.md` is
-Bryan's to edit.** It's outbound copy; an agent may draft into it when asked, never on its
-own initiative.
-
-## License
-
-This repo is **deliberately private and
-deliberately unlicensed for now**: the engine and libraries are open and permissive, the web app
-is GPL, and the app's own license waits until we've worked out a structure that actually holds
-(copyleft + paid distribution + contributor terms don't sit cleanly together). Getting it right
-beats getting it fast.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+tests and pull-request guidance. You will need Xcode 26 or later and XcodeGen;
+then run `xcodegen generate` and open `Slackwater.xcodeproj`.
