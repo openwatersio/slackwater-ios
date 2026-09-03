@@ -108,6 +108,9 @@ struct OnlineGateDetailView: View {
                             live: $live, scrubTime: $scrubTime,
                             onReturn: returnToNow,
                             anchor: $anchor,
+                            // A stored block, even one the anchor has paged off,
+                            // is a week the picker can get back to; none is not.
+                            canPickDate: window != nil,
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in applyAnchor() },
                             scrubSummary: { tl in
