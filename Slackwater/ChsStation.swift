@@ -17,6 +17,7 @@ struct ChsStationInfo: Decodable, Identifiable, Hashable, StationIdentity {
     let latitude: Double
     let longitude: Double
     let timezone: String
+    var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
     static let all: [ChsStationInfo] = bundled("chs-stations")
 }
