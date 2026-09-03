@@ -181,7 +181,8 @@ struct ReturnToNowSlot: View {
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .accessibilityLabel("Return to now")
-                .accessibilityIdentifier("detail-return-now")
+                // Distinct from the strip's floating `detail-return-now`.
+                .accessibilityIdentifier("when-row-return-now")
             }
         }
         .frame(width: 44, height: 44)
@@ -303,10 +304,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     // which looks like a boundary artefact rather than a reading.
                     // With the unconditional 48h back-pad, noon has 60h (1080pt) of
                     // data behind it — no pane is that wide, so the park never
-                    // opens on dead space (#67 item 1).
+                    // opens on dead space (#67 item 1). Calendar noon, not +12h:
+                    // a spring-forward day would otherwise open at 13:00.
                     let week = Timeline.window(anchor: picked)
                     if scrubTime < week.start || scrubTime > week.end {
-                        scrubTime = picked.addingTimeInterval(12 * 3600)
+                        scrubTime = noonLocal(picked, tz)
                     }
                     onPicked(picked)
                 })
