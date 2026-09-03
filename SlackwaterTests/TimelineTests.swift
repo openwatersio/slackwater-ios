@@ -125,6 +125,19 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(strip.contains("detail-return-now"))
     }
 
+    /// The readout prints the threshold the strip was BUILT with, never the
+    /// global: `TimelineData.build` takes `threshold:` as a parameter, so a
+    /// caller passing anything else would otherwise draw one band and print
+    /// another (#233).
+    func testSlackReadoutsPrintTheTimelinesOwnThreshold() throws {
+        for file in ["Slackwater/CurrentDetailView.swift", "Slackwater/OnlineGateDetailView.swift"] {
+            let source = try repoSource(file)
+            XCTAssertTrue(source.contains("formatSpeed(tl.slackThreshold"), file)
+            XCTAssertFalse(source.contains("formatSpeed(slackThresholdKn"), file)
+            XCTAssertFalse(source.contains("threshold: slackThresholdKn"), file)
+        }
+    }
+
     func testOnlineGatesShareTheDownloadSurfaceAndCopy() throws {
         let manager = try repoSource("Slackwater/OfflineDownloads.swift")
         let detail = try repoSource("Slackwater/OnlineGateDetailView.swift")
