@@ -69,10 +69,15 @@ struct StationCardGraph: View {
     let extremes: [Extreme]
     /// The curve spans now − `back` … now + `forward`.
     let now: Date
-    /// The card's span by default; the small widget narrows both to one
-    /// swing so now sits at the center.
+    /// The card's span by default. The small widget narrows it to half a
+    /// swing back and one and a half ahead over the same points, so now
+    /// sits a quarter in; everything outside the span is cropped, and the
+    /// domain, datum line and spoken extremes follow the span, not the
+    /// points.
     var back: TimeInterval = Self.backWindow
     var forward: TimeInterval = Self.forwardWindow
+    private var start: Date { now.addingTimeInterval(-back) }
+    private var end: Date { now.addingTimeInterval(forward) }
     /// Signed current curves keep zero in the domain so flood/ebb read as
     /// above/below the resting line.
     var includesZero = false
@@ -91,10 +96,13 @@ struct StationCardGraph: View {
     var body: some View {
         Canvas { context, size in
             guard points.count > 1 else { return }
-            let start = now.addingTimeInterval(-back)
             let xScale = size.width / (back + forward)
-            var lo = points.map(\.value).min() ?? 0
-            var hi = points.map(\.value).max() ?? 1
+            // The visible water's range: the builders sample the card's full
+            // span, and a narrower view must not flatten under an off-screen
+            // swing.
+            let visible = points.filter { $0.time >= start && $0.time <= end }.map(\.value)
+            var lo = visible.min() ?? 0
+            var hi = visible.max() ?? 1
             if includesZero { lo = min(lo, 0); hi = max(hi, 0) }
             // The water's own range, before display padding — "does the tide
             // actually get near datum" is judged against this, not the
@@ -338,7 +346,8 @@ struct StationCardGraph: View {
             }
         }
         .accessibilityLabel("\(Int(((back + forward) / 3600).rounded()))-hour curve")
-        .accessibilityValue(extremes.map { "\($0.spokenText) at \($0.timeText)" }
+        .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
+            .map { "\($0.spokenText) at \($0.timeText)" }
             .joined(separator: ", "))
     }
 }
