@@ -620,9 +620,7 @@ final class RecentsStore: ObservableObject {
         AppGroup.defaults.set(ids, forKey: Self.key)
     }
 
-    var items: [StationItem] {
-        ids.compactMap { id in StationItem.all.first { $0.id == id } }
-    }
+    var items: [StationItem] { ids.compactMap { StationItem.byId[$0] } }
 
     /// The most recently opened station, which is the best guess at where the
     /// user is when Core Location has told us nothing.
@@ -726,10 +724,6 @@ final class FavoritesStore: ObservableObject {
         persist()
     }
 
-    var items: [StationItem] {
-        ids.compactMap { id in StationItem.all.first { $0.id == id } }
-    }
-
     // MARK: - iCloud (see FavoritesCloud)
 
     private func persist() { AppGroup.defaults.set(ids, forKey: Self.key) }
@@ -817,6 +811,10 @@ struct StationGroups {
     private let byName: [String: [StationItem]]
     /// Any station id -> the id that actually renders for its name.
     private let canonical: [String: String]
+    /// `collapse(ranked ids)`, done once here rather than per render: the
+    /// list re-evaluates on every fit-queue transition, and mapping 3,600
+    /// ids through a Set each time to find four is what #232 measured.
+    let shownIds: [String]
 
     /// `ranked` is the catalog sorted nearest-first, so the first station of a
     /// name is the nearest one — the one shown.
@@ -824,8 +822,11 @@ struct StationGroups {
         var byName: [String: [StationItem]] = [:]
         for item in ranked { byName[item.name, default: []].append(item) }
         self.byName = byName
-        canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
-                               uniquingKeysWith: { first, _ in first })
+        let canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
+                                   uniquingKeysWith: { first, _ in first })
+        self.canonical = canonical
+        var seen = Set<String>()
+        shownIds = ranked.map { canonical[$0.id] ?? $0.id }.filter { seen.insert($0).inserted }
     }
 
     /// What renders in place of `id` — itself, unless a nearer station shares its name.

@@ -443,7 +443,7 @@ struct StationListView: View {
                                 // would let Recents silently show and reopen the nearest namesake
                                 // instead. Near Me stays collapsed: distance ranking is not user choice.
                                 recentIds: recents.ids,
-                                rankedIds: places.collapse(ranked.map(\.id)),
+                                rankedIds: places.shownIds,
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 

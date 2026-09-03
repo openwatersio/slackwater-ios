@@ -106,6 +106,8 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertEqual(discovery.count, 2, "the collision this exists for")
         let shown = places.collapse(discovery.map(\.id))
         XCTAssertEqual(shown, [discovery[0].id], "one entry per name, the nearest")
+        XCTAssertEqual(places.shownIds, places.collapse(ranked.map(\.id)),
+                       "the memoised list is the same collapse the per-render call made")
         XCTAssertEqual(places.shown(discovery[1].id), discovery[0].id)
         XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id),
                        "the chooser still offers both, nearest first")
