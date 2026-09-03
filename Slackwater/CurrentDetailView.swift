@@ -107,7 +107,7 @@ struct CurrentDetailView: View {
                                 }
                             },
                             card: { tl in
-                                readout
+                                readout(tl)
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    speedUnit: speedUnit, now: live,
                                                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
@@ -142,7 +142,7 @@ struct CurrentDetailView: View {
         StationGlyph.colour(for: phase == .flood ? .flood : phase == .ebb ? .ebb : .slack)
     }
 
-    private var readout: some View {
+    private func readout(_ tl: TimelineData) -> some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 4) {
                 if let win = activeSlackWin {
@@ -197,7 +197,7 @@ struct CurrentDetailView: View {
                         // The threshold prints HERE, once, and not on the
                         // strip: one statement of a constant is information,
                         // six a day is texture.
-                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
+                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(tl.slackThreshold, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
                             .accessibilityIdentifier("slack-window")

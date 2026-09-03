@@ -317,7 +317,7 @@ extension TypeScaleTests {
         }
         // …and above the strip, which is the half of #55 that was visible.
         let online = try repoSource("Slackwater/OnlineGateDetailView.swift")
-        let readout = try XCTUnwrap(online.range(of: "readout(window)"))
+        let readout = try XCTUnwrap(online.range(of: "readout(window, tl)"))
         let strip = try XCTUnwrap(online.range(of: "TimelineScrubStrip("))
         XCTAssertLessThan(readout.lowerBound, strip.lowerBound,
                           "the readout goes above the strip, same as CurrentDetailView")
