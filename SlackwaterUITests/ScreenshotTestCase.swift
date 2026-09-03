@@ -233,8 +233,8 @@ class ScreenshotTestCase: XCTestCase {
     func assertTitleTapFocusesMap(_ app: XCUIApplication) {
         // Top of the detail, under the status bar clearance — should be
         // hittable the moment the header renders, no scroll needed.
-        let title = app.descendants(matching: .any)["map-header-title"].firstMatch
-        XCTAssert(title.waitForExistence(timeout: 10), "map-header-title missing")
+        let title = app.descendants(matching: .any)["detail-title"].firstMatch
+        XCTAssert(title.waitForExistence(timeout: 10), "detail-title missing")
         // bounded retap (see pickSearchResult); a landed tap pops the title with the detail
         let canvas = app.otherElements["map-canvas"].firstMatch
         var shown = false
@@ -243,7 +243,7 @@ class ScreenshotTestCase: XCTestCase {
             if canvas.waitForExistence(timeout: 5) { shown = true; break }
         }
         XCTAssert(shown, "the title tap did not show the map")
-        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+        XCTAssertFalse(app.otherElements["detail-header"].exists,
                        "the title tap must pop the detail, not layer the map over it")
     }
 
@@ -256,7 +256,7 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     /// Drag from the very left edge — the interactive pop, not a content swipe.
-    /// Anchored to the map header's own band (near its bottom, not its
+    /// Anchored to the detail header's own band (near its bottom, not its
     /// screen-midpoint fraction) when a header is on screen: the header is only
     /// a third of the screen tall, and a start point
     /// close to the top of the screen — under the status bar / Dynamic
@@ -266,7 +266,7 @@ class ScreenshotTestCase: XCTestCase {
     /// that zone at any Dynamic Type size. On the root list (no header, e.g.
     /// the no-op check) fall back to the same safe screen fraction.
     func edgeSwipeBack(_ app: XCUIApplication) {
-        let header = app.otherElements["detail-map-header"].firstMatch
+        let header = app.otherElements["detail-header"].firstMatch
         let edge: XCUICoordinate
         let across: XCUICoordinate
         if header.exists {

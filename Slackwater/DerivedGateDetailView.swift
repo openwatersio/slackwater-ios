@@ -29,7 +29,6 @@ struct DerivedGateDetailView: View {
 
     var body: some View {
         ScrubDetailScaffold(name: gate.name, region: gate.region,
-                            latitude: gate.latitude, longitude: gate.longitude,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
                             live: $live, scrubTime: $scrubTime,
@@ -42,7 +41,6 @@ struct DerivedGateDetailView: View {
                                 readout
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    now: live, scrubTime: $scrubTime)
-                                    .padding(.horizontal, -16)  // full-bleed strip
                                     .padding(.top, 12)
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
                                 Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")

@@ -2,8 +2,8 @@
 // TidesApp.dc.html): one continuous multi-day strip pans under a fixed
 // centerline, current only — a paired reference port's tide no longer rides
 // the same track (split-scrubbers spec §1). The port stays reachable one tap
-// away via TideAtPortLink, under the scrub card's own readout. No day pager;
-// the schedule is a rolling multi-day list, rows scrub cross-day.
+// away via TideAtPortLink, in the scrub card. No day pager; the schedule is a
+// rolling multi-day list, rows scrub cross-day.
 import SwiftUI
 import TideEngine
 
@@ -66,15 +66,28 @@ struct CurrentDetailView: View {
     private var activeSlackWin: (slack: Date, start: Date, end: Date)? {
         timeline?.containingSlackWindow(at: scrubTime)
     }
-    private var nextSlack: CurrentEvent? {
-        timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
+    private var isSlack: Bool { activeSlackWin != nil || phase == .slack }
+    /// What the right tile shows. Running water: the next slack, since the max
+    /// belongs to this run and the left tile's caption carries it. Slack: the
+    /// next max. Inside a window, everything before its end IS this slack — a
+    /// weak station's window can swallow a sub-threshold max and the slack
+    /// after it — so next is whatever follows the window.
+    private var nextEvent: CurrentEvent? {
+        guard let events = timeline?.currentEvents else { return nil }
+        if let win = activeSlackWin { return events.first { $0.time >= win.end } }
+        return isSlack ? events.first { $0.time > scrubTime }
+                       : events.first { $0.kind == .slack && $0.time > scrubTime }
     }
-    /// The window around the next slack — looked up, not recomputed. The strip
-    /// draws these same numbers as a band (gutter spec §3).
-    private var slackWin: (start: Date, end: Date)? {
-        guard let slack = nextSlack else { return nil }
-        return timeline?.slackWindows.first { $0.slack == slack.time }
-            .map { (start: $0.start, end: $0.end) }
+    /// This run's max — behind the scrub once past it, ahead before it.
+    private var runMax: CurrentEvent? {
+        guard let events = timeline?.currentEvents else { return nil }
+        if let prev = events.last(where: { $0.time <= scrubTime }), prev.kind != .slack { return prev }
+        return events.first { $0.time > scrubTime && $0.kind != .slack }
+    }
+    /// The window around a slack — looked up, not recomputed. The strip draws
+    /// these same numbers as a band (gutter spec §3).
+    private func slackWindow(at slack: Date) -> (start: Date, end: Date)? {
+        timeline?.slackWindows.first { $0.slack == slack }.map { (start: $0.start, end: $0.end) }
     }
 
     /// The fast answer's marking, on every number this page prints: the tilde
@@ -84,7 +97,6 @@ struct CurrentDetailView: View {
 
     var body: some View {
         ScrubDetailScaffold(name: record.name, region: record.region,
-                            latitude: record.latitude, longitude: record.longitude,
                             favoriteId: record.itemId, tz: tz,
                             timeline: timeline,
                             entries: { scheduleEntries($0, floodDeg: record.floodDirection,
@@ -103,17 +115,17 @@ struct CurrentDetailView: View {
                                                  expectation: gate.provisionalExpectation(online: net.online),
                                                  action: "See all downloads",
                                                  identifier: "chs-provisional-warning") { showDownloads = true }
-                                        .padding(.top, 14)
+                                        .padding(.bottom, 14)
                                 }
+                                readout
+                                    .padding(.horizontal, 16)
+                                    .padding(.bottom, 14)
                             },
                             card: { tl in
-                                readout
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    speedUnit: speedUnit, now: live,
                                                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
                                                    scrubTime: $scrubTime, onReturn: returnToNow)
-                                    .padding(.horizontal, -16)  // full-bleed strip
-                                    .padding(.top, 12)
                             },
                             links: {
                                 if let port = pairedTide { TideAtPortLink(port: port) }
@@ -133,7 +145,7 @@ struct CurrentDetailView: View {
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
     }
 
-    // MARK: - Readout above the strip
+    // MARK: - Readout between header and card: two tiles, now and next
 
     /// Kept as the tests' named binding (ColourAndFormTests); the palette
     /// itself lives in `StationGlyph.colour(for:)`. Slack is the app's "go"
@@ -142,71 +154,105 @@ struct CurrentDetailView: View {
         StationGlyph.colour(for: phase == .flood ? .flood : phase == .ebb ? .ebb : .slack)
     }
 
+    private func speedText(_ kn: Double) -> Text {
+        Text("\(tilde)\(formatSpeed(abs(kn), unit: speedUnit))").font(ReadoutType.hero.monospacedDigit())
+            + Text(" \(speedUnitLabel(speedUnit))").font(ReadoutType.unit)
+    }
+    private var thresholdText: String {
+        "<\(formatSpeed(timeline?.slackThreshold ?? slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))"
+    }
+
+    /// Running water's caption: this run's max and when. Relative from now;
+    /// once scrubbed away, "in 4h" from an arbitrary point means nothing, so
+    /// the clock time.
+    private var maxLine: String? {
+        runMax.map { m in
+            let when = scrubbedAway(scrubTime, from: live) ? chartTime(m.time, tz)
+                : m.time > scrubTime ? "in \(countdown(from: scrubTime, to: m.time))"
+                : "\(countdown(from: m.time, to: scrubTime)) ago"
+            return "\(tilde)Max \(formatSpeed(abs(m.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit)) · \(when)"
+        }
+    }
+
     private var readout: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let win = activeSlackWin {
-                    let timing = slackWindowTiming(start: win.start, end: win.end, tz: tz)
-                    Text("Slack" + (timing.duration.map { " · \($0)" } ?? ""))
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(.slack) : SN.amber)
-                    Text("\(tilde)\(timing.span)")
-                        .font(.title3.monospacedDigit())
-                        .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
-                } else {
-                    Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
-                    HStack(spacing: 4) {
-                        Text("\(tilde)\(formatSpeed(abs(scrubSigned), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.title3.monospacedDigit())
-                        CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.title3)
-                        Text(compass16(record.setDegrees(signed: scrubSigned))).font(.title3)
+        let phaseColor = provisionalGate == nil ? Self.phaseColor(isSlack ? .slack : phase) : SN.amber
+        let caption = provisionalGate == nil ? SN.foam.opacity(0.55) : SN.amber.opacity(0.7)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                // Now. The set is the hero (#59): a novice reads the arrow
+                // first. In slack the water goes both ways, so the glyph does
+                // too, and the number is how long the slack holds — time
+                // REMAINING, not the window's original length.
+                ReadoutTile(label: isSlack ? "Slack" : phase.word,
+                            caption: isSlack ? (activeSlackWin.map { "\(tilde)\(thresholdText) until \(chartTime($0.end, tz))" } ?? chartTime(scrubTime, tz))
+                                : (maxLine ?? chartTime(scrubTime, tz)),
+                            valueColor: readingColor, captionColor: caption,
+                            accessibility: isSlack ? "Slack" : "\(phase.word), setting \(compass16(record.setDegrees(signed: scrubSigned)))") {
+                    if isSlack {
+                        Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                            .foregroundStyle(phaseColor)
+                    } else {
+                        let deg = record.setDegrees(signed: scrubSigned)
+                        Text(compass16(deg)).foregroundStyle(SN.foam.opacity(0.5))
+                        CompassArrow(deg: deg).foregroundStyle(phaseColor)
                     }
-                    .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
-                }
-                if let gate = provisionalGate {
-                    MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
-                              color: SN.amber, tracking: 1.2)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(SN.amber.opacity(0.16), in: Capsule())
-                        .padding(.top, 2)
-                        .accessibilityIdentifier("provisional-reading-badge")
-                }
-            }
-            Spacer()
-            if let slack = nextSlack {
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    if let win = slackWin {
-                        // Counts to the window OPENING, not the slack instant:
-                        // this readout answers "when can I be there", and the
-                        // window is when the pass is transitable. The window
-                        // brackets the slack, so it is often already open —
-                        // then it says `now` (gutter spec §5).
-                        Text(win.start > scrubTime
-                             ? "\(tilde)in \(countdown(from: scrubTime, to: win.start))"
-                             : "\(tilde)now")
-                            .font(.caption.monospacedDigit())
-                            // SN.go, not SN.leaf: this line says when slack is.
-                            // Same value today, but the token has to name the
-                            // meaning or retargeting one of them breaks it.
-                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
-                        // Time REMAINING, not the window's original length —
-                        // an already-open window must not claim its full run.
-                        // The threshold prints HERE, once, and not on the
-                        // strip: one statement of a constant is information,
-                        // six a day is texture.
-                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(slackThresholdKn, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
+                } value: {
+                    if isSlack {
+                        Text(activeSlackWin.map { "\(tilde)for \(countdown(from: scrubTime, to: $0.end))" } ?? "\(tilde)now")
+                            .font(ReadoutType.hero.monospacedDigit())
                             .accessibilityIdentifier("slack-window")
                     } else {
-                        Text("\(tilde)in \(countdown(from: scrubTime, to: slack.time))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
+                        speedText(scrubSigned)
                     }
                 }
+                .accessibilityIdentifier("detail-reading")
+
+                if let next = nextEvent {
+                    // Next. A slack counts to its window OPENING, not the
+                    // instant: the window is when the pass is transitable
+                    // (gutter spec §5), and for a slack the when IS the hero
+                    // and the caption is how long it holds. A max counts to
+                    // the max. Relative from now, the clock time once scrubbed
+                    // away.
+                    let window = next.kind == .slack ? slackWindow(at: next.time) : nil
+                    let target = window?.start ?? next.time
+                    let away = scrubbedAway(scrubTime, from: live)
+                    let when = away ? chartTime(target, tz) : countdown(from: scrubTime, to: target)
+                    let nextColor = provisionalGate == nil
+                        ? Self.phaseColor(next.kind == .slack ? .slack : next.kind == .maxFlood ? .flood : .ebb)
+                        : SN.amber
+                    ReadoutTile(label: next.kind == .slack ? "Next slack" : next.turnLabel,
+                                caption: next.kind == .slack
+                                    // The threshold prints HERE, once, not on the strip.
+                                    ? (window.map { "\(tilde)\(thresholdText) for \(countdown(from: $0.start, to: $0.end))" }
+                                       ?? "\(tilde)never \(thresholdText)")
+                                    : (away ? "\(tilde)\(when)" : "\(tilde)in \(when)"),
+                                valueColor: readingColor, captionColor: caption,
+                                accessibility: "Next \(next.turnLabel.lowercased())") {
+                        if next.kind == .slack {
+                            Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                                .foregroundStyle(nextColor)
+                        } else {
+                            let deg = next.kind == .maxFlood ? record.floodDirection : record.ebbDirection
+                            Text(compass16(deg)).foregroundStyle(SN.foam.opacity(0.5))
+                            CompassArrow(deg: deg).foregroundStyle(nextColor)
+                        }
+                    } value: {
+                        if next.kind == .slack {
+                            Text(away ? "\(tilde)\(when)" : "\(tilde)In \(when)")
+                                .font(ReadoutType.hero.monospacedDigit())
+                        } else {
+                            speedText(next.speed)
+                        }
+                    }
+                }
+            }
+            if let gate = provisionalGate {
+                MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
+                          color: SN.amber, tracking: 1.2)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(SN.amber.opacity(0.16), in: Capsule())
+                    .accessibilityIdentifier("provisional-reading-badge")
             }
         }
     }
@@ -251,5 +297,11 @@ struct CurrentDetailView: View {
     private func rebuild() {
         timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: anchor,
                                       threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+    }
+}
+
+#Preview {
+    NavigationStack {
+        CurrentDetailView(record: CurrentStationRecord.all.first { $0.name == "Deception Pass (Narrows)" }!)
     }
 }

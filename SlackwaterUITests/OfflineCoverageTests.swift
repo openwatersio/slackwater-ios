@@ -134,7 +134,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // lookup: on iPad the persistent sidebar can carry "Victoria" in its
         // own list ranking independently of what got pushed (same trap
         // testOnlineGateUnfetchedShowsHonestyCard's header lookup dodges).
-        let header = app.otherElements["detail-map-header"].firstMatch
+        let header = app.otherElements["detail-header"].firstMatch
         XCTAssert(header.waitForExistence(timeout: 5),
                   "the row tap did not push a detail")
         XCTAssert(header.staticTexts["Victoria"].firstMatch.exists,
@@ -203,7 +203,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                   "tapping Retry did not promote the row — expected \"YOU OPENED\"/\"Waiting\" in its label, got \"\(label)\"")
 
         // And the row tap's OWN effect never fired: the sheet is still up.
-        // NOT a bare "no detail-map-header exists" check — on iPad the split
+        // NOT a bare "no detail-header exists" check — on iPad the split
         // layout auto-selects Victoria's OWN detail underneath this sheet
         // regardless of anything this test does (the same auto-select the
         // doc comment above routes around), so a header legitimately exists
@@ -212,7 +212,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // Harbour's detail, replacing what's shown.
         XCTAssert(app.staticTexts["Downloads"].exists,
                   "the row's onTapGesture must not have fired — the Retry button owns this tap")
-        let header = app.otherElements["detail-map-header"].firstMatch
+        let header = app.otherElements["detail-header"].firstMatch
         if header.exists {
             XCTAssertFalse(header.staticTexts["Victoria Harbour"].firstMatch.exists,
                            "no detail should have opened — the button, not the row, must have handled the tap")

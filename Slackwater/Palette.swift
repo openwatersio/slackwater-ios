@@ -247,6 +247,8 @@ func shortWeekday(_ date: Date, _ tz: TimeZone) -> String {
 struct CompassArrow: View {
     let deg: Double
     var body: some View {
-        Text("↑").rotationEffect(.degrees(deg))
+        // The SF Symbol, not the "↑" text glyph: a text arrow at the same
+        // point size renders visibly smaller than its symbol neighbours.
+        Image(systemName: "arrow.up").rotationEffect(.degrees(deg))
     }
 }

@@ -156,7 +156,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         let app = launch("-seedGate")
         // The pane opens on the first row, not the placeholder — the
         // placeholder is only reachable by clearing the pane (map toggle).
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 10),
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 10),
                   "regular width did not auto-select a station into the detail pane")
         openFridayHarbor(app)
         // The sidebar must still be on screen while the detail shows —
@@ -246,9 +246,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
-    /// Issue #32: the map-header title jumps to the map, focused on the
+    /// Issue #32: the detail header title jumps to the map, focused on the
     /// detail's own station (StationListView.swift `openMapFocused`/`mapFocus`,
-    /// MapHeader.swift's title pill). No accessibility surface exposes an
+    /// DetailHeader.swift's title). No accessibility surface exposes an
     /// `MLNMapView`'s live center/zoom to XCUITest — nothing in this file
     /// reads one — so this proves the navigation contract (map up, detail
     /// gone) rather than the actual camera position; `mapFocus`/`stationZoom`
@@ -386,7 +386,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         }
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 10),
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 10),
                   "the detail pane did not open a station on launch")
         XCTAssertFalse(app.staticTexts["Pick a station"].exists,
                        "the placeholder is still what a fresh iPad launch shows")

@@ -89,6 +89,49 @@ func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
     return "\(head) – \(formatter(tailPattern, tz).string(from: last))"
 }
 
+/// One Weather-style readout tile (tide + current): eyebrow with the glyph in
+/// the far corner, the number, a caption. The glyph colours itself; the value
+/// takes `valueColor` — white, or amber for a provisional reading.
+enum ReadoutType {
+    static let hero: Font = .system(.title2, design: .rounded).weight(.medium)
+    static let unit: Font = .title3.weight(.light)
+}
+
+struct ReadoutTile<Glyph: View, Value: View>: View {
+    let label: String
+    let caption: String
+    var valueColor: Color = .white
+    var captionColor: Color = SN.foam.opacity(0.55)
+    /// Spoken for the eyebrow row, glyph included.
+    let accessibility: String
+    @ViewBuilder var glyph: () -> Glyph
+    @ViewBuilder var value: () -> Value
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                MonoLabel(text: label, color: SN.foam.opacity(0.5))
+                Spacer()
+                HStack(spacing: 4) { glyph() }
+                    .font(.caption.weight(.semibold))
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibility)
+            value()
+                .foregroundStyle(valueColor)
+            Text(caption)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(captionColor)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SN.cardFill)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+    }
+}
+
 /// The *when* of a scrub reading — clock time stacked over the date, the
 /// return-to-now slot directly beside them, moon trailing. The LAST row of
 /// every scrub card: it is the calendar of the reading, secondary to what the
@@ -190,7 +233,7 @@ struct ReturnToNowSlot: View {
 
 // MARK: - The scrub-detail scaffold (tide / current / derived gate / online gate)
 
-/// The four scrub details' shared anatomy: map-header hero, scrub card
+/// The four scrub details' shared anatomy: header, scrub card
 /// (caller's readout + strip, then the shared swipe hint, ScrubWhen and card
 /// chrome), the rolling schedule card, and the bottom slot (footer — or the
 /// online gate's honesty card, which is also what shows while `timeline` is
@@ -198,8 +241,6 @@ struct ReturnToNowSlot: View {
 struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: View {
     let name: String
     let region: String
-    let latitude: Double
-    let longitude: Double
     let favoriteId: String
     let tz: TimeZone
     let timeline: TimelineData?
@@ -237,16 +278,14 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
 
     var body: some View {
         // GeometryReader sits inside the safe area (only the ScrollView below
-        // ignores it), so the proxy reads the real top inset for MapHeader —
+        // ignores it), so the proxy reads the real top inset for DetailHeader —
         // per device and per iPad split-view pane, live across rotation.
         GeometryReader { geo in
             ScrollView {
                 VStack(spacing: 0) {
-                    MapHeader(name: name, region: region,
-                              latitude: latitude, longitude: longitude,
-                              favoriteId: favoriteId,
-                              topSafeInset: geo.safeAreaInsets.top,
-                              minHeight: (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) / 3)
+                    DetailHeader(name: name, region: region,
+                                 favoriteId: favoriteId,
+                                 topSafeInset: geo.safeAreaInsets.top)
                     above()
                     if let timeline {
                         scrubCard(timeline)
@@ -326,17 +365,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn,
                       summary: scrubSummary(tl))
                 .padding(.top, 14)
+                .padding(.horizontal, 16)
 
             links()
                 .padding(.top, 12)
+                .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
         .padding(.bottom, 12)
-        .background(SN.cardFill)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(SN.leaf.opacity(0.22)).frame(height: 0.5)
-        }
+        // The schedule card's shape, without its fill: the strip paints its
+        // own sky, so the card is the outline it sits in.
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+        .padding(.horizontal, 16)
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {
@@ -519,7 +560,7 @@ extension EnvironmentValues {
     }
 }
 
-/// Same reasoning as `openChsRoute` above: the map-header title (issue #32)
+/// Same reasoning as `openChsRoute` above: the detail-header title (issue #32)
 /// jumps straight to the map, focused on the detail's own station — not a
 /// NavigationLink or Button, same press-tracking hazard in the iPad split
 /// detail column.

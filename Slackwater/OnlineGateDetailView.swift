@@ -97,7 +97,6 @@ struct OnlineGateDetailView: View {
     var body: some View {
         // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
         ScrubDetailScaffold(name: gate.name, region: gate.region,
-                            latitude: gate.latitude, longitude: gate.longitude,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline,
                             entries: { tl in
@@ -122,7 +121,6 @@ struct OnlineGateDetailView: View {
                                                        speedUnit: speedUnit, now: live,
                                                        floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
                                                        scrubTime: $scrubTime, onReturn: returnToNow)
-                                        .padding(.horizontal, -16)  // full-bleed strip
                                         .padding(.top, 12)
                                 }
                             },

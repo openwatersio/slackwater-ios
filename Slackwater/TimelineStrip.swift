@@ -358,8 +358,10 @@ struct TimelineData {
     var hasCurrent: Bool { !currentPoints.isEmpty }
     var totalWidth: CGFloat { x(end) }
 
+    /// Half-open: the end is a snap target, and parked there the water is
+    /// already leaving slack — the reading should say so, not "Slack · 0m".
     func containingSlackWindow(at time: Date) -> (slack: Date, start: Date, end: Date)? {
-        slackWindows.first { $0.start <= time && time <= $0.end }
+        slackWindows.first { $0.start <= time && time < $0.end }
     }
 
     /// The list's window: the anchor's own midnight → +7d. Deliberately
@@ -1112,7 +1114,8 @@ struct TimelineCanvas: View {
                     ctx.drawLayer { l in
                         l.translateBy(x: x, y: cy + CurveStyle.hangGlyphDrop)
                         l.rotate(by: .degrees(d))
-                        l.draw(Text("↑").font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
+                        l.draw(Text(Image(systemName: "arrow.up"))
+                                .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .bold))
                                 .foregroundStyle(ink),
                                at: .zero, anchor: .center)
                     }

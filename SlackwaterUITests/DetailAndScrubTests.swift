@@ -167,14 +167,13 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
     }
 
-    // The detail header is the station map with the title overlaid, the
-    // day header carries the sun times, and the scrubber wears the moon
-    // with its phase name.
-    func testM41DetailMapHeaderSunMoon() throws {
+    // The detail header carries the title, the day header carries the sun
+    // times, and the scrubber wears the moon with its phase name.
+    func testM41DetailHeaderSunMoon() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
-                  "map header missing from tide detail")
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+                  "header missing from tide detail")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
             .firstMatch.waitForExistence(timeout: 5),
                   "sun times missing from the schedule day header")
@@ -184,16 +183,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
                   "moon phase name missing from the scrub readout")
-        sleep(6)  // header map tiles: MLNMapView surfaces no load state to XCUITest
-        save(app, "m41-detail-mapheader.png")
+        save(app, "m41-detail-header.png")
 
-        // The map header carries the current-station detail too.
+        // The header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
-                  "map header missing from current detail")
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+                  "header missing from current detail")
+        save(app, "m41-current-detail-header.png")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
             .firstMatch.waitForExistence(timeout: 5),
                   "sun times missing from the current-station day header")
@@ -297,7 +296,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // The 44pt slot this guards is fixed by construction, but re-reading
         // star/now/header/back live below would still be racy (settled — see
         // testM50RecentsNamesFit). One read, one layout, four snapshots.
-        let header = app.otherElements["detail-map-header"].firstMatch
+        let header = app.otherElements["detail-header"].firstMatch
         let after = settled { [star.frame, now.frame, header.frame, back.frame] }
         let starAfter = after[0], nowFrame = after[1], headerFrame = after[2]
         XCTAssertEqual(starAfter.minX, starBefore.minX, accuracy: 0.5,
@@ -315,7 +314,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // Leading side of the DETAIL PANE, not of the window: on a portrait
         // iPad the sidebar pushes the pane past the window's midX, so the
         // window ruler only passed here because the test before this one
-        // leaves the device in landscape. `detail-map-header` is no ruler
+        // leaves the device in landscape. `detail-header` is no ruler
         // either — its accessibility frame spans the whole window, not the
         // pane. The pane's own chrome is: back on its leading edge, star on
         // its trailing one.
