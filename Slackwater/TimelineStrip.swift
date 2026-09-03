@@ -311,7 +311,7 @@ func currentPeakToPeakRange(_ events: [CurrentEvent], around time: Date) -> Doub
 // MARK: - Data: everything the strip draws, computed once per station
 
 struct TimelineDay {
-    let offset: Int          // days from today
+    let offset: Int          // days from the anchor (which is today only on return-to-now)
     let start: Date          // local midnight
     let sunrise: Date?
     let sunset: Date?
@@ -482,7 +482,9 @@ struct TimelineData {
     }
 
     // Widen the event scans a touch so nothing at the edges is clipped.
-    private static let eventPad = 6.0 * 3600
+    // Not private: `DerivedGateDetailView` derives its phase slacks over the
+    // same padded span, and must use the same number.
+    static let eventPad = 6.0 * 3600
 
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
@@ -882,12 +884,12 @@ struct TimelineCanvas: View {
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
-                     at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY),
+                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY),
                      anchor: .center)
             ctx.draw(Text(monthDay(day.start, data.tz))
                         .font(.system(size: 10, weight: .medium).monospaced())
                         .foregroundStyle(SN.foam.opacity(0.48)),
-                     at: CGPoint(x: data.x(day.start.addingTimeInterval(12 * 3600)), y: geo.dayY + 17),
+                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY + 17),
                      anchor: .center)
             // Sun rise/set dots + "↑5:24AM" labels.
             for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {
@@ -1221,9 +1223,19 @@ struct TimelineScrubber: UIViewRepresentable {
         // so `desired` sits at the nudge's destination while the offset is
         // still travelling — without the guard the first re-render jumps
         // straight there and the hint never plays.
+        //
+        // NOT gated on `isDecelerating` or `magneting` (#237): while the strip
+        // coasts, every frame writes `scrubTime` back from the offset, so a
+        // request skipped here is overwritten before the glide ends — the Now
+        // tap was simply swallowed. A finger still down (`isDragging`) keeps
+        // its say; momentum does not. Setting the offset unanimated is how
+        // UIKit stops a deceleration, and it cancels a magnet in flight too.
         let desired = data.x(scrubTime) - sv.bounds.width / 2
-        if abs(desired - sv.contentOffset.x) > 1,
-           !sv.isDragging, !sv.isDecelerating, !co.magneting, !co.nudging {
+        if abs(desired - sv.contentOffset.x) > 1, !sv.isDragging, !co.nudging {
+            if sv.isDecelerating || co.magneting {
+                sv.setContentOffset(sv.contentOffset, animated: false)
+                co.cancelMagnet()
+            }
             sv.contentOffset = CGPoint(x: desired, y: 0)
         }
     }
@@ -1297,6 +1309,12 @@ struct TimelineScrubber: UIViewRepresentable {
             if !willDecelerate { magnet(sv) }
         }
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) { magnet(sv) }
+        /// An external scrub interrupted the animated settle; drop its
+        /// target so a late `didEndScrollingAnimation` cannot park on it.
+        func cancelMagnet() {
+            magneting = false
+            magnetTarget = nil
+        }
         func scrollViewDidEndScrollingAnimation(_ sv: UIScrollView) {
             magneting = false
             nudging = false
@@ -1362,6 +1380,10 @@ struct TimelineScrubStrip: View {
                 }
                 .position(x: 52, y: geo.timeY)
                 .accessibilityLabel("Return to now")
+                // The id the UI tests target: with a scrub summary (tide,
+                // current, online) this is the only Now on screen — the
+                // when-row slot (`when-row-return-now`) only renders without
+                // one. Sharing one id made every test reach for `.firstMatch`.
                 .accessibilityIdentifier("detail-return-now")
             }
         }

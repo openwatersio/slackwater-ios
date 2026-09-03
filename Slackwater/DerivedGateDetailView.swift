@@ -41,7 +41,7 @@ struct DerivedGateDetailView: View {
                             card: { tl in
                                 readout
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   now: live, scrubTime: $scrubTime)
+                                                   now: live, scrubTime: $scrubTime, onReturn: returnToNow)
                                     .padding(.horizontal, -16)  // full-bleed strip
                                     .padding(.top, 12)
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
@@ -134,7 +134,7 @@ struct DerivedGateDetailView: View {
         timeline = tl
         // Same padded window the strip's events were derived over, so
         // the phase/readout and the drawn dots can never disagree.
-        let pad = 6.0 * 3600
+        let pad = TimelineData.eventPad
         slacks = record.engineGate.slacks(from: tl.start.addingTimeInterval(-pad),
                                           to: tl.end.addingTimeInterval(pad))
     }
