@@ -84,7 +84,7 @@ enum ReadoutType {
     /// A tile's value.
     static let hero: Font = .system(.title2, design: .rounded).weight(.medium)
     /// A tile whose value is words rather than a reading.
-    static let tileText: Font = .system(.title3, design: .rounded).weight(.medium)
+    static let tileText: Font = .system(.body, design: .rounded).weight(.medium)
     static let unit: Font = .title3.weight(.light)
 }
 
@@ -193,11 +193,9 @@ struct SummaryTiles: View {
                 MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
             } value: {
                 // Words, not a number: "Waning Crescent" has to fit on one
-                // line where "7.6 ft" does, so it sits a step below the hero.
+                // line where "7.6 ft" does, so it sits well below the hero.
                 Text(SunMoon.phaseName(phase: moon.phase))
                     .font(ReadoutType.tileText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
             }
         }
     }
@@ -260,6 +258,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// The window's anchor. The scaffold moves it (via the picker) but does not
     /// own it — it lives in the detail view, alongside return-to-now.
     @Binding var anchor: Date
+    /// Whether the week-range bar stays up when there is no timeline. The
+    /// three constituent-backed details always have somewhere to go; an
+    /// online gate with nothing downloaded yet does not — every week the
+    /// picker can reach lands on the same honesty card (#172).
+    var canPickDate = true
     /// Fired when the picker OPENS, before a date is chosen. Only an online
     /// gate has anything to do here (speculatively fetch the next block); the
     /// other three are constituents and pass a no-op.
@@ -295,11 +298,12 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         scrubCard(timeline)
                         scheduleCard(timeline)
                             .padding(.top, 14)
-                    } else if anchor != .distantPast {
+                    } else if anchor != .distantPast, canPickDate {
                         // #67 item 2: no timeline means the caller is showing its
                         // honesty card below — but the bar (and its picker) need
                         // no timeline, and without them that card is a dead end
-                        // with no way back to a covered week. Guarded on anchor:
+                        // with no way back to a covered week — when there IS one
+                        // (`canPickDate`). Guarded on anchor:
                         // all four details start at .distantPast (real anchor
                         // arrives in onAppear), and weekRangeLabel force-unwraps
                         // a Calendar.date(byAdding:) against it — the pre-onAppear
@@ -346,10 +350,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     // which looks like a boundary artefact rather than a reading.
                     // With the unconditional 48h back-pad, noon has 60h (1080pt) of
                     // data behind it — no pane is that wide, so the park never
-                    // opens on dead space (#67 item 1).
+                    // opens on dead space (#67 item 1). Calendar noon, not +12h:
+                    // a spring-forward day would otherwise open at 13:00.
                     let week = Timeline.window(anchor: picked)
                     if scrubTime < week.start || scrubTime > week.end {
-                        scrubTime = picked.addingTimeInterval(12 * 3600)
+                        scrubTime = noonLocal(picked, tz)
                     }
                     onPicked(picked)
                 })
@@ -655,9 +660,7 @@ final class RecentsStore: ObservableObject {
         AppGroup.defaults.set(ids, forKey: Self.key)
     }
 
-    var items: [StationItem] {
-        ids.compactMap { id in StationItem.all.first { $0.id == id } }
-    }
+    var items: [StationItem] { ids.compactMap { StationItem.byId[$0] } }
 
     /// The most recently opened station, which is the best guess at where the
     /// user is when Core Location has told us nothing.
@@ -761,10 +764,6 @@ final class FavoritesStore: ObservableObject {
         persist()
     }
 
-    var items: [StationItem] {
-        ids.compactMap { id in StationItem.all.first { $0.id == id } }
-    }
-
     // MARK: - iCloud (see FavoritesCloud)
 
     private func persist() { AppGroup.defaults.set(ids, forKey: Self.key) }
@@ -852,6 +851,10 @@ struct StationGroups {
     private let byName: [String: [StationItem]]
     /// Any station id -> the id that actually renders for its name.
     private let canonical: [String: String]
+    /// `collapse(ranked ids)`, done once here rather than per render: the
+    /// list re-evaluates on every fit-queue transition, and mapping 3,600
+    /// ids through a Set each time to find four is what #232 measured.
+    let shownIds: [String]
 
     /// `ranked` is the catalog sorted nearest-first, so the first station of a
     /// name is the nearest one — the one shown.
@@ -859,8 +862,11 @@ struct StationGroups {
         var byName: [String: [StationItem]] = [:]
         for item in ranked { byName[item.name, default: []].append(item) }
         self.byName = byName
-        canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
-                               uniquingKeysWith: { first, _ in first })
+        let canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
+                                   uniquingKeysWith: { first, _ in first })
+        self.canonical = canonical
+        var seen = Set<String>()
+        shownIds = ranked.map { canonical[$0.id] ?? $0.id }.filter { seen.insert($0).inserted }
     }
 
     /// What renders in place of `id` — itself, unless a nearer station shares its name.

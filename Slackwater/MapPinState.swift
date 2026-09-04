@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. What colour a station's map pin takes: the tide and
 // current tone derivations, and the cache the pin source is built from.
 import Foundation
+import TideEngine
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
 /// half-period, so it always finds the next turn. Only the minority of
@@ -38,6 +39,11 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 /// grid, so the pair is a 30-minute window *straddling* `now` (at 12:29 that
 /// is 12:00 and 12:30) — which is what the sweep measured and trusts.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
+    // A subordinate has no cheap path: its curve is only defined by its
+    // extremes, so the exact search is the only search. 2,017 of them cost
+    // ~0.26 ms each here (debug) — the pin budget in
+    // `testPinLayerBuildsInsideAFrame` was re-based for it.
+    if record.isSubordinate { return tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
     guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it
@@ -64,11 +70,48 @@ func tidePinTone(_ record: TideStationRecord, at now: Date) -> String {
 /// flood-versus-ebb here; the detail card's arrow + cardinal carries
 /// direction (#97's own argument for taking it off hue).
 func currentPinColour(_ station: CurrentStationRecord, at now: Date) -> String {
-    let signed = station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)
-        .first?.speed ?? 0
+    let signed = station.isSubordinate
+        ? subordinateCurrentPinSpeed(station, at: now)
+        : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
     return abs(signed) <= slackThresholdKn
         ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
         : pinRampHex(forSpeedKn: abs(signed))
+}
+
+/// 1,549 subordinate current pins hang off 50 references, so the reference is
+/// searched once per build and each pin only reduces — the engine's own
+/// `reduce` and `speed(at:along:)`, so the math has one owner. The engine
+/// extracts reference events per UTC day (`eventsByDay`), so the held list
+/// and the one the detail view's `speeds` searches are the same events, and
+/// the pin's colour is the detail's speed at that instant.
+private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now: Date) -> Double {
+    guard let ref = station.referenceRecord,
+          case let sub as SubordinateStation = station.engineStation else { return 0 }
+    return SubordinateStation.speed(at: now, along: sub.reduce(ReferenceCurrentEvents.shared.events(of: ref, at: now)))
+}
+
+/// Lock-protected like `PinFeaturesCache`, and keyed on its 30-minute bucket,
+/// because a style build asks for each pin with its own `appNow()`.
+final class ReferenceCurrentEvents: @unchecked Sendable {
+    static let shared = ReferenceCurrentEvents()
+    /// 8 h brackets any current's window (the engine's own pad) and 9 h clears
+    /// the largest subordinate offset.
+    private static let pad: TimeInterval = 17 * 3600
+    private let lock = NSLock()
+    private var bucket = Int.min
+    private var events: [String: [CurrentEvent]] = [:]
+
+    func events(of reference: CurrentStationRecord, at now: Date) -> [CurrentEvent] {
+        lock.lock(); defer { lock.unlock() }
+        let b = Int(now.timeIntervalSince1970 / PIN_TIDE_DIFF_DT)
+        if b != bucket { bucket = b; events = [:] }
+        if let cached = events[reference.id] { return cached }
+        let start = Date(timeIntervalSince1970: Double(b) * PIN_TIDE_DIFF_DT)
+        let found = reference.harmonicStation.eventsByDay(from: start.addingTimeInterval(-Self.pad),
+                                                          to: start.addingTimeInterval(PIN_TIDE_DIFF_DT + Self.pad))
+        events[reference.id] = found
+        return found
+    }
 }
 
 /// A station's state as a tone name, for the pin's colour.

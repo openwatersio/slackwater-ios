@@ -143,6 +143,12 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let honesty = app.descendants(matching: .any)["online-honesty-card"].firstMatch
         XCTAssert(honesty.waitForExistence(timeout: 5),
                   "an online gate with no window must show the honesty card, never a dead end")
+        // Cold open: nothing downloaded, so no week the picker could reach is
+        // any better than this one — the bar stays down (#172). The recovery
+        // case, a stored window paged off, keeps it: OfflineCoverageTests
+        // .testOnlineGatePagedBeyondItsWindowOffline.
+        XCTAssertFalse(app.descendants(matching: .any)["week-range-bar"].firstMatch.exists,
+                       "no stored window: the week-range bar has nowhere to go")
 
         // Its one tap out: the nearest of the 11 shipped (fittable) gates —
         // Dodd Narrows, ~67 km away. Bundled-identity distance, independent of
@@ -337,7 +343,9 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let chooserButton = app.buttons["matching-stations"].firstMatch
         XCTAssert(chooserButton.waitForExistence(timeout: 5),
                   "no matching-station affordance on a collided name")
-        XCTAssert(app.staticTexts["2 matching stations"].firstMatch.exists)
+        // Three since #268: the NOAA subordinate "2.6 nm SSE" (PCT1411) joined
+        // the two harmonic stations.
+        XCTAssert(app.staticTexts["3 matching stations"].firstMatch.exists)
         chooserButton.tap()
 
         // The chooser: both stations, each with what it measures and how far.

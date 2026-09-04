@@ -362,7 +362,7 @@ struct StationListView: View {
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
             }
-            .id("\(mapFocusToken)-\(slackWindowSpeed)")
+            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
@@ -443,7 +443,7 @@ struct StationListView: View {
                                 // would let Recents silently show and reopen the nearest namesake
                                 // instead. Near Me stays collapsed: distance ranking is not user choice.
                                 recentIds: recents.ids,
-                                rankedIds: places.collapse(ranked.map(\.id)),
+                                rankedIds: places.shownIds,
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 

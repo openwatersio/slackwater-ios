@@ -207,6 +207,15 @@ func todayLocal(_ tz: TimeZone) -> Date {
     return cal.startOfDay(for: appNow())
 }
 
+/// Local noon of the day `day` falls in — through `Calendar`, because on a
+/// DST day `midnight + 12h` is 11:00 or 13:00 (see "Calendar days are not
+/// 86,400 seconds").
+func noonLocal(_ day: Date, _ tz: TimeZone) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = tz
+    return cal.date(bySettingHour: 12, minute: 0, second: 0, of: day)!
+}
+
 // MARK: - Station-local time formatting
 
 /// NSCache, not a Dictionary: thread-safe (Canvas draws can run off-main) and

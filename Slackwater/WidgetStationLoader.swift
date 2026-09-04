@@ -6,8 +6,8 @@ import Foundation
 import TideEngine
 
 enum WidgetStation {
-    case tide(Station, tz: TimeZone, name: String)
-    case current(CurrentStation, tz: TimeZone, name: String)
+    case tide(any TidePredicting, tz: TimeZone, name: String)
+    case current(any CurrentPredicting, tz: TimeZone, name: String)
     case derived(DerivedSlackStation, tz: TimeZone, name: String)
 }
 

@@ -135,6 +135,12 @@ struct CurrentDetailView: View {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
+            } else if let ref = record.referenceRecord {
+                // A different accuracy class: NOAA's table offsets against the
+                // reference's events, with a drawn curve between them.
+                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA subordinate station: \(ref.name)'s slacks and maxima, corrected by published offsets")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
             } else {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))

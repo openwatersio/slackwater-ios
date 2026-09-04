@@ -143,7 +143,7 @@ struct DerivedGateDetailView: View {
         timeline = tl
         // Same padded window the strip's events were derived over, so
         // the phase/readout and the drawn dots can never disagree.
-        let pad = 6.0 * 3600
+        let pad = TimelineData.eventPad
         slacks = record.engineGate.slacks(from: tl.start.addingTimeInterval(-pad),
                                           to: tl.end.addingTimeInterval(pad))
     }

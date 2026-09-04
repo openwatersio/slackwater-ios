@@ -105,6 +105,20 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(strip.contains("detail-return-now"))
     }
 
+    /// No current detail reaches for the global threshold: `TimelineData.build`
+    /// takes `threshold:` as a parameter, and the lead reads the windows the
+    /// strip was built with, so nothing can draw one band and describe
+    /// another (#233). The run on the line is the threshold's only mark.
+    func testSlackReadoutsNeverUseTheGlobalThreshold() throws {
+        for file in ["Slackwater/CurrentDetailView.swift", "Slackwater/OnlineGateDetailView.swift",
+                     "Slackwater/CurrentLead.swift"] {
+            let source = try repoSource(file)
+            XCTAssertFalse(source.contains("formatSpeed(slackThresholdKn"), file)
+            XCTAssertFalse(source.contains("threshold: slackThresholdKn"), file)
+            XCTAssertFalse(source.contains("slackWindow(tl.currentPoints"), file)
+        }
+    }
+
     func testOnlineGatesShareTheDownloadSurfaceAndCopy() throws {
         let manager = try repoSource("Slackwater/OfflineDownloads.swift")
         let detail = try repoSource("Slackwater/OnlineGateDetailView.swift")

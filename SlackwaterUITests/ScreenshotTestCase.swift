@@ -66,7 +66,11 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssert(result.waitForExistence(timeout: 10), "search result did not appear")
         let field = app.textFields.firstMatch
         for _ in 0..<3 {
-            if result.exists, result.isHittable { result.tap() }
+            // `exists`, not `isHittable`: a result under the search bar reads
+            // as not hittable yet takes the tap (ten "Boston" hits since #268
+            // put the tide station fourth, under the bar). The guard is for a
+            // result that vanished mid-refilter, and `exists` is that test.
+            if result.exists { result.tap() }
             if field.waitForNonExistence(timeout: 5) { return }
         }
         XCTFail("tap on a search result never closed the search overlay")

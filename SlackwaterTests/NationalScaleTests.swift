@@ -166,11 +166,17 @@ final class NationalScaleTests: XCTestCase {
     /// machine at 4,699 total stations (all kinds), ~32% headroom above that
     /// — enough to absorb shared-machine variance without sitting on the
     /// edge, tight enough that a future 2×+ regression still trips it.
+    ///
+    /// Re-budgeted again to 1.45s for #229: 1,083.7ms cold at 6,707 stations.
+    /// The 2,017 subordinate tide stations have no cheap two-sample path —
+    /// a subordinate's curve is only defined by its extremes — so each pays
+    /// the exact 13h search (~0.26ms here), about half the growth; the rest
+    /// is the catalogue simply being 43% bigger.
     func testPinLayerBuildsInsideAFrame() {
         PinFeaturesCache.shared.resetForTesting()
         let build = elapsed { _ = stationShapeSource() }
         print(String(format: "M53 pin source · %d stations: %.1f ms", StationItem.all.count, build * 1000))
-        XCTAssertLessThan(build, 0.75)
+        XCTAssertLessThan(build, 1.45)
     }
 
     /// The regression this exists for: a stale CHS tone surviving after a fit

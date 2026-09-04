@@ -107,7 +107,7 @@ struct WidgetSnapshot: Equatable {
             var window: (Date, Date)?
             if let ev, ev.kind == .slack {
                 let windowPts = s.speeds(from: ev.time.addingTimeInterval(-21_600),
-                                         to: ev.time.addingTimeInterval(21_600))
+                                         to: ev.time.addingTimeInterval(21_600), step: 600)
                 window = slackWindow(windowPts, around: ev.time, threshold: slackThresholdKn)
             }
             let next = ev.map {

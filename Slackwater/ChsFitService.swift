@@ -596,7 +596,10 @@ final class ChsFitService: ObservableObject {
     private nonisolated func fit(_ info: ChsStationInfo, list: [IwlsStation],
                                  fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
         let station = try Self.resolve(info, in: list)
-        let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
+        // The STATION's today, on the app clock — not the device's. A phone
+        // set to UTC, or a traveller outside Pacific time, would otherwise
+        // anchor the window a day off (#230).
+        let end = todayLocal(info.tz)
         let plan = Self.chunkPlan(days: Self.tideFitDays, end: end)
         var samples: [ChsSample] = []
         for chunk in plan {
@@ -638,7 +641,7 @@ final class ChsFitService: ObservableObject {
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
             throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
         }
-        let end = Calendar(identifier: .gregorian).startOfDay(for: .now)
+        let end = todayLocal(gate.tz)
         let plan = Self.chunkPlan(days: gate.fitDays, end: end)
         let provisionalCut = end.addingTimeInterval(-ChsCurrentGateInfo.provisionalDays * 86_400)
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []

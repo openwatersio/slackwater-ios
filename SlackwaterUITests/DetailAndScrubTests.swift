@@ -156,7 +156,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // week puts `scrubTime` far from now, and return-to-now is what shows
         // when it is. Without it there is no way back to today at all — the
         // range bar's "not this week" is a label, not a control.
-        XCTAssert(app.buttons["detail-return-now"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.buttons["detail-return-now"].waitForExistence(timeout: 5),
                   "picking a future week left the centerline on today: no return-to-now")
 
         // And the chart has to actually DRAW. The assertion above passes on a
@@ -174,7 +174,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // fix that only handled the shrink would blank the strip on the way
         // home. "Today" is in the schedule's day column only when the anchor is
         // today — it is absent for the whole September week above.
-        app.buttons["detail-return-now"].firstMatch.tap()
+        app.buttons["detail-return-now"].tap()
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
                   "return-to-now did not bring the window back to today")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
@@ -368,7 +368,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let back = app.buttons["detail-back"].firstMatch
         XCTAssert(star.waitForExistence(timeout: 5))
         let starBefore = star.frame, backBefore = back.frame
-        let now = app.buttons["detail-return-now"].firstMatch
+        let now = app.buttons["detail-return-now"]
         XCTAssertFalse(now.exists, "return-to-now must not show before a scrub")
 
         scrubStrip(app)
@@ -405,9 +405,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // And it still does its job — back to now, and gone again.
         now.tap()
         _ = now.waitForNonExistence(timeout: 10)
-        XCTAssertFalse(app.buttons["detail-return-now"].firstMatch.exists,
+        XCTAssertFalse(app.buttons["detail-return-now"].exists,
                        "return-to-now did not clear after returning to now")
         XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,
                        "the star moved when return-to-now went away")
-    }
-}
+    }}

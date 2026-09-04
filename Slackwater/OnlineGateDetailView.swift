@@ -47,29 +47,16 @@ struct OnlineGateDetailView: View {
 
     /// Fetched view only when the stored window still covers the full strip
     /// (online-gates spec §3: an expired window is the honesty card's job,
-    /// same as no window at all — never a chart with a dead zone in it). Not
-    /// cached in `@State`: filtering and sorting the stored series is cheap next
-    /// to the tide/current harmonic synthesis `CurrentDetailView` caches for.
-    /// The magnitude has moved, though — the 30-day fetch
-    /// (`Timeline.onlineFetchDays`) made that series ~2,900 samples, roughly 4×
-    /// the strip it draws, and this rebuilds on every body evaluation including
-    /// scrub frames. Nobody has measured a regression; measure before caching.
+    /// same as no window at all — never a chart with a dead zone in it).
     ///
-    /// Computed, not `@State` — unlike the other three details, which store
-    /// their `TimelineData`. It re-reads `window`/`anchor`/`live` on every
-    /// access, so nothing here needs an explicit rebuild when the anchor
-    /// moves; SwiftUI re-evaluates it. Don't add a `rebuild()` seam for
-    /// symmetry with the others — it would have an empty body.
-    ///
-    /// The uncovered path pays for a build it discards. That path renders the
-    /// honesty card, which nobody scrubs.
-    private var timeline: TimelineData? {
-        guard let window else { return nil }
-        let tl = TimelineData.build(onlinePoints: window.points, tz: tz,
-                                    lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,
-                                    threshold: normalizedSlackThresholdKn(slackWindowSpeed))
-        return window.covers(anchor: anchor) ? tl : nil
-    }
+    /// Stored, like the other three details, and rebuilt from the same
+    /// explicit seams (`rebuild()`). It used to be computed off
+    /// `window`/`anchor`/`live`, on the theory that filtering the stored
+    /// series was cheap — but the body reads it through a dozen paths per
+    /// evaluation, and the strip re-evaluates the body on every scroll frame,
+    /// so a ~2,900-sample filter plus event detection ran a dozen times per
+    /// frame (#231).
+    @State private var timeline: TimelineData?
 
     private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow) -> CurrentLead {
         CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: tl.velocityAt(scrubTime),
@@ -98,6 +85,9 @@ struct OnlineGateDetailView: View {
                             },
                             scrubTime: $scrubTime,
                             anchor: $anchor,
+                            // A stored block, even one the anchor has paged off,
+                            // is a week the picker can get back to; none is not.
+                            canPickDate: window != nil,
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in applyAnchor() },
                             above: { EmptyView() },
@@ -138,6 +128,7 @@ struct OnlineGateDetailView: View {
                 let today = todayLocal(tz)
                 if anchor == .distantPast { anchor = today }
                 if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
+                rebuild()
                 RecentsStore.shared.record(gate.id)
                 if window?.covers(anchor: anchor) != true, net.online { fetchNow(from: anchor) }
             }
@@ -152,7 +143,9 @@ struct OnlineGateDetailView: View {
             // queue's churn from re-rendering a scrubbing strip.
             .onReceive(ChsFitService.shared.$onlineFetchStamp) { _ in
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
+                rebuild()
             }
+            .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
             }
@@ -182,6 +175,7 @@ struct OnlineGateDetailView: View {
     /// so re-pick first; only then is a nil timeline a real gap worth a fetch.
     private func applyAnchor() {
         if let block = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) { window = block }
+        rebuild()
         if timeline == nil, net.online { fetchNow(from: anchor) }
     }
 
@@ -204,10 +198,10 @@ struct OnlineGateDetailView: View {
                 //
                 // What comes back is the MERGED window, not just the block
                 // that was fetched, so assigning it never narrows what this
-                // view knows it has. `timeline` is computed off it, so there is
-                // no stored data to rebuild.
+                // view knows it has.
                 let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: from)
                 window = fresh
+                rebuild()
                 fetching = false
             } catch {
                 fetching = false
@@ -306,9 +300,20 @@ struct OnlineGateDetailView: View {
         // the whole window back, not just park the centerline at a `now` that
         // isn't on this strip.
         anchor = todayLocal(tz)
-        // And the same coverage check every other anchor move gets.
-        // `applyAnchor` asks `timeline`, which is computed off the
-        // `anchor`/`live` just set here, and fetches when it says nil.
+        // And the same coverage check every other anchor move gets:
+        // `applyAnchor` re-picks the block, rebuilds off the `anchor`/`live`
+        // just set here, and fetches when the timeline comes back nil.
         applyAnchor()
+    }
+
+    /// One place the timeline is rebuilt from — every seam that moves
+    /// `window`, `anchor` or `live` calls it, so the strip can never draw a
+    /// stale window. Nil when no block covers the anchor: that is the
+    /// honesty card's cue, and the picker's way back stays on screen.
+    private func rebuild() {
+        guard let window, window.covers(anchor: anchor) else { timeline = nil; return }
+        timeline = TimelineData.build(onlinePoints: window.points, tz: tz,
+                                      lat: gate.latitude, lon: gate.longitude, now: live, anchor: anchor,
+                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
     }
 }
