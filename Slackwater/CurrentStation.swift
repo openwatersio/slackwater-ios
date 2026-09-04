@@ -59,6 +59,22 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
     return items.sorted { $0.name < $1.name }
 }
 
+/// Decode one record without materializing a multi-megabyte catalog in a
+/// memory-limited extension.
+/// ponytail: relies on generated compact JSON keeping `id` first; add an
+/// offset index if that catalog format changes.
+func bundled<T: Decodable & StationIdentity>(_ resource: String, id: String) -> T? {
+    guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
+          let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+    let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
+    guard let start = data.range(of: marker)?.lowerBound,
+          let arrayEnd = data.lastIndex(of: 93) else { return nil }
+    let separator = Data(",{\"id\":".utf8)
+    let afterMarker = data.index(start, offsetBy: marker.count)
+    let end = data.range(of: separator, in: afterMarker..<data.endIndex)?.lowerBound ?? arrayEnd
+    return try? JSONDecoder().decode(T.self, from: data[start..<end])
+}
+
 struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
@@ -234,6 +250,23 @@ enum StationItem: Identifiable, Hashable {
     /// at 3,125 it is a linear scan per row per render (M53).
     static let byId: [String: StationItem] =
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+    /// Widget-safe lookup: decode only the requested large NOAA record; the
+    /// three CHS identity catalogs are small enough to retain whole.
+    static func widgetItem(id: String) -> StationItem? {
+        if id.hasPrefix("current:") {
+            let record: CurrentStationRecord? = bundled(
+                "currents", id: String(id.dropFirst("current:".count)))
+            return record.map { .current($0) }
+        }
+        if id.hasPrefix("chs-") {
+            if let record = ChsStationInfo.all.first(where: { $0.id == id }) { return .chs(record) }
+            if let record = ChsGateInfo.all.first(where: { $0.id == id }) { return .chsGate(record) }
+            return ChsCurrentGateInfo.all.first(where: { $0.id == id }).map { .chsCurrent($0) }
+        }
+        let record: TideStationRecord? = bundled("stations", id: id)
+        return record.map { .tide($0) }
+    }
 
     /// How many results the search screen shows.
     ///

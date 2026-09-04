@@ -15,7 +15,7 @@ enum WidgetStation {
 /// which `ChsModelStore` lookup). Everything downstream (`WidgetCard.build`,
 /// `load(id:)`) reads records, never `StationItem` again.
 enum WidgetRecord {
-    case tide(TideStationRecord)
+    case tide(TideStationRecord, station: any TidePredicting)
     case current(CurrentStationRecord)
     case derived(DerivedGateRecord)
 }
@@ -25,15 +25,19 @@ enum WidgetStationLoader {
     /// through `ChsModelStore`'s on-device fitted models — nil when a
     /// station isn't fitted yet.
     static func loadRecord(id: String) -> WidgetRecord? {
-        guard let item = StationItem.byId[id] else { return nil }
+        guard let item = StationItem.widgetItem(id: id) else { return nil }
         switch item {
         case .tide(let r):
-            return .tide(r)
+            let reference: TideStationRecord? = r.reference.flatMap {
+                bundled("stations", id: $0)
+            }
+            return .tide(r, station: r.engineStation(referenceRecord: reference))
         case .current(let r):
             return .current(r)
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }
-            return .tide(info.record(with: model))
+            let record = info.record(with: model)
+            return .tide(record, station: record.harmonicStation)
         case .chsGate(let gate):
             // Mirrors DerivedGateRecord.engineGate (ChsGate.swift:40-43): the
             // reference port's fitted model → DerivedSlackStation(hwLag/lwLag).
@@ -56,7 +60,7 @@ enum WidgetStationLoader {
     /// snapshot's station and the card from it.
     static func station(from record: WidgetRecord) -> WidgetStation {
         switch record {
-        case .tide(let r): .tide(r.engineStation, tz: r.tz, name: r.name)
+        case .tide(let r, let station): .tide(station, tz: r.tz, name: r.name)
         case .current(let r): .current(r.engineStation, tz: r.tz, name: r.name)
         case .derived(let r): .derived(r.engineGate, tz: r.gate.tz, name: r.gate.name)
         }
@@ -82,7 +86,7 @@ enum WidgetStationLoader {
     ) -> String {
         guard id == AppGroup.currentLocationStationID else { return id }
         if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
-           StationItem.byId[cached] != nil { return cached }
+           StationItem.widgetItem(id: cached) != nil { return cached }
         return fallbackStationID(defaults: defaults)
     }
 
