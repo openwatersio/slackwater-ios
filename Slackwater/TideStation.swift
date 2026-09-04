@@ -15,8 +15,27 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     let chartDatum: String
     let datumOffset: Double
     let constituents: [Con]
+    /// Subordinate station (#229): NOAA time and height corrections against a
+    /// bundled reference, and no constituents of its own — the generator
+    /// guarantees the reference ships (tools/gen-tides.mjs, isSubordinate).
+    var reference: String? = nil
+    var offsets: TideOffsets? = nil
 
-    var engineStation: Station {
+    var isSubordinate: Bool { reference != nil }
+    var referenceRecord: TideStationRecord? { reference.flatMap { TideStationRecord.byId[$0] } }
+
+    var engineStation: any TidePredicting {
+        guard let offsets, let ref = referenceRecord else { return harmonicStation }
+        let h = offsets.height
+        return SubordinateTideStation(
+            reference: ref.harmonicStation,
+            highTimeOffset: offsets.time.high * 60, lowTimeOffset: offsets.time.low * 60,
+            height: h.type == "fixed" ? .fixed(high: h.high, low: h.low) : .ratio(high: h.high, low: h.low))
+    }
+
+    /// The constituent model itself. A CHS-fitted port is always harmonic, and
+    /// a derived gate lags its extremes directly.
+    var harmonicStation: Station {
         Station(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
                 offset: datumOffset)
     }
@@ -30,7 +49,27 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
 
     /// All bundled stations, alphabetical.
     static let all: [TideStationRecord] = bundled("stations")
+    static let byId: [String: TideStationRecord] =
+        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 }
+
+/// Minutes and metres (or a ratio), exactly as NOAA publishes them.
+struct TideOffsets: Decodable, Hashable {
+    struct Time: Decodable, Hashable { let high: Double; let low: Double }
+    struct Height: Decodable, Hashable { let type: String; let high: Double; let low: Double }
+    let time: Time
+    let height: Height
+}
+
+/// What every tide consumer needs: a harmonic `Station` or a subordinate
+/// reduced from one, behind the same three calls.
+protocol TidePredicting {
+    func heights(from: Date, to: Date, step: TimeInterval) -> [TidePoint]
+    func rates(from: Date, to: Date, step: TimeInterval) -> [TideRatePoint]
+    func extremes(from: Date, to: Date) -> [TideExtreme]
+}
+extension Station: TidePredicting {}
+extension SubordinateTideStation: TidePredicting {}
 
 /// What a list card shows: height now, direction, next turn. Heights in metres.
 struct CardState {
@@ -59,7 +98,7 @@ extension TideStationRecord {
     }
 }
 
-extension Station {
+extension TidePredicting {
     /// dh/dt at `t` in metres/hour — the rate-of-rise readout (#95 part 1).
     /// The engine's analytic derivative (v0.4.0), same evaluation the strip's
     /// rate ramp draws from.

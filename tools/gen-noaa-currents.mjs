@@ -67,11 +67,19 @@ const PAIR_KM = 2.0;
  *  tide network does not reach, and its region line would be a guess. */
 const REGION_SANITY_KM = 250;
 
-const nearestTide = (s) =>
-  tides.reduce((best, t) => {
+// Harmonic stations first (#229): a subordinate tide station is a lower
+// accuracy class and 302 of them carry a bare state code for a region, so it
+// never names a current station's region and only pairs where no harmonic
+// gauge is within PAIR_KM — otherwise adding subordinates would have moved 30
+// regions and 16 existing pairings.
+const harmonic = tides.filter((t) => !t.reference);
+const subordinates = tides.filter((t) => t.reference);
+const nearestIn = (list, s) =>
+  list.reduce((best, t) => {
     const d = km(s, t);
     return best && best.d <= d ? best : { t, d };
   }, null);
+const nearestTide = (s) => nearestIn(harmonic, s);
 
 let curated = 0, paired = 0, worstNeighbour = 0;
 const stations = bundle.stations
@@ -107,6 +115,9 @@ const stations = bundle.stations
       curated += 1;
     } else if (near.d <= PAIR_KM) {
       out.tideReference = near.t.id;
+      paired += 1;
+    } else if (nearestIn(subordinates, s)?.d <= PAIR_KM) {
+      out.tideReference = nearestIn(subordinates, s).t.id;
       paired += 1;
     }
     return out;

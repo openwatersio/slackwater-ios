@@ -101,6 +101,10 @@ test("no station outside North America carries a gazetteer-derived region", () =
 test("every station has a region line and a usable model", () => {
   for (const s of stations) {
     assert.ok(s.region, `${s.name} has no region`);
+    if (s.reference) {  // a subordinate's model is its offsets (see below)
+      assert.ok(s.offsets?.time && s.offsets?.height, `${s.name} has no offsets`);
+      continue;
+    }
     assert.ok(s.constituents.length > 0, `${s.name} has no constituents`);
     assert.ok(s.constituents.every((c) => c.amplitude > 0), `${s.name} has a dead constituent`);
   }
@@ -277,10 +281,40 @@ test("no UHSLC gauge ships through both of its feeds", () => {
 // datums by 0.53 m; it must not be in the bundle at any range.
 test("stations that fail the datum gate are not bundled", () => {
   const bundled = new Set(stations.map((s) => s.id));
+  // Subordinates never run the gate: their constituents are the reference's copy.
   const rejected = allStations.filter(
-    (s) => s.license?.commercial_use === true && !passesDatumCheck(s) && bundled.has(s.id));
+    (s) => s.license?.commercial_use === true && s.type !== "subordinate"
+        && !passesDatumCheck(s) && bundled.has(s.id));
   assert.deepEqual(rejected.map((s) => s.id), []);
   const soton = allStations.find(
     (s) => s.name === "Southampton" && s.country === "United Kingdom");
   assert.ok(!bundled.has(soton.id), "Southampton failed the gate but shipped anyway");
+});
+
+// Subordinate stations (#229). A subordinate has no model of its own: its
+// predictions are its reference's highs and lows, shifted and scaled by the
+// `offsets` block. Upstream copies the reference's constituents onto every
+// subordinate row verbatim, so shipping them would predict the reference's
+// water under the subordinate's name — they must be dropped, and the
+// reference must be on the device or the station is a dead pin.
+const subordinates = stations.filter((s) => s.reference);
+
+test("Nurse Channel ships as a subordinate of a bundled reference", () => {
+  const nurse = stations.find((s) => s.id === "noaa/TEC4635");
+  assert.ok(nurse, "noaa/TEC4635 is not in the bundle");
+  assert.equal(nurse.reference, "noaa/9710441");
+  assert.deepEqual(nurse.offsets, {
+    time: { high: 0, low: 10 },
+    height: { type: "ratio", high: 0.79, low: 1.11 },
+  });
+});
+
+test("every subordinate's reference ships in the bundle", () => {
+  const ids = new Set(stations.map((s) => s.id));
+  assert.ok(subordinates.length > 2000, `only ${subordinates.length} subordinates`);
+  assert.deepEqual(subordinates.filter((s) => !ids.has(s.reference)).map((s) => s.id), []);
+});
+
+test("no subordinate carries constituents", () => {
+  assert.deepEqual(subordinates.filter((s) => s.constituents?.length).map((s) => s.id), []);
 });
