@@ -1,6 +1,6 @@
 # The graph is the hero
 
-*Design spec, 2026-09-04. The station detail shared by `TideDetailView`, `CurrentDetailView`, `OnlineGateDetailView` and `DerivedGateDetailView`, and the waiting page `ChsDetailView` shows while a CHS station downloads. Supersedes the 2026-08-03 anatomy.*
+*Design spec, 2026-09-04. The station detail shared by `TideDetailView`, `CurrentDetailView`, `OnlineGateDetailView` and `DerivedGateDetailView`, and the waiting page `ChsDetailView` shows while a CHS station downloads.*
 
 ## Why
 
