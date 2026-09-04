@@ -25,6 +25,10 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     var referenceRecord: TideStationRecord? { reference.flatMap { TideStationRecord.byId[$0] } }
 
     var engineStation: any TidePredicting {
+        engineStation(referenceRecord: referenceRecord)
+    }
+
+    func engineStation(referenceRecord: TideStationRecord?) -> any TidePredicting {
         guard let offsets, let ref = referenceRecord else { return harmonicStation }
         let h = offsets.height
         return SubordinateTideStation(
@@ -86,7 +90,10 @@ extension TideStationRecord {
     }
 
     func cardState(at now: Date) -> CardState {
-        let station = engineStation
+        cardState(at: now, station: engineStation)
+    }
+
+    func cardState(at now: Date, station: any TidePredicting) -> CardState {
         // 30h forward guarantees a "next" exists (web predicts ±30h for the same reason).
         let extremes = station.extremes(from: now, to: now.addingTimeInterval(30 * 3600))
         let next = extremes.first { $0.time > now }

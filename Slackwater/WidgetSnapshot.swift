@@ -187,11 +187,11 @@ struct WidgetCard {
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let locationMark = stationNamePrefix != nil
         switch record {
-        case .tide(let r):
-            let state = r.cardState(at: now)
+        case .tide(let r, let station):
+            let state = r.cardState(at: now, station: station)
             return .init(name: r.name, region: r.region,
                          reading: .tide(state, imperial: imperial),
-                         graph: r.cardGraph(at: now, imperial: imperial), nextSlack: nil,
+                         graph: r.cardGraph(at: now, imperial: imperial, station: station), nextSlack: nil,
                          locationMark: locationMark, countdownEnd: nil)
         case .current(let r):
             let state = r.cardState(at: now)

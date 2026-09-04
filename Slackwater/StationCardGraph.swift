@@ -347,9 +347,12 @@ func cardWindows(points: [CurrentPoint], slacks: [Date], threshold: Double = sla
 
 extension TideStationRecord {
     func cardGraph(at now: Date, imperial: Bool) -> StationCardGraph {
+        cardGraph(at: now, imperial: imperial, station: engineStation)
+    }
+
+    func cardGraph(at now: Date, imperial: Bool, station s: any TidePredicting) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
-        let s = engineStation
         return StationCardGraph(
             points: s.heights(from: start, to: end, step: StationCardGraph.sampleStep)
                 .map { .init(time: $0.time, value: $0.height) },

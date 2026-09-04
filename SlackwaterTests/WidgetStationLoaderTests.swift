@@ -6,6 +6,13 @@ import XCTest
 import TideEngine
 
 final class WidgetStationLoaderTests: XCTestCase {
+    func testTargetedBundledLookupFindsOneStation() {
+        let record: TideStationRecord? = bundled(
+            "stations", id: TideStationRecord.fridayHarborID)
+
+        XCTAssertEqual(record?.id, TideStationRecord.fridayHarborID)
+    }
+
     func testBundledTideStationLoads() {
         let st = WidgetStationLoader.load(id: TideStationRecord.fridayHarborID)
         guard case .tide(let s, let tz, let name)? = st else {

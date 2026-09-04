@@ -29,14 +29,14 @@ struct StationQuery: EntityQuery {
             + (d.stringArray(forKey: AppGroup.recentsKey) ?? [])
         var seen = Set<String>()
         return [currentLocation] + ids.compactMap { id in
-            guard seen.insert(id).inserted, let item = StationItem.byId[id] else { return nil }
+            guard seen.insert(id).inserted, let item = StationItem.widgetItem(id: id) else { return nil }
             return StationChoice(id: id, name: item.name)
         }
     }
     func entities(for identifiers: [String]) async throws -> [StationChoice] {
         identifiers.compactMap { id in
             if id == AppGroup.currentLocationStationID { return currentLocation }
-            return StationItem.byId[id].map { StationChoice(id: id, name: $0.name) }
+            return StationItem.widgetItem(id: id).map { StationChoice(id: id, name: $0.name) }
         }
     }
     func suggestedEntities() async throws -> [StationChoice] { choices() }
