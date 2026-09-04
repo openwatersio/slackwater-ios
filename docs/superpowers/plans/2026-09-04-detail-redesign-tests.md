@@ -61,4 +61,5 @@ New:
 - Long commentary at accessibility sizes can overlap the Now pill; the row is a bare stack. Reserve the pill's width or drop to a second row past a size threshold.
 - Commentary settle fade ignores Reduce Motion. A cross-fade is acceptable, but hiding the pill mid-scrub is content loss; consider keeping it visible and only suppressing taps.
 - The Moon tile speaks its phase name twice to VoiceOver.
+- The plain-word gloss ("incoming", "outgoing") reaches no screen. `CurrentPhase.gloss` and `DerivedPhase.gloss` survive for one unit test. Either give them a home the reader will meet (the lead's VoiceOver label is the cheapest; the provenance footer sits under a week of schedule rows and is not it) or retire them with `PhaseGlossTests.testGlossWords`.
 - Card graph alignment: `2026-09-04-card-graph-detail-look.md`.
