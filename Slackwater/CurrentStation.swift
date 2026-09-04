@@ -76,8 +76,32 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// against station-corrections v2.5.0; absent = current-only fallback).
     let tideReference: String?
     let constituents: [Con]
+    /// Subordinate station (#268): NOAA's four time offsets (seconds) and two
+    /// speed ratios against a bundled reference, and no constituents of its
+    /// own — the generator guarantees the reference ships.
+    var reference: String? = nil
+    var slackBeforeFloodOffset: Double? = nil
+    var slackBeforeEbbOffset: Double? = nil
+    var floodTimeOffset: Double? = nil
+    var ebbTimeOffset: Double? = nil
+    var floodSpeedRatio: Double? = nil
+    var ebbSpeedRatio: Double? = nil
 
-    var engineStation: CurrentStation {
+    var isSubordinate: Bool { reference != nil }
+    var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
+
+    var engineStation: any CurrentPredicting {
+        guard let ref = referenceRecord else { return harmonicStation }
+        return SubordinateStation(
+            reference: ref.harmonicStation,
+            slackBeforeFloodOffset: slackBeforeFloodOffset ?? 0, slackBeforeEbbOffset: slackBeforeEbbOffset ?? 0,
+            floodTimeOffset: floodTimeOffset ?? 0, ebbTimeOffset: ebbTimeOffset ?? 0,
+            floodSpeedRatio: floodSpeedRatio ?? 1, ebbSpeedRatio: ebbSpeedRatio ?? 1,
+            floodDirection: floodDirection, ebbDirection: ebbDirection)
+    }
+
+    /// The constituent model itself; a CHS-fitted gate is always harmonic.
+    var harmonicStation: CurrentStation {
         CurrentStation(constituents: constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
                        floodDirection: floodDirection, ebbDirection: ebbDirection, offset: meanFlow)
     }
@@ -85,7 +109,18 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
     static let all: [CurrentStationRecord] = bundled("currents")
+    static let byId: [String: CurrentStationRecord] =
+        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 }
+
+/// What every current consumer needs: a harmonic `CurrentStation` or a
+/// subordinate reduced from one, behind the same two calls.
+protocol CurrentPredicting {
+    func speeds(from: Date, to: Date, step: TimeInterval) -> [CurrentPoint]
+    func events(from: Date, to: Date) -> [CurrentEvent]
+}
+extension CurrentStation: CurrentPredicting {}
+extension SubordinateStation: CurrentPredicting {}
 
 /// The set the water flows toward at signed velocity `v` — rectilinear pass
 /// stations are bimodal, so the sign fixes the bearing (web chs/current.ts).
@@ -244,25 +279,54 @@ enum StationItem: Identifiable, Hashable {
     /// scrolls, and the screen says when it has truncated (M53).
     static let searchLimit = 60
 
+    /// One lowercased UTF-8 key per station in `all`, built once: name, region
+    /// and aliases joined by a byte no query can contain. A keystroke is one
+    /// `memmem` per station — `String.contains` three times per station was
+    /// 19.7 ms at 8,256 stations (#268) against the 16 ms frame budget. The
+    /// first occurrence's position IS the rank, because name precedes region
+    /// precedes aliases, the same order `searchRank` tries.
+    struct SearchKey {
+        let bytes: [UInt8]
+        let regionStart: Int
+        let aliasStart: Int
+        init(_ s: StationIdentity) {
+            let name = Array(s.name.lowercased().utf8), region = Array(s.region.lowercased().utf8)
+            bytes = name + [1] + region + [1] + Array(s.aliases.joined(separator: "\u{1}").utf8)
+            regionStart = name.count + 1
+            aliasStart = regionStart + region.count + 1
+        }
+        func rank(_ q: [UInt8]) -> Int? {
+            let offset: Int? = bytes.withUnsafeBufferPointer { b in
+                q.withUnsafeBufferPointer { qb in
+                    memmem(b.baseAddress, b.count, qb.baseAddress, qb.count)
+                        .map { UnsafeRawPointer($0) - UnsafeRawPointer(b.baseAddress!) }
+                }
+            }
+            guard let offset else { return nil }
+            return offset < regionStart ? 0 : offset < aliasStart ? 1 : 2
+        }
+    }
+    static let searchKeys: [SearchKey] = all.map { SearchKey($0.info) }
+
     /// Matches, best first. Rank is the web's (name > region > alias) and
     /// DISTANCE breaks the tie — the other thing national scale forces, since
     /// alphabetical order across 3,125 stations answers "port" in Boston with
     /// Alaska. Ties on distance break on id, so the order is total.
     ///
-    /// ponytail: a plain scan, no index. Lowercasing three strings per station
-    /// measured the same as a prebuilt lowercased index at 3,125 stations
-    /// (~6 ms per keystroke, debug simulator), and the index was 35 lines of
-    /// cache that moved no number.
+    /// A plain scan over prebuilt lowercased keys. Lowercasing three strings
+    /// per station on every keystroke measured the same as an index at 3,125
+    /// stations; at 8,256 (#268) it was 19.7 ms against the 16 ms frame, so
+    /// the lowercasing moved to load time.
     /// `near` has no default on purpose: defaulting it to `firstRunFix` is the
     /// exact bug this branch exists to fix (search ranked from Victoria in the
     /// Solent), and a default would let a future caller reintroduce it by
     /// omission rather than by decision.
     static func search(_ query: String, near anchor: (lat: Double, lon: Double)) -> [StationItem] {
-        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = Array(query.trimmingCharacters(in: .whitespaces).lowercased().utf8)
         var ranked: [(item: StationItem, rank: Int, km: Double)] = []
         ranked.reserveCapacity(128)
-        for s in all {
-            guard let rank = q.isEmpty ? 0 : s.searchRank(q) else { continue }
+        for (s, key) in zip(all, searchKeys) {
+            guard let rank = q.isEmpty ? 0 : key.rank(q) else { continue }
             ranked.append((s, rank, s.km(fromLat: anchor.lat, lon: anchor.lon)))
         }
         ranked.sort {

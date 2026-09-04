@@ -9,10 +9,11 @@
  *
  * Filters, all inherited from slackwater-web's build-currents.mjs, all still
  * load-bearing:
- *   1. Harmonic stations only — a subordinate is offsets against a reference
- *      and needs reduction math slackwater-engine has not ported.
- *      ponytail: harmonic-only; port the engine's subordinate reduction when a
- *      pass we care about turns out to be subordinate-only.
+ *   1. Harmonic and subordinate stations (#268). A subordinate has no
+ *      constituents: it ships with `reference` and NOAA's six offsets, in the
+ *      engine's own field names, for slackwater-engine's SubordinateStation —
+ *      and only if its reference ships too (the 147 whose reference is a
+ *      non-primary bin are #269).
  *   2. Primary bin only (id without "@") — one station, one prediction.
  *   3. At least one non-zero constituent; zero-amplitude ones are dropped.
  * A fourth guard is not a filter: the extract's crossFlow census bounds how much
@@ -81,16 +82,26 @@ const nearestIn = (list, s) =>
   }, null);
 const nearestTide = (s) => nearestIn(harmonic, s);
 
-let curated = 0, paired = 0, worstNeighbour = 0;
-const stations = bundle.stations
-  .filter((s) => s.type === "harmonic")
+let curated = 0, paired = 0, worstNeighbour = 0, orphaned = 0, undirected = 0;
+const isSubordinate = (s) => s.type === "subordinate";
+const OFFSETS = ["slackBeforeFloodOffset", "slackBeforeEbbOffset", "floodTimeOffset",
+  "ebbTimeOffset", "floodSpeedRatio", "ebbSpeedRatio"];
+const kept = bundle.stations
+  .filter((s) => s.type === "harmonic" || isSubordinate(s))
   .filter((s) => !s.id.includes("@"))
-  .filter((s) => s.constituents.some((c) => c.amplitude > 0))
+  .filter((s) => isSubordinate(s) || s.constituents.some((c) => c.amplitude > 0))
+  // Nine subordinates publish one direction and null for the other; the app
+  // draws a set arrow from both, and guessing the reciprocal is a claim about
+  // the water nobody made.
+  .filter((s) => (Number.isFinite(s.floodDirection) && Number.isFinite(s.ebbDirection)) || (undirected++, false))
   .map((s) => {
     const id = `noaa/${s.id}`;
     const near = nearestTide(s);
-    worstNeighbour = Math.max(worstNeighbour, near.d);
     const r = resolve({ id, name: s.name, latitude: s.latitude, longitude: s.longitude });
+    // The neighbour only matters when it names the region. Three subordinates
+    // (Rat Islands, Meyers Passage) sit 250-350 km from any harmonic gauge and
+    // carry their own context, so their distance is nobody's business.
+    if (!undangle(r.context)) worstNeighbour = Math.max(worstNeighbour, near.d);
     const out = {
       id,
       name: r.name,
@@ -107,8 +118,13 @@ const stations = bundle.stations
       timezone: tzLookup(s.latitude, s.longitude),
       floodDirection: s.floodDirection,
       ebbDirection: s.ebbDirection,
-      meanFlow: s.offset,
-      constituents: s.constituents.filter((c) => c.amplitude > 0),
+      meanFlow: s.offset ?? 0,
+      constituents: isSubordinate(s) ? [] : s.constituents.filter((c) => c.amplitude > 0),
+      // Seconds and ratios, exactly as the bundle (and the engine) spell them.
+      ...(isSubordinate(s) && {
+        reference: `noaa/${s.reference}`,
+        ...Object.fromEntries(OFFSETS.map((k) => [k, s[k]])),
+      }),
     };
     if (r.tideReference && tides.some((t) => t.id === r.tideReference)) {
       out.tideReference = r.tideReference;
@@ -125,6 +141,10 @@ const stations = bundle.stations
   // (37 station names collide, and locale collation of punctuation varies
   // across ICU builds — hence byNameThenId's codepoint compare.)
   .sort(byNameThenId);
+// A subordinate whose reference is not on the device is a dead pin.
+const shipped = new Set(kept.filter((s) => !s.reference).map((s) => s.id));
+const stations = kept.filter((s) =>
+  !s.reference || shipped.has(s.reference) || (orphaned++, false));
 
 if (stations.length < 700) {
   throw new Error(`only ${stations.length} current stations survived the filters — refusing to ship`);
@@ -158,8 +178,10 @@ if (cf.worstRatio.ratio > CROSS_FLOW_RATIO_MAX) {
 }
 
 const size = writeBundle(join(res, "currents.json"), stations);
+const subordinateCount = stations.filter((s) => s.reference).length;
 console.log(
-  `${stations.length} NOAA current stations, ${size}; ` +
+  `${stations.length} NOAA current stations (${stations.length - subordinateCount} harmonic, ` +
+  `${subordinateCount} subordinate; ${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size}; ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);
 console.log(
