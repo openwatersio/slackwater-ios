@@ -71,17 +71,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(chevrons.allSatisfy { d.snapTimes.contains($0.time) })
     }
 
-    func testFloatingReadoutMovesAwayFromTheCurve() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let data = TimelineData(tz: .current, anchor: t0, today: t0, start: t0,
-                                end: t0.addingTimeInterval(3600), days: [], tidePoints: [],
-                                tideRates: [], tideExtremes: [], currentPoints: [CurrentPoint(time: t0, speed: 1)],
-                                currentEvents: [], snapTimes: [], slackWindows: [])
-        let geo = TimelineGeo(data: data)
-        XCTAssertGreaterThan(floatingReadoutY(pointY: geo.curTop, geo: geo), geo.curTop)
-        XCTAssertLessThan(floatingReadoutY(pointY: geo.curBottom, geo: geo), geo.curBottom)
-    }
-
     func testCurrentRangeIsPeakToPeakBetweenAdjacentMaxima() throws {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let events = [
@@ -91,12 +80,6 @@ final class TimelineTests: XCTestCase {
         ]
         XCTAssertEqual(try XCTUnwrap(currentPeakToPeakRange(events, around: t0.addingTimeInterval(3_600))),
                        4.2, accuracy: 1e-9)
-    }
-
-    func testCurrentAxisUsesTheSelectedDisplayUnit() {
-        XCTAssertEqual(currentAxisTicks(maxAbsKn: 2, unit: "kn"), [-2, -1, 0, 1, 2])
-        XCTAssertEqual(currentAxisKnots(3.704, unit: "kmh"), 2, accuracy: 1e-9)
-        XCTAssertEqual(currentAxisKnots(1.028888, unit: "ms"), 2, accuracy: 1e-9)
     }
 
     func testSixFeetPerHourTideRateIsRed() {
@@ -423,13 +406,10 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
 
-    /// The strip is 12-hour with a bare lowercase suffix; the schedule stays
-    /// 24-hour and zero-padded. Both facts matter and pinning them apart is the
-    /// point: the schedule's times are a left-aligned monospaced column where
-    /// the pad keeps the colons in line and a suffix only some rows carry would
-    /// ragged it, while the strip centres each label on its own event and pays
-    /// for every character it prints.
-    func testChartTimeIsBareTwelveHourAndClockTimeStaysPadded() {
+    /// One clock wherever a moment is printed: `cardTime` and `chartTime` are
+    /// the same string, so a time never changes shape between the row you
+    /// tapped and the strip you landed on.
+    func testOneTwelveHourClockAcrossTheApp() {
         var cal = Calendar(identifier: .gregorian)
         let utc = TimeZone(identifier: "UTC")!
         cal.timeZone = utc
@@ -437,9 +417,9 @@ final class TimelineTests: XCTestCase {
             cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: m))!
         }
         XCTAssertEqual(chartTime(at(7, 3), utc), "7:03am", "no pad, bare lowercase suffix")
-        XCTAssertEqual(clockTime(at(7, 3), utc), "07:03", "the schedule column keeps its pad")
+        XCTAssertEqual(cardTime(at(7, 3), utc), chartTime(at(7, 3), utc),
+                       "cards, readouts and charts print one clock")
         XCTAssertEqual(chartTime(at(16, 22), utc), "4:22pm")
-        XCTAssertEqual(clockTime(at(16, 22), utc), "16:22")
         // The two ends of the clock, where 12-hour conversion goes wrong:
         // midnight is 12am and noon is 12pm, never 0am/0pm and never each other.
         XCTAssertEqual(chartTime(at(0, 36), utc), "12:36am")
@@ -544,7 +524,6 @@ final class TimelineTests: XCTestCase {
         else { return XCTFail("drawTide body not found") }
         let body = lines[start..<end].joined(separator: "\n")
 
-        XCTAssertFalse(body.contains("currentFillStops"), "tide fill must not use the current speed palette")
         XCTAssertTrue(body.contains("SN.graphLine.opacity(CurveStyle.fillOpacity)"), "tide fill is the card's blue gradient")
         XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
         XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")
@@ -630,22 +609,6 @@ final class TimelineTests: XCTestCase {
                      "a slack after the series must not borrow the trailing run")
     }
 
-    func testCurrentExcessSegmentsStartAtTheSlackThreshold() {
-        let t0 = Date(timeIntervalSince1970: 1_760_000_000)
-        let points = [
-            CurrentPoint(time: t0, speed: -2),
-            CurrentPoint(time: t0.addingTimeInterval(600), speed: -0.5),
-            CurrentPoint(time: t0.addingTimeInterval(1200), speed: 0.5),
-            CurrentPoint(time: t0.addingTimeInterval(1800), speed: 2),
-        ]
-
-        let segments = currentExcessSegments(points, threshold: 1)
-
-        XCTAssertEqual(segments.map { $0.map(\.speed) }, [[-2, -1], [1, 2]])
-        XCTAssertEqual(segments[0][1].time, t0.addingTimeInterval(400))
-        XCTAssertEqual(segments[1][0].time, t0.addingTimeInterval(1400))
-    }
-
     /// The window computation is build-time data now, not a per-view recompute
     /// (gutter spec §3) — so the band on the strip and the duration in the
     /// readout are the same numbers by construction.
@@ -693,39 +656,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
     }
 
-    func testSlackWindowTimingHumanizesOnlyUsefulDurations() {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .gmt
-        let start = cal.date(from: DateComponents(year: 2026, month: 8, day: 25,
-                                                  hour: 11, minute: 25))!
-
-        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(35 * 60), tz: .gmt).duration,
-                       "35 min")
-        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(89 * 60), tz: .gmt).duration,
-                       "~1 hr")
-        XCTAssertEqual(slackWindowTiming(start: start, end: start.addingTimeInterval(134 * 60), tz: .gmt).duration,
-                       "~2 hrs")
-        XCTAssertNil(slackWindowTiming(start: start, end: start.addingTimeInterval(150 * 60), tz: .gmt).duration)
-    }
-
-    func testSlackWindowTimingMarksLaterDays() {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .gmt
-        let start = cal.date(from: DateComponents(year: 2026, month: 8, day: 25,
-                                                  hour: 21, minute: 35))!
-        let end = { (day: Int) in
-            cal.date(byAdding: DateComponents(day: day, minute: 19),
-                     to: cal.startOfDay(for: start))!
-        }
-
-        XCTAssertEqual(slackWindowTiming(start: start, end: end(1), tz: .gmt).span,
-                       "21:35 → 00:19⁺¹")
-        XCTAssertEqual(slackWindowTiming(start: start, end: end(9), tz: .gmt).span,
-                       "21:35 → 00:19⁺⁹")
-        XCTAssertEqual(slackWindowTiming(start: start, end: end(10), tz: .gmt).span,
-                       "21:35 → 00:19⁺⁺")
-    }
-
     /// A derived gate's curve is a schematic ±1 SHAPE, not a velocity, so a
     /// 0.5 kn window measured off it would be fiction (gutter spec §3). Its
     /// slacks fall back to a plain dropline instead.
@@ -766,39 +696,6 @@ final class TimelineTests: XCTestCase {
             XCTAssertEqual((TimelineCanvas.tileWidth * s).truncatingRemainder(dividingBy: 1), 0,
                            "tile boundary must land on a pixel at \(s)×")
         }
-    }
-
-    /// The fixed left axis: round values, at most six of them, inside the
-    /// plotted span. The step has to adapt — a Salish spring range and a
-    /// half-metre creek can't share one interval — and the labels have to be
-    /// values a chart datum is actually quoted in, not raw span edges.
-    func testAxisTicksAreRoundAndBounded() {
-        // ~4.4 m of range: whole metres, all inside the span.
-        let m = axisTicks(lo: -0.4, hi: 4.0, imperial: false)
-        XCTAssertEqual(m, [0, 1, 2, 3, 4])
-        XCTAssert(m.allSatisfy { $0 >= -0.4 && $0 <= 4.0 }, "a tick outside the span points at nothing")
-
-        // A narrow station drops to the half-metre step rather than showing one label.
-        XCTAssertEqual(axisTicks(lo: 0.1, hi: 1.4, imperial: false), [0.5, 1.0])
-
-        // A big range coarsens instead of printing a wall of numbers.
-        XCTAssert(axisTicks(lo: -1, hi: 12, imperial: false).count <= 6)
-        XCTAssert(axisTicks(lo: -1, hi: 12, imperial: true).count <= 6,
-                  "~43 ft of range in feet still fits the column")
-
-        // Imperial reads the span in feet: 4 m is ~13.1 ft, so the ticks must
-        // be foot values, not metre ones leaking through.
-        let ft = axisTicks(lo: 0, hi: 4.0, imperial: true)
-        XCTAssertEqual(ft.last, 10, "ticks are display units — 10 ft, not 4")
-        XCTAssertEqual(axisTickMetres(10, imperial: true), 10 / 3.28084, accuracy: 1e-9)
-        XCTAssertEqual(axisTickMetres(3, imperial: false), 3, "metric ticks are already metres")
-
-        // Degenerate spans can't loop forever or emit junk.
-        XCTAssert(axisTicks(lo: 2, hi: 2, imperial: false).isEmpty)
-
-        XCTAssertEqual(axisTickLabel(4), "4", "no trailing zeros in an axis column")
-        XCTAssertEqual(axisTickLabel(0.5), "0.5")
-        XCTAssertEqual(axisTickLabel(-0.0), "0", "no negative zero at chart datum")
     }
 
     /// Events scanned from a sampled series (online gates draw fetched points,
@@ -866,82 +763,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertLessThan(median, 0.30)
         XCTAssertLessThan(Timeline.rampT(forSpeedKn: 5.0), 0.5,
                           "a 5-kn current remains below orange on the global scale")
-    }
-
-    /// **The defect this exists to fix.** `TimelineGeo` normalizes every curve
-    /// to its own extremes, so a 3 kn pass and Sechelt Rapids draw the same
-    /// shape. Colour is the absolutely-scaled channel now, and this is the
-    /// assertion that goes red if auto-fitting is ever reintroduced into it.
-    func testTwoGatesOfDifferentSpeedCannotFillTheSameColour() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        func series(peak: Double) -> [CurrentPoint] {
-            (0..<75).map { i in
-                let dt = Double(i) * 600
-                return CurrentPoint(time: t0.addingTimeInterval(dt),
-                                    speed: peak * sin(2 * .pi * dt / (12.42 * 3600)))
-            }
-        }
-        let x: (Date) -> CGFloat = { CGFloat($0.timeIntervalSince(t0) / 3600) * Timeline.pph }
-        let width = x(t0.addingTimeInterval(74 * 600))
-
-        let mild = currentFillStops(series(peak: 3), x: x, width: width)
-        let gate = currentFillStops(series(peak: 16), x: x, width: width)
-        XCTAssertEqual(mild.count, 75, "one stop per sample")
-        XCTAssertEqual(gate.count, 75)
-
-        XCTAssertNotEqual(hottest(mild), hottest(gate),
-                          "a 3 kn pass and a 16 kn gate must not fill the same colour")
-        XCTAssertLessThan(sum(hottest(gate)), sum(hottest(mild)),
-                          "the faster gate must reach the red end of the ramp")
-
-        // CGGradient requires non-decreasing locations inside 0...1.
-        XCTAssertEqual(gate.map(\.location), gate.map(\.location).sorted())
-        XCTAssertTrue(gate.allSatisfy { $0.location >= 0 && $0.location <= 1 })
-
-        XCTAssertTrue(currentFillStops([], x: x, width: width).isEmpty,
-                      "no samples, no fill — an empty gradient is a crash")
-        XCTAssertEqual(currentFillStops(series(peak: 3), x: x, width: 0).count, 0,
-                       "a zero-width strip has no gradient to build")
-    }
-
-    /// A derived gate's curve is a schematic ±1 shape standing in for "flood,
-    /// then ebb" — nobody measured a speed. Running it through the absolute
-    /// ramp would draw a one-knot gate, which is the same fiction the slack
-    /// windows already refuse to make out of that shape. It fills `SN.steel`,
-    /// the app's existing word for a state it does not know.
-    func testASchematicGateIsNotGivenASpeedItNeverHad() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let shape = (0..<75).map { i -> CurrentPoint in
-            let dt = Double(i) * 600
-            return CurrentPoint(time: t0.addingTimeInterval(dt),
-                                speed: sin(2 * .pi * dt / (12.42 * 3600)))
-        }
-        let x: (Date) -> CGFloat = { CGFloat($0.timeIntervalSince(t0) / 3600) * Timeline.pph }
-        let width = x(t0.addingTimeInterval(74 * 600))
-        let stops = currentFillStops(shape, x: x, width: width, schematic: true)
-
-        XCTAssertEqual(Set(stops.map(rgba)).count, 1, "a shape has one colour, not a gradient")
-        XCTAssertEqual(rgba(stops[0]), rgba(Gradient.Stop(color: SN.steel.opacity(0.32), location: 0)),
-                       "the unknown-magnitude fill is steel")
-
-        // And the ramp is genuinely off: this nominal one-knot shape would
-        // otherwise be yellow, not the unknown-magnitude steel.
-        let ramped = currentFillStops(shape, x: x, width: width)
-        XCTAssertNotEqual(rgba(stops[0]), rgba(ramped[0]))
-    }
-
-    /// The yellow → orange → red ramp gets darker as it heats up, so its
-    /// darkest stop is the highest-speed one.
-    private func hottest(_ stops: [Gradient.Stop]) -> [CGFloat] {
-        stops.map(rgba).min { sum($0) < sum($1) } ?? []
-    }
-
-    private func sum(_ c: [CGFloat]) -> CGFloat { c.prefix(3).reduce(0, +) }
-
-    private func rgba(_ stop: Gradient.Stop) -> [CGFloat] {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(stop.color).getRed(&r, green: &g, blue: &b, alpha: &a)
-        return [r, g, b, a].map { ($0 * 1000).rounded() / 1000 }
     }
 
     /// An exact-zero sample IS the slack — both polarities, no interpolation.

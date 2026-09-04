@@ -10,21 +10,6 @@ func countdown(from: Date, to target: Date) -> String {
     return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
 }
 
-func slackWindowTiming(start: Date, end: Date, tz: TimeZone) -> (duration: String?, span: String) {
-    let minutes = max(Int((end.timeIntervalSince(start) / 60).rounded()), 0)
-    let hours = Int((Double(minutes) / 60).rounded())
-    let duration = minutes < 60 ? "\(minutes) min"
-        : hours <= 2 ? "~\(hours) \(hours == 1 ? "hr" : "hrs")"
-        : nil
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = tz
-    let days = max(calendar.dateComponents([.day], from: calendar.startOfDay(for: start),
-                                           to: calendar.startOfDay(for: end)).day ?? 0, 0)
-    let digits = ["", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"]
-    let suffix = days == 0 ? "" : days < 10 ? "⁺\(digits[days])" : "⁺⁺"
-    return (duration, "\(clockTime(start, tz)) → \(clockTime(end, tz))\(suffix)")
-}
-
 /// The moon's dark-limb offset for a disc of radius `r`: covering at new
 /// (shift 0), clear at full (2r), lit side right while waxing. (The prototype
 /// export's (1-fraction)·1.9r is inverted — it blacks out a full moon.)
@@ -93,8 +78,134 @@ func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
 /// the far corner, the number, a caption. The glyph colours itself; the value
 /// takes `valueColor` — white, or amber for a provisional reading.
 enum ReadoutType {
+    /// The page's one reading: what sits under the centerline.
+    static let lead: Font = .system(size: 44, weight: .medium, design: .rounded)
+    static let leadUnit: Font = .title2.weight(.light)
+    /// A tile's value.
     static let hero: Font = .system(.title2, design: .rounded).weight(.medium)
+    /// A tile whose value is words rather than a reading.
+    static let tileText: Font = .system(.title3, design: .rounded).weight(.medium)
     static let unit: Font = .title3.weight(.light)
+}
+
+/// The hero: the reading under the centerline, which runs up into it. The
+/// eyebrow — the state and its glyph — leads, the value is the only large
+/// thing, and the time sits alone beneath it on the centerline.
+///
+/// `value` is optional because a derived gate predicts no speed: its lead is
+/// the eyebrow over the time, with the big line left out rather than filled
+/// with a placeholder number.
+struct LeadCard<Eyebrow: View>: View {
+    var value: Text? = nil
+    let time: String
+    var valueColor: Color = .white
+    @ViewBuilder var eyebrow: () -> Eyebrow
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 6) { eyebrow() }
+                .font(.subheadline.weight(.semibold))
+            value?.foregroundStyle(valueColor)
+            Text(time)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(SN.foam.opacity(0.55))
+        }
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("detail-reading")
+    }
+}
+
+/// The eyebrow's word, in the weight and ink every lead shares.
+func leadState(_ text: String) -> Text {
+    // The tiles' label voice, a size up: caps mono means "a state token" on
+    // every surface here — tile labels, schedule pills, and this.
+    Text(text.uppercased())
+        .font(.subheadline.monospaced().weight(.medium))
+        .tracking(1.4)
+        .foregroundStyle(SN.foam.opacity(0.85))
+}
+
+/// "Low tide in 28m" while the reading is now; "Low tide 3h 28m later" once
+/// the scrub has left it — "in" counts from the reader, "later" from wherever
+/// on the strip they are looking.
+func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date) -> String {
+    let gap = countdown(from: scrub, to: time)
+    return scrubbedAway(scrub, from: now) ? "\(event) \(gap) later" : "\(event) in \(gap)"
+}
+
+/// What comes next, centred on the reading line in the strip's chrome row.
+/// Tapping scrubs to it. It fades while the strip is moving and returns once
+/// the scrub has rested, so it never flickers through the events a fling
+/// passes.
+struct Commentary: View {
+    let text: String?
+    let scrubTime: Date
+    let onTap: () -> Void
+    @State private var settled = false
+
+    var body: some View {
+        Group {
+            if let text {
+                // Glass, not a fill: it floats over the curve and its labels,
+                // and has to stay legible over both. The button style owns the
+                // glass — interactive glass on the label competes with the
+                // button for the tap and drops every other one.
+                Button(action: onTap) {
+                    Text(text)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(SN.foam)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .accessibilityIdentifier("commentary")
+            }
+        }
+        .opacity(settled ? 1 : 0)
+        .allowsHitTesting(settled)
+        .animation(.easeInOut(duration: 0.2), value: settled)
+        .task(id: scrubTime) {
+            // Rest = no scrub change for this long. A cancelled sleep is a
+            // scrub still in motion, not a rest.
+            settled = false
+            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            settled = true
+        }
+    }
+}
+
+/// Between the strip and the schedule: the one number this station kind has
+/// to add beside the moon that drives it. `primary` is the caller's — a tide's
+/// swing ("Range"), a current's next maximum ("Next max"); a derived gate has
+/// no number at all and passes nil, leaving the moon on its own.
+struct SummaryTiles: View {
+    var primary: (label: String, value: String, caption: String)? = nil
+    let at: Date
+
+    var body: some View {
+        let moon = SunMoon.moonIllumination(date: at)
+        HStack(alignment: .top, spacing: 12) {
+            if let primary {
+                ReadoutTile(label: primary.label, caption: primary.caption,
+                            accessibility: primary.label) {
+                    EmptyView()
+                } value: {
+                    Text(primary.value).font(ReadoutType.hero.monospacedDigit())
+                }
+            }
+            ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
+                        accessibility: "Moon, \(SunMoon.phaseName(phase: moon.phase))") {
+                MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
+            } value: {
+                // Words, not a number: "Waning Crescent" has to fit on one
+                // line where "7.6 ft" does, so it sits a step below the hero.
+                Text(SunMoon.phaseName(phase: moon.phase))
+                    .font(ReadoutType.tileText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+        }
+    }
 }
 
 struct ReadoutTile<Glyph: View, Value: View>: View {
@@ -110,7 +221,7 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                MonoLabel(text: label, color: SN.foam.opacity(0.5))
+                MonoLabel(text: label, color: SN.foam.opacity(0.55))
                 Spacer()
                 HStack(spacing: 4) { glyph() }
                     .font(.caption.weight(.semibold))
@@ -132,112 +243,17 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     }
 }
 
-/// The *when* of a scrub reading — clock time stacked over the date, the
-/// return-to-now slot directly beside them, moon trailing. The LAST row of
-/// every scrub card: it is the calendar of the reading, secondary to what the
-/// water is doing (2026-08-03 hero-crop spec §3). The slot lives HERE, in one
-/// shared row, because giving it a home per-card had it bouncing between
-/// layouts and dragging row alignment around with it (2026-08-07).
-struct ScrubWhen: View {
-    let scrubTime: Date
-    let live: Date
-    let tz: TimeZone
-    let onReturn: () -> Void
-    var summary: (label: String, value: String)? = nil
-
-    var body: some View {
-        let moon = SunMoon.moonIllumination(date: scrubTime)
-        if let summary {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    MonoLabel(text: summary.label, color: SN.foam.opacity(0.5))
-                    Text(summary.value)
-                        .font(.title.weight(.medium).monospacedDigit())
-                        .foregroundStyle(SN.foam)
-                }
-                Spacer()
-                moonPhase(moon)
-            }
-            .accessibilityElement(children: .contain)
-        } else {
-        // Wrap, never truncate (the StationCard rule): the one-line row is
-        // tier 1, and when the .title time, the fixed 44pt slot and the
-        // phase name outgrow the width — AX3 and up on a phone — the moon
-        // drops to its own line instead of the phase clipping to "…".
-        // Which tier wins is verified by geometry in ScrubWhenTests, not
-        // asked directly — ViewThatFits exposes no way to ask.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 14) {
-                timeAndSlot
-                Spacer()
-                moonPhase(moon)
-            }
-            VStack(alignment: .leading, spacing: 10) {
-                timeAndSlot
-                moonPhase(moon)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        }
-    }
-
-    private var timeAndSlot: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(cardTime(scrubTime, tz))
-                    .font(.title.weight(.medium).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .contentTransition(.numericText())
-                MonoLabel(text: monthDay(scrubTime, tz))
-            }
-            ReturnToNowSlot(scrubTime: scrubTime, live: live, onReturn: onReturn)
-        }
-    }
-
-    private func moonPhase(_ moon: SunMoon.MoonIllumination) -> some View {
-        HStack(spacing: 14) {
-            MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 22)
-            Text(SunMoon.phaseName(phase: moon.phase))
-                .font(.caption2)
-                .foregroundStyle(SN.foam.opacity(0.6))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-/// Return-to-now as a FIXED 44pt slot: present or not, it occupies the same
-/// points, so the readout row never reflows when a scrub starts or ends (the
-/// occupies-its-points-either-way reasoning the old hero overlay used).
-struct ReturnToNowSlot: View {
-    let scrubTime: Date
-    let live: Date
-    let onReturn: () -> Void
-
-    var body: some View {
-        ZStack {
-            if scrubbedAway(scrubTime, from: live) {
-                Button(action: onReturn) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(SN.leaf)
-                        .frame(width: 44, height: 44)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .accessibilityLabel("Return to now")
-                .accessibilityIdentifier("detail-return-now")
-            }
-        }
-        .frame(width: 44, height: 44)
-    }
-}
-
 // MARK: - The scrub-detail scaffold (tide / current / derived gate / online gate)
 
-/// The four scrub details' shared anatomy: header, scrub card
-/// (caller's readout + strip, then the shared swipe hint, ScrubWhen and card
-/// chrome), the rolling schedule card, and the bottom slot (footer — or the
+/// The four scrub details' shared anatomy: header, the caller's lead reading,
+/// the strip, the caller's links (summary tiles, tide-at-port), the rolling
+/// schedule card, and the bottom slot (footer — or the
 /// online gate's honesty card, which is also what shows while `timeline` is
-/// nil). Return-to-now lives here: live = appNow(), scrub back onto it.
+/// nil).
+///
+/// Return-to-now is the caller's, not the scaffold's: it resets the window's
+/// `anchor` as well as the scrub, and only the detail view holds that. The
+/// strip takes it directly.
 struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: View {
     let name: String
     let region: String
@@ -245,16 +261,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     let tz: TimeZone
     let timeline: TimelineData?
     let entries: (TimelineData) -> [ScheduleEntry]
-    @Binding var live: Date
     @Binding var scrubTime: Date
-    /// Return-to-now, owned by the caller: it resets the window's `anchor` too,
-    /// which only the detail view holds. Parking the centerline at a `now` that
-    /// isn't on a September strip would be the half of the job the scaffold can
-    /// see and the wrong half to do alone.
-    let onReturn: () -> Void
     /// The window's anchor. The scaffold moves it (via the picker) but does not
-    /// own it — it lives in the detail view, which is also what makes
-    /// `onReturn` caller-owned.
+    /// own it — it lives in the detail view, alongside return-to-now.
     @Binding var anchor: Date
     /// Fired when the picker OPENS, before a date is chosen. Only an online
     /// gate has anything to do here (speculatively fetch the next block); the
@@ -263,16 +272,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// Fired after the anchor moves, with the picked date. The three
     /// `@State`-backed views rebuild here; the online gate re-checks coverage.
     var onPicked: (Date) -> Void = { _ in }
-    /// Optional aggregate reading for the bottom of the scrub card.
-    var scrubSummary: (TimelineData) -> (label: String, value: String)? = { _ in nil }
     @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
     /// the scrub card above its shared tail.
     @ViewBuilder var card: (TimelineData) -> Card
-    /// After ScrubWhen, still inside the scrub card (TideAtPortLink).
-    @ViewBuilder var links: () -> Links
+    /// Under the strip, above the schedule (summary tiles, TideAtPortLink).
+    /// Handed the same `TimelineData` the card gets, so a consumer reads the
+    /// timeline the page is already drawing rather than deriving a second one.
+    @ViewBuilder var links: (TimelineData) -> Links
     /// Below the schedule card; each element gets the standard 14pt top gap.
     @ViewBuilder var bottom: () -> Bottom
 
@@ -355,29 +364,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
 
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Full bleed, no chrome: the curve is the hero and the page is its
+            // frame. No "‹ swipe to scrub ›" label here, and none is coming
+            // back (#58): "scrubber" is audio-editing jargon, and testers who
+            // read the label still didn't find the horizontal scroll. The
+            // strip's own opening slide-into-place is the affordance now —
+            // `TimelineScrubber.centerIfNeeded`.
             card(tl)
 
-            // No "‹ swipe to scrub ›" label here, and none is coming back
-            // (#58): "scrubber" is audio-editing jargon, and testers who read
-            // the label still didn't find the horizontal scroll. The strip's
-            // own opening slide-into-place is the affordance now —
-            // `TimelineScrubber.centerIfNeeded`.
-            ScrubWhen(scrubTime: scrubTime, live: live, tz: tz, onReturn: onReturn,
-                      summary: scrubSummary(tl))
-                .padding(.top, 14)
-                .padding(.horizontal, 16)
-
-            links()
+            links(tl)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
         }
         .padding(.bottom, 12)
-        // The schedule card's shape, without its fill: the strip paints its
-        // own sky, so the card is the outline it sits in.
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-        .padding(.horizontal, 16)
     }
 
     private func scheduleCard(_ tl: TimelineData) -> some View {

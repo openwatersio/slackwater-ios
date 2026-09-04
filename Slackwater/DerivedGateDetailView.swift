@@ -31,24 +31,36 @@ struct DerivedGateDetailView: View {
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
-                            live: $live, scrubTime: $scrubTime,
-                            onReturn: returnToNow,
+                            scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
-                            scrubSummary: { _ in gate.magnitudeNote.map { ("Large-tide context", $0) } },
                             above: { EmptyView() },
                             card: { tl in
-                                readout
+                                let slack = nextSlack
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   now: live, scrubTime: $scrubTime)
-                                    .padding(.top, 12)
+                                                   now: live, scrubTime: $scrubTime,
+                                                   onReturn: returnToNow,
+                                                   commentary: slack.map {
+                                                       commentaryText("Slack", at: $0.time, from: scrubTime, now: live)
+                                                   },
+                                                   onCommentary: { if let slack { scrubTime = slack.time } })
+                                    .overlay(alignment: .top) { lead }
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
                                 Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
                                     .font(.caption2)
                                     .foregroundStyle(SN.foam.opacity(0.5))
                                     .padding(.top, 10)
                             },
-                            links: { TideAtPortLink(port: port) },
+                            links: { _ in
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Moon only: a derived gate has slack times and phase, no knots.
+                                    SummaryTiles(at: scrubTime)
+                                    if let note = gate.magnitudeNote {
+                                        Text(note).font(.caption).foregroundStyle(SN.foam.opacity(0.7))
+                                    }
+                                    TideAtPortLink(port: port)
+                                }
+                            },
                             bottom: { footer })
             .onAppear {
                 if timeline == nil {
@@ -59,7 +71,7 @@ struct DerivedGateDetailView: View {
             }
     }
 
-    // MARK: - Readout above the strip: the phase word, never a number
+    // MARK: - The lead reading, fixed over the centerline
 
     /// Kept as the tests' named binding (ColourAndFormTests); the palette
     /// itself lives in `StationGlyph.colour(for:)`.
@@ -67,29 +79,28 @@ struct DerivedGateDetailView: View {
         StationGlyph.colour(for: ChsGateCardView.glyphTone(phase))
     }
 
-    private var readout: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                // The bare phase word was the app's worst jargon moment — no
-                // number, no arrow, just "Ebbing" (#59). The gloss rides the
-                // big line the way speed heroes carry their unit.
-                (Text(phase.gloss?.capitalized ?? phase.word).font(.largeTitle)
-                 + Text(phase.gloss.map { _ in " · \(phase.word)" } ?? "").font(.footnote))
-                    .foregroundStyle(Self.phaseColor(phase))
-                Text("speeds not predicted for this pass")
-                    .font(.footnote).foregroundStyle(SN.foam.opacity(0.7))
-            }
-            Spacer()
-            if let slack = nextSlack {
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    Text("in \(countdown(from: scrubTime, to: slack.time))")
-                        // SN.go, not SN.leaf: this line says when slack is.
-                        .font(.caption.monospacedDigit()).foregroundStyle(SN.go)
-                    Text("at \(slack.highWater ? "high" : "low") water")
-                        .font(.caption).foregroundStyle(SN.foam.opacity(0.7))
-                }
-            }
+    /// The same lead anatomy the other three details wear, minus its big
+    /// line: no speed exists for this pass (spec §3), so the eyebrow's phase
+    /// word sits straight above the time rather than over an invented number.
+    ///
+    /// A plain forward/back arrow, not a `CompassArrow`: a derived gate has no
+    /// set bearing to point at — only which way through the pass the water is
+    /// going. The word is the same one the measured leads use, so the four
+    /// details read alike.
+    private var lead: some View {
+        let word = phase.word
+        return LeadCard(time: chartTime(scrubTime, tz)) {
+            leadState(word)
+            Image(systemName: glyph)
+                .foregroundStyle(Self.phaseColor(phase))
+        }
+    }
+
+    private var glyph: String {
+        switch phase {
+        case .flood: "arrow.forward"
+        case .ebb: "arrow.backward"
+        case .slack: "arrow.right.and.line.vertical.and.arrow.left"
         }
     }
 

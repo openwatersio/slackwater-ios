@@ -48,25 +48,22 @@ struct TideDetailView: View {
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
-                            live: $live, scrubTime: $scrubTime,
-                            onReturn: returnToNow,
+                            scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
-                            scrubSummary: { _ in
-                                guard let prev = prevExtreme, let next = nextExtreme else { return nil }
-                                return ("Range", "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)")
-                            },
-                            above: {
-                                readout
-                                    .padding(.horizontal, 16)
-                                    .padding(.bottom, 14)
-                            },
+                            above: { EmptyView() },
                             card: { tl in
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    imperial: imperial, now: live, scrubTime: $scrubTime,
-                                                   onReturn: returnToNow)
+                                                   onReturn: returnToNow,
+                                                   commentary: nextExtreme.map {
+                                                       commentaryText($0.kind == .high ? "High" : "Low",
+                                                                      at: $0.time, from: scrubTime, now: live)
+                                                   },
+                                                   onCommentary: { if let next = nextExtreme { scrubTime = next.time } })
+                                    .overlay(alignment: .top) { lead }
                             },
-                            links: { EmptyView() },
+                            links: { _ in SummaryTiles(primary: range, at: scrubTime) },
                             bottom: {
                                 VStack(spacing: 14) {
                                     footer
@@ -85,49 +82,36 @@ struct TideDetailView: View {
             }
     }
 
-    // MARK: - Readout between header and card: two tiles, now and next
+    // MARK: - The lead reading, fixed over the centerline
 
     /// At a turn the water is at its high or low; otherwise it is on its way
     /// to one. Snap targets land exactly on the extreme, hence the 1 s.
     private var atTurn: TideExtreme? {
         timeline?.tideExtremes.first { abs($0.time.timeIntervalSince(scrubTime)) < 1 }
     }
-
-    private func heightText(_ metres: Double) -> Text {
-        Text(formatHeight(metres, imperial: imperial)).font(ReadoutType.hero.monospacedDigit())
-            + Text(" \(unit)").font(ReadoutType.unit)
+    /// This swing's range: the extreme behind the scrub to the one ahead.
+    private var range: (label: String, value: String, caption: String)? {
+        guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+        return ("Range",
+                "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
+                prev.kind == .low ? "low to high" : "high to low")
     }
 
-    private var readout: some View {
-        let trend = rising ? SN.rising : SN.falling
+    private var lead: some View {
         let turn = atTurn
-        return HStack(alignment: .top, spacing: 12) {
-            // Now. The rate ramp's colour on the glyph when the rate is out of
-            // the ordinary (#95), else the direction's.
-            ReadoutTile(label: turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling"),
-                        caption: chartTime(scrubTime, tz),
-                        accessibility: turn.map { $0.kind == .high ? "High tide" : "Low tide" } ?? (rising ? "Rising" : "Falling")) {
-                Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
-                                  ?? (rising ? "arrow.up.right" : "arrow.down.right"))
-                    .foregroundStyle(rateWarningColor ?? trend)
-            } value: {
-                heightText(scrubHeight)
-            }
-            .accessibilityIdentifier("detail-reading")
-
-            if let next = nextExtreme {
-                // Relative from now; once scrubbed away, "in 4h" from an
-                // arbitrary point means nothing, so the clock time.
-                ReadoutTile(label: next.kind == .high ? "Next high" : "Next low",
-                            caption: scrubbedAway(scrubTime, from: live) ? chartTime(next.time, tz)
-                                : "in \(countdown(from: scrubTime, to: next.time))",
-                            accessibility: next.kind == .high ? "Next high" : "Next low") {
-                    Image(systemName: next.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line")
-                        .foregroundStyle(trend)
-                } value: {
-                    heightText(next.height)
-                }
-            }
+        let up = turn.map { $0.kind == .high } ?? rising
+        let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
+        return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
+                            + Text(" \(unit)").font(ReadoutType.leadUnit),
+                        time: chartTime(scrubTime, tz)) {
+            // Word then glyph, the order the current lead reads in.
+            leadState(state)
+            // The graph's own two inks, so the eyebrow names the curve the
+            // reader is looking at — unless the rate is out of the ordinary
+            // (#95), which outranks direction.
+            Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
+                              ?? (rising ? "arrow.up.right" : "arrow.down.right"))
+                .foregroundStyle(rateWarningColor ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
 

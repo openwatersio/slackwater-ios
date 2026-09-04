@@ -279,6 +279,24 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// readout row, hard right beside the star — so it can appear and disappear
     /// without moving anything. Sharing the header's top-right row with the
     /// favourite star shoves the star sideways the moment you scrub.
+    // Return-to-now from HISTORY: the pill sits on the right and must still
+    // bring the strip home.
+    func testReturnToNowFromHistory() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 5))
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+        let now = app.buttons["detail-return-now"].firstMatch
+        XCTAssert(now.waitForExistence(timeout: 5), "no return-to-now after scrubbing back")
+        save(app, "history-before-now.png")
+        XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
+        now.tap()
+        XCTAssert(now.waitForNonExistence(timeout: 10), "return-to-now did not bring the strip home")
+        save(app, "history-after-now.png")
+    }
+
     func testM52ReturnToNowHasItsOwnFixedSlot() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
@@ -293,6 +311,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         scrubStrip(app)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
+        save(app, "m52-scrubbed.png")
         // The 44pt slot this guards is fixed by construction, but re-reading
         // star/now/header/back live below would still be racy (settled — see
         // testM50RecentsNamesFit). One read, one layout, four snapshots.
