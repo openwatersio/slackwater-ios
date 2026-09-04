@@ -75,7 +75,9 @@ final class UnitsAndGroupsTests: XCTestCase {
     func testBundledRegionsAreNauticalAndShoutTheirCompassPoints() {
         let titleCased = try! NSRegularExpression(
             pattern: "\\b(Nne|Ene|Ese|Sse|Ssw|Wsw|Wnw|Nnw|Ne|Se|Sw|Nw)\\b")
-        let statute = try! NSRegularExpression(pattern: "\\bmi\\.|\\bmiles?\\b",
+        // A distance, not a proper noun: Deepwater Point sits on the Miles
+        // River (a subordinate current station since #268).
+        let statute = try! NSRegularExpression(pattern: "\\b\\d+(?:\\.\\d+)?\\s*(?:mi\\.|miles?)\\b",
                                                options: .caseInsensitive)
         let regions = StationItem.all.map(\.region)
         XCTAssertFalse(regions.isEmpty, "no bundled stations — did the resources ship?")
@@ -91,7 +93,8 @@ final class UnitsAndGroupsTests: XCTestCase {
     /// The specific card Bryan found: "7.6 mi. Sse" is now "6.6 nm SSE".
     func testDiscoveryIslandSubtitleRendersFixed() {
         let regions = StationItem.all.filter { $0.name == "Discovery Island" }.map(\.region)
-        XCTAssertEqual(Set(regions), ["3.0 nm NE", "6.6 nm SSE"])
+        // Three since #268: the subordinate current station 2.6 nm SSE joined.
+        XCTAssertEqual(Set(regions), ["3.0 nm NE", "6.6 nm SSE", "2.6 nm SSE"])
     }
 
     // MARK: - One entry per place (M50 matching-station grouping)
@@ -103,7 +106,7 @@ final class UnitsAndGroupsTests: XCTestCase {
         }
         let places = StationGroups(ranked: ranked)
         let discovery = ranked.filter { $0.name == "Discovery Island" }
-        XCTAssertEqual(discovery.count, 2, "the collision this exists for")
+        XCTAssertEqual(discovery.count, 3, "the collision this exists for (three since #268)")
         let shown = places.collapse(discovery.map(\.id))
         XCTAssertEqual(shown, [discovery[0].id], "one entry per name, the nearest")
         XCTAssertEqual(places.shownIds, places.collapse(ranked.map(\.id)),
@@ -131,7 +134,7 @@ final class UnitsAndGroupsTests: XCTestCase {
         }
         let places = StationGroups(ranked: ranked)
         let wilsons = ranked.filter { $0.name == "Point Wilson" }
-        XCTAssertEqual(wilsons.count, 3)
+        XCTAssertEqual(wilsons.count, 4)  // four since #268: PCT1496, 0.7 nm east
         let friday = TideStationRecord.fridayHarborID
         XCTAssertEqual(places.collapse([wilsons[2].id, friday, wilsons[0].id]),
                        [wilsons[0].id, friday])
