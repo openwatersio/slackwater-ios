@@ -202,7 +202,8 @@ final class WidgetSnapshotTests: XCTestCase {
     @MainActor
     func testSmallWidgetRendersTheCompactCard() throws {
         let now = Date(timeIntervalSince1970: 1_755_800_000)
-        let tide = WidgetCard.build(.tide(TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!), now: now)
+        let tideRecord = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
+        let tide = WidgetCard.build(.tide(tideRecord, station: tideRecord.engineStation), now: now)
         let current = WidgetCard.build(.current(CurrentStationRecord.all.first!), now: now)
         let gateInfo = try XCTUnwrap(ChsGateInfo.all.first)
         let port = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gateInfo.reference })
