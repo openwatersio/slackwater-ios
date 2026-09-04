@@ -39,7 +39,7 @@ struct DerivedGateRecord: Hashable {
     let port: TideStationRecord   // the reference port, fitted on this device
 
     var engineGate: DerivedSlackStation {
-        DerivedSlackStation(reference: port.engineStation,
+        DerivedSlackStation(reference: port.harmonicStation,
                             hwLagMinutes: gate.hwLagMinutes, lwLagMinutes: gate.lwLagMinutes)
     }
 }

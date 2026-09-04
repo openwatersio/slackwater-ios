@@ -150,6 +150,12 @@ struct TideDetailView: View {
                 Text("\(record.chartDatum) datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
+            } else if let ref = record.referenceRecord {
+                // A different accuracy class, and the reference can be far
+                // away (Nurse Channel sits 600 km from Settlement Point).
+                Text("\(record.chartDatum) datum · NOAA subordinate station: \(ref.name)'s tide, corrected by published offsets")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
             } else if record.id.hasPrefix("noaa/") {
                 Text("\(record.chartDatum) datum · NOAA harmonic prediction")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
@@ -170,7 +176,12 @@ struct TideDetailView: View {
                 detailRow("Station", record.id)
                 detailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
                 detailRow("Time zone", record.timezone)
-                detailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
+                if let ref = record.referenceRecord {
+                    detailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
+                    detailRow("Prediction", "Reference highs and lows, shifted and scaled by NOAA offsets, computed on this device")
+                } else {
+                    detailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
+                }
                 if let chsFittedAt {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Downloaded")

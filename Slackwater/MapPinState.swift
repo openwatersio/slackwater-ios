@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. What colour a station's map pin takes: the tide and
 // current tone derivations, and the cache the pin source is built from.
 import Foundation
+import TideEngine
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
 /// half-period, so it always finds the next turn. Only the minority of
@@ -38,6 +39,11 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 /// grid, so the pair is a 30-minute window *straddling* `now` (at 12:29 that
 /// is 12:00 and 12:30) — which is what the sweep measured and trusts.
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
+    // A subordinate has no cheap path: its curve is only defined by its
+    // extremes, so the exact search is the only search. 2,017 of them cost
+    // ~0.26 ms each here (debug) — the pin budget in
+    // `testPinLayerBuildsInsideAFrame` was re-based for it.
+    if record.isSubordinate { return tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
     guard rangeProxy > 0 else { return fallback() }  // no M2/K1-class amplitude — don't divide by it

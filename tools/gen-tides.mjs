@@ -30,9 +30,10 @@
  * Three more filters, all inherited from slackwater-web's build-stations.mjs
  * and all still load-bearing:
  *
- *   - reference stations only. A subordinate is offsets against a reference
- *     and needs reduction math slackwater-engine has not ported; without it a
- *     subordinate is a dead pin on the map.
+ *   - reference and subordinate stations. A subordinate is offsets against a
+ *     reference (slackwater-engine's SubordinateTideStation does the
+ *     reduction); it ships with `reference` and `offsets` and NO constituents
+ *     — see isSubordinate below for why — and only if its reference ships too.
  *   - at least one non-zero constituent, or there is nothing to predict.
  *   - zero-amplitude constituents dropped: they contribute nothing but bytes.
  *
@@ -348,15 +349,29 @@ const servedByChs = (s) =>
 
 let dropped = 0;
 let failedDatum = 0;
+let orphaned = 0;
+/**
+ * SUBORDINATE STATIONS (#229). Upstream copies the reference's constituents
+ * onto every subordinate row, byte for byte, and marks `published_harmonics:
+ * true` — NOAA publishes none. Predicting from them would show the reference's
+ * water under the subordinate's name, wrong by up to the full height ratio,
+ * with nothing on screen to say so. So a subordinate never carries
+ * constituents, never runs the datum gate (it has no datums of its own to
+ * check), sorts LAST so it yields to any harmonic station already on that
+ * water, and is dropped outright if its reference did not survive the
+ * pipeline — an unpaired subordinate is a dead pin, and the slug allocator
+ * tombstones a station that leaves, so a departure here is permanent.
+ */
+const isSubordinate = (s) => s.type === "subordinate";
 // Ids whose region came from the derived nearest-town tier (station-metadata
 // 5.0.0 dropped the "~" that used to mark this in the region string itself —
 // see `region` inside buildStation — so it has to be tracked here instead).
 const derivedTownIds = new Set();
-const stations = shippable
+const kept = shippable
   .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
   .filter((s) => (servedByChs(s) ? (cededToChs++, false) : true))
-  .filter((s) => s.type === "reference")
-  .filter((s) => s.harmonic_constituents?.some((c) => c.amplitude > 0))
+  .filter((s) => s.type === "reference" || isSubordinate(s))
+  .filter((s) => isSubordinate(s) || s.harmonic_constituents?.some((c) => c.amplitude > 0))
   // The datum gate is decided HERE and applied at the dedupe below, not as a
   // filter of its own. A FAILING NOAA ROW STILL HAS TO REACH THE DEDUPE AND
   // CLAIM ITS WATER. Filtering it out here made the gate promote the mirror it
@@ -372,16 +387,18 @@ const stations = shippable
   //
   // "We cannot vouch for this water" has to yield NO station, not a worse one.
   // A failing TICON row is dropped outright; it has nothing to protect.
-  .map((s) => ({ s, passes: passesDatumCheck(s) }))
+  .map((s) => ({ s, passes: isSubordinate(s) || passesDatumCheck(s) }))
   .filter(({ s, passes }) => (passes ? true : (failedDatum++, s.source?.name === NOAA)))
+  // NOAA harmonic first, then everyone else's harmonic, subordinates last.
   .sort((a, b) =>
-    (a.s.source?.name === NOAA ? 0 : 1) - (b.s.source?.name === NOAA ? 0 : 1) ||
+    (isSubordinate(a.s) ? 2 : a.s.source?.name === NOAA ? 0 : 1) -
+      (isSubordinate(b.s) ? 2 : b.s.source?.name === NOAA ? 0 : 1) ||
     (a.s.id < b.s.id ? -1 : a.s.id > b.s.id ? 1 : 0))
   // Named BEFORE the dedupe filter runs (see samePlace above) — the collision
   // check needs the display name and NOAA-source flag can't survive on the
   // built station object, so it's carried alongside.
   .map(({ s, passes }) =>
-    ({ station: buildStation(s), isNoaa: s.source?.name === NOAA, passes }))
+    ({ station: buildStation(s), isNoaa: s.source?.name === NOAA && !isSubordinate(s), passes }))
   // A NOAA row is never dropped. It was already shipping, users have fits and
   // favourites keyed on its id, and NOAA publishing two gauges a few hundred
   // metres apart ("Garden City Pier (ocean)") is a judgement it is entitled to
@@ -395,6 +412,10 @@ const stations = shippable
   })
   .map(({ station }) => station)
   .sort(byNameThenId);
+// Runs after the dedupe, which is what decides whether a reference survives.
+const shipped = new Set(kept.filter((s) => !s.reference).map((s) => s.id));
+const stations = kept.filter((s) =>
+  !s.reference || shipped.has(s.reference) || (orphaned++, false));
 
 /** Builds the shape shipped in stations.json for one raw database row. */
 function buildStation(s) {
@@ -448,9 +469,19 @@ function buildStation(s) {
       datumOffset: s.datums?.MSL != null && s.datums?.[s.chart_datum] != null
         ? s.datums.MSL - s.datums[s.chart_datum]
         : 0,
-      constituents: s.harmonic_constituents
+      constituents: isSubordinate(s) ? [] : s.harmonic_constituents
         .filter((c) => c.amplitude > 0)
         .map((c) => ({ name: c.name, amplitude: c.amplitude, phase: c.phase })),
+      // Minutes and metres (or a ratio), exactly as NOAA publishes them; the
+      // reference's own datumOffset is the one that applies.
+      ...(isSubordinate(s) && {
+        datumOffset: 0,
+        reference: s.offsets.reference,
+        offsets: {
+          time: { high: s.offsets.time.high, low: s.offsets.time.low },
+          height: { type: s.offsets.height.type, high: s.offsets.height.high, low: s.offsets.height.low },
+        },
+      }),
     };
 }
 
@@ -498,8 +529,10 @@ if (contested.length) {
 const size = writeBundle(out, stations);
 const towns = stations.filter((s) => derivedTownIds.has(s.id)).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
+const subordinates = stations.filter((s) => s.reference).length;
 console.log(
-  `${stations.length} reference tide stations, ${size} ` +
+  `${stations.length} tide stations (${stations.length - subordinates} reference, ` +
+  `${subordinates} subordinate, ${orphaned} orphaned subordinates dropped), ${size} ` +
   `(${stations.length - towns - codes} curated contexts, ${towns} nearest town, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
