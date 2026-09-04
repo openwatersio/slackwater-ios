@@ -343,7 +343,9 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let chooserButton = app.buttons["matching-stations"].firstMatch
         XCTAssert(chooserButton.waitForExistence(timeout: 5),
                   "no matching-station affordance on a collided name")
-        XCTAssert(app.staticTexts["2 matching stations"].firstMatch.exists)
+        // Three since #268: the NOAA subordinate "2.6 nm SSE" (PCT1411) joined
+        // the two harmonic stations.
+        XCTAssert(app.staticTexts["3 matching stations"].firstMatch.exists)
         chooserButton.tap()
 
         // The chooser: both stations, each with what it measures and how far.
