@@ -104,7 +104,7 @@ struct LeadCard<Eyebrow: View>: View {
     var body: some View {
         VStack(spacing: 4) {
             HStack(spacing: 6) { eyebrow() }
-                .font(.subheadline.weight(.semibold))
+                .font(.footnote.weight(.semibold))
             value?.foregroundStyle(valueColor)
             Text(time)
                 .font(.caption.monospacedDigit())
@@ -118,12 +118,7 @@ struct LeadCard<Eyebrow: View>: View {
 
 /// The eyebrow's word, in the weight and ink every lead shares.
 func leadState(_ text: String) -> Text {
-    // The tiles' label voice, a size up: caps mono means "a state token" on
-    // every surface here — tile labels, schedule pills, and this.
-    Text(text.uppercased())
-        .font(.subheadline.monospaced().weight(.medium))
-        .tracking(1.4)
-        .foregroundStyle(SN.foam.opacity(0.85))
+    Text(text).fontWeight(.medium).foregroundStyle(SN.foam.opacity(0.85))
 }
 
 /// "Low tide in 28m" while the reading is now; "Low tide 3h 28m later" once

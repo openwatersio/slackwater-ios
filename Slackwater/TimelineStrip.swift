@@ -157,13 +157,22 @@ func tideRateStops(_ rates: [(time: Date, rate: Double)], x: (Date) -> CGFloat, 
     return stops.count == 1 ? [stops[0], Gradient.Stop(color: stops[0].color, location: 1)] : stops
 }
 
-/// The useful current-cycle aggregate: the signed difference between the
-/// adjoining flood and ebb maxima around a reading, expressed in knots.
-func currentPeakToPeakRange(_ events: [CurrentEvent], around time: Date) -> Double? {
-    let maxima = events.filter { $0.kind != .slack }.sorted { $0.time < $1.time }
-    guard let before = maxima.last(where: { $0.time <= time }),
-          let after = maxima.first(where: { $0.time > time }) else { return nil }
-    return abs(after.speed - before.speed)
+/// The times the axis row has room to print, earliest first. Two events close
+/// together — a low an hour after a shallow high — would print on top of each
+/// other, so a time within `minGap` of the last one kept is dropped; the
+/// schedule below still lists it. Order-independent: the input is sorted by
+/// time first, so the EARLIER of a crowded pair is always the survivor.
+///
+/// ponytail: drops the later label. Stagger onto a second row if a station
+/// ever hides something worth reading.
+func thinnedAxisTimes(_ times: [Date], x: (Date) -> CGFloat, minGap: CGFloat) -> [Date] {
+    var kept: [Date] = []
+    var lastX = -CGFloat.greatestFiniteMagnitude
+    for t in times.sorted() where x(t) - lastX >= minGap {
+        lastX = x(t)
+        kept.append(t)
+    }
+    return kept
 }
 
 // MARK: - Data: everything the strip draws, computed once per station
@@ -522,8 +531,12 @@ struct TimelineGeo {
             tideTop = 0; tideBottom = 0
             curTop = Self.plotTop; curBottom = Self.plotBottom
         }
+        // Both edges resolve tide-first, like the switch above: a both-tracks
+        // input that took its top from the tide box and its bottom from the
+        // empty current box would collapse the plot to nothing and drag the
+        // chrome rows and the canvas height up with it.
         bodyTop = hasTide ? tideTop : curTop
-        bodyBottom = hasCurrent ? curBottom : tideBottom
+        bodyBottom = hasTide ? tideBottom : curBottom
         let heights = data.tidePoints.map(\.height)
         let mn = heights.min() ?? 0, mx = heights.max() ?? 1
         tideMid = (mn + mx) / 2
@@ -680,23 +693,13 @@ struct TimelineCanvas: View {
                    style: StrokeStyle(lineWidth: 1, dash: CurveStyle.referenceLineDash))
     }
 
-    /// The axis times on the bottom row, faded when passed. Two events close
-    /// together — a low an hour after a shallow high — would print on top of
-    /// each other, so a time within a label's width of the last one drawn is
-    /// left off; the schedule below still lists it.
-    /// ponytail: drops the later label. Stagger onto a second row if a
-    /// station ever hides something worth reading.
+    /// The axis times on the bottom row, faded when passed.
     private func axisTimes(_ ctx: GraphicsContext, _ times: [Date]) {
-        let minGap: CGFloat = 64
-        var lastX = -CGFloat.greatestFiniteMagnitude
-        for t in times.sorted() {
-            let x = data.x(t)
-            guard x - lastX >= minGap else { continue }
-            lastX = x
+        for t in thinnedAxisTimes(times, x: data.x, minGap: 64) {
             ctx.draw(Text(chartTime(t, data.tz))
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(0.7 * fade(t))),
-                     at: CGPoint(x: x, y: geo.timeY), anchor: .center)
+                     at: CGPoint(x: data.x(t), y: geo.timeY), anchor: .center)
         }
     }
 

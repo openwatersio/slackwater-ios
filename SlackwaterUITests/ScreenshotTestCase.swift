@@ -280,15 +280,47 @@ class ScreenshotTestCase: XCTestCase {
                    withVelocity: .default, thenHoldForDuration: 0)
     }
 
-    /// The reading the strip's centerline is parked on ("1:42 PM"). Never nil:
-    /// a missing readout is a hard test failure inside the query itself. One
-    /// resolve on purpose — an `exists` pre-check is a second snapshot, and
-    /// callers read this mid-deceleration, where the extra round trip lands
-    /// the read after the moment the assertion is about.
+    /// The lead reading under the centerline — the page's one readout, and the
+    /// only element that carries the scrubbed time. `LeadCard` combines its
+    /// children, so the eyebrow, the value and the time arrive as one label and
+    /// no bare "4:22pm" static text exists to query.
+    func leadReading(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["detail-reading"].firstMatch
+    }
+
+    /// The time the strip's centerline is parked on ("1:42pm"), pulled out of
+    /// the lead's combined label. Never nil: a missing readout is a hard test
+    /// failure inside the query itself. One resolve on purpose — an `exists`
+    /// pre-check is a second snapshot, and callers read this mid-deceleration,
+    /// where the extra round trip lands the read after the moment the assertion
+    /// is about. The whole label is the fallback: it moves with the scrub too,
+    /// so a settle still settles.
     func scrubClock(_ app: XCUIApplication) -> String {
-        app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$"))
-            .firstMatch.label
+        let label = leadReading(app).label
+        guard let time = label.range(of: "\\d{1,2}:\\d{2}(am|pm)",
+                                     options: .regularExpression) else { return label }
+        return String(label[time])
+    }
+
+    /// A current detail — harmonic station or gate — has rendered: the lead
+    /// reading over the strip and the Next max tile beside the moon. The pair
+    /// is what says "this page is a live current detail" rather than a pending
+    /// or honesty card, and both are anatomy every current kind shares.
+    func assertCurrentDetailRendered(_ app: XCUIApplication, timeout: TimeInterval = 10) {
+        XCTAssert(leadReading(app).waitForExistence(timeout: timeout),
+                  "no lead reading on the current detail")
+        // Case-insensitive: the tile's eyebrow combines a MonoLabel that
+        // uppercases with an accessibility label that does not.
+        XCTAssert(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label ==[c] 'Next max'")).firstMatch
+            .waitForExistence(timeout: timeout),
+                  "no Next max tile on the current detail")
+    }
+
+    /// The glass pill on the strip's chrome row, naming the stop ahead. Every
+    /// scrubable detail has one; a current's names a slack, a run or a max.
+    func commentaryPill(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["commentary"].firstMatch
     }
 
     /// The schedule rows' accessibility labels — NOT every "HH:mm" label on

@@ -113,6 +113,36 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertGreaterThan(body.count, 40, "body extraction looks wrong — check the guard above")
     }
 
+    /// A high is one ink and a low is the other, on all three surfaces a tide
+    /// detail stacks: the chart's turn dots, the schedule row's pill, and the
+    /// lead's glyph. They sit within a screen of each other, so a row whose
+    /// pill disagreed with the dot it scrubs to would read as two events.
+    /// Source text rather than rendered colour — the failure mode is a
+    /// surface reaching for `SN.rising`/`SN.flood` (the direction axis) or a
+    /// literal, not a token resolving wrong.
+    func testTurnInksAgreeAcrossChartPillAndLead() throws {
+        let strip = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = strip.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func pillView(") }),
+              let offset = lines[(start + 1)...].firstIndex(where: { $0 == "    }" })
+        else { return XCTFail("pillView's body not found — this tripwire needs retargeting") }
+        let pills = lines[start...offset].joined(separator: "\n")
+        XCTAssertTrue(pills.contains(".background(SN.graphHigh, in: Capsule())"),
+                      "the HIGH pill must wear the chart's high ink")
+        XCTAssertTrue(pills.contains(".background(SN.graphLow, in: Capsule())"),
+                      "the LOW pill must wear the chart's low ink")
+
+        // The chart's turn dots, the source of the pair.
+        XCTAssertTrue(strip.contains("(high ? SN.graphHigh : SN.graphLow)"),
+                      "the chart's turn dots must draw the same two inks")
+
+        // The lead glyph, which may be outranked by a rate warning (#95) but
+        // otherwise names the curve the reader is looking at.
+        XCTAssertTrue(try repoSource("Slackwater/TideDetailView.swift")
+                        .contains("(up ? SN.graphHigh : SN.graphLow)"),
+                      "the tide lead's glyph must draw the same two inks")
+    }
+
     /// Green means slack and only slack. A ramp that passes through green puts
     /// a second, opposite meaning a few hundred points from the column that
     /// means *go* — which is the specific reason this is not a rainbow.

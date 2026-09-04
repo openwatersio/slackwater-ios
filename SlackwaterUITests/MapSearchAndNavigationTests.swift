@@ -21,7 +21,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))  // MonoLabel uppercases
+        assertCurrentDetailRendered(app)
 
         // Scrub: pan the combined tide+current strip, release.
         scrubStrip(app)
@@ -116,10 +116,14 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                        "port tide rows must not appear in a gate schedule")
         XCTAssertFalse(app.staticTexts["⤓ LOW"].firstMatch.exists,
                        "port tide rows must not appear in a gate schedule")
-        // The slack window is the new next-slack detail.
-        XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
-            .firstMatch.waitForExistence(timeout: 5),
-                  "slack window missing under Next slack")
+        // What the gate does say about slack is the commentary pill: the
+        // stop ahead, named and walked to.
+        let pill = commentaryPill(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the gate detail")
+        XCTAssert(pill.label.hasPrefix("Slack") || pill.label.contains("Max")
+                  || pill.label.hasPrefix("Flood") || pill.label.hasPrefix("Ebb"),
+                  "the commentary must name a current stop, got '\(pill.label)'")
         let strip = app.otherElements["timeline-strip"].firstMatch
         _ = strip.waitForExistence(timeout: 10)
         settleLayout(strip)  // the chart is most of this picture
@@ -166,8 +170,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // A second pick replaces the detail (no stacking) — web sidebar behavior.
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5),
-                  "row tap did not replace the detail pane")
+        // the current detail's own anatomy is the tell that the pane swapped
+        assertCurrentDetailRendered(app)
         sleep(5)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m44-ipad-landscape.png")
 
@@ -352,7 +356,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // (b) current detail.
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10))
+        assertCurrentDetailRendered(app)
         edgeSwipeBack(app)
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5),
                   "edge swipe did not pop the current detail")

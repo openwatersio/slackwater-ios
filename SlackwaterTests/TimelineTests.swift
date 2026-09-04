@@ -71,17 +71,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(chevrons.allSatisfy { d.snapTimes.contains($0.time) })
     }
 
-    func testCurrentRangeIsPeakToPeakBetweenAdjacentMaxima() throws {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let events = [
-            CurrentEvent(time: t0, speed: 2.4, kind: .maxFlood),
-            CurrentEvent(time: t0.addingTimeInterval(3_600), speed: 0, kind: .slack),
-            CurrentEvent(time: t0.addingTimeInterval(6_000), speed: -1.8, kind: .maxEbb),
-        ]
-        XCTAssertEqual(try XCTUnwrap(currentPeakToPeakRange(events, around: t0.addingTimeInterval(3_600))),
-                       4.2, accuracy: 1e-9)
-    }
-
     func testSixFeetPerHourTideRateIsRed() {
         XCTAssertEqual(Timeline.rampT(forTideRateMHr: 1.8), 1, accuracy: 1e-9)
         XCTAssertEqual(Timeline.rampT(forTideRateMHr: 6.1 / 3.28084), 1, accuracy: 1e-9)
@@ -98,12 +87,20 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(try repoSource("Slackwater/TideDetailView.swift").contains("\\(severity) \\(direction) tide"))
     }
 
+    /// The current lead speaks plain language, and both current surfaces get
+    /// it from the same view. `CurrentScrubCard` is the shared anatomy —
+    /// strip, lead, commentary — so a redesign cannot land on a harmonic
+    /// station and miss an online gate the way it did in #55.
     func testCurrentHeadersLeadWithPlainLanguageAndRestoreNow() throws {
-        let current = try repoSource("Slackwater/CurrentDetailView.swift")
-        let online = try repoSource("Slackwater/OnlineGateDetailView.swift")
+        let lead = try repoSource("Slackwater/CurrentLead.swift")
+        XCTAssertTrue(lead.contains("phase.word"), "the lead names the phase in words")
+        XCTAssertTrue(lead.contains("compass16("), "and the set as a cardinal point")
+        for file in ["Slackwater/CurrentDetailView.swift", "Slackwater/OnlineGateDetailView.swift"] {
+            let source = try repoSource(file)
+            XCTAssertTrue(source.contains("CurrentScrubCard("), "\(file) must draw the shared scrub card")
+            XCTAssertTrue(source.contains("onReturn: returnToNow"), "\(file) must offer a way back to now")
+        }
         let strip = try repoSource("Slackwater/TimelineStrip.swift")
-        XCTAssertTrue(current.contains("\\(phase.gloss?.capitalized ?? phase.word) · \\(phase.word)"))
-        XCTAssertTrue(online.contains("\\(phase.gloss?.capitalized ?? phase.word) · \\(phase.word)"))
         XCTAssertTrue(strip.contains("scrubbedAway(scrubTime, from: now)"))
         XCTAssertTrue(strip.contains("detail-return-now"))
     }
@@ -430,6 +427,64 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
+    /// One clock means one FORMATTER: a 24-hour pattern anywhere in the app is
+    /// a second clock, and it would print beside the 12-hour one on the same
+    /// screen. Repo-wide, because the surface that reaches for its own
+    /// formatter is always the one nobody thought to check.
+    func testNoSourceFileSpellsATwentyFourHourPattern() throws {
+        var offenders: [String] = []
+        for (name, source) in try appSources() {
+            for (n, line) in source.components(separatedBy: .newlines).enumerated()
+            where codeOnly(line).contains("HH:mm") {
+                offenders.append("\(name):\(n + 1)")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+                      "24-hour time pattern outside chartTime:\n" + offenders.joined(separator: "\n"))
+    }
+
+    /// An external scrub — a tapped commentary pill, return-to-now — rides the
+    /// magnet's animated path so the curve eases under the centerline, except
+    /// under Reduce Motion, where it lands directly. A source scan, not a
+    /// behaviour test: the branch lives in `updateUIView`, which needs a real
+    /// `UIScrollView` and a live `UIAccessibility`, and this target can inject
+    /// neither. The UI suite covers what a scrub actually does; this only
+    /// guards the accessibility branch from being simplified away.
+    func testExternalScrubHonoursReduceMotion() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = source.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("if co.seenJump != jumpToken {") }),
+              let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
+        else { return XCTFail("the jump branch was not found — this tripwire needs retargeting") }
+        let jump = lines[start...offset].joined(separator: "\n")
+        XCTAssertTrue(jump.contains("UIAccessibility.isReduceMotionEnabled"),
+                      "the jump must ask about Reduce Motion before animating")
+        XCTAssertTrue(jump.contains("co.magneting = false"),
+                      "the direct landing clears the magnet rather than riding it")
+        XCTAssertTrue(jump.contains("animated: true"),
+                      "and the ordinary path animates the travel")
+    }
+
+    /// The axis row's crowding rule, on its own. Two times a label's width
+    /// apart both print; closer than that, the LATER one is dropped — the
+    /// schedule below still lists it. Order-independent, because the callers
+    /// hand this whatever order their events came out in.
+    func testAxisTimesDropTheLaterOfACrowdedPair() {
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        let close = t0.addingTimeInterval(2400)      // 40pt at 60pt/hour
+        let clear = t0.addingTimeInterval(4200)      // 70pt
+        let x = { (t: Date) -> CGFloat in CGFloat(t.timeIntervalSince(t0)) / 60 }
+
+        XCTAssertEqual(thinnedAxisTimes([t0, close], x: x, minGap: 64), [t0],
+                       "40pt apart, the later label is dropped")
+        XCTAssertEqual(thinnedAxisTimes([t0, clear], x: x, minGap: 64), [t0, clear],
+                       "70pt apart, both print")
+        XCTAssertEqual(thinnedAxisTimes([close, t0], x: x, minGap: 64), [t0],
+                       "the earlier time survives whichever order it arrives in")
+        XCTAssertEqual(thinnedAxisTimes([clear, t0], x: x, minGap: 64), [t0, clear],
+                       "and the output is always in time order")
+    }
+
     /// EVERY time the strip prints must be a time the strip can stop on.
     ///
     /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
@@ -476,9 +531,18 @@ final class TimelineTests: XCTestCase {
         // left to size differently. Asserted as structure, not pixels.
         XCTAssertEqual(tide.bodyTop, tide.tideTop)
         XCTAssertEqual(tide.bodyBottom, tide.tideBottom)
-        XCTAssertGreaterThan(tide.bodyTop, tide.sunY + 8 + 8, "the plot clears the moon disc")
-        XCTAssertGreaterThan(tide.timeY, tide.bodyBottom + 8, "the time row sits under the plot")
-        XCTAssertLessThan(tide.timeY, tide.height - 8, "and inside the canvas")
+        // Chrome reads downward under the curve — time row, day label and sun
+        // times, then the moon disc — and the canvas ends a moon's radius
+        // past the last of them. The card graph's order, asserted as ordering
+        // rather than as the pixel each row happens to sit on.
+        XCTAssertGreaterThan(tide.timeY, tide.bodyBottom, "the time row sits under the plot")
+        XCTAssertGreaterThan(tide.dayY, tide.timeY, "the day row sits under the times")
+        XCTAssertGreaterThan(tide.sunY, tide.dayY, "the sun dots and moons sit under the day label")
+        XCTAssertEqual(tide.height, tide.sunY + 18, "the canvas ends below the moon disc")
+        // The lead and its pill row own the pad above the plot: the row's top
+        // plus a pill's height has to land inside it, or a pill overlaps the
+        // curve it floats above.
+        XCTAssertLessThanOrEqual(tide.chromeY + 30, tide.padTop, "the pill row clears the plot's pad")
 
         // Current-only: construct TimelineData directly — the geometry keys only
         // on which point arrays are non-empty.
@@ -513,9 +577,9 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.curTop, 0)
     }
 
-    /// The tide track draws the card's curve: the card's blue fill, no
-    /// speed palette in the fill, and the tide-rate ramp carried by the
-    /// LINE COLOUR rather than by chevron glyphs (card-look spec §4).
+    /// The tide track draws the card's curve: a fill anchored at chart datum,
+    /// no speed palette in it, and the tide-rate ramp carried by the LINE
+    /// COLOUR rather than by chevron glyphs (card-look spec §4).
     func testTideTrackUsesCardFillAndRateColouredLine() throws {
         let source = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = source.components(separatedBy: .newlines)
@@ -525,6 +589,12 @@ final class TimelineTests: XCTestCase {
         let body = lines[start..<end].joined(separator: "\n")
 
         XCTAssertTrue(body.contains("SN.graphLine.opacity(CurveStyle.fillOpacity)"), "tide fill is the card's blue gradient")
+        // Both hues vanish on the datum line, so a low under datum reads as
+        // less water than the chart shows with no seam at the crossing. Two
+        // stops at the same location is what makes that edge invisible;
+        // either one alone puts a hard line across the fill.
+        XCTAssertTrue(body.contains("datumStop"), "the fill is anchored at chart datum, not at the plot's edge")
+        XCTAssertTrue(body.contains("SN.graphLow.opacity(0)"), "the below-datum hue fades out at datum")
         XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
         XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")
     }
@@ -635,7 +705,12 @@ final class TimelineTests: XCTestCase {
         XCTAssertTrue(timeline.snapTimes.contains(window.end))
     }
 
-    func testSlackWindowContainingTimeIncludesBothEdges() throws {
+    /// The window is half-open: parked on its opening the water is still
+    /// slack, parked on its closing it is already leaving — and the closing is
+    /// a snap target, so the scrubber does park there. Reporting "Slack · 0m"
+    /// at the edge you are being told to leave is the defect this shape
+    /// prevents; the commentary names the run that begins instead.
+    func testSlackWindowContainsItsOpeningButNotItsClosing() throws {
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
         let window = (slack: t0.addingTimeInterval(1_200),
                       start: t0.addingTimeInterval(300),
@@ -650,8 +725,10 @@ final class TimelineTests: XCTestCase {
                        window.slack)
         XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.slack)).slack,
                        window.slack)
-        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.end)).slack,
-                       window.slack)
+        XCTAssertEqual(try XCTUnwrap(timeline.containingSlackWindow(at: window.end.addingTimeInterval(-1))).slack,
+                       window.slack, "a second before the closing is still inside")
+        XCTAssertNil(timeline.containingSlackWindow(at: window.end),
+                     "the closing itself is outside — the run has begun")
         XCTAssertNil(timeline.containingSlackWindow(at: window.start.addingTimeInterval(-1)))
         XCTAssertNil(timeline.containingSlackWindow(at: window.end.addingTimeInterval(1)))
     }

@@ -59,10 +59,20 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openSearch(app, "malibu")
         pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
 
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 10),
+        // A derived gate predicts no speed, so its lead is the phase word over
+        // the time and nothing else — the one detail kind whose reading has no
+        // number in it (spec §3).
+        let lead = leadReading(app)
+        XCTAssert(lead.waitForExistence(timeout: 10),
                   "seeded reference fit did not render the derived-gate detail")
-        XCTAssert(app.staticTexts["LARGE-TIDE CONTEXT"].waitForExistence(timeout: 5),
-                  "derived gate kept the redundant time/date row instead of magnitude context")
+        let leadLabel = lead.label
+        XCTAssertNotNil(leadLabel.range(of: "flooding|ebbing|slack",
+                                        options: [.regularExpression, .caseInsensitive]),
+                        "the derived-gate lead must speak the phase word, got '\(leadLabel)'")
+        XCTAssertFalse(leadLabel.contains("kn"),
+                       "a derived gate publishes no speed: '\(leadLabel)'")
+        XCTAssert(app.staticTexts["9 kn flood & ebb"].waitForExistence(timeout: 5),
+                  "derived gate lost the magnitude context under its tiles")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
                   "slack rows missing from the schedule")
@@ -84,6 +94,17 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
         sleep(1)  // the header's offline tile floor; MLNMapView reports nothing
         save(app, "m46-derived-gate-seeded.png")
+
+        // A derived gate scrubs like the other three, so it needs the same way
+        // home: the Now pill on the strip's chrome row.
+        scrubStrip(app)
+        let now = app.buttons["detail-return-now"].firstMatch
+        XCTAssert(now.waitForExistence(timeout: 5),
+                  "scrubbing a derived gate revealed no return-to-now")
+        XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
+        now.tap()
+        XCTAssert(now.waitForNonExistence(timeout: 10),
+                  "return-to-now did not bring the derived-gate strip home")
     }
 
     /// Issue #33: a Downloads row is a live tap — it closes the sheet and opens
@@ -268,7 +289,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // Boston's range is metres — the numbers are the station's own.
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty,
                        "no height readings on the Boston detail")
-        XCTAssertGreaterThanOrEqual(scheduleValues(app, "\\b\\d{2}:\\d{2}\\b").count, 3,
+        XCTAssertGreaterThanOrEqual(scheduleValues(app, "\\b\\d{1,2}:\\d{2}(?:am|pm)\\b").count, 3,
                                     "no schedule on the Boston detail")
         sleep(3)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m53-us-station.png")
@@ -302,6 +323,14 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                   "opening an undownloaded Canadian station must explain itself")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists)
+        // The waiting page wears the same name header the four scrub details
+        // do, and nothing else above the status card — no map, no strip.
+        XCTAssert(app.otherElements["detail-header"].exists,
+                  "the waiting page must still name the station it is waiting for")
+        XCTAssertFalse(app.otherElements["detail-map-header"].exists,
+                       "no map header belongs above a station that has no data yet")
+        XCTAssertFalse(app.otherElements["timeline-strip"].exists,
+                       "an undownloaded station has nothing to draw")
 
         // Opening it put it in the download set, at the front.
         app.buttons["detail-back"].firstMatch.tap()
@@ -345,9 +374,13 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "the seeded window did not render the fetched strip")
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 5))  // MonoLabel uppercases
-        XCTAssert(app.descendants(matching: .any).matching(identifier: "slack-window")
-            .firstMatch.waitForExistence(timeout: 5), "slack window missing under Next slack")
+        assertCurrentDetailRendered(app)
+        let pill = commentaryPill(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the online-gate detail")
+        XCTAssert(pill.label.hasPrefix("Slack") || pill.label.contains("Max")
+                  || pill.label.hasPrefix("Flood") || pill.label.hasPrefix("Ebb"),
+                  "the commentary must name a current stop, got '\(pill.label)'")
 
         let provenance = app.staticTexts["online-provenance"].firstMatch
         XCTAssert(provenance.waitForExistence(timeout: 5), "provenance footer missing")
@@ -361,8 +394,6 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists,
                        "an online gate can never carry the fitted-station refining strip")
-        XCTAssertFalse(app.descendants(matching: .any)["provisional-reading-badge"].firstMatch.exists,
-                       "an online gate can never show a fitted-station fast-answer amber reading")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists,
                        "a covering window must render the real detail, not the honesty card")
 

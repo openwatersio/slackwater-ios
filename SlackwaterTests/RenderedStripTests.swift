@@ -40,8 +40,8 @@ final class RenderedStripTests: XCTestCase {
     /// (Severn, 13.7 ft/hr peak) near the top, so between them they exercise
     /// both ends of the ramp rather than one colour twice.
     ///
-    /// Measured at 1×: Friday Harbor 0.363, Avonmouth 0.297, against a
-    /// no-track floor of 0.071 (`drawnStripInk`).
+    /// Measured at 1× on the 396pt canvas: Friday Harbor 0.115, Avonmouth
+    /// 0.102, against a no-track floor of 0.028 (`drawnStripInk`).
     @MainActor
     func testTideRateRampDrawsOnQuietAndExtremeStations() throws {
         let now = appNow()
@@ -66,7 +66,8 @@ final class RenderedStripTests: XCTestCase {
     /// its metres of range) is pinned in NationalScaleTests; what this adds is
     /// that the far end of the bundle reaches the chart.
     ///
-    /// Measured at 1×: Boston 0.312, against a no-track floor of 0.071.
+    /// Measured at 1× on the 396pt canvas: Boston 0.097, against a no-track
+    /// floor of 0.028.
     @MainActor
     func testUsEastCoastStationDrawsItsCurve() throws {
         let now = appNow()
@@ -95,8 +96,9 @@ final class RenderedStripTests: XCTestCase {
     /// plausible harmonic shape gives TideEngine real highs and lows to lag
     /// into slacks, which is all a gate reads from its reference.
     ///
-    /// Measured at 1×: 0.187 against a no-track floor of 0.071 — the lowest
-    /// drawn shape the app has, and the one that sets `drawnStripInk`.
+    /// Measured at 1× on the 396pt canvas: 0.090 against a no-track floor of
+    /// 0.028 — a thin ±1 shape carries no fill under it, so it clears the
+    /// floor by less than any tide curve does.
     @MainActor
     func testDerivedGateDrawsItsSchematicStrip() throws {
         let port = TideStationRecord(
@@ -136,8 +138,10 @@ final class RenderedStripTests: XCTestCase {
     /// sine at the 15-minute official-sample cadence, spanning exactly
     /// `Timeline.window(anchor:)`.
     ///
-    /// Measured at 1×: 0.207 against a no-track floor of 0.071 — a fetched gate
-    /// fills under its curve, so it reads above a schematic one.
+    /// Measured at 1× on the 396pt canvas: 0.075 against a no-track floor of
+    /// 0.028 — the lowest drawn shape the app has, and the one that sets
+    /// `drawnStripInk`. A fetched curve spends the window near zero, so it
+    /// occupies less of the plot than a tide sweeping it top to bottom.
     @MainActor
     func testOnlineGateDrawsItsFetchedStrip() throws {
         let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == "chs-sechelt-rapids" })
