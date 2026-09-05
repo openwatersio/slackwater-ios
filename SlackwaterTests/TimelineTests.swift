@@ -434,11 +434,16 @@ final class TimelineTests: XCTestCase {
     /// a second clock, and it would print beside the 12-hour one on the same
     /// screen. Repo-wide, because the surface that reaches for its own
     /// formatter is always the one nobody thought to check.
+    ///
+    /// An ISO 8601 date-time — the hour glued to a full date by `'T'` — is a
+    /// wire format, not a readout: nothing on screen prints it, and the share
+    /// link (DeepLink.swift) has to write the instant the web reads. Only the
+    /// bare 24-hour time is a second clock.
     func testNoSourceFileSpellsATwentyFourHourPattern() throws {
         var offenders: [String] = []
         for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
-            where codeOnly(line).contains("HH:mm") {
+            where codeOnly(line).replacingOccurrences(of: "'T'HH:mm", with: "").contains("HH:mm") {
                 offenders.append("\(name):\(n + 1)")
             }
         }
