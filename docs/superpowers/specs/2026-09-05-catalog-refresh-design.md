@@ -6,8 +6,9 @@
 
 Let Slackwater receive corrected, added, and removed station identity and model
 data without an App Store release. A fresh install must remain fully useful
-offline, a failed refresh must leave the current catalog untouched, and a valid
-refresh must become visible in the running app and its widgets immediately.
+offline, a rejected candidate must leave the current snapshot untouched, and a
+valid refresh must become visible in the running app immediately. Widgets must
+read the new generation on their next system-permitted timeline refresh.
 
 This design covers the catalog channel only. Refreshing fitted CHS models and
 online prediction windows is a separate phase because that work is paced,
@@ -152,13 +153,16 @@ The release log includes the resource name, response ETag when one exists, and
 the validation reason. It does not include catalog contents, device location,
 favorites, or other user data.
 
-The app's complete-catalog loader uses the active snapshot and falls back to the
-bundle as a unit. The widget keeps the existing mapped, single-record strategy
-so it does not decode the multi-megabyte NOAA catalogs. Its file locator first
-selects the active generation's file. If reading or decoding that record fails,
-it logs the failure and retries the bundled file. If both sources fail it logs
-both failures and returns `nil`; it never instantiates `CatalogStore` or starts
-network work.
+The app's complete-catalog accessors use the active snapshot and fall back to
+the bundle as a unit. They are app-target-only forwards into `CatalogStore`.
+The widget keeps the existing mapped, single-record strategy so it does not
+decode complete catalogs or cross the store's main-actor boundary. Every
+widget catalog lookup, including CHS identity and tombstone lookup, uses a
+small shared file locator and the single-record decoder. The locator first
+selects the active generation's file. If reading or decoding that record
+fails, it logs the failure and retries the bundled file. If both sources fail
+it logs both failures and returns `nil`; it never instantiates `CatalogStore`
+or starts network work.
 
 This centralizes the #234 fix at the two real trust boundaries: complete
 catalog loading for the app and one-record loading for the widget.
@@ -169,10 +173,22 @@ catalog loading for the app and one-record loading for the widget.
 configuration:
 
 - uses download tasks so iOS can continue transfers while the app is suspended;
-- sets `waitsForConnectivity`;
+- relies on background sessions' inherent connectivity waiting;
 - allows expensive cellular access;
 - disallows constrained Low Data Mode access; and
 - asks iOS to relaunch the app for background-session completion events.
+
+A minimal `UIApplicationDelegate` connected with
+`UIApplicationDelegateAdaptor` receives
+`application(_:handleEventsForBackgroundURLSession:completionHandler:)`. It
+routes only the catalog session identifier to the store, retains the system
+completion handler, and recreates the session with the same identifier and
+configuration. After `urlSessionDidFinishEvents(forBackgroundURLSession:)`, it
+calls the completion handler on the main thread only after the restored staged
+batch has activated or been rejected. This follows Apple's [background-session
+lifecycle] so iOS can suspend the relaunched app cleanly.
+
+[background-session lifecycle]: https://developer.apple.com/documentation/foundation/downloading-files-in-the-background
 
 One batch creates six download tasks. Each request uses its active file's ETag
 in `If-None-Match`; ETags are opaque strings and are stored and replayed without
@@ -228,14 +244,18 @@ Validation is pure and runs before persistence or publication. A candidate must:
    the record carries one.
 4. Keep IDs unique within each file and keep rendered `StationItem.id` values
    unique across live catalog kinds.
-5. Give harmonic tide and current records usable constituent data; give
-   subordinate tides both offsets and a live tide reference.
+5. Give harmonic tides and non-subordinate currents usable constituent data;
+   give subordinate tides both offsets and a live tide reference.
 6. Resolve every subordinate tide reference within `stations.json`.
-7. Resolve every NOAA current `tideReference` within `stations.json`.
-8. Resolve every derived gate `reference` and every CHS current
+7. Give every subordinate NOAA current all four finite time offsets and two
+   finite, non-negative speed ratios, at least one of which is positive. Its
+   `reference` must resolve within `currents.json` to a non-subordinate record
+   with usable constituents.
+8. Resolve every NOAA current `tideReference` within `stations.json`.
+9. Resolve every derived gate `reference` and every CHS current
    `tideReference` within `chs-stations.json`.
-9. Keep tombstone IDs disjoint from all live `StationItem` IDs.
-10. Include a tombstone for every rendered station ID present in the active
+10. Keep tombstone IDs disjoint from all live `StationItem` IDs.
+11. Include a tombstone for every rendered station ID present in the active
     snapshot but absent from the candidate.
 
 Current catalog-specific invariants already covered by generator tests remain
@@ -276,10 +296,12 @@ data loss.
 
 ## Immediate activation
 
-The model types remain the public surface used throughout the app. Their
-`all`/`byId` accessors become computed forwards into `CatalogStore.snapshot`
-instead of separately initialized `static let` values. The merged arrays and
-indexes are computed once when a snapshot is built, not on every accessor.
+The model types remain the public surface used throughout the app. In the app
+target, their `all`/`byId` accessors become computed forwards into
+`CatalogStore.snapshot` instead of separately initialized `static let` values.
+The merged arrays and indexes are computed once when a snapshot is built, not
+on every accessor. Widget code uses only the shared file locator and
+single-record decoder described above; it never calls these app accessors.
 
 When the current pointer has been replaced, the store publishes one generation
 change on the main actor. That change causes the following bounded reactions:
@@ -294,8 +316,11 @@ change on the main actor. That change causes the following bounded reactions:
 - `ChartPackManager` reconciles so corrected station positions update desired
   packs.
 - The nearest-widget station cache is recomputed when a current location exists.
-- `WidgetCenter.reloadAllTimelines()` makes widgets re-read the shared active
+- `WidgetCenter.reloadAllTimelines()` requests the earliest
+  [system-permitted widget refresh]; the next timeline reads the shared active
   generation.
+
+[system-permitted widget refresh]: https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date/
 
 Navigation currently stores complete record values in `NavigationPath`.
 Converting every destination to an ID route solely for rare catalog activation
@@ -333,6 +358,9 @@ Focused Swift tests cover:
 - an invalid `200` retains the active file and ETag;
 - duplicate IDs, invalid identity fields, empty catalogs, broken references,
   live/tombstone collisions, and un-tombstoned removals reject a candidate;
+- subordinate currents with an unresolved or subordinate reference, missing
+  corrections, non-finite offsets, negative ratios, or two zero ratios reject
+  a candidate;
 - a correctly tombstoned removal validates;
 - interruption before pointer replacement leaves the old generation active;
 - stored-snapshot corruption falls back to the bundle;
@@ -340,8 +368,11 @@ Focused Swift tests cover:
   identity, and drops removed jobs;
 - catalog generation invalidates station ranking, pin features, and chart-pack
   inputs; and
-- the widget loads one active record, falls back to the bundled record after
-  active-file corruption, and does not instantiate the complete catalog store.
+- the widget resolves active records from every catalog kind and the tombstone
+  ledger, falls back to bundled records after active-file corruption, and does
+  not instantiate the complete catalog store;
+- a restored background session finishes or rejects its staged batch before
+  invoking the saved UIKit completion handler on the main thread.
 
 Existing generator, catalog, app, and widget tests remain required. The publish
 job runs only after the data and app jobs pass, then performs the live six-file
