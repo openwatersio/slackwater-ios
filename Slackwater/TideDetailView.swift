@@ -135,7 +135,7 @@ struct TideDetailView: View {
                             + Text(" \(unit)").font(ReadoutType.leadUnit),
                         time: chartTime(scrubTime, tz),
                         valueColor: ink,
-                        timeColor: ink.opacity(0.72)) {
+                        timeColor: ink) {
             // Word then glyph, the order the current lead reads in.
             Text(state).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
             // The graph's own two inks, so the eyebrow names the curve the

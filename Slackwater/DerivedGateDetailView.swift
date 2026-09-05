@@ -93,7 +93,7 @@ struct DerivedGateDetailView: View {
     /// details read alike.
     private func lead(ink: Color) -> some View {
         let word = phase.word
-        return LeadCard(time: chartTime(scrubTime, tz), timeColor: ink.opacity(0.72)) {
+        return LeadCard(time: chartTime(scrubTime, tz), timeColor: ink) {
             leadState(word, ink: ink)
             Image(systemName: glyph)
                 .foregroundStyle(Self.phaseColor(phase))

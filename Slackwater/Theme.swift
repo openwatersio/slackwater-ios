@@ -31,7 +31,8 @@ func skyPaint(sunAltitude: Double) -> SkyPaint {
     return SkyPaint(top: last.top, bottom: last.bottom)
 }
 
-func skyUsesDarkInk(sunAltitude: Double) -> Bool { sunAltitude >= -3 }
+// The muted daylight paint never gets bright enough for navy at the lead's position.
+func skyUsesDarkInk(sunAltitude _: Double) -> Bool { false }
 func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
 func starOpacity(sunAltitude: Double) -> Double {
     max(0, min(0.7, (-sunAltitude - 6) / 12 * 0.7))
@@ -62,11 +63,9 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize)
                    y: size.height * (1 - CGFloat(altitude / 90)))
 }
 
-/// A simple rise-to-set semicircle. Almanac still decides whether the sun is
-/// above the horizon and where it sits east-to-west; this projection keeps the
-/// displayed path circular instead of stretching it to the view's aspect ratio.
-func sunArcPoint(azimuth: Double, size: CGSize) -> CGPoint {
-    let progress = max(0, min(1, (azimuth - 90) / 180))
+/// A circular path from Almanac's actual rise to set times.
+func sunArcPoint(progress: Double, size: CGSize) -> CGPoint {
+    let progress = max(0, min(1, progress))
     let angle = progress * .pi
     let radius = min(size.width / 2, size.height)
     return CGPoint(x: size.width / 2 - radius * CGFloat(cos(angle)),
@@ -82,6 +81,7 @@ private func starPoint(_ index: Int, size: CGSize) -> CGPoint {
 struct SkyState {
     let latitude: Double
     let sun: AltAz?
+    let sunProgress: Double?
     let moon: AltAz?
     let illumination: MoonIllumination?
 
@@ -89,6 +89,16 @@ struct SkyState {
         self.latitude = latitude
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
+        if let observer,
+           let events = try? sunEvents(from: time.addingTimeInterval(-24 * 60 * 60),
+                                       to: time.addingTimeInterval(24 * 60 * 60),
+                                       observer: observer),
+           let rise = events.last(where: { $0.kind == .rise && $0.time <= time }),
+           let set = events.first(where: { $0.kind == .set && $0.time >= time }) {
+            sunProgress = time.timeIntervalSince(rise.time) / set.time.timeIntervalSince(rise.time)
+        } else {
+            sunProgress = nil
+        }
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
     }
@@ -132,7 +142,9 @@ struct SkyBackdrop: View {
                 }
                 if let sun = sky.sun {
                     if sun.altDeg >= 0 {
-                        let point = sunArcPoint(azimuth: sun.azDeg, size: proxy.size)
+                        let point = sky.sunProgress.map { sunArcPoint(progress: $0, size: proxy.size) }
+                            ?? skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg,
+                                        latitude: sky.latitude, size: proxy.size)
                         Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
                             .frame(width: 54, height: 54).position(point)
                         Circle().fill(SN.sun)

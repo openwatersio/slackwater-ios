@@ -1,5 +1,6 @@
 // Slackwater — GPL v3.
 import CoreGraphics
+import Almanac
 import XCTest
 @testable import Slackwater
 
@@ -19,8 +20,9 @@ final class SkyBackdropTests: XCTestCase {
                        SkyPaint(top: 0x04060F, bottom: 0x0B1023))
         XCTAssertEqual(skyPaint(sunAltitude: -9),
                        SkyPaint(top: 0x111D3D, bottom: 0x5C3A5B))
-        XCTAssertTrue(skyUsesDarkInk(sunAltitude: 10))
-        XCTAssertTrue(skyUsesDarkInk(sunAltitude: 0))
+        XCTAssertFalse(skyUsesDarkInk(sunAltitude: 10))
+        XCTAssertFalse(skyUsesDarkInk(sunAltitude: 0))
+        XCTAssertFalse(skyUsesDarkInk(sunAltitude: -3))
         XCTAssertFalse(skyUsesDarkInk(sunAltitude: -6))
         XCTAssertEqual(moonGlowRadius(fraction: 0), 12)
         XCTAssertEqual(moonGlowRadius(fraction: 1), 32)
@@ -44,12 +46,28 @@ final class SkyBackdropTests: XCTestCase {
                        CGPoint(x: 100, y: 160))
 
         let arc = CGSize(width: 400, height: 320)
-        for (azimuth, expected) in [(90.0, CGPoint(x: 0, y: 320)),
-                                    (180, CGPoint(x: 200, y: 120)),
-                                    (270, CGPoint(x: 400, y: 320))] {
-            let point = sunArcPoint(azimuth: azimuth, size: arc)
+        for (progress, expected) in [(0.0, CGPoint(x: 0, y: 320)),
+                                     (0.5, CGPoint(x: 200, y: 120)),
+                                     (1.0, CGPoint(x: 400, y: 320))] {
+            let point = sunArcPoint(progress: progress, size: arc)
             XCTAssertEqual(point.x, expected.x, accuracy: 0.001)
             XCTAssertEqual(point.y, expected.y, accuracy: 0.001)
+        }
+    }
+
+    func testWinterSunArcMeetsHorizonAtActualRiseAndSet() throws {
+        let observer = try Observer(latitudeDeg: 48.535, longitudeDeg: -123.01)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-12-21T00:00:00Z"))
+        let end = start.addingTimeInterval(24 * 60 * 60)
+        let events = try sunEvents(from: start, to: end, observer: observer)
+        let rise = try XCTUnwrap(events.first { $0.kind == .rise })
+        let set = try XCTUnwrap(events.first { $0.kind == .set })
+        let size = CGSize(width: 400, height: 320)
+
+        for time in [rise.time.addingTimeInterval(60), set.time.addingTimeInterval(-60)] {
+            let sky = SkyState(time: time, latitude: 48.535, longitude: -123.01)
+            let point = sunArcPoint(progress: try XCTUnwrap(sky.sunProgress), size: size)
+            XCTAssertGreaterThan(point.y, 318)
         }
     }
 }

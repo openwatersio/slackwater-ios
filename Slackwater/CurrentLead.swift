@@ -92,7 +92,7 @@ struct CurrentLead: View {
                     + Text(" \(speedUnitLabel(speedUnit))").font(ReadoutType.leadUnit),
                  time: chartTime(scrubTime, tz),
                  valueColor: readingColor,
-                 timeColor: ink.opacity(0.72)) {
+                 timeColor: ink) {
             leadState(state, ink: ink)
             // The set is the hero (#59), arrow and point together after the
             // word. In slack the water goes both ways, so the glyph does too.
