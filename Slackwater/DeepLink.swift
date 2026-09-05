@@ -37,3 +37,84 @@ func deepLink(forStationID id: String?) -> URL? {
 func stationID(from url: URL) -> String {
     String(url.path(percentEncoded: false).dropFirst())
 }
+
+/// The host whose station links this app claims, matching the
+/// `applinks:` entry in Slackwater.entitlements and the
+/// apple-app-site-association the slackwater.xyz Worker serves. All three have
+/// to agree or the link opens Safari instead.
+let stationLinkHost = "slackwater.xyz"
+
+/// A shared station link: `https://slackwater.xyz/<kind>/<slug>[/<instant>]`.
+///
+/// Distinct from the widget's `slackwater://station/<id>` scheme, which stays
+/// an internal hop and is deliberately not what gets shared: Messages and Mail
+/// will not linkify a custom scheme, and a tap does nothing at all on a phone
+/// without the app.
+struct StationLink: Equatable {
+    /// The URL namespace. A tide and a current station may hold the same slug,
+    /// so the kind is what tells them apart - it is not decoration.
+    enum Kind: String, Equatable {
+        case tides
+        case currents
+    }
+
+    var kind: Kind
+    var slug: String
+    /// The moment the sender was looking at. Absent means "now", which is what
+    /// a share from an unscrubbed view means.
+    var instant: Date?
+}
+
+/// The instant is written in the station's own UTC offset, so it survives the
+/// receiver being in another timezone. Seconds are optional because the web
+/// writes minute precision; both are accepted rather than guessing which.
+private let stationLinkInstantFormats = [
+    "yyyy-MM-dd'T'HH:mmZZZZZ",
+    "yyyy-MM-dd'T'HH:mm:ssZZZZZ",
+]
+
+private func stationLinkInstant(from text: String) -> Date? {
+    let formatter = DateFormatter()
+    // Fixed format parsing must not follow the device's locale or calendar:
+    // under a non-Gregorian calendar or an odd locale the same string parses
+    // to a different date, or to nothing.
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    for format in stationLinkInstantFormats {
+        formatter.dateFormat = format
+        if let date = formatter.date(from: text) { return date }
+    }
+    return nil
+}
+
+/// Parse a shared station link, or `nil` if this is not one.
+///
+/// Strict on purpose. This runs on every URL the app is handed, and anything it
+/// accepts it also claims: a link it half-understands would swallow a URL the
+/// browser should have shown. A trailing slash is tolerated because share
+/// sheets and link previews add one; anything else unexpected is refused.
+func stationLink(from url: URL) -> StationLink? {
+    guard url.scheme == "https", url.host() == stationLinkHost else { return nil }
+
+    // `pathComponents` is safe here, unlike for the widget's ids: a slug is
+    // /^[a-z0-9-]+$/ by construction, so it carries no "/" to be split on.
+    var components = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+    guard let first = components.first, let kind = StationLink.Kind(rawValue: first) else { return nil }
+    components.removeFirst()
+
+    guard let slug = components.first, !slug.isEmpty else { return nil }
+    components.removeFirst()
+
+    switch components.count {
+    case 0:
+        return StationLink(kind: kind, slug: slug, instant: nil)
+    case 1:
+        // An unparseable instant is a refusal, not a fallback to "now". Landing
+        // someone on the wrong moment silently is the failure this format
+        // exists to prevent.
+        guard let instant = stationLinkInstant(from: components[0]) else { return nil }
+        return StationLink(kind: kind, slug: slug, instant: instant)
+    default:
+        return nil
+    }
+}

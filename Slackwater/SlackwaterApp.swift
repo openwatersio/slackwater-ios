@@ -52,7 +52,14 @@ struct RootView: View {
         // already rides. Past the gate this does nothing and the list's own
         // handler takes the URL directly.
         .onOpenURL { url in
-            guard !seenGate, url.scheme == "slackwater", url.host == "station" else { return }
+            guard !seenGate else { return }
+            // A universal link can arrive on a device that has never opened the
+            // app - that is the ordinary case for a link someone was sent, not
+            // an edge one - so it needs the same pre-gate handoff the widget's
+            // scheme already gets. Both are a station chosen, which is the only
+            // thing the gate asks.
+            let isStationLink = stationLink(from: url) != nil
+            guard isStationLink || (url.scheme == "slackwater" && url.host == "station") else { return }
             pendingDeepLink = url
             seenGate = true
         }
