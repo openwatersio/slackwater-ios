@@ -6,7 +6,7 @@
 	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.openwaters.slackwater</string>
+		<string>group.io.openwaters.slackwater</string>
 	</array>
 </dict>
 </plist>
