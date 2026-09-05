@@ -288,30 +288,50 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     /// Over a fast tide the pill explains the yellow line: the rate, in the
-    /// ramp's colour, instead of the next turn. Boston moves well over the
-    /// ramp's first anchor between turns. Landing on a turn first (the
+    /// ramp's colour, instead of the next turn. Landing on a turn first (the
     /// commentary tap) and then dragging about three hours on puts the scrub
     /// mid-run, where the magnet parks it on the run's fastest point — a snap
     /// stop — so the pill reads the peak rate.
+    ///
+    /// Eastport, not Boston: the magnet only has a fastest point to park on
+    /// when the run clears the ramp's first anchor (0.6 m/hr — a slower run
+    /// grows no flow arrow, and the drag snaps to a turn instead, where the
+    /// pill names the stop). Boston's weaker limb dips under the anchor at
+    /// neaps; Eastport's worst-case limb (M2 − S2 − N2) stays well over it,
+    /// any day of the lunar month.
     func testFastTideCommentaryNamesTheRate() throws {
         let app = launch("-seedGate", "-networkKillSwitch")
-        openSearch(app, "boston")
-        pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
+        openSearch(app, "eastport")
+        pickSearchResult(app, app.staticTexts["Eastport"].firstMatch)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.waitForExistence(timeout: 10))
         settleLayout(strip)
         let pill = commentaryPill(app)
         XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "no commentary pill on the Boston detail")
+                  "no commentary pill on the Eastport detail")
         pill.tap()
         settleScrub(app)
-        // One point of strip is five minutes: a tenth of the width is ~3 h.
-        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
-        settleScrub(app)
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after the drag")
-        XCTAssert(pill.label.range(of: #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#, options: .regularExpression) != nil,
+        // The tap's destination depends on the water at "now": already fast,
+        // it goes to the run's peak — the pill reads the rate and there is
+        // nothing left to stage. Quiet, it parks on the next turn, and
+        // mid-run is a drag away: one point of strip is five minutes, so a
+        // tenth of the width is ~3 h — right beside the run's fastest point,
+        // which Eastport always grows (the doc comment above). The hold
+        // releases the drag at rest: a flicked release keeps UIScrollView
+        // momentum, which carries the scrub about a half-cycle on, and the
+        // magnet then parks it on the NEXT turn — slack water — instead.
+        let namesTheRate = #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#
+        if pill.label.range(of: namesTheRate, options: .regularExpression) == nil {
+            strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .press(forDuration: 0.3,
+                       thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)),
+                       withVelocity: .default,
+                       thenHoldForDuration: 0.5)
+            settleScrub(app)
+            XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                      "the commentary did not come back after the drag")
+        }
+        XCTAssert(pill.label.range(of: namesTheRate, options: .regularExpression) != nil,
                   "over a fast tide the commentary names the rate: '\(pill.label)'")
         save(app, "fast-tide-commentary.png")
     }
