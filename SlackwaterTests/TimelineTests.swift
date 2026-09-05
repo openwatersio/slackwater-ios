@@ -580,45 +580,69 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(both.curTop, 0)
     }
 
-    /// The tide track draws the card's curve: a fill anchored at chart datum,
-    /// no speed palette in it, and the tide-rate ramp carried by the LINE
-    /// COLOUR rather than by chevron glyphs (card-look spec §4).
-    func testTideTrackUsesCardFillAndRateColouredLine() throws {
-        let source = try repoSource("Slackwater/TimelineStrip.swift")
-        let lines = source.components(separatedBy: .newlines)
-        guard let start = lines.firstIndex(where: { $0.contains("private func drawTide(") }),
-              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("private func deg(") })
-        else { return XCTFail("drawTide body not found") }
-        let body = lines[start..<end].joined(separator: "\n")
-
-        XCTAssertTrue(body.contains("SN.graphLine.opacity(CurveStyle.fillOpacity)"), "tide fill is the card's blue gradient")
+    /// Both surfaces draw the tide through the shared helpers: the fill
+    /// anchored at chart datum and the line coloured by the tide-rate ramp,
+    /// with no chevron glyphs. A source scan, because what it guards is a
+    /// surface quietly growing its own fill again.
+    func testTideTracksShareTheDatumFillAndRateColouredLine() throws {
+        for (file, from, to) in [("Slackwater/TimelineStrip.swift", "private func drawTide(", "private func deg("),
+                                 ("Slackwater/StationCardGraph.swift", "var body: some View {", "func cardWindows(")] {
+            let lines = try repoSource(file).components(separatedBy: .newlines)
+            guard let start = lines.firstIndex(where: { $0.contains(from) }),
+                  let end = lines[(start + 1)...].firstIndex(where: { $0.contains(to) })
+            else { return XCTFail("\(file): tide drawing not found") }
+            let body = lines[start..<end].joined(separator: "\n")
+            XCTAssertTrue(body.contains("CurveDrawing.datumFill("), "\(file): the tide fill is the shared datum fill")
+            XCTAssertTrue(body.contains("CurveDrawing.tideLine("), "\(file): the stroke takes its colour from the tide-rate ramp")
+            XCTAssertFalse(body.contains("››››"), "\(file): chevrons are gone; the line carries the rate")
+            XCTAssertFalse(body.contains("Gradient("), "\(file): no fill or stroke gradient of its own")
+        }
         // Both hues vanish on the datum line, so a low under datum reads as
         // less water than the chart shows with no seam at the crossing. Two
         // stops at the same location is what makes that edge invisible;
         // either one alone puts a hard line across the fill.
-        XCTAssertTrue(body.contains("fadeStop"), "the fill fades to datum or the lowest trough, never to the plot's edge")
-        XCTAssertTrue(body.contains("SN.graphLow.opacity(0)"), "the below-datum hue fades out at datum")
-        XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
-        XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")
+        let helpers = try repoSource("Slackwater/CurveDrawing.swift")
+        XCTAssertTrue(helpers.contains("SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0"), "blue at the top")
+        XCTAssertTrue(helpers.contains("SN.graphLine.opacity(0), location: fadeStop"), "fading out at datum or the lowest trough")
+        XCTAssertTrue(helpers.contains("SN.graphLow.opacity(0), location: fadeStop"), "the below-datum hue fades in from the same line")
     }
 
     /// Below the ramp floor the line is the base colour; above it the stroke
     /// follows the absolute tide-rate ramp, so a lazy tide never leaves blue
     /// and a Fundy run reaches red.
     func testTideRateStopsColourOnlyFastWater() {
-        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
-        let x = { (t: Date) -> CGFloat in CGFloat(t.timeIntervalSince(t0)) }
-        let lazy = [(time: t0, rate: 0.2), (time: t0.addingTimeInterval(100), rate: -0.5)]
-        XCTAssertTrue(tideRateStops(lazy, x: x, width: 100).allSatisfy { $0.color == SN.graphLine })
+        let lazy = [(x: CGFloat(0), rate: 0.2), (x: CGFloat(100), rate: -0.5)]
+        XCTAssertTrue(CurveDrawing.tideRateStops(lazy, width: 100).allSatisfy { $0.color == SN.graphLine })
 
-        let fundy = [(time: t0, rate: 0.2),
-                     (time: t0.addingTimeInterval(50), rate: 1.8),
-                     (time: t0.addingTimeInterval(100), rate: 0.2)]
-        let stops = tideRateStops(fundy, x: x, width: 100)
+        let fundy = [(x: CGFloat(0), rate: 0.2), (x: CGFloat(50), rate: 1.8), (x: CGFloat(100), rate: 0.2)]
+        let stops = CurveDrawing.tideRateStops(fundy, width: 100)
         XCTAssertEqual(stops[0].color, SN.graphLine)
         XCTAssertEqual(stops[1].color, SN.speedColour(1), "1.8 m/hr is the red ceiling")
         XCTAssertEqual(stops[2].color, SN.graphLine)
         XCTAssertEqual(stops[1].location, 0.5, accuracy: 0.001)
+    }
+
+    /// The speed thread: clear below the ramp's first anchor, its yellow
+    /// fading in to the second, the absolute ramp above — so two peaks of
+    /// different speed thread different colours and a 6 kn peak threads the
+    /// same colour at every station.
+    func testSpeedCoreStopsFollowTheAbsoluteRamp() {
+        XCTAssertTrue(CurveDrawing.speedCoreStops([], width: 100).isEmpty)
+        XCTAssertTrue(CurveDrawing.speedCoreStops([(x: 0, speedKn: 6)], width: 0).isEmpty, "a zero-width plot has no stops")
+        let single = CurveDrawing.speedCoreStops([(x: 50, speedKn: 6)], width: 100)
+        XCTAssertEqual(single.count, 2, "one sample is doubled so the gradient has two stops")
+
+        let stops = CurveDrawing.speedCoreStops(
+            [(x: -10, speedKn: 0.2), (x: 25, speedKn: 3), (x: 50, speedKn: -6), (x: 75, speedKn: 12), (x: 110, speedKn: 0.4)],
+            width: 100)
+        XCTAssertEqual(stops.map(\.location), stops.map(\.location).sorted(), "locations are in order")
+        XCTAssertTrue(stops.allSatisfy { (0...1).contains($0.location) }, "and clamped to the plot")
+        XCTAssertEqual(stops[0].color, SN.speedColour(0).opacity(0), "clear below the first anchor")
+        XCTAssertEqual(stops[4].color, SN.speedColour(0).opacity(0), "at either end")
+        XCTAssertEqual(stops[1].color, SN.speedColour(widgetSpeedRampT(3)), "the ramp from the second anchor")
+        XCTAssertEqual(stops[2].color, SN.speedColour(widgetSpeedRampT(6)), "sign is direction, not speed")
+        XCTAssertEqual(stops[3].color, SN.speedColour(1), "12 kn is the red ceiling")
+        XCTAssertNotEqual(stops[2].color, stops[3].color, "two peaks of different speed thread different colours")
     }
 
     /// v falls linearly 2 kn → -2 kn over 2 h (slack at +60 min); |v| < 0.5

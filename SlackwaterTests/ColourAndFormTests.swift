@@ -92,25 +92,28 @@ final class ColourAndFormTests: XCTestCase {
     /// about the zero line, and the rotated set arrow); this asserts nothing
     /// quietly puts it back on colour.
     ///
-    /// Scoped to `drawCurrent`'s body rather than the file: `drawTide` draws
-    /// no direction colour any more (its turn dots are the card's teal/amber
-    /// tokens); the scope stays on `drawCurrent` because that is the track
-    /// the ramp replaced direction colour on.
+    /// Three scopes: `drawCurrent`'s body on the strip (the track the ramp
+    /// replaced direction colour on; `drawTide` draws none any more), the
+    /// card's canvas, and the shared helpers both call — where a direction
+    /// token would reach every surface at once.
     func testCurrentTrackDoesNotSpeakDirectionInColour() throws {
-        let source = try repoSource("Slackwater/TimelineStrip.swift")
-        let lines = source.components(separatedBy: .newlines)
-        guard let start = lines.firstIndex(where: { $0.contains("private func drawCurrent(") }),
-              let offset = lines[(start + 1)...].firstIndex(where: { $0 == "    }" })
-        else { return XCTFail("drawCurrent's body not found — this tripwire needs retargeting") }
-        let body = lines[start...offset]
         // `SN.flood`/`SN.ebb` catch their `…Label` variants as substrings.
         // `SN.leaf` is the slack-only green, which once stood in for the flood
-        // fill; it has no business in this function under any name.
+        // fill; it has no business in these scopes under any name.
         let banned = ["SN.flood", "SN.ebb", "SN.rising", "SN.falling", "SN.leaf"]
-        let offenders = body.filter { line in banned.contains(where: line.contains) }
-        XCTAssertTrue(offenders.isEmpty,
-                      "direction colour inside drawCurrent: \(offenders)")
-        XCTAssertGreaterThan(body.count, 40, "body extraction looks wrong — check the guard above")
+        func scan(_ file: String, from: String, to: (String) -> Bool, atLeast: Int) throws {
+            let lines = try repoSource(file).components(separatedBy: .newlines)
+            guard let start = lines.firstIndex(where: { $0.contains(from) }),
+                  let offset = lines[(start + 1)...].firstIndex(where: to)
+            else { return XCTFail("\(file): \(from) body not found — this tripwire needs retargeting") }
+            let body = lines[start...offset]
+            let offenders = body.filter { line in banned.contains(where: line.contains) }
+            XCTAssertTrue(offenders.isEmpty, "direction colour in \(file) \(from): \(offenders)")
+            XCTAssertGreaterThan(body.count, atLeast, "\(file): body extraction looks wrong — check the guard above")
+        }
+        try scan("Slackwater/TimelineStrip.swift", from: "private func drawCurrent(", to: { $0 == "    }" }, atLeast: 40)
+        try scan("Slackwater/StationCardGraph.swift", from: "var body: some View {", to: { $0.contains("func cardWindows(") }, atLeast: 40)
+        try scan("Slackwater/CurveDrawing.swift", from: "enum CurveDrawing {", to: { $0 == "}" }, atLeast: 40)
     }
 
     /// A high is one ink and a low is the other, on all three surfaces a tide
