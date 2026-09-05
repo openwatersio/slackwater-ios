@@ -16,6 +16,16 @@ struct DetailHeader: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var location = LocationService.shared
+
+    /// "Puget Sound • 3.2 nm" when there is a fix; just the region otherwise.
+    /// Distance is from the fix to the station.
+    private var regionLine: String {
+        guard location.authorized, let fix = location.location,
+              let item = StationItem.byId[favoriteId] else { return region }
+        let km = item.km(fromLat: fix.coordinate.latitude, lon: fix.coordinate.longitude)
+        return "\(region) • \(formatNm(km))"
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -53,7 +63,7 @@ struct DetailHeader: View {
                     .font(.title)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                Text(region)
+                Text(regionLine)
                     .font(.caption)
                     .foregroundStyle(SN.foam.opacity(0.55))
             }
