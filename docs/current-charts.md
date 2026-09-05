@@ -700,3 +700,16 @@ arrow hanging off the turn toward the plot middle, and every turn's time on
 the bottom row. It follows the geometry of §15.1, not its thesis: on a tide
 the turns *are* the events (§1).
 
+### 15.5 The small widget
+
+The small widget is the same card one row shorter: the name, then the
+reading with its direction on one line — height and a rising/falling arrow,
+or speed and the set arrow with its cardinal, *Slack* in the go colour
+inside a window — and the curve below. The curve is the medium card's own
+points over a narrower span: half a swing behind now and one and a half
+ahead, so now sits a quarter in and the next turn or window lands mid-card
+with its own value and time. No phase word and no caption line: the arrow's
+colour is the phase, and the curve's labels are the schedule. Turns near
+either edge keep their dot and time and drop the value, as on the card. A
+derived gate, which has no curve, keeps a *Slack · time* line.
+

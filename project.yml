@@ -122,6 +122,7 @@ targets:
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
       - Slackwater/DayCurveContentView.swift
+      - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
       - Slackwater/CurrentStation.swift
       - Slackwater/ChsStation.swift

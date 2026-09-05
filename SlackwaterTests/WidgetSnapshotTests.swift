@@ -194,6 +194,45 @@ final class WidgetSnapshotTests: XCTestCase {
         }
     }
 
+    /// §15.5: the small widget is the card's reading over its own curve —
+    /// name, hero with its arrow, the curve with dots and labels. Rendered at
+    /// both live small-widget sizes (155² older phones, 170² iPhone 15 Pro
+    /// and later) for a tide, a current and a derived gate; the frame IS the
+    /// widget, as in the medium test above. Fixed epoch, not `Date()`.
+    @MainActor
+    func testSmallWidgetRendersTheCompactCard() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let tideRecord = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
+        let tide = WidgetCard.build(.tide(tideRecord, station: tideRecord.engineStation), now: now)
+        let current = WidgetCard.build(.current(CurrentStationRecord.all.first!), now: now)
+        let gateInfo = try XCTUnwrap(ChsGateInfo.all.first)
+        let port = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gateInfo.reference })
+        let model = ChsModel(
+            stationID: port.id, iwlsID: "iwls-test", iwlsName: port.name,
+            fittedAt: .now, fitStartMs: 0, fitEndMs: 1, offset: 1, rms: 0,
+            constituents: [.init(name: "M2", amplitude: 1, phase: 0)])
+        let gate = WidgetCard.build(.derived(DerivedGateRecord(gate: gateInfo, port: port.record(with: model))), now: now)
+
+        for (card, kind) in [(tide, "tide"), (current, "current"), (gate, "gate")] {
+            for side: CGFloat in [155, 170] {
+                let renderer = ImageRenderer(content: NextEventContentView(card: card)
+                    .frame(width: side, height: side)
+                    .background(SN.canvas))
+                let image = try XCTUnwrap(renderer.uiImage)
+                let png = try XCTUnwrap(image.pngData())
+                XCTAssertGreaterThan(png.count, 1_000)
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "widget-small-\(kind)-\(Int(side))"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+        XCTAssertNotNil(tide.graph)
+        XCTAssertNotNil(current.graph)
+        XCTAssertNil(gate.graph)
+        XCTAssertNotNil(gate.nextSlack)
+    }
+
     /// §15.3: inside a slack window the widget's reading counts down to the
     /// window's close instead of showing a speed. Fixed epoch, not `Date()`
     /// — deterministic, not a flake.

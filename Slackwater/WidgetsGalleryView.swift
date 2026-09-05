@@ -15,7 +15,7 @@ struct WidgetsGalleryView: View {
                     group("Home screen — free",
                           note: "Long-press your home screen → + → Slackwater.",
                           rows: [("Next Event", "square.grid.2x2",
-                                  "The next slack or tide turn at your station."),
+                                  "Now, which way it's going, and the next turn."),
                                  ("Today's Curve", "waveform.path.ecg",
                                   "Today's curve with the next event.")])
                     group("Lock screen — Premium",

@@ -9,36 +9,28 @@ struct NextEventWidget: Widget {
         AppIntentConfiguration(kind: "NextEvent", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
             NextEventView(entry: entry)
-                .containerBackground(.background, for: .widget)
+                .containerBackground(SN.canvas, for: .widget)
         }
         .configurationDisplayName("Next Event")
-        .description("The next slack or tide turn at your station.")
+        .description("Now, which way it's going, and the next turn.")
         .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
 
+/// The small widget IS the card's reading (current-charts §15.5): the same
+/// shell the medium widget draws, one row shorter. No chrome — the widget's
+/// container clips.
 struct NextEventView: View {
     let entry: SlackwaterEntry
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let s = entry.snapshot {
-                Text(s.stationName).font(.caption2).lineLimit(1).foregroundStyle(.secondary)
-                if let next = s.next {
-                    Image(systemName: next.symbol).font(.title3)
-                    Text(next.time, style: .time)
-                        .font(.title2.weight(.semibold).monospacedDigit())
-                        .environment(\.timeZone, s.tz)
-                    // .monospacedDigit(): `next.label` carries a formatted
-                    // height/speed (H2's formatHeight/formatSpeed) — same
-                    // no-jitter rule as every other numeric reading
-                    // (TypeScaleTests.testNumericFormattersAreMonospacedDigit).
-                    Text(next.label).font(.caption.monospacedDigit()).lineLimit(1)
-                } else {
-                    Text("—").font(.title)
-                }
+        Group {
+            if let card = entry.card {
+                NextEventContentView(card: card)
             } else {
+                // Content margins are off, so the empty state pads itself.
                 Text("Open Slackwater to prepare this station")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary).padding(16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

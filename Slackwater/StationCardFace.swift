@@ -159,21 +159,33 @@ struct ConditionsItem: View {
         case gate(DerivedPhase)
     }
     let reading: Reading
+    /// One row instead of two — the small widget's hero (current-charts
+    /// §15.5). The tide keeps its arrow and drops the word; the current keeps
+    /// Slack, then the arrow before its cardinal. The phase word is spoken,
+    /// not shown: the arrow's colour is the phase.
+    var compact = false
 
     var body: some View {
         switch reading {
         case .tide(let state, let imperial):
             let tint = state.rising ? SN.rising : SN.falling
-
-            (Text(formatHeight(state.height, imperial: imperial))
+            let spoken = "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial)), \(state.rising ? "rising" : "falling")"
+            let value = Text(formatHeight(state.height, imperial: imperial))
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(heightUnit(imperial: imperial))")
-                .font(.body))
-                .foregroundStyle(.white)
-            HStack(spacing: 4) {
-                Text(state.rising ? "Rising" : "Falling").font(.caption).foregroundStyle(tint.opacity(0.6))
-                Text(state.rising ? "▲" : "▼").font(.caption)
-            }.foregroundStyle(tint)
+                .font(.body)
+            if compact {
+                (value + Text(" \(state.rising ? "▲" : "▼")").font(.caption).foregroundStyle(tint))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .accessibilityLabel(spoken)
+            } else {
+                value.foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Text(state.rising ? "Rising" : "Falling").font(.caption).foregroundStyle(tint.opacity(0.6))
+                    Text(state.rising ? "▲" : "▼").font(.caption)
+                }.foregroundStyle(tint)
+            }
 
         case .current(let signed, let deg, let unit, let tilde, let inWindow):
             // Always the speed and the set (current-charts §15.2): a pill
@@ -183,7 +195,8 @@ struct ConditionsItem: View {
             // the shared predicate (current-charts §6.1, §15.2) — the word is
             // Slack in the go colour whatever the instantaneous phase word says.
             let slack = inWindow || phase == .slack
-            (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
+            let spoken = "\(formatSpeed(abs(signed), unit: unit)) \(speedUnitLabel(unit)), \(slack ? "slack" : "\(phase.word), setting \(compass16(deg))")"
+            let value = (Text((tilde ? "~" : "") + formatSpeed(abs(signed), unit: unit))
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(speedUnitLabel(unit))")
                 .font(.body))
@@ -194,23 +207,46 @@ struct ConditionsItem: View {
             // 0.05 kn the set gives way to a neutral mark of the same
             // footprint so the header never resizes.
             let tint = slack ? SN.go : phase == .flood ? SN.flood : SN.ebb
-            HStack(spacing: 4) {
-                Text(slack ? "Slack" : phase.word).font(.caption2)
-                    .foregroundStyle(tint.opacity(slack ? 1 : 0.6))
-                if abs(signed) < 0.05 {
-                    Text("•").font(.caption2).foregroundStyle(SN.foam.opacity(0.4))
-                        .frame(width: 30)
-                } else {
-                    Text(compass16(deg)).font(.caption2).foregroundStyle(tint)
-                    CompassArrow(deg: deg).font(.caption2).foregroundStyle(tint)
+            if compact {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    // The number never truncates; a tight row loses the cardinal.
+                    value.layoutPriority(1)
+                    if slack { Text("Slack").font(.caption).foregroundStyle(tint) }
+                    set(deg: deg, signed: signed, tint: tint, font: .caption, arrowFirst: true)
                 }
-            }.foregroundStyle(tint)
+                .lineLimit(1)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(spoken)
+            } else {
+                value
+                HStack(spacing: 4) {
+                    Text(slack ? "Slack" : phase.word).font(.caption2)
+                        .foregroundStyle(tint.opacity(slack ? 1 : 0.6))
+                    set(deg: deg, signed: signed, tint: tint, font: .caption2, arrowFirst: false)
+                }.foregroundStyle(tint)
+            }
         case .gate(let phase):
             Text(phase == .flood ? "FLOOD" : phase == .ebb ? "EBB" : "SLACK")
                 .font(.caption2.monospaced().weight(.medium)).tracking(1)
                 .foregroundStyle(phase == .slack ? SN.navyDeep : .white)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
+        }
+    }
+
+    /// The set: cardinal and bearing arrow by the sign of the velocity, or a
+    /// neutral mark of the same footprint under 0.05 kn.
+    @ViewBuilder
+    private func set(deg: Double, signed: Double, tint: Color, font: Font, arrowFirst: Bool) -> some View {
+        if abs(signed) < 0.05 {
+            Text("•").font(font).foregroundStyle(SN.foam.opacity(0.4))
+                .frame(width: 30)
+        } else {
+            HStack(spacing: arrowFirst ? 2 : 4) {
+                if arrowFirst { CompassArrow(deg: deg) }
+                Text(compass16(deg))
+                if !arrowFirst { CompassArrow(deg: deg) }
+            }.font(font).foregroundStyle(tint)
         }
     }
 }
