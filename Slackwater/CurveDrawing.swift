@@ -77,10 +77,11 @@ enum CurveDrawing {
     /// top fading to clear at datum, amber (`SN.graphLow`) fading in below it
     /// so a low under datum reads as "less water than the chart shows" with
     /// no seam at the crossing — both hues vanish on the same line. When the
-    /// series never reaches datum (`lowestY` above `datumY`) the fade ends
-    /// at the lowest trough instead, so the fill is clear where the plot is
-    /// clipped rather than half-strong at a hard edge. `area` is the curve
-    /// closed to the datum line; the fill is clipped to the plot box.
+    /// series never reaches datum — its lowest trough sits higher on screen
+    /// than the datum line, so `lowestY < datumY` with y growing downward —
+    /// the fade ends at that trough instead, so the fill is clear where the
+    /// plot is clipped rather than half-strong at a hard edge. `area` is the
+    /// curve closed to the datum line; the fill is clipped to the plot box.
     static func datumFill(_ ctx: GraphicsContext, _ area: Path,
                           plotTop: CGFloat, plotBottom: CGFloat, width: CGFloat,
                           datumY: CGFloat, lowestY: CGFloat) {
