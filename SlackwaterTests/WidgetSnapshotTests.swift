@@ -273,7 +273,7 @@ final class WidgetSnapshotTests: XCTestCase {
         let underDatum = try XCTUnwrap(records.first { lowest($0) < -0.1 }, "no station dips under datum")
         let aboveDatum = try XCTUnwrap(records.first { lowest($0) > 0.5 }, "no station stays clear of datum")
         for (record, name) in [(underDatum, "widget-tide-under-datum"), (aboveDatum, "widget-tide-above-datum")] {
-            let card = WidgetCard.build(.tide(record), now: now)
+            let card = WidgetCard.build(.tide(record, station: record.engineStation), now: now)
             let renderer = ImageRenderer(content: DayCurveContentView(card: card)
                 .frame(width: 364, height: 170)
                 .background(SN.canvas))
