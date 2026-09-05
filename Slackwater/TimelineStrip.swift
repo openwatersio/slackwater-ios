@@ -994,11 +994,11 @@ struct TimelineCanvas: View {
             var eraser = ctx
             eraser.blendMode = .destinationOut
             eraser.stroke(seg, with: .color(.black),
-                          style: StrokeStyle(lineWidth: CurveStyle.lineWidth + CurveStyle.haloGap * 2,
+                          style: StrokeStyle(lineWidth: CurveStyle.runWidth + CurveStyle.haloGap * 2,
                                              lineCap: .round))
         }
         for seg in segs {
-            strokeSplitAtNow(ctx, seg, with: .color(SN.go))
+            strokeSplitAtNow(ctx, seg, with: .color(SN.go), lineWidth: CurveStyle.runWidth)
         }
 
         let margin = 0.3 * 3600
