@@ -155,17 +155,21 @@ favorites, or other user data.
 
 The app's complete-catalog accessors use the active snapshot and fall back to
 the bundle as a unit. They are app-target-only forwards into `CatalogStore`.
-The widget keeps the existing mapped, single-record strategy so it does not
-decode complete catalogs or cross the store's main-actor boundary. Every
-widget catalog lookup, including CHS identity and tombstone lookup, uses a
-small shared file locator and the single-record decoder. The locator first
-selects the active generation's file. If reading or decoding that record
-fails, it logs the failure and retries the bundled file. If both sources fail
-it logs both failures and returns `nil`; it never instantiates `CatalogStore`
-or starts network work.
+The widget keeps the decode split `StationItem.widgetItem` ships today: the
+mapped single-record scanner for the two multi-megabyte NOAA catalogs, and
+whole decodes for the small CHS catalogs and the tombstone ledger. The scanner
+requires the compact one-line record form the NOAA generators emit;
+`chs-gates.json` and `chs-current-gates.json` are pretty-printed, which is one
+reason the small catalogs are decoded whole rather than scanned. Every widget
+lookup, including CHS identity and tombstone lookup, goes through a small
+shared file locator, which first selects the active generation's file. If
+reading or decoding there fails, it logs the failure and retries the bundled
+file. If both sources fail it logs both failures and returns `nil`; it never
+instantiates `CatalogStore`, crosses the store's main-actor boundary, or
+starts network work.
 
 This centralizes the #234 fix at the two real trust boundaries: complete
-catalog loading for the app and one-record loading for the widget.
+catalog loading for the app and widget-side record loading.
 
 ## Refresh lifecycle
 
@@ -257,6 +261,9 @@ Validation is pure and runs before persistence or publication. A candidate must:
 10. Keep tombstone IDs disjoint from all live `StationItem` IDs.
 11. Include a tombstone for every rendered station ID present in the active
     snapshot but absent from the candidate.
+12. Keep `stations.json` and `currents.json` in the compact record form the
+    widget scanner requires: the validator locates a sampled record in each
+    file with the single-record decoder itself.
 
 Current catalog-specific invariants already covered by generator tests remain
 there; the runtime validator protects the app from incomplete, corrupt, or
@@ -300,8 +307,8 @@ The model types remain the public surface used throughout the app. In the app
 target, their `all`/`byId` accessors become computed forwards into
 `CatalogStore.snapshot` instead of separately initialized `static let` values.
 The merged arrays and indexes are computed once when a snapshot is built, not
-on every accessor. Widget code uses only the shared file locator and
-single-record decoder described above; it never calls these app accessors.
+on every accessor. Widget code uses only the shared file locator and the two
+widget decode paths described above; it never calls these app accessors.
 
 When the current pointer has been replaced, the store publishes one generation
 change on the main actor. That change causes the following bounded reactions:
@@ -361,6 +368,7 @@ Focused Swift tests cover:
 - subordinate currents with an unresolved or subordinate reference, missing
   corrections, non-finite offsets, negative ratios, or two zero ratios reject
   a candidate;
+- a NOAA catalog re-serialized out of compact record form rejects a candidate;
 - a correctly tombstoned removal validates;
 - interruption before pointer replacement leaves the old generation active;
 - stored-snapshot corruption falls back to the bundle;
@@ -369,8 +377,10 @@ Focused Swift tests cover:
 - catalog generation invalidates station ranking, pin features, and chart-pack
   inputs; and
 - the widget resolves active records from every catalog kind and the tombstone
-  ledger, falls back to bundled records after active-file corruption, and does
-  not instantiate the complete catalog store;
+  ledger — exercising the actual generated resource files through both the
+  NOAA single-record scanner and the small-catalog whole decodes — falls back
+  to bundled records after active-file corruption, and does not instantiate
+  the complete catalog store;
 - a restored background session finishes or rejects its staged batch before
   invoking the saved UIKit completion handler on the main thread.
 
