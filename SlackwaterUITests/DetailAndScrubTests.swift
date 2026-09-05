@@ -287,6 +287,35 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                           "first scrub left the readout frozen — initial centering raced layout again")
     }
 
+    /// Over a fast tide the pill explains the yellow line: the rate, in the
+    /// ramp's colour, instead of the next turn. Boston moves well over the
+    /// ramp's first anchor between turns. Landing on a turn first (the
+    /// commentary tap) and then dragging about three hours on puts the scrub
+    /// mid-run, where the magnet parks it on the run's fastest point — a snap
+    /// stop — so the pill reads the peak rate.
+    func testFastTideCommentaryNamesTheRate() throws {
+        let app = launch("-seedGate", "-networkKillSwitch")
+        openSearch(app, "boston")
+        pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 10))
+        settleLayout(strip)
+        let pill = commentaryPill(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the Boston detail")
+        pill.tap()
+        settleScrub(app)
+        // One point of strip is five minutes: a tenth of the width is ~3 h.
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
+        settleScrub(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "the commentary did not come back after the drag")
+        XCTAssert(pill.label.range(of: #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#, options: .regularExpression) != nil,
+                  "over a fast tide the commentary names the rate: '\(pill.label)'")
+        save(app, "fast-tide-commentary.png")
+    }
+
     /// The commentary pill names the stop ahead and walks to it: tapping it
     /// scrubs the strip there, so the lead's time moves and the pill returns
     /// naming the stop after that one. Its phrasing follows the scrub — "in"

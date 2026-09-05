@@ -147,4 +147,14 @@ final class DetailLeadTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(provisional.nextMax).value, "~2.4\u{00a0}kn")
         XCTAssertEqual(provisional.commentary, "~Max flood in 1m")
     }
+
+    /// The pill explains the yellow line: the rate, direction first, in the
+    /// station's height unit per hour, and nothing at all below the ramp's
+    /// first anchor.
+    func testFastTideCommentaryNamesTheRate() {
+        XCTAssertNil(tideRateCommentary(rate: 0.3, imperial: true))
+        XCTAssertNil(tideRateCommentary(rate: -0.59, imperial: false))
+        XCTAssertEqual(tideRateCommentary(rate: 0.6, imperial: false), "Rising 0.60 m/hr")
+        XCTAssertEqual(tideRateCommentary(rate: -1.6, imperial: true), "Falling 5.2 ft/hr")
+    }
 }

@@ -32,16 +32,41 @@ struct TideDetailView: View {
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
+    /// Metres per hour under the centerline, signed.
+    private var scrubRate: Double { timeline?.rateAt(scrubTime) ?? 0 }
+    /// The line is on the ramp here: the water is moving faster than the
+    /// first anchor, the same test `tideRateStops` colours by.
+    private var fastTide: Bool { abs(scrubRate) >= tideMovementRampAnchorsMHr[0] }
     /// The rate ramp's colour when the rate is out of the ordinary (#95: at
     /// Friday Harbor 0.8 ft/hr is nothing, at Ile Haute 8 ft/hr is the
     /// warning), else nil and the direction colour stands.
     private var rateWarningColor: Color? {
-        guard let flow = timeline.flatMap({ timeline in
-            tideFlowArrows(timeline.tideRates).first {
-                abs($0.time.timeIntervalSince(scrubTime)) < 1
-            }
-        }), tideRateSeverity(flow.rate) != nil else { return nil }
-        return SN.speedColour(Timeline.rampT(forTideRateMHr: abs(flow.rate)))
+        fastTide ? SN.speedColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
+    }
+    /// What the pill says: the rate while the tide is fast — it explains the
+    /// yellow line under it — else the next turn.
+    private var commentary: String? {
+        if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
+        return nextExtreme.map {
+            commentaryText($0.kind == .high ? "High" : "Low", at: $0.time, from: scrubTime, now: live)
+        }
+    }
+    private var commentaryTint: Color? {
+        fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
+    }
+    /// A fast tide's tap goes to this run's fastest point — the flow arrow the
+    /// magnet already snaps to — so the pill then reads the peak rate. From
+    /// the peak itself, or a quiet tide, it goes to the next turn.
+    private func scrubToCommentary() {
+        if fastTide, let tl = timeline,
+           let peak = tideFlowArrows(tl.tideRates)
+               .filter({ ($0.rate < 0) == (scrubRate < 0) })
+               .min(by: { abs($0.time.timeIntervalSince(scrubTime)) < abs($1.time.timeIntervalSince(scrubTime)) }),
+           abs(peak.time.timeIntervalSince(scrubTime)) > 1 {
+            scrubTime = peak.time
+        } else if let next = nextExtreme {
+            scrubTime = next.time
+        }
     }
 
     var body: some View {
@@ -56,11 +81,9 @@ struct TideDetailView: View {
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    imperial: imperial, now: live, scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
-                                                   commentary: nextExtreme.map {
-                                                       commentaryText($0.kind == .high ? "High" : "Low",
-                                                                      at: $0.time, from: scrubTime, now: live)
-                                                   },
-                                                   onCommentary: { if let next = nextExtreme { scrubTime = next.time } })
+                                                   commentary: commentary,
+                                                   commentaryTint: commentaryTint,
+                                                   onCommentary: scrubToCommentary)
                                     .overlay(alignment: .top) { lead }
                             },
                             links: { _ in SummaryTiles(primary: range, at: scrubTime) },
@@ -217,6 +240,14 @@ struct TideDetailView: View {
     private func rebuild() {
         timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
     }
+}
+
+/// "Falling 5.2 ft/hr" while the water moves faster than the ramp's first
+/// anchor — the reason the line is yellow — else nil. `rate` is metres per
+/// hour, signed; the height formatter converts it like a height.
+func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
+    guard abs(rate) >= tideMovementRampAnchorsMHr[0] else { return nil }
+    return "\(rate < 0 ? "Falling" : "Rising") \(formatHeight(abs(rate), imperial: imperial)) \(heightUnit(imperial: imperial))/hr"
 }
 
 #Preview {

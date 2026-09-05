@@ -108,6 +108,16 @@ enum SN {
         return Color(red: c.r / 255, green: c.g / 255, blue: c.b / 255)
     }
 
+    /// The ramp as text on the dark ground: lifted a quarter toward white so
+    /// the red end clears the small-text contrast floor the yellow end
+    /// already does.
+    static func speedLabelColour(_ t: Double) -> Color {
+        let c = speedRGB(t)
+        return Color(red: (c.r + (255 - c.r) * 0.25) / 255,
+                     green: (c.g + (255 - c.g) * 0.25) / 255,
+                     blue: (c.b + (255 - c.b) * 0.25) / 255)
+    }
+
     /// Ink for a label drawn ON the ramp fill — whichever of white or `canvas`
     /// has more contrast against it. Chosen from the ramp position rather
     /// than from how far the label sits off the zero line: the curve's shape

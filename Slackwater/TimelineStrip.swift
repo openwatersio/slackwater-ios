@@ -291,6 +291,8 @@ struct TimelineData {
     /// Linear interpolation over the drawn 10-min samples — the centerline dots
     /// must ride the curve as rendered (prototype _ser reads the same series).
     func heightAt(_ t: Date) -> Double { interp(tidePoints.map { ($0.time, $0.height) }, t) }
+    /// Metres per hour under the centerline, signed like `tideRates`.
+    func rateAt(_ t: Date) -> Double { interp(tideRates.map { ($0.time, $0.rate) }, t) }
     func velocityAt(_ t: Date) -> Double { interp(currentPoints.map { ($0.time, $0.speed) }, t) }
 
     private func interp(_ pts: [(Date, Double)], _ t: Date) -> Double {
@@ -1312,6 +1314,8 @@ struct TimelineScrubStrip: View {
     var onReturn: (() -> Void)? = nil
     /// The next significant event from the scrub, and the scrub to it.
     var commentary: String? = nil
+    /// The commentary's ink when it is a warning rather than a next event.
+    var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
     @State private var jumpToken = 0
 
@@ -1334,7 +1338,7 @@ struct TimelineScrubStrip: View {
         let past = scrubTime < now
         let showNow = onReturn != nil && scrubbedAway(scrubTime, from: now)
         return ZStack {
-            Commentary(text: commentary, scrubTime: scrubTime) { jumpToken += 1; onCommentary() }
+            Commentary(text: commentary, tint: commentaryTint, scrubTime: scrubTime) { jumpToken += 1; onCommentary() }
             if showNow {
                 HStack {
                     if past { Spacer(minLength: 0) }

@@ -135,6 +135,10 @@ func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date)
 /// passes.
 struct Commentary: View {
     let text: String?
+    /// Set when the text is a warning about the scrub instant — a fast tide —
+    /// rather than the next event; the ramp's colour, so the pill explains
+    /// the line under it.
+    var tint: Color? = nil
     let scrubTime: Date
     let onTap: () -> Void
     @State private var settled = false
@@ -149,7 +153,7 @@ struct Commentary: View {
                 Button(action: onTap) {
                     Text(text)
                         .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(SN.foam)
+                        .foregroundStyle(tint ?? SN.foam)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.capsule)

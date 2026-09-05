@@ -76,17 +76,6 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(Timeline.rampT(forTideRateMHr: 6.1 / 3.28084), 1, accuracy: 1e-9)
     }
 
-    func testTideRateWarningsFollowTheChevronSeverityBands() {
-        XCTAssertEqual(tideRateSeverity(0.8), "⚠️ Fast")
-        XCTAssertEqual(tideRateSeverity(1.2), "‼️ Very fast")
-        XCTAssertEqual(tideRateSeverity(1.6), "🚨 Extreme")
-        XCTAssertNil(tideRateSeverity(0.5))
-    }
-
-    func testChevronWarningsDoNotAppendTide() throws {
-        XCTAssertFalse(try repoSource("Slackwater/TideDetailView.swift").contains("\\(severity) \\(direction) tide"))
-    }
-
     /// The current lead speaks plain language, and both current surfaces get
     /// it from the same view. `CurrentScrubCard` is the shared anatomy —
     /// strip, lead, commentary — so a redesign cannot land on a harmonic
