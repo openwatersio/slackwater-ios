@@ -63,7 +63,7 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize)
                    y: size.height * (1 - CGFloat(altitude / 90)))
 }
 
-/// A circular path from Almanac's actual rise to set times.
+/// A circular path from the day's actual rise to set times.
 func sunArcPoint(progress: Double, size: CGSize) -> CGPoint {
     let progress = max(0, min(1, progress))
     let angle = progress * .pi
@@ -89,13 +89,9 @@ struct SkyState {
         self.latitude = latitude
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
-        if let observer,
-           let events = try? sunEvents(from: time.addingTimeInterval(-24 * 60 * 60),
-                                       to: time.addingTimeInterval(24 * 60 * 60),
-                                       observer: observer),
-           let rise = events.last(where: { $0.kind == .rise && $0.time <= time }),
-           let set = events.first(where: { $0.kind == .set && $0.time >= time }) {
-            sunProgress = time.timeIntervalSince(rise.time) / set.time.timeIntervalSince(rise.time)
+        let times = SunMoon.sunTimes(date: time, lat: latitude, lon: longitude)
+        if let rise = times.sunrise, let set = times.sunset {
+            sunProgress = time.timeIntervalSince(rise) / set.timeIntervalSince(rise)
         } else {
             sunProgress = nil
         }
