@@ -22,9 +22,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleLayout(strip)  // the push animation is still moving the strip
 
         // Scrub: pan the strip under the fixed centerline (drag left = later),
-        // release — the readout keeps the scrubbed time.
+        // release — the lead keeps the scrubbed time. The lead is the page's
+        // one readout and combines its children, so its whole label is what a
+        // test can read; comparing it across the drag is the scrub landing.
+        let lead = leadReading(app)
+        XCTAssert(lead.waitForExistence(timeout: 10), "no lead reading on the tide detail")
+        let leadBefore = lead.label
         scrubStrip(app)
         settleScrub(app)
+        XCTAssertNotEqual(lead.label, leadBefore,
+                          "the scrub left the lead reading unchanged")
         save(app, "m1-detail-scrubbed.png")
 
         // Back to the station list (search closed itself on the pick).
@@ -54,9 +61,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // Metres via Settings, then open Friday Harbor in metric.
         setUnits(app, "Meters")
         openFridayHarbor(app)
-        // the rate line re-rendered in metres is the unit switch landing
-        _ = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'm/hr'"))
-            .firstMatch.waitForExistence(timeout: 10)
+        // the lead re-rendered in metres is the unit switch landing. The
+        // height and its unit are one Text inside the combined label, so the
+        // digit-then-unit match holds however the label is joined.
+        XCTAssert(waitFor(leadReading(app), "label MATCHES '.*\\\\d m.*'"),
+                  "the lead did not re-render in metres: \(leadReading(app).label)")
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
         app.buttons["detail-back"].firstMatch.tap()
@@ -64,24 +73,29 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         setUnits(app, "Feet")
     }
 
-    /// #95 part 1: the readout says how fast the water is moving and how big
-    /// this tide is — rate of rise on the direction line, a Range block beside
-    /// the next-turn readout. Friday Harbor reads small; the point is the
-    /// figures exist at every station, so Ile Haute's 32 ft can't hide.
-    func testTideReadoutShowsRateAndRange() throws {
+    /// #95: the tide detail says where the water is and how big this swing is
+    /// — a height under the centerline and a Range tile beside the moon. How
+    /// fast it is moving is the lead glyph's colour, which no query can read,
+    /// so the readable half is what this pins. Friday Harbor reads small; the
+    /// point is the figures exist at every station, so Ile Haute's 32 ft can't
+    /// hide.
+    func testTideReadoutShowsHeightAndRange() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
         openFridayHarbor(app)
-        let rate = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'ft/hr'")).firstMatch
-        XCTAssert(rate.waitForExistence(timeout: 10), "no rate-of-rise readout")
-        let range = app.staticTexts.matching(
+        let lead = leadReading(app)
+        XCTAssert(lead.waitForExistence(timeout: 10), "no lead reading on the tide detail")
+        XCTAssert(lead.label.contains("ft"),
+                  "the lead must carry the height and its unit, got '\(lead.label)'")
+        // Case-insensitive: the tile's eyebrow combines a MonoLabel that
+        // uppercases with an accessibility label that does not.
+        let range = app.descendants(matching: .any).matching(
             NSPredicate(format: "label ==[c] 'range'")).firstMatch
-        XCTAssert(range.exists, "no Range block in the readout")
-        save(app, "tide-readout-rate-range.png")
+        XCTAssert(range.exists, "no Range tile beside the moon")
+        save(app, "tide-readout-height-range.png")
     }
 
     /// #170: provenance stays out of the primary tide-reading flow until the
@@ -167,14 +181,13 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
     }
 
-    // The detail header is the station map with the title overlaid, the
-    // day header carries the sun times, and the scrubber wears the moon
-    // with its phase name.
-    func testM41DetailMapHeaderSunMoon() throws {
+    // The detail header carries the title, the day header carries the sun
+    // times, and the scrubber wears the moon with its phase name.
+    func testM41DetailHeaderSunMoon() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
-                  "map header missing from tide detail")
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+                  "header missing from tide detail")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
             .firstMatch.waitForExistence(timeout: 5),
                   "sun times missing from the schedule day header")
@@ -184,16 +197,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
                   "moon phase name missing from the scrub readout")
-        sleep(6)  // header map tiles: MLNMapView surfaces no load state to XCUITest
-        save(app, "m41-detail-mapheader.png")
+        save(app, "m41-detail-header.png")
 
-        // The map header carries the current-station detail too.
+        // The header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 5),
-                  "map header missing from current detail")
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+                  "header missing from current detail")
+        save(app, "m41-current-detail-header.png")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
             .firstMatch.waitForExistence(timeout: 5),
                   "sun times missing from the current-station day header")
@@ -263,9 +276,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
 
         // First frame after appearance — no scrub, no settle yet.
-        let readout = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^\\d{1,2}:\\d{2} (AM|PM)$")).firstMatch
-        XCTAssert(readout.waitForExistence(timeout: 5))
+        XCTAssert(leadReading(app).waitForExistence(timeout: 5))
         let before = scrubClock(app)
 
         // The FIRST drag on a fresh detail: the readout must move during the
@@ -276,11 +287,108 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                           "first scrub left the readout frozen — initial centering raced layout again")
     }
 
-    /// Return-to-now owns a fixed slot — below the hero, in the scrub card's
-    /// readout row, hard right beside the star — so it can appear and disappear
-    /// without moving anything. Sharing the header's top-right row with the
-    /// favourite star shoves the star sideways the moment you scrub.
-    func testM52ReturnToNowHasItsOwnFixedSlot() throws {
+    /// Over a fast tide the pill explains the yellow line: the rate, in the
+    /// ramp's colour, instead of the next turn. Boston moves well over the
+    /// ramp's first anchor between turns. Landing on a turn first (the
+    /// commentary tap) and then dragging about three hours on puts the scrub
+    /// mid-run, where the magnet parks it on the run's fastest point — a snap
+    /// stop — so the pill reads the peak rate.
+    func testFastTideCommentaryNamesTheRate() throws {
+        let app = launch("-seedGate", "-networkKillSwitch")
+        openSearch(app, "boston")
+        pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 10))
+        settleLayout(strip)
+        let pill = commentaryPill(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the Boston detail")
+        pill.tap()
+        settleScrub(app)
+        // One point of strip is five minutes: a tenth of the width is ~3 h.
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
+        settleScrub(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "the commentary did not come back after the drag")
+        XCTAssert(pill.label.range(of: #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#, options: .regularExpression) != nil,
+                  "over a fast tide the commentary names the rate: '\(pill.label)'")
+        save(app, "fast-tide-commentary.png")
+    }
+
+    /// The commentary pill names the stop ahead and walks to it: tapping it
+    /// scrubs the strip there, so the lead's time moves and the pill returns
+    /// naming the stop after that one. Its phrasing follows the scrub — "in"
+    /// counts from the reader, "later" from wherever on the strip they are
+    /// looking — so the trip out and the trip home read differently.
+    func testCommentaryTapScrubsToTheStopItNames() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 10))
+        settleLayout(strip)  // the push animation is still moving the strip
+
+        // The pill fades in once the scrub rests, so hittability is the wait,
+        // not existence.
+        let pill = commentaryPill(app)
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "no commentary pill on the tide detail")
+        let saidBefore = pill.label
+        XCTAssert(saidBefore.contains(" in "),
+                  "parked on now, the commentary counts from the reader: '\(saidBefore)'")
+        let clockBefore = scrubClock(app)
+
+        pill.tap()
+        settleScrub(app)
+        XCTAssertNotEqual(scrubClock(app), clockBefore,
+                          "tapping the commentary did not scrub to the stop it names")
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "the commentary did not come back after the jump")
+        XCTAssertNotEqual(pill.label, saidBefore,
+                          "the commentary must name the next stop, not the one just landed on")
+        XCTAssert(pill.label.hasSuffix("later"),
+                  "scrubbed away, the commentary counts from the strip: '\(pill.label)'")
+        save(app, "commentary-tapped.png")
+
+        // Home again, and the count is the reader's once more.
+        app.buttons["detail-return-now"].firstMatch.tap()
+        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
+                  "the commentary did not come back after returning to now")
+        XCTAssert(pill.label.contains(" in "),
+                  "back on now, the commentary counts from the reader: '\(pill.label)'")
+    }
+
+    /// Return-to-now from HISTORY: the Now pill rides the strip's chrome row
+    /// on the side now is, so scrubbing back puts it on the right, arrow
+    /// pointing that way — and it must still bring the strip home.
+    func testReturnToNowFromHistory() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 5))
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+        let now = app.buttons["detail-return-now"].firstMatch
+        XCTAssert(now.waitForExistence(timeout: 5), "no return-to-now after scrubbing back")
+        save(app, "history-before-now.png")
+        // One read, one layout (settled — see testM50RecentsNamesFit): the
+        // strip is the ruler, since the pill lives inside its chrome row.
+        let places = settled { [now.frame, strip.frame] }
+        XCTAssert(places[0].midX > places[1].midX,
+                  "scrubbed into history, the Now pill belongs on the right: "
+                  + "\(places[0].midX) vs strip mid \(places[1].midX)")
+        XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
+        now.tap()
+        XCTAssert(now.waitForNonExistence(timeout: 10), "return-to-now did not bring the strip home")
+        save(app, "history-after-now.png")
+    }
+
+    /// Scrubbed into the FUTURE, now is behind you: the Now pill takes the
+    /// left edge of the strip's chrome row with its arrow pointing back there,
+    /// and appearing costs the header chrome nothing — the pill lives on the
+    /// strip, not in the header's top row, so the star and the back button
+    /// never move when it comes and goes.
+    func testNowPillSitsLeftWhenScrubbedForward() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
@@ -294,10 +402,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         scrubStrip(app)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
-        // The 44pt slot this guards is fixed by construction, but re-reading
-        // star/now/header/back live below would still be racy (settled — see
-        // testM50RecentsNamesFit). One read, one layout, four snapshots.
-        let header = app.otherElements["detail-map-header"].firstMatch
+        save(app, "now-pill-scrubbed.png")
+        // Re-reading star/now/header/back live below would be racy (settled —
+        // see testM50RecentsNamesFit). One read, one layout, four snapshots.
+        let header = app.otherElements["detail-header"].firstMatch
         let after = settled { [star.frame, now.frame, header.frame, back.frame] }
         let starAfter = after[0], nowFrame = after[1], headerFrame = after[2]
         XCTAssertEqual(starAfter.minX, starBefore.minX, accuracy: 0.5,
@@ -306,22 +414,21 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertEqual(after[3].minX, backBefore.minX, accuracy: 0.5,
                        "return-to-now must not move the back button either")
 
-        // Its own slot: below the hero, in the when-row at the bottom of the
-        // scrub card, directly beside the time/date stack on the LEADING side —
-        // next to the time it resets.
+        // On the strip's chrome row, which sits below the name header — not in
+        // the header's own top row with the star.
         XCTAssert(nowFrame.minY > starAfter.maxY, "return-to-now is not below the star")
         XCTAssert(nowFrame.minY >= headerFrame.maxY - 1,
-                 "return-to-now must live below the hero, in the scrub card")
+                 "return-to-now must live below the header, on the strip")
         // Leading side of the DETAIL PANE, not of the window: on a portrait
         // iPad the sidebar pushes the pane past the window's midX, so the
         // window ruler only passed here because the test before this one
-        // leaves the device in landscape. `detail-map-header` is no ruler
+        // leaves the device in landscape. `detail-header` is no ruler
         // either — its accessibility frame spans the whole window, not the
         // pane. The pane's own chrome is: back on its leading edge, star on
         // its trailing one.
         let paneMidX = (after[3].minX + starAfter.maxX) / 2
         XCTAssert(nowFrame.midX < paneMidX,
-                  "return-to-now sits beside the time stack on the leading side: "
+                  "scrubbed into the future, the Now pill belongs on the left: "
                   + "\(nowFrame.midX) vs pane mid \(paneMidX)")
 
         // And it still does its job — back to now, and gone again.

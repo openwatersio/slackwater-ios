@@ -2,8 +2,8 @@
 // TidesApp.dc.html): one continuous multi-day strip pans under a fixed
 // centerline, current only — a paired reference port's tide no longer rides
 // the same track (split-scrubbers spec §1). The port stays reachable one tap
-// away via TideAtPortLink, under the scrub card's own readout. No day pager;
-// the schedule is a rolling multi-day list, rows scrub cross-day.
+// away via TideAtPortLink, in the scrub card. No day pager; the schedule is a
+// rolling multi-day list, rows scrub cross-day.
 import SwiftUI
 import TideEngine
 
@@ -56,67 +56,49 @@ struct CurrentDetailView: View {
     private var provisionalGate: ChsCurrentGateInfo? {
         service.isProvisional(record.id) ? record.chsGate : nil
     }
-    /// Every number on this page is the fast answer's: amber, not white.
-    private var readingColor: Color { provisionalGate == nil ? .white : SN.amber }
 
     private var pairedTide: TideStationRecord? { record.pairedTide }
     private var tz: TimeZone { record.tz }
-    private var scrubSigned: Double { exactSigned(at: scrubTime) }
-    private var phase: CurrentPhase { currentPhase(signed: scrubSigned) }
-    private var activeSlackWin: (slack: Date, start: Date, end: Date)? {
-        timeline?.containingSlackWindow(at: scrubTime)
+    /// Engine-exact velocity under the centerline, the same call the
+    /// committed readout has always made.
+    private func lead(_ tl: TimelineData) -> CurrentLead {
+        CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
+                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                    speedUnit: speedUnit, tz: tz, provisional: provisionalGate != nil)
     }
-    private var nextSlack: CurrentEvent? {
-        timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
-    }
-    /// The window around the next slack — looked up, not recomputed. The strip
-    /// draws these same numbers as a band (gutter spec §3).
-    private var slackWin: (start: Date, end: Date)? {
-        guard let slack = nextSlack else { return nil }
-        return timeline?.slackWindows.first { $0.slack == slack.time }
-            .map { (start: $0.start, end: $0.end) }
-    }
-
-    /// The fast answer's marking, on every number this page prints: the tilde
-    /// appears when the reading IS provisional. Every call site below reaches
-    /// it rather than inlining the ternary.
-    private var tilde: String { provisionalGate == nil ? "" : "~" }
 
     var body: some View {
         ScrubDetailScaffold(name: record.name, region: record.region,
-                            latitude: record.latitude, longitude: record.longitude,
                             favoriteId: record.itemId, tz: tz,
                             timeline: timeline,
                             entries: { scheduleEntries($0, floodDeg: record.floodDirection,
                                                        ebbDeg: record.ebbDirection, speedUnit: speedUnit) },
-                            live: $live, scrubTime: $scrubTime,
-                            onReturn: returnToNow,
+                            scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
-                            scrubSummary: { tl in
-                                guard let range = currentPeakToPeakRange(tl.currentEvents, around: scrubTime) else { return nil }
-                                return ("Range", "\(formatSpeed(range, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            },
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
                                                  expectation: gate.provisionalExpectation(online: net.online),
                                                  action: "See all downloads",
                                                  identifier: "chs-provisional-warning") { showDownloads = true }
-                                        .padding(.top, 14)
+                                        .padding(.bottom, 14)
                                 }
                             },
                             card: { tl in
-                                readout(tl)
-                                TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   speedUnit: speedUnit, now: live,
-                                                   floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                                                   scrubTime: $scrubTime, onReturn: returnToNow)
-                                    .padding(.horizontal, -16)  // full-bleed strip
-                                    .padding(.top, 12)
+                                // No badge over the strip: the amber card
+                                // above, the amber numbers and the tilde
+                                // already say the reading is provisional, and
+                                // a fourth marking landed in the pill row.
+                                CurrentScrubCard(lead: lead(tl), data: tl, speedUnit: speedUnit, now: live,
+                                                 floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                                                 scrubTime: $scrubTime, onReturn: returnToNow)
                             },
-                            links: {
-                                if let port = pairedTide { TideAtPortLink(port: port) }
+                            links: { tl in
+                                VStack(spacing: 12) {
+                                    SummaryTiles(primary: lead(tl).nextMax, at: scrubTime)
+                                    if let port = pairedTide { TideAtPortLink(port: port) }
+                                }
                             },
                             bottom: { footer })
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
@@ -133,82 +115,13 @@ struct CurrentDetailView: View {
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
     }
 
-    // MARK: - Readout above the strip
+    // MARK: - Colour
 
     /// Kept as the tests' named binding (ColourAndFormTests); the palette
     /// itself lives in `StationGlyph.colour(for:)`. Slack is the app's "go"
     /// colour — the moment the app is named for, the same on every surface.
     static func phaseColor(_ phase: CurrentPhase) -> Color {
         StationGlyph.colour(for: phase == .flood ? .flood : phase == .ebb ? .ebb : .slack)
-    }
-
-    private func readout(_ tl: TimelineData) -> some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let win = activeSlackWin {
-                    let timing = slackWindowTiming(start: win.start, end: win.end, tz: tz)
-                    Text("Slack" + (timing.duration.map { " · \($0)" } ?? ""))
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(.slack) : SN.amber)
-                    Text("\(tilde)\(timing.span)")
-                        .font(.title3.monospacedDigit())
-                        .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
-                } else {
-                    Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber)
-                    HStack(spacing: 4) {
-                        Text("\(tilde)\(formatSpeed(abs(scrubSigned), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.title3.monospacedDigit())
-                        CompassArrow(deg: record.setDegrees(signed: scrubSigned)).font(.title3)
-                        Text(compass16(record.setDegrees(signed: scrubSigned))).font(.title3)
-                    }
-                    .foregroundStyle(provisionalGate == nil ? Self.phaseColor(phase) : SN.amber.opacity(0.85))
-                }
-                if let gate = provisionalGate {
-                    MonoLabel(text: "Fast answer · slack \(gate.provisionalTolerance)",
-                              color: SN.amber, tracking: 1.2)
-                        .padding(.horizontal, 8).padding(.vertical, 4)
-                        .background(SN.amber.opacity(0.16), in: Capsule())
-                        .padding(.top, 2)
-                        .accessibilityIdentifier("provisional-reading-badge")
-                }
-            }
-            Spacer()
-            if let slack = nextSlack {
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    if let win = slackWin {
-                        // Counts to the window OPENING, not the slack instant:
-                        // this readout answers "when can I be there", and the
-                        // window is when the pass is transitable. The window
-                        // brackets the slack, so it is often already open —
-                        // then it says `now` (gutter spec §5).
-                        Text(win.start > scrubTime
-                             ? "\(tilde)in \(countdown(from: scrubTime, to: win.start))"
-                             : "\(tilde)now")
-                            .font(.caption.monospacedDigit())
-                            // SN.go, not SN.leaf: this line says when slack is.
-                            // Same value today, but the token has to name the
-                            // meaning or retargeting one of them breaks it.
-                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
-                        // Time REMAINING, not the window's original length —
-                        // an already-open window must not claim its full run.
-                        // The threshold prints HERE, once, and not on the
-                        // strip: one statement of a constant is information,
-                        // six a day is texture.
-                        Text("\(tilde)for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(tl.slackThreshold, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(provisionalGate == nil ? SN.foam.opacity(0.7) : SN.amber.opacity(0.7))
-                            .accessibilityIdentifier("slack-window")
-                    } else {
-                        Text("\(tilde)in \(countdown(from: scrubTime, to: slack.time))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(provisionalGate == nil ? SN.go : SN.amber)
-                    }
-                }
-            }
-        }
     }
 
     private var footer: some View {
@@ -257,5 +170,11 @@ struct CurrentDetailView: View {
     private func rebuild() {
         timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: anchor,
                                       threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+    }
+}
+
+#Preview {
+    NavigationStack {
+        CurrentDetailView(record: CurrentStationRecord.all.first { $0.name == "Deception Pass (Narrows)" }!)
     }
 }

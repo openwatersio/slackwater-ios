@@ -108,6 +108,16 @@ enum SN {
         return Color(red: c.r / 255, green: c.g / 255, blue: c.b / 255)
     }
 
+    /// The ramp as text on the dark ground: lifted a quarter toward white so
+    /// the red end clears the small-text contrast floor the yellow end
+    /// already does.
+    static func speedLabelColour(_ t: Double) -> Color {
+        let c = speedRGB(t)
+        return Color(red: (c.r + (255 - c.r) * 0.25) / 255,
+                     green: (c.g + (255 - c.g) * 0.25) / 255,
+                     blue: (c.b + (255 - c.b) * 0.25) / 255)
+    }
+
     /// Ink for a label drawn ON the ramp fill — whichever of white or `canvas`
     /// has more contrast against it. Chosen from the ramp position rather
     /// than from how far the label sits off the zero line: the curve's shape
@@ -138,6 +148,9 @@ enum CurveStyle {
     static let pastLabelFade = 0.45
     /// Extreme and window-start dots; the now dot is its own size.
     static let dotRadius: CGFloat = 2.5
+    /// The slack run's stroke: a step fatter than the line, so the go mark
+    /// reads as a segment laid over it rather than a recolour of it.
+    static let runWidth: CGFloat = 3.5
     static let nowDotDiameter: CGFloat = 7
     /// The background-punched ring beyond a dot's or run's edge.
     static let haloGap: CGFloat = 2.5
@@ -148,12 +161,18 @@ enum CurveStyle {
     static let referenceLineOpacity = 0.35
     static let referenceLineDash: [CGFloat] = [1, 3]
     /// The reading hangs off a turn or peak toward the plot middle: the
-    /// value this far from the dot, the pointer glyph under it. Both tracks
-    /// read these, so tuning one cannot silently unpair the other.
+    /// pointer glyph nearest the dot, the value beyond it. The two gaps are
+    /// applied as ± around `hangOffset` in the direction the reading hangs,
+    /// so neither one names a fixed screen direction. Both tracks and the
+    /// card read these, so tuning one cannot silently unpair the others.
     static let hangOffset: CGFloat = 23
-    static let hangValueRise: CGFloat = 7
-    static let hangGlyphDrop: CGFloat = 8
+    static let hangValueGap: CGFloat = 7
+    static let hangGlyphGap: CGFloat = 8
     static let hangValueFontSize: CGFloat = 14
+    /// The detail strip's values: larger than the card's, it has the room.
+    static let stripValueFontSize: CGFloat = 18
+    /// The speed thread down the middle of the current line.
+    static let speedCore: CGFloat = 2
     static let hangGlyphFontSize: CGFloat = 12
 }
 
@@ -230,22 +249,15 @@ func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
     return f
 }
 
-/// "1:42 PM" — the card/readout style (web cardTime, en-US).
+/// "4:22pm" — the card/readout style. The same string `chartTime` prints:
+/// one clock across cards, readouts, charts and the schedule, so a time never
+/// changes shape between the surface you read it on and the one you tapped.
 func cardTime(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("h:mm a", tz).string(from: date)
+    chartTime(date, tz)
 }
 
-/// "14:05" — the chart/table style (web en-CA 24h). Zero-padded, and that
-/// padding is load-bearing in `MultiDaySchedule`: the times there are a
-/// left-aligned monospaced COLUMN, and "7:03" would hang a character left of
-/// "12:53" all the way down the list.
-func clockTime(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("HH:mm", tz).string(from: date)
-}
-
-/// "4:22pm" — the strip's clock. Twelve-hour, lowercase, no space and no
+/// "4:22pm" — the app's clock. Twelve-hour, lowercase, no space and no
 /// periods: " p.m." labels were mostly meridiem and collided because of it.
-/// `MultiDaySchedule` stays on 24h `clockTime` — its column needs the pad.
 func chartTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("h:mma", tz).string(from: date).lowercased()
 }
@@ -259,6 +271,8 @@ func shortWeekday(_ date: Date, _ tz: TimeZone) -> String {
 struct CompassArrow: View {
     let deg: Double
     var body: some View {
-        Text("↑").rotationEffect(.degrees(deg))
+        // The SF Symbol, not the "↑" text glyph: a text arrow at the same
+        // point size renders visibly smaller than its symbol neighbours.
+        Image(systemName: "arrow.up").rotationEffect(.degrees(deg))
     }
 }

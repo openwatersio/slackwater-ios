@@ -126,10 +126,10 @@ struct StationListView: View {
         // the sheet stays under the newly pushed route on the back stack —
         // correct behavior, not a side effect to work around.
         .environment(\.openChsRoute, openChsRoute)
-        // Same attachment point, same reasoning — the map-header title lives
+        // Same attachment point, same reasoning — the detail header lives
         // inside a pushed detail in both layouts, so ordinary ancestor
         // inheritance from here is enough; no `.sheet` re-forward needed
-        // because MapHeader never appears inside Settings or Downloads.
+        // because a station detail never appears inside Settings or Downloads.
         .environment(\.openMapFocused, openMapFocused)
         // Search is modal: hide the base surface from accessibility while the
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the

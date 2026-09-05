@@ -1,7 +1,7 @@
 name: Slackwater
 options:
   bundleIdPrefix: org.openwaters
-  # iOS 26: Liquid Glass chrome (MapHeader) with no #available fences. Raised
+  # iOS 26: Liquid Glass chrome with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
   # concern, not this app's.
@@ -117,6 +117,7 @@ targets:
       - Slackwater/CardStatus.swift
       - Slackwater/StationCardFace.swift
       - Slackwater/StationCardGraph.swift
+      - Slackwater/CurveDrawing.swift
       - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/StationIntent.swift

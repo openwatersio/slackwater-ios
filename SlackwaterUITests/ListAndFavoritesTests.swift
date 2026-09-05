@@ -163,7 +163,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // iPad the persistent sidebar can carry "Dodd Narrows" in its own Near
         // Me ranking independently of what's pushed, so the name alone is a
         // secondary tell at best.
-        let header = app.otherElements["detail-map-header"].firstMatch
+        let header = app.otherElements["detail-header"].firstMatch
         XCTAssert(header.waitForExistence(timeout: 5), "nearest-gate-link did not open a detail")
         XCTAssert(header.staticTexts["Dodd Narrows"].firstMatch.exists,
                   "nearest-gate-link did not land on the nearest shipped gate's detail")
@@ -360,7 +360,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Picking the collapsed one opens it — it is not lost, just quiet.
         app.staticTexts["6.6 nm SSE"].firstMatch.tap()
         XCTAssert(app.staticTexts["Discovery Island"].firstMatch.waitForExistence(timeout: 8))
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8),
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 8),
                   "the chooser pick did not open a station detail")
 
         // Recents keeps the station actually opened: the chooser pick is an
@@ -391,7 +391,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         for name in ["Deception Pass (Narrows)", "Deception Pass State Park"] {
             openSearch(app, "deception")
             pickSearchResult(app, app.staticTexts[name].firstMatch)
-            XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
+            XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 8))
             app.buttons["detail-back"].firstMatch.tap()
             XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
         }
@@ -448,7 +448,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         openSearch(app, "discovery island")
         pickSearchResult(app, app.staticTexts["3.0 nm NE"].firstMatch)
-        XCTAssert(app.otherElements["detail-map-header"].waitForExistence(timeout: 8))
+        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch.exists,
                        "an unpaired current station has no reference port to link")
         let before = scheduleRowLabels(app)
