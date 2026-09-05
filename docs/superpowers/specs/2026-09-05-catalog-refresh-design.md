@@ -132,7 +132,11 @@ directory, renames it to its final generation name, then atomically replaces
 the small `current` pointer. A crash before the pointer replacement leaves the
 old generation active. After a successful replacement, obsolete generations
 and abandoned staging directories are best-effort cleanup; failure to clean
-them cannot affect correctness.
+them cannot affect correctness. Cleanup needs no handshake with the widget
+process: a file the widget has already opened or mapped keeps serving reads
+after its directory is unlinked, and the widget's locator pins a generation
+per lookup and retries whole lookups when a pinned file has disappeared (see
+the widget rules below).
 
 On process start, the store reads and validates the pointed-to snapshot
 synchronously before any catalog consumer runs. If the pointer, directory,
@@ -162,9 +166,15 @@ requires the compact one-line record form the NOAA generators emit;
 `chs-gates.json` and `chs-current-gates.json` are pretty-printed, which is one
 reason the small catalogs are decoded whole rather than scanned. Every widget
 lookup, including CHS identity and tombstone lookup, goes through a small
-shared file locator, which first selects the active generation's file. If
-reading or decoding there fails, it logs the failure and retries the bundled
-file. If both sources fail it logs both failures and returns `nil`; it never
+shared file locator. The locator pins one generation per lookup: it resolves
+the `current` pointer once, and every related read in that lookup — a
+subordinate record, its reference, its tombstone check — uses the pinned
+directory, never a per-file re-resolution that could mix generations. If a
+pinned read fails — activation can replace the generation and cleanup can
+unlink it between the pointer read and the file open — the locator logs the
+failure, re-resolves the pointer once, and retries the whole lookup against
+the new generation. If that fails it retries the bundled files, and if the
+bundle also fails it logs every failure and returns `nil`; it never
 instantiates `CatalogStore`, crosses the store's main-actor boundary, or
 starts network work.
 
@@ -385,6 +395,8 @@ Focused Swift tests cover:
   NOAA single-record scanner and the small-catalog whole decodes — falls back
   to bundled records after active-file corruption, and does not instantiate
   the complete catalog store;
+- activation or cleanup between related widget reads causes one whole-lookup
+  retry against the new generation, never a mixed-generation result;
 - a restored background session finishes or rejects its staged batch before
   invoking the saved UIKit completion handler on the main thread.
 
