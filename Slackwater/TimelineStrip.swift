@@ -818,23 +818,35 @@ struct TimelineCanvas: View {
         // above, fading out at datum; amber below it, deepening downward. Both
         // hues vanish on the same line, so a low under datum reads as "less
         // water than the chart shows" with no seam at the crossing.
+        // The fade ends at datum when datum is in reach, else at the week's
+        // lowest trough: a station that never comes near datum would otherwise
+        // still be half-strong where the plot is clipped, a hard edge under
+        // the curve.
         let datumY = geo.tideY(0)
+        let lowest = data.tidePoints.map(\.height).min() ?? 0
+        let datumInReach = lowest <= 0
+        let fadeY = datumInReach ? datumY : geo.tideY(lowest)
         var area = line
         area.addLine(to: CGPoint(x: data.totalWidth, y: datumY))
         area.addLine(to: CGPoint(x: 0, y: datumY))
         area.closeSubpath()
-        let gradTop = min(geo.tideTop, datumY), gradBottom = max(geo.tideBottom, datumY)
-        let datumStop = (datumY - gradTop) / (gradBottom - gradTop)
+        let gradTop = min(geo.tideTop, fadeY), gradBottom = max(geo.tideBottom, fadeY)
+        let fadeStop = (fadeY - gradTop) / (gradBottom - gradTop)
+        var fillStops = [
+            Gradient.Stop(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
+            Gradient.Stop(color: SN.graphLine.opacity(0), location: fadeStop),
+        ]
+        if datumInReach {
+            fillStops.append(.init(color: SN.graphLow.opacity(0), location: fadeStop))
+            fillStops.append(.init(color: SN.graphLow.opacity(CurveStyle.fillOpacity), location: 1))
+        } else {
+            fillStops.append(.init(color: SN.graphLine.opacity(0), location: 1))
+        }
         var plot = ctx
         plot.clip(to: Path(CGRect(x: 0, y: geo.tideTop, width: data.totalWidth,
                                   height: geo.tideBottom - geo.tideTop)))
         plot.fill(area, with: .linearGradient(
-            Gradient(stops: [
-                .init(color: SN.graphLine.opacity(CurveStyle.fillOpacity), location: 0),
-                .init(color: SN.graphLine.opacity(0), location: datumStop),
-                .init(color: SN.graphLow.opacity(0), location: datumStop),
-                .init(color: SN.graphLow.opacity(CurveStyle.fillOpacity), location: 1),
-            ]),
+            Gradient(stops: fillStops),
             startPoint: CGPoint(x: 0, y: gradTop),
             endPoint: CGPoint(x: 0, y: gradBottom)))
 

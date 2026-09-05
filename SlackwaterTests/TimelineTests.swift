@@ -607,7 +607,7 @@ final class TimelineTests: XCTestCase {
         // less water than the chart shows with no seam at the crossing. Two
         // stops at the same location is what makes that edge invisible;
         // either one alone puts a hard line across the fill.
-        XCTAssertTrue(body.contains("datumStop"), "the fill is anchored at chart datum, not at the plot's edge")
+        XCTAssertTrue(body.contains("fadeStop"), "the fill fades to datum or the lowest trough, never to the plot's edge")
         XCTAssertTrue(body.contains("SN.graphLow.opacity(0)"), "the below-datum hue fades out at datum")
         XCTAssertFalse(body.contains("››››"), "chevrons are gone; the line carries the rate")
         XCTAssertTrue(body.contains("tideRateStops("), "the stroke takes its colour from the tide-rate ramp")

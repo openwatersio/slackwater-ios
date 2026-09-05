@@ -25,7 +25,7 @@ Geometry is fixed points (`TimelineGeo`): a 160pt pad the lead and pills sit ove
 
 Drawing rules, which the card graph adopts in the follow-up below:
 
-- **Tide fill** anchors at chart datum: blue at `fillOpacity` at the top fading to clear at datum, amber (`SN.graphLow`) fading in below it. The dashed datum line draws when datum is inside the plotted span.
+- **Tide fill** anchors at chart datum: blue at `fillOpacity` at the top fading to clear at datum, amber (`SN.graphLow`) fading in below it. When the week never reaches datum, the fade ends at its lowest trough instead, so the fill is clear where the plot is clipped. The dashed datum line draws when datum is inside the plotted span.
 - **Current fill** is blue on both sides of zero, `fillOpacity` at the extremes and clear at the zero line, with a dashed zero line. A schematic gate's shape takes a flat steel fill because its magnitude is unmeasured.
 - **Current line** is `SN.graphLine` at 2.5pt with a 2pt thread down its middle carrying the absolute speed ramp: clear below 0.5 kn, the ramp's yellow fading in to 3 kn, then yellow through orange to red on the shared anchors. A 6 kn peak is the same colour at every station.
 - **Slack runs** are one green (`SN.go`) segment per run inside a clear halo punched by a wider round-capped eraser. No end dots. The tide line keeps its rate ramp.
