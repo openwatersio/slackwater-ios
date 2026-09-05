@@ -219,7 +219,7 @@ const regionOf = (s) => {
  * Upstream's own `region` — "England", "Scotland", "Bretagne" — is the
  * presentation the source authority uses, and outside North America it is
  * the best context this pipeline has: the derived gazetteer tier never
- * reaches this far (see NORTH_AMERICA in bundle.mjs), and station-corrections
+ * reaches this far (see NORTH_AMERICA in bundle.mjs), and station-metadata
  * has no curated context for anywhere outside the Salish bundle yet.
  *
  * Two guards, both against a value that isn't a usable place name:
@@ -287,7 +287,7 @@ const collides = (s) => {
 // Runs on the RESOLVED/display name, not the raw upstream one — raw names
 // disagree across networks for the exact same gauge ("HILO" vs "Hilo
 // Hawaii", "CHARLOTTE AMALIE, ST. THOMAS ISLAND" vs "Charlotte Amalie",
-// same station id both times) and only converge once station-corrections
+// same station id both times) and only converge once station-metadata
 // and untrail() have run. Matching on the raw name missed those pairs
 // entirely; this is why the dedupe below runs AFTER naming, not before.
 const byName = new Map();
@@ -314,7 +314,7 @@ const samePlace = (s) =>
 // Mossel Bay, Port Sonara and Inhambane. Neither feed is reliably right, so
 // the tiebreak stays the deterministic one every machine reproduces.
 // ponytail: leaves a pin up to ~22 km off at Mossel Bay. Fix by curating the
-// position in station-corrections, which is where station identity belongs.
+// position in station-metadata, which is where station identity belongs.
 const uhslcKey = (id) =>
   id.match(/-(\d+)[a-z]?-([a-z]{3})-uhslc_(?:fd|rq)$/)?.slice(1, 3).join("-");
 const uhslcSeen = new Set();

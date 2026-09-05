@@ -55,6 +55,12 @@ git push -u origin docs/<topic>
 
 CI skips the app lane for those automatically, so opening one is not expensive — it's just rarely useful when there's nothing to review.
 
+## License and CLA
+
+Slackwater is licensed under [GPL-3.0](LICENSE.md). All contributors must sign the [Contributor License Agreement](CLA.md) before their pull request can be merged. The CLA grants Open Water Software, LLC the rights needed to distribute your contributions (including through the iOS App Store) while you retain full copyright ownership of your work — [docs/licensing.md](docs/licensing.md) explains why a GPL app on the App Store needs this.
+
+You will be prompted to sign the CLA automatically when you open your first pull request.
+
 ## Changing bundled station data
 
 The JSON files in `Slackwater/Resources/` are generated artifacts, not source. Edit the generator or its upstream input, then regenerate:

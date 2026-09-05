@@ -1,0 +1,42 @@
+name: CLA
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, synchronize, closed]
+
+env:
+  CLA_SIGN_COMMENT: "I have read the CLA Document and I hereby sign the CLA"
+
+jobs:
+  cla:
+    if: |
+      (github.event_name == 'pull_request_target' && github.event.action != 'closed') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA'))
+    runs-on: ubuntu-latest
+    # This workflow runs on pull_request_target and must NEVER check out or
+    # execute pull-request code. The four scopes are the minimum the assistant
+    # needs: contents to record signatures in .cla.json on main, pull-requests
+    # and statuses to report on the PR, actions to re-run the check after a
+    # signature lands.
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-document: "https://github.com/${{ github.repository }}/blob/main/CLA.md"
+          path-to-signatures: ".cla.json"
+          branch: "main"
+          allowlist: "*[bot]"
+          custom-notsigned-prcomment: |
+            Thank you for this pull request! Before we can accept your contribution, you need to sign our [Contributor License Agreement](https://github.com/${{ github.repository }}/blob/main/CLA.md). [Read more about why this is necessary.](https://github.com/${{ github.repository }}/blob/main/docs/licensing.md)
+
+            To sign, please reply to this comment with:
+          custom-pr-sign-comment: ${{ env.CLA_SIGN_COMMENT }}

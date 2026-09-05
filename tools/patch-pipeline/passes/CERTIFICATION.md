@@ -275,7 +275,7 @@ flare rule catches one of them:
   This is a clean §6b.3 FAIL, independent of the anchor-stability failure above, and it
   would still fail if the stability gate were cleared.
 
-The fix, if the owner wants one, belongs in `station-corrections` (the workspace's source
+The fix, if the owner wants one, belongs in `station-metadata` (the workspace's source
 of truth for station *position*), not in this pipeline: the CHS current-station positions
 for Dodd (49.134351 / −123.817132) and Porlier (49.015 / −123.585 — three decimals, and
 exactly round) are nominal chart labels, not the point the predictions describe. Seymour's
@@ -294,7 +294,7 @@ it is noted here because a reader comparing 960 m to a chart will otherwise assu
 
 ## Provenance and reproduction
 
-- Anchors: CHS gates, identity from `station-corrections/data/registry.json` (no
+- Anchors: CHS gates, identity from `station-metadata/data/registry.json` (no
   provider-minted station code is committed — the registry ships identity, the id resolves
   under the operator's own provider licence). Flood axes are the IWLS station metadata
   `floodDirection`: Dodd **355°** (floods N), Seymour **180°** (floods S), Porlier **30°**
