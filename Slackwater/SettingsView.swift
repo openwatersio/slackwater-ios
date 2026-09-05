@@ -121,7 +121,9 @@ struct SettingsView: View {
                     }
 
                     section("License") {
-                        Text("The Slackwater engine and web app are open source (MIT / GPL). This iOS app's own license is still being worked out — a copyleft structure that holds together with paid distribution — and will be published when it is.")
+                        Text("Slackwater is open source: this app under GPL-3.0, the prediction engine under MIT.")
+                        Link("Source on GitHub", destination: URL(string: "https://github.com/openwatersio/slackwater-ios")!)
+                            .foregroundStyle(SN.leaf)
                     }
 
                     section("Version") {

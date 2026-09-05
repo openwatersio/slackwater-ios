@@ -6,6 +6,8 @@ on:
   pull_request_target:
     types: [opened, synchronize, closed]
 
+# The signing phrase appears twice: here, and hard-coded in the job's `if:`,
+# where the env context is not available. Change both together.
 env:
   CLA_SIGN_COMMENT: "I have read the CLA Document and I hereby sign the CLA"
 
