@@ -97,6 +97,15 @@ extension TypeScaleTests {
             // to the nearest one above it — previewGraph.
             "StationCard.swift:previewGraph",
             "TideDetailView.swift:scheduleEntries",
+            // The summary tile's number: a tide's range and a current's next
+            // max are formatted where they are known and consumed by
+            // `SummaryTiles`' `Text(primary.value)`, which carries the mono
+            // trait (Theme.swift).
+            "TideDetailView.swift:range",
+            "CurrentLead.swift:nextMax",
+            // The fast tide's rate, consumed by `Commentary`'s Text, which
+            // carries the mono trait (Theme.swift).
+            "TideDetailView.swift:tideRateCommentary",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
             "OnlineGateDetailView.swift:body",
@@ -292,34 +301,5 @@ extension TypeScaleTests {
         XCTAssertTrue(spacers.first?.contains("fabClearance") == true,
                       "the FAB clearance spacer must be driven by fabClearance, not a literal: "
                       + (spacers.first ?? "<none>"))
-    }
-}
-
-extension TypeScaleTests {
-    /// The two current details drifted a redesign apart (#55): the online
-    /// gates kept the strip above the readout and the pre-redesign next-slack
-    /// copy long after `CurrentDetailView` moved on. Both tag the same
-    /// readout `slack-window`, so the cheap guard is that both still spell it
-    /// the same way and put it in the same place.
-    ///
-    /// Source text, like every other check in this file — SwiftUI exposes no
-    /// way to read a rendered hierarchy back. It catches a divergence, not a
-    /// rendering difference.
-    func testSlackWindowReadoutMatchesAcrossCurrentDetails() throws {
-        let window = "for \\(countdown(from: max(scrubTime, win.start), to: win.end)) @ "
-        for file in ["Slackwater/CurrentDetailView.swift",
-                     "Slackwater/OnlineGateDetailView.swift"] {
-            let src = try repoSource(file)
-            XCTAssertTrue(src.contains(window),
-                          "\(file) must print the slack window in the shared two-line form")
-            XCTAssertTrue(src.contains(".accessibilityIdentifier(\"slack-window\")"),
-                          "\(file) must tag that line slack-window")
-        }
-        // …and above the strip, which is the half of #55 that was visible.
-        let online = try repoSource("Slackwater/OnlineGateDetailView.swift")
-        let readout = try XCTUnwrap(online.range(of: "readout(window, tl)"))
-        let strip = try XCTUnwrap(online.range(of: "TimelineScrubStrip("))
-        XCTAssertLessThan(readout.lowerBound, strip.lowerBound,
-                          "the readout goes above the strip, same as CurrentDetailView")
     }
 }

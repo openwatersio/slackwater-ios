@@ -102,7 +102,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // a 210-day gate, so the card above lands on its 60-day fast answer —
         // the final footer is the tell that the full model has replaced
         // it (the fast answer's own footer says "60 of 210 days downloaded").
-        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        assertCurrentDetailRendered(app)
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 300))
 
@@ -116,7 +116,7 @@ final class LiveFetchTests: ScreenshotTestCase {
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
         XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
-        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        assertCurrentDetailRendered(app)
     }
 
     // After the reference port fits (live IWLS), the gate card
@@ -143,7 +143,9 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "tapping the gate did not open a detail")
         // ~5 min ceiling: the in-flight station finishes, then the promoted
         // Point Atkinson runs.
-        XCTAssert(app.staticTexts["NEXT SLACK"].waitForExistence(timeout: 300),
+        // A derived gate has no speed to lead with, so the lead itself — the
+        // phase word over the time — is the page filling in.
+        XCTAssert(leadReading(app).waitForExistence(timeout: 300),
                   "the open detail never filled in — Point Atkinson fit missing (IWLS unreachable?)")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
         XCTAssert(app.descendants(matching: .any).matching(identifier: "tide-at-port")
@@ -170,7 +172,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // Print today's rendered schedule times into the test log, to be read
         // against CHS's published ones. Scoped to the rows via scheduleValues:
         // unscoped, this print would quietly include iPad sidebar card readings.
-        print("M46-SCHEDULE-TIMES: \(scheduleValues(app, "\\b\\d{2}:\\d{2}\\b").sorted())")
+        print("M46-SCHEDULE-TIMES: \(scheduleValues(app, "\\b\\d{1,2}:\\d{2}(?:am|pm)\\b").sorted())")
 
         // The live card (PA fitted now): "Slack · time" line + the phase pill.
         app.buttons["detail-back"].firstMatch.tap()
@@ -331,7 +333,7 @@ final class LiveFetchTests: ScreenshotTestCase {
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists,
                        "a gate validated at 60 d must go straight to final — no provisional marking")
         pickSearchResult(app, app.staticTexts["Active Pass"].firstMatch)
-        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.waitForExistence(timeout: 10))
+        assertCurrentDetailRendered(app)
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'can be off by up to'")).firstMatch.exists,
                        "no fast-answer warning belongs on a final model")
@@ -394,7 +396,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         _ = warning.waitForNonExistence(timeout: 300)
         XCTAssertFalse(warning.exists, "the fast answer never refined to the full model")
         report("nearest 210-day gate → FINAL", t0)
-        XCTAssert(app.staticTexts["NEXT SLACK"].firstMatch.exists, "the refined page is still a live detail")
+        assertCurrentDetailRendered(app)  // the refined page is still a live detail
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.exists,
                   "the refined page carries the ordinary final footer")

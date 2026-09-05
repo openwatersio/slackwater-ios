@@ -58,20 +58,10 @@ struct OnlineGateDetailView: View {
     /// frame (#231).
     @State private var timeline: TimelineData?
 
-    private var scrubSigned: Double { timeline?.velocityAt(scrubTime) ?? 0 }
-    private var phase: CurrentPhase { currentPhase(signed: scrubSigned) }
-    private var activeSlackWin: (slack: Date, start: Date, end: Date)? {
-        timeline?.containingSlackWindow(at: scrubTime)
-    }
-    private var nextSlack: CurrentEvent? {
-        timeline?.currentEvents.first { $0.kind == .slack && $0.time > scrubTime }
-    }
-    /// The window around the next slack — looked up, not recomputed, so it
-    /// can never disagree with the band the strip draws (#233).
-    private var slackWin: (start: Date, end: Date)? {
-        guard let slack = nextSlack else { return nil }
-        return timeline?.slackWindows.first { $0.slack == slack.time }
-            .map { (start: $0.start, end: $0.end) }
+    private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow) -> CurrentLead {
+        CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: tl.velocityAt(scrubTime),
+                    floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
+                    speedUnit: speedUnit, tz: tz)
     }
 
     /// The unfetched card's one tap out: nearest of the 11 shipped (fittable)
@@ -86,7 +76,6 @@ struct OnlineGateDetailView: View {
     var body: some View {
         // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
         ScrubDetailScaffold(name: gate.name, region: gate.region,
-                            latitude: gate.latitude, longitude: gate.longitude,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline,
                             entries: { tl in
@@ -94,32 +83,32 @@ struct OnlineGateDetailView: View {
                                 return scheduleEntries(tl, floodDeg: window.floodDirection,
                                                        ebbDeg: window.ebbDirection, speedUnit: speedUnit)
                             },
-                            live: $live, scrubTime: $scrubTime,
-                            onReturn: returnToNow,
+                            scrubTime: $scrubTime,
                             anchor: $anchor,
                             // A stored block, even one the anchor has paged off,
                             // is a week the picker can get back to; none is not.
                             canPickDate: window != nil,
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in applyAnchor() },
-                            scrubSummary: { tl in
-                                guard let range = currentPeakToPeakRange(tl.currentEvents, around: scrubTime) else { return nil }
-                                return ("Range", "\(formatSpeed(range, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            },
                             above: { EmptyView() },
                             card: { tl in
                                 if let window {
-                                    readout(window, tl)
-                                    TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                       speedUnit: speedUnit, now: live,
-                                                       floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
-                                                       scrubTime: $scrubTime, onReturn: returnToNow)
-                                        .padding(.horizontal, -16)  // full-bleed strip
-                                        .padding(.top, 12)
+                                    CurrentScrubCard(lead: lead(tl, window), data: tl, speedUnit: speedUnit,
+                                                     now: live, floodDeg: window.floodDirection,
+                                                     ebbDeg: window.ebbDirection,
+                                                     scrubTime: $scrubTime, onReturn: returnToNow)
                                 }
                             },
-                            links: {
-                                if let port = pairedTide { TideAtPortLink(port: port) }
+                            links: { tl in
+                                VStack(spacing: 12) {
+                                    // `tl`, never this view's `timeline`: that
+                                    // property rebuilds the whole TimelineData
+                                    // on every read, and the scaffold has
+                                    // already built the one on screen.
+                                    SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
+                                                 at: scrubTime)
+                                    if let port = pairedTide { TideAtPortLink(port: port) }
+                                }
                             },
                             bottom: {
                                 if let note = gate.magnitudeNote {
@@ -217,71 +206,6 @@ struct OnlineGateDetailView: View {
             } catch {
                 fetching = false
                 fetchFailed = true
-            }
-        }
-    }
-
-    // MARK: - Fetched: readout above the strip
-
-    private func setDegrees(_ signed: Double, _ window: ChsOnlineWindow) -> Double {
-        signed >= 0 ? window.floodDirection : window.ebbDirection
-    }
-
-    private func readout(_ window: ChsOnlineWindow, _ tl: TimelineData) -> some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let win = activeSlackWin {
-                    let timing = slackWindowTiming(start: win.start, end: win.end, tz: tz)
-                    Text("Slack" + (timing.duration.map { " · \($0)" } ?? ""))
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(CurrentDetailView.phaseColor(.slack))
-                    Text(timing.span)
-                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7))
-                } else {
-                    Text("\(phase.gloss?.capitalized ?? phase.word) · \(phase.word)")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(CurrentDetailView.phaseColor(phase))
-                    HStack(spacing: 4) {
-                        Text("\(formatSpeed(abs(scrubSigned), unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.title3.monospacedDigit())
-                        CompassArrow(deg: setDegrees(scrubSigned, window)).font(.title3)
-                        Text(compass16(setDegrees(scrubSigned, window))).font(.title3)
-                    }
-                    .foregroundStyle(CurrentDetailView.phaseColor(phase))
-                }
-            }
-            Spacer()
-            if let slack = nextSlack {
-                // Same two-line window form as CurrentDetailView, minus its
-                // tilde/amber provisional treatment — an online gate is never
-                // provisional, the published numbers are all there is (#55).
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Next slack", color: SN.foam.opacity(0.5), tracking: 1.4)
-                    if let win = slackWin {
-                        // Counts to the window OPENING, not the slack instant:
-                        // this readout answers "when can I be there", and the
-                        // window is when the pass is transitable. The window
-                        // brackets the slack, so it is often already open —
-                        // then it says `now` (gutter spec §5).
-                        Text(win.start > scrubTime
-                             ? "in \(countdown(from: scrubTime, to: win.start))"
-                             : "now")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.go)
-                        // Time REMAINING, not the window's original length —
-                        // an already-open window must not claim its full run.
-                        // The threshold prints HERE, once, and not on the
-                        // strip.
-                        Text("for \(countdown(from: max(scrubTime, win.start), to: win.end)) @ \(formatSpeed(tl.slackThreshold, unit: speedUnit)) \(speedUnitLabel(speedUnit))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.foam.opacity(0.7))
-                            .accessibilityIdentifier("slack-window")
-                    } else {
-                        Text("in \(countdown(from: scrubTime, to: slack.time))")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SN.go)
-                    }
-                }
             }
         }
     }

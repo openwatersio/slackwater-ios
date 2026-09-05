@@ -8,8 +8,9 @@
 //     `onAppear` and no `.task`, and it draws no `UIViewRepresentable` — a
 //     MapLibre header or a `TimelineScrubber` comes out empty — so it is only
 //     ever pointed at drawing leaves like `TimelineCanvas`.
-//   * SIZE works: `UIHostingController.sizeThatFits`, the HeroChromeTests /
-//     ScrubWhenTests idiom.
+//   * SIZE works: host the view in a `UIHostingController` and ask
+//     `sizeThatFits` — the probe for "how tall does this get at
+//     accessibility5".
 //   * The RENDERED TEXT and the PER-ELEMENT FRAMES do not. A `_UIHostingView`
 //     in this target builds no subviews and an empty accessibility tree
 //     (`accessibilityElements` is empty, laid out, in a key window, after a
@@ -31,9 +32,9 @@ import UIKit
 /// whose "blank" was 0.008 — a strip element holding only the centerline, the
 /// riding dot and the ft axis, SwiftUI overlays drawn ON TOP of the canvas. An
 /// `ImageRenderer` shot of `TimelineCanvas` alone has no overlays and the whole
-/// 228-hour span of day chrome, which measures 0.071 with no track on it. A
-/// completely blank chart would sail past 0.05 here. `drawnStripInk` is the
-/// threshold measured against that floor; see it for the numbers.
+/// 228-hour span of day chrome. A completely blank chart would sail past 0.05
+/// here, and a drawn one sits under it. `drawnStripInk` is the threshold
+/// measured against the real floor; see it for the numbers.
 func inkFraction(_ image: UIImage) -> Double {
     guard let cg = image.cgImage else { return 0 }
     let w = cg.width, h = cg.height
@@ -87,17 +88,22 @@ func blankStripInk(tz: TimeZone, now: Date = appNow()) -> Double {
 }
 
 /// "Something is on this strip beyond its day chrome." Measured over
-/// `ImageRenderer` at 1×, full 228-hour width:
+/// `ImageRenderer` at 1×, full 228-hour width, on a 396pt canvas — the height
+/// `TimelineGeo` gives a single-track strip: a 160pt lead pad, a 150pt plot,
+/// and the time, day and moon rows under it. Every number here scales with
+/// that height, because the ink is a FRACTION of the bitmap and the pad is
+/// empty canvas — the lead and its pills are SwiftUI overlays, drawn above
+/// this bitmap, not into it. A geometry change moves all six numbers, so
+/// re-measure rather than nudging the threshold.
 ///
-///     no track (day chrome only)   0.071
-///     derived gate (schematic ±1)  0.187   ← the lowest drawn shape
-///     online gate (fetched speeds) 0.207
-///     Avonmouth tide               0.297
-///     Boston tide                  0.312
-///     Friday Harbor tide           0.363
+///     no track (day chrome only)   0.028
+///     online gate (fetched speeds) 0.075   ← the lowest drawn shape
+///     derived gate (schematic ±1)  0.090
+///     Boston tide                  0.097
+///     Avonmouth tide               0.102
+///     Friday Harbor tide           0.115
 ///
-/// 0.12 sits in the gap, with ~1.7× of margin either side. The schematic gate
-/// sets the low end: a thin ±1 shape carries no fill under it, so it clears the
-/// floor by far less than any tide curve does — a threshold tuned on a tide
-/// station alone would reject it.
-let drawnStripInk = 0.12
+/// 0.046 sits in the gap, with ~1.6× of margin either side. The online gate
+/// sets the low end: its fetched curve spends the window near zero, hugging
+/// the middle of a plot the tide curves fill top to bottom.
+let drawnStripInk = 0.046

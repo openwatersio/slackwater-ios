@@ -29,11 +29,3 @@ func tideFlowArrows(_ rates: [TideRatePoint]) -> [TideRatePoint] {
     finishRun()
     return peaks
 }
-
-func tideRateSeverity(_ rate: Double) -> String? {
-    let rate = abs(rate)
-    guard rate >= tideMovementRampAnchorsMHr[0] else { return nil }
-    if rate >= tideMovementRampAnchorsMHr[2] { return "🚨 Extreme" }
-    if rate >= tideMovementRampAnchorsMHr[1] { return "‼️ Very fast" }
-    return "⚠️ Fast"
-}

@@ -240,12 +240,12 @@ struct StationCardGraph: View {
                 context.draw(Text(e.valueText)
                                 .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit())
                                 .foregroundStyle(text),
-                             at: CGPoint(x: dotAt.x, y: cy - CurveStyle.hangValueRise))
+                             at: CGPoint(x: dotAt.x, y: cy + toward * CurveStyle.hangValueGap))
                 if let deg = e.deg {
                     // The SF Symbol, not the "↑" text glyph — a text arrow
                     // at the same point size renders visibly smaller.
                     var rotated = context
-                    rotated.translateBy(x: dotAt.x, y: cy + CurveStyle.hangGlyphDrop)
+                    rotated.translateBy(x: dotAt.x, y: cy - toward * CurveStyle.hangGlyphGap)
                     rotated.rotate(by: .degrees(deg))
                     rotated.draw(Text(Image(systemName: "arrow.up"))
                                     .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .bold))
@@ -255,7 +255,7 @@ struct StationCardGraph: View {
                     context.draw(Text(e.high ? "⤒" : "⤓")
                                     .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
                                     .foregroundStyle(tint),
-                                 at: CGPoint(x: dotAt.x, y: cy + CurveStyle.hangGlyphDrop))
+                                 at: CGPoint(x: dotAt.x, y: cy - toward * CurveStyle.hangGlyphGap))
                 }
             }
 

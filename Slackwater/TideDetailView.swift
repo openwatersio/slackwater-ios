@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Tide detail on the iOS scrub model (prototype
 // TidesApp.dc.html, not the web's): a FIXED reading line at the center of the
 // strip, the continuous multi-day curve panning underneath it. No day pager —
-// free panning plus the map header's return-to-now. The schedule below is a
+// free panning plus return-to-now. The schedule below is a
 // rolling list over `Timeline.scheduleRange` — the week hanging off the
 // anchor, and the strip is `Timeline.window` over the same anchor — with day
 // headers; rows scrub, cross-day.
@@ -32,48 +32,61 @@ struct TideDetailView: View {
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
-    private var tideState: String {
-        if let turn = timeline?.tideExtremes.first(where: { abs($0.time.timeIntervalSince(scrubTime)) < 1 }) {
-            return turn.kind == .high ? "High tide" : "Low tide"
-        }
-        return rising ? "Rising" : "Falling"
+    /// Metres per hour under the centerline, signed.
+    private var scrubRate: Double { timeline?.rateAt(scrubTime) ?? 0 }
+    /// The line is on the ramp here: the water is moving faster than the
+    /// first anchor, the same test `tideRateStops` colours by.
+    private var fastTide: Bool { abs(scrubRate) >= tideMovementRampAnchorsMHr[0] }
+    /// The rate ramp's colour when the rate is out of the ordinary (#95: at
+    /// Friday Harbor 0.8 ft/hr is nothing, at Ile Haute 8 ft/hr is the
+    /// warning), else nil and the direction colour stands.
+    private var rateWarningColor: Color? {
+        fastTide ? SN.speedColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
-    /// m/hr at the scrub time; sign lives in the ▲/▼, display is unsigned.
-    private var scrubRate: Double { record.engineStation.rateOfChange(at: scrubTime) }
-    private var tideRateWarning: (text: String, color: Color)? {
-        guard let flow = timeline.flatMap({ timeline in
-            tideFlowArrows(timeline.tideRates).first {
-                abs($0.time.timeIntervalSince(scrubTime)) < 1
-            }
-        }), let severity = tideRateSeverity(flow.rate) else { return nil }
-        let direction = flow.rate >= 0 ? "rising" : "falling"
-        return ("\(severity) \(direction)",
-                SN.speedColour(Timeline.rampT(forTideRateMHr: abs(flow.rate))))
+    /// What the pill says: the rate while the tide is fast — it explains the
+    /// yellow line under it — else the next turn.
+    private var commentary: String? {
+        if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
+        return nextExtreme.map {
+            commentaryText($0.kind == .high ? "High" : "Low", at: $0.time, from: scrubTime, now: live)
+        }
+    }
+    private var commentaryTint: Color? {
+        fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
+    }
+    /// A fast tide's tap goes to this run's fastest point — the flow arrow the
+    /// magnet already snaps to — so the pill then reads the peak rate. From
+    /// the peak itself, or a quiet tide, it goes to the next turn.
+    private func scrubToCommentary() {
+        if fastTide, let tl = timeline,
+           let peak = tideFlowArrows(tl.tideRates)
+               .filter({ ($0.rate < 0) == (scrubRate < 0) })
+               .min(by: { abs($0.time.timeIntervalSince(scrubTime)) < abs($1.time.timeIntervalSince(scrubTime)) }),
+           abs(peak.time.timeIntervalSince(scrubTime)) > 1 {
+            scrubTime = peak.time
+        } else if let next = nextExtreme {
+            scrubTime = next.time
+        }
     }
 
     var body: some View {
         ScrubDetailScaffold(name: record.name, region: record.region,
-                            latitude: record.latitude, longitude: record.longitude,
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
-                            live: $live, scrubTime: $scrubTime,
-                            onReturn: returnToNow,
+                            scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
-                            scrubSummary: { _ in
-                                guard let prev = prevExtreme, let next = nextExtreme else { return nil }
-                                return ("Range", "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)")
-                            },
                             above: { EmptyView() },
                             card: { tl in
-                                readout
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    imperial: imperial, now: live, scrubTime: $scrubTime,
-                                                   onReturn: returnToNow)
-                                    .padding(.horizontal, -16)  // full-bleed strip (prototype margin 0 -16)
-                                    .padding(.top, 12)
+                                                   onReturn: returnToNow,
+                                                   commentary: commentary,
+                                                   commentaryTint: commentaryTint,
+                                                   onCommentary: scrubToCommentary)
+                                    .overlay(alignment: .top) { lead }
                             },
-                            links: { EmptyView() },
+                            links: { _ in SummaryTiles(primary: range, at: scrubTime) },
                             bottom: {
                                 VStack(spacing: 14) {
                                     footer
@@ -92,41 +105,36 @@ struct TideDetailView: View {
             }
     }
 
-    // MARK: - Readout above the strip
+    // MARK: - The lead reading, fixed over the centerline
 
-    private var readout: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tideState)
-                    .font(.title2.weight(.medium))
-                    .foregroundStyle(rising ? SN.rising : SN.falling)
-                HStack(spacing: 4) {
-                    Text(rising ? "▲" : "▼").font(.caption2)
-                    // Rate of rise, first-class (#95): at Friday Harbor this
-                    // reads 0.8 ft/hr and nobody looks twice; at Ile Haute it
-                    // reads 8 ft/hr and does the work of a warning.
-                    Text("\(formatHeight(abs(scrubRate), imperial: imperial)) \(unit)/hr")
-                        .font(.title3.monospacedDigit())
-                    if let warning = tideRateWarning {
-                        Text(warning.text)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(warning.color)
-                    }
-                }
-                .foregroundStyle(rising ? SN.rising : SN.falling)
-            }
-            Spacer()
-            if let next = nextExtreme {
-                VStack(alignment: .trailing, spacing: 1) {
-                    MonoLabel(text: "Next \(next.kind == .high ? "High" : "Low")",
-                              color: SN.foam.opacity(0.5), tracking: 1.4)
-                    Text("\(formatHeight(next.height, imperial: imperial)) \(unit)")
-                        .font(.title3.monospacedDigit()).foregroundStyle(SN.foam)
-                    // Relative only — the absolute time lives on the strip.
-                    Text("in \(countdown(from: scrubTime, to: next.time))")
-                        .font(.caption.monospacedDigit()).foregroundStyle(SN.leaf)
-                }
-            }
+    /// At a turn the water is at its high or low; otherwise it is on its way
+    /// to one. Snap targets land exactly on the extreme, hence the 1 s.
+    private var atTurn: TideExtreme? {
+        timeline?.tideExtremes.first { abs($0.time.timeIntervalSince(scrubTime)) < 1 }
+    }
+    /// This swing's range: the extreme behind the scrub to the one ahead.
+    private var range: (label: String, value: String, caption: String)? {
+        guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+        return ("Range",
+                "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
+                prev.kind == .low ? "low to high" : "high to low")
+    }
+
+    private var lead: some View {
+        let turn = atTurn
+        let up = turn.map { $0.kind == .high } ?? rising
+        let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
+        return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
+                            + Text(" \(unit)").font(ReadoutType.leadUnit),
+                        time: chartTime(scrubTime, tz)) {
+            // Word then glyph, the order the current lead reads in.
+            leadState(state)
+            // The graph's own two inks, so the eyebrow names the curve the
+            // reader is looking at — unless the rate is out of the ordinary
+            // (#95), which outranks direction.
+            Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
+                              ?? (rising ? "arrow.up.right" : "arrow.down.right"))
+                .foregroundStyle(rateWarningColor ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
 
@@ -231,5 +239,19 @@ struct TideDetailView: View {
     /// can never be applied by two different code paths.
     private func rebuild() {
         timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
+    }
+}
+
+/// "Falling 5.2 ft/hr" while the water moves faster than the ramp's first
+/// anchor — the reason the line is yellow — else nil. `rate` is metres per
+/// hour, signed; the height formatter converts it like a height.
+func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
+    guard abs(rate) >= tideMovementRampAnchorsMHr[0] else { return nil }
+    return "\(rate < 0 ? "Falling" : "Rising") \(formatHeight(abs(rate), imperial: imperial)) \(heightUnit(imperial: imperial))/hr"
+}
+
+#Preview {
+    NavigationStack {
+        TideDetailView(record: TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!)
     }
 }

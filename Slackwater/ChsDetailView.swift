@@ -52,8 +52,7 @@ struct ChsDetailView: View {
                 if case .fitted(let record) = service.state(info.id) {
                     TideDetailView(record: record)
                 } else {
-                    waiting(name: info.name, region: info.region, favoriteId: info.id,
-                            latitude: info.latitude, longitude: info.longitude, needs: nil)
+                    waiting(name: info.name, region: info.region, favoriteId: info.id, needs: nil)
                 }
             case .currentGate(let gate):
                 if gate.isOnline {
@@ -66,15 +65,14 @@ struct ChsDetailView: View {
                 } else {
                     // Bare id: CHS gates key the catalog without the NOAA
                     // "current:" prefix — see CurrentStationRecord.itemId.
-                    waiting(name: gate.name, region: gate.region, favoriteId: gate.id,
-                            latitude: gate.latitude, longitude: gate.longitude, needs: nil)
+                    waiting(name: gate.name, region: gate.region, favoriteId: gate.id, needs: nil)
                 }
             case .derivedGate(let gate):
                 if case .fitted(let port) = service.state(gate.reference) {
                     DerivedGateDetailView(record: DerivedGateRecord(gate: gate, port: port))
                 } else {
                     waiting(name: gate.name, region: gate.region, favoriteId: gate.id,
-                            latitude: gate.latitude, longitude: gate.longitude, needs: gate.referenceName)
+                            needs: gate.referenceName)
                 }
             }
         }
@@ -96,22 +94,21 @@ struct ChsDetailView: View {
     }
 
     private func waiting(name: String, region: String, favoriteId: String,
-                         latitude: Double, longitude: Double, needs: String?) -> some View {
-        ChsWaitingView(jobID: route.jobID, name: name, region: region, favoriteId: favoriteId,
-                       latitude: latitude, longitude: longitude, referenceName: needs)
+                         needs: String?) -> some View {
+        ChsWaitingView(jobID: route.jobID, name: name, region: region,
+                       favoriteId: favoriteId, referenceName: needs)
     }
 }
 
-/// The unfitted station page: the ordinary map header (so it is recognisably
-/// this station, and back/favourite work), then the live status in place of
-/// the chart. Never an empty chart, never a spinner to nothing.
+/// The unfitted station page: the same name header the four scrub details
+/// wear (so it is recognisably this station, and back/favourite work), then
+/// the live status in place of the chart. Never an empty chart, never a
+/// spinner to nothing.
 struct ChsWaitingView: View {
     let jobID: String
     let name: String
     let region: String
     let favoriteId: String
-    let latitude: Double
-    let longitude: Double
     /// Set for a derived gate: the reference port whose tide it waits on.
     let referenceName: String?
 
@@ -129,7 +126,7 @@ struct ChsWaitingView: View {
     private var series: String { isCurrent ? "current" : "tidal" }
 
     var body: some View {
-        // GeometryReader reads the real top inset for MapHeader (only the
+        // GeometryReader reads the real top inset for DetailHeader (only the
         // ScrollView below ignores the safe area) — the scaffold in
         // Theme.swift does the same.
         GeometryReader { geo in
@@ -140,9 +137,11 @@ struct ChsWaitingView: View {
                 // inset the pill sits on — inside the tinted card, like the
                 // scrub card's interior 14 — so the seam doesn't double up.
                 VStack(spacing: 0) {
-                    MapHeader(name: name, region: region, latitude: latitude, longitude: longitude,
-                              favoriteId: favoriteId, topSafeInset: geo.safeAreaInsets.top,
-                              minHeight: (geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom) / 3)
+                    // No map while a station downloads: the header names the
+                    // station and gets out of the way, so the status card is
+                    // the whole page.
+                    DetailHeader(name: name, region: region, favoriteId: favoriteId,
+                                 topSafeInset: geo.safeAreaInsets.top)
                     statusCard
                     footer
                 }

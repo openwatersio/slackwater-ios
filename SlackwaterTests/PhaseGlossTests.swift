@@ -2,11 +2,11 @@ import XCTest
 import TideEngine
 @testable import Slackwater
 
-/// Issue #59: "Flooding"/"Ebbing" mean nothing to non-sailors. Roomy surfaces
-/// (the detail heroes) gloss the word in place — "Flooding · incoming" — and
-/// tight surfaces (list cards, schedule pills) lead with the direction
-/// instead. The shared phase word itself never changes: sailors want it, and
-/// it aligns with the CHS/NOAA tables.
+/// Issue #59: "Flooding"/"Ebbing" mean nothing to non-sailors, so no surface
+/// leans on the word alone. The details lead with the phase word and carry the
+/// direction beside it; the tight surfaces (list cards, schedule pills) lead
+/// with the direction outright. The shared phase word itself never changes:
+/// sailors want it, and it aligns with the CHS/NOAA tables.
 final class PhaseGlossTests: XCTestCase {
 
     func testGlossWords() {
@@ -24,14 +24,18 @@ final class PhaseGlossTests: XCTestCase {
     }
 
     /// Source tripwires (the register ColourAndFormTests' chart guard set):
-    /// each detail hero renders the gloss; the tight surfaces render the
-    /// cardinal beside the arrow rather than gloss text.
-    func testGlossAndDirectionReachTheirSurfaces() throws {
-        for hero in ["CurrentDetailView.swift", "OnlineGateDetailView.swift",
-                     "DerivedGateDetailView.swift"] {
-            XCTAssertTrue(try repoSource("Slackwater/\(hero)").contains(".gloss"),
-                          "\(hero): detail hero lost its plain-word gloss (#59)")
-        }
+    /// every lead states the phase in words, and every surface that has room
+    /// for a bearing prints the cardinal beside its arrow rather than leaving
+    /// direction to a colour.
+    func testPhaseWordAndDirectionReachTheirSurfaces() throws {
+        // The measured leads — `CurrentLead` draws for both, so the two views
+        // cannot drift apart — and the derived gate's own lead, which has a
+        // phase but no bearing to point at.
+        XCTAssertTrue(try repoSource("Slackwater/CurrentLead.swift").contains("phase.word"),
+                      "the measured current lead lost its phase word (#59)")
+        XCTAssertTrue(try repoSource("Slackwater/DerivedGateDetailView.swift").contains("phase.word"),
+                      "the derived gate's lead lost its phase word (#59)")
+
         // The list cards lead with arrow + cardinal, rendered once for every
         // card kind by ConditionsItem's `.current` case — a single call site
         // by design, so this asserts presence, not a count. ConditionsItem
