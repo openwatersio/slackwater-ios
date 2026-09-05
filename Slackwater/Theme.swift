@@ -231,6 +231,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// Optional aggregate reading for the bottom of the scrub card.
     var scrubSummary: (TimelineData) -> (label: String, value: String)? = { _ in nil }
     @State private var showPicker = false
+    /// A shared link's moment (`pendingScrubInstant`), held from this view's
+    /// appear until the caller's first timeline lands.
+    @State private var linkedInstant: Date?
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -286,6 +289,32 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .environment(\.timeZone, tz)
             .toolbar(.hidden, for: .navigationBar)
+            // A shared link's moment (#187). Taken on appear so it reaches only
+            // the detail the link opened, but APPLIED once the timeline exists:
+            // the caller's own onAppear sets the anchor and builds, and SwiftUI
+            // does not promise which onAppear runs first — a scrub set here
+            // would be built over. Waiting for the timeline is deterministic,
+            // and for an online gate it is also when there is anything to
+            // scrub.
+            .onAppear {
+                if let t = pendingScrubInstant {
+                    pendingScrubInstant = nil
+                    linkedInstant = t
+                }
+            }
+            .onChange(of: timeline == nil) { _, isNil in
+                guard !isNil, let t = linkedInstant else { return }
+                linkedInstant = nil
+                scrubTime = t
+                // The picker's rule, inverted: move the window only when the
+                // moment isn't already on the strip, so a link to later today
+                // doesn't open on a week bar reading "not this week".
+                let week = Timeline.window(anchor: anchor)
+                if t < week.start || t > week.end {
+                    anchor = dayLocal(t, tz)
+                    onPicked(anchor)
+                }
+            }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
                     // Park the centerline on the picked week when it isn't already

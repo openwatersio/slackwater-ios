@@ -118,3 +118,84 @@ func stationLink(from url: URL) -> StationLink? {
         return nil
     }
 }
+
+// MARK: - Slug ↔ station
+
+/// Resources/slugs.json (tools/gen-slugs.mjs): the published slug of every
+/// bundled station, per kind, keyed by CATALOG id — bare `noaa/…` for a
+/// current; the `current:` prefix is `StationItem.id`'s own. Loaded on first
+/// use only, so the widget appex, which compiles this file but bundles no
+/// table, never pays for it.
+private struct SlugTable: Decodable {
+    let tide: [String: String]
+    let current: [String: String]
+
+    static let shared: SlugTable = {
+        guard let url = Bundle.main.url(forResource: "slugs", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let table = try? JSONDecoder().decode(SlugTable.self, from: data)
+        else { return SlugTable(tide: [:], current: [:]) }
+        return table
+    }()
+
+    /// slug → catalog id. Two rows on one slug are one station recorded
+    /// twice (station-metadata #24), so whichever wins is the same water.
+    static let tideIDs = invert(shared.tide)
+    static let currentIDs = invert(shared.current)
+    private static func invert(_ table: [String: String]) -> [String: String] {
+        Dictionary(table.map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+}
+
+/// The bundled station a shared link names, or nil when this build has none
+/// under that slug — an older build, or a station that has since left the
+/// bundle. Never a different station: a slug is allocated once and never
+/// reused, so a miss is a dead link and not the wrong water.
+func stationItem(for link: StationLink) -> StationItem? {
+    switch link.kind {
+    case .tides:
+        return SlugTable.tideIDs[link.slug].flatMap { StationItem.byId[$0] }
+    case .currents:
+        guard let id = SlugTable.currentIDs[link.slug] else { return nil }
+        // A NOAA current keys the list with the `current:` prefix; a CHS gate
+        // keys it bare (CurrentStationRecord.itemId). Try the prefix first —
+        // a bare `noaa/…` is only ever a tide.
+        return StationItem.byId["current:" + id] ?? StationItem.byId[id]
+    }
+}
+
+/// The link to share for a station — the inverse of `stationItem(for:)`. `at`
+/// is the moment the sender is looking at, written in `tz` (the station's own
+/// zone, so the receiver reads the same absolute instant wherever they are);
+/// nil means "now", which is what sharing an unscrubbed view means. Nil when
+/// the station has no published slug, which the generator makes impossible
+/// for anything bundled.
+func shareURL(forStationID id: String, at instant: Date?, tz: TimeZone) -> URL? {
+    guard let item = StationItem.byId[id] else { return nil }
+    let kind: StationLink.Kind
+    let slug: String?
+    switch item {
+    case .tide, .chs:
+        kind = .tides; slug = SlugTable.shared.tide[id]
+    case .current(let s):
+        kind = .currents; slug = SlugTable.shared.current[s.id]
+    case .chsGate, .chsCurrent:
+        kind = .currents; slug = SlugTable.shared.current[id]
+    }
+    guard let slug else { return nil }
+    var path = "/\(kind.rawValue)/\(slug)"
+    if let instant { path += "/" + stationLinkInstant(instant, tz: tz) }
+    return URL(string: "https://\(stationLinkHost)\(path)")
+}
+
+/// The instant segment as the web writes it: minute precision, the offset
+/// spelled out (`ZZZZZ` writes "-07:00", and "Z" for UTC — both of which
+/// `stationLinkInstant(from:)` reads back).
+private func stationLinkInstant(_ instant: Date, tz: TimeZone) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.timeZone = tz
+    formatter.dateFormat = stationLinkInstantFormats[0]
+    return formatter.string(from: instant)
+}

@@ -394,13 +394,10 @@ struct StationListView: View {
     private func handleDeepLink(_ url: URL) {
         // A universal link arrives here too, not through a separate callback.
         if let link = stationLink(from: url) {
-            // Resolving a slug to a station needs the published slug table
-            // bundled - station-metadata ships it as data/slugs.json, and the
-            // generators here are still on the release before it. Until that
-            // lands there is nothing to look up, and the app simply opens where
-            // it was: no crash, no wrong station, and the link is no longer
-            // handed to Safari.
-            _ = link
+            // A slug this build doesn't know — an older build, or a station
+            // that has since left the bundle — opens nothing. It can never open
+            // something else: a slug is allocated once and never reused.
+            if let item = stationItem(for: link) { open(item, at: link.instant) }
             return
         }
         guard url.scheme == "slackwater" else { return }
@@ -416,7 +413,11 @@ struct StationListView: View {
     /// Show a station picked anywhere (row tap in regular, map pin tap in
     /// both). Resets the path first: in the split layout this replaces the
     /// shown detail; in the stack the path is empty here anyway.
-    private func open(_ item: StationItem) {
+    ///
+    /// `at` is the moment a shared link carried; the pushed detail scrubs to
+    /// it (ScrubDetailScaffold). Nil — every other caller — means "now".
+    private func open(_ item: StationItem, at instant: Date? = nil) {
+        pendingScrubInstant = instant
         // Regular width: the sidebar (and its focused search field) stays on
         // screen when a detail opens, so the keyboard would sit over the new
         // detail — drop it. On iPhone the push dismisses it anyway.
