@@ -138,9 +138,9 @@ enum CurveStyle {
     static let pastLabelFade = 0.45
     /// Extreme and window-start dots; the now dot is its own size.
     static let dotRadius: CGFloat = 2.5
-    /// The slack run's stroke: as fat as a turn dot, so the go mark reads as a
-    /// segment laid over the line rather than a recolour of it.
-    static let runWidth: CGFloat = dotRadius * 2
+    /// The slack run's stroke: a step fatter than the line, so the go mark
+    /// reads as a segment laid over it rather than a recolour of it.
+    static let runWidth: CGFloat = 3.5
     static let nowDotDiameter: CGFloat = 7
     /// The background-punched ring beyond a dot's or run's edge.
     static let haloGap: CGFloat = 2.5
