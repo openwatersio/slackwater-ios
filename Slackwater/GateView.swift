@@ -130,3 +130,10 @@ var gateSearchHandoff = false
 /// Set by a widget deep link that arrives before the gate is answered (RootView),
 /// consumed by the list's first appear — same handoff, one screen later.
 var pendingDeepLink: URL?
+
+/// The moment a shared station link carried, set by `StationListView.open`
+/// and consumed by the first `ScrubDetailScaffold` to appear (#187). The link
+/// opens its station by pushing it, and the pushed detail is what owns the
+/// scrub time — so the instant waits here for it. Every `open` resets it, so
+/// a link's moment can never reach a station opened later by hand.
+var pendingScrubInstant: Date?

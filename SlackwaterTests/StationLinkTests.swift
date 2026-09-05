@@ -110,4 +110,71 @@ final class StationLinkTests: XCTestCase {
     func testWidgetSchemeIsNotAStationLink() {
         XCTAssertNil(link("slackwater://station/noaa%2F9449880"))
     }
+
+    // MARK: - Resolving a link to a bundled station (Resources/slugs.json)
+
+    private func item(_ string: String) -> StationItem? {
+        link(string).flatMap(stationItem(for:))
+    }
+
+    func testTideSlugResolvesToItsStation() {
+        XCTAssertEqual(item("https://slackwater.xyz/tides/friday-harbor")?.id, "noaa/9449880")
+    }
+
+    /// The table keys a NOAA current by its catalog id; the list keys it with
+    /// the app's own `current:` prefix. The resolver bridges the two.
+    func testNoaaCurrentSlugResolvesToThePrefixedListID() {
+        XCTAssertEqual(item("https://slackwater.xyz/currents/0-15-nm-wsw-of-pier-no-2")?.id,
+                       "current:noaa/CHB9904")
+    }
+
+    /// CHS current gates and derived gates key the list bare, and both are
+    /// currents on the web.
+    func testChsGateSlugsResolveBare() {
+        XCTAssertEqual(item("https://slackwater.xyz/currents/dodd-narrows")?.id, "chs-dodd-narrows")
+        XCTAssertEqual(item("https://slackwater.xyz/currents/malibu-rapids")?.id, "chs-malibu-rapids")
+    }
+
+    /// Alcatraz Island is a tide station and a current station with one
+    /// slug between them; the kind in the path is what picks.
+    func testSameSlugResolvesToADifferentStationPerKind() {
+        XCTAssertEqual(item("https://slackwater.xyz/tides/alcatraz-island")?.id, "noaa/9414792")
+        XCTAssertEqual(item("https://slackwater.xyz/currents/alcatraz-island")?.id, "current:noaa/SFB1204")
+    }
+
+    /// A slug this build doesn't know — an older build, a tombstoned station,
+    /// a typo — opens nothing. It must never open something else.
+    func testUnknownSlugResolvesToNothing() {
+        XCTAssertNil(item("https://slackwater.xyz/tides/atlantis"))
+        XCTAssertNil(item("https://slackwater.xyz/currents/friday-harbor"))
+    }
+
+    // MARK: - Minting the link (the share button's half, UI pending #187)
+
+    private let vancouver = TimeZone(identifier: "America/Vancouver")!
+
+    /// One id of every shape the list holds, out through `shareURL` and back
+    /// through the parser and resolver to the same station.
+    func testShareURLRoundTripsEveryIDShape() throws {
+        for id in ["noaa/9454616", "current:noaa/CHB9904", "chs-abbotts-harbour",
+                   "chs-dodd-narrows", "chs-malibu-rapids", "ticon/aasiaat-aas-grl-gloss"] {
+            let url = try XCTUnwrap(shareURL(forStationID: id, at: nil, tz: vancouver), id)
+            let parsed = try XCTUnwrap(stationLink(from: url), id)
+            XCTAssertNil(parsed.instant, id)
+            XCTAssertEqual(stationItem(for: parsed)?.id, id)
+        }
+    }
+
+    /// The instant rides in the station's own offset and reads back as the
+    /// same absolute moment.
+    func testShareURLWritesTheInstantInTheStationsOffset() throws {
+        let moment = Date(timeIntervalSince1970: 1_788_125_400)
+        let url = try XCTUnwrap(shareURL(forStationID: "chs-dodd-narrows", at: moment, tz: vancouver))
+        XCTAssertEqual(url.absoluteString, "https://slackwater.xyz/currents/dodd-narrows/2026-08-30T14:30-07:00")
+        XCTAssertEqual(stationLink(from: url)?.instant, moment)
+    }
+
+    func testShareURLForAnUnknownStationIsNil() {
+        XCTAssertNil(shareURL(forStationID: "noaa/0000000", at: nil, tz: vancouver))
+    }
 }

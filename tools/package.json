@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@openwaters/station-metadata": "^5.0.1"
+    "@openwaters/station-metadata": "^5.2.0"
   },
   "devDependencies": {
     "@neaps/tide-database": "^0.9.20260801",
@@ -11,7 +11,7 @@
     "tz-lookup": "^6.1.25"
   },
   "scripts": {
-    "build:data": "node gen-chs-stations.mjs && node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-chs-gates.mjs",
+    "build:data": "node gen-chs-stations.mjs && node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-chs-gates.mjs && node gen-slugs.mjs",
     "test": "npm run build:data && node --test"
   }
 }

@@ -214,10 +214,13 @@ func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
 
 /// Today's local midnight in `tz`, on the app clock. The anchor every detail
 /// view starts on, and the `today` half of every `Timeline.window` call.
-func todayLocal(_ tz: TimeZone) -> Date {
+func todayLocal(_ tz: TimeZone) -> Date { dayLocal(appNow(), tz) }
+
+/// Local midnight of the day `t` falls in, in `tz`.
+func dayLocal(_ t: Date, _ tz: TimeZone) -> Date {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
-    return cal.startOfDay(for: appNow())
+    return cal.startOfDay(for: t)
 }
 
 /// Local noon of the day `day` falls in — through `Calendar`, because on a
