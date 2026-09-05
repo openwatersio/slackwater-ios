@@ -189,7 +189,7 @@ struct SummaryTiles: View {
                 }
             }
             ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
-                        accessibility: "Moon, \(SunMoon.phaseName(phase: moon.phase))") {
+                        accessibility: "Moon") {
                 MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
             } value: {
                 // Words, not a number: "Waning Crescent" has to fit on one
@@ -206,7 +206,8 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     let caption: String
     var valueColor: Color = .white
     var captionColor: Color = SN.foam.opacity(0.55)
-    /// Spoken for the eyebrow row, glyph included.
+    /// Spoken for the eyebrow row, glyph included; the tile then reads as one
+    /// element, this, the value and the caption in order.
     let accessibility: String
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value
@@ -233,6 +234,7 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+        .accessibilityElement(children: .combine)
     }
 }
 

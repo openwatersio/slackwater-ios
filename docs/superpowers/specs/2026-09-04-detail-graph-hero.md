@@ -48,7 +48,6 @@ The strip's `UIScrollView` drives `scrubTime`; the magnet snaps to the nearest s
 - **Pill height.** The commentary and Now pills are about 30pt tall, under the 44pt target. The large control size read too heavy over the chart; revisit if taps miss in use.
 - **Long commentary at accessibility sizes** can overlap the Now pill; the row is a bare stack. Reserve the pill's width or move to a second row past a size threshold.
 - **Commentary under Reduce Motion.** The settle fade ignores the setting, and hiding the pill mid-scrub is content loss, not just motion. Consider keeping it visible and only suppressing taps.
-- **Moon tile VoiceOver** speaks the phase name twice.
 - **Gloss words.** "Incoming" and "outgoing" reach no screen; `CurrentPhase.gloss` and `DerivedPhase.gloss` survive for one unit test. Either give them a home the reader will meet (the lead's VoiceOver label is the cheapest; the provenance footer sits under a week of schedule rows and is not it) or retire them with `PhaseGlossTests.testGlossWords`.
 - **Card graph** on the same drawing rules: the section below.
 - **Pre-existing test failures** reproduced on `main`: the two online-gate date-picker tests, the two map frame-budget timings on iPad, and the live download-promotion test. They need an issue.

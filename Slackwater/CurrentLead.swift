@@ -34,10 +34,15 @@ struct CurrentLead: View {
         // this of every slack event, and the linear scan it replaces made
         // that quadratic across a week of events.
         var windowSlacks = Set<Date>()
+        let seriesEnd = timeline.currentPoints.last?.time ?? .distantPast
         for w in timeline.slackWindows {
             stops.append((w.start, "Slack"))
-            let v = timeline.velocityAt(w.end.addingTimeInterval(60))
-            stops.append((w.end, v >= 0 ? "Flood" : "Ebb"))
+            // A window that runs to the series' end never closes, so no run
+            // begins there. Direction is read a second past the edge.
+            if w.end < seriesEnd {
+                let v = timeline.velocityAt(w.end.addingTimeInterval(1))
+                stops.append((w.end, v >= 0 ? "Flood" : "Ebb"))
+            }
             windowSlacks.insert(w.slack)
         }
         for e in timeline.currentEvents {
