@@ -17,6 +17,9 @@ settings:
     MARKETING_VERSION: 1.9.0
     CURRENT_PROJECT_VERSION: 34
 packages:
+  Almanac:
+    url: https://github.com/openwatersio/almanac
+    from: 0.1.0
   TideEngine:
     url: https://github.com/openwatersio/slackwater-engine
     from: 0.7.0
@@ -29,6 +32,8 @@ targets:
     platform: iOS
     sources: [Slackwater]
     dependencies:
+      - package: Almanac
+        product: Almanac
       - package: TideEngine
         product: TideEngine
       - package: MapLibre

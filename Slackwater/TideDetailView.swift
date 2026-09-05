@@ -14,7 +14,7 @@ struct TideDetailView: View {
 
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.
-    @State private var scrubTime = appNow()
+    @State private var scrubTime = Timeline.introStart(for: appNow())
     @State private var timeline: TimelineData?
     @State private var chsFittedAt: Date?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
@@ -70,21 +70,28 @@ struct TideDetailView: View {
     }
 
     var body: some View {
+        let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude)
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
-                                TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   imperial: imperial, now: live, scrubTime: $scrubTime,
+                                let geo = TimelineGeo(data: tl)
+                                TimelineScrubStrip(data: tl, geo: geo,
+                                                   imperial: imperial, now: live,
+                                                   showsDayBands: false,
+                                                   skyFill: sky.horizon,
+                                                   chromeInk: sky.ink,
+                                                   scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    commentary: commentary,
                                                    commentaryTint: commentaryTint,
                                                    onCommentary: scrubToCommentary)
-                                    .overlay(alignment: .top) { lead }
+                                    .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { _ in SummaryTiles(primary: range, at: scrubTime) },
                             bottom: {
@@ -120,15 +127,17 @@ struct TideDetailView: View {
                 prev.kind == .low ? "low to high" : "high to low")
     }
 
-    private var lead: some View {
+    private func lead(ink: Color) -> some View {
         let turn = atTurn
         let up = turn.map { $0.kind == .high } ?? rising
         let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
         return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
                             + Text(" \(unit)").font(ReadoutType.leadUnit),
-                        time: chartTime(scrubTime, tz)) {
+                        time: chartTime(scrubTime, tz),
+                        valueColor: ink,
+                        timeColor: ink.opacity(0.72)) {
             // Word then glyph, the order the current lead reads in.
-            leadState(state)
+            Text(state).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
             // The graph's own two inks, so the eyebrow names the curve the
             // reader is looking at — unless the rate is out of the ordinary
             // (#95), which outranks direction.

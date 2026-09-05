@@ -16,6 +16,7 @@ struct CurrentLead: View {
     let ebbDeg: Double
     let speedUnit: String
     let tz: TimeZone
+    var ink: Color = .white
     /// A fast answer marks every number with a tilde and paints them amber.
     var provisional = false
 
@@ -23,7 +24,7 @@ struct CurrentLead: View {
     private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil || phase == .slack }
     private var tilde: String { provisional ? "~" : "" }
     private var setDegrees: Double { signed >= 0 ? floodDeg : ebbDeg }
-    private var readingColor: Color { provisional ? SN.amber : .white }
+    private var readingColor: Color { provisional ? SN.amber : ink }
 
     /// The stops the commentary walks: a window opening, its closing (the
     /// run that begins), each max, and a bare slack where no window exists.
@@ -90,8 +91,9 @@ struct CurrentLead: View {
         LeadCard(value: Text("\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))").font(ReadoutType.lead.monospacedDigit())
                     + Text(" \(speedUnitLabel(speedUnit))").font(ReadoutType.leadUnit),
                  time: chartTime(scrubTime, tz),
-                 valueColor: readingColor) {
-            leadState(state)
+                 valueColor: readingColor,
+                 timeColor: ink.opacity(0.72)) {
+            leadState(state, ink: ink)
             // The set is the hero (#59), arrow and point together after the
             // word. In slack the water goes both ways, so the glyph does too.
             HStack(spacing: 4) {
@@ -118,6 +120,7 @@ struct CurrentScrubCard: View {
     let now: Date
     let floodDeg: Double
     let ebbDeg: Double
+    let sky: SkyState
     @Binding var scrubTime: Date
     let onReturn: () -> Void
 
@@ -128,6 +131,7 @@ struct CurrentScrubCard: View {
         let next = lead.nextSignificant
         TimelineScrubStrip(data: data, geo: TimelineGeo(data: data),
                            speedUnit: speedUnit, now: now,
+                           showsDayBands: false, skyFill: sky.horizon, chromeInk: sky.ink,
                            floodDeg: floodDeg, ebbDeg: ebbDeg,
                            scrubTime: $scrubTime, onReturn: onReturn,
                            commentary: lead.commentary,

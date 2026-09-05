@@ -76,6 +76,26 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(Timeline.rampT(forTideRateMHr: 6.1 / 3.28084), 1, accuracy: 1e-9)
     }
 
+    func testScrubberIntroStartsTwoHoursBeforeNow() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(Timeline.introStart(for: now), Date(timeIntervalSince1970: 992_800))
+    }
+
+    func testScrubberIntroStaysBrief() {
+        XCTAssertTrue((0.5...1).contains(Timeline.introDuration))
+    }
+
+    func testScrubberIntroAdvancesThroughTime() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let start = Timeline.introStart(for: now)
+        XCTAssertEqual(Timeline.introTime(from: start, to: now, elapsed: 0), start)
+        XCTAssertEqual(Timeline.introTime(from: start, to: now,
+                                          elapsed: Timeline.introDuration / 2),
+                       now.addingTimeInterval(-3600))
+        XCTAssertEqual(Timeline.introTime(from: start, to: now,
+                                          elapsed: Timeline.introDuration), now)
+    }
+
     /// The current lead speaks plain language, and both current surfaces get
     /// it from the same view. `CurrentScrubCard` is the shared anatomy —
     /// strip, lead, commentary — so a redesign cannot land on a harmonic

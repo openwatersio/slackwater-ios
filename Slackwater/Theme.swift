@@ -1,8 +1,171 @@
 // Slackwater — GPL v3. Detail-view chrome and list state; the palette and formatters live in Palette.swift so the widget can share them.
+import Almanac
 import SwiftUI
 import WidgetKit
 
 // MARK: - Detail-view shared pieces (tide + current)
+
+struct SkyPaint: Equatable {
+    let top: UInt32
+    let bottom: UInt32
+}
+
+private let skyPaintAnchors: [(altitude: Double, top: UInt32, bottom: UInt32)] = [
+    (10, 0x2F7FD4, 0xBDE3FB),
+    (0, 0x2B4A7A, 0xF8A15F),
+    (-6, 0x17264A, 0x8D4A63),
+    (-12, 0x0B1430, 0x2A2A52),
+    (-18, 0x04060F, 0x0B1023),
+]
+
+func skyPaint(sunAltitude: Double) -> SkyPaint {
+    let first = skyPaintAnchors[0]
+    if sunAltitude >= first.altitude { return SkyPaint(top: first.top, bottom: first.bottom) }
+    for (high, low) in zip(skyPaintAnchors, skyPaintAnchors.dropFirst())
+        where sunAltitude > low.altitude {
+        let t = (high.altitude - sunAltitude) / (high.altitude - low.altitude)
+        return SkyPaint(top: mixedHex(high.top, low.top, t),
+                        bottom: mixedHex(high.bottom, low.bottom, t))
+    }
+    let last = skyPaintAnchors.last!
+    return SkyPaint(top: last.top, bottom: last.bottom)
+}
+
+func skyUsesDarkInk(sunAltitude: Double) -> Bool { sunAltitude >= -3 }
+func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
+func starOpacity(sunAltitude: Double) -> Double {
+    max(0, min(0.7, (-sunAltitude - 6) / 12 * 0.7))
+}
+func starTwinkle(index: Int, seconds: TimeInterval, reduceMotion: Bool) -> Double {
+    guard !reduceMotion else { return 1 }
+    return 0.86 + 0.14 * sin(seconds * (0.55 + Double(index % 5) * 0.08) + Double(index) * 1.7)
+}
+func skyOpacity(sunAltitude: Double) -> Double {
+    1 - max(0, min(1, (sunAltitude + 6) / 6)) * 0.45
+}
+
+private func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
+    func channel(_ shift: UInt32) -> UInt32 {
+        let x = Double((a >> shift) & 0xFF)
+        let y = Double((b >> shift) & 0xFF)
+        return UInt32((x + (y - x) * t).rounded())
+    }
+    return channel(16) << 16 | channel(8) << 8 | channel(0)
+}
+
+/// The same full-sky projection as openwaters.io/sky: south-centred in the
+/// northern hemisphere, with the horizon at the bottom and zenith at the top.
+func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize) -> CGPoint {
+    let center = latitude >= 0 ? 180.0 : 0.0
+    let signed = (azimuth - center + 540).truncatingRemainder(dividingBy: 360) - 180
+    return CGPoint(x: size.width / 2 + CGFloat(signed / 360) * size.width,
+                   y: size.height * (1 - CGFloat(altitude / 90)))
+}
+
+/// A simple rise-to-set semicircle. Almanac still decides whether the sun is
+/// above the horizon and where it sits east-to-west; this projection keeps the
+/// displayed path circular instead of stretching it to the view's aspect ratio.
+func sunArcPoint(azimuth: Double, size: CGSize) -> CGPoint {
+    let progress = max(0, min(1, (azimuth - 90) / 180))
+    let angle = progress * .pi
+    let radius = min(size.width / 2, size.height)
+    return CGPoint(x: size.width / 2 - radius * CGFloat(cos(angle)),
+                   y: size.height - radius * CGFloat(sin(angle)))
+}
+
+private func starPoint(_ index: Int, size: CGSize) -> CGPoint {
+    let x = Double((index * 37 + 11) % 97) / 96
+    let y = Double((index * 53 + 7) % 89) / 88
+    return CGPoint(x: size.width * x, y: size.height * CGFloat(y) * 0.82)
+}
+
+struct SkyState {
+    let latitude: Double
+    let sun: AltAz?
+    let moon: AltAz?
+    let illumination: MoonIllumination?
+
+    init(time: Date, latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
+        sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
+        moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
+        illumination = try? moonIllumination(time)
+    }
+
+    var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
+    var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
+    var horizon: Color { Color(hex: paint.bottom).opacity(opacity) }
+    var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
+}
+
+struct SkyBackdrop: View {
+    let sky: SkyState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            let paint = sky.paint
+            ZStack {
+                LinearGradient(colors: [Color(hex: paint.top), Color(hex: paint.bottom)],
+                               startPoint: .top, endPoint: .bottom)
+                    .opacity(sky.opacity)
+                if let altitude = sky.sun?.altDeg {
+                    let opacity = starOpacity(sunAltitude: altitude)
+                    TimelineView(.animation(minimumInterval: 0.125,
+                                            paused: opacity == 0 || reduceMotion)) { timeline in
+                        let seconds = timeline.date.timeIntervalSinceReferenceDate
+                        Canvas { context, size in
+                            for i in 0..<24 {
+                                let point = starPoint(i, size: size)
+                                let radius: CGFloat = i.isMultiple(of: 5) ? 1.15 : 0.7
+                                let twinkle = starTwinkle(index: i, seconds: seconds,
+                                                          reduceMotion: reduceMotion)
+                                context.fill(Path(ellipseIn: CGRect(x: point.x - radius,
+                                                                   y: point.y - radius,
+                                                                   width: radius * 2,
+                                                                   height: radius * 2)),
+                                             with: .color(.white.opacity(opacity * twinkle)))
+                            }
+                        }
+                    }
+                }
+                if let sun = sky.sun {
+                    if sun.altDeg >= 0 {
+                        let point = sunArcPoint(azimuth: sun.azDeg, size: proxy.size)
+                        Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
+                            .frame(width: 54, height: 54).position(point)
+                        Circle().fill(SN.sun)
+                            .frame(width: 16, height: 16).position(point)
+                    }
+                }
+                if let moon = sky.moon, let illumination = sky.illumination, moon.altDeg >= 0 {
+                    let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
+                                         latitude: sky.latitude, size: proxy.size)
+                    let glowRadius = moonGlowRadius(fraction: illumination.fraction)
+                    Circle()
+                        .fill(RadialGradient(
+                            stops: [
+                                .init(color: Color(hex: 0xE6EEFF,
+                                                   opacity: 0.95 * (0.1 + illumination.fraction * 0.66)),
+                                      location: 0),
+                                .init(color: Color(hex: 0xCFE0FF,
+                                                   opacity: 0.28 * (0.1 + illumination.fraction * 0.66)),
+                                      location: 0.45),
+                                .init(color: Color(hex: 0xCFE0FF, opacity: 0), location: 1),
+                            ], center: .center, startRadius: 0, endRadius: glowRadius))
+                        .frame(width: glowRadius * 2, height: glowRadius * 2)
+                        .position(point)
+                    MoonGlyph(fraction: illumination.fraction, waxing: illumination.waxing, size: 22)
+                        .position(point)
+                }
+            }
+        }
+        .clipped()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
 
 /// "42m" / "2h 14m" until `target`, floored at zero.
 func countdown(from: Date, to target: Date) -> String {
@@ -99,6 +262,7 @@ struct LeadCard<Eyebrow: View>: View {
     var value: Text? = nil
     let time: String
     var valueColor: Color = .white
+    var timeColor: Color = SN.foam.opacity(0.55)
     @ViewBuilder var eyebrow: () -> Eyebrow
 
     var body: some View {
@@ -108,7 +272,7 @@ struct LeadCard<Eyebrow: View>: View {
             value?.foregroundStyle(valueColor)
             Text(time)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(SN.foam.opacity(0.55))
+                .foregroundStyle(timeColor)
         }
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
@@ -117,8 +281,8 @@ struct LeadCard<Eyebrow: View>: View {
 }
 
 /// The eyebrow's word, in the weight and ink every lead shares.
-func leadState(_ text: String) -> Text {
-    Text(text).fontWeight(.medium).foregroundStyle(SN.foam.opacity(0.85))
+func leadState(_ text: String, ink: Color = SN.foam) -> Text {
+    Text(text).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
 }
 
 /// "Low tide in 28m" while the reading is now; "Low tide 3h 28m later" once
@@ -140,6 +304,7 @@ struct Commentary: View {
     /// the line under it.
     var tint: Color? = nil
     let scrubTime: Date
+    var ink: Color = SN.foam
     let onTap: () -> Void
     @State private var settled = false
 
@@ -153,7 +318,7 @@ struct Commentary: View {
                 Button(action: onTap) {
                     Text(text)
                         .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(tint ?? SN.foam)
+                        .foregroundStyle(tint ?? ink)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.capsule)
@@ -244,6 +409,13 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
 
 // MARK: - The scrub-detail scaffold (tide / current / derived gate / online gate)
 
+private struct DetailTopHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// The four scrub details' shared anatomy: header, the caller's lead reading,
 /// the strip, the caller's links (summary tiles, tide-at-port), the rolling
 /// schedule card, and the bottom slot (footer — or the
@@ -276,6 +448,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// Fired after the anchor moves, with the picked date. The three
     /// `@State`-backed views rebuild here; the online gate re-checks coverage.
     var onPicked: (Date) -> Void = { _ in }
+    /// A detail can supply its scrub-time sky without changing the scaffold's
+    /// generic signature.
+    var topBackdrop: AnyView? = nil
+    @State private var topHeight: CGFloat = 0
     @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -295,16 +471,30 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         // per device and per iPad split-view pane, live across rotation.
         GeometryReader { geo in
             ScrollView {
-                VStack(spacing: 0) {
-                    DetailHeader(name: name, region: region,
-                                 favoriteId: favoriteId,
-                                 topSafeInset: geo.safeAreaInsets.top)
-                    above()
-                    if let timeline {
-                        scrubCard(timeline)
-                        scheduleCard(timeline)
-                            .padding(.top, 14)
-                    } else if anchor != .distantPast, canPickDate {
+                ZStack(alignment: .top) {
+                    if let topBackdrop, let timeline {
+                        topBackdrop
+                            .frame(maxWidth: .infinity)
+                            .frame(height: topHeight + TimelineGeo(data: timeline).bodyTop)
+                    }
+                    VStack(spacing: 0) {
+                        VStack(spacing: 0) {
+                            DetailHeader(name: name, region: region,
+                                         favoriteId: favoriteId,
+                                         topSafeInset: geo.safeAreaInsets.top)
+                            above()
+                        }
+                            .background {
+                                GeometryReader { top in
+                                    Color.clear.preference(key: DetailTopHeightKey.self,
+                                                           value: top.size.height)
+                                }
+                            }
+                        if let timeline {
+                            scrubCard(timeline)
+                            scheduleCard(timeline)
+                                .padding(.top, 14)
+                        } else if anchor != .distantPast, canPickDate {
                         // #67 item 2: no timeline means the caller is showing its
                         // honesty card below — but the bar (and its picker) need
                         // no timeline, and without them that card is a dead end
@@ -314,22 +504,24 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         // arrives in onAppear), and weekRangeLabel force-unwraps
                         // a Calendar.date(byAdding:) against it — the pre-onAppear
                         // frame must render nothing here, as it always has.
-                        WeekRangeBar(anchor: anchor, today: todayLocal(tz), tz: tz,
-                                     onTap: { showPicker = true })
-                            .background(SN.cardFill)
-                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .strokeBorder(SN.cardStroke, lineWidth: 0.5))
-                            .padding(.horizontal, 16)
+                            WeekRangeBar(anchor: anchor, today: todayLocal(tz), tz: tz,
+                                         onTap: { showPicker = true })
+                                .background(SN.cardFill)
+                                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+                                .padding(.horizontal, 16)
+                                .padding(.top, 14)
+                        }
+                        bottom()
                             .padding(.top, 14)
                     }
-                    bottom()
-                        .padding(.top, 14)
+                    .padding(.bottom, 42)
                 }
-                .padding(.bottom, 42)
             }
             .ignoresSafeArea(edges: .top)
             .background(CanvasBackground())
+            .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPicker) {
