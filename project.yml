@@ -117,6 +117,7 @@ targets:
       - Slackwater/CardStatus.swift
       - Slackwater/StationCardFace.swift
       - Slackwater/StationCardGraph.swift
+      - Slackwater/CurveDrawing.swift
       - Slackwater/TideMovement.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/StationIntent.swift

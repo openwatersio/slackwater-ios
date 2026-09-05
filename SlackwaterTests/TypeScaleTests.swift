@@ -111,11 +111,10 @@ extension TypeScaleTests {
             "OnlineGateDetailView.swift:body",
             "TideDetailView.swift:body",
             "DerivedGateDetailView.swift:scheduleEntries",
-            // Both tracks format their reading inline and apply
-            // .monospacedDigit() on the very next line, so the ±4-line scan
-            // already clears them; the entries are kept only so a future
-            // reformat that splits the call from its modifier fails loudly
-            // here instead of silently.
+            // Both tracks format their reading where it is known and hand
+            // the string to `CurveDrawing.hangLabel`, whose one `Text`
+            // applies the mono trait (CurveDrawing.swift). The card's
+            // canvas does the same through its `cardGraph` builders above.
             "TimelineStrip.swift:drawTide",
             "TimelineStrip.swift:drawCurrent",
             // The heuristic's blind spot in miniature: these three calls live

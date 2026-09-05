@@ -8,17 +8,23 @@ let defaultSlackThresholdKn = 0.5
 let slackThresholdRange = 0.1...10.0
 let currentSpeedRampAnchorsKn: [Double] = [0.5, 3, 8, 12]
 
+/// Position on a ramp for `v`: piecewise-linear between `anchors`, which
+/// are spaced equally across 0...1, and clamped at both ends. Above the
+/// ceiling everything is the top colour — "beyond the top of the scale" is
+/// not a distinction worth resolving.
+func rampT(_ v: Double, anchors a: [Double]) -> Double {
+    let step = 1.0 / Double(a.count - 1)
+    if v <= a[0] { return 0 }
+    for i in 0..<(a.count - 1) where v <= a[i + 1] {
+        return (Double(i) + (v - a[i]) / (a[i + 1] - a[i])) * step
+    }
+    return 1
+}
+
 /// Absolute capability scale shared by the full scrubber and its widget.
 /// The same speed must never change colour with station or day.
 func widgetSpeedRampT(_ speedKn: Double) -> Double {
-    let step = 1.0 / Double(currentSpeedRampAnchorsKn.count - 1)
-    if speedKn <= currentSpeedRampAnchorsKn[0] { return 0 }
-    for i in 0..<(currentSpeedRampAnchorsKn.count - 1)
-        where speedKn <= currentSpeedRampAnchorsKn[i + 1] {
-        return (Double(i) + (speedKn - currentSpeedRampAnchorsKn[i])
-                / (currentSpeedRampAnchorsKn[i + 1] - currentSpeedRampAnchorsKn[i])) * step
-    }
-    return 1
+    rampT(speedKn, anchors: currentSpeedRampAnchorsKn)
 }
 
 func normalizedSlackThresholdKn(_ value: Double) -> Double {
@@ -97,16 +103,6 @@ func mergeWindows(_ windows: [(start: Date, end: Date)]) -> [WindowRun] {
 func currentAxisMoments(runs: [WindowRun], slacks: [Date]) -> [Date] {
     let bare = slacks.filter { t in !runs.contains { $0.contains(t) } }
     return (runs.map(\.start) + bare).sorted()
-}
-
-/// The window's two edges are the points of interest (current-charts
-/// §5.4.1): the opening is major while the run is ahead, the closing is
-/// major once inside it; the other draws at half strength. A run already
-/// passed fades both like any past mark, keeping the same ratio.
-func windowDotOpacities(run: WindowRun, now: Date) -> (opening: Double, closing: Double) {
-    if now < run.start { return (1, 0.5) }
-    if now <= run.end { return (0.5, 1) }
-    return (CurveStyle.pastLabelFade * 0.5, CurveStyle.pastLabelFade)
 }
 
 func sampleEvents(_ points: [CurrentPoint]) -> [CurrentEvent] {

@@ -233,6 +233,59 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertNotNil(gate.nextSlack)
     }
 
+    /// The fastest current in the first sixty records, so the speed thread
+    /// has something to colour: `testMediumWidgetRendersTheStationCard`
+    /// picks the longest slack window, which is a station that never
+    /// leaves green. An attachment to look at, not a pixel assertion.
+    @MainActor
+    func testMediumWidgetRendersAFastCurrentCard() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let fastest = try XCTUnwrap(Array(CurrentStationRecord.all.prefix(60)).max { a, b in
+            let peak = { (r: CurrentStationRecord) in
+                r.cardGraph(at: now, unit: "kn").points.map { abs($0.value) }.max() ?? 0
+            }
+            return peak(a) < peak(b)
+        })
+        let card = WidgetCard.build(.current(fastest), now: now)
+        let renderer = ImageRenderer(content: DayCurveContentView(card: card)
+            .frame(width: 364, height: 170)
+            .background(SN.canvas))
+        let image = try XCTUnwrap(renderer.uiImage)
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "widget-current-fast"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 1_000)
+    }
+
+    /// The tide card, both ways the datum fill can go: a station whose lows
+    /// reach under chart datum (amber below the dashed rule) and one that
+    /// sits well above it (the fill fades out at its lowest trough, no
+    /// rule). Attachments to look at; the pixel floor only says the curve
+    /// drew at all. Fixed epoch, not `Date()`.
+    @MainActor
+    func testMediumWidgetRendersTheTideCard() throws {
+        let now = Date(timeIntervalSince1970: 1_755_800_000)
+        let records = Array(TideStationRecord.all.prefix(60))
+        func lowest(_ r: TideStationRecord) -> Double {
+            r.cardGraph(at: now, imperial: false).points.map(\.value).min() ?? .infinity
+        }
+        let underDatum = try XCTUnwrap(records.first { lowest($0) < -0.1 }, "no station dips under datum")
+        let aboveDatum = try XCTUnwrap(records.first { lowest($0) > 0.5 }, "no station stays clear of datum")
+        for (record, name) in [(underDatum, "widget-tide-under-datum"), (aboveDatum, "widget-tide-above-datum")] {
+            let card = WidgetCard.build(.tide(record), now: now)
+            let renderer = ImageRenderer(content: DayCurveContentView(card: card)
+                .frame(width: 364, height: 170)
+                .background(SN.canvas))
+            let image = try XCTUnwrap(renderer.uiImage)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            XCTAssertGreaterThan(try XCTUnwrap(image.pngData()).count, 1_000)
+        }
+    }
+
     /// §15.3: inside a slack window the widget's reading counts down to the
     /// window's close instead of showing a speed. Fixed epoch, not `Date()`
     /// — deterministic, not a flake.

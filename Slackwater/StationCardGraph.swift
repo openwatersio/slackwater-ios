@@ -5,6 +5,12 @@ import TideEngine
 /// ahead, tide height or signed current speed as a line, and a dot with
 /// value/time labels at each extreme. It is the card's only carrier of the
 /// coming extremes, so it reads them out to VoiceOver rather than hiding.
+///
+/// The drawing itself — fills, line colour, slack runs, dots and hanging
+/// readings — is `CurveDrawing`, shared with the detail strip, so the page
+/// a card opens into is the same drawing at a larger scale. What is the
+/// card's own: the four-swing window, the padded auto-fit domain, the axis
+/// row's edge rules, and the VoiceOver summary.
 struct StationCardGraph: View {
     /// One extreme-to-extreme swing: half the M2 semidiurnal period (12.42 h).
     static let swing: TimeInterval = (12.42 / 2) * 3600
@@ -16,13 +22,6 @@ struct StationCardGraph: View {
     /// Sampling interval for the builders' point series.
     static let sampleStep: TimeInterval = 600
 
-
-    /// Shorthands for the theme's curve tokens (SN doc comment: the Neaps
-    /// dark-mode palette, full saturation for the card's hero element).
-    private static let line = SN.graphLine
-    private static let high = SN.graphHigh
-    private static let low = SN.graphLow
-
     // MARK: - Tunables: every visual knob, in one place.
 
     /// Vertical headroom above and below the sampled range, as a fraction
@@ -31,9 +30,6 @@ struct StationCardGraph: View {
     /// Strip at the bottom reserved for the time axis; the curve plots above
     /// it so a trough never runs into the labels.
     private static let axisHeight: CGFloat = 6
-    /// How close (in data units — metres) a low must come to chart datum
-    /// before the datum line appears on a tide card.
-    private static let nearDatum = 0.1
     /// An extreme closer than this to a card edge keeps its dot and axis
     /// time but drops its value label; every axis time — extreme or slack
     /// crossing — uses the tighter margin.
@@ -56,12 +52,12 @@ struct StationCardGraph: View {
         /// The number with its unit, for VoiceOver only.
         let spokenText: String
         let timeText: String
-        /// High tide / max flood (vs low / max ebb) — picks the dot and
-        /// pointer tint (teal vs amber) and the pointer direction.
+        /// High tide / max flood (vs low / max ebb) — picks the dot tint
+        /// (teal vs amber) and the direction the reading hangs.
         let high: Bool
         /// A current extreme's set bearing. When present the pointer is the
-        /// app's CompassArrow (↑ rotated to the bearing, "water goes this
-        /// way") instead of the tide high/low arrows.
+        /// set arrow (↑ rotated to the bearing, "water goes this way")
+        /// instead of the tide's to-bar arrows.
         var deg: Double? = nil
     }
 
@@ -92,6 +88,10 @@ struct StationCardGraph: View {
     /// Every slack instant on the curve, so the axis can print the bare
     /// instant where no run covers a slack. Only signed current curves.
     var slacks: [Date] = []
+    /// A tide curve's rate of rise (m/hr), index-aligned with `points`, for
+    /// the line's rate colour. Empty on a current curve, and the preview
+    /// sines — the line is then plain blue.
+    var rates: [Double] = []
 
     var body: some View {
         Canvas { context, size in
@@ -104,168 +104,17 @@ struct StationCardGraph: View {
             var lo = visible.min() ?? 0
             var hi = visible.max() ?? 1
             if includesZero { lo = min(lo, 0); hi = max(hi, 0) }
-            // The water's own range, before display padding — "does the tide
-            // actually get near datum" is judged against this, not the
-            // padded domain.
-            let sampledLo = lo
+            let lowest = lo
             let pad = max((hi - lo) * Self.domainPadFraction, 0.001)
             lo -= pad; hi += pad
 
             func x(_ t: Date) -> CGFloat { t.timeIntervalSince(start) * xScale }
             let plotHeight = size.height - Self.axisHeight
             func y(_ v: Double) -> CGFloat { plotHeight * (1 - (v - lo) / (hi - lo)) }
-
-            var line = Path()
-            line.move(to: CGPoint(x: x(points[0].time), y: y(points[0].value)))
-            for p in points.dropFirst() {
-                line.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
-            }
-
-            func referenceLine(at lineY: CGFloat) {
-                var path = Path()
-                path.move(to: CGPoint(x: 0, y: lineY))
-                path.addLine(to: CGPoint(x: size.width, y: lineY))
-                context.stroke(path, with: .color(SN.foam.opacity(CurveStyle.referenceLineOpacity)),
-                               style: StrokeStyle(lineWidth: 1, dash: CurveStyle.referenceLineDash))
-            }
-
-            // The area fill, closed to the zero line for signed curves and
-            // to the card bottom for tides.
-            let baseY = includesZero ? y(0) : size.height
-            var area = line
-            area.addLine(to: CGPoint(x: x(points[points.count - 1].time), y: baseY))
-            area.addLine(to: CGPoint(x: x(points[0].time), y: baseY))
-            area.closeSubpath()
-            if includesZero {
-                // Distance from the zero line IS speed, so the gradient is
-                // vertical and ANCHORED AT ZERO: transparent at slack,
-                // intensifying outward — flood blue above, ebb amber below.
-                // A shallow lobe near slack sits entirely in the transparent
-                // zone; a max reaches into the intense one. Both hues vanish
-                // at the same line, so there is no seam at a crossing.
-                let zeroStop = baseY / size.height
-                context.fill(area, with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: Self.line.opacity(CurveStyle.fillOpacity), location: 0),
-                        .init(color: Self.line.opacity(0), location: zeroStop),
-                        .init(color: Self.low.opacity(0), location: zeroStop),
-                        .init(color: Self.low.opacity(CurveStyle.fillOpacity), location: 1),
-                    ]),
-                    startPoint: .zero,
-                    endPoint: CGPoint(x: 0, y: size.height)))
-            } else {
-                // A tide's intensity is the water level itself, so the fade
-                // stays vertical (Neaps TideGraphChart): strongest at the
-                // surface, easing toward the bottom.
-                context.fill(area, with: .linearGradient(
-                    Gradient(colors: [Self.line.opacity(CurveStyle.fillOpacity),
-                                      Self.line.opacity(CurveStyle.tideFillFloor)]),
-                    startPoint: .zero,
-                    endPoint: CGPoint(x: 0, y: size.height)))
-                // Chart datum, but only when the water actually gets near
-                // it: most curves sit entirely above zero, and forcing the
-                // datum into view would flatten them. When a low dips toward
-                // or under datum the line appears where it matters.
-                if sampledLo <= Self.nearDatum {
-                    referenceLine(at: y(0))
-                }
-            }
-
-            // The past is context, the future is the forecast: the line
-            // draws muted left of now and at full strength to the right,
-            // split by clipping the same path both ways.
             let nowX = x(now)
-            var past = context
-            past.clip(to: Path(CGRect(x: 0, y: 0, width: nowX, height: size.height)))
-            past.stroke(line, with: .color(Self.line.opacity(CurveStyle.pastLineOpacity)),
-                        lineWidth: CurveStyle.lineWidth)
-            var future = context
-            future.clip(to: Path(CGRect(x: nowX, y: 0,
-                                        width: size.width - nowX, height: size.height)))
-            future.stroke(line, with: .color(Self.line), lineWidth: CurveStyle.lineWidth)
 
-            // A halo that truly matches the background: erase the line and
-            // fill in a ring around each dot (destinationOut punches through
-            // to whatever is behind the Canvas) rather than painting a guess
-            // at the card color over them.
-            func punchHalo(at p: CGPoint, dotRadius: CGFloat) {
-                let radius = dotRadius + CurveStyle.haloGap
-                var eraser = context
-                eraser.blendMode = .destinationOut
-                eraser.fill(Path(ellipseIn: CGRect(x: p.x - radius, y: p.y - radius,
-                                                   width: radius * 2, height: radius * 2)),
-                            with: .color(.black))
-            }
-
-            func dot(at p: CGPoint, color: Color) {
-                punchHalo(at: p, dotRadius: CurveStyle.dotRadius)
-                context.fill(Path(ellipseIn: CGRect(x: p.x - CurveStyle.dotRadius,
-                                                    y: p.y - CurveStyle.dotRadius,
-                                                    width: CurveStyle.dotRadius * 2,
-                                                    height: CurveStyle.dotRadius * 2)),
-                             with: .color(color))
-            }
-
-            for e in extremes {
-                // A past extreme fades like the past line.
-                let fade = e.time < now ? CurveStyle.pastLabelFade : 1.0
-                let tint = (e.high ? Self.high : Self.low).opacity(fade)
-                let text = SN.foam.opacity(fade)
-                let dotAt = CGPoint(x: x(e.time), y: y(e.value))
-                let isCurrent = e.deg != nil
-                if !isCurrent {
-                    dot(at: dotAt, color: tint)
-                }
-                // The extreme's time joins the bottom axis under the axis's
-                // own edge rule — the same one the slack crossing times use.
-                if !isCurrent, dotAt.x >= Self.axisEdgeMargin,
-                   dotAt.x <= size.width - Self.axisEdgeMargin {
-                    context.draw(Text(e.timeText)
-                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(text),
-                                 at: CGPoint(x: dotAt.x, y: size.height - Self.timeBaseline))
-                }
-                // An extreme hugging the card edge keeps its dot and axis
-                // time but drops its value label — a shifted label detaches
-                // from its dot and reads as belonging to the wrong spot.
-                guard dotAt.x >= Self.labelEdgeMargin,
-                      dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
-                // The reading hangs off the turn toward the plot middle with
-                // its pointer under it — the same rule the detail strip
-                // follows (current-charts §15.1). No unit: the card's
-                // reading states it once.
-                let toward: CGFloat = e.high ? 1 : -1
-                let cy = dotAt.y + toward * CurveStyle.hangOffset
-                context.draw(Text(e.valueText)
-                                .font(.system(size: CurveStyle.hangValueFontSize, weight: .semibold).monospacedDigit())
-                                .foregroundStyle(text),
-                             at: CGPoint(x: dotAt.x, y: cy + toward * CurveStyle.hangValueGap))
-                if let deg = e.deg {
-                    // The SF Symbol, not the "↑" text glyph — a text arrow
-                    // at the same point size renders visibly smaller.
-                    var rotated = context
-                    rotated.translateBy(x: dotAt.x, y: cy - toward * CurveStyle.hangGlyphGap)
-                    rotated.rotate(by: .degrees(deg))
-                    rotated.draw(Text(Image(systemName: "arrow.up"))
-                                    .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .bold))
-                                    .foregroundStyle(tint),
-                                 at: .zero)
-                } else {
-                    context.draw(Text(e.high ? "⤒" : "⤓")
-                                    .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
-                                    .foregroundStyle(tint),
-                                 at: CGPoint(x: dotAt.x, y: cy - toward * CurveStyle.hangGlyphGap))
-                }
-            }
-
-            // Slack: the line itself turns the go colour for each window's
-            // duration — the run computed by the builders from the SHARED
-            // slackWindow predicate, never re-derived here — wearing the
-            // same halo the dots wear. Each run is a REAL sub-path of the
-            // curve (interpolated endpoints), stroked round-capped: the
-            // wider round-capped eraser under it is what leaves a rounded
-            // clear seam at both ends instead of a slanted clip cut.
+            /// Linear interpolation over the drawn samples, so a run's ends
+            /// and the now dot ride the curve as rendered.
             func valueAt(_ t: Date) -> Double {
                 var prev = points[0]
                 for p in points {
@@ -279,43 +128,91 @@ struct StationCardGraph: View {
                 }
                 return points[points.count - 1].value
             }
-            for w in windows {
-                guard w.end > w.start else { continue }
+
+            var line = Path()
+            line.move(to: CGPoint(x: x(points[0].time), y: y(points[0].value)))
+            for p in points.dropFirst() {
+                line.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+            }
+
+            // The area, closed to the zero line for a current and to chart
+            // datum for a tide — the same line each fill is anchored at.
+            var area = line
+            area.addLine(to: CGPoint(x: x(points[points.count - 1].time), y: y(0)))
+            area.addLine(to: CGPoint(x: x(points[0].time), y: y(0)))
+            area.closeSubpath()
+            if includesZero {
+                CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: plotHeight, zeroY: y(0))
+                CurveDrawing.referenceLine(context, at: y(0), width: size.width)
+                CurveDrawing.currentLine(context, line,
+                                         samples: points.map { (x: x($0.time), speedKn: $0.value) },
+                                         nowX: nowX, width: size.width, height: size.height)
+            } else {
+                // The fill runs on under the axis row: the card has no plot
+                // box below the curve, only the labels' clear strip.
+                CurveDrawing.datumFill(context, area, plotTop: 0, plotBottom: size.height,
+                                       width: size.width, datumY: y(0), lowestY: y(lowest))
+                // Chart datum, when it is inside the plotted span — a curve
+                // that sits well above it gets no rule pinned to an edge.
+                if lo < 0 && 0 < hi {
+                    CurveDrawing.referenceLine(context, at: y(0), width: size.width)
+                }
+                CurveDrawing.tideLine(context, line,
+                                      rates: zip(points, rates).map { (x: x($0.time), rate: $1) },
+                                      nowX: nowX, width: size.width, height: size.height)
+            }
+
+            for e in extremes {
+                // A past extreme fades like the past line.
+                let fade = e.time < now ? CurveStyle.pastLabelFade : 1.0
+                let tint = (e.high ? SN.graphHigh : SN.graphLow).opacity(fade)
+                let ink = SN.foam.opacity(fade)
+                let dotAt = CGPoint(x: x(e.time), y: y(e.value))
+                let isCurrent = e.deg != nil
+                // A tide turn is the event and gets a dot; a current peak is
+                // context inside its lobe and does not.
+                if !isCurrent {
+                    CurveDrawing.dot(context, at: dotAt, color: tint)
+                }
+                // The extreme's time joins the bottom axis under the axis's
+                // own edge rule — the same one the slack crossing times use.
+                if !isCurrent, dotAt.x >= Self.axisEdgeMargin,
+                   dotAt.x <= size.width - Self.axisEdgeMargin {
+                    context.draw(Text(e.timeText)
+                                    .font(.system(size: Self.timeFontSize).monospacedDigit())
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(ink),
+                                 at: CGPoint(x: dotAt.x, y: size.height - Self.timeBaseline))
+                }
+                // An extreme hugging the card edge keeps its dot and axis
+                // time but drops its value label — a shifted label detaches
+                // from its dot and reads as belonging to the wrong spot.
+                guard dotAt.x >= Self.labelEdgeMargin,
+                      dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
+                // The reading hangs off the turn toward the plot middle with
+                // its pointer nearest the dot (current-charts §15.1). The set
+                // arrow wears the reading's ink, not a direction colour. No
+                // unit: the card's reading states it once.
+                CurveDrawing.hangLabel(context, at: dotAt, toward: e.high ? 1 : -1,
+                                       value: e.valueText,
+                                       glyph: e.deg.map { .set(deg: $0) } ?? .toBar(high: e.high),
+                                       tint: isCurrent ? ink : tint, ink: ink,
+                                       valueFontSize: CurveStyle.hangValueFontSize)
+            }
+
+            // Slack: each run is a REAL sub-path of the curve (interpolated
+            // endpoints), computed by the builders from the SHARED
+            // slackWindow predicate — never re-derived here.
+            let segs = windows.filter { $0.end > $0.start }.map { w -> Path in
                 var seg = Path()
                 seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
                 for p in points where p.time > w.start && p.time < w.end {
                     seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
                 }
                 seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
-
-                var eraser = context
-                eraser.blendMode = .destinationOut
-                eraser.stroke(seg, with: .color(.black),
-                              style: StrokeStyle(lineWidth: CurveStyle.lineWidth + CurveStyle.haloGap * 2,
-                                                 lineCap: .round))
-                // The past/future fade still splits by clip — an opacity
-                // seam mid-run, never a shape cut. Clips reach one stroke
-                // width past the ends so they can't shave the round caps.
-                func strokeGo(from a: CGFloat, to b: CGFloat, opacity: Double) {
-                    guard b > a else { return }
-                    var c = context
-                    c.clip(to: Path(CGRect(x: a, y: 0, width: b - a, height: size.height)))
-                    c.stroke(seg, with: .color(SN.go.opacity(opacity)),
-                             style: StrokeStyle(lineWidth: CurveStyle.lineWidth, lineCap: .round))
-                }
-                let x0 = x(w.start), x1 = x(w.end)
-                strokeGo(from: x0 - CurveStyle.lineWidth, to: min(x1 + CurveStyle.lineWidth, nowX),
-                         opacity: CurveStyle.pastLineOpacity)
-                strokeGo(from: max(x0 - CurveStyle.lineWidth, nowX), to: x1 + CurveStyle.lineWidth,
-                         opacity: 1)
-
-                // The window's edges are the points of interest (§5.4.1):
-                // the opening at full strength while the run is ahead, the
-                // closing at half; inside the run they swap.
-                let o = windowDotOpacities(run: w, now: now)
-                dot(at: CGPoint(x: x0, y: y(valueAt(w.start))), color: SN.go.opacity(o.opening))
-                dot(at: CGPoint(x: x1, y: y(valueAt(w.end))), color: SN.go.opacity(o.closing))
+                return seg
             }
+            CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
 
             // The axis names each run's opening, and a bare slack only where
             // no run covers it — the same moments the detail strip prints.
@@ -334,16 +231,7 @@ struct StationCardGraph: View {
             }
 
             // The "now" dot rides the curve one swing in from the left edge.
-            if let nowValue = points.min(by: {
-                abs($0.time.timeIntervalSince(now)) < abs($1.time.timeIntervalSince(now))
-            })?.value {
-                let nowDot = CGPoint(x: x(now), y: y(nowValue))
-                let r = CurveStyle.nowDotDiameter / 2
-                punchHalo(at: nowDot, dotRadius: r)
-                context.fill(Path(ellipseIn: CGRect(x: nowDot.x - r, y: nowDot.y - r,
-                                                    width: r * 2, height: r * 2)),
-                             with: .color(SN.paper))
-            }
+            CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now))))
         }
         .accessibilityLabel("\(Int(((back + forward) / 3600).rounded()))-hour curve")
         .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
@@ -376,7 +264,8 @@ extension TideStationRecord {
                       timeText: cardTime($0.time, tz),
                       high: $0.kind == .high)
             },
-            now: now)
+            now: now,
+            rates: s.rates(from: start, to: end, step: StationCardGraph.sampleStep).map(\.rate))
     }
 }
 
