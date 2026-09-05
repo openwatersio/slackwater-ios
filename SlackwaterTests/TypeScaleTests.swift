@@ -103,6 +103,9 @@ extension TypeScaleTests {
             // trait (Theme.swift).
             "TideDetailView.swift:range",
             "CurrentLead.swift:nextMax",
+            // The fast tide's rate, consumed by `Commentary`'s Text, which
+            // carries the mono trait (Theme.swift).
+            "TideDetailView.swift:tideRateCommentary",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
             "OnlineGateDetailView.swift:body",
