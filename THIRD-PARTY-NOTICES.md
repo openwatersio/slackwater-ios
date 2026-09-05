@@ -1,6 +1,6 @@
 # Third-party notices
 
-Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.md). It builds on the following third-party code and data. The same attribution appears in the app under Settings → Data & attribution.
+Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.md). It builds on the following third-party code and data. A subset of this attribution appears in the app under Settings → Data & attribution.
 
 ## Code
 
