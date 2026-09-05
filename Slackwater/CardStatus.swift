@@ -1,7 +1,6 @@
 // Slackwater — GPL v3. One state model for a list card that has no reading to
-// show (#93). The card gets an icon and two words; the explanation — what CHS
-// is, why a gate has no offline model, what "queued" means — stays on the
-// detail views, which have room for it.
+// show (#93). The explanation — what CHS is, why a gate has no offline model,
+// what "queued" means — stays on the detail views, which have room for it.
 import SwiftUI
 
 /// What a station card is waiting on. Six states with no reading at all, plus
@@ -30,6 +29,14 @@ enum CardStatus: Equatable {
     /// this gate's own measured slack tolerance ("±35 min") — the number the
     /// ⚠️ badge it replaced could only gesture at.
     case refining(tolerance: String?)
+
+    var showsPlaceholder: Bool {
+        switch self {
+        case .downloading, .queued, .notDownloaded: true
+        default: false
+        }
+    }
+
     var icon: String {
         switch self {
         case .downloading: "arrow.down.circle"
@@ -55,10 +62,8 @@ enum CardStatus: Equatable {
         }
     }
 
-    /// VoiceOver keeps the sentence the strip dropped — an icon and two words
-    /// must not be LESS legible than the prose they replaced (#93). Each one
-    /// STARTS with `label`, so a locator matching the visible words still finds
-    /// the element.
+    /// VoiceOver keeps the sentence the strip dropped — including when the
+    /// active queue states reduce to an icon (#93).
     var accessibilityLabel: String {
         let once = "Canadian predictions download once, then work offline."
         switch self {
@@ -101,16 +106,17 @@ func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar 
     return "Available offline for \(days) more days"
 }
 
-/// Icon + two words, one line, in place of the paragraph a pending card used to
-/// carry. Sits below the identity row at full card width.
+/// Compact status below the identity row. Active queue states are icon-only;
+/// actionable and exceptional states keep their text.
 struct CardStatusStrip: View {
     let status: CardStatus
 
     var body: some View {
-        Label {
-            Text(status.label)
-        } icon: {
+        HStack(spacing: 5) {
             Image(systemName: status.icon)
+            if status != .downloading && status != .queued {
+                Text(status.label)
+            }
         }
         .font(.caption)
         .foregroundStyle(status.tint)
@@ -125,7 +131,6 @@ struct CardStatusStrip: View {
         // verified in an a11y dump, where this element came back carrying the
         // card's id and not its own. A per-state locator would work on a
         // refining card and silently not on a pending one, which is worse than
-        // none. Tests locate the strip by label; every `accessibilityLabel`
-        // above starts with the words on screen so both readings match.
+        // none. Tests locate the strip by its full accessibility label.
     }
 }

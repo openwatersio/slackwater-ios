@@ -89,6 +89,7 @@ struct StationCard<Trailing: View>: View {
     }
 
     var body: some View {
+        let placeholder = status?.showsPlaceholder == true
         VStack(alignment: .leading, spacing: 0) {
             // Which candidate wins is verified by screenshot, not by
             // unit test — ViewThatFits exposes no way to ask.
@@ -119,9 +120,9 @@ struct StationCard<Trailing: View>: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        // A curve card is taller: an identity band up top (the curve's top
-        // inset below), then room for the curve and its extreme labels.
-        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil ? 96 : 168),
+        // A curve or its loading placeholder is taller: an identity band up
+        // top, then room for the curve and its extreme labels.
+        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil && !placeholder ? 96 : 168),
                maxHeight: chrome ? nil : .infinity, alignment: .topLeading)
         .background {
             ZStack {
@@ -132,11 +133,60 @@ struct StationCard<Trailing: View>: View {
                 // than the card each side; the clipShape trims it, so the
                 // curve exits through the edge on its own slope no matter
                 // where any builder's last sample lands.
-                if let graph { graph.padding(.top, 54).padding(.horizontal, -3) }
+                if let graph {
+                    graph.padding(.top, 54).padding(.horizontal, -3)
+                } else if placeholder, let status {
+                    StationCardPlaceholder(animated: status == .downloading)
+                        .padding(.top, 54).padding(.horizontal, -3)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: chrome ? 24 : 0, style: .continuous))
         .shadow(color: chrome ? SN.shadow.opacity(0.24) : .clear, radius: chrome ? 12 : 0, y: chrome ? 10 : 0)
+    }
+}
+
+/// A data-free echo of the card curve and its time axis. Only an active
+/// download moves; queued and on-demand rows stay flat.
+private struct StationCardPlaceholder: View {
+    let animated: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if animated && !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                let phase = timeline.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: 1.4) / 1.4
+                marks.foregroundStyle(LinearGradient(
+                    colors: [SN.foam.opacity(0.12), SN.foam.opacity(0.34), SN.foam.opacity(0.12)],
+                    startPoint: UnitPoint(x: phase - 0.45, y: 0.5),
+                    endPoint: UnitPoint(x: phase + 0.45, y: 0.5)))
+            }
+        } else {
+            marks.foregroundStyle(SN.foam.opacity(0.2))
+        }
+    }
+
+    private var marks: some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width
+            let h = proxy.size.height
+            Path { path in
+                path.move(to: CGPoint(x: -4, y: h * 0.46))
+                for x in stride(from: CGFloat.zero, through: w + 4, by: 4) {
+                    let y = h * (0.46 - 0.26 * sin(x / max(w, 1) * 4 * .pi))
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+            }
+            .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+            ForEach([0.22, 0.5, 0.78], id: \.self) { x in
+                Capsule()
+                    .frame(width: 34, height: 6)
+                    .position(x: w * x, y: h - 10)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
