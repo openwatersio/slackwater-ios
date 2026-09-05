@@ -288,30 +288,67 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     /// Over a fast tide the pill explains the yellow line: the rate, in the
-    /// ramp's colour, instead of the next turn. Boston moves well over the
-    /// ramp's first anchor between turns. Landing on a turn first (the
-    /// commentary tap) and then dragging about three hours on puts the scrub
-    /// mid-run, where the magnet parks it on the run's fastest point — a snap
-    /// stop — so the pill reads the peak rate.
+    /// ramp's colour, instead of the next turn. Park on a turn, drag part way
+    /// into the run, and the magnet finishes the job — it parks on the run's
+    /// fastest point, a snap stop — so the pill reads the peak rate.
+    ///
+    /// Three things this test used to assume, each false on some days:
+    ///
+    /// - **Boston is fast.** A run gets a fastest-point snap stop, and the
+    ///   pill names a rate, only when its peak clears the ramp's first anchor
+    ///   (0.6 m/hr). Over 2026 Boston misses on 365 of 1,409 runs — every
+    ///   neap — so this failed a quarter of the days it ran. Eastport's
+    ///   slowest run of the year peaks at 0.76 m/hr.
+    /// - **The commentary tap lands on a turn.** Over a fast tide it goes to
+    ///   the run's fastest point instead, so a fast "now" started the drag
+    ///   from the peak and ended it on the next turn. A schedule row is a
+    ///   turn whatever the clock says.
+    /// - **A drag lands where it points.** A plain `thenDragTo` lets go at
+    ///   speed and the strip coasted 16 h past the target; slow and held,
+    ///   it stops where it was left.
     func testFastTideCommentaryNamesTheRate() throws {
         let app = launch("-seedGate", "-networkKillSwitch")
-        openSearch(app, "boston")
-        pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
+        openSearch(app, "eastport")
+        pickSearchResult(app, app.staticTexts["Eastport"].firstMatch)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.waitForExistence(timeout: 10))
         settleLayout(strip)
+
+        // Today's first row: a turn. Clear of the home-indicator band first,
+        // same as the cross-midnight row tap above.
+        let turnRow = app.buttons.matching(identifier: "schedule-row-d0").firstMatch
+        XCTAssert(turnRow.waitForExistence(timeout: 5), "no schedule rows for today")
+        var tries = 0
+        while turnRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
+            app.swipeUp()
+            settleLayout(turnRow)
+            tries += 1
+        }
+        turnRow.tap()
+        settleScrub(app)
+        if tries > 0 {
+            app.swipeDown()
+            settleLayout(strip)
+        }
+
+        // 45pt of finger is 2.5 h of tide (Timeline.pph is 18 pt/hr), so from
+        // the turn the run's fastest point (~3 h out) is the nearest snap stop
+        // by a wide margin, on any strip width. Slow, and HELD before release,
+        // so the scroll view gets no fling to run with.
+        let centre = strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        centre.press(forDuration: 0.3, thenDragTo: centre.withOffset(CGVector(dx: -45, dy: 0)),
+                     withVelocity: .slow, thenHoldForDuration: 0.3)
+        settleScrub(app)
         let pill = commentaryPill(app)
         XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "no commentary pill on the Boston detail")
-        pill.tap()
-        settleScrub(app)
-        // One point of strip is five minutes: a tenth of the width is ~3 h.
-        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
-        settleScrub(app)
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after the drag")
-        XCTAssert(pill.label.range(of: #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#, options: .regularExpression) != nil,
+                  "no commentary pill after the drag")
+        // WAIT for the wording rather than read it once: the pill is hittable
+        // a beat before the magnet's landing writes `scrubTime`, and a single
+        // read there still names the turn. The settled state is the claim.
+        let namesRate = NSPredicate { _, _ in
+            pill.label.range(of: #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#, options: .regularExpression) != nil
+        }
+        XCTAssert(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: namesRate, object: nil)], timeout: 10) == .completed,
                   "over a fast tide the commentary names the rate: '\(pill.label)'")
         save(app, "fast-tide-commentary.png")
     }
