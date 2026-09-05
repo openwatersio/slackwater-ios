@@ -18,13 +18,11 @@ struct DetailHeader: View {
     @ObservedObject private var favorites = FavoritesStore.shared
     @ObservedObject private var location = LocationService.shared
 
-    /// "Puget Sound • 3.2 nm" when there is a fix; just the region otherwise.
-    /// Distance is from the fix to the station.
-    private var regionLine: String {
+    /// Distance from the fix to this station — nil without an authorized fix.
+    private var kmFromFix: Double? {
         guard location.authorized, let fix = location.location,
-              let item = StationItem.byId[favoriteId] else { return region }
-        let km = item.km(fromLat: fix.coordinate.latitude, lon: fix.coordinate.longitude)
-        return "\(region) • \(formatNm(km))"
+              let item = StationItem.byId[favoriteId] else { return nil }
+        return item.km(fromLat: fix.coordinate.latitude, lon: fix.coordinate.longitude)
     }
 
     var body: some View {
@@ -63,9 +61,19 @@ struct DetailHeader: View {
                     .font(.title)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
-                Text(regionLine)
-                    .font(.caption)
-                    .foregroundStyle(SN.foam.opacity(0.55))
+                // "Puget Sound • 3.2 nm" when there is a fix; just the region
+                // otherwise — the station cards' region • distance pair.
+                HStack(spacing: 4) {
+                    Text(region)
+                        .font(.caption)
+                    if let km = kmFromFix {
+                        Text("•")
+                            .font(.caption)
+                        Text(formatNm(km))
+                            .font(.caption.monospacedDigit())
+                    }
+                }
+                .foregroundStyle(SN.foam.opacity(0.55))
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
