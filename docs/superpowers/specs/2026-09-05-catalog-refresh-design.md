@@ -353,6 +353,7 @@ callback.
 | Active stored snapshot is corrupt | Error is logged and the complete bundle loads. |
 | Bundled file is corrupt | Debug assertion and release log identify the file; CI is expected to prevent shipment. |
 | Worker deployment fails | Previous Worker assets remain live. |
+| Published set rolled back after clients activated it | Rule 11 rejects the older set on those clients; they keep their newer snapshot until a corrective deployment publishes a ledger-preserving set. |
 | New schema cannot decode on an older client | That client logs and retains its last valid snapshot or bundle. |
 
 ## Verification
@@ -370,6 +371,9 @@ Focused Swift tests cover:
   a candidate;
 - a NOAA catalog re-serialized out of compact record form rejects a candidate;
 - a correctly tombstoned removal validates;
+- adding a station, activating it, then serving the prior set again keeps the
+  newer snapshot active, and a corrective set whose ledger tombstones the
+  retracted ID activates;
 - interruption before pointer replacement leaves the old generation active;
 - stored-snapshot corruption falls back to the bundle;
 - CHS queue reconciliation preserves surviving work, updates fitted-record
@@ -396,5 +400,16 @@ ETags, so its first connected refresh downloads all six files. Subsequent
 refreshes transfer only changed assets.
 
 If client problems appear, roll back the app change in a normal release; its
-bundle remains complete. If catalog problems appear, roll back the Worker
-deployment. No server-side migration or remote state must be reversed.
+bundle remains complete.
+
+Worker deployment rollback covers serving problems: a failed deploy, broken
+headers, an asset set that never validated anywhere. It cannot retract catalog
+content that clients have already activated. A client that activated release B
+holds B's additions as active IDs, so a rolled-back set that lacks those
+stations and their tombstones fails validation rule 11 there; that client
+keeps B until the server moves forward. Retracting content is therefore a
+corrective deployment, not a rollback: revert the source change, regenerate so
+the cumulative ledger tombstones every retracted ID, and publish the result.
+Clients still on the older set never see the retracted stations; clients on B
+activate the correction as an ordinary refresh. No server-side migration or
+remote state must be reversed.
