@@ -23,7 +23,7 @@ Top to bottom, one scrolling column on the canvas ground:
 
 Geometry is fixed points (`TimelineGeo`): a 160pt pad the lead and pills sit over, the pill row's top at pad minus 36, the plot from 170 to 320, the time row 18 below the plot, the day row 26 below that, the sun row 14 below that. Chart labels are fixed size by the chart spec's rule; the lead's text is not, which is the first follow-up.
 
-Drawing rules, shared in intent with the card graph (`2026-09-04-card-graph-detail-look.md` brings the card to them):
+Drawing rules, which the card graph adopts in the follow-up below:
 
 - **Tide fill** anchors at chart datum: blue at `fillOpacity` at the top fading to clear at datum, amber (`SN.graphLow`) fading in below it. The dashed datum line draws when datum is inside the plotted span.
 - **Current fill** is blue on both sides of zero, `fillOpacity` at the extremes and clear at the zero line, with a dashed zero line. A schematic gate's shape takes a flat steel fill because its magnitude is unmeasured.
@@ -50,5 +50,19 @@ The strip's `UIScrollView` drives `scrubTime`; the magnet snaps to the nearest s
 - **Commentary under Reduce Motion.** The settle fade ignores the setting, and hiding the pill mid-scrub is content loss, not just motion. Consider keeping it visible and only suppressing taps.
 - **Moon tile VoiceOver** speaks the phase name twice.
 - **Gloss words.** "Incoming" and "outgoing" reach no screen; `CurrentPhase.gloss` and `DerivedPhase.gloss` survive for one unit test. Either give them a home the reader will meet (the lead's VoiceOver label is the cheapest; the provenance footer sits under a week of schedule rows and is not it) or retire them with `PhaseGlossTests.testGlossWords`.
-- **Card graph** on the same drawing rules: `docs/superpowers/plans/2026-09-04-card-graph-detail-look.md`.
+- **Card graph** on the same drawing rules: the section below.
 - **Pre-existing test failures** reproduced on `main`: the two online-gate date-picker tests, the two map frame-budget timings on iPad, and the live download-promotion test. They need an issue.
+
+## Follow-up: the card graph on the same rules
+
+The station card's curve (`StationCardGraph`, used by the list card, the card face and the widgets) draws its own way today: a top-to-bottom tide fade, a flood-blue and ebb-amber current fill, a plain blue line, and slack runs with haloed end dots. Bringing it onto the rules above is one PR.
+
+**Architecture.** A new `Slackwater/CurveDrawing.swift`, an enum namespace of free functions taking a `GraphicsContext` and already-mapped geometry: points, the y of zero or datum, the plot's top and bottom, the x of now. No `Date`, no engine types, no `TimelineData`. Both canvases call it. The widget target compiles an explicit source list in `project.yml` that includes `Palette.swift`, `SlackWindow.swift`, `StationCardGraph.swift` and `WidgetSnapshot.swift` but not `TimelineStrip.swift`, so the helpers cannot live in the strip file or reference `Timeline`; the widget-safe ramp entry points are `currentSpeedRampAnchorsKn` and `widgetSpeedRampT` in `SlackWindow.swift`.
+
+**Helpers.** `strokeSplitAtNow` in the detail's form, which fades the context's opacity left of now so a gradient shading fades too. `punchHalo` and `dot`, identical in both files today. `speedCoreStops(samples, width)`, pure and testable: clear below the first anchor, the ramp's yellow fading in to the second, the ramp above, one stop per sample. `datumFill` and `zeroFill` taking the true zero fraction, since the card's padded domain does not centre zero. `runs(segments, nowX)`: every eraser first, then each green stroke, no end dots. `hangLabel` with a `.toBar(high:)` or `.set(deg:)` glyph. Card-specific and untouched: the swing window and padding, the axis row and its edge margins, the nearest-sample now dot, the VoiceOver summary. Glyphs stay as they are on both surfaces.
+
+**Steps**, each compiling alone: add the file and the `project.yml` entry, then `xcodegen generate`; re-point the detail canvas at the helpers, pixel-identical by construction; card tide fill to `datumFill`, keeping the near-datum dashed line; card current fill to `zeroFill`; card line to base blue plus the `CurveStyle.speedCore` thread; the dashed zero line on current cards; card runs without end dots, which orphans `windowDotOpacities` in `SlackWindow.swift` and its `SlackWindowTests` test, both deleted; card dots and hang labels on the helpers; full suite, then the list, card face, medium and small widget screenshots.
+
+**Tests.** `TimelineTests.testTideTrackUsesCardFillAndRateColouredLine` scans `drawTide` for literals; retarget it to the helper call and mirror it on `StationCardGraph.swift`. Extend `ColourAndFormTests.testCurrentTrackDoesNotSpeakDirectionInColour`'s banned-token scan to the card's canvas. Add a pure `speedCoreStops` test: locations sorted in `0...1`, clear below the first anchor, two peaks of different speed give different hottest stops, empty and zero-width inputs are safe. `WidgetSnapshotTests.testMediumWidgetRendersTheStationCard` counts `SN.go` pixels and must stay over its floor without end dots. `TypeScaleTests.testNumericFormattersAreMonospacedDigit` needs no new indirection if helpers take pre-formatted strings.
+
+**Risks.** A missed `project.yml` entry breaks only the widget build, at compile time. A 2pt thread on a 2.5pt line at card scale may read as a recolour; judge from the medium widget screenshot, the knob is `CurveStyle.speedCore`, shared with the detail. The card's `domainPadFraction` pads more than the detail's span, so a datum gradient covers a taller range there; expected. Per-sample gradient stops are cheap at the card's ~150 samples.
