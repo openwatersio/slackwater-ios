@@ -69,6 +69,20 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String, id: String) -> 
     return try? decodeCatalogRecord(data, id: id)
 }
 
+func catalogRecord<T: Decodable & StationIdentity>(
+    _ resource: String, id: String, directory: URL
+) throws -> T? {
+    let url = directory.appendingPathComponent(resource + ".json")
+    guard FileManager.default.fileExists(atPath: url.path) else {
+        throw CatalogError(resource: resource, stage: .lookup, reason: "file missing")
+    }
+    let data: Data
+    do { data = try Data(contentsOf: url, options: .mappedIfSafe) }
+    catch { throw CatalogError(resource: resource, stage: .read, reason: "unable to read file") }
+    do { return try decodeCatalogRecord(data, id: id) }
+    catch { throw CatalogError(resource: resource, stage: .decode, reason: "invalid catalog record") }
+}
+
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
@@ -114,7 +128,11 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
 
     var engineStation: any CurrentPredicting {
-        guard let ref = referenceRecord else { return harmonicStation }
+        engineStation(referenceRecord: referenceRecord)
+    }
+
+    func engineStation(referenceRecord: CurrentStationRecord?) -> any CurrentPredicting {
+        guard reference != nil, let ref = referenceRecord else { return harmonicStation }
         return SubordinateStation(
             reference: ref.harmonicStation,
             slackBeforeFloodOffset: slackBeforeFloodOffset ?? 0, slackBeforeEbbOffset: slackBeforeEbbOffset ?? 0,
@@ -308,6 +326,24 @@ enum StationItem: Identifiable, Hashable {
         }
         let record: TideStationRecord? = bundled("stations", id: id)
         return record.map { .tide($0) }
+    }
+
+    static func widgetItem(id: String, directory: URL) throws -> StationItem? {
+        if id.hasPrefix("current:") {
+            let record: CurrentStationRecord? = try catalogRecord(
+                "currents", id: String(id.dropFirst("current:".count)), directory: directory)
+            return record.map(StationItem.current)
+        }
+        if id.hasPrefix("chs-") {
+            let stations: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)
+            if let record = stations.first(where: { $0.id == id }) { return .chs(record) }
+            let gates: [ChsGateInfo] = try readCatalog("chs-gates", directory: directory)
+            if let record = gates.first(where: { $0.id == id }) { return .chsGate(record) }
+            let currents: [ChsCurrentGateInfo] = try readCatalog("chs-current-gates", directory: directory)
+            return currents.first(where: { $0.id == id }).map(StationItem.chsCurrent)
+        }
+        let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
+        return record.map(StationItem.tide)
     }
 
     /// How many results the search screen shows.

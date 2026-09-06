@@ -193,7 +193,7 @@ struct WidgetCard {
                          reading: .tide(state, imperial: imperial),
                          graph: r.cardGraph(at: now, imperial: imperial, station: station), nextSlack: nil,
                          locationMark: locationMark, countdownEnd: nil)
-        case .current(let r):
+        case .current(let r, _):
             let state = r.cardState(at: now)
             let graph = r.cardGraph(at: now, unit: speedUnit)
             // Inside a window the widget counts down to the closing (§15.3),

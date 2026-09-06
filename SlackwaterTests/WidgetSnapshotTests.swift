@@ -153,7 +153,7 @@ final class WidgetSnapshotTests: XCTestCase {
         let (record, now, graph) = try XCTUnwrap(widestWindowCard(
             among: Array(CurrentStationRecord.all.prefix(30)),
             near: Date(timeIntervalSince1970: 1_755_800_000)))
-        let card = WidgetCard.build(.current(record), now: now)
+        let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
 
         func render(_ width: CGFloat, _ height: CGFloat, name: String) throws -> UIImage {
             // SN.canvas: the widget's real containerBackground (the list's
@@ -204,7 +204,8 @@ final class WidgetSnapshotTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let tideRecord = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
         let tide = WidgetCard.build(.tide(tideRecord, station: tideRecord.engineStation), now: now)
-        let current = WidgetCard.build(.current(CurrentStationRecord.all.first!), now: now)
+        let currentRecord = CurrentStationRecord.all.first!
+        let current = WidgetCard.build(.current(currentRecord, station: currentRecord.engineStation), now: now)
         let gateInfo = try XCTUnwrap(ChsGateInfo.all.first)
         let port = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gateInfo.reference })
         let model = ChsModel(
@@ -246,7 +247,7 @@ final class WidgetSnapshotTests: XCTestCase {
             }
             return peak(a) < peak(b)
         })
-        let card = WidgetCard.build(.current(fastest), now: now)
+        let card = WidgetCard.build(.current(fastest, station: fastest.engineStation), now: now)
         let renderer = ImageRenderer(content: DayCurveContentView(card: card)
             .frame(width: 364, height: 170)
             .background(SN.canvas))
@@ -304,7 +305,7 @@ final class WidgetSnapshotTests: XCTestCase {
             throw XCTSkip("fixture window is under an hour wide")
         }
 
-        let card = WidgetCard.build(.current(record), now: now)
+        let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
         let end = try XCTUnwrap(card.countdownEnd, "expected a card counting down")
         if case .current(_, _, _, _, let inWindow) = card.reading {
             XCTAssertTrue(inWindow)
@@ -337,7 +338,7 @@ final class WidgetSnapshotTests: XCTestCase {
             throw XCTSkip("no bundled window over three hours wide")
         }
         let now = window.end.addingTimeInterval(-3 * 3_600)
-        let card = WidgetCard.build(.current(record), now: now)
+        let card = WidgetCard.build(.current(record, station: record.engineStation), now: now)
         XCTAssertNil(card.countdownEnd)
     }
 

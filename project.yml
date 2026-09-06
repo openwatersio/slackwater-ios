@@ -119,6 +119,8 @@ targets:
       - Slackwater/StationCardGraph.swift
       - Slackwater/CurveDrawing.swift
       - Slackwater/TideMovement.swift
+      - Slackwater/CatalogSnapshot.swift
+      - Slackwater/CatalogStorage.swift
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
