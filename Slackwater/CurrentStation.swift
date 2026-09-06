@@ -97,6 +97,10 @@ func catalogRecord<T: Decodable & StationIdentity>(
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
+    guard data.first == 91, data.last == 93 else {
+        throw DecodingError.dataCorrupted(.init(
+            codingPath: [], debugDescription: "invalid compact catalog framing"))
+    }
     let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
     guard let start = data.range(of: marker)?.lowerBound,
           let arrayEnd = data.lastIndex(of: 93) else { return nil }
@@ -327,19 +331,10 @@ enum StationItem: Identifiable, Hashable {
 
     /// Widget-safe lookup: decode only the requested large NOAA record; the
     /// three CHS identity catalogs are small enough to retain whole.
-    static func widgetItem(id: String) -> StationItem? {
-        if id.hasPrefix("current:") {
-            let record: CurrentStationRecord? = bundled(
-                "currents", id: String(id.dropFirst("current:".count)))
-            return record.map { .current($0) }
-        }
-        if id.hasPrefix("chs-") {
-            if let record = ChsStationInfo.all.first(where: { $0.id == id }) { return .chs(record) }
-            if let record = ChsGateInfo.all.first(where: { $0.id == id }) { return .chsGate(record) }
-            return ChsCurrentGateInfo.all.first(where: { $0.id == id }).map { .chsCurrent($0) }
-        }
-        let record: TideStationRecord? = bundled("stations", id: id)
-        return record.map { .tide($0) }
+    static func widgetItem(
+        id: String, locator: CatalogFileLocator = .shared
+    ) -> StationItem? {
+        locator.load { directory in try widgetItem(id: id, directory: directory) }
     }
 
     static func widgetItem(id: String, directory: URL) throws -> StationItem? {

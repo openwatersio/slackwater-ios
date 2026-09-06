@@ -18,14 +18,14 @@ enum CatalogStorageError: Error, Equatable {
     case invalidMetadata
 }
 
-struct CatalogStorage {
+struct CatalogStorage: Sendable {
     static let shared = CatalogStorage(
         root: AppGroup.container.appendingPathComponent("Catalogs", isDirectory: true),
         bundleDirectory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
 
     let root: URL
     let bundleDirectory: URL
-    private let files = FileManager.default
+    private var files: FileManager { .default }
 
     init(root: URL, bundleDirectory: URL) {
         self.root = root
@@ -87,7 +87,7 @@ struct CatalogStorage {
     }
 }
 
-struct CatalogFileLocator {
+struct CatalogFileLocator: Sendable {
     static let shared = CatalogFileLocator(storage: .shared)
     let storage: CatalogStorage
 

@@ -64,6 +64,15 @@ final class WidgetStationLoaderTests: XCTestCase {
         }
     }
 
+    private func appendStation(copying id: String, as newID: String, name: String, in directory: URL) throws {
+        try edit("stations", in: directory) { rows in
+            var station = rows[rows.firstIndex { $0["id"] as? String == id }!]
+            station["id"] = newID
+            station["name"] = name
+            rows.append(station)
+        }
+    }
+
     private func appendTombstone(_ id: String, to directory: URL) throws {
         try edit("chs-tombstones", in: directory) {
             $0.append(["id": id, "name": "Removed station", "region": "Removed", "latitude": 0, "longitude": 0])
@@ -96,7 +105,9 @@ final class WidgetStationLoaderTests: XCTestCase {
         let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
         let referenced = Set(bundled.tides.compactMap(\.reference))
             .union(bundled.currents.compactMap(\.tideReference))
-        let removed = try XCTUnwrap(bundled.tides.first { !referenced.contains($0.id) })
+        let removed = try XCTUnwrap(bundled.tides.first {
+            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
+        })
         let storage = try makeStorage { directory in
             try removeStation(removed.id, from: directory)
             try appendTombstone(removed.id, to: directory)
@@ -104,6 +115,17 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertNil(WidgetStationLoader.loadRecord(
             id: removed.id,
             locator: CatalogFileLocator(storage: storage)))
+    }
+
+    func testCorruptActiveNOAAFileFallsBackToBundle() throws {
+        let storage = try makeStorage()
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        try Data("broken".utf8).write(to: directory.appendingPathComponent("stations.json"))
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: TideStationRecord.fridayHarborID,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
     }
 
     func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
@@ -163,6 +185,40 @@ final class WidgetStationLoaderTests: XCTestCase {
         }
         let tombstones: [StationTombstone] = try readCatalog("chs-tombstones", directory: directory)
         XCTAssertFalse(tombstones.isEmpty)
+    }
+
+    func testWidgetIdentityCallersUseActiveCatalog() async throws {
+        let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        let referenced = Set(bundled.tides.compactMap(\.reference))
+            .union(bundled.currents.compactMap(\.tideReference))
+        let removed = try XCTUnwrap(bundled.tides.first {
+            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
+        })
+        let addedID = "999999999"
+        let storage = try makeStorage { directory in
+            try appendStation(copying: removed.id, as: addedID, name: "Remote only", in: directory)
+            try removeStation(removed.id, from: directory)
+            try appendTombstone(removed.id, to: directory)
+        }
+        let locator = CatalogFileLocator(storage: storage)
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        defaults.set([addedID, removed.id], forKey: AppGroup.favoritesKey)
+
+        let query = StationQuery(locator: locator, defaults: defaults)
+        let suggestions = try await query.suggestedEntities()
+        XCTAssertEqual(suggestions.first { $0.id == addedID }?.name, "Remote only")
+        XCTAssertNil(suggestions.first { $0.id == removed.id })
+        let resolved = try await query.entities(for: [addedID, removed.id])
+        XCTAssertEqual(resolved.map(\.id), [addedID])
+
+        defaults.set(addedID, forKey: AppGroup.currentLocationStationKey)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: defaults, locator: locator), addedID)
+        defaults.set(removed.id, forKey: AppGroup.currentLocationStationKey)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: defaults, locator: locator),
+                       addedID)
     }
 
     func testTargetedBundledLookupFindsOneStation() {

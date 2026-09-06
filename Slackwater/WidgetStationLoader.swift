@@ -92,11 +92,13 @@ enum WidgetStationLoader {
     }
 
     static func resolvedStationID(
-        _ id: String, defaults: UserDefaults = AppGroup.defaults
+        _ id: String,
+        defaults: UserDefaults = AppGroup.defaults,
+        locator: CatalogFileLocator = .shared
     ) -> String {
         guard id == AppGroup.currentLocationStationID else { return id }
         if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
-           StationItem.widgetItem(id: cached) != nil { return cached }
+           StationItem.widgetItem(id: cached, locator: locator) != nil { return cached }
         return fallbackStationID(defaults: defaults)
     }
 
