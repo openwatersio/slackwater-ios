@@ -26,7 +26,7 @@ extension Color {
 
 enum SN {
     static let navyDeep = Color(hex: 0x00183C)
-    static let canvas = Color(hex: 0x05122A)
+    static let canvas = Color(hex: 0x05122A)  // duplicated in LaunchBackground.colorset — the launch screen renders before code
     static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of a screen
     static let leaf = Color(hex: 0x88B868)
     static let steelHex: UInt32 = 0x5888A8
