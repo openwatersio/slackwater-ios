@@ -66,13 +66,20 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
 func bundled<T: Decodable & StationIdentity>(_ resource: String, id: String) -> T? {
     guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
           let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+    return try? decodeCatalogRecord(data, id: id)
+}
+
+/// Shared with candidate validation so downloaded NOAA files must satisfy the
+/// exact same compact-record contract as widget lookups.
+func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
     let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
     guard let start = data.range(of: marker)?.lowerBound,
           let arrayEnd = data.lastIndex(of: 93) else { return nil }
     let separator = Data(",{\"id\":".utf8)
     let afterMarker = data.index(start, offsetBy: marker.count)
+    guard arrayEnd >= afterMarker else { return nil }
     let end = data.range(of: separator, in: afterMarker..<data.endIndex)?.lowerBound ?? arrayEnd
-    return try? JSONDecoder().decode(T.self, from: data[start..<end])
+    return try JSONDecoder().decode(T.self, from: data[start..<end])
 }
 
 struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
