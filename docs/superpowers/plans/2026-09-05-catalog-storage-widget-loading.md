@@ -375,6 +375,7 @@ rtk git commit -m "feat: pin widget catalog lookups to one generation"
 
 **Files:**
 - Modify: `Slackwater/CurrentStation.swift`
+- Modify: `Slackwater/StationIntent.swift`
 - Modify: `Slackwater/WidgetStationLoader.swift`
 - Modify: `SlackwaterTests/WidgetStationLoaderTests.swift`
 - Modify: `project.yml`
@@ -448,6 +449,31 @@ func testWidgetReadsEverySmallGeneratedCatalogThroughActiveDirectory() throws {
     let tombstones: [StationTombstone] = try readCatalog("chs-tombstones", directory: directory)
     XCTAssertFalse(tombstones.isEmpty)
 }
+
+func testLocatorBackedWidgetIdentityUsesActiveCatalog() throws {
+    let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+    let removed = try XCTUnwrap(bundled.tides.first)
+    let addedID = "999999999"
+    let storage = try makeStorage { directory in
+        try appendStation(copying: removed.id, as: addedID, name: "Remote only", in: directory)
+        try removeStation(removed.id, from: directory)
+        try appendTombstone(removed.id, to: directory)
+    }
+    let locator = CatalogFileLocator(storage: storage)
+    XCTAssertEqual(StationItem.widgetItem(id: addedID, locator: locator)?.name, "Remote only")
+    XCTAssertNil(StationItem.widgetItem(id: removed.id, locator: locator))
+}
+
+func testCorruptActiveNOAAFileFallsBackToBundle() throws {
+    let storage = try makeStorage()
+    let directory = try XCTUnwrap(storage.activeDirectory())
+    try Data("broken".utf8).write(to: directory.appendingPathComponent("stations.json"))
+    let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+        id: TideStationRecord.fridayHarborID,
+        locator: CatalogFileLocator(storage: storage)))
+    guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+    XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+}
 ```
 
 The helper mutations must preserve compact id-first formatting for the two NOAA files, using the existing JSON rewrite helper pattern in `CatalogSnapshotTests`.
@@ -501,7 +527,20 @@ static func widgetItem(id: String, directory: URL) throws -> StationItem? {
     let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
     return record.map(StationItem.tide)
 }
+
+static func widgetItem(
+    id: String, locator: CatalogFileLocator = .shared
+) -> StationItem? {
+    locator.load { directory in try widgetItem(id: id, directory: directory) }
+}
 ```
+
+Before returning `nil` for a missing compact NOAA record, `decodeCatalogRecord`
+must verify the generated array framing (`[` first and `]` last). Malformed or
+truncated bytes throw so `catalogRecord` reports `.decode` and the locator can
+fall back; a structurally valid catalog without the requested marker remains
+`nil`. Replace the old bundle-only `widgetItem(id:)` implementation with the
+locator-backed forwarder above.
 
 Do not make the scanner whitespace-independent; PR #285 already validates the generated NOAA format, while the small pretty-printed catalogs use whole decode.
 
@@ -575,6 +614,12 @@ Update `station(from:)` to return the carried current predictor. Update `derived
 
 Add `Slackwater/CatalogSnapshot.swift` and `Slackwater/CatalogStorage.swift` to the widget target's explicit source list in `project.yml`, then regenerate the Xcode project.
 
+Give `StationQuery` a defaulted locator so its favorites/recents suggestions and
+entity resolution use the same locator-backed identity lookup and remain
+injectable in tests. Give `WidgetStationLoader.resolvedStationID` the same
+defaulted locator parameter so an active-only cached station is accepted and a
+tombstoned cached station is rejected. Add focused caller tests for both cases.
+
 - [ ] **Step 5: Run widget tests and compile both targets**
 
 Run the Step 2 command, then:
@@ -588,7 +633,7 @@ Expected: widget tests PASS and both app/widget targets compile.
 - [ ] **Step 6: Commit widget generation loading**
 
 ```bash
-rtk git add Slackwater/CurrentStation.swift Slackwater/WidgetStationLoader.swift SlackwaterTests/WidgetStationLoaderTests.swift project.yml Slackwater.xcodeproj/project.pbxproj
+rtk git add Slackwater/CurrentStation.swift Slackwater/StationIntent.swift Slackwater/WidgetStationLoader.swift SlackwaterTests/WidgetStationLoaderTests.swift project.yml Slackwater.xcodeproj/project.pbxproj
 rtk git commit -m "feat: load widget stations from active catalogs"
 ```
 
