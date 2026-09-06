@@ -7,6 +7,7 @@
 // after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
 // event) under the centerline when it's within 46pt. One implementation for
 // the tide-only and current-only details.
+import Almanac
 import SwiftUI
 import UIKit
 import TideEngine
@@ -318,12 +319,21 @@ struct TimelineData {
         // when the window actually reaches it, so nothing else changes. 8 is
         // the other end: never visible, it supplies the sunrise that closes
         // the last visible night band (offset 7).
+        let observer = try? Observer(latitudeDeg: lat, longitudeDeg: lon)
         let days: [TimelineDay] = (-3...8).map { off in
             let d0 = cal.date(byAdding: .day, value: off, to: anchor)!
-            let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
+            // The civil day is bounded HERE because Almanac takes a half-open
+            // UTC window and knows nothing of time zones; the widen-±1-day
+            // filtering the old suncalc port needed goes away with it.
+            // Calendar bounds, not +86_400: a DST-transition day is 23 or 25
+            // hours, and the duration bound drops or admits events in the
+            // skewed hour.
+            let dayStart = cal.startOfDay(for: d0)
+            let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
+            let sun = observer.flatMap { try? sunEvents(from: dayStart, to: dayEnd, observer: $0) } ?? []
             return TimelineDay(offset: off, start: d0,
-                               sunrise: sun.first { $0.kind == .sunrise }?.time,
-                               sunset: sun.first { $0.kind == .sunset }?.time)
+                               sunrise: sun.first { $0.kind == .rise }?.time,
+                               sunset: sun.first { $0.kind == .set }?.time)
         }
         return DayChrome(tz: tz, anchor: anchor, today: today,
                          start: w.start, end: w.end, days: days)

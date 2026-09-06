@@ -63,11 +63,46 @@ final class SkyBackdropTests: XCTestCase {
         let rise = try XCTUnwrap(events.first { $0.kind == .rise })
         let set = try XCTUnwrap(events.first { $0.kind == .set })
         let size = CGSize(width: 400, height: 320)
+        // The arc's endpoints come from the strip's day chrome, not from a
+        // second computation inside SkyState — so the test hands it the same
+        // shape `TimelineData.days` does.
+        let days = [TimelineDay(offset: 0, start: start, sunrise: rise.time, sunset: set.time)]
 
         for time in [rise.time.addingTimeInterval(60), set.time.addingTimeInterval(-60)] {
-            let sky = SkyState(time: time, latitude: 48.535, longitude: -123.01)
+            let sky = SkyState(time: time, latitude: 48.535, longitude: -123.01, days: days)
             let point = sunArcPoint(progress: try XCTUnwrap(sky.sunProgress), size: size)
             XCTAssertGreaterThan(point.y, 318)
         }
+    }
+
+    /// No day chrome (an online gate still fetching) means no arc: SkyBackdrop
+    /// falls back to the sun's true az/alt rather than inventing endpoints.
+    func testSunArcIsAbsentWithoutDayChrome() throws {
+        let noon = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-12-21T20:00:00Z"))
+        XCTAssertNil(SkyState(time: noon, latitude: 48.535, longitude: -123.01).sunProgress)
+    }
+
+    /// Phase names are presentation, kept app-side when the astronomy moved to
+    /// Almanac (#228). The prototype's moonName buckets, driven by phase.
+    func testMoonPhaseNames() {
+        XCTAssertEqual(moonPhaseName(phase: 0.001), "New Moon")
+        XCTAssertEqual(moonPhaseName(phase: 0.995), "New Moon")
+        XCTAssertEqual(moonPhaseName(phase: 0.25), "First Quarter")
+        XCTAssertEqual(moonPhaseName(phase: 0.5), "Full Moon")
+        XCTAssertEqual(moonPhaseName(phase: 0.75), "Last Quarter")
+        XCTAssertEqual(moonPhaseName(phase: 0.12), "Waxing Crescent")
+        XCTAssertEqual(moonPhaseName(phase: 0.38), "Waxing Gibbous")
+        XCTAssertEqual(moonPhaseName(phase: 0.62), "Waning Gibbous")
+        XCTAssertEqual(moonPhaseName(phase: 0.88), "Waning Crescent")
+    }
+
+    /// The names have to agree with Almanac's own phase convention (0 new,
+    /// 0.5 full), not just with the bucket arithmetic: the 2026-08-28 full
+    /// moon is the eclipse night #222 is about, and it must read "Full Moon".
+    func testPhaseNameAgreesWithAlmanacAtAKnownFullMoon() throws {
+        let peak = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-28T04:13:00Z"))
+        let moon = try moonIllumination(peak)
+        XCTAssertEqual(moonPhaseName(phase: moon.phase), "Full Moon")
+        XCTAssertGreaterThan(moon.fraction, 0.99)
     }
 }

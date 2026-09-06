@@ -74,7 +74,8 @@ struct OnlineGateDetailView: View {
     }
 
     var body: some View {
-        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude)
+        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
+                           days: timeline?.days ?? [])
         // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
