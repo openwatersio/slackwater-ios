@@ -489,6 +489,7 @@ func testCompactScannerRejectsInvalidOuterGrammar() throws {
     for (bytes, id) in [
         (#"[{"id":"first"}][]"#, "missing"),
         (#"[{"id":"first"},garbage]"#, "missing"),
+        (#"[{"id":"first"}{"id":"second"}]"#, "missing"),
         (#"{"id":"first"}]"#, "first"),
     ] {
         XCTAssertThrowsError(
