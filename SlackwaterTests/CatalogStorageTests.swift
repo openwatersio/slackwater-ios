@@ -78,4 +78,54 @@ final class CatalogStorageTests: XCTestCase {
             XCTAssertEqual(error as? CatalogStorageError, .invalidMetadata)
         }
     }
+
+    func testLocatorPinsOneDirectoryForAllReads() throws {
+        let active = try commitBundle(batch: UUID())
+        var directories: [URL] = []
+        let result: String? = CatalogFileLocator(storage: storage).load { directory in
+            directories += [directory, directory]
+            _ = try Data(contentsOf: directory.appendingPathComponent("stations.json"))
+            _ = try Data(contentsOf: directory.appendingPathComponent("currents.json"))
+            return "ok"
+        }
+        XCTAssertEqual(result, "ok")
+        XCTAssertEqual(Set(directories), [active.directory])
+    }
+
+    func testMissingRecordDoesNotResurrectBundledRecord() throws {
+        _ = try commitBundle(batch: UUID())
+        var attempts = 0
+        let result: String? = CatalogFileLocator(storage: storage).load { _ in
+            attempts += 1
+            return nil
+        }
+        XCTAssertNil(result)
+        XCTAssertEqual(attempts, 1)
+    }
+
+    func testFailedPinnedReadRetriesNewGenerationThenBundle() throws {
+        let old = try commitBundle(batch: UUID())
+        var attempted: [URL] = []
+        let locator = CatalogFileLocator(storage: storage)
+        let result: String? = locator.load { directory in
+            attempted.append(directory)
+            if directory == old.directory {
+                _ = try self.commitBundle(batch: UUID())
+                try FileManager.default.removeItem(at: old.directory)
+                throw CatalogStorageError.missingGeneration(old.name)
+            }
+            return directory.lastPathComponent
+        }
+        XCTAssertEqual(result, try storage.activeDirectory()?.lastPathComponent)
+        XCTAssertEqual(attempted.count, 2)
+    }
+
+    func testFailedActiveAndRetryReadsFallBackToBundle() throws {
+        let active = try commitBundle(batch: UUID())
+        let result: URL? = CatalogFileLocator(storage: storage).load { directory in
+            if directory == storage.bundleDirectory { return directory }
+            throw CatalogStorageError.missingGeneration(active.name)
+        }
+        XCTAssertEqual(result, storage.bundleDirectory)
+    }
 }

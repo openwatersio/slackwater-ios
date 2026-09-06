@@ -86,3 +86,44 @@ struct CatalogStorage {
                                        metadata: metadata, snapshot: snapshot)
     }
 }
+
+struct CatalogFileLocator {
+    static let shared = CatalogFileLocator(storage: .shared)
+    let storage: CatalogStorage
+
+    func load<T>(_ body: (URL) throws -> T?) -> T? {
+        let first: URL?
+        do { first = try storage.activeDirectory() }
+        catch {
+            CatalogDiagnostics.log(error)
+            first = nil
+        }
+        if let first {
+            do { return try body(first) }
+            catch {
+                CatalogDiagnostics.log(error)
+                do {
+                    if let retry = try storage.activeDirectory(), retry != first {
+                        do { return try body(retry) }
+                        catch { CatalogDiagnostics.log(error) }
+                    }
+                } catch {
+                    CatalogDiagnostics.log(error)
+                }
+            }
+        }
+        do { return try body(storage.bundleDirectory) }
+        catch {
+            CatalogDiagnostics.log(error)
+            return nil
+        }
+    }
+}
+
+enum CatalogDiagnostics {
+    private static let logger = Logger(subsystem: "org.openwaters.slackwater", category: "Catalog")
+
+    static func log(_ error: Error) {
+        logger.error("Catalog load failed: \(String(describing: error), privacy: .public)")
+    }
+}
