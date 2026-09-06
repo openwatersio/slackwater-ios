@@ -57,16 +57,24 @@ final class SkyBackdropTests: XCTestCase {
 
     func testWinterSunArcMeetsHorizonAtActualRiseAndSet() throws {
         let observer = try Observer(latitudeDeg: 48.535, longitudeDeg: -123.01)
-        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-12-21T00:00:00Z"))
-        let end = start.addingTimeInterval(24 * 60 * 60)
-        let events = try sunEvents(from: start, to: end, observer: observer)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        // The LOCAL day, the same window `TimelineStrip.dayChrome` builds. A
+        // UTC day at this longitude straddles two local days and hands back a
+        // sunset with the NEXT day's sunrise — a pair in the wrong order, which
+        // no `TimelineDay` ever holds. The assert below keeps that honest.
+        let noon = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-12-21T20:00:00Z"))
+        let dayStart = cal.startOfDay(for: noon)
+        let dayEnd = try XCTUnwrap(cal.date(byAdding: .day, value: 1, to: dayStart))
+        let events = try sunEvents(from: dayStart, to: dayEnd, observer: observer)
         let rise = try XCTUnwrap(events.first { $0.kind == .rise })
         let set = try XCTUnwrap(events.first { $0.kind == .set })
+        XCTAssertLessThan(rise.time, set.time, "a local day rises before it sets")
         let size = CGSize(width: 400, height: 320)
         // The arc's endpoints come from the strip's day chrome, not from a
         // second computation inside SkyState — so the test hands it the same
         // shape `TimelineData.days` does.
-        let days = [TimelineDay(offset: 0, start: start, sunrise: rise.time, sunset: set.time)]
+        let days = [TimelineDay(offset: 0, start: dayStart, sunrise: rise.time, sunset: set.time)]
 
         for time in [rise.time.addingTimeInterval(60), set.time.addingTimeInterval(-60)] {
             let sky = SkyState(time: time, latitude: 48.535, longitude: -123.01, days: days)
