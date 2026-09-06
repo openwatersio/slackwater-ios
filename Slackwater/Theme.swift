@@ -85,12 +85,21 @@ struct SkyState {
     let moon: AltAz?
     let illumination: MoonIllumination?
 
-    init(time: Date, latitude: Double, longitude: Double) {
+    /// `days` is the strip's own day chrome. The arc's endpoints come from
+    /// there rather than a second rise/set computation here: this initialiser
+    /// runs on every scrub frame, and an Almanac event search costs two orders
+    /// of magnitude more than the position lookups above it (~0.6 ms against
+    /// ~0.005 ms) — but the real reason is agreement, since the dome's sun
+    /// would otherwise fly over night bands drawn from a different answer. Empty days (an online gate still fetching) means no arc, and
+    /// `SkyBackdrop` falls back to the sun's true az/alt.
+    init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = []) {
         self.latitude = latitude
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
-        let times = SunMoon.sunTimes(date: time, lat: latitude, lon: longitude)
-        if let rise = times.sunrise, let set = times.sunset {
+        // The arc only draws in daylight, so the pair that matters is the rise
+        // behind `time` and the set ahead of it.
+        if let rise = days.compactMap(\.sunrise).last(where: { $0 <= time }),
+           let set = days.compactMap(\.sunset).first(where: { $0 >= time }) {
             sunProgress = time.timeIntervalSince(rise) / set.timeIntervalSince(rise)
         } else {
             sunProgress = nil
@@ -188,6 +197,23 @@ func countdown(from: Date, to target: Date) -> String {
 /// GraphicsContext renderers can't merge, so the geometry must.
 func moonLimbShift(fraction: Double, waxing: Bool, radius: CGFloat) -> CGFloat {
     (waxing ? -1 : 1) * CGFloat(fraction) * 2 * radius
+}
+
+/// Phase → name, the prototype's moonName buckets (age thresholds 1.7 d for
+/// new/full, 1.4 d for the quarters, over the 29.53 d synodic month).
+/// Presentation, not astronomy: Almanac reports `phase`, and where the names
+/// change hands is this app's call.
+func moonPhaseName(phase: Double) -> String {
+    let syn = 29.53
+    let age = phase * syn
+    let waxing = age < syn / 2
+    if age < 1.7 || age > syn - 1.7 { return "New Moon" }
+    if abs(age - syn / 2) < 1.7 { return "Full Moon" }
+    if abs(age - syn / 4) < 1.4 { return "First Quarter" }
+    if abs(age - 3 * syn / 4) < 1.4 { return "Last Quarter" }
+    let fraction = (1 - cos(2 * .pi * age / syn)) / 2
+    if fraction < 0.5 { return waxing ? "Waxing Crescent" : "Waning Crescent" }
+    return waxing ? "Waxing Gibbous" : "Waning Gibbous"
 }
 
 /// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
@@ -355,7 +381,6 @@ struct SummaryTiles: View {
     let at: Date
 
     var body: some View {
-        let moon = SunMoon.moonIllumination(date: at)
         HStack(alignment: .top, spacing: 12) {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
@@ -365,14 +390,18 @@ struct SummaryTiles: View {
                     Text(primary.value).font(ReadoutType.hero.monospacedDigit())
                 }
             }
-            ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
-                        accessibility: "Moon") {
-                MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
-            } value: {
-                // Words, not a number: "Waning Crescent" has to fit on one
-                // line where "7.6 ft" does, so it sits well below the hero.
-                Text(SunMoon.phaseName(phase: moon.phase))
-                    .font(ReadoutType.tileText)
+            // Almanac throws only outside 1950–2101; the tile drops rather
+            // than the row, so a primary reading still stands on its own.
+            if let moon = try? moonIllumination(at) {
+                ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
+                            accessibility: "Moon") {
+                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
+                } value: {
+                    // Words, not a number: "Waning Crescent" has to fit on one
+                    // line where "7.6 ft" does, so it sits well below the hero.
+                    Text(moonPhaseName(phase: moon.phase))
+                        .font(ReadoutType.tileText)
+                }
             }
         }
     }

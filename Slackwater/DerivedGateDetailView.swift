@@ -28,7 +28,8 @@ struct DerivedGateDetailView: View {
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
 
     var body: some View {
-        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude)
+        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
+                           days: timeline?.days ?? [])
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,

@@ -70,7 +70,8 @@ struct TideDetailView: View {
     }
 
     var body: some View {
-        let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude)
+        let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude,
+                           days: timeline?.days ?? [])
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
