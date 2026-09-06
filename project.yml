@@ -43,7 +43,10 @@ targets:
     info:
       path: Slackwater/Info.plist
       properties:
-        UILaunchScreen: {}
+        # LaunchBackground is SN.canvas (Palette.swift) as an asset — the
+        # launch screen renders before any code runs, so the hex lives twice.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         ITSAppUsesNonExemptEncryption: false
         # Without this the plist ships XcodeGen's literal default of "1" and the
         # build number that reaches TestFlight is whatever `exportArchive`
