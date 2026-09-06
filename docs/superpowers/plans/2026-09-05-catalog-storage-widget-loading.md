@@ -272,8 +272,29 @@ func testFailedPinnedReadRetriesNewGenerationThenBundle() throws {
 
 func testFailedActiveAndRetryReadsFallBackToBundle() throws {
     let active = try commitBundle(batch: UUID())
+    var activeAttempts = 0
     let result: URL? = CatalogFileLocator(storage: storage).load { directory in
         if directory == storage.bundleDirectory { return directory }
+        activeAttempts += 1
+        if directory == active.directory { _ = try self.commitBundle(batch: UUID()) }
+        throw CatalogStorageError.missingGeneration(active.name)
+    }
+    XCTAssertEqual(result, storage.bundleDirectory)
+    XCTAssertEqual(activeAttempts, 2)
+}
+
+func testInvalidInitialPointerFallsBackToBundle() throws {
+    try FileManager.default.createDirectory(at: storage.root, withIntermediateDirectories: true)
+    try Data("invalid".utf8).write(to: storage.currentURL)
+    let result: URL? = CatalogFileLocator(storage: storage).load { $0 }
+    XCTAssertEqual(result, storage.bundleDirectory)
+}
+
+func testInvalidRetryPointerFallsBackToBundle() throws {
+    let active = try commitBundle(batch: UUID())
+    let result: URL? = CatalogFileLocator(storage: storage).load { directory in
+        if directory == storage.bundleDirectory { return directory }
+        try Data("invalid".utf8).write(to: storage.currentURL)
         throw CatalogStorageError.missingGeneration(active.name)
     }
     XCTAssertEqual(result, storage.bundleDirectory)
