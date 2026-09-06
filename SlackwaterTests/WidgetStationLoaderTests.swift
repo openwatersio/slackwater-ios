@@ -128,6 +128,18 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
     }
 
+    func testTruncatedNestedActiveNOAAFileFallsBackToBundle() throws {
+        let storage = try makeStorage()
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        try Data("[{\"id\":\"first\",\"aliases\":[]".utf8)
+            .write(to: directory.appendingPathComponent("stations.json"))
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: TideStationRecord.fridayHarborID,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+    }
+
     func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
         let subordinate = try XCTUnwrap(CurrentStationRecord.all.first(where: \.isSubordinate))
         let storage = try makeStorage { directory in

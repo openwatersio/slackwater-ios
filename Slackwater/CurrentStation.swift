@@ -97,13 +97,29 @@ func catalogRecord<T: Decodable & StationIdentity>(
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
-    guard data.first == 91, data.last == 93 else {
-        throw DecodingError.dataCorrupted(.init(
-            codingPath: [], debugDescription: "invalid compact catalog framing"))
-    }
     let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
-    guard let start = data.range(of: marker)?.lowerBound,
-          let arrayEnd = data.lastIndex(of: 93) else { return nil }
+    guard let start = data.range(of: marker)?.lowerBound else {
+        guard data == Data("[]".utf8) || data.starts(with: Data("[{\"id\":\"".utf8)),
+              data.first == 91, data.last == 93 else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
+        }
+        var stack: [UInt8] = [], quoted = false, escaped = false
+        for byte in data {
+            if quoted { if escaped { escaped = false } else if byte == 92 { escaped = true } else if byte == 34 { quoted = false }; continue }
+            if byte == 34 { quoted = true }
+            else if byte == 91 || byte == 123 { stack.append(byte) }
+            else if byte == 93 || byte == 125 {
+                guard let open = stack.popLast(), (open == 91 && byte == 93) || (open == 123 && byte == 125) else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog delimiters"))
+                }
+            }
+        }
+        guard !quoted, !escaped, stack.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "truncated compact catalog"))
+        }
+        return nil
+    }
+    guard let arrayEnd = data.lastIndex(of: 93) else { return nil }
     let separator = Data(",{\"id\":".utf8)
     let afterMarker = data.index(start, offsetBy: marker.count)
     guard arrayEnd >= afterMarker else { return nil }
