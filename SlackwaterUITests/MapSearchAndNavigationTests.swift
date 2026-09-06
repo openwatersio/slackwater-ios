@@ -78,7 +78,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             // earlier test in this run (UserDefaults persists across launches
             // in the same simulator) reliably steals the camera and every tap
             // below lands on the wrong pin.
-            let app = launch("-seedGate", "-resetRecents")
+            let app = launch("-seedGate", "-resetRecents", "-locDenied")
             app.buttons["Map"].tap()
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.waitForExistence(timeout: 5))
