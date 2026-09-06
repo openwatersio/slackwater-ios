@@ -271,7 +271,9 @@ Validation is pure and runs before persistence or publication. A candidate must:
 10. Keep tombstone IDs disjoint from all live `StationItem` IDs.
 11. Include a tombstone for every rendered station ID present in the active
     snapshot but absent from the candidate.
-12. Keep `stations.json` and `currents.json` in the compact record form the
+12. Preserve every tombstone in the active snapshot unless that exact rendered
+    ID is live again in the candidate.
+13. Keep `stations.json` and `currents.json` in the compact record form the
     widget scanner requires: the validator locates a sampled record in each
     file with the single-record decoder itself.
 
@@ -381,6 +383,8 @@ Focused Swift tests cover:
   a candidate;
 - a NOAA catalog re-serialized out of compact record form rejects a candidate;
 - a correctly tombstoned removal validates;
+- dropping a historical tombstone without restoring its station rejects a
+  candidate;
 - adding a station, activating it, then serving the prior set again keeps the
   newer snapshot active, and a corrective set whose ledger tombstones the
   retracted ID activates;
