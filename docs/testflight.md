@@ -115,6 +115,14 @@ name in that output is the bug.
 
 ## Cadence
 
+Build 35 adds Associated Domains for `applinks:slackwater.xyz`. The app's
+distribution profile was refreshed on 2026-09-05: `LNV5YA445J`, UUID
+`d167dc60-6125-4498-9022-5ab20b16bbf1`. Its decoded entitlements include
+`com.apple.developer.associated-domains => *`, the existing App Group, and
+iCloud key-value storage. The old `5c858630…` profile was moved out of the
+installed profiles directory to `/private/tmp/slackwater-build35-previous-profile.mobileprovision`
+to prevent duplicate-name selection. The widgets profile is unchanged.
+
 Per-release procedure lives in the `releasing-to-testflight` skill
 (`.claude/skills/`) — bump, test, PR, upload, verify. What follows is the state
 that procedure sits on.

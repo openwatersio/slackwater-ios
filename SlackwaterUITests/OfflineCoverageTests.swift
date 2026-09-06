@@ -255,7 +255,9 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// row means the port radius let a far station through, and an online-gate
     /// row means the manager listed a Salish pass it can never fetch.
     func testFarFromCanadaDownloadsNothing() throws {
-        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+        // Favorites intentionally download regardless of distance; earlier
+        // tests can leave a Canadian favorite on this simulator.
+        let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "42.3601", "-fixLon", "-71.0589")  // Boston
 
         app.buttons["offline-status"].firstMatch.tap()

@@ -40,18 +40,22 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     override private init() {
         status = manager.authorizationStatus
         super.init()
-        manager.delegate = self
+        // Test locations must not be overwritten by the simulator's cached fix
+        // or authorization callback, including the deliberate no-fix states.
+        if Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix {
+            manager.delegate = self
+        }
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         if let fix = Self.testFix {
             location = fix
-        } else if authorized {
+        } else if authorized && !Self.testAuthorizedNoFix {
             location = Self.recentLocation(manager.location)
         }
     }
 
     var authorized: Bool {
-        Self.testFix != nil || Self.testAuthorizedNoFix
-            || status == .authorizedWhenInUse || status == .authorizedAlways
+        !Self.testDenied && (Self.testFix != nil || Self.testAuthorizedNoFix
+            || status == .authorizedWhenInUse || status == .authorizedAlways)
     }
     var denied: Bool {
         Self.testDenied || (!Self.testAuthorizedNoFix && Self.testFix == nil
