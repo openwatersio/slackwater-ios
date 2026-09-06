@@ -124,7 +124,7 @@ func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
                     guard index == bytes.count - 1, !expectsRecord || bytes == [91, 93] else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "multiple compact catalog roots"))
                     }
-                } else if byte != 91 {
+                } else {
                     throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
                 }
             }

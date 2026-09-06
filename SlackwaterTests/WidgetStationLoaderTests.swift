@@ -141,11 +141,19 @@ final class WidgetStationLoaderTests: XCTestCase {
     }
 
     func testCompactScannerRejectsInvalidOuterGrammar() {
+        struct IDOnlyRecord: Decodable { let id: String }
         let missing = "missing"
-        for bytes in ["[{\"id\":\"first\"}][]", "[{\"id\":\"first\"},garbage]", "[{\"id\":\"first\"}{\"id\":\"second\"}]"] {
+        for bytes in [
+            "[{\"id\":\"first\"}][]",
+            "[{\"id\":\"first\"},garbage]",
+            "[{\"id\":\"first\"}{\"id\":\"second\"}]",
+            "[{\"id\":\"first\"}[]]",
+            "[{\"id\":\"first\"},[]{\"id\":\"second\"}]",
+            "[{\"id\":\"first\"},[garbage]{\"id\":\"second\"}]"
+        ] {
             XCTAssertThrowsError(try decodeCatalogRecord(Data(bytes.utf8), id: missing) as TideStationRecord?)
         }
-        XCTAssertThrowsError(try decodeCatalogRecord(Data("{\"id\":\"first\"}]".utf8), id: "first") as TideStationRecord?)
+        XCTAssertThrowsError(try decodeCatalogRecord(Data("{\"id\":\"first\"}]".utf8), id: "first") as IDOnlyRecord?)
     }
 
     func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
