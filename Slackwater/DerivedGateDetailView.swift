@@ -12,7 +12,7 @@ struct DerivedGateDetailView: View {
     let record: DerivedGateRecord
 
     @State private var live = appNow()
-    @State private var scrubTime = appNow()
+    @State private var scrubTime = Timeline.introStart(for: appNow())
     @State private var timeline: TimelineData?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
@@ -28,23 +28,27 @@ struct DerivedGateDetailView: View {
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
 
     var body: some View {
+        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude)
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
                                 let slack = nextSlack
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   now: live, scrubTime: $scrubTime,
+                                                   now: live, showsDayBands: false,
+                                                   skyFill: sky.horizon, chromeInk: sky.ink,
+                                                   scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    commentary: slack.map {
                                                        commentaryText("Slack", at: $0.time, from: scrubTime, now: live)
                                                    },
                                                    onCommentary: { if let slack { scrubTime = slack.time } })
-                                    .overlay(alignment: .top) { lead }
+                                    .overlay(alignment: .top) { lead(ink: sky.ink) }
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
                                 Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
                                     .font(.caption2)
@@ -87,10 +91,10 @@ struct DerivedGateDetailView: View {
     /// set bearing to point at — only which way through the pass the water is
     /// going. The word is the same one the measured leads use, so the four
     /// details read alike.
-    private var lead: some View {
+    private func lead(ink: Color) -> some View {
         let word = phase.word
-        return LeadCard(time: chartTime(scrubTime, tz)) {
-            leadState(word)
+        return LeadCard(time: chartTime(scrubTime, tz), timeColor: ink) {
+            leadState(word, ink: ink)
             Image(systemName: glyph)
                 .foregroundStyle(Self.phaseColor(phase))
         }

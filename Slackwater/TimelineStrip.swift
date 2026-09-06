@@ -37,12 +37,14 @@ enum Timeline {
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
-    /// The discoverability nudge (#58). The strip opens this far off-centre
-    /// and animates in, so the first thing you see it do is move sideways —
-    /// which is the whole affordance now that the `‹ swipe to scrub ›` label
-    /// is gone. Well inside `magnetPts`, so the settle never lands somewhere
-    /// the magnet would then drag it away from.
-    static let nudgePts: CGFloat = 28
+    /// The one-shot loading affordance: show two hours of tide/current and sky
+    /// motion, then settle on the live reading before the page feels delayed.
+    static let introDuration: TimeInterval = 0.65
+    static func introStart(for now: Date) -> Date { now.addingTimeInterval(-2 * 3600) }
+    static func introTime(from start: Date, to now: Date, elapsed: TimeInterval) -> Date {
+        let progress = max(0, min(1, elapsed / introDuration))
+        return start.addingTimeInterval(now.timeIntervalSince(start) * progress)
+    }
 
     /// How much an online gate fetches in one go. Four times the strip it
     /// needs, so ordinary paging lands in cache instead of on the network —
@@ -167,7 +169,7 @@ struct TimelineData {
     let today: Date
     let start: Date          // anchor - 48h, and only when the anchor is today
     let end: Date            // anchor + 180h
-    let days: [TimelineDay]  // offsets -3…8 (the ends are DST/moon slack, see dayChrome)
+    let days: [TimelineDay]  // offsets -3…8 (the ends cover DST and adjoining nights)
     let tidePoints: [TidePoint]        // empty when current-only
     let tideRates: [TideRatePoint]     // index-aligned with tidePoints (#95)
     let tideExtremes: [TideExtreme]
@@ -235,8 +237,9 @@ struct TimelineData {
     /// that day's midnight and a midnight-in-window test would drop 23 visible
     /// hours of chrome — the same bug, once a year. Don't "simplify" this back
     /// to a midnight test. `day(of: start)` is the day the window opens inside,
-    /// and it is visible whether its own midnight is or not. `days` runs to offset 8, which is never visible: it exists so the
-    /// last visible night can find the following sunrise for its moon.
+    /// and it is visible whether its own midnight is or not. `days` runs to
+    /// offset 8, which is never visible: it supplies the sunrise that closes
+    /// the last visible night band.
     var visibleDays: [TimelineDay] {
         let firstStart = day(of: start)?.start ?? .distantPast
         return days.filter { $0.start >= firstStart && $0.start <= end }
@@ -313,8 +316,8 @@ struct TimelineData {
         //
         // Costs one `sunEvents` call per build; `visibleDays` picks -3 up only
         // when the window actually reaches it, so nothing else changes. 8 is
-        // the other end: never visible, it exists so the last visible night
-        // (offset 7) can find the following sunrise for its moon.
+        // the other end: never visible, it supplies the sunrise that closes
+        // the last visible night band (offset 7).
         let days: [TimelineDay] = (-3...8).map { off in
             let d0 = cal.date(byAdding: .day, value: off, to: anchor)!
             let sun = SunMoon.sunEvents(lat: lat, lon: lon, tz: tz, day: d0)
@@ -466,8 +469,7 @@ struct TimelineData {
 struct TimelineGeo {
     let hasTide: Bool
     let hasCurrent: Bool
-    /// The strip's height follows its last row: the day row's moon disc plus
-    /// a margin.
+    /// The strip's height follows its last row of sun-event dots plus a margin.
     var height: CGFloat { sunY + 18 }
     let tideTop: CGFloat
     let tideBottom: CGFloat
@@ -490,7 +492,7 @@ struct TimelineGeo {
     /// edge on the side now is.
     var chromeY: CGFloat { padTop - 36 }
     /// The plot box. 10 past the pad clears a turn dot's halo. Below it come
-    /// the time row, then the day row (day label, sun times, moon) — the card
+    /// the time row, then the day row (day label and sun times) — the card
     /// graph's order, chrome under the curve rather than over it.
     private static let plotTop: CGFloat = 170
     private static let plotBottom: CGFloat = 320
@@ -531,7 +533,7 @@ struct TimelineGeo {
     /// one home per surface).
     var timeY: CGFloat { bodyBottom + 18 }
     /// The day row under the axis: day label and sun times on `dayY`, the
-    /// date 17 below it, sun dots and the night moons' centre on `sunY`.
+    /// date 17 below it, with sun dots centred on `sunY`.
     var dayY: CGFloat { timeY + 26 }
     var sunY: CGFloat { dayY + 14 }
 
@@ -551,6 +553,7 @@ struct TimelineCanvas: View {
     let imperial: Bool
     let speedUnit: String
     let now: Date
+    var showsDayBands = true
 
     /// True set bearings for this station's flood and ebb, so a max's glyph on
     /// the chart is the compass arrow the schedule pill and the readout already
@@ -643,83 +646,58 @@ struct TimelineCanvas: View {
         }
     }
 
-    // Night bands, day tint, day labels, sun markers, per-night moons —
-    // continuous across midnight (prototype's per-day rects abut exactly).
+    // Night bands, day tint, day labels and sun markers — continuous across
+    // midnight (prototype's per-day rects abut exactly).
     private func drawDayChrome(_ ctx: GraphicsContext) {
         let visible = data.visibleDays
         // Night and day bands span the strip's full height (#246) and fade
         // into each other across twilight — a hard edge at sunset read as a
         // rectangle pasted onto the chart. One rect per NIGHT, sunset to the
-        // next day's sunrise straddling midnight (the moon loop below pairs
-        // days the same way), so the fades land on the sun events and
-        // nothing abuts at midnight. `data.days` rather than `visible`: the
+        // next day's sunrise straddling midnight, so the fades land on the
+        // sun events and nothing abuts at midnight. `data.days` rather than
+        // `visible`: the
         // night before the first visible sunrise belongs to a day off the
         // strip, and the tile clip discards what is off-canvas.
-        let fadeW = CGFloat(Self.twilightHours) * Timeline.pph
-        // The bands rise behind the lead and sink behind the axis rows, fading
-        // to nothing at both ends: a soft alpha clip, so the page shows through
-        // above and below the plot.
-        var banded = ctx
-        banded.clipToLayer { mask in
-            mask.fill(Path(CGRect(x: -1e5, y: 0, width: 2e5, height: geo.height)),
-                      with: .linearGradient(
-                        Gradient(stops: [.init(color: .white.opacity(0), location: 0),
-                                         .init(color: .white, location: geo.padTop / geo.height),
-                                         .init(color: .white, location: geo.bodyBottom / geo.height),
-                                         .init(color: .white.opacity(0), location: 1)]),
-                        startPoint: .zero, endPoint: CGPoint(x: 0, y: geo.height)))
-        }
-        func fadedBand(from a: CGFloat, to b: CGFloat, color: Color, opacity: Double) {
-            guard b > a else { return }
-            let rect = CGRect(x: a - fadeW, y: 0, width: (b - a) + 2 * fadeW, height: geo.height)
-            let ramp = min(2 * fadeW / rect.width, 0.5)
-            banded.fill(Path(rect), with: .linearGradient(
-                Gradient(stops: [
-                    .init(color: color.opacity(0), location: 0),
-                    .init(color: color.opacity(opacity), location: ramp),
-                    .init(color: color.opacity(opacity), location: 1 - ramp),
-                    .init(color: color.opacity(0), location: 1),
-                ]),
-                startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
-        }
-        for day in data.days {
-            guard let set = day.sunset,
-                  let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
-            else { continue }
-            fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.52)
-        }
-        for day in data.days {
-            guard let rise = day.sunrise, let set = day.sunset else { continue }
-            fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.07)
+        if showsDayBands {
+            let fadeW = CGFloat(Self.twilightHours) * Timeline.pph
+            // The bands rise behind the lead and sink behind the axis rows, fading
+            // to nothing at both ends: a soft alpha clip, so the page shows through
+            // above and below the plot.
+            var banded = ctx
+            banded.clipToLayer { mask in
+                mask.fill(Path(CGRect(x: -1e5, y: 0, width: 2e5, height: geo.height)),
+                          with: .linearGradient(
+                            Gradient(stops: [.init(color: .white.opacity(0), location: 0),
+                                             .init(color: .white, location: geo.padTop / geo.height),
+                                             .init(color: .white, location: geo.bodyBottom / geo.height),
+                                             .init(color: .white.opacity(0), location: 1)]),
+                            startPoint: .zero, endPoint: CGPoint(x: 0, y: geo.height)))
+            }
+            func fadedBand(from a: CGFloat, to b: CGFloat, color: Color, opacity: Double) {
+                guard b > a else { return }
+                let rect = CGRect(x: a - fadeW, y: 0, width: (b - a) + 2 * fadeW, height: geo.height)
+                let ramp = min(2 * fadeW / rect.width, 0.5)
+                banded.fill(Path(rect), with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: color.opacity(0), location: 0),
+                        .init(color: color.opacity(opacity), location: ramp),
+                        .init(color: color.opacity(opacity), location: 1 - ramp),
+                        .init(color: color.opacity(0), location: 1),
+                    ]),
+                    startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
+            }
+            for day in data.days {
+                guard let set = day.sunset,
+                      let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
+                else { continue }
+                fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.52)
+            }
+            for day in data.days {
+                guard let rise = day.sunrise, let set = day.sunset else { continue }
+                fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.07)
+            }
         }
         for day in visible {
-            // The night's moon sits mid-night — between this sunset and the
-            // NEXT day's sunrise, straddling midnight (prototype moon loop).
-            if let set = day.sunset,
-               let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise {
-                let mid = set.addingTimeInterval(nextRise.timeIntervalSince(set) / 2)
-                let moon = SunMoon.moonIllumination(date: mid)
-                let cx = data.x(mid)
-                let glowR = 12 + CGFloat(moon.fraction) * 20
-                ctx.fill(Path(ellipseIn: CGRect(x: cx - glowR, y: geo.sunY - glowR,
-                                                width: glowR * 2, height: glowR * 2)),
-                         with: .radialGradient(
-                            Gradient(stops: [
-                                .init(color: Color(hex: 0xE6EEFF, opacity: 0.95 * (0.1 + moon.fraction * 0.66)), location: 0),
-                                .init(color: Color(hex: 0xCFE0FF, opacity: 0.28 * (0.1 + moon.fraction * 0.66)), location: 0.45),
-                                .init(color: Color(hex: 0xCFE0FF, opacity: 0), location: 1)]),
-                            center: CGPoint(x: cx, y: geo.sunY), startRadius: 0, endRadius: glowR))
-                let r: CGFloat = 8
-                let disc = CGRect(x: cx - r, y: geo.sunY - r, width: 2 * r, height: 2 * r)
-                let shift = moonLimbShift(fraction: moon.fraction, waxing: moon.waxing, radius: r)
-                ctx.drawLayer { l in
-                    l.clip(to: Path(ellipseIn: disc))
-                    l.fill(Path(ellipseIn: disc), with: .color(Color(hex: 0xEEF4FF)))
-                    l.fill(Path(ellipseIn: disc.offsetBy(dx: shift, dy: 0)),
-                           with: .color(SN.moonLimb))
-                }
-                ctx.stroke(Path(ellipseIn: disc), with: .color(.white.opacity(0.3)), lineWidth: 0.6)
-            }
             // Day label at local noon. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
@@ -917,6 +895,7 @@ struct TimelineScrubber: UIViewRepresentable {
     let imperial: Bool
     let speedUnit: String
     let now: Date
+    var showsDayBands = true
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
@@ -990,10 +969,9 @@ struct TimelineScrubber: UIViewRepresentable {
         // External scrub (event tap, return-to-now): jump the strip so the
         // requested time sits under the centerline (prototype scrubTo/centerNow
         // are instant). User-driven scrolling round-trips within a point.
-        // `!co.nudging` for the opening slide: it suppresses scrubTime writes,
-        // so `desired` sits at the nudge's destination while the offset is
-        // still travelling — without the guard the first re-render jumps
-        // straight there and the hint never plays.
+        // `!co.nudging` for the opening slide: scroll callbacks move
+        // `scrubTime` with the animation, and this guard stops those updates
+        // from making the representable snap its own offset mid-flight.
         //
         // NOT gated on `isDecelerating` or `magneting` (#237): while the strip
         // coasts, every frame writes `scrubTime` back from the offset, so a
@@ -1012,8 +990,8 @@ struct TimelineScrubber: UIViewRepresentable {
             // Reduce Motion, or nothing to travel, lands directly: a
             // zero-length animated scroll may never call back.
             co.seenJump = jumpToken
+            co.stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
-            co.nudging = false
             if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
                 co.magneting = false
                 sv.contentOffset = CGPoint(x: desired, y: 0)
@@ -1035,7 +1013,8 @@ struct TimelineScrubber: UIViewRepresentable {
 
     private var canvas: TimelineCanvas {
         TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
-                       now: now, floodDeg: floodDeg, ebbDeg: ebbDeg)
+                       now: now, showsDayBands: showsDayBands,
+                       floodDeg: floodDeg, ebbDeg: ebbDeg)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
@@ -1044,14 +1023,14 @@ struct TimelineScrubber: UIViewRepresentable {
         var didInitialCenter = false
         var seenJump = 0
         var magneting = false
-        /// The opening nudge is animating. Suppresses the `scrubTime` writes
-        /// `scrollViewDidScroll` would otherwise make from a scroll nobody
-        /// asked for — a hint must not move the reading — and keeps
-        /// `updateUIView`'s external-scrub branch from snapping the offset
-        /// back mid-animation, which would cancel the nudge on its first
-        /// re-render (#66: scroll-callback writes during a view update are
-        /// the hazard zone here).
+        /// The opening slide is animating. It keeps `updateUIView`'s external-
+        /// scrub branch from snapping the offset back while scroll callbacks
+        /// deliberately drive the reading and sky toward now.
         var nudging = false
+        var introDisplayLink: CADisplayLink?
+        var introStartedAt: CFTimeInterval?
+        var introRange: (start: Date, destination: Date)?
+        weak var introScrollView: UIScrollView?
         /// Where the animated scroll — the magnet's snap or a pill's jump — is
         /// headed; parked on exactly when the animation ends.
         var magnetTarget: Date?
@@ -1063,44 +1042,72 @@ struct TimelineScrubber: UIViewRepresentable {
         /// this, scrollViewDidScroll drives scrubTime — including the very
         /// first drag.
         ///
-        /// It arrives from `Timeline.nudgePts` off-centre and animates into
-        /// place: that sideways motion is the scrubber's affordance now that
-        /// the label is gone (#58). Once per appearance — `didInitialCenter`
-        /// already makes this one-shot — and never on a scrub. Under Reduce
-        /// Motion it lands directly, with no static hint standing in: the
-        /// label it replaced is gone for everyone.
+        /// The four detail views initialize at `Timeline.introStart`; that
+        /// exact opening state slides to now. Any other state (for example a
+        /// picked week after an online timeline reload) centres without an
+        /// intro. Reduce Motion likewise lands directly on now.
         func centerIfNeeded(_ sv: UIScrollView) {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
+            let start = parent.scrubTime
+            let isIntro = abs(start.timeIntervalSince(Timeline.introStart(for: parent.now))) < 2
+            let destination = isIntro ? parent.now : start
+            let startX = parent.data.x(start) - sv.bounds.width / 2
+            let destinationX = parent.data.x(destination) - sv.bounds.width / 2
+
+            // Offset assignment can call the delegate synchronously. Keep
+            // `didInitialCenter` false until the opening position is in place,
+            // so layout never mutates SwiftUI state.
+            sv.contentOffset = CGPoint(x: isIntro ? startX : destinationX, y: 0)
             didInitialCenter = true
-            let x = parent.data.x(parent.scrubTime) - sv.bounds.width / 2
+            guard isIntro else { return }
             guard !UIAccessibility.isReduceMotionEnabled else {
-                sv.contentOffset = CGPoint(x: x, y: 0)
+                sv.contentOffset = CGPoint(x: destinationX, y: 0)
+                Task { @MainActor [weak self] in self?.parent.scrubTime = destination }
                 return
             }
-            // Set true BEFORE the offset: assigning contentOffset calls
-            // scrollViewDidScroll synchronously, and that off-centre offset
-            // is not a reading.
+
             nudging = true
-            sv.contentOffset = CGPoint(x: x + Timeline.nudgePts, y: 0)
-            // UIKit clamps that to contentSize, so at the strip's right edge
-            // the nudge has nowhere to go — and `setContentOffset(animated:)`
-            // over a zero-length move is not guaranteed to call
-            // `didEndScrollingAnimation`, which would latch `nudging` on and
-            // leave the strip permanently unable to write `scrubTime`. Ask
-            // the scroll view where it actually landed, not where we put it.
-            guard abs(sv.contentOffset.x - x) > 0.5 else { nudging = false; return }
-            sv.setContentOffset(CGPoint(x: x, y: 0), animated: true)
+            introScrollView = sv
+            introRange = (start, destination)
+            let link = CADisplayLink(target: self, selector: #selector(advanceIntro))
+            introDisplayLink = link
+            link.add(to: .main, forMode: .common)
+        }
+
+        @objc private func advanceIntro(_ link: CADisplayLink) {
+            guard let sv = introScrollView, let range = introRange else {
+                stopIntro()
+                return
+            }
+            if introStartedAt == nil { introStartedAt = link.timestamp }
+            let elapsed = link.timestamp - (introStartedAt ?? link.timestamp)
+            let time = Timeline.introTime(from: range.start, to: range.destination,
+                                          elapsed: elapsed)
+            sv.contentOffset = CGPoint(x: parent.data.x(time) - sv.bounds.width / 2, y: 0)
+            if elapsed >= Timeline.introDuration {
+                parent.scrubTime = range.destination
+                stopIntro()
+            }
+        }
+
+        func stopIntro() {
+            introDisplayLink?.invalidate()
+            introDisplayLink = nil
+            introStartedAt = nil
+            introRange = nil
+            introScrollView = nil
+            nudging = false
         }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
-            guard sv.bounds.width > 0, didInitialCenter, !nudging else { return }
+            guard sv.bounds.width > 0, didInitialCenter else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
-        /// A touch during the opening nudge ends it — the user is scrubbing
-        /// now, and their offset has to reach `scrubTime`. Needed on its own
-        /// because a touch cancels the animation without
-        /// `didEndScrollingAnimation` ever firing.
-        func scrollViewWillBeginDragging(_ sv: UIScrollView) { nudging = false }
+        /// A touch during the opening slide leaves the scrubber exactly where
+        /// the user grabbed it.
+        func scrollViewWillBeginDragging(_ sv: UIScrollView) {
+            stopIntro()
+        }
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate: Bool) {
             if !willDecelerate { magnet(sv) }
         }
@@ -1140,12 +1147,40 @@ struct TimelineScrubber: UIViewRepresentable {
 
 // MARK: - Strip + fixed overlay (centerline, riding dots, track labels)
 
+/// Extends the sky's horizon colour down to the visible tide/current line. The path
+/// stops on the line at every x, so sky never leaks into the water below it.
+private struct SkyCurveFill: View {
+    let data: TimelineData
+    let geo: TimelineGeo
+    let scrubTime: Date
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            path.move(to: CGPoint(x: 0, y: geo.bodyTop))
+            for x in stride(from: CGFloat(0), through: size.width, by: 2) {
+                let seconds = Double(x - size.width / 2) / Double(Timeline.pph) * 3600
+                let time = scrubTime.addingTimeInterval(seconds)
+                let y = geo.hasTide ? geo.tideY(data.heightAt(time)) : geo.curY(data.velocityAt(time))
+                path.addLine(to: CGPoint(x: x, y: y))
+            }
+            path.addLine(to: CGPoint(x: size.width, y: geo.bodyTop))
+            path.closeSubpath()
+            context.fill(path, with: .color(color))
+        }
+    }
+}
+
 struct TimelineScrubStrip: View {
     let data: TimelineData
     let geo: TimelineGeo
     var imperial = true    // only read by the tide track; current-only strips omit it
     var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
+    var showsDayBands = true
+    var skyFill: Color? = nil
+    var chromeInk: Color = SN.foam
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
@@ -1159,9 +1194,15 @@ struct TimelineScrubStrip: View {
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
-                         now: now, floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
+                         now: now, showsDayBands: showsDayBands,
+                         floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          jumpToken: jumpToken)
             .frame(height: geo.height)
+            .background {
+                if let skyFill, geo.hasTide || geo.hasCurrent {
+                    SkyCurveFill(data: data, geo: geo, scrubTime: scrubTime, color: skyFill)
+                }
+            }
             .overlay { overlay }
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
@@ -1176,7 +1217,11 @@ struct TimelineScrubStrip: View {
         let past = scrubTime < now
         let showNow = onReturn != nil && scrubbedAway(scrubTime, from: now)
         return ZStack {
-            Commentary(text: commentary, tint: commentaryTint, scrubTime: scrubTime) { jumpToken += 1; onCommentary() }
+            Commentary(text: commentary, tint: commentaryTint,
+                       scrubTime: scrubTime, ink: chromeInk) {
+                jumpToken += 1
+                onCommentary()
+            }
             if showNow {
                 HStack {
                     if past { Spacer(minLength: 0) }
@@ -1197,7 +1242,7 @@ struct TimelineScrubStrip: View {
                 if past { Image(systemName: "arrow.right") }
             }
             .font(.caption.weight(.semibold))
-            .foregroundStyle(SN.foam)
+            .foregroundStyle(chromeInk)
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)

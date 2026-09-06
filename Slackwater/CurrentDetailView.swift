@@ -40,7 +40,7 @@ struct CurrentDetailView: View {
     @ObservedObject private var net = Connectivity.shared
 
     @State private var live = appNow()
-    @State private var scrubTime = appNow()
+    @State private var scrubTime = Timeline.introStart(for: appNow())
     @State private var timeline: TimelineData?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
@@ -61,13 +61,14 @@ struct CurrentDetailView: View {
     private var tz: TimeZone { record.tz }
     /// Engine-exact velocity under the centerline, the same call the
     /// committed readout has always made.
-    private func lead(_ tl: TimelineData) -> CurrentLead {
+    private func lead(_ tl: TimelineData, ink: Color = .white) -> CurrentLead {
         CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
                     floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                    speedUnit: speedUnit, tz: tz, provisional: provisionalGate != nil)
+                    speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
     }
 
     var body: some View {
+        let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude)
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.itemId, tz: tz,
                             timeline: timeline,
@@ -76,6 +77,7 @@ struct CurrentDetailView: View {
                             scrubTime: $scrubTime,
                             anchor: $anchor,
                             onPicked: { _ in rebuild() },
+                            topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
@@ -90,8 +92,10 @@ struct CurrentDetailView: View {
                                 // above, the amber numbers and the tilde
                                 // already say the reading is provisional, and
                                 // a fourth marking landed in the pill row.
-                                CurrentScrubCard(lead: lead(tl), data: tl, speedUnit: speedUnit, now: live,
+                                CurrentScrubCard(lead: lead(tl, ink: sky.ink), data: tl,
+                                                 speedUnit: speedUnit, now: live,
                                                  floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                                                 sky: sky,
                                                  scrubTime: $scrubTime, onReturn: returnToNow)
                             },
                             links: { tl in

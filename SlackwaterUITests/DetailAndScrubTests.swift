@@ -19,7 +19,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         _ = strip.waitForExistence(timeout: 10)
-        settleLayout(strip)  // the push animation is still moving the strip
+        settleLayout(strip)  // the intro is still sliding the strip to now
 
         // Scrub: pan the strip under the fixed centerline (drag left = later),
         // release — the lead keeps the scrubbed time. The lead is the page's
@@ -182,7 +182,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     }
 
     // The detail header carries the title, the day header carries the sun
-    // times, and the scrubber wears the moon with its phase name.
+    // times, and the summary tile names the moon phase.
     func testM41DetailHeaderSunMoon() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
@@ -346,7 +346,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.waitForExistence(timeout: 10))
-        settleLayout(strip)  // the push animation is still moving the strip
+        settleLayout(strip)  // the intro is still sliding the strip to now
 
         // The pill fades in once the scrub rests, so hittability is the wait,
         // not existence.
@@ -418,7 +418,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(star.waitForExistence(timeout: 5))
         let starBefore = star.frame, backBefore = back.frame
         let now = app.buttons["detail-return-now"]
-        XCTAssertFalse(now.exists, "return-to-now must not show before a scrub")
+        XCTAssert(now.waitForNonExistence(timeout: 3),
+                  "the opening slide did not settle on now")
 
         scrubStrip(app)
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")

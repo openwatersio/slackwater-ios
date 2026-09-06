@@ -15,7 +15,7 @@ struct OnlineGateDetailView: View {
     @Environment(\.openChsRoute) private var openChsRoute
 
     @State private var live = appNow()
-    @State private var scrubTime = appNow()
+    @State private var scrubTime = Timeline.introStart(for: appNow())
     /// The store's block for the current `anchor` — narrower than "this
     /// gate's whole store" since #67 item 4: the disjoint blocks live on
     /// disk, and `window` is only ever the one covering where the view is
@@ -58,10 +58,10 @@ struct OnlineGateDetailView: View {
     /// frame (#231).
     @State private var timeline: TimelineData?
 
-    private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow) -> CurrentLead {
+    private func lead(_ tl: TimelineData, _ window: ChsOnlineWindow, ink: Color = .white) -> CurrentLead {
         CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: tl.velocityAt(scrubTime),
                     floodDeg: window.floodDirection, ebbDeg: window.ebbDirection,
-                    speedUnit: speedUnit, tz: tz)
+                    speedUnit: speedUnit, tz: tz, ink: ink)
     }
 
     /// The unfetched card's one tap out: nearest of the 11 shipped (fittable)
@@ -74,6 +74,7 @@ struct OnlineGateDetailView: View {
     }
 
     var body: some View {
+        let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude)
         // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
@@ -90,12 +91,15 @@ struct OnlineGateDetailView: View {
                             canPickDate: window != nil,
                             onPickerOpen: prefetchNextBlock,
                             onPicked: { _ in applyAnchor() },
+                            topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
                                 if let window {
-                                    CurrentScrubCard(lead: lead(tl, window), data: tl, speedUnit: speedUnit,
+                                    CurrentScrubCard(lead: lead(tl, window, ink: sky.ink), data: tl,
+                                                     speedUnit: speedUnit,
                                                      now: live, floodDeg: window.floodDirection,
                                                      ebbDeg: window.ebbDirection,
+                                                     sky: sky,
                                                      scrubTime: $scrubTime, onReturn: returnToNow)
                                 }
                             },
