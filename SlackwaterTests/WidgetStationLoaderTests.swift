@@ -140,6 +140,14 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
     }
 
+    func testCompactScannerRejectsInvalidOuterGrammar() {
+        let missing = "missing"
+        for bytes in ["[{\"id\":\"first\"}][]", "[{\"id\":\"first\"},garbage]", "[{\"id\":\"first\"}{\"id\":\"second\"}]"] {
+            XCTAssertThrowsError(try decodeCatalogRecord(Data(bytes.utf8), id: missing) as TideStationRecord?)
+        }
+        XCTAssertThrowsError(try decodeCatalogRecord(Data("{\"id\":\"first\"}]".utf8), id: "first") as TideStationRecord?)
+    }
+
     func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
         let subordinate = try XCTUnwrap(CurrentStationRecord.all.first(where: \.isSubordinate))
         let storage = try makeStorage { directory in

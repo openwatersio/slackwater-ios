@@ -97,15 +97,37 @@ func catalogRecord<T: Decodable & StationIdentity>(
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
+    guard data.first == 91, data.last == 93 else {
+        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
+    }
     let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
     guard let start = data.range(of: marker)?.lowerBound else {
-        guard data == Data("[]".utf8) || data.starts(with: Data("[{\"id\":\"".utf8)),
-              data.first == 91, data.last == 93 else {
+        guard data == Data("[]".utf8) || data.starts(with: Data("[{\"id\":\"".utf8)) else {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
         }
-        var stack: [UInt8] = [], quoted = false, escaped = false
-        for byte in data {
+        var stack: [UInt8] = [], quoted = false, escaped = false, expectsRecord = true
+        let bytes = Array(data)
+        for (index, byte) in bytes.enumerated() {
             if quoted { if escaped { escaped = false } else if byte == 92 { escaped = true } else if byte == 34 { quoted = false }; continue }
+            if stack.count == 1 {
+                if byte == 123 {
+                    guard expectsRecord, bytes[index...].starts(with: [123, 34, 105, 100, 34, 58, 34]) else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                    }
+                    expectsRecord = false
+                } else if byte == 44 {
+                    guard !expectsRecord else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                    }
+                    expectsRecord = true
+                } else if byte == 93 {
+                    guard index == bytes.count - 1, !expectsRecord || bytes == [91, 93] else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "multiple compact catalog roots"))
+                    }
+                } else if byte != 91 {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                }
+            }
             if byte == 34 { quoted = true }
             else if byte == 91 || byte == 123 { stack.append(byte) }
             else if byte == 93 || byte == 125 {
