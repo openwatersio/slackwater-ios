@@ -484,6 +484,17 @@ func testTruncatedActiveNOAAFileEndingAtNestedArrayFallsBackToBundle() throws {
         id: TideStationRecord.fridayHarborID,
         locator: CatalogFileLocator(storage: storage)))
 }
+
+func testCompactScannerRejectsInvalidOuterGrammar() throws {
+    for (bytes, id) in [
+        (#"[{"id":"first"}][]"#, "missing"),
+        (#"[{"id":"first"},garbage]"#, "missing"),
+        (#"{"id":"first"}]"#, "first"),
+    ] {
+        XCTAssertThrowsError(
+            try decodeCatalogRecord(Data(bytes.utf8), id: id) as TideStationRecord?)
+    }
+}
 ```
 
 The helper mutations must preserve compact id-first formatting for the two NOAA files, using the existing JSON rewrite helper pattern in `CatalogSnapshotTests`.
@@ -548,12 +559,16 @@ static func widgetItem(
 Before returning `nil` for a missing compact NOAA record, `decodeCatalogRecord`
 must scan the bytes with a small delimiter/string-state check: the outer array,
 every nested object/array, and every quoted string must close in the right order,
-and a non-empty generated catalog must begin with the exact `[{"id":"` record
-prefix. This catches truncation that ends at a nested `]` without materializing
-the NOAA array. Run this O(n) framing scan only when the requested marker is
-absent; successful lookups keep the compact scanner's existing cost. Malformed
-bytes throw so `catalogRecord` reports `.decode` and the locator can fall back;
-a structurally complete catalog without the requested marker remains `nil`.
+the outer array must remain open until the final byte, and every non-empty
+top-level element must be a comma-separated record beginning with the exact
+`{"id":"` prefix. Reject a second root, leading/trailing commas, and unquoted
+top-level garbage. This catches truncation that ends at a nested `]` without
+materializing the NOAA array. Keep the constant-time first-`[`/last-`]` guard
+before marker lookup so malformed marker hits still throw. Run the O(n) state
+scan only when the requested marker is absent; successful lookups otherwise keep
+the compact scanner's existing cost. Malformed bytes throw so `catalogRecord`
+reports `.decode` and the locator can fall back; a structurally complete catalog
+without the requested marker remains `nil`.
 Replace the old bundle-only `widgetItem(id:)` implementation with the
 locator-backed forwarder above.
 
