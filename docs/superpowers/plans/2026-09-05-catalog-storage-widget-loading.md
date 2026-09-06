@@ -474,6 +474,16 @@ func testCorruptActiveNOAAFileFallsBackToBundle() throws {
     guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
     XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
 }
+
+func testTruncatedActiveNOAAFileEndingAtNestedArrayFallsBackToBundle() throws {
+    let storage = try makeStorage()
+    let directory = try XCTUnwrap(storage.activeDirectory())
+    try Data(#"[{"id":"first","aliases":[]"#.utf8)
+        .write(to: directory.appendingPathComponent("stations.json"))
+    XCTAssertNotNil(WidgetStationLoader.loadRecord(
+        id: TideStationRecord.fridayHarborID,
+        locator: CatalogFileLocator(storage: storage)))
+}
 ```
 
 The helper mutations must preserve compact id-first formatting for the two NOAA files, using the existing JSON rewrite helper pattern in `CatalogSnapshotTests`.
@@ -536,10 +546,15 @@ static func widgetItem(
 ```
 
 Before returning `nil` for a missing compact NOAA record, `decodeCatalogRecord`
-must verify the generated array framing (`[` first and `]` last). Malformed or
-truncated bytes throw so `catalogRecord` reports `.decode` and the locator can
-fall back; a structurally valid catalog without the requested marker remains
-`nil`. Replace the old bundle-only `widgetItem(id:)` implementation with the
+must scan the bytes with a small delimiter/string-state check: the outer array,
+every nested object/array, and every quoted string must close in the right order,
+and a non-empty generated catalog must begin with the exact `[{"id":"` record
+prefix. This catches truncation that ends at a nested `]` without materializing
+the NOAA array. Run this O(n) framing scan only when the requested marker is
+absent; successful lookups keep the compact scanner's existing cost. Malformed
+bytes throw so `catalogRecord` reports `.decode` and the locator can fall back;
+a structurally complete catalog without the requested marker remains `nil`.
+Replace the old bundle-only `widgetItem(id:)` implementation with the
 locator-backed forwarder above.
 
 Do not make the scanner whitespace-independent; PR #285 already validates the generated NOAA format, while the small pretty-printed catalogs use whole decode.
