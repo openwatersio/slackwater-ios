@@ -218,7 +218,10 @@ struct CurrentCardState {
 
 extension CurrentStationRecord {
     func cardState(at now: Date) -> CurrentCardState {
-        let station = engineStation
+        cardState(at: now, station: engineStation)
+    }
+
+    func cardState(at now: Date, station: any CurrentPredicting) -> CurrentCardState {
         let signed = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
         // 30h forward guarantees a "next" exists, like the tide cards.
         let next = station.events(from: now, to: now.addingTimeInterval(30 * 3600)).first { $0.time > now }

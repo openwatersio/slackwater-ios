@@ -124,11 +124,35 @@ final class WidgetStationLoaderTests: XCTestCase {
         let expected = current.engineStation(referenceRecord: activeReference)
             .speeds(from: start, to: end, step: 60).map(\.speed)
         let bundled = try XCTUnwrap(CurrentStationRecord.byId[subordinate.reference!])
-        let stale = current.engineStation(referenceRecord: bundled)
+        let staleStation = current.engineStation(referenceRecord: bundled)
+        let stale = staleStation
             .speeds(from: start, to: end, step: 60).map(\.speed)
         XCTAssertEqual(actual.count, expected.count)
         XCTAssertTrue(zip(actual, expected).allSatisfy { abs($0 - $1) < 0.000_001 })
         XCTAssertTrue(zip(actual, stale).contains { abs($0 - $1) > 0.000_001 })
+
+        let paired = zip(
+            station.speeds(from: start, to: end, step: 60),
+            staleStation.speeds(from: start, to: end, step: 60))
+        let pair = try XCTUnwrap(paired.max { abs($0.0.speed - $0.1.speed) < abs($1.0.speed - $1.1.speed) })
+        let now = pair.0.time
+        let card = WidgetCard.build(record, now: now)
+        let expectedReading = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
+        let staleReading = staleStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
+        guard case .current(let signed, _, _, _, _) = card.reading else {
+            return XCTFail("Expected current reading")
+        }
+        XCTAssertEqual(signed, expectedReading, accuracy: 0.000_001)
+        XCTAssertGreaterThan(abs(signed - staleReading), 0.000_001)
+
+        let graph = try XCTUnwrap(card.graph)
+        let graphStart = now.addingTimeInterval(-StationCardGraph.backWindow)
+        let graphEnd = now.addingTimeInterval(StationCardGraph.forwardWindow)
+        let activeGraph = station.speeds(from: graphStart, to: graphEnd, step: StationCardGraph.sampleStep).map(\.speed)
+        let staleGraph = staleStation.speeds(from: graphStart, to: graphEnd, step: StationCardGraph.sampleStep).map(\.speed)
+        XCTAssertEqual(graph.points.count, activeGraph.count)
+        XCTAssertTrue(zip(graph.points, activeGraph).allSatisfy { abs($0.value - $1) < 0.000_001 })
+        XCTAssertTrue(zip(graph.points, staleGraph).contains { abs($0.value - $1) > 0.000_001 })
     }
 
     func testWidgetReadsEverySmallGeneratedCatalogThroughActiveDirectory() throws {
