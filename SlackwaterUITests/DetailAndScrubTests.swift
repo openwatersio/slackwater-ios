@@ -313,23 +313,48 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleScrub(app)
         // The tap's destination depends on the water at "now": already fast,
         // it goes to the run's peak — the pill reads the rate and there is
-        // nothing left to stage. Quiet, it parks on the next turn, and
-        // mid-run is a drag away: one point of strip is five minutes, so a
-        // tenth of the width is ~3 h — right beside the run's fastest point,
-        // which Eastport always grows (the doc comment above). The hold
-        // releases the drag at rest: a flicked release keeps UIScrollView
-        // momentum, which carries the scrub about a half-cycle on, and the
-        // magnet then parks it on the NEXT turn — slack water — instead.
+        // nothing left to stage. Quiet, it parks on the next TURN, and
+        // mid-run is a drag away. The hold releases the drag at rest: a
+        // flicked release keeps UIScrollView momentum, which carries the
+        // scrub about a half-cycle on, and the magnet then parks it on the
+        // next turn — slack water — instead.
+        //
+        // That drag is measured in POINTS against the magnet, never as a
+        // fraction of the strip (#289). The tap has just parked the
+        // centerline exactly ON a stop, and the magnet pulls it back onto any
+        // stop within `Timeline.magnetPts` — so a drag shorter than that
+        // radius is a no-op that re-reads the very label it was staged to
+        // change. The `dx: 0.4` this replaces was ~40 pt on a phone, inside
+        // the 46 pt radius, and had been sized when `Timeline.pph` was still
+        // 12: it silently shrank under the magnet when the NEAPS pass widened
+        // the strip to 18, and only ever passed on the days the tap happened
+        // to land somewhere already fast.
+        //
+        // Three hours clears the radius with room (54 pt at 18 pt/hr) and is
+        // about a quarter-cycle from a turn, which is where a semidiurnal run
+        // runs fastest — the run Eastport always grows (the doc comment
+        // above). Both numbers are the app's own and a UI test cannot link
+        // them, so they are spelled out here and asserted below rather than
+        // trusted.
+        let pointsPerHour: CGFloat = 18     // Timeline.pph
+        let dragHours: CGFloat = 3
         let namesTheRate = #"^(Rising|Falling) \d+(\.\d+)? (ft|m)/hr$"#
         if pill.label.range(of: namesTheRate, options: .regularExpression) == nil {
+            let parked = scrubClock(app)
+            let dx = dragHours * pointsPerHour / strip.frame.width
             strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .press(forDuration: 0.3,
-                       thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)),
+                       thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5 - dx, dy: 0.5)),
                        withVelocity: .default,
                        thenHoldForDuration: 0.5)
             settleScrub(app)
             XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
                       "the commentary did not come back after the drag")
+            // The failure #289 was actually about: a drag inside the magnet
+            // snaps straight back, and the label mismatch below then reads as
+            // "the commentary is wrong" rather than "the scrub never moved".
+            XCTAssertNotEqual(scrubClock(app), parked,
+                              "the drag did not clear the magnet — the scrub is still parked on \(parked)")
         }
         XCTAssert(pill.label.range(of: namesTheRate, options: .regularExpression) != nil,
                   "over a fast tide the commentary names the rate: '\(pill.label)'")
