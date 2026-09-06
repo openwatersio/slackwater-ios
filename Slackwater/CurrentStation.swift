@@ -51,12 +51,23 @@ extension StationIdentity {
 /// A harmonic constituent as it appears in bundled and on-device JSON.
 struct Con: Codable, Hashable { let name: String; let amplitude: Double; let phase: Double }
 
-/// A bundled JSON station catalog, name-sorted; missing or undecodable → empty.
+/// Reads a required catalog from a directory without converting failures to an invented empty array.
+func requiredCatalog<T: Decodable & StationIdentity>(
+    _ resource: String, directory: URL
+) throws -> [T] {
+    try readCatalog(resource, directory: directory)
+}
+
+/// A bundled JSON station catalog, name-sorted; a missing or undecodable bundle is terminal.
 func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
-    guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
-          let data = try? Data(contentsOf: url),
-          let items = try? JSONDecoder().decode([T].self, from: data) else { return [] }
-    return items.sorted { $0.name < $1.name }
+    do {
+        return try requiredCatalog(
+            resource, directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+    } catch {
+        CatalogDiagnostics.log(error)
+        assertionFailure(String(describing: error))
+        preconditionFailure(String(describing: error))
+    }
 }
 
 /// Decode one record without materializing a multi-megabyte catalog in a

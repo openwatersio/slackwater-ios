@@ -68,6 +68,17 @@ final class CatalogSnapshotTests: XCTestCase {
         rejected("stations", stage: .read)
     }
 
+    func testRequiredCatalogNeverConvertsFailureToEmpty() throws {
+        let missing = directory.appendingPathComponent("missing", isDirectory: true)
+        XCTAssertThrowsError(
+            try requiredCatalog("stations", directory: missing) as [TideStationRecord]
+        ) { error in
+            let catalog = error as? CatalogError
+            XCTAssertEqual(catalog?.resource, "stations")
+            XCTAssertEqual(catalog?.stage, .lookup)
+        }
+    }
+
     func testEveryCatalogMustRemainNonempty() throws {
         for resource in CatalogSnapshot.resources {
             let url = directory.appendingPathComponent(resource + ".json")
