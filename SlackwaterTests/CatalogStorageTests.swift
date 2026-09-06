@@ -103,37 +103,42 @@ final class CatalogStorageTests: XCTestCase {
         XCTAssertEqual(attempts, 1)
     }
 
-    func testFailedPinnedReadRetriesNewGenerationThenBundle() throws {
+    func testFailedPinnedReadRetriesReplacementGeneration() throws {
         let old = try commitBundle(batch: UUID())
-        var activeAttempts = 0
+        var attempted: [URL] = []
+        var replacement: StoredCatalogGeneration?
         let locator = CatalogFileLocator(storage: storage)
         let result: String? = locator.load { directory in
-            guard directory != self.storage.bundleDirectory else { return directory.lastPathComponent }
-            activeAttempts += 1
-            if activeAttempts == 1 {
-                _ = try self.commitBundle(batch: UUID())
+            attempted.append(directory)
+            if directory == old.directory {
+                replacement = try self.commitBundle(batch: UUID())
                 try FileManager.default.removeItem(at: old.directory)
+                throw CatalogStorageError.missingGeneration(old.name)
             }
-            throw CatalogStorageError.missingGeneration(directory.lastPathComponent)
+            return directory.lastPathComponent
         }
-        XCTAssertEqual(result, storage.bundleDirectory.lastPathComponent)
-        XCTAssertEqual(activeAttempts, 2)
+        let replacementGeneration = try XCTUnwrap(replacement)
+        XCTAssertEqual(result, replacementGeneration.name)
+        XCTAssertEqual(attempted, [old.directory, replacementGeneration.directory])
     }
 
     func testFailedActiveAndRetryReadsFallBackToBundle() throws {
-        let active = try commitBundle(batch: UUID())
-        var activeAttempts = 0
+        let old = try commitBundle(batch: UUID())
+        var attempted: [URL] = []
+        var replacement: StoredCatalogGeneration?
         let result: URL? = CatalogFileLocator(storage: storage).load { directory in
+            attempted.append(directory)
             if directory == storage.bundleDirectory { return directory }
-            activeAttempts += 1
-            if activeAttempts == 1 {
-                _ = try self.commitBundle(batch: UUID())
-                try FileManager.default.removeItem(at: active.directory)
+            if directory == old.directory {
+                replacement = try self.commitBundle(batch: UUID())
+                try FileManager.default.removeItem(at: old.directory)
+                throw CatalogStorageError.missingGeneration(old.name)
             }
-            throw CatalogStorageError.missingGeneration(active.name)
+            throw CatalogStorageError.missingGeneration(directory.lastPathComponent)
         }
+        let replacementGeneration = try XCTUnwrap(replacement)
         XCTAssertEqual(result, storage.bundleDirectory)
-        XCTAssertEqual(activeAttempts, 2)
+        XCTAssertEqual(attempted, [old.directory, replacementGeneration.directory, storage.bundleDirectory])
     }
 
     func testInvalidPointerBeforeFirstBodyFallsBackToBundle() throws {
