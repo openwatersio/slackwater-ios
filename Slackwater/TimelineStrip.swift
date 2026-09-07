@@ -176,7 +176,13 @@ struct TimelineData {
     let tideExtremes: [TideExtreme]
     let currentPoints: [CurrentPoint]  // empty when tide-only
     let currentEvents: [CurrentEvent]
-    let snapTimes: [Date]    // prototype stops(): turns + slacks/maxes + sun events
+    let snapTimes: [Date]    // prototype stops(): turns + slacks/maxes + sun events + eclipse contacts
+
+    /// Lunar eclipses with a peak inside the window and at least one contact
+    /// above this station's horizon. Built ONCE, in the builders below —
+    /// `SkyState.init` runs on every scrub frame and must never search — and
+    /// read by the dome's moon, the schedule row and the strip's mark.
+    var eclipses: [WindowEclipse] = []
 
     /// The workable sub-threshold window around each slack, computed ONCE here
     /// off the same `currentPoints` the strip draws (gutter spec §3). The green
@@ -344,6 +350,22 @@ struct TimelineData {
     // same padded span, and must use the same number.
     static let eventPad = 6.0 * 3600
 
+    /// The window's eclipses, or nothing — the shared tail of both builders.
+    ///
+    /// The full-moon gate is the whole performance story: `nextLunarEclipse`
+    /// scans lunation by lunation and will happily walk months past the window
+    /// before it finds one, on every rebuild. An eclipse IS a full moon, so a
+    /// window without one cannot hold an eclipse, and `searchMoonPhases`
+    /// answers that far more cheaply than the eclipse scan does.
+    private static func windowEclipses(lat: Double, lon: Double,
+                                       start: Date, end: Date) -> [WindowEclipse] {
+        guard let observer = try? Observer(latitudeDeg: lat, longitudeDeg: lon),
+              let phases = try? searchMoonPhases(from: start, to: end),
+              phases.contains(where: { $0.phase == .full })
+        else { return [] }
+        return lunarEclipses(from: start, to: end, observer: observer)
+    }
+
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
     /// reads it), never a drawn track (split-scrubbers spec §3).
@@ -382,7 +404,9 @@ struct TimelineData {
 
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
+        let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(currentEvents.map(\.time) + sunTimes
+                              + eclipses.flatMap(\.contacts)
                               + windows.flatMap { [$0.start, $0.end] }))
             .filter { $0 >= start && $0 <= end }.sorted()
 
@@ -390,7 +414,8 @@ struct TimelineData {
                             start: start, end: end, days: chrome.days,
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, slackWindows: windows, slackThreshold: threshold)
+                            snapTimes: snaps, eclipses: eclipses,
+                            slackWindows: windows, slackThreshold: threshold)
     }
 
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
@@ -450,15 +475,17 @@ struct TimelineData {
         // them are gone, but each is now the most saturated point of the
         // rate-coloured line, and the readout's rate warning fires exactly
         // there.
+        let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
                               + currentEvents.map(\.time) + sunTimes
+                              + eclipses.flatMap(\.contacts)
                               + windows.flatMap { [$0.start, $0.end] }))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, slackWindows: windows,
+                            snapTimes: snaps, eclipses: eclipses, slackWindows: windows,
                             slackThreshold: threshold,
                             speedsAreSchematic: gate != nil)
     }

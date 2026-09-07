@@ -81,4 +81,40 @@ final class EclipseTests: XCTestCase {
                                     to: utc("2026-10-31T00:00:00Z"),
                                     observer: Self.victoria).isEmpty)
     }
+
+    // MARK: - On the timeline
+
+    func testTheTimelineCarriesTheEclipseAndSnapsToEveryContact() throws {
+        let at = anchor("2026-08-28T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        let e = try XCTUnwrap(tl.eclipses.first)
+        XCTAssertEqual(e.kind, .partial)
+        for c in e.contacts where tl.contains(c) {
+            XCTAssertTrue(tl.snapTimes.contains(c), "contact \(c) is not magnetic")
+        }
+    }
+
+    func testAWindowWithNoFullMoonCarriesNoEclipse() {
+        let at = anchor("2026-10-08T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        XCTAssertTrue(tl.eclipses.isEmpty)
+    }
+
+    /// A rebuild is a user action — opening a detail, picking a week — not a
+    /// frame. 250 ms is where it stops feeling instant.
+    func testBuildingAnEclipseWindowStaysUnderTheRebuildBudget() {
+        let eclipseWeek = anchor("2026-08-28T12:00:00Z", friday.tz)
+        let t0 = Date()
+        _ = TimelineData.build(tide: friday, current: nil, now: eclipseWeek, anchor: eclipseWeek)
+        let withEclipse = Date().timeIntervalSince(t0)
+
+        let quietWeek = anchor("2026-10-08T12:00:00Z", friday.tz)
+        let t1 = Date()
+        _ = TimelineData.build(tide: friday, current: nil, now: quietWeek, anchor: quietWeek)
+        let without = Date().timeIntervalSince(t1)
+
+        print("eclipse-week build \(withEclipse * 1000) ms, quiet week \(without * 1000) ms")
+        XCTAssertLessThan(withEclipse, 0.25)
+        XCTAssertLessThan(without, 0.25)
+    }
 }
