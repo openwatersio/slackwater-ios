@@ -1,7 +1,8 @@
 // Slackwater — GPL v3. Bundled NOAA Salish current stations (public domain
 // data, the same file slackwater-web ships as currents.json, enriched with
 // resolved names/regions/aliases from @sailingnaturali/station-corrections —
-// harmonic stations only, primary bin, exactly the web's bundle).
+// harmonic and subordinate stations, primary bin plus the bins subordinates
+// reduce from).
 import CoreLocation
 import Foundation
 import TideEngine
@@ -176,6 +177,9 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var ebbTimeOffset: Double? = nil
     var floodSpeedRatio: Double? = nil
     var ebbSpeedRatio: Double? = nil
+    /// A non-primary bin carried only as a subordinate's reference (#269):
+    /// harmonic shape, in `all` and `byId`, never in `StationItem.all`.
+    var referenceOnly: Bool? = nil
 
     var isSubordinate: Bool { reference != nil }
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
@@ -353,7 +357,7 @@ enum StationItem: Identifiable, Hashable {
     /// the Salish Sea.
     static let all: [StationItem] = {
         var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
-        merged += CurrentStationRecord.all.map { StationItem.current($0) }
+        merged += CurrentStationRecord.all.filter { $0.referenceOnly != true }.map { StationItem.current($0) }
         merged += ChsStationInfo.all.map { StationItem.chs($0) }
         merged += ChsGateInfo.all.map { StationItem.chsGate($0) }
         merged += ChsCurrentGateInfo.all.map { StationItem.chsCurrent($0) }
