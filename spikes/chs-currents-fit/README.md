@@ -29,7 +29,7 @@ resolve-by-position rule) — run per gate over the 19 registry CHS gates:
 ## The bar (set before scoring)
 
 Slack is the safety quantity — a gate is transited *at slack* — so it gets the tightest
-numbers, tighter than the engine's ±20-min maxima bar per chs-online-design §6a:
+numbers. The thresholds used for this spike are:
 
 | Quantity | Bar | Why |
 |---|---|---|

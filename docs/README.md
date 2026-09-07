@@ -20,25 +20,15 @@ snapshots rather than edited:
 | [`mytide-2026-08-21.md`](research/mytide-2026-08-21.md) | MyTide.ie — Irish indie tide PWA, convergent design; gauge-vs-modelled overlay + crossing windows worth stealing |
 | [`xtide-ios-2026-08-21.md`](research/xtide-ios-2026-08-21.md) | XTide for iOS — the free-and-clean incumbent: stale (2023), US-only; the niche is real but undefended |
 
-Deeper background (specs, superpowers plans) lives in the Slackwater planning repo
-(`sailingnaturali/slackwater`, private) — ask if you want anything from there surfaced here.
+Shared product planning lives in the private [Open Waters planning repo](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Technical reasoning needed to work on this app lives here; read [the CHS data model](chs-data-model.md#3-the-licence-architecture--the-load-bearing-section) before changing how Canadian data is stored, bundled or served.
 
-**One spec there is cited from this repo by bare name and is worth naming here**, because four
-files reference it and none of them says where it is:
+## Archived source citations
 
-| Cited as | Lives at | What it settles |
-|---|---|---|
-| `chs-online-design` | `sailingnaturali/slackwater` → `docs/superpowers/specs/2026-07-21-chs-online-design.md` | **§2 is the CHS licence architecture** — why Canadian predictions are *fetched per user* and never bundled (clause 3 bars redistribution, clause 10 permits the user's own derivation; we ship a client, so nothing is redistributed). **§6a** is where the ±20-min maxima bar comes from |
+Bare `chs-online-design` citations in `Slackwater/ChsStation.swift`, `tools/gen-chs-stations.mjs`, and `tools/FitValidation/Sources/fit-validation/main.swift` resolve to the following source. The current licence architecture is documented in `chs-data-model.md` §3.
 
-Cited by `Slackwater/ChsStation.swift:6`, `tools/gen-chs-stations.mjs:5`,
-`tools/FitValidation/Sources/fit-validation/main.swift:114`, and
-`spikes/chs-currents-fit/README.md:32`. Read §2 before changing anything about what CHS data
-this app stores, ships, or re-serves — see #99 for what happens when that architecture is
-mistaken for a loophole that generalises to other datasets (it does not; it works only because
-DFO runs IWLS as a service the device can query directly).
+| Citation | Source | Subject |
+| --- | --- | --- |
+| `chs-online-design` §2 | [Archived CHS online design](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#2-the-licence-architecture) | The per-user fetch and local-storage rationale |
+| `chs-online-design` §6a | [Archived current-station selection rule](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#6a-currents-the-rule-already-in-the-data) | Which current stations belong in the registry; this section does not specify a maxima-timing tolerance |
 
-**That argument is now reproduced in [`chs-data-model.md`](chs-data-model.md) §3**, in full and
-with the three-option table, so it can be read without access to the private repo — which is
-the point of the row above it. A pointer resolves a citation; it does not let most readers
-follow the reasoning. Reasoning that work in *this* repo depends on should not live only
-there, and `chs-data-model.md` is the pattern to follow.
+The fit spike's numerical acceptance criteria are in its own [threshold table](../spikes/chs-currents-fit/README.md#the-bar-set-before-scoring).
