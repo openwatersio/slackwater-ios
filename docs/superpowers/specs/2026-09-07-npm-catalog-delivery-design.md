@@ -30,9 +30,9 @@ tombstone, and fallback decisions remain in force.
   `@openwaters/slackwater-catalog`.
 - Keep the six existing JSON filenames and schemas.
 - Publish complete, immutable SemVer versions; never publish deltas.
-- Resolve the `latest` version from the npm registry.
+- Resolve the current `schema-v1` version from the npm registry.
 - Fetch the manifest and catalog files from jsDelivr using that exact version,
-  never the `latest` alias.
+  never a tag or version alias.
 - Verify every downloaded file against the release manifest before running the
   existing whole-snapshot validation and atomic activation.
 - Publish from GitHub Releases with npm OIDC trusted publishing. Do not store an
@@ -156,10 +156,17 @@ cumulative tombstone and no historical tombstone disappears accidentally.
 ## npm package contract
 
 The package name is `@openwaters/slackwater-catalog`. It is public and uses
-ordinary SemVer beginning at `0.1.0`. Patch releases carry data changes, minor
-releases may add backward-compatible metadata, and a breaking catalog schema
-uses a new major version. The manifest schema remains the client's authority;
-SemVer alone does not grant an old client permission to accept a new schema.
+ordinary SemVer beginning at `1.0.0`. Patch releases carry data changes, minor
+releases may add backward-compatible metadata, and the package major equals the
+breaking catalog schema version. The manifest schema remains the client's
+authority; SemVer alone does not grant an old client permission to accept a new
+schema.
+
+Each schema has a permanent npm dist-tag named `schema-v<schemaVersion>`. A
+schema-1 client resolves only `schema-v1`, so it can keep receiving compatible
+1.x corrections after a future `schema-v2` line exists. Published versions and
+the iOS repository's development dependency remain exact; neither relies on
+npm's global `latest` tag.
 
 The published tarball contains only:
 
@@ -195,7 +202,7 @@ published forward.
 {
   "schemaVersion": 1,
   "packageName": "@openwaters/slackwater-catalog",
-  "packageVersion": "0.1.0",
+  "packageVersion": "1.0.0",
   "sources": {
     "@neaps/tide-database": "0.9.20260901",
     "@openwaters/noaa-current-stations": "0.5.0",
@@ -246,23 +253,34 @@ tests, raw inputs, and dependency trees.
 ## Release workflow
 
 Publishing is driven by a GitHub Release whose tag is `v<package version>`.
-The `publish.yml` workflow runs only when that release is published and:
+The repository requires pull-request review for protected `main`. The
+`publish.yml` workflow runs only when that release is published, uses a single
+non-cancelling `npm-publish` concurrency group, targets a protected `npm`
+environment with required review, and:
 
 1. checks that the tag, `package.json`, and manifest versions match;
-2. checks out the tagged commit;
+2. checks out the tagged commit and proves it is reachable from `origin/main`;
 3. installs with `npm ci` on Node 24 with npm 11.5 or newer;
 4. rebuilds and verifies the committed output;
 5. runs all tests and catalog/transition validation;
 6. verifies the packed file list; and
-7. runs `npm publish` with `contents: read` and `id-token: write` permissions.
+7. immediately re-reads the schema's current npm dist-tag, proves the candidate
+   is greater, and reruns transition validation against that exact version; and
+8. runs `npm publish --tag schema-v<schemaVersion>` with `contents: read` and
+   `id-token: write` permissions.
+
+The concurrency group serializes validation and publication across releases;
+`cancel-in-progress` is false. The final version and transition check prevents
+an older queued release from publishing after a newer one or two releases from
+validating against the same predecessor.
 
 The npm package configures this repository and exact workflow filename as an
-[npm trusted publisher]. The first `0.1.0` publication is the one unavoidable
+[npm trusted publisher]. The first `1.0.0` publication is the one unavoidable
 bootstrap exception: after CI passes, a maintainer tags the clean commit and
-publishes it manually with npm two-factor authentication, then configures
-trusted publishing. Automated GitHub Releases begin with the next version. No
-`NPM_TOKEN` is added to the repository. All subsequent releases use a
-GitHub-hosted runner, OIDC, and automatically generated [npm provenance].
+publishes it manually as `schema-v1` with npm two-factor authentication, then
+configures trusted publishing. Automated GitHub Releases begin with the next
+version. No `NPM_TOKEN` is added to the repository. All subsequent releases use
+a GitHub-hosted runner, OIDC, and automatically generated [npm provenance].
 
 [npm trusted publisher]: https://docs.npmjs.com/trusted-publishers/
 [npm provenance]: https://docs.npmjs.com/generating-provenance-statements/
@@ -279,7 +297,7 @@ The npm registry's [package metadata endpoint] is the release-discovery
 authority:
 
 ```text
-GET https://registry.npmjs.org/@openwaters%2Fslackwater-catalog/latest
+GET https://registry.npmjs.org/@openwaters%2Fslackwater-catalog/schema-v1
 ```
 
 The app decodes only the response fields it needs: `name` and `version`. It
@@ -297,8 +315,8 @@ files.
 The app therefore fetches files at immutable exact-version URLs:
 
 ```text
-https://cdn.jsdelivr.net/npm/@openwaters/slackwater-catalog@0.1.0/catalogs/catalog-manifest.json
-https://cdn.jsdelivr.net/npm/@openwaters/slackwater-catalog@0.1.0/catalogs/stations.json
+https://cdn.jsdelivr.net/npm/@openwaters/slackwater-catalog@1.0.0/catalogs/catalog-manifest.json
+https://cdn.jsdelivr.net/npm/@openwaters/slackwater-catalog@1.0.0/catalogs/stations.json
 ```
 
 It constructs the remaining five URLs from the exact allowlisted filenames.
@@ -320,7 +338,7 @@ snapshot validation, and atomic generation pointer remain the client design.
 Discovery changes the batch from six independent fixed URLs into three ordered
 steps:
 
-1. Download npm `latest` metadata.
+1. Download npm `schema-v1` metadata.
 2. If its version is new, download that exact version's manifest.
 3. Reuse or download each allowlisted catalog file, then validate and activate
    the complete candidate.
@@ -436,21 +454,21 @@ runtime operation.
 | Files pass hashes but fail catalog validation | Reject that immutable version; leave the active pointer untouched. |
 | App stops during any step | Background-session state resumes or abandoned staging is removed next launch. |
 | Active stored snapshot is corrupt | Log the error and load the complete bundle. |
-| npm package publication fails | The previous `latest` version and all exact-version files remain available. |
-| Bad package was published | Publish a greater corrective version; never overwrite, unpublish, or move `latest` backward. |
+| npm package publication fails | The previous schema-tagged version and all exact-version files remain available. |
+| Bad package was published | Publish a greater corrective version; never overwrite, unpublish, or move the schema tag backward. |
 
 ## Correction and rollback
 
-Rollback is always a forward release. If version `0.1.2` introduced bad data,
-the source change is reverted, generation runs again as `0.1.3`, and the
+Rollback is always a forward release. If version `1.0.2` introduced bad data,
+the source change is reverted, generation runs again as `1.0.3`, and the
 cumulative tombstone ledger records any IDs that clients may have activated in
-`0.1.2` but that the correction removes.
+`1.0.2` but that the correction removes.
 
-The release validator compares the candidate against the current npm `latest`
-package as a final guard, in addition to pull-request transition validation.
+The release validator compares the candidate against the schema's current npm
+dist-tag as a final guard, in addition to pull-request transition validation.
 This prevents a release from skipping a published station generation or
-silently dropping its tombstones. The npm `latest` tag is never moved backward
-and a published package is never deleted as an operational rollback.
+silently dropping its tombstones. A schema dist-tag is never moved backward and
+a published package is never deleted as an operational rollback.
 
 ## Verification
 
@@ -462,6 +480,8 @@ The dedicated repository must prove:
 - the full catalog and transition validator accepts the candidate;
 - removed IDs require cumulative tombstones;
 - tag, package, and manifest versions must match; and
+- only a version reachable from protected `main` can publish, serialized after
+  a final transition check against the current schema tag; and
 - the published exact-version jsDelivr files match the npm release manifest.
 
 Focused iOS tests add coverage for:
@@ -487,7 +507,7 @@ remote refresh design remain required.
 ## Rollout
 
 1. Create `openwatersio/slackwater-catalog`, move the existing generators and
-   tests, pin inputs, and publish `0.1.0` whose six files are byte-identical to
+   tests, pin inputs, and publish `1.0.0` whose six files are byte-identical to
    the current app bundle.
 2. Configure npm trusted publishing after the bootstrap release and verify the
    complete exact-version CDN surface.
@@ -500,7 +520,7 @@ remote refresh design remain required.
 
 There is no Cloudflare migration or dual-publish period because the Worker
 delivery path has not shipped. Existing app versions know only their bundle;
-the first npm-aware app can be released after `0.1.0` is verified.
+the first npm-aware app can be released after `1.0.0` is verified.
 
 ## Non-goals
 
