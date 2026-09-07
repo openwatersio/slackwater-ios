@@ -2,8 +2,7 @@
 
 *M4, 2026-07-30. **Rewritten 2026-08-01 for national coverage** (M5.3: 3,352 bundled
 stations across the US and Canada — the previous draft described a Salish-Sea app).
-Nothing here has been submitted; App Store Connect still has placeholder values.
-Original keyword strategy from the ASO block in [gtm.md](gtm.md), now superseded below.*
+Nothing here has been submitted; App Store Connect still has placeholder values.*
 
 **What changed in the rewrite:** keywords (regional → national + one regional anchor),
 promotional text, and the description's coverage claims. Name, subtitle, category,
@@ -16,9 +15,7 @@ privacy answers and review notes were already national and stand unchanged.
 | **Name** | `Slackwater — Tides & Currents` | 30 (29 used) |
 | **Subtitle** | `Offline currents, US & Canada` | 30 (29 used) |
 
-Both still fit national coverage — "US & Canada" was always in the subtitle. The gtm.md
-alternate `Salish Sea slack & tide timing` is now **retired**: it describes a handful of
-3,352 stations.
+The subtitle covers both countries; a Salish Sea-only subtitle would understate the app’s coverage.
 
 ## Keywords (≤100 chars, name/subtitle words omitted)
 
@@ -85,11 +82,6 @@ closing "already on your phone" to "offline on your phone", matching slackwater.
 that phrase sits at character 187, past the ~3-line truncation this section is written
 around — most readers would never have seen the word. Moving it into the second sentence
 puts it at character 52, inside the collapsed view, without touching the problem-first hook.
-
-**This supersedes the ASO block's first line** (`Slack and max-current timing you
-can trust — offline, US and Canadian waters, no subscription required`). That line led with
-"slack and max-current timing", which is the vocabulary of someone who already
-knows they want this app. Kept in gtm.md for the record; not used here.
 
 Full draft:
 
