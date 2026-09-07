@@ -138,30 +138,6 @@ let brightStars: [Star] = {
     return rows.compactMap { $0.count == 3 ? Star(ra: $0[0], dec: $0[1], mag: $0[2]) : nil }
 }()
 
-// TODO: move these two into Almanac as a public `starAltAz` beside
-// `sunAltAz` before this merges — Almanac already has the sidereal time
-// (`siderealDeg`) this re-derives, and the app should not own sky math.
-/// Local mean sidereal time in degrees (Meeus 12.4, first two terms). Mean,
-/// not apparent: the equation of the equinoxes is under 0.005°.
-func localSiderealDeg(_ time: Date, longitude: Double) -> Double {
-    // Days since J2000.0; the reference date is 365.5 days after it.
-    let d = time.timeIntervalSinceReferenceDate / 86400 + 365.5
-    let gmst = 280.46061837 + 360.98564736629 * d
-    return ((gmst + longitude).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-}
-
-/// Where a fixed star stands: azimuth from north through east, altitude
-/// above the horizon. No precession, refraction or parallax — a J2000
-/// position drifts 0.014°/yr, about a point at `skyAltitudeScale` so far.
-func starAltAz(raDeg: Double, decDeg: Double, siderealDeg: Double,
-               latitude: Double) -> (azDeg: Double, altDeg: Double) {
-    let ha = (siderealDeg - raDeg) * .pi / 180
-    let dec = decDeg * .pi / 180, lat = latitude * .pi / 180
-    let alt = asin(sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(ha))
-    let az = atan2(-sin(ha) * cos(dec), sin(dec) * cos(lat) - cos(dec) * sin(lat) * cos(ha))
-    return ((az * 180 / .pi + 360).truncatingRemainder(dividingBy: 360), alt * 180 / .pi)
-}
-
 struct SkyState {
     let latitude: Double
     /// The scrub time this state was built for — what the eclipse is read at.
@@ -171,8 +147,9 @@ struct SkyState {
     let moon: AltAz?
     let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
-    /// Local sidereal time: the one number every star's position turns on.
-    let siderealDeg: Double
+    /// Every catalog star Almanac could place, with where it stands: built
+    /// once per scrub frame here so the twinkle redraws don't recompute it.
+    let stars: [(star: Star, at: AltAz)]
     /// The eclipse underway at `time`, if any. Chosen from an array the
     /// timeline already built: this initialiser runs on EVERY scrub frame, and
     /// an eclipse search here would cost orders of magnitude more than the
@@ -194,10 +171,14 @@ struct SkyState {
          eclipses: [WindowEclipse] = []) {
         self.latitude = latitude
         self.time = time
-        siderealDeg = localSiderealDeg(time, longitude: longitude)
         eclipse = eclipses.first { $0.underway(at: time) }
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
+        stars = observer.map { o in
+            brightStars.compactMap { s in
+                (try? starAltAz(raDeg: s.ra, decDeg: s.dec, at: time, observer: o)).map { (star: s, at: $0) }
+            }
+        } ?? []
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
         sunSpan = observer.flatMap { obs in
@@ -258,15 +239,12 @@ struct SkyBackdrop: View {
                         // the scrubber moves. Off-frame and set stars cost
                         // nothing: the canvas clips them.
                         Canvas { context, _ in
-                            for (i, star) in brightStars.enumerated() {
-                                let (az, alt) = starAltAz(raDeg: star.ra, decDeg: star.dec,
-                                                          siderealDeg: sky.siderealDeg,
-                                                          latitude: sky.latitude)
-                                let haze = starHazeOpacity(altitude: alt)
+                            for (i, placed) in sky.stars.enumerated() {
+                                let haze = starHazeOpacity(altitude: placed.at.altDeg)
                                 guard haze > 0 else { continue }
-                                let point = skyPoint(azimuth: az, altitude: alt, latitude: sky.latitude,
-                                                     span: sky.sunSpan, size: size)
-                                let radius = max(0.5, 1.6 - 0.3 * CGFloat(star.mag))
+                                let point = skyPoint(azimuth: placed.at.azDeg, altitude: placed.at.altDeg,
+                                                     latitude: sky.latitude, span: sky.sunSpan, size: size)
+                                let radius = max(0.5, 1.6 - 0.3 * CGFloat(placed.star.mag))
                                 let twinkle = starTwinkle(index: i, seconds: seconds,
                                                           reduceMotion: reduceMotion)
                                 context.fill(Path(ellipseIn: CGRect(x: point.x - radius,
