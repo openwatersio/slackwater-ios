@@ -205,6 +205,15 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertTrue(zip(graph.points, staleGraph).contains { abs($0.value - $1) > 0.000_001 })
     }
 
+    func testWidgetResolvesASubordinateOfANonPrimaryBin() throws {
+        let friar = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/ACT0091" })
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: "current:" + friar.id))
+        guard case .current(_, let station) = record else { return XCTFail("Expected current") }
+        let now = Date(timeIntervalSince1970: 1_784_000_000)
+        let speeds = station.speeds(from: now, to: now.addingTimeInterval(86_400), step: 600).map(\.speed)
+        XCTAssertGreaterThan(speeds.max()! - speeds.min()!, 0.5, "the widget fell back to a flat harmonic with no constituents")
+    }
+
     func testWidgetReadsEverySmallGeneratedCatalogThroughActiveDirectory() throws {
         let storage = try makeStorage()
         let directory = try XCTUnwrap(storage.activeDirectory())
