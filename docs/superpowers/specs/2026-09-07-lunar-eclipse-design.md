@@ -22,15 +22,21 @@ The 2026-08-28 partial (umbral magnitude 0.93), including Victoria visibility at
 
 Nothing is ported into the app. #228 closed on 2026-09-06, so `SunMoon.swift` is gone and there is no dead call site to add to.
 
-## What Almanac does not have
+## What Almanac gained for this
 
-There is no `previousLunarEclipse` and no range search. The sheet's "last eclipse" line is therefore iteration over the existing API in the app:
+At the time of writing this spec, `nextLunarEclipse(after:)` was the only way in — no backward search, no range search — so "when was the last one" meant a 400-day forward walk in the app, and the window search meant a consumer loop. [openwatersio/almanac#6](https://github.com/openwatersio/almanac/issues/6) asked whether the package should own both.
 
-```swift
-lunarEclipses(from: now.addingTimeInterval(-400 * 86_400), to: now).last
-```
+It now does. Almanac **0.2.0** added `previousLunarEclipse(before:)` and `lunarEclipses(from:to:)`, and this app pins **0.2.1**. The consumer loops and both look-window constants are gone; what remains app-side is the visibility filter, which stays a separate observer query in Almanac by design.
 
-400 days covers the catalog's longest gap between consecutive lunar eclipses (under a year). This is iteration, not astronomy — no Meeus lands in this repo. An `openwatersio/almanac` issue tracks whether the package should own a backward or range search with its TypeScript twin and parity corpus; if it does, this helper collapses into a one-line call and the change is confined to `Eclipse.swift`.
+Measured on this machine, debug build, Friday Harbor — 0.1.0 against 0.2.1:
+
+| | 0.1.0 | 0.2.1 |
+|---|---|---|
+| Eclipse-week rebuild | 133 ms | 79 ms |
+| Quiet-week rebuild | 108 ms | 70 ms |
+| `moonFacts` | 178 ms | 79 ms |
+
+The full-moon gate described below went with it: 0.2's range search prunes on ecliptic latitude internally, so gating on `searchMoonPhases` measured *slower* (69.7 ms against 67.9 ms on a quiet week) than not gating at all.
 
 ## Where the data lives
 
@@ -60,7 +66,7 @@ func lunarEclipses(from: Date, to: Date, observer: Observer) -> [WindowEclipse]
 
 `TimelineData` gains `let eclipses: [WindowEclipse]` (defaulted empty), filled in `TimelineData.build(tide:current:...)` and the online-gate builder — the two places that already hold the station's lat/lon and the window. Each eclipse's `contacts` join `snapTimes` under the existing `filter { $0 >= start && $0 <= end }`.
 
-**Cost.** The search is per timeline *build* — a rebuild or an anchor move — never per scrub frame. `SkyState.init` runs on every frame and must not learn about eclipses; it is handed the answer. Before the search runs at all, a gate: if `searchMoonPhases(from:to:)` puts no full moon inside the window, there can be no eclipse and the builder skips it, which is most weeks. The plan measures the un-gated and gated build cost and records both; if a gated build costs more than ~10 ms the search moves to a `Task` that merges its result in.
+**Cost.** The search is per timeline *build* — a rebuild or an anchor move — never per scrub frame. `SkyState.init` runs on every frame and must not learn about eclipses; it is handed the answer. That is the whole performance design: at 79 ms an eclipse-week rebuild is a user action (opening a detail, picking a week), and nothing in it happens at frame rate.
 
 ### Visibility
 

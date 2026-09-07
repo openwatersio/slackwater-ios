@@ -43,7 +43,7 @@ final class EclipseTests: XCTestCase {
     // MARK: - The window search
 
     func testTheWindowFindsThe2026PartialAndDescribesIt() throws {
-        let found = lunarEclipses(from: utc("2026-08-25T00:00:00Z"),
+        let found = visibleEclipses(from: utc("2026-08-25T00:00:00Z"),
                                   to: utc("2026-08-31T00:00:00Z"),
                                   observer: Self.victoria)
         XCTAssertEqual(found.count, 1)
@@ -57,14 +57,14 @@ final class EclipseTests: XCTestCase {
     }
 
     func testAnEclipseNobodyHereCanSeeIsDropped() {
-        let found = lunarEclipses(from: utc("2026-08-25T00:00:00Z"),
+        let found = visibleEclipses(from: utc("2026-08-25T00:00:00Z"),
                                   to: utc("2026-08-31T00:00:00Z"),
                                   observer: Self.perth)
         XCTAssertTrue(found.isEmpty, "Perth is in daylight for the whole event")
     }
 
     func testShadowIsZeroOutsideAndPeaksAtTheUmbralMagnitude() throws {
-        let e = try XCTUnwrap(lunarEclipses(from: utc("2026-08-25T00:00:00Z"),
+        let e = try XCTUnwrap(visibleEclipses(from: utc("2026-08-25T00:00:00Z"),
                                             to: utc("2026-08-31T00:00:00Z"),
                                             observer: Self.victoria).first)
         XCTAssertEqual(e.shadow(at: e.eclipse.p1.addingTimeInterval(-60)), 0)
@@ -88,13 +88,13 @@ final class EclipseTests: XCTestCase {
     func testAQuietMonthHasNoEclipse() {
         // October 2026 carries a full moon and no lunar eclipse; the next one
         // after 2026-08-28 is in 2027.
-        XCTAssertTrue(lunarEclipses(from: utc("2026-10-01T00:00:00Z"),
+        XCTAssertTrue(visibleEclipses(from: utc("2026-10-01T00:00:00Z"),
                                     to: utc("2026-10-31T00:00:00Z"),
                                     observer: Self.victoria).isEmpty)
     }
 
     func testThePenumbralLegDimsTheMoonWhereTheUmbraDoesNot() throws {
-        let e = try XCTUnwrap(lunarEclipses(from: utc("2026-08-25T00:00:00Z"),
+        let e = try XCTUnwrap(visibleEclipses(from: utc("2026-08-25T00:00:00Z"),
                                             to: utc("2026-08-31T00:00:00Z"),
                                             observer: Self.victoria).first)
         // Between P1 and U1 the moon is IN the penumbra and nowhere near the

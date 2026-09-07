@@ -15,19 +15,12 @@ struct MoonFacts {
     let distanceKm: Double
     let closest: Date?
     let farthest: Date?
-    /// The last and next eclipse VISIBLE FROM HERE — `lunarEclipses` filters on
-    /// the observer's horizon, so the sheet never offers a jump to a night
+    /// The last and next eclipse VISIBLE FROM HERE — both searches skip the
+    /// ones this observer misses, so the sheet never offers a jump to a night
     /// with nothing to look at.
     let last: WindowEclipse?
     let next: WindowEclipse?
 }
-
-/// 400 days back covers the longest gap between consecutive lunar eclipses
-/// (under a year across the 1950–2100 catalog), which is what lets "the last
-/// one" be a forward walk from there. Almanac has no backward or range search;
-/// openwatersio/almanac#6 asks whether it should.
-private let eclipseLookBack = 400.0 * 86_400
-private let eclipseLookAhead = 800.0 * 86_400
 
 func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
     guard let illumination = try? moonIllumination(at),
@@ -64,10 +57,8 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
         distanceKm: position.distanceKm,
         closest: closest?.time,
         farthest: farthest?.time,
-        last: lunarEclipses(from: at.addingTimeInterval(-eclipseLookBack), to: at,
-                            observer: observer).last,
-        next: lunarEclipses(from: at, to: at.addingTimeInterval(eclipseLookAhead),
-                            observer: observer).first)
+        last: previousVisibleEclipse(before: at, observer: observer),
+        next: nextVisibleEclipse(after: at, observer: observer))
 }
 
 struct MoonDetailSheet: View {

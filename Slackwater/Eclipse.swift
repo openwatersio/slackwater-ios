@@ -85,22 +85,52 @@ struct WindowEclipse: Identifiable {
     }
 }
 
-/// Every lunar eclipse whose peak falls in `from...to` and that this observer
-/// can see any contact of.
+/// Every eclipse in `from..<to` that this observer can see any contact of.
 ///
-/// Walks `nextLunarEclipse(after:)` forward — Almanac has no range or backward
-/// search (openwatersio/almanac#6). Almanac throws outside 1950–2101; that
-/// ends the walk and returns what was found, the way `SummaryTiles` drops its
-/// tile rather than the row.
-func lunarEclipses(from: Date, to: Date, observer: Observer) -> [WindowEclipse] {
-    var out: [WindowEclipse] = []
-    var cursor = from
-    while cursor < to {
-        guard let e = try? nextLunarEclipse(after: cursor), e.peak <= to else { break }
+/// The search itself is Almanac's `lunarEclipses(from:to:)` (0.2.0, from
+/// openwatersio/almanac#6 — this app's consumer loop is what prompted it, and
+/// CI measured the native range search 65–99% faster than the loop it
+/// replaced). What is left here is the visibility filter, which stays a
+/// separate observer query in Almanac by design.
+///
+/// Named `visibleEclipses`, not `lunarEclipses`: sharing a name with the
+/// Almanac function it calls would resolve fine by argument label and read
+/// like a bug at every call site.
+func visibleEclipses(from: Date, to: Date, observer: Observer) -> [WindowEclipse] {
+    guard let found = try? lunarEclipses(from: from, to: to) else { return [] }
+    return found.compactMap { visible($0, observer: observer) }
+}
+
+/// The last eclipse before `at` that can be seen from here, or nil.
+///
+/// Almanac walks backward natively as of 0.2.0; the loop that remains only
+/// skips eclipses this observer misses, which is why it is bounded by a COUNT
+/// rather than by a span of days. Eight is roughly three years of eclipses —
+/// past that, "the last one you could see" is not a fact worth printing.
+func previousVisibleEclipse(before at: Date, observer: Observer) -> WindowEclipse? {
+    var cursor = at
+    for _ in 0..<8 {
+        guard let e = try? previousLunarEclipse(before: cursor) else { return nil }
         cursor = e.peak
-        guard let v = try? lunarEclipseVisibility(e, observer: observer) else { continue }
-        let windowed = WindowEclipse(eclipse: e, visibility: v)
-        if windowed.anyContactVisible { out.append(windowed) }
+        if let found = visible(e, observer: observer) { return found }
     }
-    return out
+    return nil
+}
+
+/// The next eclipse after `at` that can be seen from here, or nil. The mirror
+/// of `previousVisibleEclipse`, same bound, same reason.
+func nextVisibleEclipse(after at: Date, observer: Observer) -> WindowEclipse? {
+    var cursor = at
+    for _ in 0..<8 {
+        guard let e = try? nextLunarEclipse(after: cursor) else { return nil }
+        cursor = e.peak
+        if let found = visible(e, observer: observer) { return found }
+    }
+    return nil
+}
+
+private func visible(_ e: LunarEclipse, observer: Observer) -> WindowEclipse? {
+    guard let v = try? lunarEclipseVisibility(e, observer: observer) else { return nil }
+    let windowed = WindowEclipse(eclipse: e, visibility: v)
+    return windowed.anyContactVisible ? windowed : nil
 }
