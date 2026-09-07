@@ -223,9 +223,7 @@ func moonPhaseName(phase: Double) -> String {
     return waxing ? "Waxing Gibbous" : "Waning Gibbous"
 }
 
-/// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
-/// an offset circle clipped to the disc — fullness and waxing side track the
-/// illumination as you scrub across days.
+/// The moon glyph: a lit disc with the dark limb carved away.
 struct MoonGlyph: View {
     let fraction: Double
     let waxing: Bool
@@ -235,8 +233,16 @@ struct MoonGlyph: View {
         let r = size / 2 - 1
         let shift = moonLimbShift(fraction: fraction, waxing: waxing, radius: r)
         ZStack {
+            /// The dark side is semi-transparent to show the sky.
+            Circle().fill(SN.moonLimb.opacity(0.18))
             Circle().fill(SN.foam)
-            Circle().fill(SN.moonLimb).offset(x: shift)
+                .mask {
+                    ZStack {
+                        Circle().fill(.white)
+                        Circle().fill(.black).offset(x: shift).blendMode(.destinationOut)
+                    }
+                    .compositingGroup() // confine destinationOut to the mask's own layers
+                }
         }
         .frame(width: 2 * r, height: 2 * r)
         .clipShape(Circle())
