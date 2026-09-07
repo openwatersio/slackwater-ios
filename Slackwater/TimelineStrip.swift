@@ -765,12 +765,21 @@ struct TimelineCanvas: View {
         // Outside the day loop — an eclipse belongs to an instant, not a day.
         for e in data.eclipses where data.contains(e.start) {
             let x = data.x(e.start)
+            // `SN.umbraLabel`, not `SN.umbra`: the dark copper that reads as a
+            // shadow ON the lit moon disappears into the night canvas here.
+            // Same event, two colours, because the backgrounds are opposites.
             ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
-                     with: .color(SN.umbra))
+                     with: .color(SN.umbraLabel))
+            // A SECOND row, under the sun labels. An eclipse begins in the
+            // evening, so its label lands within an hour or two of sunset —
+            // 36pt apart at 18pt/hour against a ~60pt label — and on the sun
+            // row the two print through each other ("↓8:24🌘m10:23pm",
+            // 2026-08-16 at Friday Harbor). This row is empty at night: the
+            // month/day that uses it sits at noon.
             ctx.draw(Text("🌘\(cardTime(e.start, data.tz))")
                         .font(.system(size: 11, weight: .medium).monospaced())
                         .foregroundStyle(SN.umbraLabel),
-                     at: CGPoint(x: x, y: geo.dayY), anchor: .center)
+                     at: CGPoint(x: x, y: geo.dayY + 17), anchor: .center)
         }
     }
 

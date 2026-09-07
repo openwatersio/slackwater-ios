@@ -446,15 +446,19 @@ struct SummaryTiles: View {
     var onJump: ((Date) -> Void)? = nil
     var latitude: Double? = nil
     var longitude: Double? = nil
+    /// Read HERE, inside the presenting hierarchy where the scaffold set it,
+    /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
+    @Environment(\.timeZone) private var tz
 
     /// Non-nil only when the caller gave both somewhere to go and somewhere to
     /// stand: the sheet needs an `Observer`, and this view is the only thing
     /// between the detail view and it.
     private var sheet: (() -> AnyView)? {
         guard let onJump, let latitude, let longitude else { return nil }
+        let tz = tz
         return { AnyView(MoonDetailSheet(at: at, eclipse: eclipse,
                                          latitude: latitude, longitude: longitude,
-                                         onJump: onJump)) }
+                                         tz: tz, onJump: onJump)) }
     }
 
     var body: some View {

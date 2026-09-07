@@ -75,10 +75,14 @@ struct MoonDetailSheet: View {
     var eclipse: WindowEclipse? = nil
     let latitude: Double
     let longitude: Double
+    /// Passed, not read from the environment: `.sheet` content does not
+    /// inherit what was set above the presenting view (the story is on
+    /// `CurrentDetailView.openChsRoute`), and a station in another zone would
+    /// otherwise print its rise and set in the device's.
+    let tz: TimeZone
     let onJump: (Date) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.timeZone) private var tz
     @State private var facts: MoonFacts?
 
     var body: some View {
@@ -89,8 +93,10 @@ struct MoonDetailSheet: View {
                         head(facts)
                         line("RISE", facts.rise.map { chartTime($0, tz) } ?? "—")
                         line("SET", facts.set.map { chartTime($0, tz) } ?? "—")
-                        line("NEXT FULL", when(facts.nextFull))
-                        line("NEXT NEW", when(facts.nextNew))
+                        line("NEXT FULL", when(facts.nextFull),
+                             jumpTo: facts.nextFull, id: "moon-next-full")
+                        line("NEXT NEW", when(facts.nextNew),
+                             jumpTo: facts.nextNew, id: "moon-next-new")
                         line("DISTANCE", "\(Int((facts.distanceKm / 100).rounded()) * 100) km",
                              caption: [facts.closest.map { "closest \(monthDay($0, tz))" },
                                        facts.farthest.map { "farthest \(monthDay($0, tz))" }]
@@ -115,9 +121,18 @@ struct MoonDetailSheet: View {
         }
     }
 
+    /// "Aug 27 · 9:12pm", and "Aug 17, 2027 · 12:13am" when the year is not
+    /// the one being scrubbed. The year is not decoration here: the next
+    /// eclipse is usually months out and often the following year, and a bare
+    /// "Aug 17" under a "NEXT ECLIPSE" label on September 7th reads as a date
+    /// in the past. `weekRangeLabel` makes the same call for the same reason.
     private func when(_ d: Date?) -> String {
         guard let d else { return "—" }
-        return "\(monthDay(d, tz)) · \(chartTime(d, tz))"
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let sameYear = cal.component(.year, from: d) == cal.component(.year, from: at)
+        let day = sameYear ? monthDay(d, tz) : formatter("MMM d, yyyy", tz).string(from: d)
+        return "\(day) · \(chartTime(d, tz))"
     }
 
     private func head(_ facts: MoonFacts) -> some View {
@@ -139,19 +154,36 @@ struct MoonDetailSheet: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func line(_ label: String, _ value: String, caption: String = "") -> some View {
+    /// A label/value row. With `jumpTo` it becomes a destination — chevron,
+    /// tap, dismiss — on the same terms as the eclipse rows below: every time
+    /// printed in this sheet that the scrubber can reach is somewhere to go,
+    /// and one that isn't tappable while its neighbour is reads as broken.
+    private func line(_ label: String, _ value: String, caption: String = "",
+                      jumpTo: Date? = nil, id: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 MonoLabel(text: label, color: SN.foam.opacity(0.55))
                 Spacer()
                 Text(value).font(.footnote.monospacedDigit()).foregroundStyle(.white)
+                if jumpTo != nil {
+                    Image(systemName: "chevron.right").font(.caption2)
+                        .foregroundStyle(SN.foam.opacity(0.5))
+                }
             }
             if !caption.isEmpty {
                 Text(caption).font(.caption2).foregroundStyle(SN.foam.opacity(0.55))
             }
         }
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let jumpTo else { return }
+            onJump(jumpTo)
+            dismiss()
+        }
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(jumpTo != nil ? .isButton : [])
+        .accessibilityIdentifier(id ?? "")
     }
 
     /// An eclipse either side of now. Nil reads "none visible from here" rather

@@ -565,11 +565,20 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         let next = app.descendants(matching: .any)["moon-next-eclipse"].firstMatch
         XCTAssert(next.waitForExistence(timeout: 10), "no next-eclipse row in the Moon sheet")
+        // The phase rows are destinations on the same terms — every reachable
+        // time in this sheet is somewhere the scrubber can go.
+        XCTAssert(app.descendants(matching: .any)["moon-next-full"].firstMatch.exists,
+                  "the next-full-moon row is not in the sheet")
+        XCTAssert(app.descendants(matching: .any)["moon-next-new"].firstMatch.exists,
+                  "the next-new-moon row is not in the sheet")
         next.tap()
 
         // The sheet closes, and the window has moved: the next eclipse is
-        // months out, so the range bar has to be saying so.
-        XCTAssertFalse(app.navigationBars["Moon"].exists, "the sheet stayed up after a jump")
+        // months out, so the range bar has to be saying so. Both are WAITS —
+        // a sheet dismissal is animated, and `exists` read on the line after
+        // the tap catches it mid-flight (it did, first run).
+        XCTAssert(app.navigationBars["Moon"].waitForNonExistence(timeout: 10),
+                  "the sheet stayed up after a jump")
         XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 10),
                   "the jump did not move the window")
         save(app, "moon-sheet-jumped.png")
