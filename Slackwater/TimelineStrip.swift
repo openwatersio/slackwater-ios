@@ -499,9 +499,8 @@ struct TimelineGeo {
     let maxAbsCur: Double    // prototype mxv = cur.mx*1.05
 
     /// The lead reading and, under it, the row of glass pills sit over this
-    /// zone at the top of the strip, so the night and day bands can rise
-    /// behind them and fade out — no hard edge where the page meets the
-    /// chart, and nothing floating over the curve.
+    /// zone at the top of the strip, with the sky behind them and nothing
+    /// floating over the curve.
     let padTop: CGFloat = 160
     /// The pill row's top. The pills are caption-height glass, about 30pt,
     /// so the row ends 6pt above the pad and never reaches the plot. The
@@ -573,7 +572,6 @@ struct TimelineCanvas: View {
     let imperial: Bool
     let speedUnit: String
     let now: Date
-    var showsDayBands = true
 
     /// True set bearings for this station's flood and ebb, so a max's glyph on
     /// the chart is the compass arrow the schedule pill and the readout already
@@ -625,9 +623,11 @@ struct TimelineCanvas: View {
     }
 
     private func draw(_ ctx: GraphicsContext) {
-        drawDayChrome(ctx)
+        // Tracks first: their night shade runs down through the axis rows,
+        // and the day chrome's labels go over it.
         if geo.hasTide { drawTide(ctx) }
         if geo.hasCurrent { drawCurrent(ctx) }
+        drawDayChrome(ctx)
     }
 
     // MARK: Card-look primitives, shared by both tracks
@@ -666,58 +666,9 @@ struct TimelineCanvas: View {
         }
     }
 
-    // Night bands, day tint, day labels and sun markers — continuous across
-    // midnight (prototype's per-day rects abut exactly).
+    // Day labels and sun markers — continuous across midnight.
     private func drawDayChrome(_ ctx: GraphicsContext) {
-        let visible = data.visibleDays
-        // Night and day bands span the strip's full height (#246) and fade
-        // into each other across twilight — a hard edge at sunset read as a
-        // rectangle pasted onto the chart. One rect per NIGHT, sunset to the
-        // next day's sunrise straddling midnight, so the fades land on the
-        // sun events and nothing abuts at midnight. `data.days` rather than
-        // `visible`: the
-        // night before the first visible sunrise belongs to a day off the
-        // strip, and the tile clip discards what is off-canvas.
-        if showsDayBands {
-            let fadeW = CGFloat(Self.twilightHours) * Timeline.pph
-            // The bands rise behind the lead and sink behind the axis rows, fading
-            // to nothing at both ends: a soft alpha clip, so the page shows through
-            // above and below the plot.
-            var banded = ctx
-            banded.clipToLayer { mask in
-                mask.fill(Path(CGRect(x: -1e5, y: 0, width: 2e5, height: geo.height)),
-                          with: .linearGradient(
-                            Gradient(stops: [.init(color: .white.opacity(0), location: 0),
-                                             .init(color: .white, location: geo.padTop / geo.height),
-                                             .init(color: .white, location: geo.bodyBottom / geo.height),
-                                             .init(color: .white.opacity(0), location: 1)]),
-                            startPoint: .zero, endPoint: CGPoint(x: 0, y: geo.height)))
-            }
-            func fadedBand(from a: CGFloat, to b: CGFloat, color: Color, opacity: Double) {
-                guard b > a else { return }
-                let rect = CGRect(x: a - fadeW, y: 0, width: (b - a) + 2 * fadeW, height: geo.height)
-                let ramp = min(2 * fadeW / rect.width, 0.5)
-                banded.fill(Path(rect), with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: color.opacity(0), location: 0),
-                        .init(color: color.opacity(opacity), location: ramp),
-                        .init(color: color.opacity(opacity), location: 1 - ramp),
-                        .init(color: color.opacity(0), location: 1),
-                    ]),
-                    startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
-            }
-            for day in data.days {
-                guard let set = day.sunset,
-                      let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
-                else { continue }
-                fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.52)
-            }
-            for day in data.days {
-                guard let rise = day.sunrise, let set = day.sunset else { continue }
-                fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.07)
-            }
-        }
-        for day in visible {
+        for day in data.visibleDays {
             // Day label at local noon. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
@@ -760,6 +711,7 @@ struct TimelineCanvas: View {
         let lowest = data.tidePoints.map(\.height).min() ?? 0
         CurveDrawing.datumFill(ctx, area, plotTop: geo.tideTop, plotBottom: geo.tideBottom,
                                width: data.totalWidth, datumY: datumY, lowestY: geo.tideY(lowest))
+        nightShade(ctx, under: line)
 
         // Chart datum, the reference every printed height is quoted against.
         // Drawn only when datum is inside the plotted span; a week where the
@@ -801,17 +753,69 @@ struct TimelineCanvas: View {
     /// This station's set for one direction, nil on a derived gate.
     private func deg(_ flood: Bool) -> Double? { flood ? floodDeg : ebbDeg }
 
-    /// Opaque page colour from the curve down to the plot's floor. The sky
-    /// backdrop runs on behind the plot so a body's glow can reach the water,
-    /// and the translucent fills above would otherwise let it through.
-    /// ponytail: flat `canvas` where the page is a radial glow — a hair
-    /// darker at the plot's top, invisible under the fill.
+    /// The water: opaque page colour from the curve down to the plot's floor.
+    /// The sky backdrop runs on behind the plot so a body's glow can reach
+    /// the water, and the translucent fills above would otherwise let it
+    /// through.
     private func seaBase(_ ctx: GraphicsContext, under line: Path, floor: CGFloat) {
         var sea = line
         sea.addLine(to: CGPoint(x: data.totalWidth, y: floor))
         sea.addLine(to: CGPoint(x: 0, y: floor))
         sea.closeSubpath()
         ctx.fill(sea, with: .color(SN.canvas))
+    }
+
+    /// Daylight under the curve, painted after the fill so the dark reaches
+    /// the line: one band per NIGHT, sunset to the next day's sunrise
+    /// straddling midnight, and a faint tint per day, each fading across
+    /// twilight — a hard edge at sunset read as a rectangle pasted onto the
+    /// chart. The fades land on the sun events and nothing abuts at midnight.
+    /// Clipped under the curve, so the line is the shade's top edge at every
+    /// x, and faded out from mid-plot to the strip's bottom edge so the shade
+    /// sinks into the page through the axis rows instead of ending on the
+    /// plot floor. `data.days` rather than `visibleDays`: the night before
+    /// the first visible sunrise belongs to a day off the strip, and the tile
+    /// clip discards what is off-canvas.
+    /// ponytail: two states with a fixed twilight ramp. Sample the sun's
+    /// altitude hourly through `skyPaint` if the ramp reads wrong against the
+    /// sky at high latitudes, where twilight runs long.
+    private func nightShade(_ ctx: GraphicsContext, under line: Path) {
+        var under = line
+        under.addLine(to: CGPoint(x: data.totalWidth, y: geo.height))
+        under.addLine(to: CGPoint(x: 0, y: geo.height))
+        under.closeSubpath()
+        var water = ctx
+        water.clipToLayer { mask in
+            mask.fill(under, with: .linearGradient(
+                Gradient(stops: [.init(color: .white, location: 0),
+                                 .init(color: .white, location: 0.35),
+                                 .init(color: .white.opacity(0), location: 1)]),
+                startPoint: CGPoint(x: 0, y: geo.bodyTop), endPoint: CGPoint(x: 0, y: geo.height)))
+        }
+        let fadeW = CGFloat(Self.twilightHours) * Timeline.pph
+        func fadedBand(from a: CGFloat, to b: CGFloat, color: Color, opacity: Double) {
+            guard b > a else { return }
+            let rect = CGRect(x: a - fadeW, y: 0, width: (b - a) + 2 * fadeW, height: geo.height)
+            let ramp = min(2 * fadeW / rect.width, 0.5)
+            water.fill(Path(rect), with: .linearGradient(
+                Gradient(stops: [
+                    .init(color: color.opacity(0), location: 0),
+                    .init(color: color.opacity(opacity), location: ramp),
+                    .init(color: color.opacity(opacity), location: 1 - ramp),
+                    .init(color: color.opacity(0), location: 1),
+                ]),
+                startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
+        }
+        for day in data.days {
+            guard let set = day.sunset,
+                  let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
+            else { continue }
+            fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.7)
+        }
+        for day in data.days {
+            guard let rise = day.sunrise, let set = day.sunset else { continue }
+            fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.14)
+        }
     }
 
     private func drawCurrent(_ ctx: GraphicsContext) {
@@ -836,6 +840,7 @@ struct TimelineCanvas: View {
         } else {
             CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
         }
+        nightShade(ctx, under: line)
 
         // Slack: the line every speed on this track is signed against, drawn
         // the way the tide track draws chart datum. Under the curve, so the
@@ -930,7 +935,6 @@ struct TimelineScrubber: UIViewRepresentable {
     let imperial: Bool
     let speedUnit: String
     let now: Date
-    var showsDayBands = true
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
@@ -1048,7 +1052,7 @@ struct TimelineScrubber: UIViewRepresentable {
 
     private var canvas: TimelineCanvas {
         TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
-                       now: now, showsDayBands: showsDayBands,
+                       now: now,
                        floodDeg: floodDeg, ebbDeg: ebbDeg)
     }
 
@@ -1236,7 +1240,6 @@ struct TimelineScrubStrip: View {
     var imperial = true    // only read by the tide track; current-only strips omit it
     var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
-    var showsDayBands = true
     var chromeInk: Color = SN.foam
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
@@ -1251,7 +1254,7 @@ struct TimelineScrubStrip: View {
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
-                         now: now, showsDayBands: showsDayBands,
+                         now: now,
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          jumpToken: jumpToken)
             .frame(height: geo.height)

@@ -41,8 +41,7 @@ struct DerivedGateDetailView: View {
                             card: { tl in
                                 let slack = nextSlack
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
-                                                   now: live, showsDayBands: false,
-                                                   chromeInk: sky.ink,
+                                                   now: live, chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    commentary: slack.map {
