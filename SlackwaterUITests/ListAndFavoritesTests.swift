@@ -63,6 +63,19 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["NEAR ME"].exists)
     }
 
+    /// Past the gate with the choice never made — the "or search" bypass, or
+    /// iOS "Ask Next Time Or When I Share" resetting an answered app. No
+    /// `-loc*` flag is the point: on a clean simulator that IS `.notDetermined`,
+    /// the state that used to render an empty slot and never prompt.
+    func testM41UndeterminedSlotOffersTheAsk() throws {
+        let app = launch("-seedGate", "-resetRecents")
+        XCTAssert(app.staticTexts["See stations near you"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Use My Location"].exists)
+        XCTAssertFalse(app.staticTexts["Location unavailable"].exists)
+        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        save(app, "m41-location-ask.png")
+    }
+
     func testM41AuthorizedLocationKeepsItsSlotWhileWaitingForAFix() throws {
         let app = launch("-seedGate", "-resetRecents", "-locAuthorizedNoFix")
         XCTAssert(app.staticTexts["MY LOCATION"].waitForExistence(timeout: 5))

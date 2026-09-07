@@ -459,8 +459,9 @@ struct StationListView: View {
                                 // With a hero the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 
-        // My Location slot: the hero tile, its locating state, or the amber
-        // denied card. Keep the slot mounted while Core Location finds a fix.
+        // My Location slot: the hero tile, its locating state, the amber
+        // denied card, or — past the gate, with the choice never made — the ask
+        // card. Keep the slot mounted while Core Location finds a fix.
         Group {
             if let fix, let nearest = heroItem {
                 VStack(spacing: 0) {
@@ -476,6 +477,16 @@ struct StationListView: View {
                     .transition(.opacity)
             } else if loc.denied {
                 unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
+            } else {
+                // .notDetermined past the gate. Two ways in, and NEITHER is a
+                // first run: the gate's "or search" bypass sets seenGate
+                // without ever asking, and iOS's "Ask Next Time Or When I
+                // Share" (or an expired "Allow Once") resets an answered app
+                // back to undecided. seenGate is one-way, so the gate — the
+                // only caller of `request()` — never comes back, and this slot
+                // used to render nothing at all: the whole My Location group
+                // silently vanished with no prompt and no explanation.
+                askCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
             }
         }
         .animation(.easeInOut(duration: 0.25),
@@ -695,6 +706,20 @@ struct StationListView: View {
             .sorted { $0.km(fromLat: origin.lat, lon: origin.lon)
                     < $1.km(fromLat: origin.lat, lon: origin.lon) }
             .prefix(5))
+    }
+
+    /// Location never answered — same card shape as `unavailableCard`, but the
+    /// action is the ask itself, not a trip to Settings: `.notDetermined` is
+    /// the one state iOS still lets the app prompt from.
+    private var askCard: some View {
+        ChsAmberCard(title: "See stations near you",
+                     headline: "Turn on location to find the nearest tide & current stations.",
+                     action: "Use My Location",
+                     identifier: "location-ask-card",
+                     icon: "location.fill",
+                     accent: SN.leaf) {
+            loc.request()
+        }
     }
 
     /// Location denied — the app's one amber card (ChsAmberCard carries the
