@@ -13,6 +13,27 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertTrue(try repoSource("Slackwater/CurrentLead.swift").contains("showsDayBands: false"))
     }
 
+    func testStarsStandWhereTheAlmanacPutsTheSun() throws {
+        // The sun is a star with a known RA/Dec: fed to the star transform,
+        // Almanac's apparent position must land where sunAltAz puts it, give
+        // or take refraction and the mean/apparent sidereal difference.
+        let time = ISO8601DateFormatter().date(from: "2026-03-20T20:00:00Z")!
+        let lat = 48.4, lon = -123.4
+        let sun = try sunPosition(time)
+        let expected = try sunAltAz(time, observer: Observer(latitudeDeg: lat, longitudeDeg: lon))
+        let lst = localSiderealDeg(time, longitude: lon)
+        let got = starAltAz(raDeg: sun.raDeg, decDeg: sun.decDeg, siderealDeg: lst, latitude: lat)
+        XCTAssertEqual(got.altDeg, expected.altDeg, accuracy: 0.1)
+        XCTAssertEqual(got.azDeg, expected.azDeg, accuracy: 0.1)
+        // Polaris stands at the latitude, due north, whatever the hour.
+        let polaris = starAltAz(raDeg: 37.95, decDeg: 89.26, siderealDeg: lst, latitude: lat)
+        XCTAssertEqual(polaris.altDeg, lat, accuracy: 1)
+        XCTAssertTrue(polaris.azDeg < 2 || polaris.azDeg > 358, "\(polaris.azDeg)")
+        // Sirius leads the catalog.
+        XCTAssertEqual(brightStars.count, 288)
+        XCTAssertEqual(brightStars.first?.mag, -1.44)
+    }
+
     func testSkyProjectionAndPaletteMatchTheAlmanacDome() {
         XCTAssertEqual(skyPaint(sunAltitude: 10),
                        SkyPaint(top: 0x2F7FD4, bottom: 0xBDE3FB))
@@ -35,6 +56,9 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertEqual(starOpacity(sunAltitude: 0), 0)
         XCTAssertEqual(starOpacity(sunAltitude: -12), 0.35, accuracy: 0.001)
         XCTAssertEqual(starOpacity(sunAltitude: -18), 0.7)
+        XCTAssertEqual(starHazeOpacity(altitude: -10), 0)
+        XCTAssertEqual(starHazeOpacity(altitude: 15), 0.5)
+        XCTAssertEqual(starHazeOpacity(altitude: 40), 1)
         XCTAssertEqual(starTwinkle(index: 3, seconds: 10, reduceMotion: true), 1)
         XCTAssertGreaterThanOrEqual(starTwinkle(index: 3, seconds: 10, reduceMotion: false), 0.72)
         XCTAssertLessThanOrEqual(starTwinkle(index: 3, seconds: 10, reduceMotion: false), 1)
