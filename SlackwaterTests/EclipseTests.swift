@@ -93,6 +93,27 @@ final class EclipseTests: XCTestCase {
                                     observer: Self.victoria).isEmpty)
     }
 
+    func testThePenumbralLegDimsTheMoonWhereTheUmbraDoesNot() throws {
+        let e = try XCTUnwrap(lunarEclipses(from: utc("2026-08-25T00:00:00Z"),
+                                            to: utc("2026-08-31T00:00:00Z"),
+                                            observer: Self.victoria).first)
+        // Between P1 and U1 the moon is IN the penumbra and nowhere near the
+        // umbra. Without the wash the app would draw an untouched moon while
+        // saying an eclipse was underway — which is what the first screenshots
+        // of a penumbral eclipse showed.
+        let u1 = try XCTUnwrap(e.eclipse.u1)
+        let leg = e.eclipse.p1.addingTimeInterval(u1.timeIntervalSince(e.eclipse.p1) / 2)
+        XCTAssertEqual(e.shadow(at: leg), 0)
+        XCTAssertGreaterThan(e.wash(at: leg), 0)
+
+        XCTAssertEqual(e.wash(at: e.eclipse.p1), 0, accuracy: 0.001)
+        XCTAssertEqual(e.wash(at: e.eclipse.p4), 0, accuracy: 0.001)
+        XCTAssertEqual(e.wash(at: e.eclipse.p1.addingTimeInterval(-60)), 0)
+        // Clamped: magPenumbral runs above 1 for a deep partial.
+        XCTAssertLessThanOrEqual(e.wash(at: e.peak), 1)
+        XCTAssertGreaterThan(e.wash(at: e.peak), 0.5)
+    }
+
     // MARK: - The glyph
 
     func testTheUmbraDiscSlidesFromTouchingToCovering() {
@@ -107,9 +128,9 @@ final class EclipseTests: XCTestCase {
 
     @MainActor
     func testTheEclipsedGlyphDrawsSomethingTheCleanOneDoesNot() throws {
-        func shot(_ umbra: Double) throws -> UIImage {
+        func shot(_ umbra: Double, _ wash: Double) throws -> UIImage {
             let renderer = ImageRenderer(content:
-                MoonGlyph(fraction: 1, waxing: false, size: 44, umbra: umbra)
+                MoonGlyph(fraction: 1, waxing: false, size: 44, umbra: umbra, wash: wash)
                     .frame(width: 60, height: 60)
                     .background(SN.canvas))
             renderer.scale = 2
@@ -118,10 +139,19 @@ final class EclipseTests: XCTestCase {
         // Copper pixels, not ink: the umbra REPLACES lit moon rather than
         // adding to it, so the not-background count barely moves (measured:
         // 0.388 clean against 0.389 eclipsed).
-        let clean = copperFraction(try shot(0))
-        let eclipsed = copperFraction(try shot(0.93))
-        XCTAssertEqual(clean, 0, accuracy: 0.001, "a clear moon has nothing copper on it")
-        XCTAssertGreaterThan(eclipsed, 0.1, "the shadow covers most of the disc — got \(eclipsed)")
+        let clean = try shot(0, 0)
+        let eclipsed = try shot(0.93, 1)
+        // A penumbral eclipse has NO umbral bite — the wash is its only mark,
+        // so what matters is that it changes the moon at all.
+        let penumbral = try shot(0, 0.9)
+        XCTAssertEqual(copperFraction(clean), 0, accuracy: 0.001,
+                       "a clear moon has nothing copper on it")
+        XCTAssertGreaterThan(copperFraction(eclipsed), 0.1,
+                             "the shadow covers most of the disc — got \(copperFraction(eclipsed))")
+        let washed = differingFraction(penumbral, clean)
+        XCTAssertGreaterThan(washed, 0.1, "a penumbral eclipse left the moon untouched")
+        XCTAssertLessThan(copperFraction(penumbral), copperFraction(eclipsed),
+                          "the wash must read lighter than the umbra")
     }
 
     // MARK: - The Moon sheet
@@ -194,7 +224,7 @@ final class EclipseTests: XCTestCase {
     }
 
     @MainActor
-    func testTheStripMarksTheEclipseInCopper() throws {
+    func testTheStripMarksTheEclipse() throws {
         let (tl, _) = try eclipseTimeline()
 
         // The SAME window with the eclipses removed — not a different week, so
@@ -205,12 +235,11 @@ final class EclipseTests: XCTestCase {
 
         let marked = try XCTUnwrap(stripImage(tl))
         let plain = try XCTUnwrap(stripImage(stripped))
-        let plainCopper = copperFraction(plain)
-        let markedCopper = copperFraction(marked)
-        XCTAssertEqual(plainCopper, 0, accuracy: 0.0001,
-                       "nothing else on this strip is copper — got \(plainCopper)")
-        XCTAssertGreaterThan(markedCopper, plainCopper,
-                             "no eclipse mark on the strip — \(markedCopper)")
+        // A 6.5pt glyph on a 228-hour strip is a handful of pixels, so the
+        // measure is "anything at all changed", not a share. A colour
+        // threshold cannot help here either: the emoji is not copper.
+        let changed = differingFraction(marked, plain)
+        XCTAssertGreaterThan(changed, 0, "no eclipse mark on the strip")
     }
 
     // MARK: - On the dome

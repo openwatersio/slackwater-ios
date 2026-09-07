@@ -41,7 +41,7 @@ struct WindowEclipse: Identifiable {
     /// Fraction of the moon's diameter inside the UMBRA at `t`, 0 outside the
     /// umbral phase — including for the whole of a penumbral eclipse, which
     /// has no umbral contact. That is not a gap: a penumbral eclipse is a
-    /// dimming, not a bite, and the glow carries it.
+    /// dimming rather than a bite, and `wash(at:)` below is what carries it.
     ///
     /// ponytail: linear between contacts. Almanac reports contact instants and
     /// the magnitude at greatest eclipse, not a coverage curve; the shape
@@ -59,6 +59,29 @@ struct WindowEclipse: Identifiable {
         }
         let span = u4.timeIntervalSince(peak)
         return span > 0 ? mag * u4.timeIntervalSince(t) / span : mag
+    }
+
+    /// The PENUMBRAL shading at `t`, 0…1 — the whole disc dimming and warming
+    /// rather than a bite taken out of it.
+    ///
+    /// This is the channel that makes a penumbral eclipse visible at all:
+    /// it has no umbral contact, so `shadow(at:)` is 0 for its entire
+    /// duration, and without this the moon would look untouched while the app
+    /// claims an eclipse is underway. It is also what the sky really does —
+    /// a penumbral eclipse IS a dimming, not a bite.
+    ///
+    /// Clamped at 1: `magPenumbral` runs well above 1 for a deep partial,
+    /// where the umbral bite is carrying the reading anyway.
+    func wash(at t: Date) -> Double {
+        let p1 = eclipse.p1, p4 = eclipse.p4
+        guard t >= p1, t <= p4 else { return 0 }
+        let mag = min(max(eclipse.magPenumbral, 0), 1)
+        if t <= peak {
+            let span = peak.timeIntervalSince(p1)
+            return span > 0 ? mag * t.timeIntervalSince(p1) / span : mag
+        }
+        let span = p4.timeIntervalSince(peak)
+        return span > 0 ? mag * p4.timeIntervalSince(t) / span : mag
     }
 }
 

@@ -138,7 +138,8 @@ struct MoonDetailSheet: View {
     private func head(_ facts: MoonFacts) -> some View {
         HStack(spacing: 14) {
             MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
-                      size: 54, umbra: eclipse?.shadow(at: at) ?? 0)
+                      size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
+                      wash: eclipse?.wash(at: at) ?? 0)
             VStack(alignment: .leading, spacing: 3) {
                 Text(eclipse.map { eclipseTileText($0.kind) }
                         ?? moonPhaseName(phase: facts.illumination.phase))

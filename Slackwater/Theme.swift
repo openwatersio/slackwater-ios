@@ -128,6 +128,8 @@ struct SkyState {
 
     /// Fraction of the moon's diameter in the umbra right now, 0 when clear.
     var shadow: Double { eclipse?.shadow(at: time) ?? 0 }
+    /// Penumbral shading right now — what a penumbral eclipse has instead.
+    var wash: Double { eclipse?.wash(at: time) ?? 0 }
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
@@ -185,7 +187,7 @@ struct SkyBackdrop: View {
                     // with it: two changes to the one gradient, not a second
                     // element on top of it. The umbra is copper, not black.
                     let eclipsed = sky.eclipse?.underway(at: sky.time) ?? false
-                    let dim = 1 - 0.75 * sky.shadow
+                    let dim = 1 - 0.75 * sky.shadow - 0.25 * sky.wash
                     let core: UInt32 = eclipsed ? 0xE8B08C : 0xE6EEFF
                     let halo: UInt32 = eclipsed ? 0xD79A78 : 0xCFE0FF
                     Circle()
@@ -202,7 +204,7 @@ struct SkyBackdrop: View {
                         .frame(width: glowRadius * 2, height: glowRadius * 2)
                         .position(point)
                     MoonGlyph(fraction: illumination.fraction, waxing: illumination.waxing,
-                              size: 22, umbra: sky.shadow)
+                              size: 22, umbra: sky.shadow, wash: sky.wash)
                         .position(point)
                 }
             }
@@ -274,6 +276,10 @@ struct MoonGlyph: View {
     /// Fraction of the moon's diameter inside the umbra — `WindowEclipse.shadow(at:)`.
     /// Zero draws exactly what this glyph has always drawn.
     var umbra: Double = 0
+    /// Penumbral shading, 0…1 — `WindowEclipse.wash(at:)`. The whole disc
+    /// warms and dims, which for a penumbral eclipse is the ONLY mark there
+    /// is: it has no umbral contact, so `umbra` stays 0 throughout.
+    var wash: Double = 0
 
     var body: some View {
         let r = size / 2 - 1
@@ -281,6 +287,12 @@ struct MoonGlyph: View {
         ZStack {
             Circle().fill(SN.foam)
             Circle().fill(SN.moonLimb).offset(x: shift)
+            if wash > 0 {
+                // Over the whole disc, under the bite: the penumbra darkens
+                // everything it touches, and the umbra is a deeper shadow
+                // inside it, not a separate event.
+                Circle().fill(SN.umbra.opacity(0.42 * min(max(wash, 0), 1)))
+            }
             if umbra > 0 {
                 // A THIRD element, entering from the side the phase limb is
                 // leaving, so an eclipse can never be read as a phase: an
@@ -477,7 +489,8 @@ struct SummaryTiles: View {
                 ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon", detail: sheet) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
-                              umbra: eclipse?.shadow(at: at) ?? 0)
+                              umbra: eclipse?.shadow(at: at) ?? 0,
+                              wash: eclipse?.wash(at: at) ?? 0)
                 } value: {
                     // Words, not a number: "Waning Crescent" has to fit on one
                     // line where "7.6 ft" does, so it sits well below the hero.

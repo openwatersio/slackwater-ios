@@ -759,27 +759,28 @@ struct TimelineCanvas: View {
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
         }
-        // The eclipse's first bite, on the sun dots' row. One mark per eclipse
-        // even though every contact is magnetic: five labels on one evening is
-        // a smear, and the one worth reading is where the shadow starts.
-        // Outside the day loop — an eclipse belongs to an instant, not a day.
-        for e in data.eclipses where data.contains(e.start) {
-            let x = data.x(e.start)
-            // `SN.umbraLabel`, not `SN.umbra`: the dark copper that reads as a
-            // shadow ON the lit moon disappears into the night canvas here.
-            // Same event, two colours, because the backgrounds are opposites.
-            ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
-                     with: .color(SN.umbraLabel))
-            // A SECOND row, under the sun labels. An eclipse begins in the
-            // evening, so its label lands within an hour or two of sunset —
-            // 36pt apart at 18pt/hour against a ~60pt label — and on the sun
-            // row the two print through each other ("↓8:24🌘m10:23pm",
-            // 2026-08-16 at Friday Harbor). This row is empty at night: the
-            // month/day that uses it sits at noon.
-            ctx.draw(Text("🌘\(cardTime(e.start, data.tz))")
-                        .font(.system(size: 11, weight: .medium).monospaced())
-                        .foregroundStyle(SN.umbraLabel),
-                     at: CGPoint(x: x, y: geo.dayY + 17), anchor: .center)
+        drawEclipses(ctx)
+    }
+
+    /// A moon at greatest eclipse, on the sun dots' row. That is the whole
+    /// mark on the strip.
+    ///
+    /// No text, and no band. The text came first and could not fit: `dayY`
+    /// holds the day name and sun times, `dayY + 17` the date, `sunY` the sun
+    /// dots, `height` is `sunY + 18` — there is no free row, and an eclipse
+    /// starts in the evening, so a time label lands an hour or two from sunset
+    /// and prints through it. A copper band across P1–P4 replaced it and was
+    /// worse in a different way: a coloured span over the curve reads as a
+    /// measurement of something, and nobody could tell what.
+    ///
+    /// So: half-size glyph, small enough to sit between the sun dots without
+    /// crowding them, and the times stay where they already were — the
+    /// schedule row below, and the readout as you scrub. #304 is where a
+    /// better answer goes; this one is deliberately quiet rather than wrong.
+    private func drawEclipses(_ ctx: GraphicsContext) {
+        for e in data.eclipses where data.contains(e.peak) {
+            ctx.draw(Text("🌘").font(.system(size: 6.5)),
+                     at: CGPoint(x: data.x(e.peak), y: geo.sunY), anchor: .center)
         }
     }
 

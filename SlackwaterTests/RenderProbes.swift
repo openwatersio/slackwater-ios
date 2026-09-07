@@ -88,6 +88,39 @@ func copperFraction(_ image: UIImage) -> Double {
     return Double(warm) / Double(w * h)
 }
 
+/// The share of pixels that differ between two renders of the same thing.
+///
+/// The measure for "did this mark draw at all" when a colour threshold cannot
+/// answer it. Both of the eclipse's marks defeat a threshold, for opposite
+/// reasons: the penumbral wash over a near-white disc lands as a warm grey
+/// (r-b 32, under `copperFraction`'s bar), and the strip's band over a
+/// near-black canvas is fainter still. Rendering the SAME data twice, once
+/// with the mark and once without, leaves the mark as the only difference.
+func differingFraction(_ a: UIImage, _ b: UIImage) -> Double {
+    guard let ca = a.cgImage, let cb = b.cgImage,
+          ca.width == cb.width, ca.height == cb.height else { return 0 }
+    let w = ca.width, h = ca.height
+    guard w > 0, h > 0 else { return 0 }
+    func pixels(_ cg: CGImage) -> [UInt8] {
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return px }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return px
+    }
+    let pa = pixels(ca), pb = pixels(cb)
+    var differing = 0
+    for i in stride(from: 0, to: pa.count, by: 4)
+    where max(abs(Int(pa[i]) - Int(pb[i])),
+              abs(Int(pa[i + 1]) - Int(pb[i + 1])),
+              abs(Int(pa[i + 2]) - Int(pb[i + 2]))) > 4 {
+        differing += 1
+    }
+    return Double(differing) / Double(w * h)
+}
+
 /// The timeline strip's drawn layer, as a bitmap. `TimelineCanvas` is the whole
 /// picture — curve and fill, day chrome, event bands, gutter times — and it is
 /// a pure SwiftUI `Canvas`, so it is the part of the strip a renderer can see;
