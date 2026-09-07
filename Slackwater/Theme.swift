@@ -87,10 +87,18 @@ private func starPoint(_ index: Int, size: CGSize) -> CGPoint {
 
 struct SkyState {
     let latitude: Double
+    /// The scrub time this state was built for — what the eclipse is read at.
+    let time: Date
     let sun: AltAz?
     let sunProgress: Double?
     let moon: AltAz?
     let illumination: MoonIllumination?
+    /// The eclipse underway at `time`, if any. Chosen from an array the
+    /// timeline already built: this initialiser runs on EVERY scrub frame, and
+    /// an eclipse search here would cost orders of magnitude more than the
+    /// position lookups below — the same reason the sun's arc reads its
+    /// endpoints from `days` rather than searching for them.
+    let eclipse: WindowEclipse?
 
     /// `days` is the strip's own day chrome. The arc's endpoints come from
     /// there rather than a second rise/set computation here: this initialiser
@@ -99,8 +107,11 @@ struct SkyState {
     /// ~0.005 ms) — but the real reason is agreement, since the dome's sun
     /// would otherwise fly over night bands drawn from a different answer. Empty days (an online gate still fetching) means no arc, and
     /// `SkyBackdrop` falls back to the sun's true az/alt.
-    init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = []) {
+    init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = [],
+         eclipses: [WindowEclipse] = []) {
         self.latitude = latitude
+        self.time = time
+        eclipse = eclipses.first { $0.underway(at: time) }
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
         // The arc only draws in daylight, so the pair that matters is the rise
@@ -114,6 +125,9 @@ struct SkyState {
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
     }
+
+    /// Fraction of the moon's diameter in the umbra right now, 0 when clear.
+    var shadow: Double { eclipse?.shadow(at: time) ?? 0 }
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
@@ -167,20 +181,28 @@ struct SkyBackdrop: View {
                     let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                          latitude: sky.latitude, size: proxy.size)
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
+                    // An eclipsed moon dims and warms, and the sky goes quiet
+                    // with it: two changes to the one gradient, not a second
+                    // element on top of it. The umbra is copper, not black.
+                    let eclipsed = sky.eclipse?.underway(at: sky.time) ?? false
+                    let dim = 1 - 0.75 * sky.shadow
+                    let core: UInt32 = eclipsed ? 0xE8B08C : 0xE6EEFF
+                    let halo: UInt32 = eclipsed ? 0xD79A78 : 0xCFE0FF
                     Circle()
                         .fill(RadialGradient(
                             stops: [
-                                .init(color: Color(hex: 0xE6EEFF,
-                                                   opacity: 0.95 * (0.1 + illumination.fraction * 0.66)),
+                                .init(color: Color(hex: core,
+                                                   opacity: 0.95 * (0.1 + illumination.fraction * 0.66) * dim),
                                       location: 0),
-                                .init(color: Color(hex: 0xCFE0FF,
-                                                   opacity: 0.28 * (0.1 + illumination.fraction * 0.66)),
+                                .init(color: Color(hex: halo,
+                                                   opacity: 0.28 * (0.1 + illumination.fraction * 0.66) * dim),
                                       location: 0.45),
-                                .init(color: Color(hex: 0xCFE0FF, opacity: 0), location: 1),
+                                .init(color: Color(hex: halo, opacity: 0), location: 1),
                             ], center: .center, startRadius: 0, endRadius: glowRadius))
                         .frame(width: glowRadius * 2, height: glowRadius * 2)
                         .position(point)
-                    MoonGlyph(fraction: illumination.fraction, waxing: illumination.waxing, size: 22)
+                    MoonGlyph(fraction: illumination.fraction, waxing: illumination.waxing,
+                              size: 22, umbra: sky.shadow)
                         .position(point)
                 }
             }

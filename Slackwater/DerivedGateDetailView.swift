@@ -29,7 +29,8 @@ struct DerivedGateDetailView: View {
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
-                           days: timeline?.days ?? [])
+                           days: timeline?.days ?? [],
+                           eclipses: timeline?.eclipses ?? [])
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,

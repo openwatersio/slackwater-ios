@@ -114,6 +114,32 @@ final class EclipseTests: XCTestCase {
         XCTAssertGreaterThan(eclipsed, 0.1, "the shadow covers most of the disc — got \(eclipsed)")
     }
 
+    // MARK: - On the dome
+
+    func testTheSkyStateCarriesOnlyTheEclipseUnderwayAtItsTime() throws {
+        let at = anchor("2026-08-28T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        let e = try XCTUnwrap(tl.eclipses.first)
+
+        let peak = SkyState(time: e.peak, latitude: friday.latitude, longitude: friday.longitude,
+                            days: tl.days, eclipses: tl.eclipses)
+        XCTAssertNotNil(peak.eclipse)
+        XCTAssertEqual(peak.shadow, e.eclipse.magUmbral, accuracy: 0.001)
+
+        let after = SkyState(time: e.eclipse.p4.addingTimeInterval(3600),
+                             latitude: friday.latitude, longitude: friday.longitude,
+                             days: tl.days, eclipses: tl.eclipses)
+        XCTAssertNil(after.eclipse)
+        XCTAssertEqual(after.shadow, 0)
+    }
+
+    func testEveryScrubDetailHandsTheSkyItsEclipses() throws {
+        for file in ["Slackwater/TideDetailView.swift", "Slackwater/CurrentDetailView.swift",
+                     "Slackwater/OnlineGateDetailView.swift", "Slackwater/DerivedGateDetailView.swift"] {
+            XCTAssertTrue(try repoSource(file).contains("eclipses: timeline?.eclipses ?? []"), file)
+        }
+    }
+
     // MARK: - On the timeline
 
     func testTheTimelineCarriesTheEclipseAndSnapsToEveryContact() throws {
