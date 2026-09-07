@@ -60,7 +60,7 @@ struct DerivedGateDetailView: View {
                             links: { tl, jump in
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Moon only: a derived gate has slack times and phase, no knots.
-                                    SummaryTiles(at: scrubTime,
+                                    SummaryTiles(moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: gate.latitude, longitude: gate.longitude)

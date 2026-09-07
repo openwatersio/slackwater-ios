@@ -12,8 +12,9 @@ const slugs = read("slugs.json");
 test("every bundled station has a slug, keyed by its catalog id", () => {
   const expect = (kind, files) => {
     for (const file of files) {
-      for (const { id } of read(file)) {
-        assert.ok(slugs[kind][id], `${file}: ${id} has no ${kind} slug`);
+      for (const s of read(file)) {
+        if (s.referenceOnly) continue;
+        assert.ok(slugs[kind][s.id], `${file}: ${s.id} has no ${kind} slug`);
       }
     }
   };

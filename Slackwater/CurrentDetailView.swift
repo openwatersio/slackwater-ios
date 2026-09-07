@@ -102,7 +102,8 @@ struct CurrentDetailView: View {
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
-                                    SummaryTiles(primary: lead(tl).nextMax, at: scrubTime,
+                                    SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination,
+                                                 at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)

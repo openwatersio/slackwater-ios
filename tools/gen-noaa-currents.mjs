@@ -14,7 +14,10 @@
  *      engine's own field names, for slackwater-engine's SubordinateStation —
  *      and only if its reference ships too (the 147 whose reference is a
  *      non-primary bin are #269).
- *   2. Primary bin only (id without "@") — one station, one prediction.
+ *   2. Primary bin only (id without "@") — one station, one prediction — except
+ *      a bin that a shipped subordinate reduces from (#269). That bin ships as
+ *      a reference-only record: `referenceOnly: true`, harmonic shape, named
+ *      for its surface station, no slug. The app never lists it.
  *   3. At least one non-zero constituent; zero-amplitude ones are dropped.
  * A fourth guard is not a filter: the extract's crossFlow census bounds how much
  * perpendicular flow this 1-D model drops. See the CROSS-FLOW note below.
@@ -86,18 +89,27 @@ let curated = 0, paired = 0, worstNeighbour = 0, orphaned = 0, undirected = 0;
 const isSubordinate = (s) => s.type === "subordinate";
 const OFFSETS = ["slackBeforeFloodOffset", "slackBeforeEbbOffset", "floodTimeOffset",
   "ebbTimeOffset", "floodSpeedRatio", "ebbSpeedRatio"];
+const directed = (s) => Number.isFinite(s.floodDirection) && Number.isFinite(s.ebbDirection);
+// #269: a non-primary bin ships only as the reference of a subordinate that
+// itself ships. Reference-only: in the file for the reduction, never a station.
+const referencedBins = new Set(
+  bundle.stations
+    .filter((s) => isSubordinate(s) && directed(s) && s.reference.includes("@"))
+    .map((s) => s.reference));
+const isReferenceOnly = (s) => s.id.includes("@");
 const kept = bundle.stations
   .filter((s) => s.type === "harmonic" || isSubordinate(s))
-  .filter((s) => !s.id.includes("@"))
+  .filter((s) => !s.id.includes("@") || referencedBins.has(s.id))
   .filter((s) => isSubordinate(s) || s.constituents.some((c) => c.amplitude > 0))
   // Nine subordinates publish one direction and null for the other; the app
   // draws a set arrow from both, and guessing the reciprocal is a claim about
   // the water nobody made.
-  .filter((s) => (Number.isFinite(s.floodDirection) && Number.isFinite(s.ebbDirection)) || (undirected++, false))
+  .filter((s) => directed(s) || (undirected++, false))
   .map((s) => {
     const id = `noaa/${s.id}`;
     const near = nearestTide(s);
-    const r = resolve({ id, name: s.name, latitude: s.latitude, longitude: s.longitude });
+    // A bin is named for its surface station: same water, same resolved name.
+    const r = resolve({ id: `noaa/${s.id.split("@")[0]}`, name: s.name, latitude: s.latitude, longitude: s.longitude });
     // The neighbour only matters when it names the region. Three subordinates
     // (Rat Islands, Meyers Passage) sit 250-350 km from any harmonic gauge and
     // carry their own context, so their distance is nobody's business.
@@ -125,16 +137,19 @@ const kept = bundle.stations
         reference: `noaa/${s.reference}`,
         ...Object.fromEntries(OFFSETS.map((k) => [k, s[k]])),
       }),
+      ...(isReferenceOnly(s) && { referenceOnly: true }),
     };
-    if (r.tideReference && tides.some((t) => t.id === r.tideReference)) {
-      out.tideReference = r.tideReference;
-      curated += 1;
-    } else if (near.d <= PAIR_KM) {
-      out.tideReference = near.t.id;
-      paired += 1;
-    } else if (nearestIn(subordinates, s)?.d <= PAIR_KM) {
-      out.tideReference = nearestIn(subordinates, s).t.id;
-      paired += 1;
+    if (!isReferenceOnly(s)) {
+      if (r.tideReference && tides.some((t) => t.id === r.tideReference)) {
+        out.tideReference = r.tideReference;
+        curated += 1;
+      } else if (near.d <= PAIR_KM) {
+        out.tideReference = near.t.id;
+        paired += 1;
+      } else if (nearestIn(subordinates, s)?.d <= PAIR_KM) {
+        out.tideReference = nearestIn(subordinates, s).t.id;
+        paired += 1;
+      }
     }
     return out;
   })
@@ -145,6 +160,12 @@ const kept = bundle.stations
 const shipped = new Set(kept.filter((s) => !s.reference).map((s) => s.id));
 const stations = kept.filter((s) =>
   !s.reference || shipped.has(s.reference) || (orphaned++, false));
+
+const used = new Set(stations.filter((s) => s.reference).map((s) => s.reference));
+const unused = stations.filter((s) => s.referenceOnly && !used.has(s.id)).map((s) => s.id);
+if (unused.length) {
+  throw new Error(`reference-only bins nobody references: ${unused.join(", ")} — a filter was reordered`);
+}
 
 if (stations.length < 700) {
   throw new Error(`only ${stations.length} current stations survived the filters — refusing to ship`);
@@ -179,9 +200,12 @@ if (cf.worstRatio.ratio > CROSS_FLOW_RATIO_MAX) {
 
 const size = writeBundle(join(res, "currents.json"), stations);
 const subordinateCount = stations.filter((s) => s.reference).length;
+const referenceOnlyCount = stations.filter((s) => s.referenceOnly).length;
+const binSubordinates = stations.filter((s) => s.reference?.includes("@")).length;
 console.log(
-  `${stations.length} NOAA current stations (${stations.length - subordinateCount} harmonic, ` +
-  `${subordinateCount} subordinate; ${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size}; ` +
+  `${stations.length} NOAA current stations (${stations.length - subordinateCount - referenceOnlyCount} harmonic, ` +
+  `${subordinateCount} subordinate, ${referenceOnlyCount} reference-only bins serving ${binSubordinates}; ` +
+  `${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size}; ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);
 console.log(

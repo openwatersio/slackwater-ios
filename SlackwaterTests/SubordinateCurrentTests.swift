@@ -53,4 +53,32 @@ final class SubordinateCurrentTests: XCTestCase {
             XCTAssertEqual(currentPinColour(bonita, at: t), exactColour, "hour \(hour)")
         }
     }
+
+    // MARK: - Non-primary bin references (#269)
+
+    private var friarRoads: CurrentStationRecord {
+        CurrentStationRecord.all.first { $0.id == "noaa/ACT0091" }!
+    }
+
+    func testBinReferencedSubordinateDecodesAndResolvesItsReference() {
+        XCTAssertEqual(friarRoads.reference, "noaa/EPT0003@11")
+        XCTAssertNotNil(friarRoads.referenceRecord)
+        XCTAssertEqual(friarRoads.referenceRecord?.referenceOnly, true)
+        XCTAssertFalse(friarRoads.referenceRecord!.constituents.isEmpty)
+    }
+
+    func testBinReferencedSubordinateCurveIsNotFlat() {
+        let speeds = friarRoads.engineStation.speeds(from: day, to: day.addingTimeInterval(86_400), step: 600).map(\.speed)
+        XCTAssertGreaterThan(speeds.max()! - speeds.min()!, 0.5)
+        XCTAssertNotEqual(currentPinColour(friarRoads, at: day), "unknown")
+    }
+
+    func testAReferenceOnlyBinIsInTheCatalogButNotAStation() {
+        XCTAssertNotNil(CurrentStationRecord.byId["noaa/EPT0003@11"])
+        XCTAssertNil(StationItem.byId["current:noaa/EPT0003@11"])
+        XCTAssertFalse(StationItem.all.contains { if case .current(let s) = $0 { s.referenceOnly == true } else { false } })
+        let hits = StationItem.search("Estes Head", near: (lat: 44.888, lon: -66.996))
+            .filter { if case .current = $0 { true } else { false } }
+        XCTAssertEqual(hits.map(\.id), ["current:noaa/EPT0003"])
+    }
 }

@@ -75,6 +75,8 @@ private let STATION_RADIUS_KM = 20.0
 private let PACK_RETRY_S: TimeInterval = 60
 /// How long to let reconcile triggers pile up before acting on them.
 private let RECONCILE_DEBOUNCE_S: TimeInterval = 1.0
+/// How long to let progress notifications pile up before recounting.
+private let SUMMARY_DEBOUNCE_S: TimeInterval = 0.25
 
 /// One desired offline pack: identity (`key`), region, zoom range. Bounds are
 /// plain degrees so specs stay Hashable and testable.
@@ -164,6 +166,7 @@ final class ChartPackManager: NSObject, ObservableObject {
     private var creating: Set<String> = []
     private var retryScheduled = false
     private var reconcilePending = false
+    private var summaryPending = false
     /// Packs MapLibre reported an error for, cleared the moment one makes
     /// progress again. The only honest source of "didn't finish".
     private var errored: Set<String> = []
@@ -195,7 +198,7 @@ final class ChartPackManager: NSObject, ObservableObject {
                    let key = Self.chartContext(of: pack)?["chart"] {
                     self?.errored.remove(key)
                 }
-                self?.publishSummary()
+                self?.setNeedsSummary()
             }
         }
         NotificationCenter.default.addObserver(
@@ -206,7 +209,7 @@ final class ChartPackManager: NSObject, ObservableObject {
                    let key = Self.chartContext(of: pack)?["chart"] {
                     self?.errored.insert(key)
                 }
-                self?.publishSummary()
+                self?.setNeedsSummary()
             }
         }
         FavoritesStore.shared.$ids
@@ -245,6 +248,21 @@ final class ChartPackManager: NSObject, ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + RECONCILE_DEBOUNCE_S) { [weak self] in
             self?.reconcilePending = false
             self?.reconcile()
+        }
+    }
+
+    /// Same trick for the summary, and for a harder reason: progress fires
+    /// once per RESOURCE per pack, and each recount re-parses every pack's
+    /// context. On launch every pack is `.unknown`, so reconcile asks them all
+    /// for progress at once and the recounts arrive faster than they run —
+    /// enough main-thread work to lose the scene-update watchdog (0x8BADF00D,
+    /// 1.10.0 build 35). The summary is a label on a card; display rate is plenty.
+    private func setNeedsSummary() {
+        guard !summaryPending else { return }
+        summaryPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + SUMMARY_DEBOUNCE_S) { [weak self] in
+            self?.summaryPending = false
+            self?.publishSummary()
         }
     }
 
@@ -288,7 +306,7 @@ final class ChartPackManager: NSObject, ObservableObject {
         for (key, pack) in existing where desiredByKey[key] == nil {
             MLNOfflineStorage.shared.removePack(pack, withCompletionHandler: nil)
         }
-        defer { publishSummary() }
+        defer { setNeedsSummary() }
         for (key, spec) in desiredByKey {
             if creating.contains(key) { continue }
             if let pack = existing[key] {

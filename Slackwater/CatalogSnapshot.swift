@@ -113,7 +113,8 @@ struct CatalogSnapshot {
         }
 
         let groups: [(String, [StationItem])] = [
-            ("stations", tides.map(StationItem.tide)), ("currents", currents.map(StationItem.current)),
+            ("stations", tides.map(StationItem.tide)),
+            ("currents", currents.filter { $0.referenceOnly != true }.map(StationItem.current)),
             ("chs-stations", chsStations.map(StationItem.chs)), ("chs-gates", chsGates.map(StationItem.chsGate)),
             ("chs-current-gates", chsCurrents.map(StationItem.chsCurrent))]
         var ids = Set<String>()

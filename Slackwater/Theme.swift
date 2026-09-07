@@ -449,6 +449,12 @@ struct Commentary: View {
 /// no number at all and passes nil, leaving the moon on its own.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
+    /// The illumination the SKY already computed, rather than a second lookup
+    /// per frame for the same instant (#299).
+    let moon: MoonIllumination?
+    /// The scrub time itself: the sheet searches from it, and the eclipse's
+    /// shadow is read at it. `moon` cannot supply this — it is a phase, not a
+    /// moment.
     let at: Date
     /// The eclipse underway at `at`, from the timeline: it renames the value
     /// line and shadows the glyph.
@@ -485,7 +491,7 @@ struct SummaryTiles: View {
             }
             // Almanac throws only outside 1950–2101; the tile drops rather
             // than the row, so a primary reading still stands on its own.
-            if let moon = try? moonIllumination(at) {
+            if let moon {
                 ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon", detail: sheet) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,

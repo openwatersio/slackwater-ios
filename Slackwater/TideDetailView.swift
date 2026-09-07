@@ -96,7 +96,7 @@ struct TideDetailView: View {
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { tl, jump in
-                                SummaryTiles(primary: range, at: scrubTime,
+                                SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
                                              eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                              onJump: jump,
                                              latitude: record.latitude, longitude: record.longitude)
