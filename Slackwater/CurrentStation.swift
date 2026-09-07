@@ -51,12 +51,23 @@ extension StationIdentity {
 /// A harmonic constituent as it appears in bundled and on-device JSON.
 struct Con: Codable, Hashable { let name: String; let amplitude: Double; let phase: Double }
 
-/// A bundled JSON station catalog, name-sorted; missing or undecodable → empty.
+/// Reads a required catalog from a directory without converting failures to an invented empty array.
+func requiredCatalog<T: Decodable & StationIdentity>(
+    _ resource: String, directory: URL
+) throws -> [T] {
+    try readCatalog(resource, directory: directory)
+}
+
+/// A bundled JSON station catalog, name-sorted; a missing or undecodable bundle is terminal.
 func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
-    guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
-          let data = try? Data(contentsOf: url),
-          let items = try? JSONDecoder().decode([T].self, from: data) else { return [] }
-    return items.sorted { $0.name < $1.name }
+    do {
+        return try requiredCatalog(
+            resource, directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+    } catch {
+        CatalogDiagnostics.log(error)
+        assertionFailure(String(describing: error))
+        preconditionFailure(String(describing: error))
+    }
 }
 
 /// Decode one record without materializing a multi-megabyte catalog in a
@@ -69,12 +80,68 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String, id: String) -> 
     return try? decodeCatalogRecord(data, id: id)
 }
 
+func catalogRecord<T: Decodable & StationIdentity>(
+    _ resource: String, id: String, directory: URL
+) throws -> T? {
+    let url = directory.appendingPathComponent(resource + ".json")
+    guard FileManager.default.fileExists(atPath: url.path) else {
+        throw CatalogError(resource: resource, stage: .lookup, reason: "file missing")
+    }
+    let data: Data
+    do { data = try Data(contentsOf: url, options: .mappedIfSafe) }
+    catch { throw CatalogError(resource: resource, stage: .read, reason: "unable to read file") }
+    do { return try decodeCatalogRecord(data, id: id) }
+    catch { throw CatalogError(resource: resource, stage: .decode, reason: "invalid catalog record") }
+}
+
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
+    guard data.first == 91, data.last == 93 else {
+        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
+    }
     let marker = Data("{\"id\":\"".utf8) + Data(id.utf8) + Data("\"".utf8)
-    guard let start = data.range(of: marker)?.lowerBound,
-          let arrayEnd = data.lastIndex(of: 93) else { return nil }
+    guard let start = data.range(of: marker)?.lowerBound else {
+        guard data == Data("[]".utf8) || data.starts(with: Data("[{\"id\":\"".utf8)) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
+        }
+        var stack: [UInt8] = [], quoted = false, escaped = false, expectsRecord = true
+        let bytes = Array(data)
+        for (index, byte) in bytes.enumerated() {
+            if quoted { if escaped { escaped = false } else if byte == 92 { escaped = true } else if byte == 34 { quoted = false }; continue }
+            if stack.count == 1 {
+                if byte == 123 {
+                    guard expectsRecord, bytes[index...].starts(with: [123, 34, 105, 100, 34, 58, 34]) else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                    }
+                    expectsRecord = false
+                } else if byte == 44 {
+                    guard !expectsRecord else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                    }
+                    expectsRecord = true
+                } else if byte == 93 {
+                    guard index == bytes.count - 1, !expectsRecord || bytes == [91, 93] else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "multiple compact catalog roots"))
+                    }
+                } else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog outer grammar"))
+                }
+            }
+            if byte == 34 { quoted = true }
+            else if byte == 91 || byte == 123 { stack.append(byte) }
+            else if byte == 93 || byte == 125 {
+                guard let open = stack.popLast(), (open == 91 && byte == 93) || (open == 123 && byte == 125) else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog delimiters"))
+                }
+            }
+        }
+        guard !quoted, !escaped, stack.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "truncated compact catalog"))
+        }
+        return nil
+    }
+    guard let arrayEnd = data.lastIndex(of: 93) else { return nil }
     let separator = Data(",{\"id\":".utf8)
     let afterMarker = data.index(start, offsetBy: marker.count)
     guard arrayEnd >= afterMarker else { return nil }
@@ -114,7 +181,11 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     var referenceRecord: CurrentStationRecord? { reference.flatMap { CurrentStationRecord.byId[$0] } }
 
     var engineStation: any CurrentPredicting {
-        guard let ref = referenceRecord else { return harmonicStation }
+        engineStation(referenceRecord: referenceRecord)
+    }
+
+    func engineStation(referenceRecord: CurrentStationRecord?) -> any CurrentPredicting {
+        guard reference != nil, let ref = referenceRecord else { return harmonicStation }
         return SubordinateStation(
             reference: ref.harmonicStation,
             slackBeforeFloodOffset: slackBeforeFloodOffset ?? 0, slackBeforeEbbOffset: slackBeforeEbbOffset ?? 0,
@@ -200,7 +271,10 @@ struct CurrentCardState {
 
 extension CurrentStationRecord {
     func cardState(at now: Date) -> CurrentCardState {
-        let station = engineStation
+        cardState(at: now, station: engineStation)
+    }
+
+    func cardState(at now: Date, station: any CurrentPredicting) -> CurrentCardState {
         let signed = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
         // 30h forward guarantees a "next" exists, like the tide cards.
         let next = station.events(from: now, to: now.addingTimeInterval(30 * 3600)).first { $0.time > now }
@@ -295,19 +369,28 @@ enum StationItem: Identifiable, Hashable {
 
     /// Widget-safe lookup: decode only the requested large NOAA record; the
     /// three CHS identity catalogs are small enough to retain whole.
-    static func widgetItem(id: String) -> StationItem? {
+    static func widgetItem(
+        id: String, locator: CatalogFileLocator = .shared
+    ) -> StationItem? {
+        locator.load { directory in try widgetItem(id: id, directory: directory) }
+    }
+
+    static func widgetItem(id: String, directory: URL) throws -> StationItem? {
         if id.hasPrefix("current:") {
-            let record: CurrentStationRecord? = bundled(
-                "currents", id: String(id.dropFirst("current:".count)))
-            return record.map { .current($0) }
+            let record: CurrentStationRecord? = try catalogRecord(
+                "currents", id: String(id.dropFirst("current:".count)), directory: directory)
+            return record.map(StationItem.current)
         }
         if id.hasPrefix("chs-") {
-            if let record = ChsStationInfo.all.first(where: { $0.id == id }) { return .chs(record) }
-            if let record = ChsGateInfo.all.first(where: { $0.id == id }) { return .chsGate(record) }
-            return ChsCurrentGateInfo.all.first(where: { $0.id == id }).map { .chsCurrent($0) }
+            let stations: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)
+            if let record = stations.first(where: { $0.id == id }) { return .chs(record) }
+            let gates: [ChsGateInfo] = try readCatalog("chs-gates", directory: directory)
+            if let record = gates.first(where: { $0.id == id }) { return .chsGate(record) }
+            let currents: [ChsCurrentGateInfo] = try readCatalog("chs-current-gates", directory: directory)
+            return currents.first(where: { $0.id == id }).map(StationItem.chsCurrent)
         }
-        let record: TideStationRecord? = bundled("stations", id: id)
-        return record.map { .tide($0) }
+        let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
+        return record.map(StationItem.tide)
     }
 
     /// How many results the search screen shows.

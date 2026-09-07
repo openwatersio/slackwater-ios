@@ -273,9 +273,13 @@ extension CurrentStationRecord {
     /// `tilde` hedges the extreme values (`~3.0 kn`) for a provisional
     /// (60-day) gate, like the reading's own tilde.
     func cardGraph(at now: Date, unit: String, tilde: Bool = false) -> StationCardGraph {
+        cardGraph(at: now, unit: unit, tilde: tilde, station: engineStation)
+    }
+
+    func cardGraph(at now: Date, unit: String, tilde: Bool = false,
+                   station s: any CurrentPredicting) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
-        let s = engineStation
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
         let events = s.events(from: start, to: end)
         let slackTimes = events.filter { $0.kind == .slack }.map(\.time)

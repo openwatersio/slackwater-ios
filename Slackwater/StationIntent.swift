@@ -20,23 +20,36 @@ struct StationChoice: AppEntity {
 }
 
 struct StationQuery: EntityQuery {
+    private let locator: CatalogFileLocator
+    private let defaults: UserDefaults
     private let currentLocation = StationChoice(
         id: AppGroup.currentLocationStationID, name: "Current Location")
 
+    init() {
+        self.init(locator: .shared, defaults: AppGroup.defaults)
+    }
+
+    init(locator: CatalogFileLocator, defaults: UserDefaults = AppGroup.defaults) {
+        self.locator = locator
+        self.defaults = defaults
+    }
+
     private func choices() -> [StationChoice] {
-        let d = AppGroup.defaults
+        let d = defaults
         let ids = (d.stringArray(forKey: AppGroup.favoritesKey) ?? [])
             + (d.stringArray(forKey: AppGroup.recentsKey) ?? [])
         var seen = Set<String>()
         return [currentLocation] + ids.compactMap { id in
-            guard seen.insert(id).inserted, let item = StationItem.widgetItem(id: id) else { return nil }
+            guard seen.insert(id).inserted,
+                  let item = StationItem.widgetItem(id: id, locator: locator) else { return nil }
             return StationChoice(id: id, name: item.name)
         }
     }
     func entities(for identifiers: [String]) async throws -> [StationChoice] {
         identifiers.compactMap { id in
             if id == AppGroup.currentLocationStationID { return currentLocation }
-            return StationItem.widgetItem(id: id).map { StationChoice(id: id, name: $0.name) }
+            return StationItem.widgetItem(id: id, locator: locator)
+                .map { StationChoice(id: id, name: $0.name) }
         }
     }
     func suggestedEntities() async throws -> [StationChoice] { choices() }

@@ -6,6 +6,249 @@ import XCTest
 import TideEngine
 
 final class WidgetStationLoaderTests: XCTestCase {
+    private var storageRoots: [URL] = []
+
+    override func tearDownWithError() throws {
+        for root in storageRoots where FileManager.default.fileExists(atPath: root.path) {
+            try FileManager.default.removeItem(at: root)
+        }
+    }
+
+    private func makeStorage(_ change: (URL) throws -> Void = { _ in }) throws -> CatalogStorage {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        storageRoots.append(root)
+        let storage = CatalogStorage(root: root, bundleDirectory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        let batch = UUID()
+        let directory = try storage.prepareStaging(for: batch)
+        for resource in CatalogSnapshot.resources {
+            try FileManager.default.copyItem(
+                at: XCTUnwrap(Bundle.main.url(forResource: resource, withExtension: "json")),
+                to: directory.appendingPathComponent(resource + ".json"))
+        }
+        try change(directory)
+        _ = try storage.commit(batch: batch, etags: [:], active: nil)
+        return storage
+    }
+
+    private func edit(_ resource: String, in directory: URL,
+                      change: (inout [[String: Any]]) -> Void) throws {
+        let url = directory.appendingPathComponent(resource + ".json")
+        var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        change(&rows)
+        if ["stations", "currents"].contains(resource) {
+            let records = try rows.map { row -> String in
+                var rest = row
+                let id = rest.removeValue(forKey: "id")!
+                let idJSON = try JSONSerialization.data(withJSONObject: id,
+                                                        options: [.fragmentsAllowed, .withoutEscapingSlashes])
+                let fieldsJSON = try JSONSerialization.data(withJSONObject: rest)
+                return "{\"id\":" + String(decoding: idJSON, as: UTF8.self) + ","
+                    + String(decoding: fieldsJSON.dropFirst(), as: UTF8.self)
+            }
+            try Data(("[" + records.joined(separator: ",") + "]").utf8).write(to: url)
+        } else {
+            try JSONSerialization.data(withJSONObject: rows).write(to: url)
+        }
+    }
+
+    private func editStation(_ id: String, in directory: URL,
+                             change: (inout [String: Any]) -> Void) throws {
+        try edit("stations", in: directory) { rows in
+            change(&rows[rows.firstIndex { $0["id"] as? String == id }!])
+        }
+    }
+
+    private func removeStation(_ id: String, from directory: URL) throws {
+        try edit("stations", in: directory) { rows in
+            rows.remove(at: rows.firstIndex { $0["id"] as? String == id }!)
+        }
+    }
+
+    private func appendStation(copying id: String, as newID: String, name: String, in directory: URL) throws {
+        try edit("stations", in: directory) { rows in
+            var station = rows[rows.firstIndex { $0["id"] as? String == id }!]
+            station["id"] = newID
+            station["name"] = name
+            rows.append(station)
+        }
+    }
+
+    private func appendTombstone(_ id: String, to directory: URL) throws {
+        try edit("chs-tombstones", in: directory) {
+            $0.append(["id": id, "name": "Removed station", "region": "Removed", "latitude": 0, "longitude": 0])
+        }
+    }
+
+    private func scaleCurrentConstituents(_ id: String, by factor: Double, in directory: URL) throws {
+        try edit("currents", in: directory) { rows in
+            let index = rows.firstIndex { $0["id"] as? String == id }!
+            var constituents = rows[index]["constituents"] as! [[String: Any]]
+            for index in constituents.indices {
+                constituents[index]["amplitude"] = (constituents[index]["amplitude"] as! NSNumber).doubleValue * factor
+            }
+            rows[index]["constituents"] = constituents
+        }
+    }
+
+    func testWidgetReadsCorrectedActiveStation() throws {
+        let storage = try makeStorage { directory in
+            try editStation(TideStationRecord.fridayHarborID, in: directory) { $0["name"] = "Remote Friday Harbor" }
+        }
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: TideStationRecord.fridayHarborID,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+        XCTAssertEqual(tide.name, "Remote Friday Harbor")
+    }
+
+    func testWidgetDoesNotFallBackWhenStationWasRemoved() throws {
+        let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        let referenced = Set(bundled.tides.compactMap(\.reference))
+            .union(bundled.currents.compactMap(\.tideReference))
+        let removed = try XCTUnwrap(bundled.tides.first {
+            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
+        })
+        let storage = try makeStorage { directory in
+            try removeStation(removed.id, from: directory)
+            try appendTombstone(removed.id, to: directory)
+        }
+        XCTAssertNil(WidgetStationLoader.loadRecord(
+            id: removed.id,
+            locator: CatalogFileLocator(storage: storage)))
+    }
+
+    func testCorruptActiveNOAAFileFallsBackToBundle() throws {
+        let storage = try makeStorage()
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        try Data("broken".utf8).write(to: directory.appendingPathComponent("stations.json"))
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: TideStationRecord.fridayHarborID,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+    }
+
+    func testTruncatedNestedActiveNOAAFileFallsBackToBundle() throws {
+        let storage = try makeStorage()
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        try Data("[{\"id\":\"first\",\"aliases\":[]".utf8)
+            .write(to: directory.appendingPathComponent("stations.json"))
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: TideStationRecord.fridayHarborID,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
+        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+    }
+
+    func testCompactScannerRejectsInvalidOuterGrammar() {
+        struct IDOnlyRecord: Decodable { let id: String }
+        let missing = "missing"
+        for bytes in [
+            "[{\"id\":\"first\"}][]",
+            "[{\"id\":\"first\"},garbage]",
+            "[{\"id\":\"first\"}{\"id\":\"second\"}]",
+            "[{\"id\":\"first\"}[]]",
+            "[{\"id\":\"first\"},[]{\"id\":\"second\"}]",
+            "[{\"id\":\"first\"},[garbage]{\"id\":\"second\"}]"
+        ] {
+            XCTAssertThrowsError(try decodeCatalogRecord(Data(bytes.utf8), id: missing) as TideStationRecord?)
+        }
+        XCTAssertThrowsError(try decodeCatalogRecord(Data("{\"id\":\"first\"}]".utf8), id: "first") as IDOnlyRecord?)
+    }
+
+    func testSubordinateCurrentAndReferenceUseSameGeneration() throws {
+        let subordinate = try XCTUnwrap(CurrentStationRecord.all.first(where: \.isSubordinate))
+        let storage = try makeStorage { directory in
+            try scaleCurrentConstituents(subordinate.reference!, by: 2, in: directory)
+        }
+        let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
+            id: "current:" + subordinate.id,
+            locator: CatalogFileLocator(storage: storage)))
+        guard case .current(let current, let station) = record else { return XCTFail("Expected current") }
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        let activeReference: CurrentStationRecord? = try catalogRecord(
+            "currents", id: subordinate.reference!, directory: directory)
+        let start = Date(timeIntervalSince1970: 1_750_000_000)
+        let end = start + 6 * 3600
+        let actual = station.speeds(from: start, to: end, step: 60).map(\.speed)
+        let expected = current.engineStation(referenceRecord: activeReference)
+            .speeds(from: start, to: end, step: 60).map(\.speed)
+        let bundled = try XCTUnwrap(CurrentStationRecord.byId[subordinate.reference!])
+        let staleStation = current.engineStation(referenceRecord: bundled)
+        let stale = staleStation
+            .speeds(from: start, to: end, step: 60).map(\.speed)
+        XCTAssertEqual(actual.count, expected.count)
+        XCTAssertTrue(zip(actual, expected).allSatisfy { abs($0 - $1) < 0.000_001 })
+        XCTAssertTrue(zip(actual, stale).contains { abs($0 - $1) > 0.000_001 })
+
+        let paired = zip(
+            station.speeds(from: start, to: end, step: 60),
+            staleStation.speeds(from: start, to: end, step: 60))
+        let pair = try XCTUnwrap(paired.max { abs($0.0.speed - $0.1.speed) < abs($1.0.speed - $1.1.speed) })
+        let now = pair.0.time
+        let card = WidgetCard.build(record, now: now)
+        let expectedReading = station.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
+        let staleReading = staleStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1)[0].speed
+        guard case .current(let signed, _, _, _, _) = card.reading else {
+            return XCTFail("Expected current reading")
+        }
+        XCTAssertEqual(signed, expectedReading, accuracy: 0.000_001)
+        XCTAssertGreaterThan(abs(signed - staleReading), 0.000_001)
+
+        let graph = try XCTUnwrap(card.graph)
+        let graphStart = now.addingTimeInterval(-StationCardGraph.backWindow)
+        let graphEnd = now.addingTimeInterval(StationCardGraph.forwardWindow)
+        let activeGraph = station.speeds(from: graphStart, to: graphEnd, step: StationCardGraph.sampleStep).map(\.speed)
+        let staleGraph = staleStation.speeds(from: graphStart, to: graphEnd, step: StationCardGraph.sampleStep).map(\.speed)
+        XCTAssertEqual(graph.points.count, activeGraph.count)
+        XCTAssertTrue(zip(graph.points, activeGraph).allSatisfy { abs($0.value - $1) < 0.000_001 })
+        XCTAssertTrue(zip(graph.points, staleGraph).contains { abs($0.value - $1) > 0.000_001 })
+    }
+
+    func testWidgetReadsEverySmallGeneratedCatalogThroughActiveDirectory() throws {
+        let storage = try makeStorage()
+        let directory = try XCTUnwrap(storage.activeDirectory())
+        for id in [ChsStationInfo.all[0].id, ChsGateInfo.all[0].id, ChsCurrentGateInfo.all[0].id] {
+            XCTAssertNotNil(try StationItem.widgetItem(id: id, directory: directory))
+        }
+        let tombstones: [StationTombstone] = try readCatalog("chs-tombstones", directory: directory)
+        XCTAssertFalse(tombstones.isEmpty)
+    }
+
+    func testWidgetIdentityCallersUseActiveCatalog() async throws {
+        let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
+        let referenced = Set(bundled.tides.compactMap(\.reference))
+            .union(bundled.currents.compactMap(\.tideReference))
+        let removed = try XCTUnwrap(bundled.tides.first {
+            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
+        })
+        let addedID = "999999999"
+        let storage = try makeStorage { directory in
+            try appendStation(copying: removed.id, as: addedID, name: "Remote only", in: directory)
+            try removeStation(removed.id, from: directory)
+            try appendTombstone(removed.id, to: directory)
+        }
+        let locator = CatalogFileLocator(storage: storage)
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        defaults.set([addedID, removed.id], forKey: AppGroup.favoritesKey)
+
+        let query = StationQuery(locator: locator, defaults: defaults)
+        let suggestions = try await query.suggestedEntities()
+        XCTAssertEqual(suggestions.first { $0.id == addedID }?.name, "Remote only")
+        XCTAssertNil(suggestions.first { $0.id == removed.id })
+        let resolved = try await query.entities(for: [addedID, removed.id])
+        XCTAssertEqual(resolved.map(\.id), [addedID])
+
+        defaults.set(addedID, forKey: AppGroup.currentLocationStationKey)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: defaults, locator: locator), addedID)
+        defaults.set(removed.id, forKey: AppGroup.currentLocationStationKey)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.currentLocationStationID, defaults: defaults, locator: locator),
+                       addedID)
+    }
+
     func testTargetedBundledLookupFindsOneStation() {
         let record: TideStationRecord? = bundled(
             "stations", id: TideStationRecord.fridayHarborID)

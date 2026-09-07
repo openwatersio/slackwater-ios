@@ -315,9 +315,9 @@ final class ChsFitService: ObservableObject {
     private static func sweepOrphans(_ files: Set<String>) {
         let ports = Set(ChsStationInfo.all.map(\.id))
         let gates = Set(ChsCurrentGateInfo.all.map(\.id))
-        // `bundled()` swallows a decode failure into an empty array, and an
-        // empty catalog would read as "every model on this device is an
-        // orphan". Nothing is worth deleting on that evidence.
+        // Keep this conservative guard for an unexpectedly empty catalog:
+        // nothing is worth deleting on that evidence. Bundled catalog lookup,
+        // read, and decode failures terminate through the required loader.
         guard !ports.isEmpty, !gates.isEmpty else { return }
         for file in orphanFiles(in: files, ports: ports, gates: gates) {
             // The chunk cache is keyed by IWLS id, which only the model

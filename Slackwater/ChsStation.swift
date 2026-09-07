@@ -36,10 +36,9 @@ struct StationTombstone: Decodable, Identifiable, Hashable, StationIdentity {
     let region: String
     let latitude: Double
     let longitude: Double
-    /// StationIdentity's search hook, computed rather than stored: a removed
-    /// station is never searched, and a stored-with-default property would
-    /// depend on synthesised-Decodable behaviour that `bundled`'s `try?` would
-    /// swallow into an empty catalog if it went the other way.
+    /// StationIdentity's search hook, computed rather than stored: removed
+    /// stations are never searched, and aliases are omitted from generated
+    /// tombstone data.
     var aliases: [String] { [] }
 
     static let all: [StationTombstone] = bundled("chs-tombstones")

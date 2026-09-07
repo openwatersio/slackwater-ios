@@ -16,7 +16,7 @@ enum WidgetStation {
 /// `load(id:)`) reads records, never `StationItem` again.
 enum WidgetRecord {
     case tide(TideStationRecord, station: any TidePredicting)
-    case current(CurrentStationRecord)
+    case current(CurrentStationRecord, station: any CurrentPredicting)
     case derived(DerivedGateRecord)
 }
 
@@ -24,16 +24,25 @@ enum WidgetStationLoader {
     /// One switch over the catalog. `.chs`/`.chsGate`/`.chsCurrent` go
     /// through `ChsModelStore`'s on-device fitted models — nil when a
     /// station isn't fitted yet.
-    static func loadRecord(id: String) -> WidgetRecord? {
-        guard let item = StationItem.widgetItem(id: id) else { return nil }
+    static func loadRecord(
+        id: String, locator: CatalogFileLocator = .shared
+    ) -> WidgetRecord? {
+        locator.load { directory in try loadRecord(id: id, directory: directory) }
+    }
+
+    private static func loadRecord(id: String, directory: URL) throws -> WidgetRecord? {
+        guard let item = try StationItem.widgetItem(id: id, directory: directory) else { return nil }
         switch item {
         case .tide(let r):
-            let reference: TideStationRecord? = r.reference.flatMap {
-                bundled("stations", id: $0)
+            let reference: TideStationRecord? = try r.reference.flatMap {
+                try catalogRecord("stations", id: $0, directory: directory)
             }
             return .tide(r, station: r.engineStation(referenceRecord: reference))
         case .current(let r):
-            return .current(r)
+            let reference: CurrentStationRecord? = try r.reference.flatMap {
+                try catalogRecord("currents", id: $0, directory: directory)
+            }
+            return .current(r, station: r.engineStation(referenceRecord: reference))
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }
             let record = info.record(with: model)
@@ -42,12 +51,12 @@ enum WidgetStationLoader {
             // Mirrors DerivedGateRecord.engineGate (ChsGate.swift:40-43): the
             // reference port's fitted model → DerivedSlackStation(hwLag/lwLag).
             // nil when the reference port isn't fitted yet.
-            return derivedRecord(for: gate)
+            return try derivedRecord(for: gate, directory: directory)
         case .chsCurrent(let info):
             // Mirrors ChsFitService's fitted-current path (ChsFitService.swift:179-181):
             // the "-current" suffixed model in ChsModelStore → CurrentStationRecord.
             // Online (fit-reject) gates have no "-current" model — nil, same as unfitted.
-            return fittedCurrentRecord(for: info).map { .current($0) }
+            return fittedCurrentRecord(for: info).map { .current($0, station: $0.harmonicStation) }
         }
     }
 
@@ -61,15 +70,16 @@ enum WidgetStationLoader {
     static func station(from record: WidgetRecord) -> WidgetStation {
         switch record {
         case .tide(let r, let station): .tide(station, tz: r.tz, name: r.name)
-        case .current(let r): .current(r.engineStation, tz: r.tz, name: r.name)
+        case .current(let r, let station): .current(station, tz: r.tz, name: r.name)
         case .derived(let r): .derived(r.engineGate, tz: r.gate.tz, name: r.gate.name)
         }
     }
 
     /// The reference port is itself a CHS tide station, resolved by id and
     /// fitted the same way `.chs` above is.
-    private static func derivedRecord(for gate: ChsGateInfo) -> WidgetRecord? {
-        guard let portInfo = ChsStationInfo.all.first(where: { $0.id == gate.reference }),
+    private static func derivedRecord(for gate: ChsGateInfo, directory: URL) throws -> WidgetRecord? {
+        let ports: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)
+        guard let portInfo = ports.first(where: { $0.id == gate.reference }),
               let model = ChsModelStore.load(portInfo.id) else { return nil }
         return .derived(DerivedGateRecord(gate: gate, port: portInfo.record(with: model)))
     }
@@ -82,11 +92,13 @@ enum WidgetStationLoader {
     }
 
     static func resolvedStationID(
-        _ id: String, defaults: UserDefaults = AppGroup.defaults
+        _ id: String,
+        defaults: UserDefaults = AppGroup.defaults,
+        locator: CatalogFileLocator = .shared
     ) -> String {
         guard id == AppGroup.currentLocationStationID else { return id }
         if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
-           StationItem.widgetItem(id: cached) != nil { return cached }
+           StationItem.widgetItem(id: cached, locator: locator) != nil { return cached }
         return fallbackStationID(defaults: defaults)
     }
 
