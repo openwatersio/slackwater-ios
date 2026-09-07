@@ -19,7 +19,7 @@ settings:
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
-    from: 0.2.1
+    from: 0.3.0
   TideEngine:
     url: https://github.com/openwatersio/slackwater-engine
     from: 0.7.0

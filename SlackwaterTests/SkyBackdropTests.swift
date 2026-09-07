@@ -12,25 +12,19 @@ final class SkyBackdropTests: XCTestCase {
         }
     }
 
-    func testStarsStandWhereTheAlmanacPutsTheSun() throws {
-        // The sun is a star with a known RA/Dec: fed to the star transform,
-        // Almanac's apparent position must land where sunAltAz puts it, give
-        // or take refraction and the mean/apparent sidereal difference.
+    func testSkyStatePlacesEveryCatalogStarWithAlmanac() throws {
+        // Sky math lives in Almanac now; the app only carries the catalog.
         let time = ISO8601DateFormatter().date(from: "2026-03-20T20:00:00Z")!
         let lat = 48.4, lon = -123.4
-        let sun = try sunPosition(time)
-        let expected = try sunAltAz(time, observer: Observer(latitudeDeg: lat, longitudeDeg: lon))
-        let lst = localSiderealDeg(time, longitude: lon)
-        let got = starAltAz(raDeg: sun.raDeg, decDeg: sun.decDeg, siderealDeg: lst, latitude: lat)
-        XCTAssertEqual(got.altDeg, expected.altDeg, accuracy: 0.1)
-        XCTAssertEqual(got.azDeg, expected.azDeg, accuracy: 0.1)
-        // Polaris stands at the latitude, due north, whatever the hour.
-        let polaris = starAltAz(raDeg: 37.95, decDeg: 89.26, siderealDeg: lst, latitude: lat)
-        XCTAssertEqual(polaris.altDeg, lat, accuracy: 1)
-        XCTAssertTrue(polaris.azDeg < 2 || polaris.azDeg > 358, "\(polaris.azDeg)")
-        // Sirius leads the catalog.
+        let sky = SkyState(time: time, latitude: lat, longitude: lon)
+        // Sirius leads the catalog, and every row is placed.
         XCTAssertEqual(brightStars.count, 288)
         XCTAssertEqual(brightStars.first?.mag, -1.44)
+        XCTAssertEqual(sky.stars.count, brightStars.count)
+        // Polaris stands at the latitude, due north, whatever the hour.
+        let polaris = try XCTUnwrap(sky.stars.first { $0.star.dec > 89 }).at
+        XCTAssertEqual(polaris.altDeg, lat, accuracy: 1)
+        XCTAssertTrue(polaris.azDeg < 2 || polaris.azDeg > 358, "\(polaris.azDeg)")
     }
 
     func testSkyProjectionAndPaletteMatchTheAlmanacDome() {
