@@ -159,6 +159,9 @@ struct TimelineDay {
     let start: Date          // local midnight
     let sunrise: Date?
     let sunset: Date?
+    /// A lunar day runs 24h50m, so a calendar day can lack either one.
+    let moonrise: Date?
+    let moonset: Date?
 }
 
 struct TimelineData {
@@ -315,7 +318,8 @@ struct TimelineData {
         // draws no chrome at all, which is the 36-hour gap this branch already
         // fixed once, one hour wide and twice a year.
         //
-        // Costs one `sunEvents` call per build; `visibleDays` picks -3 up only
+        // Costs one `sunEvents` and one `moonEvents` call per day per build;
+        // the moon's pair is only for the sky's horizon. `visibleDays` picks -3 up only
         // when the window actually reaches it, so nothing else changes. 8 is
         // the other end: never visible, it supplies the sunrise that closes
         // the last visible night band (offset 7).
@@ -331,9 +335,12 @@ struct TimelineData {
             let dayStart = cal.startOfDay(for: d0)
             let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
             let sun = observer.flatMap { try? sunEvents(from: dayStart, to: dayEnd, observer: $0) } ?? []
+            let moon = observer.flatMap { try? moonEvents(from: dayStart, to: dayEnd, observer: $0) } ?? []
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .rise }?.time,
-                               sunset: sun.first { $0.kind == .set }?.time)
+                               sunset: sun.first { $0.kind == .set }?.time,
+                               moonrise: moon.first { $0.kind == .rise }?.time,
+                               moonset: moon.first { $0.kind == .set }?.time)
         }
         return DayChrome(tz: tz, anchor: anchor, today: today,
                          start: w.start, end: w.end, days: days)
@@ -506,6 +513,9 @@ struct TimelineGeo {
     /// graph's order, chrome under the curve rather than over it.
     private static let plotTop: CGFloat = 170
     private static let plotBottom: CGFloat = 320
+    /// How far the plot box runs below the sky's horizon (`bodyTop`). The
+    /// sky backdrop extends this far past its horizon, under the water.
+    static let plotDepth = plotBottom - plotTop
 
     init(data: TimelineData) {
         hasTide = data.hasTide
@@ -740,6 +750,7 @@ struct TimelineCanvas: View {
             let pt = CGPoint(x: data.x(p.time), y: geo.tideY(p.height))
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
+        seaBase(ctx, under: line, floor: geo.tideBottom)
         // The card's fill, anchored at chart datum (CurveDrawing.datumFill).
         let datumY = geo.tideY(0)
         var area = line
@@ -790,6 +801,19 @@ struct TimelineCanvas: View {
     /// This station's set for one direction, nil on a derived gate.
     private func deg(_ flood: Bool) -> Double? { flood ? floodDeg : ebbDeg }
 
+    /// Opaque page colour from the curve down to the plot's floor. The sky
+    /// backdrop runs on behind the plot so a body's glow can reach the water,
+    /// and the translucent fills above would otherwise let it through.
+    /// ponytail: flat `canvas` where the page is a radial glow — a hair
+    /// darker at the plot's top, invisible under the fill.
+    private func seaBase(_ ctx: GraphicsContext, under line: Path, floor: CGFloat) {
+        var sea = line
+        sea.addLine(to: CGPoint(x: data.totalWidth, y: floor))
+        sea.addLine(to: CGPoint(x: 0, y: floor))
+        sea.closeSubpath()
+        ctx.fill(sea, with: .color(SN.canvas))
+    }
+
     private func drawCurrent(_ ctx: GraphicsContext) {
         var line = Path()
         for (i, p) in data.currentPoints.enumerated() {
@@ -797,6 +821,7 @@ struct TimelineCanvas: View {
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
         let runs = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
+        seaBase(ctx, under: line, floor: geo.curBottom)
 
         // The card's fill, anchored at zero (CurveDrawing.zeroFill). A derived
         // gate is flat steel instead: the zero-anchored blue reads as a
@@ -1205,31 +1230,6 @@ struct TimelineScrubber: UIViewRepresentable {
 
 // MARK: - Strip + fixed overlay (centerline, riding dots, track labels)
 
-/// Extends the sky's horizon colour down to the visible tide/current line. The path
-/// stops on the line at every x, so sky never leaks into the water below it.
-private struct SkyCurveFill: View {
-    let data: TimelineData
-    let geo: TimelineGeo
-    let scrubTime: Date
-    let color: Color
-
-    var body: some View {
-        Canvas { context, size in
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: geo.bodyTop))
-            for x in stride(from: CGFloat(0), through: size.width, by: 2) {
-                let seconds = Double(x - size.width / 2) / Double(Timeline.pph) * 3600
-                let time = scrubTime.addingTimeInterval(seconds)
-                let y = geo.hasTide ? geo.tideY(data.heightAt(time)) : geo.curY(data.velocityAt(time))
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
-            path.addLine(to: CGPoint(x: size.width, y: geo.bodyTop))
-            path.closeSubpath()
-            context.fill(path, with: .color(color))
-        }
-    }
-}
-
 struct TimelineScrubStrip: View {
     let data: TimelineData
     let geo: TimelineGeo
@@ -1237,7 +1237,6 @@ struct TimelineScrubStrip: View {
     var speedUnit = "kn"   // tide-only strips draw no speed labels
     let now: Date
     var showsDayBands = true
-    var skyFill: Color? = nil
     var chromeInk: Color = SN.foam
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
@@ -1256,11 +1255,6 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          jumpToken: jumpToken)
             .frame(height: geo.height)
-            .background {
-                if let skyFill, geo.hasTide || geo.hasCurrent {
-                    SkyCurveFill(data: data, geo: geo, scrubTime: scrubTime, color: skyFill)
-                }
-            }
             .overlay { overlay }
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)

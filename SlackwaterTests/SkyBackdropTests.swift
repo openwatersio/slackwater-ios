@@ -26,6 +26,12 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertFalse(skyUsesDarkInk(sunAltitude: -6))
         XCTAssertEqual(moonGlowRadius(fraction: 0), 12)
         XCTAssertEqual(moonGlowRadius(fraction: 1), 32)
+        // Inside the sun's glare the moon fades: gone where the discs would
+        // touch, clear once past the glow.
+        let touching = sunDiscRadius + moonGlyphSize / 2, clear = sunGlowRadius + moonGlyphSize / 2
+        XCTAssertEqual(moonGlareOpacity(distance: touching), 0)
+        XCTAssertEqual(moonGlareOpacity(distance: (touching + clear) / 2), 0.5, accuracy: 0.001)
+        XCTAssertEqual(moonGlareOpacity(distance: clear), 1)
         XCTAssertEqual(starOpacity(sunAltitude: 0), 0)
         XCTAssertEqual(starOpacity(sunAltitude: -12), 0.35, accuracy: 0.001)
         XCTAssertEqual(starOpacity(sunAltitude: -18), 0.7)
@@ -38,27 +44,34 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertEqual(skyOpacity(sunAltitude: -6), 1)
 
         let size = CGSize(width: 400, height: 160)
+        // No span: the whole 360° across the width, altitude at its fixed
+        // scale, and the horizon on the bottom edge.
         XCTAssertEqual(skyPoint(azimuth: 180, altitude: 0, latitude: 48, size: size),
                        CGPoint(x: 200, y: 160))
-        XCTAssertEqual(skyPoint(azimuth: 180, altitude: 90, latitude: 48, size: size),
-                       CGPoint(x: 200, y: 0))
+        XCTAssertEqual(skyPoint(azimuth: 180, altitude: 30, latitude: 48, size: size),
+                       CGPoint(x: 200, y: 160 - 30 * skyAltitudeScale))
         // East on the RIGHT — mirrored from a sky chart. Time advances to
         // the right on the strip, so the curve pans right to left under the
-        // fixed centerline and the bodies sweep with it.
+        // fixed centerline and the bodies sweep with it. In either hemisphere.
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: 48, size: size),
                        CGPoint(x: 300, y: 160))
+        XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: -48, size: size),
+                       CGPoint(x: 300, y: 160))
 
-        let arc = CGSize(width: 400, height: 320)
-        for (progress, expected) in [(0.0, CGPoint(x: 400, y: 320)),
-                                     (0.5, CGPoint(x: 200, y: 120)),
-                                     (1.0, CGPoint(x: 0, y: 320))] {
-            let point = sunArcPoint(progress: progress, size: arc)
-            XCTAssertEqual(point.x, expected.x, accuracy: 0.001)
-            XCTAssertEqual(point.y, expected.y, accuracy: 0.001)
-        }
+        // A span makes the side edges the horizon: the centre sits `pad`
+        // past the edge at rise and set, and the meridian stays centred.
+        // Altitude keeps its fixed scale whatever the span.
+        let span = HorizonSpan(riseAz: 120, setAz: 240)
+        XCTAssertEqual(skyPoint(azimuth: 120, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
+                       CGPoint(x: 420, y: 160))
+        XCTAssertEqual(skyPoint(azimuth: 240, altitude: 0, latitude: 48, span: span, pad: 20, size: size),
+                       CGPoint(x: -20, y: 160))
+        let noon = skyPoint(azimuth: 180, altitude: 30, latitude: 48, span: span, pad: 20, size: size)
+        XCTAssertEqual(noon.x, 200, accuracy: 0.001)
+        XCTAssertEqual(noon.y, 160 - 30 * skyAltitudeScale, accuracy: 0.001)
     }
 
-    func testWinterSunArcMeetsHorizonAtActualRiseAndSet() throws {
+    func testWinterSunEntersAndLeavesAtTheEdges() throws {
         let observer = try Observer(latitudeDeg: 48.535, longitudeDeg: -123.01)
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
@@ -74,23 +87,47 @@ final class SkyBackdropTests: XCTestCase {
         let set = try XCTUnwrap(events.first { $0.kind == .set })
         XCTAssertLessThan(rise.time, set.time, "a local day rises before it sets")
         let size = CGSize(width: 400, height: 320)
-        // The arc's endpoints come from the strip's day chrome, not from a
-        // second computation inside SkyState — so the test hands it the same
-        // shape `TimelineData.days` does.
-        let days = [TimelineDay(offset: 0, start: dayStart, sunrise: rise.time, sunset: set.time)]
+        // The spans come from the strip's day chrome, not from a second
+        // search inside SkyState — so the test hands it the same shape
+        // `TimelineData.days` does.
+        let days = [TimelineDay(offset: 0, start: dayStart, sunrise: rise.time, sunset: set.time,
+                                moonrise: nil, moonset: nil)]
 
-        for time in [rise.time.addingTimeInterval(60), set.time.addingTimeInterval(-60)] {
-            let sky = SkyState(time: time, latitude: 48.535, longitude: -123.01, days: days)
-            let point = sunArcPoint(progress: try XCTUnwrap(sky.sunProgress), size: size)
-            XCTAssertGreaterThan(point.y, 318)
-        }
+        let rising = SkyState(time: rise.time, latitude: 48.535, longitude: -123.01, days: days)
+        let sun = try XCTUnwrap(rising.sun)
+        let atRise = skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: 48.535,
+                              span: rising.sunSpan, pad: sunGlowRadius, size: size)
+        XCTAssertEqual(atRise.x, 400 + sunGlowRadius, accuracy: 0.001)
+        XCTAssertGreaterThan(atRise.y, 320, "the upper limb is on the horizon, the centre below it")
+
+        let setting = SkyState(time: set.time, latitude: 48.535, longitude: -123.01, days: days)
+        let sunSet = try XCTUnwrap(setting.sun)
+        let atSet = skyPoint(azimuth: sunSet.azDeg, altitude: sunSet.altDeg, latitude: 48.535,
+                             span: setting.sunSpan, pad: sunGlowRadius, size: size)
+        XCTAssertEqual(atSet.x, -sunGlowRadius, accuracy: 0.001)
+        XCTAssertNil(setting.moonSpan, "no moon chrome, no moon span")
     }
 
-    /// No day chrome (an online gate still fetching) means no arc: SkyBackdrop
-    /// falls back to the sun's true az/alt rather than inventing endpoints.
-    func testSunArcIsAbsentWithoutDayChrome() throws {
+    /// No day chrome (an online gate still fetching) means no span: SkyBackdrop
+    /// shows the whole 360° rather than inventing edges.
+    func testSpansAreAbsentWithoutDayChrome() throws {
         let noon = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-12-21T20:00:00Z"))
-        XCTAssertNil(SkyState(time: noon, latitude: 48.535, longitude: -123.01).sunProgress)
+        let sky = SkyState(time: noon, latitude: 48.535, longitude: -123.01)
+        XCTAssertNil(sky.sunSpan)
+        XCTAssertNil(sky.moonSpan)
+    }
+
+    /// The terminator is an ellipse, not an offset circle: a half moon is lit
+    /// exactly to the meridian, a gibbous moon past it, a crescent short of it.
+    func testMoonTerminatorFollowsThePhaseAngle() {
+        let r: CGFloat = 10
+        func lit(_ fraction: Double, _ x: CGFloat) -> Bool {
+            moonLitPath(fraction: fraction, radius: r).contains(CGPoint(x: x, y: 0))
+        }
+        XCTAssertTrue(lit(0.5, 1)); XCTAssertFalse(lit(0.5, -1))
+        XCTAssertTrue(lit(0.9, -5)); XCTAssertFalse(lit(0.9, -9))    // ellipse half-width 8
+        XCTAssertFalse(lit(0.1, 5)); XCTAssertTrue(lit(0.1, 9))
+        XCTAssertTrue(lit(1, -9)); XCTAssertFalse(lit(0, 9))
     }
 
     /// Phase names are presentation, kept app-side when the astronomy moved to
