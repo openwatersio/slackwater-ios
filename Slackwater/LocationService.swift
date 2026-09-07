@@ -25,7 +25,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private let manager = CLLocationManager()
 
     // UI-test hooks, deterministic in any simulator: `-fixLat x -fixLon y`
-    // renders the located list; the other two cover the no-fix slot states.
+    // renders the located list; the other three cover the no-fix slot states.
     private static let testFix: CLLocation? = {
         guard let i = CommandLine.arguments.firstIndex(of: "-fixLat"),
               let j = CommandLine.arguments.firstIndex(of: "-fixLon"),
@@ -36,13 +36,23 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }()
     private static let testDenied = CommandLine.arguments.contains("-locDenied")
     private static let testAuthorizedNoFix = CommandLine.arguments.contains("-locAuthorizedNoFix")
+    /// The undecided state. Unlike the three above it has no "off" to fall back
+    /// to — it is simply what a device reads as when nothing has ever answered,
+    /// so a test for it can be written by passing no flag at all. That works
+    /// only on a PRISTINE simulator: one that has answered once keeps an
+    /// `Authorization` key in locationd's `clients.plist` forever, and the CI
+    /// device has one. The no-flag version of the undetermined test passed on a
+    /// clean simulator and failed on CI for exactly that reason. Ambient state
+    /// is not a fixture; this flag is.
+    private static let testUndetermined = CommandLine.arguments.contains("-locUndetermined")
 
     override private init() {
         status = manager.authorizationStatus
         super.init()
         // Test locations must not be overwritten by the simulator's cached fix
         // or authorization callback, including the deliberate no-fix states.
-        if Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix {
+        if Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
+            && !Self.testUndetermined {
             manager.delegate = self
         }
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
@@ -54,17 +64,20 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     var authorized: Bool {
-        !Self.testDenied && (Self.testFix != nil || Self.testAuthorizedNoFix
+        guard !Self.testUndetermined else { return false }
+        return !Self.testDenied && (Self.testFix != nil || Self.testAuthorizedNoFix
             || status == .authorizedWhenInUse || status == .authorizedAlways)
     }
     var denied: Bool {
-        Self.testDenied || (!Self.testAuthorizedNoFix && Self.testFix == nil
+        guard !Self.testUndetermined else { return false }
+        return Self.testDenied || (!Self.testAuthorizedNoFix && Self.testFix == nil
             && (status == .denied || status == .restricted))
     }
 
     /// The gate's "Use My Location": ask, or refresh if already authorized.
     func request() {
-        guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix else { return }
+        guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
+                && !Self.testUndetermined else { return }
         locating = true
         if status == .notDetermined {
             manager.requestWhenInUseAuthorization()

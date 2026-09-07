@@ -245,6 +245,12 @@ struct ChsAmberCard: View {
     let action: String
     let identifier: String
     var icon = "exclamationmark.triangle.fill"
+    /// Amber is this app's warning language and the comment on `unavailableCard`
+    /// keeps it scarce on purpose. An invitation is not a warning: the location
+    /// ask card passes leaf, the same green the gate's own "Use My Location"
+    /// button uses, so a user who simply never opted in isn't nagged in the
+    /// colour reserved for something being wrong. `status` still wins when set.
+    var accent = SN.amber
     var status: CardStatus? = nil
     let onAction: () -> Void
 
@@ -259,9 +265,9 @@ struct ChsAmberCard: View {
             HStack(spacing: 13) {
                 Image(systemName: status?.icon ?? icon)
                     .font(.title3)
-                    .foregroundStyle(status?.tint ?? SN.amber)
+                    .foregroundStyle(status?.tint ?? accent)
                     .frame(width: iconTileSize, height: iconTileSize)
-                    .background((status?.tint ?? SN.amber).opacity(0.16),
+                    .background((status?.tint ?? accent).opacity(0.16),
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .accessibilityLabel(status?.accessibilityLabel ?? "Warning")
                 VStack(alignment: .leading, spacing: 3) {
@@ -295,7 +301,7 @@ struct ChsAmberCard: View {
                     Image(systemName: "chevron.right").font(.subheadline.weight(.semibold))
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(status?.tint ?? SN.amber)
+                .foregroundStyle(status?.tint ?? accent)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .buttonStyle(.plain)
@@ -303,10 +309,10 @@ struct ChsAmberCard: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(status == nil ? SN.amber.opacity(0.1) : SN.cardFill,
+        .background(status == nil ? accent.opacity(0.1) : SN.cardFill,
                     in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .strokeBorder(status == nil ? SN.amber.opacity(0.35) : SN.cardStroke, lineWidth: 0.5))
+            .strokeBorder(status == nil ? accent.opacity(0.35) : SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
         .accessibilityIdentifier(identifier)
     }
