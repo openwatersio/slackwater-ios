@@ -1379,6 +1379,8 @@ struct TimelineScrubStrip: View {
                 Rectangle().fill(.white.opacity(0.18))
                     .frame(width: 1, height: geo.bodyBottom - geo.padTop)
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
+                    .opacity(settled && commentary != nil ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: settled)
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas
