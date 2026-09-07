@@ -224,6 +224,16 @@ struct SkyState {
     /// Penumbral shading right now — what a penumbral eclipse has instead.
     var wash: Double { eclipse?.wash(at: time) ?? 0 }
 
+    var moonLightAngle: Double {
+        guard let sun, let moon else { return 0 }
+        let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
+        let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
+        // The sun's tangent direction at the moon stays continuous across the screen's azimuth seam.
+        let horizontal = cos(sunAlt) * sin(deltaAz) * (latitude >= 0 ? -1.0 : 1.0)
+        let vertical = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
+        return atan2(-vertical, horizontal)
+    }
+
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
     var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
@@ -295,9 +305,7 @@ struct SkyBackdrop: View {
                     let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                          latitude: sky.latitude, span: sky.moonSpan,
                                          pad: moonGlyphSize / 2, size: size)
-                    // The lit limb faces the sun on screen, above the horizon
-                    // or not; the glow leans the same way.
-                    let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
+                    let toSun = sky.moonLightAngle
                     let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
                     // An eclipsed moon dims and warms, and the sky goes quiet
                     // with it: two changes to the one gradient, not a second
@@ -321,12 +329,7 @@ struct SkyBackdrop: View {
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
                         .opacity(moonGlareOpacity(distance: glare))
                     // `waxing: true` lights the +x limb; the rotation aims it.
-                    // `shadowTilt` cancels that rotation for the umbra alone: an
-                    // eclipse is the ANTI-solar point, so a shadow that swung
-                    // around with the sun's screen position would be pointing at
-                    // the one direction it cannot come from. Screen-stable is
-                    // honest at 22pt; the true first contact is the moon's
-                    // leading limb, which is #304-adjacent work.
+                    // Keep the umbra screen-stable; its physical entry direction is #304-adjacent work.
                     MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
                               umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
                         .rotationEffect(.radians(toSun))
