@@ -18,7 +18,9 @@ import { here, stationData, writeBundle } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
 const published = stationData("slugs.json");
-const ids = (file) => JSON.parse(readFileSync(join(res, file), "utf8")).map((s) => s.id);
+// A reference-only bin (#269) is not a station and is never linked.
+const ids = (file) =>
+  JSON.parse(readFileSync(join(res, file), "utf8")).filter((s) => !s.referenceOnly).map((s) => s.id);
 
 /** The published `kind` table, narrowed to the ids in `files`. */
 function narrow(kind, files) {
