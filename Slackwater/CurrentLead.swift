@@ -131,7 +131,7 @@ struct CurrentScrubCard: View {
         let next = lead.nextSignificant
         TimelineScrubStrip(data: data, geo: TimelineGeo(data: data),
                            speedUnit: speedUnit, now: now,
-                           showsDayBands: false, skyFill: sky.horizon, chromeInk: sky.ink,
+                           showsDayBands: false, chromeInk: sky.ink,
                            floodDeg: floodDeg, ebbDeg: ebbDeg,
                            scrubTime: $scrubTime, onReturn: onReturn,
                            commentary: lead.commentary,

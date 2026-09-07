@@ -42,7 +42,7 @@ struct DerivedGateDetailView: View {
                                 let slack = nextSlack
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    now: live, showsDayBands: false,
-                                                   skyFill: sky.horizon, chromeInk: sky.ink,
+                                                   chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    commentary: slack.map {

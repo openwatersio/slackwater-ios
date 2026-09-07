@@ -28,9 +28,10 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertEqual(moonGlowRadius(fraction: 1), 32)
         // Inside the sun's glare the moon fades: gone where the discs would
         // touch, clear once past the glow.
-        XCTAssertEqual(moonGlareOpacity(distance: 10), 0)
-        XCTAssertEqual(moonGlareOpacity(distance: 32), 0.5, accuracy: 0.001)
-        XCTAssertEqual(moonGlareOpacity(distance: 60), 1)
+        let touching = sunDiscRadius + moonGlyphSize / 2, clear = sunGlowRadius + moonGlyphSize / 2
+        XCTAssertEqual(moonGlareOpacity(distance: touching), 0)
+        XCTAssertEqual(moonGlareOpacity(distance: (touching + clear) / 2), 0.5, accuracy: 0.001)
+        XCTAssertEqual(moonGlareOpacity(distance: clear), 1)
         XCTAssertEqual(starOpacity(sunAltitude: 0), 0)
         XCTAssertEqual(starOpacity(sunAltitude: -12), 0.35, accuracy: 0.001)
         XCTAssertEqual(starOpacity(sunAltitude: -18), 0.7)
@@ -95,15 +96,15 @@ final class SkyBackdropTests: XCTestCase {
         let rising = SkyState(time: rise.time, latitude: 48.535, longitude: -123.01, days: days)
         let sun = try XCTUnwrap(rising.sun)
         let atRise = skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: 48.535,
-                              span: rising.sunSpan, pad: 27, size: size)
-        XCTAssertEqual(atRise.x, 427, accuracy: 0.001)
+                              span: rising.sunSpan, pad: sunGlowRadius, size: size)
+        XCTAssertEqual(atRise.x, 400 + sunGlowRadius, accuracy: 0.001)
         XCTAssertGreaterThan(atRise.y, 320, "the upper limb is on the horizon, the centre below it")
 
         let setting = SkyState(time: set.time, latitude: 48.535, longitude: -123.01, days: days)
         let sunSet = try XCTUnwrap(setting.sun)
         let atSet = skyPoint(azimuth: sunSet.azDeg, altitude: sunSet.altDeg, latitude: 48.535,
-                             span: setting.sunSpan, pad: 27, size: size)
-        XCTAssertEqual(atSet.x, -27, accuracy: 0.001)
+                             span: setting.sunSpan, pad: sunGlowRadius, size: size)
+        XCTAssertEqual(atSet.x, -sunGlowRadius, accuracy: 0.001)
         XCTAssertNil(setting.moonSpan, "no moon chrome, no moon span")
     }
 

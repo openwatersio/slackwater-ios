@@ -33,6 +33,11 @@ func skyPaint(sunAltitude: Double) -> SkyPaint {
 
 // The muted daylight paint never gets bright enough for navy at the lead's position.
 func skyUsesDarkInk(sunAltitude _: Double) -> Bool { false }
+/// The bodies' sizes, in points. Symbols, many times the true half-degree.
+/// The horizon pad and the moon's glare fade key off the sun's glow.
+let sunDiscRadius: CGFloat = 8
+let sunGlowRadius: CGFloat = 27
+let moonGlyphSize: CGFloat = 22
 func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
 /// The moon fades out inside the sun's glare, as it does in the sky: the
 /// bodies are symbols many times their true size, so near every new moon the
@@ -41,7 +46,9 @@ func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
 /// clear once it is past the sun's glow. A real solar eclipse fades too —
 /// gate on an Almanac separation once it has one.
 func moonGlareOpacity(distance: CGFloat) -> Double {
-    max(0, min(1, Double((distance - 20) / 24)))
+    let touching = sunDiscRadius + moonGlyphSize / 2
+    let clear = sunGlowRadius + moonGlyphSize / 2
+    return max(0, min(1, Double((distance - touching) / (clear - touching))))
 }
 func starOpacity(sunAltitude: Double) -> Double {
     max(0, min(0.7, (-sunAltitude - 6) / 12 * 0.7))
@@ -154,7 +161,6 @@ struct SkyState {
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
-    var horizon: Color { Color(hex: paint.bottom).opacity(opacity) }
     var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
 }
 
@@ -165,8 +171,14 @@ struct SkyBackdrop: View {
     var body: some View {
         GeometryReader { proxy in
             let paint = sky.paint
+            // The horizon is `plotDepth` above the bottom: the frame runs on
+            // to the plot's floor so a body's glow can reach the water.
+            let size = CGSize(width: proxy.size.width, height: proxy.size.height - TimelineGeo.plotDepth)
+            let horizonStop = size.height / proxy.size.height
             ZStack {
-                LinearGradient(colors: [Color(hex: paint.top), Color(hex: paint.bottom)],
+                LinearGradient(stops: [.init(color: Color(hex: paint.top), location: 0),
+                                       .init(color: Color(hex: paint.bottom), location: horizonStop),
+                                       .init(color: Color(hex: paint.bottom), location: 1)],
                                startPoint: .top, endPoint: .bottom)
                     .opacity(sky.opacity)
                 if let altitude = sky.sun?.altDeg {
@@ -174,7 +186,7 @@ struct SkyBackdrop: View {
                     TimelineView(.animation(minimumInterval: 0.125,
                                             paused: opacity == 0 || reduceMotion)) { timeline in
                         let seconds = timeline.date.timeIntervalSinceReferenceDate
-                        Canvas { context, size in
+                        Canvas { context, _ in
                             for i in 0..<24 {
                                 let point = starPoint(i, size: size)
                                 let radius: CGFloat = i.isMultiple(of: 5) ? 1.15 : 0.7
@@ -192,19 +204,19 @@ struct SkyBackdrop: View {
                 // Below the horizon a body is past an edge; the clip hides it.
                 let sunPoint = sky.sun.map {
                     skyPoint(azimuth: $0.azDeg, altitude: $0.altDeg, latitude: sky.latitude,
-                             span: sky.sunSpan, pad: 27, size: proxy.size)
+                             span: sky.sunSpan, pad: sunGlowRadius, size: size)
                 }
                 if let point = sunPoint {
                     Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
-                        .frame(width: 54, height: 54).position(point)
+                        .frame(width: sunGlowRadius * 2, height: sunGlowRadius * 2).position(point)
                     Circle().fill(SN.sun)
-                        .frame(width: 16, height: 16).position(point)
+                        .frame(width: sunDiscRadius * 2, height: sunDiscRadius * 2).position(point)
                 }
                 if let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
                     let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                          latitude: sky.latitude, span: sky.moonSpan,
-                                         pad: glowRadius, size: proxy.size)
+                                         pad: glowRadius, size: size)
                     // The lit limb faces the sun on screen, above the horizon
                     // or not; the glow leans the same way.
                     let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
@@ -224,7 +236,7 @@ struct SkyBackdrop: View {
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
                         .opacity(moonGlareOpacity(distance: glare))
                     // `waxing: true` lights the +x limb; the rotation aims it.
-                    MoonGlyph(fraction: illumination.fraction, waxing: true, size: 22)
+                    MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize)
                         .rotationEffect(.radians(toSun))
                         .position(point)
                         .opacity(moonGlareOpacity(distance: glare))
@@ -570,9 +582,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             ScrollView {
                 ZStack(alignment: .top) {
                     if let topBackdrop, let timeline {
+                        // Down to the plot's floor, so a body's glow reaches
+                        // the water; the strip paints the water over it.
                         topBackdrop
                             .frame(maxWidth: .infinity)
-                            .frame(height: topHeight + TimelineGeo(data: timeline).bodyTop)
+                            .frame(height: topHeight + TimelineGeo(data: timeline).bodyBottom)
                     }
                     VStack(spacing: 0) {
                         VStack(spacing: 0) {
