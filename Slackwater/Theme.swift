@@ -698,7 +698,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             Divider().overlay(Color.white.opacity(0.08))
             // Both dates, never one: `anchor` keys the day groups (it is what
             // `days` offsets are relative to), `today` only says Today/Tomorrow.
-            MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+            // The eclipse row is merged HERE, not in the four detail views:
+            // an eclipse belongs to the sky, not to the station, so every kind
+            // of detail gets it from one place.
+            MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
+                             tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
                              scrubTime: scrubTime, onTap: { scrubTime = $0 })
         }

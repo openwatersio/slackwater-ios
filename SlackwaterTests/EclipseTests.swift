@@ -22,11 +22,22 @@ final class EclipseTests: XCTestCase {
         return f.date(from: s)!
     }
 
-    /// The eclipse's local day at the station, as an anchor.
+    /// The local midnight `iso` falls inside, at this station.
     private func anchor(_ iso: String, _ tz: TimeZone) -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         return cal.startOfDay(for: utc(iso))
+    }
+
+    /// A timeline anchored on the eclipse's own LOCAL day — which is 2026-08-27
+    /// at Friday Harbor, not the 08-28 the eclipse is named for: the whole
+    /// event runs from 18:24 to 00:01 PDT on the evening of the 27th. Anchored
+    /// on the 28th the start lands in the 48-hour back-pad, inside the strip's
+    /// window but outside `scheduleRange`, and the list row disappears.
+    private func eclipseTimeline() throws -> (TimelineData, WindowEclipse) {
+        let at = anchor("2026-08-27T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        return (tl, try XCTUnwrap(tl.eclipses.first))
     }
 
     // MARK: - The window search
@@ -104,22 +115,69 @@ final class EclipseTests: XCTestCase {
             renderer.scale = 2
             return try XCTUnwrap(renderer.uiImage)
         }
-        // Warm pixels, not ink: the umbra REPLACES lit moon rather than adding
-        // to it, so the not-background count barely moves (measured: 0.388
-        // clean against 0.389 eclipsed). Copper is the only warm thing on a
-        // night canvas, so counting it counts the shadow.
-        let clean = warmFraction(try shot(0))
-        let eclipsed = warmFraction(try shot(0.93))
+        // Copper pixels, not ink: the umbra REPLACES lit moon rather than
+        // adding to it, so the not-background count barely moves (measured:
+        // 0.388 clean against 0.389 eclipsed).
+        let clean = copperFraction(try shot(0))
+        let eclipsed = copperFraction(try shot(0.93))
         XCTAssertEqual(clean, 0, accuracy: 0.001, "a clear moon has nothing copper on it")
         XCTAssertGreaterThan(eclipsed, 0.1, "the shadow covers most of the disc — got \(eclipsed)")
+    }
+
+    // MARK: - In the schedule
+
+    func testTheEclipseRowMergesIntoTheScheduleInTimeOrder() throws {
+        let (tl, e) = try eclipseTimeline()
+        let rows = eclipseEntries(tl)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.time, e.start)
+        XCTAssertEqual(rows.first?.pill, .eclipse)
+        // The value column carries the peak — the one instant worth quoting.
+        XCTAssertEqual(rows.first?.value, chartTime(e.peak, tl.tz))
+        XCTAssertTrue(tl.scheduleRange.contains(e.start))
+
+        // And it sorts in among the tide turns rather than landing at an end.
+        // The tide rows are rebuilt here rather than reached for: the detail
+        // view's builder is private to it, and only the ORDER matters.
+        let tides = tl.tideExtremes
+            .filter { tl.scheduleRange.contains($0.time) }
+            .map { ScheduleEntry(time: $0.time, pill: $0.kind == .high ? .high : .low) }
+        let merged = (tides + rows).sorted { $0.time < $1.time }
+        let index = try XCTUnwrap(merged.firstIndex { $0.pill == .eclipse })
+        XCTAssertGreaterThan(index, 0, "the eclipse is not the first event of the week")
+        XCTAssertLessThan(index, merged.count - 1, "nor the last")
+    }
+
+    func testAQuietWeekAddsNoScheduleRow() {
+        let at = anchor("2026-10-08T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        XCTAssertTrue(eclipseEntries(tl).isEmpty)
+    }
+
+    @MainActor
+    func testTheStripMarksTheEclipseInCopper() throws {
+        let (tl, _) = try eclipseTimeline()
+
+        // The SAME window with the eclipses removed — not a different week, so
+        // the tide curve, day chrome and sun dots are pixel-identical and the
+        // only difference left is the mark.
+        var stripped = tl
+        stripped.eclipses = []
+
+        let marked = try XCTUnwrap(stripImage(tl))
+        let plain = try XCTUnwrap(stripImage(stripped))
+        let plainCopper = copperFraction(plain)
+        let markedCopper = copperFraction(marked)
+        XCTAssertEqual(plainCopper, 0, accuracy: 0.0001,
+                       "nothing else on this strip is copper — got \(plainCopper)")
+        XCTAssertGreaterThan(markedCopper, plainCopper,
+                             "no eclipse mark on the strip — \(markedCopper)")
     }
 
     // MARK: - On the dome
 
     func testTheSkyStateCarriesOnlyTheEclipseUnderwayAtItsTime() throws {
-        let at = anchor("2026-08-28T12:00:00Z", friday.tz)
-        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
-        let e = try XCTUnwrap(tl.eclipses.first)
+        let (tl, e) = try eclipseTimeline()
 
         let peak = SkyState(time: e.peak, latitude: friday.latitude, longitude: friday.longitude,
                             days: tl.days, eclipses: tl.eclipses)
@@ -143,9 +201,7 @@ final class EclipseTests: XCTestCase {
     // MARK: - On the timeline
 
     func testTheTimelineCarriesTheEclipseAndSnapsToEveryContact() throws {
-        let at = anchor("2026-08-28T12:00:00Z", friday.tz)
-        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
-        let e = try XCTUnwrap(tl.eclipses.first)
+        let (tl, e) = try eclipseTimeline()
         XCTAssertEqual(e.kind, .partial)
         for c in e.contacts where tl.contains(c) {
             XCTAssertTrue(tl.snapTimes.contains(c), "contact \(c) is not magnetic")
@@ -161,7 +217,7 @@ final class EclipseTests: XCTestCase {
     /// A rebuild is a user action — opening a detail, picking a week — not a
     /// frame. 250 ms is where it stops feeling instant.
     func testBuildingAnEclipseWindowStaysUnderTheRebuildBudget() {
-        let eclipseWeek = anchor("2026-08-28T12:00:00Z", friday.tz)
+        let eclipseWeek = anchor("2026-08-27T12:00:00Z", friday.tz)
         let t0 = Date()
         _ = TimelineData.build(tide: friday, current: nil, now: eclipseWeek, anchor: eclipseWeek)
         let withEclipse = Date().timeIntervalSince(t0)

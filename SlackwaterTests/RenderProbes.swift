@@ -59,14 +59,18 @@ func inkFraction(_ image: UIImage) -> Double {
     return Double(ink) / Double(w * h)
 }
 
-/// The share of an image's pixels that are WARM — red well ahead of blue.
+/// The share of an image's pixels that are COPPER — red well ahead of blue,
+/// and green held down.
 ///
 /// `inkFraction` cannot see the eclipse: the umbra replaces lit moon with
-/// copper, so the count of not-background pixels barely moves. Nothing else
-/// this app draws on a night canvas is warm — the moon is `SN.foam` (r-b 0),
-/// the canvas `SN.canvas` (r-b -37), the umbra `SN.umbra` (r-b 83) — so a
-/// warm-pixel count IS an eclipse count.
-func warmFraction(_ image: UIImage) -> Double {
+/// copper rather than adding to it, so the count of not-background pixels
+/// barely moves (measured 0.388 clean against 0.389 eclipsed on the glyph).
+///
+/// Warmth alone is not enough either, and this cost a red test: the strip's
+/// sun dots (`SN.sun` 0xF0C860) and sunrise labels are warm too. What
+/// separates them is green — the sun is a bright yellow (g 200 against r 240),
+/// the umbra a dark copper (g 42 against r 107). Hence the second clause.
+func copperFraction(_ image: UIImage) -> Double {
     guard let cg = image.cgImage else { return 0 }
     let w = cg.width, h = cg.height
     guard w > 0, h > 0 else { return 0 }
@@ -77,7 +81,8 @@ func warmFraction(_ image: UIImage) -> Double {
     else { return 0 }
     ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
     var warm = 0
-    for i in stride(from: 0, to: px.count, by: 4) where Int(px[i]) - Int(px[i + 2]) > 40 {
+    for i in stride(from: 0, to: px.count, by: 4)
+    where Int(px[i]) - Int(px[i + 2]) > 40 && Double(px[i + 1]) < Double(px[i]) * 0.75 {
         warm += 1
     }
     return Double(warm) / Double(w * h)

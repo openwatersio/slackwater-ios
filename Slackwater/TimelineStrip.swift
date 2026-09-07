@@ -759,6 +759,19 @@ struct TimelineCanvas: View {
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
         }
+        // The eclipse's first bite, on the sun dots' row. One mark per eclipse
+        // even though every contact is magnetic: five labels on one evening is
+        // a smear, and the one worth reading is where the shadow starts.
+        // Outside the day loop — an eclipse belongs to an instant, not a day.
+        for e in data.eclipses where data.contains(e.start) {
+            let x = data.x(e.start)
+            ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
+                     with: .color(SN.umbra))
+            ctx.draw(Text("🌘\(cardTime(e.start, data.tz))")
+                        .font(.system(size: 11, weight: .medium).monospaced())
+                        .foregroundStyle(SN.umbraLabel),
+                     at: CGPoint(x: x, y: geo.dayY), anchor: .center)
+        }
     }
 
     private func drawTide(_ ctx: GraphicsContext) {
@@ -1371,7 +1384,7 @@ struct TimelineScrubStrip: View {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack
+    case high, low, flood, ebb, slack, eclipse
 }
 
 struct ScheduleEntry: Identifiable {
@@ -1387,6 +1400,18 @@ struct ScheduleEntry: Identifiable {
         self.value = value
         self.arrowDeg = arrowDeg
     }
+}
+
+/// The window's eclipses as schedule rows: one row each, at the first bite,
+/// with the peak in the value column.
+///
+/// Built here and merged by `ScrubDetailScaffold` rather than by the four
+/// detail views: an eclipse is the sky's event, not the station's, so all four
+/// kinds of detail get the same row from the one place.
+func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
+    tl.eclipses
+        .filter { tl.scheduleRange.contains($0.start) }
+        .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
 }
 
 /// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
@@ -1542,6 +1567,17 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
+        case .eclipse:
+            // Copper, and light text on it rather than navy: this is the one
+            // row in the list that is not about water. The KIND (partial,
+            // total, penumbral) is deliberately absent — the column caps at
+            // 100pt for "WSW FLOOD" and "🌘 PENUMBRAL ECLIPSE" does not fit.
+            // The kind belongs to the Moon sheet, which has room for it.
+            Text("🌘 ECLIPSE")
+                .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
+                .foregroundStyle(SN.foam)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(SN.umbra, in: Capsule())
         }
     }
 }
