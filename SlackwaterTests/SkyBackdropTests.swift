@@ -10,7 +10,6 @@ final class SkyBackdropTests: XCTestCase {
                      "Slackwater/OnlineGateDetailView.swift", "Slackwater/DerivedGateDetailView.swift"] {
             XCTAssertTrue(try repoSource(file).contains("topBackdrop: AnyView(SkyBackdrop(sky: sky))"), file)
         }
-        XCTAssertTrue(try repoSource("Slackwater/CurrentLead.swift").contains("showsDayBands: false"))
     }
 
     func testStarsStandWhereTheAlmanacPutsTheSun() throws {
@@ -120,15 +119,15 @@ final class SkyBackdropTests: XCTestCase {
         let rising = SkyState(time: rise.time, latitude: 48.535, longitude: -123.01, days: days)
         let sun = try XCTUnwrap(rising.sun)
         let atRise = skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg, latitude: 48.535,
-                              span: rising.sunSpan, pad: sunGlowRadius, size: size)
-        XCTAssertEqual(atRise.x, 400 + sunGlowRadius, accuracy: 0.001)
+                              span: rising.sunSpan, pad: sunDiscRadius, size: size)
+        XCTAssertEqual(atRise.x, 400 + sunDiscRadius, accuracy: 0.001)
         XCTAssertGreaterThan(atRise.y, 320, "the upper limb is on the horizon, the centre below it")
 
         let setting = SkyState(time: set.time, latitude: 48.535, longitude: -123.01, days: days)
         let sunSet = try XCTUnwrap(setting.sun)
         let atSet = skyPoint(azimuth: sunSet.azDeg, altitude: sunSet.altDeg, latitude: 48.535,
-                             span: setting.sunSpan, pad: sunGlowRadius, size: size)
-        XCTAssertEqual(atSet.x, -sunGlowRadius, accuracy: 0.001)
+                             span: setting.sunSpan, pad: sunDiscRadius, size: size)
+        XCTAssertEqual(atSet.x, -sunDiscRadius, accuracy: 0.001)
         XCTAssertNil(setting.moonSpan, "no moon chrome, no moon span")
     }
 
