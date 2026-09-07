@@ -159,6 +159,9 @@ struct TimelineDay {
     let start: Date          // local midnight
     let sunrise: Date?
     let sunset: Date?
+    /// A lunar day runs 24h50m, so a calendar day can lack either one.
+    let moonrise: Date?
+    let moonset: Date?
 }
 
 struct TimelineData {
@@ -315,7 +318,8 @@ struct TimelineData {
         // draws no chrome at all, which is the 36-hour gap this branch already
         // fixed once, one hour wide and twice a year.
         //
-        // Costs one `sunEvents` call per build; `visibleDays` picks -3 up only
+        // Costs one `sunEvents` and one `moonEvents` call per day per build;
+        // the moon's pair is only for the sky's horizon. `visibleDays` picks -3 up only
         // when the window actually reaches it, so nothing else changes. 8 is
         // the other end: never visible, it supplies the sunrise that closes
         // the last visible night band (offset 7).
@@ -331,9 +335,12 @@ struct TimelineData {
             let dayStart = cal.startOfDay(for: d0)
             let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart)!
             let sun = observer.flatMap { try? sunEvents(from: dayStart, to: dayEnd, observer: $0) } ?? []
+            let moon = observer.flatMap { try? moonEvents(from: dayStart, to: dayEnd, observer: $0) } ?? []
             return TimelineDay(offset: off, start: d0,
                                sunrise: sun.first { $0.kind == .rise }?.time,
-                               sunset: sun.first { $0.kind == .set }?.time)
+                               sunset: sun.first { $0.kind == .set }?.time,
+                               moonrise: moon.first { $0.kind == .rise }?.time,
+                               moonset: moon.first { $0.kind == .set }?.time)
         }
         return DayChrome(tz: tz, anchor: anchor, today: today,
                          start: w.start, end: w.end, days: days)
