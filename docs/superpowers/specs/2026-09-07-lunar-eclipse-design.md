@@ -59,10 +59,12 @@ struct WindowEclipse {
     func shadow(at t: Date) -> Double
 }
 
-func lunarEclipses(from: Date, to: Date, observer: Observer) -> [WindowEclipse]
+func visibleEclipses(from: Date, to: Date, observer: Observer) -> [WindowEclipse]
+func previousVisibleEclipse(before: Date, observer: Observer) -> WindowEclipse?
+func nextVisibleEclipse(after: Date, observer: Observer) -> WindowEclipse?
 ```
 
-`lunarEclipses` walks `nextLunarEclipse(after:)` forward from `from`, stopping once a peak passes `to`, attaching visibility to each, and keeping only those with `anyContactVisible`. Almanac throws outside 1950–2101; the function swallows that and returns what it has, the same way `SummaryTiles` drops its tile rather than the row.
+Each calls the matching Almanac search and keeps only eclipses with `anyContactVisible`. Almanac throws outside 1950–2101; these swallow that and return what they have, the same way `SummaryTiles` drops its tile rather than the row. The name is `visibleEclipses`, not `lunarEclipses`: sharing a name with the Almanac function it calls would resolve fine by argument label and read like a bug at every call site.
 
 `TimelineData` gains `let eclipses: [WindowEclipse]` (defaulted empty), filled in `TimelineData.build(tide:current:...)` and the online-gate builder — the two places that already hold the station's lat/lon and the window. Each eclipse's `contacts` join `snapTimes` under the existing `filter { $0 >= start && $0 <= end }`.
 
@@ -84,13 +86,15 @@ The pill reads `PENUMBRAL` / `PARTIAL` / `TOTAL ECLIPSE` in a copper capsule. `M
 
 ### Strip mark
 
-`TimelineCanvas` draws sun rise/set dots at `geo.sunY` with `↑5:24AM` labels at `geo.dayY`. The eclipse gets the same treatment at its `start`: a copper dot and a `🌘10:11pm` label, one mark per eclipse. Every contact stays magnetic regardless, so scrubbing steps P1 → U1 → greatest → U4 → P4 while only one label sits on the axis.
+**Superseded — see [#304](https://github.com/openwatersio/slackwater-ios/issues/304).** This section planned a copper dot at `geo.sunY` with a `🌘10:11pm` label at `geo.dayY`, matching the sun's rise/set treatment. It shipped and it collided: an eclipse starts in the evening, so its label lands an hour or two from sunset — 36 pt apart at 18 pt/hour against a ~60 pt label — and printed through it (`↓8:24🌘m10:23pm`). There is no free row to move it to. A copper band across P1–P4 replaced it and read as a *measurement* of something the chart plots, which was worse.
+
+What ships is a half-size `🌘` at greatest eclipse on the sun dots' row, and no text. Every contact stays magnetic regardless, so scrubbing still steps P1 → U1 → greatest → U4 → P4. #304 carries the design question.
 
 ### Sky moon and the glyph
 
 `SkyState` gains `eclipse: WindowEclipse?` — the eclipse containing its `time`, chosen by the caller from `timeline.eclipses`. That is the one edit in each of the four detail views.
 
-`MoonGlyph` gains `umbra: Double = 0`. The disc is already a lit circle plus an offset dark limb (`moonLimbShift`); the shadow is a **third** element — a copper-tinted dark disc entering from the limb-opposite side, clipped to the moon — so it never competes with the phase reading. At `umbra == 0` the glyph is byte-for-byte what it draws today. The dome's radial glow warms and dims in proportion to the same number.
+`MoonGlyph` gains `umbra: Double = 0` and `wash: Double = 0` — the second added after review, because a penumbral eclipse has no umbral contact at all and the moon was drawing untouched while the app named an eclipse. `wash` tints and dims the whole disc, under the bite. The disc is already a lit circle plus an offset dark limb (`moonLimbShift`); the shadow is a **third** element — a copper-tinted dark disc entering from the limb-opposite side, clipped to the moon — so it never competes with the phase reading. At `umbra == 0` the glyph is byte-for-byte what it draws today. The dome's radial glow warms and dims in proportion to the same number.
 
 `shadow(at:)` interpolates linearly between contacts: 0 at P1/P4, `magPenumbral` shading through the penumbral legs, `magUmbral` at greatest, with U1/U4 as the umbral endpoints. Almanac reports contact instants and peak magnitudes, not a coverage curve; the curve between them is presentation. Marked with a `ponytail:` comment naming the approximation, and the tested claims are only the endpoints and the peak.
 
