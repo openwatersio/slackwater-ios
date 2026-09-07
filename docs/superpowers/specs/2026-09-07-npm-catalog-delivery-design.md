@@ -287,11 +287,13 @@ requires the exact expected package name and a stable SemVer version made of
 three unsigned decimal components. This small parser also provides the version
 ordering check without adding a SemVer dependency.
 
-The npm registry exposes package contents as a gzip-compressed tar archive.
-iOS has no small native API that extracts npm tarballs, and adding a general
-archive dependency solely for six JSON files adds code and attack surface.
-The [jsDelivr npm CDN] already mirrors every public npm package and exposes
-individual files.
+The npm registry exposes package contents as a gzip-compressed POSIX tar
+archive. iOS can decompress the gzip layer with AppleArchive, but Apple's
+public archive stream decodes Apple Archive entries rather than POSIX tar.
+Direct tarball consumption would therefore require a tar parser in the app or
+a third-party package. The [jsDelivr npm CDN] already mirrors every public npm
+package and exposes individual files, so neither is needed for these six JSON
+files.
 The app therefore fetches files at immutable exact-version URLs:
 
 ```text
