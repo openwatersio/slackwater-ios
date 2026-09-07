@@ -101,7 +101,7 @@ struct CurrentDetailView: View {
                             },
                             links: { tl in
                                 VStack(spacing: 12) {
-                                    SummaryTiles(primary: lead(tl).nextMax, at: scrubTime)
+                                    SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },

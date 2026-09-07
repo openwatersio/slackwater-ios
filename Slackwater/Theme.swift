@@ -385,7 +385,7 @@ struct Commentary: View {
 /// no number at all and passes nil, leaving the moon on its own.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
-    let at: Date
+    let moon: MoonIllumination?
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -399,7 +399,7 @@ struct SummaryTiles: View {
             }
             // Almanac throws only outside 1950–2101; the tile drops rather
             // than the row, so a primary reading still stands on its own.
-            if let moon = try? moonIllumination(at) {
+            if let moon {
                 ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon") {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)

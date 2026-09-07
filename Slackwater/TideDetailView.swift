@@ -94,7 +94,7 @@ struct TideDetailView: View {
                                                    onCommentary: scrubToCommentary)
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
-                            links: { _ in SummaryTiles(primary: range, at: scrubTime) },
+                            links: { _ in SummaryTiles(primary: range, moon: sky.illumination) },
                             bottom: {
                                 VStack(spacing: 14) {
                                     footer
