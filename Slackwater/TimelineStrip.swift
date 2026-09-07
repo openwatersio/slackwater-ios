@@ -943,7 +943,7 @@ struct TimelineScrubber: UIViewRepresentable {
         context.coordinator.host = host
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
-            coordinator.centerIfNeeded(sv)
+            coordinator.layoutDidRun(sv)
         }
         return sv
     }
@@ -1044,8 +1044,54 @@ struct TimelineScrubber: UIViewRepresentable {
         /// Where the animated scroll — the magnet's snap or a pill's jump — is
         /// headed; parked on exactly when the animation ends.
         var magnetTarget: Date?
+        /// The viewport width the offset was last computed against (#280).
+        var laidOutWidth: CGFloat = 0
+        /// A width change is re-anchoring the offset to `scrubTime`; the
+        /// scroll callback it fires must not write `scrubTime` back from
+        /// layout.
+        var reanchoring = false
 
         init(_ parent: TimelineScrubber) { self.parent = parent }
+
+        /// Every `layoutSubviews`: the one-shot opening centre, then the
+        /// width check that keeps the same time under the centerline.
+        func layoutDidRun(_ sv: UIScrollView) {
+            centerIfNeeded(sv)
+            reanchorIfResized(sv)
+            publishCenter(sv)
+        }
+
+        /// Rotation (iPad portrait ↔ landscape, Stage Manager) keeps
+        /// `contentOffset.x` while `bounds.width` changes, so the time under
+        /// the centerline — `contentOffset.x + width / 2` — drifts by half
+        /// the width change and the curve disagrees with the readout until
+        /// the next state change (#280). No scroll callback fires for a pure
+        /// bounds change and SwiftUI does not re-run `updateUIView` for
+        /// layout, so this is the only place that can notice. Re-anchor the
+        /// offset to `scrubTime` unanimated, cancelling a magnet or fling in
+        /// flight. The opening slide is left alone: it recomputes its offset
+        /// from the live width every frame.
+        func reanchorIfResized(_ sv: UIScrollView) {
+            let width = sv.bounds.width
+            defer { laidOutWidth = width }
+            guard didInitialCenter, width > 0, abs(width - laidOutWidth) > 0.5, !nudging else { return }
+            if sv.isDecelerating || magneting {
+                sv.setContentOffset(sv.contentOffset, animated: false)
+                cancelMagnet()
+            }
+            reanchoring = true
+            sv.contentOffset = CGPoint(x: parent.data.x(parent.scrubTime) - width / 2, y: 0)
+            reanchoring = false
+        }
+
+        /// The time actually under the centerline, as the strip's
+        /// accessibility value. The lead readout carries `scrubTime`; this is
+        /// the only signal a UI test has for whether the curve agrees with it.
+        func publishCenter(_ sv: UIScrollView) {
+            guard sv.bounds.width > 0 else { return }
+            let t = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            sv.accessibilityValue = chartTime(t, parent.data.tz)
+        }
 
         /// One-shot initial centering, at the first layout with a real width
         /// (also reachable from updateUIView, whichever lands first). After
@@ -1069,6 +1115,7 @@ struct TimelineScrubber: UIViewRepresentable {
             // so layout never mutates SwiftUI state.
             sv.contentOffset = CGPoint(x: isIntro ? startX : destinationX, y: 0)
             didInitialCenter = true
+            laidOutWidth = sv.bounds.width
             guard isIntro else { return }
             guard !UIAccessibility.isReduceMotionEnabled else {
                 sv.contentOffset = CGPoint(x: destinationX, y: 0)
@@ -1110,7 +1157,8 @@ struct TimelineScrubber: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
-            guard sv.bounds.width > 0, didInitialCenter else { return }
+            publishCenter(sv)
+            guard sv.bounds.width > 0, didInitialCenter, !reanchoring else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
         /// A touch during the opening slide leaves the scrubber exactly where
