@@ -117,8 +117,10 @@ final class EclipseTests: XCTestCase {
     // MARK: - The glyph
 
     func testTheUmbraDiscSlidesFromTouchingToCovering() {
-        // Same shape as moonLimbShift: an equal-radius disc offset across the
-        // moon. Tangent at zero coverage (2r), concentric when covered.
+        // An equal-radius disc offset across the moon: tangent at zero
+        // coverage (2r), concentric when covered. (This was "the same shape as
+        // moonLimbShift" until #306 gave the phase a real terminator; the
+        // shadow stays a disc because Earth's umbra is one.)
         XCTAssertEqual(moonUmbraShift(coverage: 0, radius: 10), 20, accuracy: 0.001)
         XCTAssertEqual(moonUmbraShift(coverage: 1, radius: 10), 0, accuracy: 0.001)
         XCTAssertEqual(moonUmbraShift(coverage: 0.5, radius: 10), 10, accuracy: 0.001)

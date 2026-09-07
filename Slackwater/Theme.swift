@@ -33,7 +33,23 @@ func skyPaint(sunAltitude: Double) -> SkyPaint {
 
 // The muted daylight paint never gets bright enough for navy at the lead's position.
 func skyUsesDarkInk(sunAltitude _: Double) -> Bool { false }
+/// The bodies' sizes, in points. Symbols, many times the true half-degree.
+/// The moon's glare fade keys off the sun's glow.
+let sunDiscRadius: CGFloat = 8
+let sunGlowRadius: CGFloat = 27
+let moonGlyphSize: CGFloat = 22
 func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
+/// The moon fades out inside the sun's glare, as it does in the sky: the
+/// bodies are symbols many times their true size, so near every new moon the
+/// two would otherwise overlap like an eclipse. `distance` is between their
+/// projected centres; the moon is gone by the time the discs would touch and
+/// clear once it is past the sun's glow. A real solar eclipse fades too —
+/// gate on an Almanac separation once it has one.
+func moonGlareOpacity(distance: CGFloat) -> Double {
+    let touching = sunDiscRadius + moonGlyphSize / 2
+    let clear = sunGlowRadius + moonGlyphSize / 2
+    return max(0, min(1, Double((distance - touching) / (clear - touching))))
+}
 func starOpacity(sunAltitude: Double) -> Double {
     max(0, min(0.7, (-sunAltitude - 6) / 12 * 0.7))
 }
@@ -54,35 +70,96 @@ private func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
     return channel(16) << 16 | channel(8) << 8 | channel(0)
 }
 
-/// Equator-centred with the horizon at the bottom and zenith at the top —
-/// but mirrored from a sky chart: east on the RIGHT, west on the left. The
-/// strip below puts the future on the right of the centerline, so a body
-/// rises where later comes from and travels the same direction as the curve
-/// it drives. (openwaters.io/sky keeps the chart convention; this page's
-/// frame is the timeline, not a compass.)
-func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize) -> CGPoint {
+/// Where a body crosses the horizon: the azimuths at its last rise at or
+/// before a moment and its first set at or after it. By day that is today's
+/// pair; by night the pair brackets the night, and the body is off screen.
+struct HorizonSpan: Equatable {
+    let riseAz: Double
+    let setAz: Double
+}
+
+/// The sky as a window whose side edges are the horizon. A body's own
+/// rise-to-set azimuths (`span`) stretch across the width, so it rises at the
+/// RIGHT edge and sets at the left wherever those azimuths fall — the horizon
+/// is a circle, and a rectangle's edges can only be it by fitting each body's
+/// arc to the frame. Altitude has its own fixed scale, `skyAltitudeScale`:
+/// azimuth stretches per day and altitude does not, so a winter noon sits
+/// well under a summer one and the sun and moon at one altitude share a
+/// height. Mirrored from a sky chart —
+/// east on the right, in either hemisphere — because the strip's time axis
+/// runs left → right, so as time advances the curve pans right → left under
+/// the fixed centerline and a body sweeps with the curve it drives.
+/// (openwaters.io/sky keeps the chart convention; this page's frame is the
+/// timeline, not a compass.)
+///
+/// `pad` is the body's disc radius: at the horizon the disc has just cleared
+/// the edge, and its glow spills in from off screen as it rises. A wider pad
+/// would cost daylight — the sun covers about 36pt an hour here, so padding
+/// by the glow instead had it leaving an hour before sunset under a blue
+/// sky. With no span the window is the whole 360°.
+let skyAltitudeScale: CGFloat = 3   // points per degree of altitude
+/// How far the horizon sits inside the plot box, so the curve's peaks rise in
+/// front of the lowest stars. Small: a body 5° up is back above the box, and
+/// a high peak never covers a rising sun.
+let skyHorizonOverlap: CGFloat = 16
+/// Haze: stars brighten from the horizon up into the zenith's clear air,
+/// and the field runs on a little below the horizon so it trails off in the
+/// plot's water instead of starting on a line.
+func starHazeOpacity(altitude: Double) -> Double { max(0, min(1, (altitude + 10) / 50)) }
+func skyPoint(azimuth: Double, altitude: Double, latitude: Double,
+              span: HorizonSpan? = nil, pad: CGFloat = 0, size: CGSize) -> CGPoint {
     let center = latitude >= 0 ? 180.0 : 0.0
-    let signed = (azimuth - center + 540).truncatingRemainder(dividingBy: 360) - 180
-    return CGPoint(x: size.width / 2 - CGFloat(signed / 360) * size.width,
-                   y: size.height * (1 - CGFloat(altitude / 90)))
+    // Degrees from the meridian, negative toward the rising side.
+    func signed(_ az: Double) -> Double {
+        let s = (az - center + 540).truncatingRemainder(dividingBy: 360) - 180
+        return latitude >= 0 ? s : -s
+    }
+    var rise = -180.0, set = 180.0
+    if let span, signed(span.riseAz) < signed(span.setAz) {
+        rise = signed(span.riseAz)
+        set = signed(span.setAz)
+    }
+    let pointsPerDegree = (size.width + 2 * pad) / CGFloat(set - rise)
+    return CGPoint(x: size.width + pad - CGFloat(signed(azimuth) - rise) * pointsPerDegree,
+                   y: size.height - CGFloat(altitude) * skyAltitudeScale)
 }
 
-/// A circular path from the day's actual rise to set times, rising on the
-/// RIGHT and setting on the left. The strip's time axis runs left → right,
-/// so as time advances the curve pans right → left under the fixed
-/// centerline — the sun sweeps with it, matching `skyPoint`'s mirror.
-func sunArcPoint(progress: Double, size: CGSize) -> CGPoint {
-    let progress = max(0, min(1, progress))
-    let angle = progress * .pi
-    let radius = min(size.width / 2, size.height)
-    return CGPoint(x: size.width / 2 + radius * CGFloat(cos(angle)),
-                   y: size.height - radius * CGFloat(sin(angle)))
+/// A fixed star: J2000 right ascension and declination in degrees, and
+/// visual magnitude.
+struct Star { let ra: Double; let dec: Double; let mag: Double }
+
+/// Every star brighter than magnitude 3.5, brightest first — enough for the
+/// constellations to read without a dust of faint points. `stars.json` is
+/// `[ra, dec, mag]` rows cut from d3-celestial's Yale Bright Star Catalog.
+let brightStars: [Star] = {
+    guard let url = Bundle.main.url(forResource: "stars", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let rows = try? JSONDecoder().decode([[Double]].self, from: data) else { return [] }
+    return rows.compactMap { $0.count == 3 ? Star(ra: $0[0], dec: $0[1], mag: $0[2]) : nil }
+}()
+
+// TODO: move these two into Almanac as a public `starAltAz` beside
+// `sunAltAz` before this merges — Almanac already has the sidereal time
+// (`siderealDeg`) this re-derives, and the app should not own sky math.
+/// Local mean sidereal time in degrees (Meeus 12.4, first two terms). Mean,
+/// not apparent: the equation of the equinoxes is under 0.005°.
+func localSiderealDeg(_ time: Date, longitude: Double) -> Double {
+    // Days since J2000.0; the reference date is 365.5 days after it.
+    let d = time.timeIntervalSinceReferenceDate / 86400 + 365.5
+    let gmst = 280.46061837 + 360.98564736629 * d
+    return ((gmst + longitude).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
 }
 
-private func starPoint(_ index: Int, size: CGSize) -> CGPoint {
-    let x = Double((index * 37 + 11) % 97) / 96
-    let y = Double((index * 53 + 7) % 89) / 88
-    return CGPoint(x: size.width * x, y: size.height * CGFloat(y) * 0.82)
+/// Where a fixed star stands: azimuth from north through east, altitude
+/// above the horizon. No precession, refraction or parallax — a J2000
+/// position drifts 0.014°/yr, about a point at `skyAltitudeScale` so far.
+func starAltAz(raDeg: Double, decDeg: Double, siderealDeg: Double,
+               latitude: Double) -> (azDeg: Double, altDeg: Double) {
+    let ha = (siderealDeg - raDeg) * .pi / 180
+    let dec = decDeg * .pi / 180, lat = latitude * .pi / 180
+    let alt = asin(sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(ha))
+    let az = atan2(-sin(ha) * cos(dec), sin(dec) * cos(lat) - cos(dec) * sin(lat) * cos(ha))
+    return ((az * 180 / .pi + 360).truncatingRemainder(dividingBy: 360), alt * 180 / .pi)
 }
 
 struct SkyState {
@@ -90,40 +167,56 @@ struct SkyState {
     /// The scrub time this state was built for — what the eclipse is read at.
     let time: Date
     let sun: AltAz?
-    let sunProgress: Double?
+    let sunSpan: HorizonSpan?
     let moon: AltAz?
+    let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
+    /// Local sidereal time: the one number every star's position turns on.
+    let siderealDeg: Double
     /// The eclipse underway at `time`, if any. Chosen from an array the
     /// timeline already built: this initialiser runs on EVERY scrub frame, and
     /// an eclipse search here would cost orders of magnitude more than the
-    /// position lookups below — the same reason the sun's arc reads its
-    /// endpoints from `days` rather than searching for them.
+    /// position lookups below — the same reason the horizon spans read their
+    /// rise and set times from `days` rather than searching for them.
     let eclipse: WindowEclipse?
 
-    /// `days` is the strip's own day chrome. The arc's endpoints come from
-    /// there rather than a second rise/set computation here: this initialiser
-    /// runs on every scrub frame, and an Almanac event search costs two orders
-    /// of magnitude more than the position lookups above it (~0.6 ms against
-    /// ~0.005 ms) — but the real reason is agreement, since the dome's sun
-    /// would otherwise fly over night bands drawn from a different answer. Empty days (an online gate still fetching) means no arc, and
-    /// `SkyBackdrop` falls back to the sun's true az/alt.
+    /// `days` is the strip's own day chrome. Both bodies' horizon spans take
+    /// their rise and set times from there rather than searching here: this
+    /// initialiser runs on every scrub frame, and an Almanac event search
+    /// costs two orders of magnitude more than a position lookup (~0.6 ms
+    /// against ~0.005 ms). Empty days (an online gate still fetching) means
+    /// no spans, and `skyPoint` shows the whole 360°.
+    ///
+    /// `eclipses` arrives the same way and for the same reason: already found,
+    /// by the timeline build, because searching for one here would be far more
+    /// expensive than either.
     init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = [],
          eclipses: [WindowEclipse] = []) {
         self.latitude = latitude
         self.time = time
+        siderealDeg = localSiderealDeg(time, longitude: longitude)
         eclipse = eclipses.first { $0.underway(at: time) }
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
-        // The arc only draws in daylight, so the pair that matters is the rise
-        // behind `time` and the set ahead of it.
-        if let rise = days.compactMap(\.sunrise).last(where: { $0 <= time }),
-           let set = days.compactMap(\.sunset).first(where: { $0 >= time }) {
-            sunProgress = time.timeIntervalSince(rise) / set.timeIntervalSince(rise)
-        } else {
-            sunProgress = nil
-        }
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
+        sunSpan = observer.flatMap { obs in
+            Self.span(rises: days.compactMap(\.sunrise), sets: days.compactMap(\.sunset),
+                      at: time) { try sunAltAz($0, observer: obs) }
+        }
+        moonSpan = observer.flatMap { obs in
+            Self.span(rises: days.compactMap(\.moonrise), sets: days.compactMap(\.moonset),
+                      at: time) { try moonAltAz($0, observer: obs) }
+        }
+    }
+
+    private static func span(rises: [Date], sets: [Date], at time: Date,
+                             altAz: (Date) throws -> AltAz) -> HorizonSpan? {
+        guard let rise = rises.last(where: { $0 <= time }),
+              let set = sets.first(where: { $0 >= time }),
+              let riseAz = try? altAz(rise).azDeg,
+              let setAz = try? altAz(set).azDeg else { return nil }
+        return HorizonSpan(riseAz: riseAz, setAz: setAz)
     }
 
     /// Fraction of the moon's diameter in the umbra right now, 0 when clear.
@@ -133,7 +226,6 @@ struct SkyState {
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
-    var horizon: Color { Color(hex: paint.bottom).opacity(opacity) }
     var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
 }
 
@@ -144,8 +236,16 @@ struct SkyBackdrop: View {
     var body: some View {
         GeometryReader { proxy in
             let paint = sky.paint
+            // The horizon is `plotDepth` above the bottom, less the overlap:
+            // the frame runs on to the plot's floor so a body's glow can
+            // reach the water.
+            let size = CGSize(width: proxy.size.width,
+                              height: proxy.size.height - TimelineGeo.plotDepth + skyHorizonOverlap)
+            let horizonStop = size.height / proxy.size.height
             ZStack {
-                LinearGradient(colors: [Color(hex: paint.top), Color(hex: paint.bottom)],
+                LinearGradient(stops: [.init(color: Color(hex: paint.top), location: 0),
+                                       .init(color: Color(hex: paint.bottom), location: horizonStop),
+                                       .init(color: Color(hex: paint.bottom), location: 1)],
                                startPoint: .top, endPoint: .bottom)
                     .opacity(sky.opacity)
                 if let altitude = sky.sun?.altDeg {
@@ -153,36 +253,52 @@ struct SkyBackdrop: View {
                     TimelineView(.animation(minimumInterval: 0.125,
                                             paused: opacity == 0 || reduceMotion)) { timeline in
                         let seconds = timeline.date.timeIntervalSinceReferenceDate
-                        Canvas { context, size in
-                            for i in 0..<24 {
-                                let point = starPoint(i, size: size)
-                                let radius: CGFloat = i.isMultiple(of: 5) ? 1.15 : 0.7
+                        // The stars share the sun's frame (`skyPoint` with
+                        // its span), so the field slides with the bodies as
+                        // the scrubber moves. Off-frame and set stars cost
+                        // nothing: the canvas clips them.
+                        Canvas { context, _ in
+                            for (i, star) in brightStars.enumerated() {
+                                let (az, alt) = starAltAz(raDeg: star.ra, decDeg: star.dec,
+                                                          siderealDeg: sky.siderealDeg,
+                                                          latitude: sky.latitude)
+                                let haze = starHazeOpacity(altitude: alt)
+                                guard haze > 0 else { continue }
+                                let point = skyPoint(azimuth: az, altitude: alt, latitude: sky.latitude,
+                                                     span: sky.sunSpan, size: size)
+                                let radius = max(0.5, 1.6 - 0.3 * CGFloat(star.mag))
                                 let twinkle = starTwinkle(index: i, seconds: seconds,
                                                           reduceMotion: reduceMotion)
                                 context.fill(Path(ellipseIn: CGRect(x: point.x - radius,
                                                                    y: point.y - radius,
                                                                    width: radius * 2,
                                                                    height: radius * 2)),
-                                             with: .color(.white.opacity(opacity * twinkle)))
+                                             with: .color(.white.opacity(
+                                                opacity * twinkle * haze)))
                             }
                         }
                     }
                 }
-                if let sun = sky.sun {
-                    if sun.altDeg >= 0 {
-                        let point = sky.sunProgress.map { sunArcPoint(progress: $0, size: proxy.size) }
-                            ?? skyPoint(azimuth: sun.azDeg, altitude: sun.altDeg,
-                                        latitude: sky.latitude, size: proxy.size)
-                        Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
-                            .frame(width: 54, height: 54).position(point)
-                        Circle().fill(SN.sun)
-                            .frame(width: 16, height: 16).position(point)
-                    }
+                // Below the horizon a body is past an edge; the clip hides it.
+                let sunPoint = sky.sun.map {
+                    skyPoint(azimuth: $0.azDeg, altitude: $0.altDeg, latitude: sky.latitude,
+                             span: sky.sunSpan, pad: sunDiscRadius, size: size)
                 }
-                if let moon = sky.moon, let illumination = sky.illumination, moon.altDeg >= 0 {
-                    let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
-                                         latitude: sky.latitude, size: proxy.size)
+                if let point = sunPoint {
+                    Circle().fill(SN.sun.opacity(0.24)).blur(radius: 12)
+                        .frame(width: sunGlowRadius * 2, height: sunGlowRadius * 2).position(point)
+                    Circle().fill(SN.sun)
+                        .frame(width: sunDiscRadius * 2, height: sunDiscRadius * 2).position(point)
+                }
+                if let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
+                    let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
+                                         latitude: sky.latitude, span: sky.moonSpan,
+                                         pad: moonGlyphSize / 2, size: size)
+                    // The lit limb faces the sun on screen, above the horizon
+                    // or not; the glow leans the same way.
+                    let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
+                    let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
                     // An eclipsed moon dims and warms, and the sky goes quiet
                     // with it: two changes to the one gradient, not a second
                     // element on top of it. The umbra is copper, not black.
@@ -202,10 +318,20 @@ struct SkyBackdrop: View {
                                 .init(color: Color(hex: halo, opacity: 0), location: 1),
                             ], center: .center, startRadius: 0, endRadius: glowRadius))
                         .frame(width: glowRadius * 2, height: glowRadius * 2)
+                        .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
+                        .opacity(moonGlareOpacity(distance: glare))
+                    // `waxing: true` lights the +x limb; the rotation aims it.
+                    // `shadowTilt` cancels that rotation for the umbra alone: an
+                    // eclipse is the ANTI-solar point, so a shadow that swung
+                    // around with the sun's screen position would be pointing at
+                    // the one direction it cannot come from. Screen-stable is
+                    // honest at 22pt; the true first contact is the moon's
+                    // leading limb, which is #304-adjacent work.
+                    MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
+                              umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
+                        .rotationEffect(.radians(toSun))
                         .position(point)
-                    MoonGlyph(fraction: illumination.fraction, waxing: illumination.waxing,
-                              size: 22, umbra: sky.shadow, wash: sky.wash)
-                        .position(point)
+                        .opacity(moonGlareOpacity(distance: glare))
                 }
             }
         }
@@ -221,13 +347,17 @@ func countdown(from: Date, to target: Date) -> String {
     return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
 }
 
-/// The moon's dark-limb offset for a disc of radius `r`: covering at new
-/// (shift 0), clear at full (2r), lit side right while waxing. (The prototype
-/// export's (1-fraction)·1.9r is inverted — it blacks out a full moon.)
-/// Shared by `MoonGlyph` and the strip's night moons: the SwiftUI and
-/// GraphicsContext renderers can't merge, so the geometry must.
-func moonLimbShift(fraction: Double, waxing: Bool, radius: CGFloat) -> CGFloat {
-    (waxing ? -1 : 1) * CGFloat(fraction) * 2 * radius
+/// The lit region of a disc of radius `r`, lit from +x. The terminator is
+/// the ellipse the lit hemisphere's edge projects to, with half-width
+/// r·cos(phase angle): the near half-disc plus that ellipse when gibbous,
+/// minus it when crescent. Almanac's `fraction` is (1 + cos i) / 2, so the
+/// cosine is 2·fraction − 1 and no angle is needed.
+func moonLitPath(fraction: Double, radius r: CGFloat) -> Path {
+    let c = CGFloat(2 * fraction - 1)
+    let disc = Path(ellipseIn: CGRect(x: -r, y: -r, width: 2 * r, height: 2 * r))
+    let near = disc.intersection(Path(CGRect(x: 0, y: -r, width: r, height: 2 * r)))
+    let terminator = Path(ellipseIn: CGRect(x: -r * abs(c), y: -r, width: 2 * r * abs(c), height: 2 * r))
+    return c >= 0 ? near.union(terminator) : near.subtracting(terminator)
 }
 
 /// The umbral shadow's offset for a disc of radius `r`: tangent at zero
@@ -235,6 +365,12 @@ func moonLimbShift(fraction: Double, waxing: Bool, radius: CGFloat) -> CGFloat {
 /// fraction of the moon's DIAMETER — what Almanac's `magUmbral` means — and
 /// runs above 1 for a total eclipse, where the disc is clamped: there is
 /// nowhere further to slide.
+///
+/// The shadow is an equal-radius disc sliding across, which is the same shape
+/// the phase used before #306 replaced it with a real terminator
+/// (`moonLitPath`). It stays a disc deliberately: Earth's umbra at the moon's
+/// distance really is a circle roughly 2.6 times the moon's diameter, so a
+/// straight-edged terminator would be the wrong curve here.
 func moonUmbraShift(coverage: Double, radius: CGFloat) -> CGFloat {
     (1 - CGFloat(min(max(coverage, 0), 1))) * 2 * radius
 }
@@ -266,9 +402,12 @@ func eclipseTileText(_ kind: LunarEclipseKind) -> String {
     }
 }
 
-/// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
-/// an offset circle clipped to the disc — fullness and waxing side track the
-/// illumination as you scrub across days.
+/// The moon glyph: the lit region over a dark disc that stays
+/// semi-transparent to show the sky. Lit on the right while waxing, the
+/// northern convention; the sky passes `waxing: true` and rotates toward the sun.
+///
+/// `umbra` and `wash` add the eclipse on top of all that, and only on top:
+/// at zero the glyph is exactly what it draws for every other night.
 struct MoonGlyph: View {
     let fraction: Double
     let waxing: Bool
@@ -280,30 +419,38 @@ struct MoonGlyph: View {
     /// warms and dims, which for a penumbral eclipse is the ONLY mark there
     /// is: it has no umbral contact, so `umbra` stays 0 throughout.
     var wash: Double = 0
+    /// Rotation applied to the SHADOW alone. The sky dome rotates the whole
+    /// glyph to aim the lit limb at the sun; the umbra must not follow it,
+    /// because an eclipse happens at the anti-solar point. Zero everywhere
+    /// else, where nothing rotates the glyph at all.
+    var shadowTilt: Angle = .zero
 
     var body: some View {
         let r = size / 2 - 1
-        let shift = moonLimbShift(fraction: fraction, waxing: waxing, radius: r)
         ZStack {
-            Circle().fill(SN.foam)
-            Circle().fill(SN.moonLimb).offset(x: shift)
-            if wash > 0 {
-                // Over the whole disc, under the bite: the penumbra darkens
-                // everything it touches, and the umbra is a deeper shadow
-                // inside it, not a separate event.
-                Circle().fill(SN.umbra.opacity(0.42 * min(max(wash, 0), 1)))
-            }
-            if umbra > 0 {
-                // A THIRD element, entering from the side the phase limb is
-                // leaving, so an eclipse can never be read as a phase: an
-                // eclipse happens at full, where the limb shift is off the
-                // disc entirely, and in practice the two never share a pixel.
-                Circle().fill(SN.umbra)
-                    .offset(x: (waxing ? 1 : -1) * moonUmbraShift(coverage: umbra, radius: r))
+            Circle().fill(SN.moonLimb.opacity(0.18))
+            moonLitPath(fraction: fraction, radius: r).offsetBy(dx: r, dy: r)
+                .fill(SN.foam)
+                .scaleEffect(x: waxing ? 1 : -1)
+            if wash > 0 || umbra > 0 {
+                // The eclipse sits OVER the lit region, not inside it: the
+                // penumbra dims whatever the phase left lit, and the umbra is a
+                // deeper shadow inside the penumbra rather than a separate
+                // event. Clipped to the disc, so neither escapes the moon.
+                ZStack {
+                    if wash > 0 {
+                        Circle().fill(SN.umbra.opacity(0.42 * min(max(wash, 0), 1)))
+                    }
+                    if umbra > 0 {
+                        Circle().fill(SN.umbra)
+                            .offset(x: moonUmbraShift(coverage: umbra, radius: r))
+                    }
+                }
+                .rotationEffect(shadowTilt)
+                .clipShape(Circle())
             }
         }
         .frame(width: 2 * r, height: 2 * r)
-        .clipShape(Circle())
         .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -633,9 +780,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             ScrollView {
                 ZStack(alignment: .top) {
                     if let topBackdrop, let timeline {
+                        // Down to the plot's floor, so a body's glow reaches
+                        // the water; the strip paints the water over it.
                         topBackdrop
                             .frame(maxWidth: .infinity)
-                            .frame(height: topHeight + TimelineGeo(data: timeline).bodyTop)
+                            .frame(height: topHeight + TimelineGeo(data: timeline).bodyBottom)
                     }
                     VStack(spacing: 0) {
                         VStack(spacing: 0) {

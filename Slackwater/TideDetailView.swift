@@ -86,7 +86,6 @@ struct TideDetailView: View {
                                 TimelineScrubStrip(data: tl, geo: geo,
                                                    imperial: imperial, now: live,
                                                    showsDayBands: false,
-                                                   skyFill: sky.horizon,
                                                    chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
