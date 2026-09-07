@@ -34,6 +34,9 @@ final class NationalScaleTests: XCTestCase {
                        "the 13 validated gates (M47/M53/M55) plus the 9 online fit-rejects")
         XCTAssertEqual(Set(StationItem.all.map(\.id)).count, StationItem.all.count,
                        "two stations sharing an id is a duplicate row, pin and model file")
+        let hidden = CurrentStationRecord.all.filter { $0.referenceOnly == true }.count
+        XCTAssertEqual(hidden, 13, "reference-only bins")
+        XCTAssertEqual(currents, CurrentStationRecord.all.count - hidden, "every non-hidden record is listed once")
     }
 
     /// Both coasts, both countries, and a real curve at the far end of one —
