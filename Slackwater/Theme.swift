@@ -254,6 +254,16 @@ func moonPhaseName(phase: Double) -> String {
     return waxing ? "Waxing Gibbous" : "Waning Gibbous"
 }
 
+/// The Moon tile's value line while an eclipse is underway. Presentation, the
+/// same way `moonPhaseName` is: Almanac reports a kind, the words are ours.
+func eclipseTileText(_ kind: LunarEclipseKind) -> String {
+    switch kind {
+    case .total: "Total Eclipse"
+    case .partial: "Partial Eclipse"
+    case .penumbral: "Penumbral Eclipse"
+    }
+}
+
 /// The prototype's moon glyph (moonGlyphEl): a lit disc with the dark limb as
 /// an offset circle clipped to the disc — fullness and waxing side track the
 /// illumination as you scrub across days.
@@ -428,6 +438,24 @@ struct Commentary: View {
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
     let at: Date
+    /// The eclipse underway at `at`, from the timeline: it renames the value
+    /// line and shadows the glyph.
+    var eclipse: WindowEclipse? = nil
+    /// Handed down from the scaffold. Without it — and without a position —
+    /// the tile stays inert, which is what the tests and previews get.
+    var onJump: ((Date) -> Void)? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+
+    /// Non-nil only when the caller gave both somewhere to go and somewhere to
+    /// stand: the sheet needs an `Observer`, and this view is the only thing
+    /// between the detail view and it.
+    private var sheet: (() -> AnyView)? {
+        guard let onJump, let latitude, let longitude else { return nil }
+        return { AnyView(MoonDetailSheet(at: at, eclipse: eclipse,
+                                         latitude: latitude, longitude: longitude,
+                                         onJump: onJump)) }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -443,12 +471,14 @@ struct SummaryTiles: View {
             // than the row, so a primary reading still stands on its own.
             if let moon = try? moonIllumination(at) {
                 ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
-                            accessibility: "Moon") {
-                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
+                            accessibility: "Moon", detail: sheet) {
+                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
+                              umbra: eclipse?.shadow(at: at) ?? 0)
                 } value: {
                     // Words, not a number: "Waning Crescent" has to fit on one
                     // line where "7.6 ft" does, so it sits well below the hero.
-                    Text(moonPhaseName(phase: moon.phase))
+                    Text(eclipse.map { eclipseTileText($0.kind) }
+                            ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
             }
@@ -464,13 +494,23 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     /// Spoken for the eyebrow row, glyph included; the tile then reads as one
     /// element, this, the value and the caption in order.
     let accessibility: String
+    /// A tile with somewhere to go: a chevron, a tap, and a sheet. Only the
+    /// Moon tile has one so far — `Range` and `Next max` stay inert until they
+    /// have something to say that the tile itself doesn't already.
+    var detail: (() -> AnyView)? = nil
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value
+    @State private var showDetail = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 MonoLabel(text: label, color: SN.foam.opacity(0.55))
+                if detail != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(SN.foam.opacity(0.4))
+                }
                 Spacer()
                 HStack(spacing: 4) { glyph() }
                     .font(.caption.weight(.semibold))
@@ -490,6 +530,13 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(detail != nil ? .isButton : [])
+        .contentShape(Rectangle())
+        // A tap gesture, not a Button: Button press tracking goes dead in the
+        // iPad split layout's detail column, the same reason MultiDaySchedule's
+        // rows use one.
+        .onTapGesture { if detail != nil { showDetail = true } }
+        .sheet(isPresented: $showDetail) { detail?() }
     }
 }
 
@@ -549,8 +596,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @ViewBuilder var card: (TimelineData) -> Card
     /// Under the strip, above the schedule (summary tiles, TideAtPortLink).
     /// Handed the same `TimelineData` the card gets, so a consumer reads the
-    /// timeline the page is already drawing rather than deriving a second one.
-    @ViewBuilder var links: (TimelineData) -> Links
+    /// timeline the page is already drawing rather than deriving a second one —
+    /// and `jump(to:)`, for the Moon sheet's eclipse rows.
+    @ViewBuilder var links: (TimelineData, @escaping (Date) -> Void) -> Links
     /// Below the schedule card; each element gets the standard 14pt top gap.
     @ViewBuilder var bottom: () -> Bottom
 
@@ -629,15 +677,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .onChange(of: timeline == nil) { _, isNil in
                 guard !isNil, let t = linkedInstant else { return }
                 linkedInstant = nil
-                scrubTime = t
-                // The picker's rule, inverted: move the window only when the
-                // moment isn't already on the strip, so a link to later today
-                // doesn't open on a week bar reading "not this week".
-                let week = Timeline.window(anchor: anchor)
-                if t < week.start || t > week.end {
-                    anchor = dayLocal(t, tz)
-                    onPicked(anchor)
-                }
+                jump(to: t)
             }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
@@ -675,6 +715,22 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         }
     }
 
+    /// Park the centerline on `t`, moving the window when `t` is not on it.
+    ///
+    /// Shared by the two things that arrive holding an instant: a shared link
+    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is the
+    /// picker's rule inverted — move only when the moment isn't already on the
+    /// strip, so a jump to later today doesn't open on a week bar reading
+    /// "not this week".
+    private func jump(to t: Date) {
+        scrubTime = t
+        let week = Timeline.window(anchor: anchor)
+        if t < week.start || t > week.end {
+            anchor = dayLocal(t, tz)
+            onPicked(anchor)
+        }
+    }
+
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Full bleed, no chrome: the curve is the hero and the page is its
@@ -685,7 +741,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
 
-            links(tl)
+            links(tl, jump)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
         }

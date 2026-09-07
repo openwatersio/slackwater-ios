@@ -100,9 +100,12 @@ struct CurrentDetailView: View {
                                                  sky: sky,
                                                  scrubTime: $scrubTime, onReturn: returnToNow)
                             },
-                            links: { tl in
+                            links: { tl, jump in
                                 VStack(spacing: 12) {
-                                    SummaryTiles(primary: lead(tl).nextMax, at: scrubTime)
+                                    SummaryTiles(primary: lead(tl).nextMax, at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: record.latitude, longitude: record.longitude)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },

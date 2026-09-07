@@ -57,10 +57,13 @@ struct DerivedGateDetailView: View {
                                     .foregroundStyle(SN.foam.opacity(0.5))
                                     .padding(.top, 10)
                             },
-                            links: { _ in
+                            links: { tl, jump in
                                 VStack(alignment: .leading, spacing: 12) {
                                     // Moon only: a derived gate has slack times and phase, no knots.
-                                    SummaryTiles(at: scrubTime)
+                                    SummaryTiles(at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: gate.latitude, longitude: gate.longitude)
                                     if let note = gate.magnitudeNote {
                                         Text(note).font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                                     }

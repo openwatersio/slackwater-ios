@@ -105,14 +105,17 @@ struct OnlineGateDetailView: View {
                                                      scrubTime: $scrubTime, onReturn: returnToNow)
                                 }
                             },
-                            links: { tl in
+                            links: { tl, jump in
                                 VStack(spacing: 12) {
                                     // `tl`, never this view's `timeline`: that
                                     // property rebuilds the whole TimelineData
                                     // on every read, and the scaffold has
                                     // already built the one on screen.
                                     SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
-                                                 at: scrubTime)
+                                                 at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: gate.latitude, longitude: gate.longitude)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },

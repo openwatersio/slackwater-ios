@@ -124,6 +124,45 @@ final class EclipseTests: XCTestCase {
         XCTAssertGreaterThan(eclipsed, 0.1, "the shadow covers most of the disc — got \(eclipsed)")
     }
 
+    // MARK: - The Moon sheet
+
+    func testTheTileNamesTheEclipseInsteadOfThePhase() {
+        XCTAssertEqual(eclipseTileText(.total), "Total Eclipse")
+        XCTAssertEqual(eclipseTileText(.partial), "Partial Eclipse")
+        XCTAssertEqual(eclipseTileText(.penumbral), "Penumbral Eclipse")
+    }
+
+    func testMoonFactsFindAnEclipseOnEitherSideOfTheNight() throws {
+        let facts = try XCTUnwrap(moonFacts(at: utc("2026-09-07T12:00:00Z"),
+                                            observer: Self.victoria,
+                                            tz: TimeZone(identifier: "America/Vancouver")!))
+        // Ten days on from the partial, it is the one behind us. An hour of
+        // slack around Espenak's 04:12 UT greatest: Almanac holds that to 60 s,
+        // so this only fails if the WRONG eclipse was found.
+        let last = try XCTUnwrap(facts.last)
+        XCTAssertEqual(last.peak.timeIntervalSince(utc("2026-08-28T04:12:00Z")), 0, accuracy: 3600)
+        XCTAssertEqual(last.kind, .partial)
+
+        let next = try XCTUnwrap(facts.next)
+        XCTAssertGreaterThan(next.peak, utc("2026-09-07T12:00:00Z"))
+
+        XCTAssertNotNil(facts.closest)
+        XCTAssertNotNil(facts.farthest)
+        XCTAssertGreaterThan(facts.distanceKm, 350_000)
+        XCTAssertLessThan(facts.distanceKm, 410_000)
+    }
+
+    /// The sheet does its searching in a `.task`, but a sheet that renders
+    /// empty for half a second is its own bug.
+    func testMoonFactsStayUnderHalfASecond() {
+        let t0 = Date()
+        _ = moonFacts(at: utc("2026-09-07T12:00:00Z"), observer: Self.victoria,
+                      tz: TimeZone(identifier: "America/Vancouver")!)
+        let elapsed = Date().timeIntervalSince(t0)
+        print("moonFacts \(elapsed * 1000) ms")
+        XCTAssertLessThan(elapsed, 0.5)
+    }
+
     // MARK: - In the schedule
 
     func testTheEclipseRowMergesIntoTheScheduleInTimeOrder() throws {

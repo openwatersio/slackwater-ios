@@ -95,7 +95,12 @@ struct TideDetailView: View {
                                                    onCommentary: scrubToCommentary)
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
-                            links: { _ in SummaryTiles(primary: range, at: scrubTime) },
+                            links: { tl, jump in
+                                SummaryTiles(primary: range, at: scrubTime,
+                                             eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                             onJump: jump,
+                                             latitude: record.latitude, longitude: record.longitude)
+                            },
                             bottom: {
                                 VStack(spacing: 14) {
                                     footer
