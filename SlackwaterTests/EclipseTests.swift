@@ -284,21 +284,33 @@ final class EclipseTests: XCTestCase {
         XCTAssertTrue(tl.eclipses.isEmpty)
     }
 
-    /// A rebuild is a user action — opening a detail, picking a week — not a
-    /// frame. 250 ms is where it stops feeling instant.
-    func testBuildingAnEclipseWindowStaysUnderTheRebuildBudget() {
-        let eclipseWeek = anchor("2026-08-27T12:00:00Z", friday.tz)
+    /// What this branch owns: finding the window's eclipses. Deliberately NOT
+    /// the whole `TimelineData.build`, which it used to measure — #306 put a
+    /// `moonEvents` call per day into `dayChrome`, and a build went from 68 ms
+    /// to 254 ms with the eclipse search stubbed out entirely (#311). A test
+    /// that fails on another change's cost guards nothing and blames the
+    /// wrong code.
+    func testFindingTheWindowsEclipsesStaysCheap() throws {
+        let observer = try Observer(latitudeDeg: friday.latitude, longitudeDeg: friday.longitude)
+
+        let eclipseWeek = Timeline.window(anchor: anchor("2026-08-27T12:00:00Z", friday.tz))
         let t0 = Date()
-        _ = TimelineData.build(tide: friday, current: nil, now: eclipseWeek, anchor: eclipseWeek)
+        let found = visibleEclipses(from: eclipseWeek.start, to: eclipseWeek.end, observer: observer)
         let withEclipse = Date().timeIntervalSince(t0)
 
-        let quietWeek = anchor("2026-10-08T12:00:00Z", friday.tz)
+        let quietWeek = Timeline.window(anchor: anchor("2026-10-08T12:00:00Z", friday.tz))
         let t1 = Date()
-        _ = TimelineData.build(tide: friday, current: nil, now: quietWeek, anchor: quietWeek)
+        let none = visibleEclipses(from: quietWeek.start, to: quietWeek.end, observer: observer)
         let without = Date().timeIntervalSince(t1)
 
-        print("eclipse-week build \(withEclipse * 1000) ms, quiet week \(without * 1000) ms")
-        XCTAssertLessThan(withEclipse, 0.25)
-        XCTAssertLessThan(without, 0.25)
+        print("eclipse search \(withEclipse * 1000) ms found \(found.count), "
+              + "quiet week \(without * 1000) ms found \(none.count)")
+        XCTAssertEqual(found.count, 1)
+        XCTAssertTrue(none.isEmpty)
+        // A rebuild is a user action — opening a detail, picking a week — and
+        // the eclipse search is one part of it. 50 ms is generous against the
+        // single-digit milliseconds Almanac 0.2 actually takes.
+        XCTAssertLessThan(withEclipse, 0.05)
+        XCTAssertLessThan(without, 0.05)
     }
 }
