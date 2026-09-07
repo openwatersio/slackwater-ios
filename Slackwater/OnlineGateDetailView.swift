@@ -111,7 +111,7 @@ struct OnlineGateDetailView: View {
                                     // on every read, and the scaffold has
                                     // already built the one on screen.
                                     SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
-                                                 at: scrubTime)
+                                                 moon: sky.illumination)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },
