@@ -42,8 +42,9 @@ final class SkyBackdropTests: XCTestCase {
                        CGPoint(x: 200, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 180, altitude: 90, latitude: 48, size: size),
                        CGPoint(x: 200, y: 0))
-        // East on the RIGHT — the sky is mirrored from a chart so bodies
-        // travel the strip's direction of time, right to left.
+        // East on the RIGHT — mirrored from a sky chart. Time advances to
+        // the right on the strip, so the curve pans right to left under the
+        // fixed centerline and the bodies sweep with it.
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: 48, size: size),
                        CGPoint(x: 300, y: 160))
 

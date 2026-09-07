@@ -68,8 +68,9 @@ func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize)
 }
 
 /// A circular path from the day's actual rise to set times, rising on the
-/// RIGHT and setting on the left — the direction time flows on the strip,
-/// matching `skyPoint`'s mirror.
+/// RIGHT and setting on the left. The strip's time axis runs left → right,
+/// so as time advances the curve pans right → left under the fixed
+/// centerline — the sun sweeps with it, matching `skyPoint`'s mirror.
 func sunArcPoint(progress: Double, size: CGSize) -> CGPoint {
     let progress = max(0, min(1, progress))
     let angle = progress * .pi
