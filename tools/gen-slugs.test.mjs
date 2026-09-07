@@ -13,7 +13,10 @@ test("every bundled station has a slug, keyed by its catalog id", () => {
   const expect = (kind, files) => {
     for (const file of files) {
       for (const s of read(file)) {
-        if (s.referenceOnly) continue;
+        if (s.referenceOnly) {
+          assert.equal(slugs[kind][s.id], undefined, `${file}: ${s.id} is reference-only but has a ${kind} slug`);
+          continue;
+        }
         assert.ok(slugs[kind][s.id], `${file}: ${s.id} has no ${kind} slug`);
       }
     }

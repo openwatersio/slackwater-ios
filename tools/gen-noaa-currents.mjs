@@ -12,8 +12,8 @@
  *   1. Harmonic and subordinate stations (#268). A subordinate has no
  *      constituents: it ships with `reference` and NOAA's six offsets, in the
  *      engine's own field names, for slackwater-engine's SubordinateStation —
- *      and only if its reference ships too (the 147 whose reference is a
- *      non-primary bin are #269).
+ *      and only if its reference ships too (143 of the 147 whose reference is
+ *      a non-primary bin do, via filter 2; the other 4 lack a set direction).
  *   2. Primary bin only (id without "@") — one station, one prediction — except
  *      a bin that a shipped subordinate reduces from (#269). That bin ships as
  *      a reference-only record: `referenceOnly: true`, harmonic shape, named

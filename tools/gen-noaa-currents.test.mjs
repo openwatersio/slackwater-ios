@@ -65,6 +65,7 @@ test("exactly the referenced bins ship, flagged, harmonic, and each one used", (
     assert.ok(bin.constituents.length > 0, `${bin.id} has no constituents`);
     assert.equal(bin.reference, undefined);
     assert.ok(OFFSETS.every((k) => bin[k] === undefined), `${bin.id} carries offsets`);
+    assert.equal(bin.tideReference, undefined, `${bin.id} carries a tideReference`);
     assert.ok(referenced.has(bin.id), `${bin.id} is referenced by nobody`);
   }
   assert.deepEqual(

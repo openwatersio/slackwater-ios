@@ -78,7 +78,7 @@ func currentPinColour(_ station: CurrentStationRecord, at now: Date) -> String {
         : pinRampHex(forSpeedKn: abs(signed))
 }
 
-/// 1,549 subordinate current pins hang off 50 references, so the reference is
+/// 1,692 subordinate current pins hang off 63 references, so the reference is
 /// searched once per build and each pin only reduces — the engine's own
 /// `reduce` and `speed(at:along:)`, so the math has one owner. The engine
 /// extracts reference events per UTC day (`eventsByDay`), so the held list

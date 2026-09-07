@@ -383,7 +383,8 @@ enum StationItem: Identifiable, Hashable {
         if id.hasPrefix("current:") {
             let record: CurrentStationRecord? = try catalogRecord(
                 "currents", id: String(id.dropFirst("current:".count)), directory: directory)
-            return record.map(StationItem.current)
+            // A reference-only bin (#269) resolves by id for the reduction, never as an item.
+            return record.flatMap { $0.referenceOnly == true ? nil : StationItem.current($0) }
         }
         if id.hasPrefix("chs-") {
             let stations: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)

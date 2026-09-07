@@ -81,4 +81,9 @@ final class SubordinateCurrentTests: XCTestCase {
             .filter { if case .current = $0 { true } else { false } }
         XCTAssertEqual(hits.map(\.id), ["current:noaa/EPT0003"])
     }
+
+    func testTheWidgetIdDoorDoesNotOpenOnAReferenceOnlyBin() {
+        XCTAssertNil(StationItem.widgetItem(id: "current:noaa/EPT0003@11"))
+        XCTAssertNotNil(StationItem.widgetItem(id: "current:noaa/ACT0091"))
+    }
 }
