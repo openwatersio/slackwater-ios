@@ -59,6 +59,30 @@ func inkFraction(_ image: UIImage) -> Double {
     return Double(ink) / Double(w * h)
 }
 
+/// The share of an image's pixels that are WARM — red well ahead of blue.
+///
+/// `inkFraction` cannot see the eclipse: the umbra replaces lit moon with
+/// copper, so the count of not-background pixels barely moves. Nothing else
+/// this app draws on a night canvas is warm — the moon is `SN.foam` (r-b 0),
+/// the canvas `SN.canvas` (r-b -37), the umbra `SN.umbra` (r-b 83) — so a
+/// warm-pixel count IS an eclipse count.
+func warmFraction(_ image: UIImage) -> Double {
+    guard let cg = image.cgImage else { return 0 }
+    let w = cg.width, h = cg.height
+    guard w > 0, h > 0 else { return 0 }
+    var px = [UInt8](repeating: 0, count: w * h * 4)
+    guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8,
+                              bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return 0 }
+    ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+    var warm = 0
+    for i in stride(from: 0, to: px.count, by: 4) where Int(px[i]) - Int(px[i + 2]) > 40 {
+        warm += 1
+    }
+    return Double(warm) / Double(w * h)
+}
+
 /// The timeline strip's drawn layer, as a bitmap. `TimelineCanvas` is the whole
 /// picture — curve and fill, day chrome, event bands, gutter times — and it is
 /// a pure SwiftUI `Canvas`, so it is the part of the strip a renderer can see;

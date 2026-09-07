@@ -206,6 +206,15 @@ func moonLimbShift(fraction: Double, waxing: Bool, radius: CGFloat) -> CGFloat {
     (waxing ? -1 : 1) * CGFloat(fraction) * 2 * radius
 }
 
+/// The umbral shadow's offset for a disc of radius `r`: tangent at zero
+/// coverage (2r), concentric once the moon is covered. `coverage` is a
+/// fraction of the moon's DIAMETER — what Almanac's `magUmbral` means — and
+/// runs above 1 for a total eclipse, where the disc is clamped: there is
+/// nowhere further to slide.
+func moonUmbraShift(coverage: Double, radius: CGFloat) -> CGFloat {
+    (1 - CGFloat(min(max(coverage, 0), 1))) * 2 * radius
+}
+
 /// Phase → name, the prototype's moonName buckets (age thresholds 1.7 d for
 /// new/full, 1.4 d for the quarters, over the 29.53 d synodic month).
 /// Presentation, not astronomy: Almanac reports `phase`, and where the names
@@ -230,6 +239,9 @@ struct MoonGlyph: View {
     let fraction: Double
     let waxing: Bool
     var size: CGFloat = 20
+    /// Fraction of the moon's diameter inside the umbra — `WindowEclipse.shadow(at:)`.
+    /// Zero draws exactly what this glyph has always drawn.
+    var umbra: Double = 0
 
     var body: some View {
         let r = size / 2 - 1
@@ -237,6 +249,14 @@ struct MoonGlyph: View {
         ZStack {
             Circle().fill(SN.foam)
             Circle().fill(SN.moonLimb).offset(x: shift)
+            if umbra > 0 {
+                // A THIRD element, entering from the side the phase limb is
+                // leaving, so an eclipse can never be read as a phase: an
+                // eclipse happens at full, where the limb shift is off the
+                // disc entirely, and in practice the two never share a pixel.
+                Circle().fill(SN.umbra)
+                    .offset(x: (waxing ? 1 : -1) * moonUmbraShift(coverage: umbra, radius: r))
+            }
         }
         .frame(width: 2 * r, height: 2 * r)
         .clipShape(Circle())

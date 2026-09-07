@@ -82,6 +82,38 @@ final class EclipseTests: XCTestCase {
                                     observer: Self.victoria).isEmpty)
     }
 
+    // MARK: - The glyph
+
+    func testTheUmbraDiscSlidesFromTouchingToCovering() {
+        // Same shape as moonLimbShift: an equal-radius disc offset across the
+        // moon. Tangent at zero coverage (2r), concentric when covered.
+        XCTAssertEqual(moonUmbraShift(coverage: 0, radius: 10), 20, accuracy: 0.001)
+        XCTAssertEqual(moonUmbraShift(coverage: 1, radius: 10), 0, accuracy: 0.001)
+        XCTAssertEqual(moonUmbraShift(coverage: 0.5, radius: 10), 10, accuracy: 0.001)
+        // A total eclipse reports magUmbral above 1; the disc stops at covered.
+        XCTAssertEqual(moonUmbraShift(coverage: 1.4, radius: 10), 0, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testTheEclipsedGlyphDrawsSomethingTheCleanOneDoesNot() throws {
+        func shot(_ umbra: Double) throws -> UIImage {
+            let renderer = ImageRenderer(content:
+                MoonGlyph(fraction: 1, waxing: false, size: 44, umbra: umbra)
+                    .frame(width: 60, height: 60)
+                    .background(SN.canvas))
+            renderer.scale = 2
+            return try XCTUnwrap(renderer.uiImage)
+        }
+        // Warm pixels, not ink: the umbra REPLACES lit moon rather than adding
+        // to it, so the not-background count barely moves (measured: 0.388
+        // clean against 0.389 eclipsed). Copper is the only warm thing on a
+        // night canvas, so counting it counts the shadow.
+        let clean = warmFraction(try shot(0))
+        let eclipsed = warmFraction(try shot(0.93))
+        XCTAssertEqual(clean, 0, accuracy: 0.001, "a clear moon has nothing copper on it")
+        XCTAssertGreaterThan(eclipsed, 0.1, "the shadow covers most of the disc — got \(eclipsed)")
+    }
+
     // MARK: - On the timeline
 
     func testTheTimelineCarriesTheEclipseAndSnapsToEveryContact() throws {
