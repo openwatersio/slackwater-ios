@@ -54,21 +54,27 @@ private func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
     return channel(16) << 16 | channel(8) << 8 | channel(0)
 }
 
-/// The same full-sky projection as openwaters.io/sky: south-centred in the
-/// northern hemisphere, with the horizon at the bottom and zenith at the top.
+/// Equator-centred with the horizon at the bottom and zenith at the top —
+/// but mirrored from a sky chart: east on the RIGHT, west on the left. The
+/// strip below puts the future on the right of the centerline, so a body
+/// rises where later comes from and travels the same direction as the curve
+/// it drives. (openwaters.io/sky keeps the chart convention; this page's
+/// frame is the timeline, not a compass.)
 func skyPoint(azimuth: Double, altitude: Double, latitude: Double, size: CGSize) -> CGPoint {
     let center = latitude >= 0 ? 180.0 : 0.0
     let signed = (azimuth - center + 540).truncatingRemainder(dividingBy: 360) - 180
-    return CGPoint(x: size.width / 2 + CGFloat(signed / 360) * size.width,
+    return CGPoint(x: size.width / 2 - CGFloat(signed / 360) * size.width,
                    y: size.height * (1 - CGFloat(altitude / 90)))
 }
 
-/// A circular path from the day's actual rise to set times.
+/// A circular path from the day's actual rise to set times, rising on the
+/// RIGHT and setting on the left — the direction time flows on the strip,
+/// matching `skyPoint`'s mirror.
 func sunArcPoint(progress: Double, size: CGSize) -> CGPoint {
     let progress = max(0, min(1, progress))
     let angle = progress * .pi
     let radius = min(size.width / 2, size.height)
-    return CGPoint(x: size.width / 2 - radius * CGFloat(cos(angle)),
+    return CGPoint(x: size.width / 2 + radius * CGFloat(cos(angle)),
                    y: size.height - radius * CGFloat(sin(angle)))
 }
 

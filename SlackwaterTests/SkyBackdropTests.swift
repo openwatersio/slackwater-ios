@@ -42,13 +42,15 @@ final class SkyBackdropTests: XCTestCase {
                        CGPoint(x: 200, y: 160))
         XCTAssertEqual(skyPoint(azimuth: 180, altitude: 90, latitude: 48, size: size),
                        CGPoint(x: 200, y: 0))
+        // East on the RIGHT — the sky is mirrored from a chart so bodies
+        // travel the strip's direction of time, right to left.
         XCTAssertEqual(skyPoint(azimuth: 90, altitude: 0, latitude: 48, size: size),
-                       CGPoint(x: 100, y: 160))
+                       CGPoint(x: 300, y: 160))
 
         let arc = CGSize(width: 400, height: 320)
-        for (progress, expected) in [(0.0, CGPoint(x: 0, y: 320)),
+        for (progress, expected) in [(0.0, CGPoint(x: 400, y: 320)),
                                      (0.5, CGPoint(x: 200, y: 120)),
-                                     (1.0, CGPoint(x: 400, y: 320))] {
+                                     (1.0, CGPoint(x: 0, y: 320))] {
             let point = sunArcPoint(progress: progress, size: arc)
             XCTAssertEqual(point.x, expected.x, accuracy: 0.001)
             XCTAssertEqual(point.y, expected.y, accuracy: 0.001)
