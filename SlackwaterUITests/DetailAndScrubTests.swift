@@ -287,6 +287,62 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                           "first scrub left the readout frozen — initial centering raced layout again")
     }
 
+    /// #280: rotating an iPad kept the strip's `contentOffset` while its width
+    /// changed, so the curve under the centerline drifted half the width
+    /// change away from the readout until the next state change. The lead
+    /// carries `scrubTime`; the strip's scroll view publishes the time
+    /// actually under the centerline as its value. Both must agree through
+    /// portrait → landscape → portrait, on the tide detail (all four detail
+    /// screens share `TimelineScrubber`).
+    func testRotationKeepsCurveUnderTheReadout() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad-only rotation test")
+        }
+        let device = XCUIDevice.shared
+        device.orientation = .portrait
+        defer { device.orientation = .portrait }
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.waitForExistence(timeout: 5), "timeline strip missing")
+        // Away from now, so nothing but the rotation moves the strip.
+        scrubStrip(app)
+        settleScrub(app)
+        XCTAssertLessThanOrEqual(clockGap(stripCentre(app), scrubClock(app)), 5,
+                                 "before rotating, the curve and readout already disagree")
+
+        for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
+            let before = scrubClock(app)
+            device.orientation = orientation
+            settleLayout(strip)
+            let readout = scrubClock(app), centre = stripCentre(app)
+            XCTAssertEqual(readout, before, "rotation changed the readout")
+            XCTAssertLessThanOrEqual(clockGap(centre, readout), 5,
+                                     "after rotating to \(orientation.rawValue) the curve under the "
+                                     + "centerline reads \(centre) while the readout says \(readout)")
+        }
+    }
+
+    /// The time under the strip's centerline ("1:42pm"), from the scroll
+    /// view's accessibility value.
+    private func stripCentre(_ app: XCUIApplication) -> String {
+        app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
+    }
+
+    /// Minutes between two "h:mma" clocks, the short way round midnight.
+    private func clockGap(_ a: String, _ b: String) -> Int {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "h:mma"
+        func minutes(_ s: String) -> Int {
+            guard let d = f.date(from: s.uppercased()) else { return Int.min / 2 }
+            let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+            return c.hour! * 60 + c.minute!
+        }
+        let gap = abs(minutes(a) - minutes(b)) % 1440
+        return min(gap, 1440 - gap)
+    }
+
     /// Over a fast tide the pill explains the yellow line: the rate, in the
     /// ramp's colour, instead of the next turn. Landing on a turn first (the
     /// commentary tap) and then dragging about three hours on puts the scrub

@@ -493,6 +493,44 @@ final class TimelineTests: XCTestCase {
                       "and the ordinary path animates the travel")
     }
 
+    /// #280: rotation keeps `contentOffset.x` while the viewport width
+    /// changes, so the time under the centerline (`offset + width / 2`)
+    /// drifts by half the width change and the curve disagrees with the
+    /// readout. The coordinator's layout hook must put `scrubTime` back under
+    /// the centerline without touching `scrubTime` itself or re-running the
+    /// opening centre. A real `UIScrollView` driven through `layoutIfNeeded`,
+    /// the same path a rotation takes.
+    func testWidthChangeKeepsScrubTimeUnderTheCenterline() {
+        let now = Date()
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
+        let geo = TimelineGeo(data: data)
+        // Six hours back: not the intro start, so no opening slide.
+        let parked = now.addingTimeInterval(-6 * 3600)
+        var scrub = parked
+        let scrubber = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: { scrub = $0 }))
+        let co = TimelineScrubber.Coordinator(scrubber)
+        let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        sv.delegate = co
+        sv.onLayout = { [weak sv] in if let sv { co.layoutDidRun(sv) } }
+        sv.layoutIfNeeded()
+        func centre() -> TimeInterval {
+            data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(parked)
+        }
+        XCTAssertTrue(co.didInitialCenter)
+        XCTAssertEqual(centre(), 0, accuracy: 300, "opening centre missed the parked time")
+
+        for width in [CGFloat(800), 400, 1194] {
+            sv.frame.size.width = width
+            sv.layoutIfNeeded()
+            XCTAssertEqual(centre(), 0, accuracy: 300,
+                           "at \(width)pt the curve under the centerline left the readout")
+            XCTAssertEqual(scrub, parked, "re-anchoring must not rewrite scrubTime from layout")
+            XCTAssertTrue(co.didInitialCenter, "a resize must not restart the opening centre")
+        }
+    }
+
     /// The axis row's crowding rule, on its own. Two times a label's width
     /// apart both print; closer than that, the LATER one is dropped — the
     /// schedule below still lists it. Order-independent, because the callers
