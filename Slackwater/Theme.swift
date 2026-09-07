@@ -164,6 +164,8 @@ func starAltAz(raDeg: Double, decDeg: Double, siderealDeg: Double,
 
 struct SkyState {
     let latitude: Double
+    /// The scrub time this state was built for — what the eclipse is read at.
+    let time: Date
     let sun: AltAz?
     let sunSpan: HorizonSpan?
     let moon: AltAz?
@@ -171,6 +173,12 @@ struct SkyState {
     let illumination: MoonIllumination?
     /// Local sidereal time: the one number every star's position turns on.
     let siderealDeg: Double
+    /// The eclipse underway at `time`, if any. Chosen from an array the
+    /// timeline already built: this initialiser runs on EVERY scrub frame, and
+    /// an eclipse search here would cost orders of magnitude more than the
+    /// position lookups below — the same reason the horizon spans read their
+    /// rise and set times from `days` rather than searching for them.
+    let eclipse: WindowEclipse?
 
     /// `days` is the strip's own day chrome. Both bodies' horizon spans take
     /// their rise and set times from there rather than searching here: this
@@ -178,9 +186,16 @@ struct SkyState {
     /// costs two orders of magnitude more than a position lookup (~0.6 ms
     /// against ~0.005 ms). Empty days (an online gate still fetching) means
     /// no spans, and `skyPoint` shows the whole 360°.
-    init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = []) {
+    ///
+    /// `eclipses` arrives the same way and for the same reason: already found,
+    /// by the timeline build, because searching for one here would be far more
+    /// expensive than either.
+    init(time: Date, latitude: Double, longitude: Double, days: [TimelineDay] = [],
+         eclipses: [WindowEclipse] = []) {
         self.latitude = latitude
+        self.time = time
         siderealDeg = localSiderealDeg(time, longitude: longitude)
+        eclipse = eclipses.first { $0.underway(at: time) }
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
@@ -203,6 +218,11 @@ struct SkyState {
               let setAz = try? altAz(set).azDeg else { return nil }
         return HorizonSpan(riseAz: riseAz, setAz: setAz)
     }
+
+    /// Fraction of the moon's diameter in the umbra right now, 0 when clear.
+    var shadow: Double { eclipse?.shadow(at: time) ?? 0 }
+    /// Penumbral shading right now — what a penumbral eclipse has instead.
+    var wash: Double { eclipse?.wash(at: time) ?? 0 }
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
@@ -279,22 +299,36 @@ struct SkyBackdrop: View {
                     // or not; the glow leans the same way.
                     let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
                     let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
+                    // An eclipsed moon dims and warms, and the sky goes quiet
+                    // with it: two changes to the one gradient, not a second
+                    // element on top of it. The umbra is copper, not black.
+                    let eclipsed = sky.eclipse?.underway(at: sky.time) ?? false
+                    let dim = 1 - 0.75 * sky.shadow - 0.25 * sky.wash
+                    let core: UInt32 = eclipsed ? 0xE8B08C : 0xE6EEFF
+                    let halo: UInt32 = eclipsed ? 0xD79A78 : 0xCFE0FF
                     Circle()
                         .fill(RadialGradient(
                             stops: [
-                                .init(color: Color(hex: 0xE6EEFF,
-                                                   opacity: 0.95 * (0.1 + illumination.fraction * 0.66)),
+                                .init(color: Color(hex: core,
+                                                   opacity: 0.95 * (0.1 + illumination.fraction * 0.66) * dim),
                                       location: 0),
-                                .init(color: Color(hex: 0xCFE0FF,
-                                                   opacity: 0.28 * (0.1 + illumination.fraction * 0.66)),
+                                .init(color: Color(hex: halo,
+                                                   opacity: 0.28 * (0.1 + illumination.fraction * 0.66) * dim),
                                       location: 0.45),
-                                .init(color: Color(hex: 0xCFE0FF, opacity: 0), location: 1),
+                                .init(color: Color(hex: halo, opacity: 0), location: 1),
                             ], center: .center, startRadius: 0, endRadius: glowRadius))
                         .frame(width: glowRadius * 2, height: glowRadius * 2)
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
                         .opacity(moonGlareOpacity(distance: glare))
                     // `waxing: true` lights the +x limb; the rotation aims it.
-                    MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize)
+                    // `shadowTilt` cancels that rotation for the umbra alone: an
+                    // eclipse is the ANTI-solar point, so a shadow that swung
+                    // around with the sun's screen position would be pointing at
+                    // the one direction it cannot come from. Screen-stable is
+                    // honest at 22pt; the true first contact is the moon's
+                    // leading limb, which is #304-adjacent work.
+                    MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
+                              umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
                         .rotationEffect(.radians(toSun))
                         .position(point)
                         .opacity(moonGlareOpacity(distance: glare))
@@ -326,6 +360,21 @@ func moonLitPath(fraction: Double, radius r: CGFloat) -> Path {
     return c >= 0 ? near.union(terminator) : near.subtracting(terminator)
 }
 
+/// The umbral shadow's offset for a disc of radius `r`: tangent at zero
+/// coverage (2r), concentric once the moon is covered. `coverage` is a
+/// fraction of the moon's DIAMETER — what Almanac's `magUmbral` means — and
+/// runs above 1 for a total eclipse, where the disc is clamped: there is
+/// nowhere further to slide.
+///
+/// The shadow is an equal-radius disc sliding across, which is the same shape
+/// the phase used before #306 replaced it with a real terminator
+/// (`moonLitPath`). It stays a disc deliberately: Earth's umbra at the moon's
+/// distance really is a circle roughly 2.6 times the moon's diameter, so a
+/// straight-edged terminator would be the wrong curve here.
+func moonUmbraShift(coverage: Double, radius: CGFloat) -> CGFloat {
+    (1 - CGFloat(min(max(coverage, 0), 1))) * 2 * radius
+}
+
 /// Phase → name, the prototype's moonName buckets (age thresholds 1.7 d for
 /// new/full, 1.4 d for the quarters, over the 29.53 d synodic month).
 /// Presentation, not astronomy: Almanac reports `phase`, and where the names
@@ -343,13 +392,38 @@ func moonPhaseName(phase: Double) -> String {
     return waxing ? "Waxing Gibbous" : "Waning Gibbous"
 }
 
+/// The Moon tile's value line while an eclipse is underway. Presentation, the
+/// same way `moonPhaseName` is: Almanac reports a kind, the words are ours.
+func eclipseTileText(_ kind: LunarEclipseKind) -> String {
+    switch kind {
+    case .total: "Total Eclipse"
+    case .partial: "Partial Eclipse"
+    case .penumbral: "Penumbral Eclipse"
+    }
+}
+
 /// The moon glyph: the lit region over a dark disc that stays
 /// semi-transparent to show the sky. Lit on the right while waxing, the
 /// northern convention; the sky passes `waxing: true` and rotates toward the sun.
+///
+/// `umbra` and `wash` add the eclipse on top of all that, and only on top:
+/// at zero the glyph is exactly what it draws for every other night.
 struct MoonGlyph: View {
     let fraction: Double
     let waxing: Bool
     var size: CGFloat = 20
+    /// Fraction of the moon's diameter inside the umbra — `WindowEclipse.shadow(at:)`.
+    /// Zero draws exactly what this glyph has always drawn.
+    var umbra: Double = 0
+    /// Penumbral shading, 0…1 — `WindowEclipse.wash(at:)`. The whole disc
+    /// warms and dims, which for a penumbral eclipse is the ONLY mark there
+    /// is: it has no umbral contact, so `umbra` stays 0 throughout.
+    var wash: Double = 0
+    /// Rotation applied to the SHADOW alone. The sky dome rotates the whole
+    /// glyph to aim the lit limb at the sun; the umbra must not follow it,
+    /// because an eclipse happens at the anti-solar point. Zero everywhere
+    /// else, where nothing rotates the glyph at all.
+    var shadowTilt: Angle = .zero
 
     var body: some View {
         let r = size / 2 - 1
@@ -358,6 +432,23 @@ struct MoonGlyph: View {
             moonLitPath(fraction: fraction, radius: r).offsetBy(dx: r, dy: r)
                 .fill(SN.foam)
                 .scaleEffect(x: waxing ? 1 : -1)
+            if wash > 0 || umbra > 0 {
+                // The eclipse sits OVER the lit region, not inside it: the
+                // penumbra dims whatever the phase left lit, and the umbra is a
+                // deeper shadow inside the penumbra rather than a separate
+                // event. Clipped to the disc, so neither escapes the moon.
+                ZStack {
+                    if wash > 0 {
+                        Circle().fill(SN.umbra.opacity(0.42 * min(max(wash, 0), 1)))
+                    }
+                    if umbra > 0 {
+                        Circle().fill(SN.umbra)
+                            .offset(x: moonUmbraShift(coverage: umbra, radius: r))
+                    }
+                }
+                .rotationEffect(shadowTilt)
+                .clipShape(Circle())
+            }
         }
         .frame(width: 2 * r, height: 2 * r)
         .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
@@ -505,7 +596,35 @@ struct Commentary: View {
 /// no number at all and passes nil, leaving the moon on its own.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
+    /// The illumination the SKY already computed, rather than a second lookup
+    /// per frame for the same instant (#299).
     let moon: MoonIllumination?
+    /// The scrub time itself: the sheet searches from it, and the eclipse's
+    /// shadow is read at it. `moon` cannot supply this — it is a phase, not a
+    /// moment.
+    let at: Date
+    /// The eclipse underway at `at`, from the timeline: it renames the value
+    /// line and shadows the glyph.
+    var eclipse: WindowEclipse? = nil
+    /// Handed down from the scaffold. Without it — and without a position —
+    /// the tile stays inert, which is what the tests and previews get.
+    var onJump: ((Date) -> Void)? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    /// Read HERE, inside the presenting hierarchy where the scaffold set it,
+    /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
+    @Environment(\.timeZone) private var tz
+
+    /// Non-nil only when the caller gave both somewhere to go and somewhere to
+    /// stand: the sheet needs an `Observer`, and this view is the only thing
+    /// between the detail view and it.
+    private var sheet: (() -> AnyView)? {
+        guard let onJump, let latitude, let longitude else { return nil }
+        let tz = tz
+        return { AnyView(MoonDetailSheet(at: at, eclipse: eclipse,
+                                         latitude: latitude, longitude: longitude,
+                                         tz: tz, onJump: onJump)) }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -521,12 +640,15 @@ struct SummaryTiles: View {
             // than the row, so a primary reading still stands on its own.
             if let moon {
                 ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
-                            accessibility: "Moon") {
-                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14)
+                            accessibility: "Moon", detail: sheet) {
+                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
+                              umbra: eclipse?.shadow(at: at) ?? 0,
+                              wash: eclipse?.wash(at: at) ?? 0)
                 } value: {
                     // Words, not a number: "Waning Crescent" has to fit on one
                     // line where "7.6 ft" does, so it sits well below the hero.
-                    Text(moonPhaseName(phase: moon.phase))
+                    Text(eclipse.map { eclipseTileText($0.kind) }
+                            ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
             }
@@ -542,13 +664,23 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     /// Spoken for the eyebrow row, glyph included; the tile then reads as one
     /// element, this, the value and the caption in order.
     let accessibility: String
+    /// A tile with somewhere to go: a chevron, a tap, and a sheet. Only the
+    /// Moon tile has one so far — `Range` and `Next max` stay inert until they
+    /// have something to say that the tile itself doesn't already.
+    var detail: (() -> AnyView)? = nil
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value
+    @State private var showDetail = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 MonoLabel(text: label, color: SN.foam.opacity(0.55))
+                if detail != nil {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(SN.foam.opacity(0.4))
+                }
                 Spacer()
                 HStack(spacing: 4) { glyph() }
                     .font(.caption.weight(.semibold))
@@ -568,6 +700,13 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(detail != nil ? .isButton : [])
+        .contentShape(Rectangle())
+        // A tap gesture, not a Button: Button press tracking goes dead in the
+        // iPad split layout's detail column, the same reason MultiDaySchedule's
+        // rows use one.
+        .onTapGesture { if detail != nil { showDetail = true } }
+        .sheet(isPresented: $showDetail) { detail?() }
     }
 }
 
@@ -627,8 +766,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     @ViewBuilder var card: (TimelineData) -> Card
     /// Under the strip, above the schedule (summary tiles, TideAtPortLink).
     /// Handed the same `TimelineData` the card gets, so a consumer reads the
-    /// timeline the page is already drawing rather than deriving a second one.
-    @ViewBuilder var links: (TimelineData) -> Links
+    /// timeline the page is already drawing rather than deriving a second one —
+    /// and `jump(to:)`, for the Moon sheet's eclipse rows.
+    @ViewBuilder var links: (TimelineData, @escaping (Date) -> Void) -> Links
     /// Below the schedule card; each element gets the standard 14pt top gap.
     @ViewBuilder var bottom: () -> Bottom
 
@@ -709,15 +849,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .onChange(of: timeline == nil) { _, isNil in
                 guard !isNil, let t = linkedInstant else { return }
                 linkedInstant = nil
-                scrubTime = t
-                // The picker's rule, inverted: move the window only when the
-                // moment isn't already on the strip, so a link to later today
-                // doesn't open on a week bar reading "not this week".
-                let week = Timeline.window(anchor: anchor)
-                if t < week.start || t > week.end {
-                    anchor = dayLocal(t, tz)
-                    onPicked(anchor)
-                }
+                jump(to: t)
             }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
@@ -755,6 +887,22 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         }
     }
 
+    /// Park the centerline on `t`, moving the window when `t` is not on it.
+    ///
+    /// Shared by the two things that arrive holding an instant: a shared link
+    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is the
+    /// picker's rule inverted — move only when the moment isn't already on the
+    /// strip, so a jump to later today doesn't open on a week bar reading
+    /// "not this week".
+    private func jump(to t: Date) {
+        scrubTime = t
+        let week = Timeline.window(anchor: anchor)
+        if t < week.start || t > week.end {
+            anchor = dayLocal(t, tz)
+            onPicked(anchor)
+        }
+    }
+
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Full bleed, no chrome: the curve is the hero and the page is its
@@ -765,7 +913,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
 
-            links(tl)
+            links(tl, jump)
                 .padding(.top, 12)
                 .padding(.horizontal, 16)
         }
@@ -778,7 +926,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             Divider().overlay(Color.white.opacity(0.08))
             // Both dates, never one: `anchor` keys the day groups (it is what
             // `days` offsets are relative to), `today` only says Today/Tomorrow.
-            MultiDaySchedule(entries: entries(tl), tz: tz, anchor: tl.anchor,
+            // The eclipse row is merged HERE, not in the four detail views:
+            // an eclipse belongs to the sky, not to the station, so every kind
+            // of detail gets it from one place.
+            MultiDaySchedule(entries: (entries(tl) + eclipseEntries(tl)).sorted { $0.time < $1.time },
+                             tz: tz, anchor: tl.anchor,
                              today: tl.today, days: tl.days,
                              scrubTime: scrubTime, onTap: { scrubTime = $0 })
         }

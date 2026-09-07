@@ -75,7 +75,8 @@ struct OnlineGateDetailView: View {
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
-                           days: timeline?.days ?? [])
+                           days: timeline?.days ?? [],
+                           eclipses: timeline?.eclipses ?? [])
         // Bare gate.id as favoriteId, per PR #31 — left as-is (task-5-brief).
         ScrubDetailScaffold(name: gate.name, region: gate.region,
                             favoriteId: gate.id, tz: tz,
@@ -104,14 +105,17 @@ struct OnlineGateDetailView: View {
                                                      scrubTime: $scrubTime, onReturn: returnToNow)
                                 }
                             },
-                            links: { tl in
+                            links: { tl, jump in
                                 VStack(spacing: 12) {
                                     // `tl`, never this view's `timeline`: that
                                     // property rebuilds the whole TimelineData
                                     // on every read, and the scaffold has
                                     // already built the one on screen.
                                     SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
-                                                 moon: sky.illumination)
+                                                 moon: sky.illumination, at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: gate.latitude, longitude: gate.longitude)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },

@@ -71,7 +71,8 @@ struct TideDetailView: View {
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude,
-                           days: timeline?.days ?? [])
+                           days: timeline?.days ?? [],
+                           eclipses: timeline?.eclipses ?? [])
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.id, tz: tz,
                             timeline: timeline, entries: scheduleEntries,
@@ -93,7 +94,12 @@ struct TideDetailView: View {
                                                    onCommentary: scrubToCommentary)
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
-                            links: { _ in SummaryTiles(primary: range, moon: sky.illumination) },
+                            links: { tl, jump in
+                                SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
+                                             eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                             onJump: jump,
+                                             latitude: record.latitude, longitude: record.longitude)
+                            },
                             bottom: {
                                 VStack(spacing: 14) {
                                     footer

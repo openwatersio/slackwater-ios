@@ -69,7 +69,8 @@ struct CurrentDetailView: View {
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: record.latitude, longitude: record.longitude,
-                           days: timeline?.days ?? [])
+                           days: timeline?.days ?? [],
+                           eclipses: timeline?.eclipses ?? [])
         ScrubDetailScaffold(name: record.name, region: record.region,
                             favoriteId: record.itemId, tz: tz,
                             timeline: timeline,
@@ -99,9 +100,13 @@ struct CurrentDetailView: View {
                                                  sky: sky,
                                                  scrubTime: $scrubTime, onReturn: returnToNow)
                             },
-                            links: { tl in
+                            links: { tl, jump in
                                 VStack(spacing: 12) {
-                                    SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination)
+                                    SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination,
+                                                 at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: record.latitude, longitude: record.longitude)
                                     if let port = pairedTide { TideAtPortLink(port: port) }
                                 }
                             },

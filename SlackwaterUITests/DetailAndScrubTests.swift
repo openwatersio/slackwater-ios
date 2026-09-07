@@ -193,7 +193,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "sun times missing from the schedule day header")
         XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
                        "sun rows have moved to the day header — none in the schedule")
-        let phaseNames = "New Moon|Waxing Crescent|First Quarter|Waxing Gibbous|Full Moon|Waning Gibbous|Last Quarter|Waning Crescent"
+        // The eclipse names belong here too (#222): on an eclipse night the
+        // Moon tile reads "Partial Eclipse" instead of "Full Moon", and this
+        // test runs against the real clock — without them it fails on a real
+        // day, for whoever happens to run the suite that week.
+        let phaseNames = "New Moon|Waxing Crescent|First Quarter|Waxing Gibbous|Full Moon|Waning Gibbous|Last Quarter|Waning Crescent|Penumbral Eclipse|Partial Eclipse|Total Eclipse"
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label MATCHES %@", phaseNames)).firstMatch.exists,
                   "moon phase name missing from the scrub readout")
@@ -540,4 +544,43 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                        "return-to-now did not clear after returning to now")
         XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,
                        "the star moved when return-to-now went away")
-    }}
+    }
+
+    /// #222: the Moon tile is the way into the moon's own facts, and the
+    /// eclipse rows are destinations — tapping one moves the window to it.
+    func testTheMoonTileOpensItsSheetAndTheEclipseRowJumps() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        // Case-insensitive, like the Range assertion elsewhere in this file:
+        // the tile's eyebrow combines an uppercasing MonoLabel with an
+        // accessibility label that does not.
+        let moon = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label ==[c] 'moon'")).firstMatch
+        XCTAssert(moon.waitForExistence(timeout: 10), "no Moon tile on the tide detail")
+        moon.tap()
+
+        XCTAssert(app.navigationBars["Moon"].waitForExistence(timeout: 5),
+                  "the Moon tile did not open its sheet")
+        save(app, "moon-sheet.png")
+
+        let next = app.descendants(matching: .any)["moon-next-eclipse"].firstMatch
+        XCTAssert(next.waitForExistence(timeout: 10), "no next-eclipse row in the Moon sheet")
+        // The phase rows are destinations on the same terms — every reachable
+        // time in this sheet is somewhere the scrubber can go.
+        XCTAssert(app.descendants(matching: .any)["moon-next-full"].firstMatch.exists,
+                  "the next-full-moon row is not in the sheet")
+        XCTAssert(app.descendants(matching: .any)["moon-next-new"].firstMatch.exists,
+                  "the next-new-moon row is not in the sheet")
+        next.tap()
+
+        // The sheet closes, and the window has moved: the next eclipse is
+        // months out, so the range bar has to be saying so. Both are WAITS —
+        // a sheet dismissal is animated, and `exists` read on the line after
+        // the tap catches it mid-flight (it did, first run).
+        XCTAssert(app.navigationBars["Moon"].waitForNonExistence(timeout: 10),
+                  "the sheet stayed up after a jump")
+        XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 10),
+                  "the jump did not move the window")
+        save(app, "moon-sheet-jumped.png")
+    }
+}
