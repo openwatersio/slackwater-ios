@@ -1302,6 +1302,7 @@ struct TimelineScrubStrip: View {
     var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
     @State private var jumpToken = 0
+    @State private var settled = false
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
@@ -1324,7 +1325,7 @@ struct TimelineScrubStrip: View {
         let showNow = onReturn != nil && scrubbedAway(scrubTime, from: now)
         return ZStack {
             Commentary(text: commentary, tint: commentaryTint,
-                       scrubTime: scrubTime, ink: chromeInk) {
+                       ink: chromeInk) {
                 jumpToken += 1
                 onCommentary()
             }
@@ -1335,6 +1336,16 @@ struct TimelineScrubStrip: View {
                     if !past { Spacer(minLength: 0) }
                 }
             }
+        }
+        .opacity(settled ? 1 : 0)
+        .allowsHitTesting(settled)
+        .animation(.easeInOut(duration: 0.2), value: settled)
+        .task(id: scrubTime) {
+            // Rest = no scrub change for this long. A cancelled sleep is a
+            // scrub still in motion, not a rest.
+            settled = false
+            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            settled = true
         }
         .padding(.top, geo.chromeY)
         .padding(.horizontal, 16)

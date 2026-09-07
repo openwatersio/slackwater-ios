@@ -546,19 +546,15 @@ func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date)
 }
 
 /// What comes next, centred on the reading line in the strip's chrome row.
-/// Tapping scrubs to it. It fades while the strip is moving and returns once
-/// the scrub has rested, so it never flickers through the events a fling
-/// passes.
+/// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
     let text: String?
     /// Set when the text is a warning about the scrub instant — a fast tide —
     /// rather than the next event; the ramp's colour, so the pill explains
     /// the line under it.
     var tint: Color? = nil
-    let scrubTime: Date
     var ink: Color = SN.foam
     let onTap: () -> Void
-    @State private var settled = false
 
     var body: some View {
         Group {
@@ -576,16 +572,6 @@ struct Commentary: View {
                 .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("commentary")
             }
-        }
-        .opacity(settled ? 1 : 0)
-        .allowsHitTesting(settled)
-        .animation(.easeInOut(duration: 0.2), value: settled)
-        .task(id: scrubTime) {
-            // Rest = no scrub change for this long. A cancelled sleep is a
-            // scrub still in motion, not a rest.
-            settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
-            settled = true
         }
     }
 }
