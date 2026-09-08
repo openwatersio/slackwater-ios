@@ -57,11 +57,10 @@ mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 
 xcodegen generate
 
-# The self-hosted runner is the same Mac we develop on, and two xcodebuild runs
-# booting the same simulator device SIGKILL each other's test runner — the
-# failures read as "Test crashed with signal kill" and results even bleed across
-# the two sessions. CI passes its own device names here so it can never share a
-# device with a local run (see .github/workflows/ci.yml).
+# SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
+# ONE device so the fast lane stays iPhone-only (see .github/workflows/ci.yml).
+# It is not concurrency protection: separate devices don't stop concurrent runs
+# from killing each other (see the lock comment at the top), the lock does.
 #
 # Fast is iPhone-only. Measured on build 27: the iPad leg costs 1169 s and is
 # the ONLY place three tests run (testM44IPadSplit,
@@ -99,8 +98,9 @@ for sim in "${sims[@]}"; do
   # iOS simulator clone costs ~2.2 GB, and on a 16 GB machine with a normal
   # desktop running, four clones push swap past physical RAM — load average
   # then counts thousands of page-in-blocked threads (430 observed, CPU 89%
-  # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit;
-  # raise SLACKWATER_WORKERS on machines with more memory (CI).
+  # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit
+  # on 16 GB; set SLACKWATER_WORKERS to the machine's budget (CI sets 1 — a
+  # hosted arm runner has ~7 GB).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
     -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
