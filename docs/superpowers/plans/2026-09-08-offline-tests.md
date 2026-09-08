@@ -12,19 +12,19 @@
 
 ## Global constraints
 
-- No new dependencies, no downloaded CHS samples committed to Git, and no network fallback during routine tests.
+- No new dependencies or network fallback during routine tests. Commit the fixed recording so ephemeral CI runners use the same input as local tests.
 - Keep immutable fixture files outside mutable model/chunk stores; missing/corrupt recordings fail clearly with the explicit setup command.
 - Preserve coverage of real fitting, decoding/projection, persistence/relaunch, provisional-to-final transitions, promotion/resume, and online-gate rendering.
 - Pin recording time bounds and test clocks; never regenerate expected results from the implementation under test at assertion time.
 - Test hooks must not alter Release behavior. Prefer existing hooks and small concrete seams over protocols/frameworks.
 - All shell commands use rtk. Every Xcode build/test respects /tmp/slackwater-test.lock and uses a worktree-local package cache. Coordinator runs simulator tests; workers do not launch competing builds.
-- No merge or publish. Do not modify other worktrees. Sol for all requested workers.
+- Open a pull request for review; do not merge it. Do not modify other worktrees. Sol for all requested workers.
 
 ## Task 1: Recorded IWLS inputs and real fitter checks
 
 **Files:** scripts/iwls-fixtures.mjs, scripts/iwls-fixtures.test.mjs, SlackwaterTests/IwlsFixtureTests.swift, Slackwater/IwlsClient.swift if a concrete injection seam is necessary, .gitignore.
 
-**Interface:** `node scripts/iwls-fixtures.mjs refresh` explicitly downloads a recording; `node scripts/iwls-fixtures.mjs prepare` validates and stages it at `SlackwaterTests/Fixtures/iwls-recording.json` without network. `SLACKWATER_FIXTURE_DIR` overrides the persistent directory; default to `~/Library/Caches/SlackwaterTests/iwls` so linked worktrees and the self-hosted checkout reuse it. Recording file carries schema, capture/bounds/station metadata, and raw response samples. XcodeGen includes the staged JSON through the existing test source directory. Missing recording is an actionable failure, never a skip.
+**Interface:** `node scripts/iwls-fixtures.mjs refresh` explicitly updates the committed `SlackwaterTests/Fixtures/iwls-recording.json` for review in Git; `node scripts/iwls-fixtures.mjs prepare` validates it without network. `SLACKWATER_FIXTURE_DIR` can supply a different recording to stage at that path. The default input is identical in local checkouts and ephemeral CI runners. Recording file carries schema, capture/bounds/station metadata, and raw response samples. XcodeGen includes the JSON through the existing test source directory. Missing recording is an actionable failure, never a skip.
 
 - [x] Write the fixture tooling regression first: preparation never fetches, refuses missing/corrupt input, atomic refresh preserves the previous recording on failure.
 - [x] Implement minimal recorder with bounded requests/timeouts, polite live pacing, fixed explicit bounds (default pinned date), Victoria tide, Active Pass current, Dodd full/provisional current, and Sechelt online samples/metadata. Resolve against the actual catalog. Validate expected series coverage and finite sample values before publishing. Avoid a general-purpose recorder framework.
@@ -51,7 +51,7 @@
 
 - [x] Write stubbed runner checks for mode selection, unknown flags, inherited live env, and missing fixtures before simulator work.
 - [x] Implement local fixture prepare before xcodegen for unit-containing modes. Never refresh implicitly. Keep live smoke independent of the fixture pack and prevent unrelated tests from running in live mode.
-- [x] Document one-time fixture refresh, reuse across runs/worktrees, explicit refresh semantics, test modes, and that fixture absence is setup failure.
+- [x] Document the committed recording, explicit refresh semantics, test modes, and that fixture absence is setup failure.
 - [x] Run stubbed runner checks and hand commands to coordinator.
 
 ## Integration validation

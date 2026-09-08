@@ -28,12 +28,7 @@ no npm install is needed for it.
 ./scripts/test.sh --live   # live IWLS smoke only, one simulator.
 ```
 
-Routine modes never download test data. Once per machine, explicitly capture the
-versioned IWLS recording with `node scripts/iwls-fixtures.mjs refresh`. The runner
-then validates and stages it with the offline `prepare` command. The recording is
-reused from `~/Library/Caches/SlackwaterTests/iwls` by every checkout and linked
-worktree; `SLACKWATER_FIXTURE_DIR` overrides that location. A missing or corrupt
-recording is a setup failure with the refresh command in its error message.
+Routine modes validate and reuse the committed `SlackwaterTests/Fixtures/iwls-recording.json`, including on fresh CI runners. They never download test data. To update the recording explicitly, run `node scripts/iwls-fixtures.mjs refresh` and review the resulting Git diff. `SLACKWATER_FIXTURE_DIR` can supply a different recording for the offline `prepare` command to stage. Missing or corrupt recordings fail validation.
 
 `--live` is the separate compatibility smoke for the real IWLS service. It does
 not use the recording. `--full` stays offline and is the pre-release suite.
