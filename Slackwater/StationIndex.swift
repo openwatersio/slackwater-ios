@@ -43,6 +43,16 @@ extension StationIndexInfo {
     /// generated from the catalog — so callers may treat it as "not renderable".
     var tideRecord: TideStationRecord? { TideStationRecord.byId[id] }
     var currentRecord: CurrentStationRecord? { CurrentStationRecord.byId[id] }
+
+    /// The same lookups off the main actor. A row's `.task` runs inside the
+    /// first commit, so the first resolve — the one that decodes the whole
+    /// catalog — would still be the first frame's to pay (#317).
+    func resolveTideRecord() async -> TideStationRecord? {
+        await Task.detached(priority: .userInitiated) { TideStationRecord.byId[id] }.value
+    }
+    func resolveCurrentRecord() async -> CurrentStationRecord? {
+        await Task.detached(priority: .userInitiated) { CurrentStationRecord.byId[id] }.value
+    }
 }
 
 /// The list's push target for a NOAA station. Identity travels on the

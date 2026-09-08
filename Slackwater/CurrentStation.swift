@@ -14,8 +14,14 @@ let slackKn = 0.15
 
 /// Great-circle distance in kilometres.
 func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
-    CLLocation(latitude: lat1, longitude: lon1)
-        .distance(from: CLLocation(latitude: lat2, longitude: lon2)) / 1000
+    // Spherical haversine, not `CLLocation.distance(from:)`: CoreLocation's
+    // answer changes by up to 0.2% between a process's first ~70 calls and
+    // every call after, so a ranking keyed on it was never reproducible
+    // (#317). Within 0.6% of the ellipsoid, which no pill or radius resolves.
+    let p1 = lat1 * .pi / 180, p2 = lat2 * .pi / 180
+    let dp = p2 - p1, dl = (lon2 - lon1) * .pi / 180
+    let h = sin(dp / 2) * sin(dp / 2) + cos(p1) * cos(p2) * sin(dl / 2) * sin(dl / 2)
+    return 2 * 6371.0088 * asin(min(1, sqrt(h)))
 }
 
 /// Great-circle distance in kilometres (the labelled spelling; forwards to

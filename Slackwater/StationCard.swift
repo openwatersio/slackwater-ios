@@ -43,7 +43,7 @@ struct RecentRowLabel: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .task { if tide == nil && current == nil && gate == nil { load() } }
+        .task { if tide == nil && current == nil && gate == nil { await load() } }
     }
 
     private var reading: String {
@@ -56,12 +56,12 @@ struct RecentRowLabel: View {
         return "\(formatHeight(tide.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
     }
 
-    private func load() {
+    private func load() async {
         switch item {
         case .tide(let s):
-            tide = s.tideRecord?.cardState(at: appNow())
+            tide = await s.resolveTideRecord()?.cardState(at: appNow())
         case .current(let s):
-            current = s.currentRecord?.cardState(at: appNow())
+            current = await s.resolveCurrentRecord()?.cardState(at: appNow())
         case .chs(let info):
             guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
             tide = record.cardState(at: appNow())
@@ -85,7 +85,7 @@ struct StationCardView: View {
     /// Resolved off the first frame, in `.task`. A bundled NOAA station enters
     /// through `init(info:)` and its record is decoded on demand (#317); a
     /// CHS-fitted port already has one and hands it over directly.
-    private let resolve: () -> TideStationRecord?
+    private let resolve: @Sendable () async -> TideStationRecord?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
 
@@ -102,7 +102,7 @@ struct StationCardView: View {
         region = info.region
         self.imperial = imperial
         self.km = km
-        resolve = { info.tideRecord }
+        resolve = { await info.resolveTideRecord() }
     }
 
     var body: some View {
@@ -112,7 +112,7 @@ struct StationCardView: View {
             }
         }
         .task {
-            guard state == nil || graph == nil, let record = resolve() else { return }
+            guard state == nil || graph == nil, let record = await resolve() else { return }
             if state == nil { state = record.cardState(at: appNow()) }
             if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
         }
@@ -347,7 +347,7 @@ struct CurrentCardView: View {
     /// bundled NOAA station's record never changes and is decoded on demand
     /// in `.task` instead of on the first frame (#317).
     private let fitted: CurrentStationRecord?
-    private let resolve: () -> CurrentStationRecord?
+    private let resolve: @Sendable () async -> CurrentStationRecord?
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @State private var record: CurrentStationRecord?
     @State private var state: CurrentCardState?
@@ -367,7 +367,7 @@ struct CurrentCardView: View {
         region = info.region
         self.km = km
         fitted = nil
-        resolve = { info.currentRecord }
+        resolve = { await info.resolveCurrentRecord() }
     }
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
@@ -391,7 +391,7 @@ struct CurrentCardView: View {
             }
         }
         .task {
-            if record == nil { record = resolve() }
+            if record == nil { record = await resolve() }
             guard let record else { return }
             if state == nil { state = record.cardState(at: appNow()) }
             if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
