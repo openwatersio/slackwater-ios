@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,8 +14,7 @@ const targets = [
 ];
 
 function defaultFixtureDir() {
-  const common = execFileSync("rtk", ["git", "rev-parse", "--git-common-dir"], { cwd: root, encoding: "utf8" }).trim();
-  return resolve(root, common, "..", ".test-fixtures", "iwls");
+  return join(homedir(), "Library/Caches/SlackwaterTests/iwls");
 }
 
 function paths(fixtureDir = process.env.SLACKWATER_FIXTURE_DIR || defaultFixtureDir(), staged = join(root, "SlackwaterTests/Fixtures/iwls-recording.json")) {

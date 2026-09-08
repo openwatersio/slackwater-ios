@@ -23,7 +23,7 @@ final class IwlsFixtureTests: XCTestCase {
     }
 
     private func samples(_ station: Recording.Station, _ code: String) throws -> [ChsSample] {
-        try IwlsFetcher.decode(JSONEncoder().encode(station.series[code]!))
+        try IwlsFetcher.decode(JSONEncoder().encode(try XCTUnwrap(station.series[code], "\(station.key): missing \(code)")))
     }
 
     func testDecoderRejectsMalformedJSONAndDropsBadDatesAndDuplicateTimestamps() throws {
@@ -78,15 +78,40 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertLessThan((errors.reduce(0) { $0 + $1 * $1 } / Double(errors.count)).squareRoot(), 0.2)
     }
 
-    func testRealFitterFitsProjectedDoddCurrent() async throws {
+    func testRealFitterComparesDoddProvisionalAndFullFitsOnHoldout() async throws {
         let fixture = try recording()
         let dodd = try XCTUnwrap(fixture.stations.first { $0.key == "dodd" })
+        let flood = try XCTUnwrap(dodd.metadata?.floodDirection)
+        let ebb = try XCTUnwrap(dodd.metadata?.ebbDirection)
         let projected = ChsFitService.project(speeds: try samples(dodd, "wcsp1"),
                                               dirs: try samples(dodd, "wcdp1"),
-                                              floodDirection: try XCTUnwrap(dodd.metadata?.floodDirection))
+                                              floodDirection: flood)
         XCTAssertGreaterThan(projected.count, 20_000)
-        let fit = try await ChsFitter().fit(samples: projected)
-        XCTAssertGreaterThanOrEqual(fit.constituents.count, 20)
-        XCTAssertLessThan(fit.rms, 0.75)
+        let holdoutStart = projected.last!.t - 7 * 86_400_000
+        let training = projected.filter { $0.t < holdoutStart }
+        let provisionalStart = holdoutStart - 60 * 86_400_000
+        let provisional = try await ChsFitter().fit(samples: training.filter { $0.t >= provisionalStart })
+        let full = try await ChsFitter().fit(samples: training)
+        XCTAssertGreaterThanOrEqual(provisional.constituents.count, 20)
+        XCTAssertGreaterThanOrEqual(full.constituents.count, 20)
+
+        func holdoutRMSE(_ fit: ChsFitResult) -> Double {
+            let engine = CurrentStation(constituents: fit.constituents.map {
+                HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
+            }, floodDirection: flood, ebbDirection: ebb, offset: fit.offset)
+            let held = projected.filter { $0.t >= holdoutStart }
+            let predicted = engine.speeds(from: Date(timeIntervalSince1970: held[0].t / 1000),
+                                          to: Date(timeIntervalSince1970: held.last!.t / 1000), step: 900)
+            let byTime = Dictionary(predicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.speed) },
+                                    uniquingKeysWith: { first, _ in first })
+            let errors = held.compactMap { sample in byTime[sample.t].map { $0 - sample.v } }
+            XCTAssertGreaterThan(errors.count, 600)
+            return (errors.reduce(0) { $0 + $1 * $1 } / Double(errors.count)).squareRoot()
+        }
+        let provisionalRMSE = holdoutRMSE(provisional)
+        let fullRMSE = holdoutRMSE(full)
+        XCTAssertLessThan(provisionalRMSE, 0.75)
+        XCTAssertLessThan(fullRMSE, 0.75)
+        XCTAssertNotEqual(provisionalRMSE, fullRMSE, accuracy: 0.000_001)
     }
 }
