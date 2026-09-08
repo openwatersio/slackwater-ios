@@ -76,7 +76,9 @@ final class SubordinateCurrentTests: XCTestCase {
     func testAReferenceOnlyBinIsInTheCatalogButNotAStation() {
         XCTAssertNotNil(CurrentStationRecord.byId["noaa/EPT0003@11"])
         XCTAssertNil(StationItem.byId["current:noaa/EPT0003@11"])
-        XCTAssertFalse(StationItem.all.contains { if case .current(let s) = $0 { s.referenceOnly == true } else { false } })
+        let referenceOnly = Set(CurrentStationRecord.all.filter { $0.referenceOnly == true }
+            .map { "current:" + $0.id })
+        XCTAssertFalse(StationItem.all.contains { referenceOnly.contains($0.id) })
         let hits = StationItem.search("Estes Head", near: (lat: 44.888, lon: -66.996))
             .filter { if case .current = $0 { true } else { false } }
         XCTAssertEqual(hits.map(\.id), ["current:noaa/EPT0003"])

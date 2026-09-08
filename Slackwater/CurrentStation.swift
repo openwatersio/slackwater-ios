@@ -300,8 +300,12 @@ extension CurrentEvent {
 // MARK: - The mixed station list (tide + current, one search)
 
 enum StationItem: Identifiable, Hashable {
-    case tide(TideStationRecord)
-    case current(CurrentStationRecord)
+    // The two NOAA cases carry identity, not the record: the list, the search
+    // and the map pins need nothing else, and decoding 9.1 MB of constituents
+    // for them cost 180 ms of the first frame (#317). Anything that predicts
+    // resolves the record by id — `info.tideRecord` / `info.currentRecord`.
+    case tide(StationIndexInfo)
+    case current(StationIndexInfo)
     case chs(ChsStationInfo)   // Canadian tide port: identity bundled, model fitted on-device
     case chsGate(ChsGateInfo)  // derived current gate: slack from a reference port's fitted tide
     case chsCurrent(ChsCurrentGateInfo)  // validated CHS gate: real velocities, fitted on-device
@@ -355,9 +359,12 @@ enum StationItem: Identifiable, Hashable {
     /// All bundled stations, alphabetical. World coverage: no station is
     /// pinned to the head of the list — that read as a bug from anywhere but
     /// the Salish Sea.
+    /// Index-backed, deliberately: nothing here may touch `TideStationRecord.all`
+    /// or `CurrentStationRecord.all` (#317). The reference-only bins the index
+    /// omits (#269) are the same ones the old filter dropped.
     static let all: [StationItem] = {
-        var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
-        merged += CurrentStationRecord.all.filter { $0.referenceOnly != true }.map { StationItem.current($0) }
+        var merged: [StationItem] = StationIndex.bundled.tides.map { StationItem.tide($0) }
+        merged += StationIndex.bundled.currents.map { StationItem.current($0) }
         merged += ChsStationInfo.all.map { StationItem.chs($0) }
         merged += ChsGateInfo.all.map { StationItem.chsGate($0) }
         merged += ChsCurrentGateInfo.all.map { StationItem.chsCurrent($0) }
@@ -383,7 +390,7 @@ enum StationItem: Identifiable, Hashable {
         if id.hasPrefix("current:") {
             let record: CurrentStationRecord? = try catalogRecord(
                 "currents", id: String(id.dropFirst("current:".count)), directory: directory)
-            return record.map(StationItem.current)
+            return record.map { .current(StationIndexInfo($0)) }
         }
         if id.hasPrefix("chs-") {
             let stations: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)
@@ -394,7 +401,7 @@ enum StationItem: Identifiable, Hashable {
             return currents.first(where: { $0.id == id }).map(StationItem.chsCurrent)
         }
         let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
-        return record.map(StationItem.tide)
+        return record.map { .tide(StationIndexInfo($0)) }
     }
 
     /// How many results the search screen shows.
