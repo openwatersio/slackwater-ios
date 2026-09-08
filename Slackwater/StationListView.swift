@@ -702,9 +702,7 @@ struct StationListView: View {
     /// own ranking and re-sort the whole catalog on the next render. This runs
     /// once, on a tap.
     private func nearest(to origin: (lat: Double, lon: Double)) -> [StationItem] {
-        Array(StationItem.all
-            .sorted { $0.km(fromLat: origin.lat, lon: origin.lon)
-                    < $1.km(fromLat: origin.lat, lon: origin.lon) }
+        Array(StationItem.rankedByDistance(StationItem.all, lat: origin.lat, lon: origin.lon)
             .prefix(5))
     }
 

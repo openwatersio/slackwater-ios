@@ -352,6 +352,24 @@ enum StationItem: Identifiable, Hashable {
         distanceKm(lat1: lat, lon1: lon, lat2: latitude, lon2: longitude)
     }
 
+    /// The catalog ranked nearest first, one `km` per station.
+    ///
+    /// A comparator that calls `km` runs it twice per comparison — about
+    /// 200,000 great-circle calls over the 7,400-station catalog, each one two
+    /// `CLLocation` allocations. Ties break on catalog position so the order is
+    /// total and deterministic: `StationGroups` reads the first station of a
+    /// name as the nearest one.
+    static func rankedByDistance(_ items: [StationItem],
+                                 lat: Double, lon: Double) -> [StationItem] {
+        var keyed: [(km: Double, rank: Int, item: StationItem)] = []
+        keyed.reserveCapacity(items.count)
+        for (rank, item) in items.enumerated() {
+            keyed.append((item.km(fromLat: lat, lon: lon), rank, item))
+        }
+        keyed.sort { $0.km == $1.km ? $0.rank < $1.rank : $0.km < $1.km }
+        return keyed.map(\.item)
+    }
+
     /// All bundled stations, alphabetical. World coverage: no station is
     /// pinned to the head of the list — that read as a bug from anywhere but
     /// the Salish Sea.
