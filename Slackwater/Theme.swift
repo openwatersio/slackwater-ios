@@ -1415,9 +1415,7 @@ enum RankedStations {
         let k = "\(Int((lat * 1000).rounded())),\(Int((lon * 1000).rounded()))"
         if k != key {
             key = k
-            ranked = StationItem.all.sorted {
-                $0.km(fromLat: lat, lon: lon) < $1.km(fromLat: lat, lon: lon)
-            }
+            ranked = StationItem.rankedByDistance(StationItem.all, lat: lat, lon: lon)
             groups = StationGroups(ranked: ranked)
         }
         return (ranked, groups)
