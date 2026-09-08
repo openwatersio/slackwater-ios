@@ -17,9 +17,19 @@ print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNE
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
   exit 1
 }
+exit 0
 STUB
   chmod +x "$scratch/bin/$tool"
 done
+
+cat > "$scratch/bin/lockf" <<'STUB'
+#!/bin/zsh
+print -r -- "lockf $*" >> "$CALL_LOG"
+if [[ $1 == -t ]]; then exit 0; fi
+shift
+exec "$@"
+STUB
+chmod +x "$scratch/bin/lockf"
 
 run_mode() {
   : > "$log"
@@ -100,5 +110,12 @@ fi
 assert_has "node scripts/iwls-fixtures.mjs prepare"
 assert_lacks "xcodegen"
 assert_lacks "xcodebuild"
+
+# Exercise the normal machine-lock probe and re-exec once; the table above
+# bypasses it so each assertion can focus on a single mode decision.
+: > "$log"
+PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/test.sh" --live >/dev/null
+assert_count '^lockf ' 2
+assert_has "xcodebuild test"
 
 print "runner mode checks passed"

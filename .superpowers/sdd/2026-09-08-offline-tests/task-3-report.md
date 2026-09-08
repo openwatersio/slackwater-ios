@@ -19,4 +19,4 @@ Current contributor, CI, release, PR, and TestFlight guidance now documents the 
 - `rtk test ./scripts/test-modes.test.sh`
 - `rtk git diff --check`
 
-The stubbed test covers target/device selection for every mode, fixture preparation order and failure, inherited environment clearing, invalid/conflicting arguments, and one-device enforcement. No Xcode build or simulator test was run; coordinator validation remains pending.
+The stubbed test covers target/device selection for every mode, fixture preparation order and failure, inherited environment clearing, invalid/conflicting arguments, one-device enforcement, and the lock probe/re-exec path. No Xcode build or simulator test was run; coordinator validation remains pending.

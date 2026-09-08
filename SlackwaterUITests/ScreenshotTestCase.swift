@@ -15,6 +15,7 @@
 // process, and the fetcher's request pacing cannot coordinate across processes.
 import UIKit
 import XCTest
+import Darwin
 
 class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
@@ -31,9 +32,9 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     func releaseFixture(_ token: String, _ checkpoint: String) {
-        let path = "/tmp/slackwater-ui-\(token)-\(checkpoint)"
-        XCTAssert(FileManager.default.createFile(atPath: path, contents: Data()),
-                  "could not release UI fixture checkpoint \(checkpoint)")
+        let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
+        XCTAssertEqual(name.withCString { notify_post($0) }, NOTIFY_STATUS_OK,
+                       "could not release UI fixture checkpoint \(checkpoint)")
     }
 
     /// Wait for a condition `waitForExistence` cannot express — hittability,
@@ -176,9 +177,9 @@ class ScreenshotTestCase: XCTestCase {
         return app
     }
 
-    /// The live-IWLS / on-device-fit tests (minutes each) skip themselves
-    /// outside `./scripts/test.sh --full`, which sets
-    /// TEST_RUNNER_SLACKWATER_FULL=1 — xcodebuild strips the prefix and sets
+    /// The small live-IWLS compatibility smoke class skips itself outside
+    /// `./scripts/test.sh --live`, which sets
+    /// TEST_RUNNER_SLACKWATER_LIVE=1 — xcodebuild strips the prefix and sets
     /// the rest on this UI-test runner process, the same route M1_SHOT_DIR
     /// rides above.
     func skipUnlessLive() throws {

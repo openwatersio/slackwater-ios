@@ -13,10 +13,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testTideFitPersistsOffline() {
-        let (app, _) = fixture("terminal", "chs-victoria", fix: ("48.4235", "-123.3705"))
+        let (app, token) = fixture("hold-first", "chs-victoria", fix: ("48.4235", "-123.3705"))
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.waitForExistence(timeout: 10))
+        releaseFixture(token, "chs-victoria-first-chunk")
         XCTAssert(pending.waitForNonExistence(timeout: 30), "fixture tide fit never landed")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
@@ -28,8 +29,12 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
         app.launch()
         openSearch(app, "victoria")
-        XCTAssertFalse(app.descendants(matching: .any)["chs-pending-chs-victoria"]
-            .firstMatch.waitForExistence(timeout: 2))
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+        XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'computed on this device'"
+        )).firstMatch.exists)
     }
 
     func testValidatedGateGoesStraightToFinal() {
@@ -46,6 +51,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'can be off by up to'"
         )).firstMatch.exists)
+        XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'computed on this device'"
+        )).firstMatch.exists)
     }
 
     func testProvisionalGateRefinesInOpenDetail() {
@@ -56,16 +64,36 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
         XCTAssert(badge.waitForExistence(timeout: 30))
         XCTAssert(badge.label.contains("±35 min"))
+        let tildeReading = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '~'")).firstMatch
+        let tildeCurve = app.descendants(matching: .any).matching(
+            NSPredicate(format: "value CONTAINS '~'")).firstMatch
+        XCTAssert(tildeReading.exists || tildeCurve.exists)
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         let warning = app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'"
         )).firstMatch
         XCTAssert(warning.waitForExistence(timeout: 5))
         XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'Stay connected'"
+        )).firstMatch.exists)
+        XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS '60 of 210 days downloaded'"
         )).firstMatch.exists)
         releaseFixture(token, "after-provisional")
         XCTAssert(warning.waitForNonExistence(timeout: 30))
+        assertCurrentDetailRendered(app)
+        XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'computed on this device'"
+        )).firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists)
+
+        app.terminate()
+        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launch()
+        openSearch(app, "dodd")
+        pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         assertCurrentDetailRendered(app)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
@@ -92,6 +120,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         releaseFixture(token, "tofino-first-chunk")
         waitFor(dodd, "label CONTAINS 'Downloading'", timeout: 20)
         XCTAssert(dodd.label.contains("Downloading"))
+        releaseFixture(token, "dodd-resumed")
+        waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30)
+        XCTAssert(dodd.label.contains("Available offline"))
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {
@@ -128,10 +159,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testOnDemandStationFillsOpenDetail() {
-        let (app, _) = fixture("terminal", "chs-halifax")
+        let (app, token) = fixture("hold-first", "chs-halifax")
         openSearch(app, "halifax")
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
         XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 10))
+        releaseFixture(token, "chs-halifax-first-chunk")
         XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 30))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
     }
@@ -143,12 +175,6 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         assertCurrentDetailRendered(app)
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists)
-        app.terminate()
-        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
-        app.launch()
-        openSearch(app, "dodd")
-        XCTAssertFalse(app.descendants(matching: .any)["chs-pending-chs-dodd-narrows"]
-            .firstMatch.waitForExistence(timeout: 2))
     }
 
     func testSeededProvisionalModelAppearsInManager() {

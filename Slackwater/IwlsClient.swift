@@ -6,6 +6,7 @@
 //   - wlp is 1-min native → decimated to 15-min before bridging
 //   - 7-day request cap; queries by resolved Mongo id, never station code
 import Foundation
+import Darwin
 
 struct IwlsStation: Decodable {
     struct Series: Decodable { let code: String }
@@ -79,9 +80,16 @@ final class IwlsFetcher {
 
     static func waitForFixtureRelease(_ checkpoint: String) async throws {
         guard let token = fixtureToken else { return }
-        let url = URL(fileURLWithPath: "/tmp/slackwater-ui-\(token)-\(checkpoint)")
+        let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
+        var notifyToken: Int32 = 0
+        let status = name.withCString { notify_register_check($0, &notifyToken) }
+        guard status == NOTIFY_STATUS_OK else {
+            throw ChsError.failed("could not register UI fixture checkpoint: \(checkpoint)")
+        }
+        defer { notify_cancel(notifyToken) }
         for _ in 0..<1_200 {
-            if FileManager.default.fileExists(atPath: url.path) { return }
+            var released: Int32 = 0
+            if notify_check(notifyToken, &released) == NOTIFY_STATUS_OK, released != 0 { return }
             try await Task.sleep(for: .milliseconds(50))
         }
         throw ChsError.failed("UI fixture checkpoint timed out: \(checkpoint)")
@@ -138,7 +146,7 @@ final class IwlsFetcher {
 #if DEBUG
         if Self.usesFixture { return Self.fixtureStations() }
 #endif
-        try JSONDecoder().decode([IwlsStation].self, from: try await get("/stations"))
+        return try JSONDecoder().decode([IwlsStation].self, from: try await get("/stations"))
     }
 
     struct Metadata: Decodable { let floodDirection: Double?; let ebbDirection: Double? }
@@ -149,7 +157,7 @@ final class IwlsFetcher {
 #if DEBUG
         if Self.usesFixture { return Metadata(floodDirection: 45, ebbDirection: 225) }
 #endif
-        try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
+        return try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
     }
 
     /// A natively 15-minute series (wcsp1/wcdp1) for one chunk. Cached on disk,
@@ -169,7 +177,6 @@ final class IwlsFetcher {
 
     private func cached(_ code: String, stationID: String, chunk: ChsChunk,
                         _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
-        if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
 #if DEBUG
         if Self.usesFixture {
             let key = "\(stationID):\(code)"
@@ -185,13 +192,26 @@ final class IwlsFetcher {
                     try await Self.waitForFixtureRelease("tofino-first-chunk")
                 }
             }
-            return transform(Self.fixtureSamples(code, chunk))
+            if Self.fixtureScenario == "yield-resume", count == 1,
+               stationID == "chs-dodd-narrows", code == "wcsp1" {
+                try await Self.waitForFixtureRelease("dodd-resumed")
+            }
         }
 #endif
+        if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
+        let raw: [ChsSample]
+#if DEBUG
+        if Self.usesFixture {
+            raw = Self.fixtureSamples(code, chunk)
+        } else {
+            raw = try Self.decode(try await get(Self.dataPath(code, stationID, chunk)))
+        }
+#else
         let iso = ISO8601DateFormatter()
         let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
             "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"
-        let raw = try Self.decode(try await get(path))
+        raw = try Self.decode(try await get(path))
+#endif
         let samples = transform(raw)
         // Only whole grid chunks are cached: the newest one runs to "now" and
         // would be a different chunk tomorrow.
@@ -200,6 +220,14 @@ final class IwlsFetcher {
         }
         return samples
     }
+
+#if DEBUG
+    private static func dataPath(_ code: String, _ stationID: String, _ chunk: ChsChunk) -> String {
+        let iso = ISO8601DateFormatter()
+        return "/stations/\(stationID)/data?time-series-code=\(code)" +
+            "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"
+    }
+#endif
 
     static func decode(_ data: Data) throws -> [ChsSample] {
         let iso = ISO8601DateFormatter()
