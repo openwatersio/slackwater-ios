@@ -6,7 +6,9 @@
 //   - wlp is 1-min native → decimated to 15-min before bridging
 //   - 7-day request cap; queries by resolved Mongo id, never station code
 import Foundation
-import Darwin
+#if DEBUG
+import notify
+#endif
 
 struct IwlsStation: Decodable {
     struct Series: Decodable { let code: String }
@@ -81,15 +83,15 @@ final class IwlsFetcher {
     static func waitForFixtureRelease(_ checkpoint: String) async throws {
         guard let token = fixtureToken else { return }
         let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
-        var notifyToken: Int32 = 0
-        let status = name.withCString { notify_register_check($0, &notifyToken) }
+        var registration: Int32 = 0
+        let status = name.withCString { notify_register_check($0, &registration) }
         guard status == NOTIFY_STATUS_OK else {
             throw ChsError.failed("could not register UI fixture checkpoint: \(checkpoint)")
         }
-        defer { notify_cancel(notifyToken) }
+        defer { notify_cancel(registration) }
         for _ in 0..<1_200 {
-            var released: Int32 = 0
-            if notify_check(notifyToken, &released) == NOTIFY_STATUS_OK, released != 0 { return }
+            var state: UInt64 = 0
+            if notify_get_state(registration, &state) == NOTIFY_STATUS_OK, state == 1 { return }
             try await Task.sleep(for: .milliseconds(50))
         }
         throw ChsError.failed("UI fixture checkpoint timed out: \(checkpoint)")

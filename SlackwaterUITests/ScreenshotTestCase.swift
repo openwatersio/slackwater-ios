@@ -15,12 +15,19 @@
 // process, and the fetcher's request pacing cannot coordinate across processes.
 import UIKit
 import XCTest
-import Darwin
+import notify
 
 class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
     static let fixtureNow = "1788868800"
     static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
+    private var fixtureNotifyTokens: [String: Int32] = [:]
+
+    override func tearDown() {
+        for token in fixtureNotifyTokens.values { notify_cancel(token) }
+        fixtureNotifyTokens.removeAll()
+        super.tearDown()
+    }
 
     func testArguments(_ args: [String], live: Bool = false) -> [String] {
         var result = args + ["-noCloudSync", "-currentFillOff", "-chartPacksOff",
@@ -33,8 +40,14 @@ class ScreenshotTestCase: XCTestCase {
 
     func releaseFixture(_ token: String, _ checkpoint: String) {
         let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
+        var registration: Int32 = 0
+        XCTAssertEqual(name.withCString { notify_register_check($0, &registration) },
+                       NOTIFY_STATUS_OK, "could not register UI fixture checkpoint \(checkpoint)")
+        fixtureNotifyTokens[name] = registration
+        XCTAssertEqual(notify_set_state(registration, 1), NOTIFY_STATUS_OK,
+                       "could not set UI fixture checkpoint \(checkpoint)")
         XCTAssertEqual(name.withCString { notify_post($0) }, NOTIFY_STATUS_OK,
-                       "could not release UI fixture checkpoint \(checkpoint)")
+                       "could not publish UI fixture checkpoint \(checkpoint)")
     }
 
     /// Wait for a condition `waitForExistence` cannot express — hittability,

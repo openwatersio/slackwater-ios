@@ -31,3 +31,4 @@ All direct launch/relaunch sites now use the common argument composer. Graphical
 
 - `git diff --check` passed.
 - No Xcode build or simulator test was run, per task instructions. Coordinator should select `OfflineTransitionTests`, changed `OfflineCoverageTests` picker cases, and the existing direct-launch classes before the full offline suite.
+- The notification handshake was not separately probed; the coordinator's focused transition UI run is the cross-process validation.
