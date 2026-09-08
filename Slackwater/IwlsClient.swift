@@ -16,7 +16,7 @@ struct IwlsStation: Decodable {
     let timeSeries: [Series]
 }
 
-struct IwlsSample: Decodable { let eventDate: String; let value: Double }
+struct IwlsSample: Codable { let eventDate: String; let value: Double }
 
 /// A decimated sample as bridged to JS: epoch-ms + metres.
 struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
@@ -111,19 +111,25 @@ final class IwlsFetcher {
         let iso = ISO8601DateFormatter()
         let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
             "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"
-        let raw = try JSONDecoder().decode([IwlsSample].self, from: try await get(path))
-        var out: [ChsSample] = []
-        for s in raw {
-            guard let date = iso.date(from: s.eventDate) else { continue }
-            let ms = date.timeIntervalSince1970 * 1000
-            if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
-        }
-        let samples = transform(out)
+        let raw = try Self.decode(try await get(path))
+        let samples = transform(raw)
         // Only whole grid chunks are cached: the newest one runs to "now" and
         // would be a different chunk tomorrow.
         if chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
             ChsChunkStore.save(samples, stationID, code, chunk)
         }
         return samples
+    }
+
+    static func decode(_ data: Data) throws -> [ChsSample] {
+        let iso = ISO8601DateFormatter()
+        let raw = try JSONDecoder().decode([IwlsSample].self, from: data)
+        var out: [ChsSample] = []
+        for s in raw {
+            guard let date = iso.date(from: s.eventDate) else { continue }
+            let ms = date.timeIntervalSince1970 * 1000
+            if out.last?.t != ms { out.append(ChsSample(t: ms, v: s.value)) }
+        }
+        return out
     }
 }
