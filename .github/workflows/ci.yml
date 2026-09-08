@@ -166,24 +166,33 @@ jobs:
       # iPad leg. SLACKWATER_SIMS must name ONE device — it overrides the
       # script's fast/full device list outright.
       #
-      # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
-      # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker.
+      # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
+      # wake it: it reports an EMPTY device list — placeholder destinations
+      # only — and exits 70 on "Unable to find a device matching iPhone 17".
+      # Listing the devices first starts the service, and the run below then
+      # finds them. actions/runner-images#13459 collects the same one-liner in
+      # front of `-downloadPlatform`, which fails the same way for the same
+      # reason.
       #
-      # DEVELOPER_DIR is pinned because the image's Xcode runs ahead of its
-      # simulator runtimes: macos-26-arm64 defaults to Xcode 26.6, and the
-      # newest iOS runtime it ships is 26.5. Under 26.6 the image has no usable
-      # simulator at all — `xcodebuild` lists only placeholder destinations and
-      # exits 70 on "Unable to find a device matching iPhone 17". Every
-      # pre-created iPhone lives under the 26.5 runtime, so the lane runs on the
-      # Xcode that matches it. Raise this when the image ships a 26.6 runtime,
-      # and check `xcrun simctl list runtimes` before assuming it has.
+      # This reads like a version problem and is not one. Apple ships no iOS
+      # 26.6 simulator runtime at all, so the image's Xcode 26.6 against its
+      # 26.5 runtime is the ordinary pairing — the same one every developer
+      # here runs locally. Pinning DEVELOPER_DIR to 26.5 also turns the lane
+      # green, which is what makes this worth writing down: it works only
+      # because switching Xcode re-enumerates the devices, so it treats the
+      # symptom and leaves a version to maintain forever.
+      - run: xcrun simctl list > /dev/null
+
+      # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
+      # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
+      # image's default Xcode ever drifts from what the project needs, pin
+      # DEVELOPER_DIR here.
       # SLACKWATER_PERF_SCALE widens the wall-clock test budgets, which were
       # calibrated on the Mac Studio. The first hosted run measured 1.9–2.5×
       # slower; 4× absorbs pool variance while a real 2×+ regression on top of
       # that still trips.
       - run: ./scripts/test.sh
         env:
-          DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
           SLACKWATER_SIMS: iPhone 17
           SLACKWATER_WORKERS: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
