@@ -563,14 +563,30 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "the Moon tile did not open its sheet")
         save(app, "moon-sheet.png")
 
-        let next = app.descendants(matching: .any)["moon-next-eclipse"].firstMatch
+        // One row per eclipse KIND, so the identifier carries the kind rather
+        // than a position: which of the three comes first depends on the date
+        // and the observer, and pinning the test to "the total one" would fail
+        // in a year that has no visible total inside the window.
+        let next = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH 'moon-next-eclipse-'")).firstMatch
         XCTAssert(next.appears(within: 10), "no next-eclipse row in the Moon sheet")
-        // The phase rows are destinations on the same terms — every reachable
-        // time in this sheet is somewhere the scrubber can go.
-        XCTAssert(app.descendants(matching: .any)["moon-next-full"].firstMatch.exists,
-                  "the next-full-moon row is not in the sheet")
-        XCTAssert(app.descendants(matching: .any)["moon-next-new"].firstMatch.exists,
-                  "the next-new-moon row is not in the sheet")
+        // Every reachable time in this sheet is somewhere the scrubber can go,
+        // and that now includes rise, set, and the two ends of the orbit.
+        for id in ["moon-next-full", "moon-next-new", "moon-rise", "moon-set",
+                   "moon-perigee", "moon-apogee"] {
+            XCTAssert(app.descendants(matching: .any)[id].firstMatch.exists,
+                      "\(id) is not in the sheet")
+        }
+        // The eclipse list runs off the bottom of a phone screen, so the half
+        // of this sheet that carries the three kinds has no shot otherwise.
+        app.swipeUp()
+        save(app, "moon-sheet-eclipses.png")
+        // Both swipes decelerate, and the tap below lands on a row that is
+        // still moving otherwise — the scroll ends with no accessibility
+        // signal, the same gap `settleLayout` exists for (#331).
+        app.swipeDown()
+        settleLayout(next)
+
         next.tap()
 
         // The sheet closes, and the window has moved: the next eclipse is
