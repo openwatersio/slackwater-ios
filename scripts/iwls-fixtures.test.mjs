@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { prepare, refresh } from "./iwls-fixtures.mjs";
 
-const samples = (days) => Array.from({ length: days * 96 }, (_, index) => ({
+const samples = (days) => Array.from({ length: days * 96 + 1 }, (_, index) => ({
   eventDate: new Date(Date.parse("2026-09-01T00:00:00Z") - (days * 96 - index) * 900_000).toISOString(), value: 1,
 }));
 const valid = {
@@ -49,10 +49,15 @@ test("failed refresh preserves the previous recording", async () => {
   assert.deepEqual(JSON.parse(await readFile(recording)), valid);
 });
 
-test("validation rejects an interior recording gap", async () => {
+test("validation rejects incomplete recording windows", async () => {
   const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
   const gapped = structuredClone(valid);
   gapped.stations.find((station) => station.key === "active").series.wcsp1.splice(1_000, 10);
   await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(gapped));
+  await assert.rejects(prepare({ fixtureDir: dir, staged: join(dir, "staged.json") }), /15-minute grid/);
+
+  const truncated = structuredClone(valid);
+  truncated.stations.find((station) => station.key === "active").series.wcsp1.shift();
+  await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(truncated));
   await assert.rejects(prepare({ fixtureDir: dir, staged: join(dir, "staged.json") }), /15-minute grid/);
 });

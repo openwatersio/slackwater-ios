@@ -35,13 +35,11 @@ export function validate(recording) {
       if (!Array.isArray(samples) || !samples.length || samples.some((sample) => !Number.isFinite(sample.value) || !Date.parse(sample.eventDate)))
         throw new Error(`${target.key}: ${code} has no valid samples`);
       const times = samples.map((sample) => Date.parse(sample.eventDate));
-      if (new Set(times).size !== times.length || times.length < target.days * 80 ||
-          Math.min(...times) > end.getTime() - (target.days * 86_400_000) + 86_400_000 ||
-          Math.max(...times) < end.getTime() - 86_400_000)
-        throw new Error(`${target.key}: ${code} does not cover the expected ${target.days}-day window`);
       const grid = times.filter((time) => time % 900_000 === 0);
       const offGrid = times.length - grid.length;
-      if (times.some((time, index) => index > 0 && time <= times[index - 1]) ||
+      if (new Set(times).size !== times.length ||
+          grid[0] !== end.getTime() - target.days * 86_400_000 || grid.at(-1) !== end.getTime() ||
+          times.some((time, index) => index > 0 && time <= times[index - 1]) ||
           grid.some((time, index) => index > 0 && time - grid[index - 1] !== 900_000) ||
           offGrid !== (target.key === "victoria" ? 1 : 0))
         throw new Error(`${target.key}: ${code} is not a complete sorted 15-minute grid`);
