@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,7 +13,7 @@ const targets = [
 ];
 
 function defaultFixtureDir() {
-  return join(homedir(), "Library/Caches/SlackwaterTests/iwls");
+  return join(root, "SlackwaterTests/Fixtures");
 }
 
 function paths(fixtureDir = process.env.SLACKWATER_FIXTURE_DIR || defaultFixtureDir(), staged = join(root, "SlackwaterTests/Fixtures/iwls-recording.json")) {

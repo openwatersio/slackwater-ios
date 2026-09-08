@@ -41,6 +41,13 @@ test("prepare is offline and rejects missing or corrupt recordings", async () =>
   assert.equal((await stat(staged)).mtimeMs, modified);
 });
 
+test("default prepare validates the committed recording without rewriting it", async () => {
+  const recording = join(import.meta.dirname, "../SlackwaterTests/Fixtures/iwls-recording.json");
+  const modified = (await stat(recording)).mtimeMs;
+  assert.equal(await prepare(), recording);
+  assert.equal((await stat(recording)).mtimeMs, modified);
+});
+
 test("failed refresh preserves the previous recording", async () => {
   const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
   const recording = join(dir, "iwls-recording.json");
