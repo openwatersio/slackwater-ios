@@ -62,6 +62,62 @@ final class IwlsFetcher {
     static let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
     private let killSwitch: Bool
     private var lastRequest = Date.distantPast
+    private var fixtureRequests: [String: Int] = [:]
+
+#if DEBUG
+    private static let fixtureToken: String? = {
+        guard let i = CommandLine.arguments.firstIndex(of: "-chsFixture"),
+              CommandLine.arguments.indices.contains(i + 1) else { return nil }
+        return CommandLine.arguments[i + 1]
+    }()
+    static var usesFixture: Bool { fixtureToken != nil }
+    static let fixtureScenario: String? = {
+        guard let i = CommandLine.arguments.firstIndex(of: "-chsFixtureScenario"),
+              CommandLine.arguments.indices.contains(i + 1) else { return nil }
+        return CommandLine.arguments[i + 1]
+    }()
+
+    static func waitForFixtureRelease(_ checkpoint: String) async throws {
+        guard let token = fixtureToken else { return }
+        let url = URL(fileURLWithPath: "/tmp/slackwater-ui-\(token)-\(checkpoint)")
+        for _ in 0..<1_200 {
+            if FileManager.default.fileExists(atPath: url.path) { return }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        throw ChsError.failed("UI fixture checkpoint timed out: \(checkpoint)")
+    }
+
+    private static func fixtureStations() -> [IwlsStation] {
+        ChsStationInfo.all.map {
+            IwlsStation(id: $0.id, officialName: $0.name, latitude: $0.latitude,
+                        longitude: $0.longitude, timeSeries: [.init(code: "wlp")])
+        } + ChsCurrentGateInfo.all.map {
+            IwlsStation(id: $0.id, officialName: $0.name, latitude: $0.latitude,
+                        longitude: $0.longitude,
+                        timeSeries: [.init(code: "wcsp1"), .init(code: "wcdp1")])
+        }
+    }
+
+    private static func fixtureSamples(_ code: String, _ chunk: ChsChunk) -> [ChsSample] {
+        var out: [ChsSample] = []
+        var date = chunk.start
+        while date <= chunk.end {
+            let phase = 2 * Double.pi * date.timeIntervalSince1970 / (12.42 * 3600)
+            let value: Double
+            switch code {
+            case "wcdp1": value = sin(phase) >= 0 ? 45 : 225
+            case "wcsp1": value = 2.4 * abs(sin(phase))
+            default: value = 3 + 1.5 * sin(phase) + 0.4 * sin(phase / 2)
+            }
+            out.append(ChsSample(t: date.timeIntervalSince1970 * 1000, v: value))
+            date = date.addingTimeInterval(900)
+        }
+        return out
+    }
+#else
+    static let usesFixture = false
+    static let fixtureScenario: String? = nil
+#endif
 
     init(killSwitch: Bool = networkKillSwitch) {
         self.killSwitch = killSwitch
@@ -79,6 +135,9 @@ final class IwlsFetcher {
     }
 
     func stationList() async throws -> [IwlsStation] {
+#if DEBUG
+        if Self.usesFixture { return Self.fixtureStations() }
+#endif
         try JSONDecoder().decode([IwlsStation].self, from: try await get("/stations"))
     }
 
@@ -87,6 +146,9 @@ final class IwlsFetcher {
     /// Per-station metadata — the only place IWLS serves the flood/ebb axis
     /// (the /stations list entries carry none).
     func metadata(stationID: String) async throws -> Metadata {
+#if DEBUG
+        if Self.usesFixture { return Metadata(floodDirection: 45, ebbDirection: 225) }
+#endif
         try JSONDecoder().decode(Metadata.self, from: try await get("/stations/\(stationID)/metadata"))
     }
 
@@ -108,6 +170,24 @@ final class IwlsFetcher {
     private func cached(_ code: String, stationID: String, chunk: ChsChunk,
                         _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
         if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
+#if DEBUG
+        if Self.usesFixture {
+            let key = "\(stationID):\(code)"
+            let count = fixtureRequests[key, default: 0]
+            fixtureRequests[key] = count + 1
+            if Self.fixtureScenario == "hold-first", count == 0 {
+                try await Self.waitForFixtureRelease("\(stationID)-first-chunk")
+            }
+            if Self.fixtureScenario == "yield-resume", count == 0 {
+                if stationID == "chs-dodd-narrows", code == "wcsp1" {
+                    try await Self.waitForFixtureRelease("dodd-first-chunk")
+                } else if stationID == "chs-tofino", code == "wlp" {
+                    try await Self.waitForFixtureRelease("tofino-first-chunk")
+                }
+            }
+            return transform(Self.fixtureSamples(code, chunk))
+        }
+#endif
         let iso = ISO8601DateFormatter()
         let path = "/stations/\(stationID)/data?time-series-code=\(code)" +
             "&from=\(iso.string(from: chunk.start))&to=\(iso.string(from: chunk.end))"

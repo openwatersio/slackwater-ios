@@ -81,7 +81,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// hide.
     func testTideReadoutShowsHeightAndRange() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-seedGate"]
+        app.launchArguments = testArguments(["-seedGate"])
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 
@@ -126,7 +126,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     /// already waits for the same element to read `before`.
     func testPickingADateMovesTheWindow() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-seedGate"]
+        app.launchArguments = testArguments(["-seedGate"])
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
 

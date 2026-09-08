@@ -8,6 +8,7 @@ import Foundation
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
 /// stand-in: every IWLS request throws before the socket).
 let networkKillSwitch = CommandLine.arguments.contains("-networkKillSwitch")
+    || (NSClassFromString("XCTestCase") != nil && !IwlsFetcher.usesFixture)
 
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.
@@ -660,6 +661,11 @@ final class ChsFitService: ObservableObject {
                                              fitDays: ChsCurrentGateInfo.provisionalDays,
                                              speeds: speeds, dirs: dirs, fitter: fitter)
             await MainActor.run { self.publishProvisional(gate, model) }
+#if DEBUG
+            if IwlsFetcher.fixtureScenario == "provisional-final" {
+                try await IwlsFetcher.waitForFixtureRelease("after-provisional")
+            }
+#endif
         }
         return try await Self.model(gate: gate, station: station, flood: flood, ebb: ebb,
                                     start: plan.last?.start ?? end, end: end, fitDays: gate.fitDays,

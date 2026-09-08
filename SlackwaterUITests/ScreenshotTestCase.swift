@@ -18,6 +18,23 @@ import XCTest
 
 class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
+    static let fixtureNow = "1788868800"
+    static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
+
+    func testArguments(_ args: [String], live: Bool = false) -> [String] {
+        var result = args + ["-noCloudSync", "-currentFillOff", "-chartPacksOff",
+                             "-nowEpoch", Self.fixtureNow]
+        if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
+            result.append("-networkKillSwitch")
+        }
+        return result
+    }
+
+    func releaseFixture(_ token: String, _ checkpoint: String) {
+        let path = "/tmp/slackwater-ui-\(token)-\(checkpoint)"
+        XCTAssert(FileManager.default.createFile(atPath: path, contents: Data()),
+                  "could not release UI fixture checkpoint \(checkpoint)")
+    }
 
     /// Wait for a condition `waitForExistence` cannot express — hittability,
     /// keyboard focus, a label the app rewrites when the work behind it lands.
@@ -137,11 +154,23 @@ class ScreenshotTestCase: XCTestCase {
     /// whose first screen is not the list (the FTUE gate, -openMap) and
     /// mid-test relaunches on an existing app stay inline.
     func launch(_ args: String...) -> XCUIApplication {
+        launch(args)
+    }
+
+    func launch(_ args: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
+        app.launchArguments = testArguments(args)
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    func launchLive(_ args: String...) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(args, live: true)
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
         return app
@@ -152,9 +181,9 @@ class ScreenshotTestCase: XCTestCase {
     /// TEST_RUNNER_SLACKWATER_FULL=1 — xcodebuild strips the prefix and sets
     /// the rest on this UI-test runner process, the same route M1_SHOT_DIR
     /// rides above.
-    func skipUnlessFull() throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_FULL"] == nil,
-                      "live-IWLS test — run ./scripts/test.sh --full")
+    func skipUnlessLive() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_LIVE"] == nil,
+                      "live IWLS smoke — run ./scripts/test.sh --live")
     }
 
     /// Units live in Settings only: toggle there.

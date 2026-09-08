@@ -30,7 +30,7 @@ final class DeepLinkUITests: XCTestCase {
     /// built view hierarchy and proves nothing about scene setup.
     private func primeThenTerminate(_ args: String...) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
+        app.launchArguments = testArguments(args)
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10),
                   "app did not finish launching before the deep link")

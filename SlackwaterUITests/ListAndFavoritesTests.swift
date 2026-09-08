@@ -510,7 +510,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
             // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
             // lazy singleton, so a relaunch that stops at the first-run gate
             // never touches it and the reset never happens.
-            app.launchArguments = ["-seedGate", "-resetFavorites", "-noCloudSync"]
+            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
             app.launch()
         }
 
@@ -567,7 +567,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
             // Leave the simulator as found. `-seedGate` too: FavoritesStore is a
             // lazy singleton, so a relaunch that stops at the first-run gate
             // never touches it and the reset never happens.
-            app.launchArguments = ["-seedGate", "-resetFavorites", "-noCloudSync"]
+            app.launchArguments = testArguments(["-seedGate", "-resetFavorites"])
             app.launch()
         }
 

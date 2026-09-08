@@ -449,10 +449,12 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["Previous Month"].firstMatch.tap()
         app.buttons["Previous Month"].firstMatch.tap()
-        let todayCell = app.collectionViews.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] 'today'")).firstMatch
-        XCTAssert(todayCell.exists, "the graphical picker labels today's cell")
-        todayCell.tap()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        let seededCell = app.collectionViews.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", formatter.string(from: Self.fixtureDate))).firstMatch
+        XCTAssert(seededCell.waitForExistence(timeout: 2), "the seeded date is absent from the picker")
+        seededCell.tap()
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "back on the seeded week, the strip must render from disk — offline")
@@ -483,7 +485,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // layouts (this repo's CLAUDE.md documents exactly that failure
         // class). Calendar-based add, not `addingTimeInterval` — see
         // "Calendar days are not 86,400 seconds".
-        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45, to: Date())!
+        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45,
+                                                           to: Self.fixtureDate)!
         let targetLabelFormatter = DateFormatter()
         targetLabelFormatter.dateFormat = "EEEE, MMMM d"   // observed cell label shape:
                                                             // "Sunday, October 11" (no year)
