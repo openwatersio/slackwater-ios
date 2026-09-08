@@ -7,8 +7,12 @@ import Foundation
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
 /// stand-in: every IWLS request throws before the socket).
-let networkKillSwitch = CommandLine.arguments.contains("-networkKillSwitch")
-    || (NSClassFromString("XCTestCase") != nil && !IwlsFetcher.usesFixture)
+let networkKillSwitch: Bool = {
+#if DEBUG
+    if NSClassFromString("XCTestCase") != nil && !IwlsFetcher.usesFixture { return true }
+#endif
+    return CommandLine.arguments.contains("-networkKillSwitch")
+}()
 
 /// Where a CHS station stands. Stored models load synchronously at init, so a
 /// previously fitted station is `.fitted` before the first frame — offline.

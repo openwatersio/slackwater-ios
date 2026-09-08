@@ -211,11 +211,17 @@ struct MonoLabel: View {
 /// day-after check (relaunch offline "tomorrow").
 private let appNowOffset: TimeInterval =
     UserDefaults.standard.double(forKey: "nowOffsetDays") * 86_400
+#if DEBUG
 private let appNowEpoch = UserDefaults.standard.double(forKey: "nowEpoch")
+#endif
 
 func appNow() -> Date {
-    (appNowEpoch == 0 ? Date.now : Date(timeIntervalSince1970: appNowEpoch))
-        .addingTimeInterval(appNowOffset)
+#if DEBUG
+    if appNowEpoch != 0 {
+        return Date(timeIntervalSince1970: appNowEpoch).addingTimeInterval(appNowOffset)
+    }
+#endif
+    return Date.now.addingTimeInterval(appNowOffset)
 }
 
 /// Today's local midnight in `tz`, on the app clock. The anchor every detail
