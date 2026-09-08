@@ -159,12 +159,11 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.os }}-
 
-      # Runs xcodegen, then the fast suite on the image's stock iPhone
-      # simulator. Two things stay out of this lane and ride
-      # `scripts/test.sh --full`, run by hand before an upload: the live-IWLS
-      # UI tests (they skip themselves unless SLACKWATER_FULL is set) and the
-      # iPad leg. SLACKWATER_SIMS must name ONE device — it overrides the
-      # script's fast/full device list outright.
+      # Validates the recorded fixture, runs xcodegen, then the offline fast
+      # suite on the image's stock iPhone simulator. The iPad leg and exhaustive
+      # data test use `scripts/test.sh --full`; live IWLS compatibility uses the
+      # explicit `scripts/test.sh --live` smoke. SLACKWATER_SIMS must name ONE
+      # device — it overrides the script's fast/full device list outright.
       #
       # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the

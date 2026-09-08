@@ -21,11 +21,21 @@ Changing the bundled data additionally needs **Node 24** and a `npm install` in 
 One test plan, driven by `scripts/test.sh`:
 
 ```sh
-./scripts/test.sh          # ~15 min, iPhone simulator. Use this while iterating.
-./scripts/test.sh --full   # adds the iPad simulator and the live-network tests. Before a release.
+./scripts/test.sh          # offline unit + UI tests, iPhone. Use while iterating.
+./scripts/test.sh --full   # offline, both reference simulators + exhaustive data test.
+./scripts/test.sh --unit   # unit target only, one simulator.
+./scripts/test.sh --live   # live IWLS smoke only, one simulator.
 ```
 
-Fast is everything that runs on stored or mocked state. `--full` adds nine UI tests that fetch live from the CHS IWLS API and fit harmonics on-device, which is the only coverage of the network path — they skip themselves without it. It takes 35 minutes and up, mostly because the API is paced at 2.5 s per request.
+Routine modes never download test data. Once per machine, explicitly capture the
+versioned IWLS recording with `node scripts/iwls-fixtures.mjs refresh`. The runner
+then validates and stages it with the offline `prepare` command. The recording is
+reused from `~/Library/Caches/SlackwaterTests/iwls` by every checkout and linked
+worktree; `SLACKWATER_FIXTURE_DIR` overrides that location. A missing or corrupt
+recording is a setup failure with the refresh command in its error message.
+
+`--live` is the separate compatibility smoke for the real IWLS service. It does
+not use the recording. `--full` stays offline and is the pre-release suite.
 
 Every `xcodebuild` invocation, by hand or by script, needs `-clonedSourcePackagesDirPath build/SourcePackages`.
 

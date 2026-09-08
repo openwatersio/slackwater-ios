@@ -151,25 +151,28 @@ that procedure sits on.
   `FillFieldTests`). The header JSON records corpus window + mesh hash — check
   those before assuming a refit is needed.
 
-## Test runs — fast by default, full before an upload (2026-08-01)
+## Test runs — offline by default, full before an upload (2026-09-08)
 
 One XCTestPlan (`TestPlans/Slackwater.xctestplan`), checked in and wired into the
-scheme by `project.yml`. The live-IWLS / on-device-fit UI tests carry
-`skipUnlessFull()` (ScreenshotTestCase) and skip themselves unless `SLACKWATER_FULL`
-reaches the UI-test runner — `scripts/test.sh --full` sets
-`TEST_RUNNER_SLACKWATER_FULL=1`, the same `TEST_RUNNER_` route as `M1_SHOT_DIR`
-below. Drive it with `scripts/test.sh`, which prints a per-sim wall clock.
+scheme by `project.yml`. `scripts/test.sh` selects targets from that plan and
+prints a per-simulator wall clock. Default, full, and unit modes use only local
+recordings and seeded state. Only `--live` opts into real IWLS access, with
+`TEST_RUNNER_SLACKWATER_LIVE=1` reaching the UI-test runner.
 
-**Fast is iPhone 17 only; `--full` adds the iPad** (Pro 11-inch (M5)). Measured on
-build 27, the iPad leg costs 1169 s and is the only place three tests run —
-`testM44IPadSplit`, `testM50DetailSwapsBetweenSameKindStations`,
-`testM52IPadAutoSelectsTheFirstStation`, 100 s between them. The other 34 UI tests
-it runs are a second rendering of what the iPhone leg just proved, so it is a
-pre-release check rather than an every-commit one.
+Capture the versioned recording once per machine with
+`node scripts/iwls-fixtures.mjs refresh`. That is the only fixture command that
+downloads. Unit-containing modes automatically run the offline
+`node scripts/iwls-fixtures.mjs prepare`, which validates and stages the recording
+or fails with the setup command. The default recording lives at
+`~/Library/Caches/SlackwaterTests/iwls`, shared by the same macOS account's
+checkouts and linked worktrees. `SLACKWATER_FIXTURE_DIR` overrides it. Refresh is
+always explicit; routine runs never replace the recording.
 
 ```sh
-./scripts/test.sh                                  # fast run  — iPhone only, the default
-./scripts/test.sh --full                           # full run  — both sims + live-IWLS tests
+./scripts/test.sh                                  # offline unit + UI, iPhone
+./scripts/test.sh --full                           # offline both sims + exhaustive data check
+./scripts/test.sh --unit                           # unit target only, one simulator
+./scripts/test.sh --live                           # real-IWLS smoke only, one simulator
 SHOT_DIR=/tmp/shots ./scripts/test.sh              # where the UI tests save screenshots
 SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 ```
@@ -199,38 +202,21 @@ Two smaller pieces of the same story:
   pair). That doesn't prevent the kill, but it does stop results bleeding between
   overlapping sessions — CI once reported a failing test that didn't exist on the
   branch under test.
-- Both modes write screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
+- UI modes write screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
   otherwise, CI included, so a local run and CI overwrite each other's images.
 
 | Mode | Devices | Contents | Wall clock |
 |---|---|---|---|
-| **Fast** (default) | iPhone 17 | unit tests + the UI tests that run on stored/mocked state | **~15 min** (876 s measured, build 27) |
-| **Full** (`--full`) | + iPad Pro 11-inch (M5) | everything: + the live-IWLS / on-device-fit UI tests, the iPad leg, and the national hybrid-direction sweep | **35 min+**, variable |
+| **Fast** (default) | iPhone 17 | offline unit and UI tests; skips the exhaustive national sweep | Re-measure after migration |
+| **Full** (`--full`) | iPhone 17 + iPad Pro 11-inch (M5) | offline unit and UI tests plus the national sweep | Re-measure after migration |
+| **Unit** (`--unit`) | one simulator | unit target, including the national sweep | Re-measure after migration |
+| **Live** (`--live`) | one simulator | `LiveFetchTests` compatibility smoke only | Network-dependent |
 
-Figures re-measured at build 27 from `build/results-fast-*.xcresult`. The old
-"9 min/sim" in this table predated the worldwide tide bundle and was stale by
-roughly 2x. Where the fast run's time actually goes: 50 UI tests are 814 s of it;
-the whole 151-test unit target is **21 s**, of which
-`testHybridDirectionHasFullCoverageAndMatchesBaseline` alone is 18 s (it sweeps
-every bundled station, so it rides `--full` — `scripts/test.sh` skips it by name
-in fast mode).
-
-The eleven the fast run skips are the whole of `LiveFetchTests` (each carries
-`try skipUnlessFull()` at the top). They fetch live from IWLS
-(`api-iwls.dfo-mpo.gc.ca`) at the fetcher's 2.5 s pacing and then fit harmonics in
-JavaScriptCore (or, for `testOnlineGateLiveFetch`, fetch CHS-published predictions),
-so each costs minutes, not seconds.
-
-`testM46MalibuDerivedGate` is the expensive one and the reason the old "12 min" figure was
-never reproducible: it launches with no `-chsFitOnly`, so how long Point Atkinson takes to
-reach the front of the whole-catalogue queue depends entirely on what that simulator already
-had cached. Measured **900 s** on a freshly-reset iPhone sim and 80 s on an iPad sim in the
-same run — one test swinging by a quarter of an hour. Full-run runtime therefore varies with
-IWLS and with simulator state; 21 min is a good run, not a ceiling.
-
-**Agents: run fast while iterating, run `--full` before `scripts/testflight.sh`.** The full
-run is also the only thing that exercises the network path at all, so a green fast run
-says nothing about IWLS resolution, chunk caching, or the provisional→final refinement.
+The old timings mixed routine behavior coverage with live downloads and do not
+describe these modes. Record observed timings after the migrated suite runs.
+Run fast while iterating and offline `--full` before `scripts/testflight.sh`.
+Run `--live` separately when real-service compatibility needs checking; green
+offline runs intentionally make no claim about current IWLS availability.
 
 Screenshots: `ScreenshotTestCase` reads `M1_SHOT_DIR` **inside the UI-test runner process**, so
 the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix and sets the
