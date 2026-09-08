@@ -10,7 +10,7 @@
 // DeepLinkTests. `system.open` delivers the same URL `.widgetURL` does.
 import XCTest
 
-final class DeepLinkUITests: XCTestCase {
+final class DeepLinkUITests: ScreenshotTestCase {
     /// "noaa/9449880" percent-encoded exactly as `deepLink(forStationID:)`
     /// encodes it — the "/"-bearing shape, which is every id but CHS.
     private let fridayHarbor = URL(string: "slackwater://station/noaa%2F9449880")!
