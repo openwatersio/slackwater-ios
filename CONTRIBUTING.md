@@ -18,7 +18,8 @@ Changing the bundled data additionally needs **Node 24** and a `npm install` in 
 
 ## Running the tests
 
-One test plan, driven by `scripts/test.sh`:
+One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;
+no npm install is needed for it.
 
 ```sh
 ./scripts/test.sh          # offline unit + UI tests, iPhone. Use while iterating.
