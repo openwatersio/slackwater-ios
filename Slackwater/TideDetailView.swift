@@ -94,7 +94,9 @@ struct TideDetailView: View {
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { tl, jump in
-                                SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
+                                SummaryTiles(primary: range,
+                                             primaryDetail: rangeSheet(jump),
+                                             moon: sky.illumination, at: scrubTime,
                                              eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                              onJump: jump,
                                              latitude: record.latitude, longitude: record.longitude)
@@ -130,6 +132,16 @@ struct TideDetailView: View {
         return ("Range",
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
                 prev.kind == .low ? "low to high" : "high to low")
+    }
+
+    /// The Range tile's sheet (#217). Nil while there is no swing under the
+    /// centerline, which is the same condition that leaves the tile itself
+    /// blank — a tile with a chevron and no number would be a dead end.
+    private func rangeSheet(_ jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
+        guard range != nil else { return nil }
+        let record = record, at = scrubTime, tz = tz, imperial = imperial
+        return { AnyView(RangeDetailSheet(record: record, at: at, tz: tz,
+                                          imperial: imperial, onJump: jump)) }
     }
 
     private func lead(ink: Color) -> some View {

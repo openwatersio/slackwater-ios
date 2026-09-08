@@ -596,6 +596,10 @@ struct Commentary: View {
 /// no number at all and passes nil, leaving the moon on its own.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
+    /// The primary tile's sheet, when its caller has one. Built by the caller
+    /// rather than here: only the tide view knows what a range means, and
+    /// three of the four scrub views passing `primary` are currents.
+    var primaryDetail: (() -> AnyView)? = nil
     /// The illumination the SKY already computed, rather than a second lookup
     /// per frame for the same instant (#299).
     let moon: MoonIllumination?
@@ -630,7 +634,7 @@ struct SummaryTiles: View {
         HStack(alignment: .top, spacing: 12) {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            accessibility: primary.label) {
+                            accessibility: primary.label, detail: primaryDetail) {
                     EmptyView()
                 } value: {
                     Text(primary.value).font(ReadoutType.hero.monospacedDigit())
@@ -664,9 +668,10 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     /// Spoken for the eyebrow row, glyph included; the tile then reads as one
     /// element, this, the value and the caption in order.
     let accessibility: String
-    /// A tile with somewhere to go: a chevron, a tap, and a sheet. Only the
-    /// Moon tile has one so far — `Range` and `Next max` stay inert until they
-    /// have something to say that the tile itself doesn't already.
+    /// A tile with somewhere to go: a chevron, a tap, and a sheet. The Moon
+    /// tile has had one since #222 and the tide's `Range` since #217; a
+    /// current's `Next max` stays inert until it has something to say that the
+    /// tile itself doesn't already.
     var detail: (() -> AnyView)? = nil
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value

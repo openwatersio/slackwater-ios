@@ -583,4 +583,43 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "the jump did not move the window")
         save(app, "moon-sheet-jumped.png")
     }
+
+    /// #217: the Range tile opens the tidal plane ladder, and its rungs are
+    /// destinations on the same terms as the Moon sheet's eclipse rows above.
+    ///
+    /// The identifiers are built from the rung's own plain-English name, so
+    /// this is also the guard on the naming: `ladder-highest-tide` exists only
+    /// while the label reads "Highest tide". Rename it to the acronym and this
+    /// test says so.
+    func testTheRangeTileOpensItsLadderAndARungJumps() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let range = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label ==[c] 'range'")).firstMatch
+        XCTAssert(range.waitForExistence(timeout: 10), "no Range tile on the tide detail")
+        range.tap()
+
+        XCTAssert(app.navigationBars["Range"].waitForExistence(timeout: 5),
+                  "the Range tile did not open its sheet")
+        // The scan runs off the main actor, so the first thing up is a spinner.
+        let datum = app.descendants(matching: .any)["ladder-chart-datum"].firstMatch
+        XCTAssert(datum.waitForExistence(timeout: 15), "the ladder never drew")
+        save(app, "range-sheet.png")
+
+        for rung in ["ladder-highest-tide", "ladder-now", "ladder-lowest-tide",
+                     "ladder-average-sea-level"] {
+            XCTAssert(app.descendants(matching: .any)[rung].firstMatch.exists,
+                      "no \(rung) rung in the ladder")
+        }
+        // A plane is not a moment: the acronym rungs must not be destinations.
+        XCTAssertFalse(app.buttons["ladder-chart-datum"].exists,
+                       "chart datum is a plane, not somewhere to scrub to")
+
+        let record = app.descendants(matching: .any)["ladder-lowest-this-year"].firstMatch
+        XCTAssert(record.exists, "no window-record rung to jump from")
+        record.tap()
+        XCTAssert(app.navigationBars["Range"].waitForNonExistence(timeout: 10),
+                  "the sheet stayed up after a jump")
+        save(app, "range-sheet-jumped.png")
+    }
 }

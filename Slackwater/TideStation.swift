@@ -20,6 +20,14 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     /// guarantees the reference ships (tools/gen-tides.mjs, isSubordinate).
     var reference: String? = nil
     var offsets: TideOffsets? = nil
+    /// The floor and ceiling of what this station can ever predict (#217), on
+    /// the same zero as every height here — a subordinate's arrive already
+    /// reduced through its own offsets. ABSENT, not zero, when the source has
+    /// no published or derivable envelope: 887 stations ship `latDatum` of
+    /// exactly 0.000 because their chart datum IS LAT, and a CHS record has
+    /// neither because nothing fitted on device can support the claim.
+    var latDatum: Double? = nil
+    var hatDatum: Double? = nil
 
     var isSubordinate: Bool { reference != nil }
     var referenceRecord: TideStationRecord? { reference.flatMap { TideStationRecord.byId[$0] } }
@@ -67,7 +75,7 @@ struct TideOffsets: Decodable, Hashable {
 
 /// What every tide consumer needs: a harmonic `Station` or a subordinate
 /// reduced from one, behind the same three calls.
-protocol TidePredicting {
+protocol TidePredicting: Sendable {
     func heights(from: Date, to: Date, step: TimeInterval) -> [TidePoint]
     func rates(from: Date, to: Date, step: TimeInterval) -> [TideRatePoint]
     func extremes(from: Date, to: Date) -> [TideExtreme]
@@ -83,6 +91,23 @@ struct CardState {
 }
 
 extension TideStationRecord {
+    /// Whether this station's model resolves the year — the gate on every
+    /// yearly or absolute claim (#217). Sa and Ssa need 183 days by the
+    /// Rayleigh criterion: they are absent from every CHS on-device fit (60
+    /// days) AND from 237 of NOAA's 1,253 harmonic references, so the test is
+    /// the constituent set, never the source. A subordinate has none of its
+    /// own and inherits the reference's answer.
+    ///
+    /// Fortnightly and perigean claims — "the biggest low of this spring
+    /// series", "the next big one in 12 days" — survive everywhere; only the
+    /// annual superlative and LAT/HAT depend on this.
+    var resolvesTheYear: Bool {
+        let set = isSubordinate ? (referenceRecord?.constituents ?? []) : constituents
+        // Zero-amplitude seasonal terms are exactly how a seasonless fit ships
+        // them, so the amplitude test is the whole point of the predicate.
+        return set.contains { ($0.name == "SA" || $0.name == "SSA") && $0.amplitude != 0 }
+    }
+
     var detailsDatum: String {
         if isChs { return "LLWLT (CHS chart datum)" }
         if id.hasPrefix("noaa/") { return "\(chartDatum) (NOAA chart datum)" }

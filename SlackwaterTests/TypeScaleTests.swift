@@ -128,7 +128,11 @@ extension TypeScaleTests {
             "WidgetSnapshot.swift:normalize",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
-        let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
+        // The ladder rung's spoken label repeats the height its own `Text` two
+        // lines up already renders mono — the reading is covered, this is the
+        // same number said out loud.
+        let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken",
+                                           "TideLadderView.swift:row"]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
         // assumption about a file this loop may not even visit that line of

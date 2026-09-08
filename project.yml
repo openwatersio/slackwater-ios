@@ -22,7 +22,7 @@ packages:
     from: 0.2.1
   TideEngine:
     url: https://github.com/openwatersio/slackwater-engine
-    from: 0.7.0
+    from: 0.8.0
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
