@@ -56,6 +56,6 @@
 
 ## Integration validation
 
-- [ ] Coordinator records fixtures explicitly, compiles under the global lock, runs unit target and all new/changed offline UI behaviors; then runs required fast suite before PR creation.
-- [ ] Independent Sol review of each task and whole branch; fix important findings and verify changed checks.
-- [ ] Summarize observed timings separately from expected savings, plus any unresolved validation limitations.
+- [x] Coordinator records fixtures explicitly, compiles under the global lock, runs unit target and all new/changed offline UI behaviors; then runs required fast suite before PR creation.
+- [x] Independent Sol review of each task and whole branch; fix important findings and verify changed checks.
+- [x] Summarize observed timings separately from expected savings, plus any unresolved validation limitations.
