@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -33,6 +33,10 @@ test("prepare is offline and rejects missing or corrupt recordings", async () =>
   globalThis.fetch = () => { throw new Error("prepare fetched"); };
   try { await prepare({ fixtureDir: dir, staged }); } finally { globalThis.fetch = oldFetch; }
   assert.deepEqual(JSON.parse(await readFile(staged)), valid);
+  const modified = (await stat(staged)).mtimeMs;
+  await new Promise((done) => setTimeout(done, 10));
+  await prepare({ fixtureDir: dir, staged });
+  assert.equal((await stat(staged)).mtimeMs, modified);
 });
 
 test("failed refresh preserves the previous recording", async () => {

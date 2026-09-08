@@ -17,3 +17,4 @@ tools/node_modules/
 # Agent scratch (SDD ledgers, briefs, review packages)
 .superpowers/
 .test-fixtures/
+SlackwaterTests/Fixtures/iwls-recording.json

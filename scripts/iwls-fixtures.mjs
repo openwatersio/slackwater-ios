@@ -54,8 +54,10 @@ export async function prepare(options = {}) {
     throw new Error(`IWLS recording at ${recording} is not valid JSON: ${error.message}`);
   }
   validate(parsed);
+  const contents = `${JSON.stringify(parsed)}\n`;
+  if (await readFile(staged, "utf8").catch(() => null) === contents) return staged;
   await mkdir(dirname(staged), { recursive: true });
-  await writeFile(staged, `${JSON.stringify(parsed)}\n`);
+  await writeFile(staged, contents);
   return staged;
 }
 

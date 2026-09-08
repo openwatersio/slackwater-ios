@@ -6,7 +6,7 @@ Implemented the explicit recorded-fixture workflow and offline XCTest coverage. 
 
 ## Changed paths
 
-- `.gitignore`: ignores the shared `.test-fixtures/` cache.
+- `.gitignore`: ignores the shared cache and staged CHS recording.
 - `scripts/iwls-fixtures.mjs`: explicit recorder, validation, and offline staging.
 - `scripts/iwls-fixtures.test.mjs`: offline preparation and atomic-refresh regression checks.
 - `Slackwater/IwlsClient.swift`: extracts the existing production response decoder for direct fixture coverage.
@@ -19,7 +19,7 @@ node scripts/iwls-fixtures.mjs refresh
 node scripts/iwls-fixtures.mjs prepare
 ```
 
-`SLACKWATER_FIXTURE_DIR` overrides the persistent recording directory. By default the recorder uses `.test-fixtures/iwls` beside the Git common directory, so linked worktrees reuse one recording. `prepare` never accesses the network and stages `SlackwaterTests/Fixtures/iwls-recording.json`; a missing recording reports the exact refresh command.
+`SLACKWATER_FIXTURE_DIR` overrides the persistent recording directory. By default the recorder uses `.test-fixtures/iwls` beside the Git common directory, so linked worktrees reuse one recording. `prepare` never accesses the network and stages the ignored `SlackwaterTests/Fixtures/iwls-recording.json`; it leaves an identical staged file untouched to avoid needless resource rebuilds. A missing recording reports the exact refresh command.
 
 Schema version 1 contains `capturedAt`, fixed `bounds.end`, and four station entries. Each station carries its fixture key, resolved IWLS id/name/position, optional current metadata, and raw `{eventDate,value}` arrays keyed by IWLS series code. The pinned end is `2026-09-01T00:00:00Z`: Victoria Harbour has 60 days of `wlp`, Active Pass has 60 days of `wcsp1/wcdp1`, Dodd Narrows has 210 days, and Sechelt Rapids has 10 days. Victoria retains the 15-minute fit grid plus one native off-grid sample to exercise decimation without storing the full one-minute response.
 
