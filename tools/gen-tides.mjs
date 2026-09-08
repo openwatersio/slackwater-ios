@@ -363,6 +363,37 @@ let orphaned = 0;
  * tombstones a station that leaves, so a departure here is permanent.
  */
 const isSubordinate = (s) => s.type === "subordinate";
+
+// The lowest and highest water this station can ever predict — LAT and HAT,
+// the bounds of a full 19-year astronomical envelope. Returned on the same
+// zero `datumOffset` puts the heights on, so they compare directly against
+// TideExtreme.height.
+//
+// Absent for any station whose constituents cannot honestly bound an envelope:
+// @neaps/tide-database omits LAT/HAT where Sa and Ssa are both zero, since a
+// seasonless set returns a narrowed envelope rather than an extreme. The keys
+// are then omitted entirely rather than set to 0 — for the ~2,000 stations
+// whose chart datum IS LAT the correct value is exactly 0.000, and absent must
+// never be confused with zero.
+function astronomicalBounds(s) {
+  const zero = s.datums?.[s.chart_datum];
+  if (zero == null || s.datums?.LAT == null || s.datums?.HAT == null) return {};
+  const round3 = (v) => Number(v.toFixed(3));
+  const lat = s.datums.LAT - zero;
+  const hat = s.datums.HAT - zero;
+  if (!isSubordinate(s)) return { latDatum: round3(lat), hatDatum: round3(hat) };
+
+  // A subordinate inherits its reference's datums unreduced — the library
+  // deliberately does not apply the offsets, because the result is the floor
+  // of a prediction rather than a hydrographic datum (see tide-database
+  // docs/datums.md). Reduce here, where the same offsets are already applied
+  // to the predicted extremes. Exact, not approximate: both corrections are
+  // monotonic in the reference height, so the lowest low maps to the lowest
+  // low. NOAA ratios are all positive; a `fixed` offset is a translation.
+  const { type, high, low } = s.offsets.height;
+  const reduce = (v, k) => (type === "ratio" ? k * v : v + k);
+  return { latDatum: round3(reduce(lat, low)), hatDatum: round3(reduce(hat, high)) };
+}
 // Ids whose region came from the derived nearest-town tier (station-metadata
 // 5.0.0 dropped the "~" that used to mark this in the region string itself —
 // see `region` inside buildStation — so it has to be tracked here instead).
@@ -469,6 +500,7 @@ function buildStation(s) {
       datumOffset: s.datums?.MSL != null && s.datums?.[s.chart_datum] != null
         ? s.datums.MSL - s.datums[s.chart_datum]
         : 0,
+      ...astronomicalBounds(s),
       constituents: isSubordinate(s) ? [] : s.harmonic_constituents
         .filter((c) => c.amplitude > 0)
         .map((c) => ({ name: c.name, amplitude: c.amplitude, phase: c.phase })),

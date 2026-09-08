@@ -318,3 +318,63 @@ test("every subordinate's reference ships in the bundle", () => {
 test("no subordinate carries constituents", () => {
   assert.deepEqual(subordinates.filter((s) => s.constituents?.length).map((s) => s.id), []);
 });
+
+test("astronomical bounds ship for nearly every station, and never invert", () => {
+  const bounded = stations.filter((s) => s.latDatum != null);
+  assert.ok(
+    bounded.length > stations.length - 20,
+    `only ${bounded.length} of ${stations.length} stations carry latDatum/hatDatum`,
+  );
+  // Both keys travel together or neither does.
+  assert.deepEqual(
+    stations.filter((s) => (s.latDatum == null) !== (s.hatDatum == null)).map((s) => s.id),
+    [],
+  );
+  assert.deepEqual(bounded.filter((s) => s.hatDatum <= s.latDatum).map((s) => s.id), []);
+});
+
+test("a missing bound is absent, never zero", () => {
+  // ~900 stations legitimately ship latDatum === 0, because their chart datum
+  // IS LAT. If absence were encoded as 0 those would be indistinguishable from
+  // "we don't know", so the generator omits the keys instead.
+  const atZero = stations.filter((s) => s.latDatum === 0);
+  assert.ok(atZero.length > 100, `expected many chart-datum-is-LAT stations, got ${atZero.length}`);
+  for (const s of atZero) {
+    assert.equal(s.chartDatum, "LAT", `${s.id} sits at 0 but its chart datum is ${s.chartDatum}`);
+  }
+  // Absence is a missing key, not a null.
+  assert.deepEqual(
+    stations.filter((s) => s.latDatum === null || s.hatDatum === null).map((s) => s.id),
+    [],
+  );
+});
+
+test("a subordinate's bounds are its reference's, reduced by its own offsets", () => {
+  const byId = new Map(stations.map((s) => [s.id, s]));
+  const checked = { ratio: 0, fixed: 0 };
+
+  for (const sub of subordinates) {
+    if (sub.latDatum == null) continue;
+    const ref = byId.get(sub.reference);
+    if (ref?.latDatum == null) continue;
+    const { type, high, low } = sub.offsets.height;
+    const reduce = (v, k) => (type === "ratio" ? k * v : v + k);
+    // Both sides are rounded to 3dp, and the generator reduces BEFORE rounding
+    // while this reduces AFTER, so a ratio amplifies the reference's +/-0.5 mm
+    // by its own factor. Benedict off Baltimore, at 1.82, moves 1.2 mm on that
+    // alone. Tolerance scales with the offset rather than being loosened flat.
+    const slack = (k) => 0.0005 * (1 + (type === "ratio" ? Math.abs(k) : 1));
+    assert.ok(
+      Math.abs(sub.latDatum - reduce(ref.latDatum, low)) < slack(low),
+      `${sub.id}: latDatum ${sub.latDatum} != ${type} reduction of ${ref.latDatum}`,
+    );
+    assert.ok(
+      Math.abs(sub.hatDatum - reduce(ref.hatDatum, high)) < slack(high),
+      `${sub.id}: hatDatum ${sub.hatDatum} != ${type} reduction of ${ref.hatDatum}`,
+    );
+    checked[type]++;
+  }
+  // Both offset kinds must actually be exercised, or this proves nothing.
+  assert.ok(checked.ratio > 1000, `only ${checked.ratio} ratio subordinates checked`);
+  assert.ok(checked.fixed > 100, `only ${checked.fixed} fixed subordinates checked`);
+});

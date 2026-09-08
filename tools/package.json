@@ -6,7 +6,7 @@
     "@openwaters/station-metadata": "^5.3.0"
   },
   "devDependencies": {
-    "@neaps/tide-database": "^0.9.20260801",
+    "@neaps/tide-database": "^0.9.20260907",
     "@neaps/tide-predictor": "^0.10.0",
     "tz-lookup": "^6.1.25"
   },
