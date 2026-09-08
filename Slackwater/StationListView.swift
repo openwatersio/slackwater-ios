@@ -563,13 +563,19 @@ struct StationListView: View {
         }
 
         // Recents at the very bottom: recently viewed, most recent
-        // first, minus everything already shown above.
+        // first, minus everything already shown above. Same cards as Near Me;
+        // no distance — a recent is an explicit pick, not a ranked one.
         let recentItems = items(groups.recents)
         if !recentItems.isEmpty {
             sectionLabel("Recents")
             ForEach(recentItems) { item in
-                recentRow(item, places: places, isFirst: item.id == recentItems.first?.id,
-                          isLast: item.id == recentItems.last?.id)
+                VStack(spacing: 0) {
+                    itemCard(item)
+                    matchingButton(item, places)
+                }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                     .swipeActions(edge: .trailing) {
                         // True deletion — red destructive full-swipe.
                         Button(role: .destructive) { recents.remove(item.id) } label: {
@@ -596,29 +602,6 @@ struct StationListView: View {
             .padding(.horizontal, 26)
             .padding(.top, 14)
             .padding(.bottom, 4)
-    }
-
-    /// A compact recently-viewed row — kind glyph, name over region —
-    /// navigating like the full cards. First/last rows
-    /// round the group's outer corners — the grouped-card look, but one List
-    /// row per station so each carries its own swipe actions.
-    @ViewBuilder private func recentRow(_ item: StationItem, places: StationGroups,
-                                        isFirst: Bool, isLast: Bool) -> some View {
-        VStack(spacing: 0) {
-            activatable(RecentRowLabel(item: item, imperial: imperial), item)
-            // Nothing at all unless the name is shared — a unique-named row
-            // gets no extra affordance.
-            matchingButton(item, places).padding(.bottom, 10)
-        }
-            .overlay(alignment: .bottom) {
-                if !isLast { Divider().overlay(Color.white.opacity(0.08)) }
-            }
-            .background(Color.white.opacity(0.05))
-            .clipShape(UnevenRoundedRectangle(
-                topLeadingRadius: isFirst ? 20 : 0, bottomLeadingRadius: isLast ? 20 : 0,
-                bottomTrailingRadius: isLast ? 20 : 0, topTrailingRadius: isFirst ? 20 : 0,
-                style: .continuous))
-            .padding(.horizontal, 16)
     }
 
     /// The matching-station chooser's entry point: a quiet link-styled line

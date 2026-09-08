@@ -45,7 +45,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Both labels realized (tall screens / short lists): direct order
         // check. The sidebar reflows as CHS pending cards above update, so
         // read both frames together and wait them out (settled — see
-        // testM50RecentsNamesFit) rather than reading each live.
+        // `settled`'s doc in ScreenshotTestCase) rather than reading each live.
         if near.exists {
             let f = settled { [near.frame, recentsLabel.frame] }
             XCTAssert(f[0].minY < f[1].minY,
@@ -395,57 +395,6 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         scrollTo(recentPick, in: app)
         XCTAssert(recentPick.exists,
                   "Recents must keep the chooser-picked station, not collapse it into the nearest namesake")
-    }
-
-    /// "Deception Pas…" — the compact Recents row starved the name column so
-    /// two different stations truncated to the same string.
-    func testM50RecentsNamesFit() throws {
-        // Upright: the split-layout test leaves the device in landscape, and
-        // these screenshots are the ones a human reads.
-        XCUIDevice.shared.orientation = .portrait
-        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
-                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
-
-        for name in ["Deception Pass (Narrows)", "Deception Pass State Park"] {
-            openSearch(app, "deception")
-            pickSearchResult(app, app.staticTexts[name].firstMatch)
-            XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 8))
-            app.buttons["detail-back"].firstMatch.tap()
-            XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
-        }
-
-        let recents = app.staticTexts["RECENTS"].firstMatch
-        scrollTo(recents, in: app)
-        let long = app.staticTexts["Deception Pass State Park"].firstMatch
-        scrollTo(long, in: app)
-        XCTAssert(long.exists, "the visited station is not in Recents")
-        // The sidebar reflows asynchronously while the CHS pending card above
-        // Recents updates its status line, and the row's name/reading gap is
-        // only ~2pt — so the name and EVERY reading come out of one `settled`
-        // read. Settling the name alone and reading the readings after it let
-        // a 3pt shift land in between and failed CI (PR #25).
-        let readingLabels = app.staticTexts.matching(
-            NSPredicate(format: "label MATCHES %@", "^-?\\d+\\.\\d+ (ft|m|kn)$"))
-        let frames = settled {
-            [long.frame] + readingLabels.allElementsBoundByIndex.compactMap {
-                $0.exists ? $0.frame : nil
-            }
-        }
-        let nameFrame = frames[0]
-        // The name owns the row's width now. Truncated, its frame collapsed to
-        // the ~150pt column left over beside the reading (iPad sidebar).
-        XCTAssert(nameFrame.width > 165,
-                  "the Recents name column is still starved: \(nameFrame.width)pt")
-        // And the reading sits below the name, not beside it. Only this row's —
-        // the Near Me cards above carry readings too.
-        let readings = frames.dropFirst().filter {
-            $0.minY >= nameFrame.minY && $0.maxY <= nameFrame.maxY + 34
-        }
-        XCTAssertFalse(readings.isEmpty, "the Recents row lost its reading")
-        for frame in readings {
-            XCTAssert(frame.minY >= nameFrame.maxY - 1,
-                      "the reading still shares the name's line: \(frame) vs name \(nameFrame)")
-        }
     }
 
     /// iPad: opening a second station of the SAME kind must not keep the first
