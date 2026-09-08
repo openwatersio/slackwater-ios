@@ -67,6 +67,9 @@ final class Connectivity: ObservableObject {
         // don't start a monitor that would immediately contradict it.
         online = !networkKillSwitch
         guard online else { return }
+#if DEBUG
+        if IwlsFetcher.usesFixture { return }
+#endif
         monitor.pathUpdateHandler = { [weak self] path in
             let up = path.status == .satisfied
             Task { @MainActor in self?.online = up }
