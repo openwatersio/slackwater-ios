@@ -170,10 +170,15 @@ jobs:
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
       # image's default Xcode ever drifts from what the project needs, pin
       # DEVELOPER_DIR here.
+      # SLACKWATER_PERF_SCALE widens the wall-clock test budgets, which were
+      # calibrated on the Mac Studio. The first hosted run measured 1.9–2.5×
+      # slower; 4× absorbs pool variance while a real 2×+ regression on top of
+      # that still trips.
       - run: ./scripts/test.sh
         env:
           SLACKWATER_SIMS: iPhone 17
           SLACKWATER_WORKERS: 1
+          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
 
       # There is no runner to ssh into, so the evidence has to travel.
       - name: Upload screenshots and results on failure
