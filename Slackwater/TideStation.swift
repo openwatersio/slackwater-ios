@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Bundled NOAA Salish tide stations (public domain data,
 // same file slackwater-web ships, enriched with resolved names/regions/aliases
-// from @sailingnaturali/station-corrections so both apps say the same thing).
+// from @openwaters/station-metadata so both apps say the same thing).
 import Foundation
 import TideEngine
 

@@ -8,5 +8,5 @@ Do not edit these committed artifacts directly:
 - `chs-gates.json` and `chs-current-gates.json` — `tools/gen-chs-gates.mjs`
 
 Their canonical station metadata comes from the packages and sources read by those
-generators, including `@sailingnaturali/station-corrections`. Change the canonical
+generators, including `@openwaters/station-metadata`. Change the canonical
 source first, then regenerate with `cd tools && npm run build:data`.

@@ -1,6 +1,6 @@
 /**
  * Generate Resources/chs-gates.json — the derived current gates from the
- * station-corrections registry (a pass with NO current station of its own,
+ * station-metadata registry (a pass with NO current station of its own,
  * where slack is the reference tide port's high/low water plus a fixed lag —
  * Malibu Rapids today; generic over every `derived` entry so a new gate is a
  * registry bump + rerun, no app edit) — and Resources/chs-current-gates.json,
