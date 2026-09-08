@@ -32,3 +32,6 @@ All direct launch/relaunch sites now use the common argument composer. Graphical
 - `git diff --check` passed.
 - No Xcode build or simulator test was run, per task instructions. Coordinator should select `OfflineTransitionTests`, changed `OfflineCoverageTests` picker cases, and the existing direct-launch classes before the full offline suite.
 - The notification handshake was not separately probed; the coordinator's focused transition UI run is the cross-process validation.
+- Focused validation passed all eight `OfflineTransitionTests` in about 207 seconds, including the notification, yield/resume, provisional/final, and persistence paths.
+- `testChartPackCardShowsStateAndOffersRefresh` uses DEBUG `-connectivityOnline` to render the connected-only action while `-networkKillSwitch` and `-chartPacksOff` still block transport.
+- The fixed-date picker matcher accepts UIKit's actual `Today, Tuesday, September 8` accessibility label by matching the date substring.

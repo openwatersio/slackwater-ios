@@ -65,10 +65,15 @@ final class Connectivity: ObservableObject {
     private init() {
         // The kill switch is the UI tests' airplane mode: stay offline, and
         // don't start a monitor that would immediately contradict it.
-        online = !networkKillSwitch
+        #if DEBUG
+        let forcedOnline = CommandLine.arguments.contains("-connectivityOnline")
+        #else
+        let forcedOnline = false
+        #endif
+        online = !networkKillSwitch || forcedOnline
         guard online else { return }
 #if DEBUG
-        if IwlsFetcher.usesFixture { return }
+        if IwlsFetcher.usesFixture || forcedOnline { return }
 #endif
         monitor.pathUpdateHandler = { [weak self] path in
             let up = path.status == .satisfied

@@ -121,7 +121,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// to be visible, or a sailor cannot tell whether the map is ready before
     /// leaving signal.
     func testChartPackCardShowsStateAndOffersRefresh() throws {
-        let app = launch("-seedGate", "-fixLat", "48.406", "-fixLon", "-122.643")
+        let app = launch("-seedGate", "-connectivityOnline",
+                         "-fixLat", "48.406", "-fixLon", "-122.643")
         app.buttons["offline-status"].firstMatch.tap()
         // The state line is the card: a VStack identifier does not surface as
         // its own element, so assert on what the user actually reads.
@@ -452,7 +453,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMMM d"
         let seededCell = app.collectionViews.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", formatter.string(from: Self.fixtureDate))).firstMatch
+            NSPredicate(format: "label CONTAINS %@", formatter.string(from: Self.fixtureDate))).firstMatch
         XCTAssert(seededCell.waitForExistence(timeout: 2), "the seeded date is absent from the picker")
         seededCell.tap()
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
