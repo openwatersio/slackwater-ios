@@ -120,7 +120,7 @@ If both signals fed the same counter, the farmable one would be the one that pay
 
 **The web half is opens-only, by construction.** The web client is a demo and cannot be the
 paid surface: charging on the web requires accounts, and this product is account-free from
-the entitlement down (`slackwater/docs/superpowers/specs/2026-07-20-web-client-design.md`).
+the entitlement down ([web-client design](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-20-web-client-design.md)).
 So there is nothing on the web to grant a referee, no reason for a web visitor to type a
 code, and no redemption for the web to report. Both rewards — the referee's 3 months and the
 referrer's year — are **iOS-only**. A shared link that lands someone on the web client is a

@@ -5,6 +5,23 @@ import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    func testMoonShadingStaysContinuousAcrossMidnightSunWrap() throws {
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-02T07:44:00Z"))
+        var previous = SkyState(time: start, latitude: 48.424, longitude: -123.371)
+        var crossedSeam = false
+        for minute in 1...55 {
+            let sky = SkyState(time: start.addingTimeInterval(Double(minute) * 60),
+                               latitude: 48.424, longitude: -123.371)
+            let sun = try XCTUnwrap(sky.sun), previousSun = try XCTUnwrap(previous.sun)
+            crossedSeam = crossedSeam || abs(sun.azDeg - previousSun.azDeg) > 180
+            let delta = sky.moonLightAngle - previous.moonLightAngle
+            XCTAssertLessThan(abs(atan2(sin(delta), cos(delta))), .pi / 180,
+                              "Shading jumped at minute \(minute)")
+            previous = sky
+        }
+        XCTAssertTrue(crossedSeam, "The regression must cross the offscreen sun's azimuth seam")
+    }
+
     func testEveryScrubDetailUsesTheSkyBackdrop() throws {
         for file in ["Slackwater/TideDetailView.swift", "Slackwater/CurrentDetailView.swift",
                      "Slackwater/OnlineGateDetailView.swift", "Slackwater/DerivedGateDetailView.swift"] {

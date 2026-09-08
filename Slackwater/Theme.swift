@@ -205,6 +205,16 @@ struct SkyState {
     /// Penumbral shading right now — what a penumbral eclipse has instead.
     var wash: Double { eclipse?.wash(at: time) ?? 0 }
 
+    var moonLightAngle: Double {
+        guard let sun, let moon else { return 0 }
+        let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
+        let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
+        // The sun's tangent direction at the moon stays continuous across the screen's azimuth seam.
+        let horizontal = cos(sunAlt) * sin(deltaAz) * (latitude >= 0 ? -1.0 : 1.0)
+        let vertical = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
+        return atan2(-vertical, horizontal)
+    }
+
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
     var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
@@ -273,9 +283,7 @@ struct SkyBackdrop: View {
                     let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                          latitude: sky.latitude, span: sky.moonSpan,
                                          pad: moonGlyphSize / 2, size: size)
-                    // The lit limb faces the sun on screen, above the horizon
-                    // or not; the glow leans the same way.
-                    let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
+                    let toSun = sky.moonLightAngle
                     let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
                     // An eclipsed moon dims and warms, and the sky goes quiet
                     // with it: two changes to the one gradient, not a second
@@ -299,12 +307,7 @@ struct SkyBackdrop: View {
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
                         .opacity(moonGlareOpacity(distance: glare))
                     // `waxing: true` lights the +x limb; the rotation aims it.
-                    // `shadowTilt` cancels that rotation for the umbra alone: an
-                    // eclipse is the ANTI-solar point, so a shadow that swung
-                    // around with the sun's screen position would be pointing at
-                    // the one direction it cannot come from. Screen-stable is
-                    // honest at 22pt; the true first contact is the moon's
-                    // leading limb, which is #304-adjacent work.
+                    // Keep the umbra screen-stable; its physical entry direction is #304-adjacent work.
                     MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
                               umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
                         .rotationEffect(.radians(toSun))
@@ -524,19 +527,15 @@ func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date)
 }
 
 /// What comes next, centred on the reading line in the strip's chrome row.
-/// Tapping scrubs to it. It fades while the strip is moving and returns once
-/// the scrub has rested, so it never flickers through the events a fling
-/// passes.
+/// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
     let text: String?
     /// Set when the text is a warning about the scrub instant — a fast tide —
     /// rather than the next event; the ramp's colour, so the pill explains
     /// the line under it.
     var tint: Color? = nil
-    let scrubTime: Date
     var ink: Color = SN.foam
     let onTap: () -> Void
-    @State private var settled = false
 
     var body: some View {
         Group {
@@ -554,16 +553,6 @@ struct Commentary: View {
                 .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("commentary")
             }
-        }
-        .opacity(settled ? 1 : 0)
-        .allowsHitTesting(settled)
-        .animation(.easeInOut(duration: 0.2), value: settled)
-        .task(id: scrubTime) {
-            // Rest = no scrub change for this long. A cancelled sleep is a
-            // scrub still in motion, not a rest.
-            settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
-            settled = true
         }
     }
 }
