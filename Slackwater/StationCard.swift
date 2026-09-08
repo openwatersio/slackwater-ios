@@ -43,7 +43,7 @@ struct RecentRowLabel: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .task { if tide == nil && current == nil && gate == nil { load() } }
+        .task { if tide == nil && current == nil && gate == nil { await load() } }
     }
 
     private var reading: String {
@@ -56,12 +56,12 @@ struct RecentRowLabel: View {
         return "\(formatHeight(tide.height, imperial: imperial)) \(heightUnit(imperial: imperial))"
     }
 
-    private func load() {
+    private func load() async {
         switch item {
         case .tide(let s):
-            tide = s.cardState(at: appNow())
+            tide = await s.resolveTideRecord()?.cardState(at: appNow())
         case .current(let s):
-            current = s.cardState(at: appNow())
+            current = await s.resolveCurrentRecord()?.cardState(at: appNow())
         case .chs(let info):
             guard case .fitted(let record) = ChsFitService.shared.state(info.id) else { return }
             tide = record.cardState(at: appNow())
@@ -78,19 +78,41 @@ struct RecentRowLabel: View {
 /// Layout A: kind glyph left, identity (name/region/distance), state right.
 /// Fraunces name, big height numeral.
 struct StationCardView: View {
-    let record: TideStationRecord
+    let name: String
+    let region: String
     let imperial: Bool
     var km: Double? = nil
+    /// Resolved off the first frame, in `.task`. A bundled NOAA station enters
+    /// through `init(info:)` and its record is decoded on demand (#317); a
+    /// CHS-fitted port already has one and hands it over directly.
+    private let resolve: @Sendable () async -> TideStationRecord?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
 
+    init(record: TideStationRecord, imperial: Bool, km: Double? = nil) {
+        name = record.name
+        region = record.region
+        self.imperial = imperial
+        self.km = km
+        resolve = { record }
+    }
+
+    init(info: StationIndexInfo, imperial: Bool, km: Double? = nil) {
+        name = info.name
+        region = info.region
+        self.imperial = imperial
+        self.km = km
+        resolve = { await info.resolveTideRecord() }
+    }
+
     var body: some View {
-        StationCard(name: record.name, region: record.region, km: km, graph: graph) {
+        StationCard(name: name, region: region, km: km, graph: graph) {
             if let state {
                 ConditionsItem(reading: .tide(state, imperial: imperial))
             }
         }
         .task {
+            guard state == nil || graph == nil, let record = await resolve() else { return }
             if state == nil { state = record.cardState(at: appNow()) }
             if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
         }
@@ -311,7 +333,8 @@ struct OnlineGateCardView: View {
 /// velocity — speed + set arrow + Flooding/Ebbing, a Slack pill at slack, and
 /// the next slack/max as the detail line (web StationCard's current layout).
 struct CurrentCardView: View {
-    let record: CurrentStationRecord
+    let name: String
+    let region: String
     var km: Double? = nil
     /// Set while this gate is showing its 60-day fast answer. On the LIST card
     /// that is the amber "Refining" strip and a `~` on the readings — nothing
@@ -319,9 +342,33 @@ struct CurrentCardView: View {
     /// measured tolerance. The full explanation lives
     /// on the detail view's amber card.
     var provisional: ChsCurrentGateInfo? = nil
+    /// The caller's own record, when it has one. A CHS fit is replaced under
+    /// an open list when a refinement lands, so it has to stay observable; a
+    /// bundled NOAA station's record never changes and is decoded on demand
+    /// in `.task` instead of on the first frame (#317).
+    private let fitted: CurrentStationRecord?
+    private let resolve: @Sendable () async -> CurrentStationRecord?
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @State private var record: CurrentStationRecord?
     @State private var state: CurrentCardState?
     @State private var graph: StationCardGraph?
+
+    init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil) {
+        name = record.name
+        region = record.region
+        self.km = km
+        self.provisional = provisional
+        fitted = record
+        resolve = { record }
+    }
+
+    init(info: StationIndexInfo, km: Double? = nil) {
+        name = info.name
+        region = info.region
+        self.km = km
+        fitted = nil
+        resolve = { await info.resolveCurrentRecord() }
+    }
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
     /// a gate that never offered a fast answer has no measured number to show.
@@ -332,9 +379,9 @@ struct CurrentCardView: View {
     }
 
     var body: some View {
-        StationCard(name: record.name, region: record.region, km: km,
+        StationCard(name: name, region: region, km: km,
                     status: status, graph: graph) {
-            if let state {
+            if let state, let record {
                 ConditionsItem(reading: .current(
                     signed: state.signed,
                     deg: record.setDegrees(signed: state.signed),
@@ -344,11 +391,15 @@ struct CurrentCardView: View {
             }
         }
         .task {
+            if record == nil { record = await resolve() }
+            guard let record else { return }
             if state == nil { state = record.cardState(at: appNow()) }
             if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
         }
         // The refinement replaces the record under an open list: recompute.
-        .onChange(of: record) { _, refined in
+        .onChange(of: fitted) { _, refined in
+            guard let refined else { return }
+            record = refined
             state = refined.cardState(at: appNow())
             graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil)
         }

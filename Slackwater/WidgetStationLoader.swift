@@ -33,12 +33,19 @@ enum WidgetStationLoader {
     private static func loadRecord(id: String, directory: URL) throws -> WidgetRecord? {
         guard let item = try StationItem.widgetItem(id: id, directory: directory) else { return nil }
         switch item {
-        case .tide(let r):
+        // `widgetItem` hands back identity only (#317), so the record costs a
+        // second scan of the same mapped file. ponytail: two scans, not one;
+        // give `widgetItem` a record-returning sibling if this ever measures.
+        case .tide(let info):
+            guard let r: TideStationRecord = try catalogRecord("stations", id: info.id, directory: directory)
+            else { return nil }
             let reference: TideStationRecord? = try r.reference.flatMap {
                 try catalogRecord("stations", id: $0, directory: directory)
             }
             return .tide(r, station: r.engineStation(referenceRecord: reference))
-        case .current(let r):
+        case .current(let info):
+            guard let r: CurrentStationRecord = try catalogRecord("currents", id: info.id, directory: directory)
+            else { return nil }
             let reference: CurrentStationRecord? = try r.reference.flatMap {
                 try catalogRecord("currents", id: $0, directory: directory)
             }

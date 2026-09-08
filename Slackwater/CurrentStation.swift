@@ -14,8 +14,14 @@ let slackKn = 0.15
 
 /// Great-circle distance in kilometres.
 func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
-    CLLocation(latitude: lat1, longitude: lon1)
-        .distance(from: CLLocation(latitude: lat2, longitude: lon2)) / 1000
+    // Spherical haversine, not `CLLocation.distance(from:)`: CoreLocation's
+    // answer changes by up to 0.2% between a process's first ~70 calls and
+    // every call after, so a ranking keyed on it was never reproducible
+    // (#317). Within 0.6% of the ellipsoid, which no pill or radius resolves.
+    let p1 = lat1 * .pi / 180, p2 = lat2 * .pi / 180
+    let dp = p2 - p1, dl = (lon2 - lon1) * .pi / 180
+    let h = sin(dp / 2) * sin(dp / 2) + cos(p1) * cos(p2) * sin(dl / 2) * sin(dl / 2)
+    return 2 * 6371.0088 * asin(min(1, sqrt(h)))
 }
 
 /// Great-circle distance in kilometres (the labelled spelling; forwards to
@@ -300,8 +306,12 @@ extension CurrentEvent {
 // MARK: - The mixed station list (tide + current, one search)
 
 enum StationItem: Identifiable, Hashable {
-    case tide(TideStationRecord)
-    case current(CurrentStationRecord)
+    // The two NOAA cases carry identity, not the record: the list, the search
+    // and the map pins need nothing else, and decoding 9.1 MB of constituents
+    // for them cost 180 ms of the first frame (#317). Anything that predicts
+    // resolves the record by id — `info.tideRecord` / `info.currentRecord`.
+    case tide(StationIndexInfo)
+    case current(StationIndexInfo)
     case chs(ChsStationInfo)   // Canadian tide port: identity bundled, model fitted on-device
     case chsGate(ChsGateInfo)  // derived current gate: slack from a reference port's fitted tide
     case chsCurrent(ChsCurrentGateInfo)  // validated CHS gate: real velocities, fitted on-device
@@ -352,12 +362,33 @@ enum StationItem: Identifiable, Hashable {
         distanceKm(lat1: lat, lon1: lon, lat2: latitude, lon2: longitude)
     }
 
+    /// The catalog ranked nearest first, one `km` per station.
+    ///
+    /// A comparator that calls `km` runs it twice per comparison — about
+    /// 200,000 great-circle calls over the 7,400-station catalog, each one two
+    /// `CLLocation` allocations. Ties break on catalog position so the order is
+    /// total and deterministic: `StationGroups` reads the first station of a
+    /// name as the nearest one.
+    static func rankedByDistance(_ items: [StationItem],
+                                 lat: Double, lon: Double) -> [StationItem] {
+        var keyed: [(km: Double, rank: Int, item: StationItem)] = []
+        keyed.reserveCapacity(items.count)
+        for (rank, item) in items.enumerated() {
+            keyed.append((item.km(fromLat: lat, lon: lon), rank, item))
+        }
+        keyed.sort { $0.km == $1.km ? $0.rank < $1.rank : $0.km < $1.km }
+        return keyed.map(\.item)
+    }
+
     /// All bundled stations, alphabetical. World coverage: no station is
     /// pinned to the head of the list — that read as a bug from anywhere but
     /// the Salish Sea.
+    /// Index-backed, deliberately: nothing here may touch `TideStationRecord.all`
+    /// or `CurrentStationRecord.all` (#317). The reference-only bins the index
+    /// omits (#269) are the same ones the old filter dropped.
     static let all: [StationItem] = {
-        var merged: [StationItem] = TideStationRecord.all.map { StationItem.tide($0) }
-        merged += CurrentStationRecord.all.filter { $0.referenceOnly != true }.map { StationItem.current($0) }
+        var merged: [StationItem] = StationIndex.bundled.tides.map { StationItem.tide($0) }
+        merged += StationIndex.bundled.currents.map { StationItem.current($0) }
         merged += ChsStationInfo.all.map { StationItem.chs($0) }
         merged += ChsGateInfo.all.map { StationItem.chsGate($0) }
         merged += ChsCurrentGateInfo.all.map { StationItem.chsCurrent($0) }
@@ -383,7 +414,7 @@ enum StationItem: Identifiable, Hashable {
         if id.hasPrefix("current:") {
             let record: CurrentStationRecord? = try catalogRecord(
                 "currents", id: String(id.dropFirst("current:".count)), directory: directory)
-            return record.map(StationItem.current)
+            return record.map { .current(StationIndexInfo($0)) }
         }
         if id.hasPrefix("chs-") {
             let stations: [ChsStationInfo] = try readCatalog("chs-stations", directory: directory)
@@ -394,7 +425,7 @@ enum StationItem: Identifiable, Hashable {
             return currents.first(where: { $0.id == id }).map(StationItem.chsCurrent)
         }
         let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
-        return record.map(StationItem.tide)
+        return record.map { .tide(StationIndexInfo($0)) }
     }
 
     /// How many results the search screen shows.

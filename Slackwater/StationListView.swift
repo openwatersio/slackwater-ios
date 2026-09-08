@@ -206,6 +206,18 @@ struct StationListView: View {
         }
     }
 
+    /// A NOAA station's detail, resolved from the identity on the path. The
+    /// record decodes here rather than in the row that pushed it (#317); a
+    /// bundled id always has one, so the empty branch is unreachable.
+    @ViewBuilder private func noaaDetail(_ route: NoaaRoute) -> some View {
+        switch route {
+        case .tide(let info):
+            if let record = info.tideRecord { TideDetailView(record: record).id(record.id) }
+        case .current(let info):
+            if let record = info.currentRecord { CurrentDetailView(record: record).id(record.id) }
+        }
+    }
+
     /// iPhone (and iPad Slide Over): the map swaps in-place for the list;
     /// both FABs persist over either.
     private var stackLayout: some View {
@@ -216,6 +228,7 @@ struct StationListView: View {
             }
             .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0).id($0.id) }
             .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0).id($0.id) }
+            .navigationDestination(for: NoaaRoute.self) { noaaDetail($0) }
             .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
             .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
             .toolbar(.hidden, for: .navigationBar)
@@ -253,6 +266,7 @@ struct StationListView: View {
                 // a pop. A different station is a different view; say so.
                 .navigationDestination(for: TideStationRecord.self) { TideDetailView(record: $0).id($0.id) }
                 .navigationDestination(for: CurrentStationRecord.self) { CurrentDetailView(record: $0).id($0.id) }
+                .navigationDestination(for: NoaaRoute.self) { noaaDetail($0) }
                 .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
                 .toolbar(.hidden, for: .navigationBar)
@@ -425,8 +439,8 @@ struct StationListView: View {
                                         to: nil, from: nil, for: nil)
         path = NavigationPath()
         switch item {
-        case .tide(let s): path.append(s)
-        case .current(let s): path.append(s)
+        case .tide(let s): path.append(NoaaRoute.tide(s))
+        case .current(let s): path.append(NoaaRoute.current(s))
         // Every CHS station routes the same way, fitted or not: ChsDetailView
         // shows the real detail when the model is there and the ⚠️ download
         // explanation when it isn't. A tap is never a dead tap.
@@ -639,10 +653,10 @@ struct StationListView: View {
     /// rows navigate without growing the disclosure chevron.
     @ViewBuilder private func navLink(_ item: StationItem) -> some View {
         switch item {
-        case .tide(let station):
-            NavigationLink(value: station) { EmptyView() }.opacity(0)
-        case .current(let station):
-            NavigationLink(value: station) { EmptyView() }.opacity(0)
+        case .tide(let info):
+            NavigationLink(value: NoaaRoute.tide(info)) { EmptyView() }.opacity(0)
+        case .current(let info):
+            NavigationLink(value: NoaaRoute.current(info)) { EmptyView() }.opacity(0)
         // Unconditional: an unfitted station still navigates, to the page
         // that explains why it has no numbers yet.
         case .chs(let info):
@@ -656,10 +670,10 @@ struct StationListView: View {
 
     @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
         switch item {
-        case .tide(let station):
-            activatable(StationCardView(record: station, imperial: imperial, km: km), item)
-        case .current(let station):
-            activatable(CurrentCardView(record: station, km: km), item)
+        case .tide(let info):
+            activatable(StationCardView(info: info, imperial: imperial, km: km), item)
+        case .current(let info):
+            activatable(CurrentCardView(info: info, km: km), item)
         case .chs(let info):
             activatable(ChsCardView(info: info, imperial: imperial, km: km), item)
         case .chsGate(let gate):
@@ -702,9 +716,7 @@ struct StationListView: View {
     /// own ranking and re-sort the whole catalog on the next render. This runs
     /// once, on a tap.
     private func nearest(to origin: (lat: Double, lon: Double)) -> [StationItem] {
-        Array(StationItem.all
-            .sorted { $0.km(fromLat: origin.lat, lon: origin.lon)
-                    < $1.km(fromLat: origin.lat, lon: origin.lon) }
+        Array(StationItem.rankedByDistance(StationItem.all, lat: origin.lat, lon: origin.lon)
             .prefix(5))
     }
 
@@ -847,8 +859,8 @@ struct StationListView: View {
     @ViewBuilder private func resultCard(_ item: StationItem) -> some View {
         Group {
             switch item {
-            case .tide(let s): StationCardView(record: s, imperial: imperial)
-            case .current(let s): CurrentCardView(record: s)
+            case .tide(let s): StationCardView(info: s, imperial: imperial)
+            case .current(let s): CurrentCardView(info: s)
             case .chs(let info): ChsCardView(info: info, imperial: imperial)
             case .chsGate(let gate): ChsGateCardView(gate: gate)
             case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate)

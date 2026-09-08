@@ -136,6 +136,10 @@ targets:
       - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
       - Slackwater/CurrentStation.swift
+      # The types only; station-index.json stays out of the appex on purpose.
+      # The widget resolves one station by id through `decodeCatalogRecord`
+      # and never builds `StationItem.all`, so it never loads the index.
+      - Slackwater/StationIndex.swift
       - Slackwater/ChsStation.swift
       - Slackwater/ChsGate.swift
       - Slackwater/ChsCurrentGate.swift

@@ -127,10 +127,10 @@ jobs:
       # data to the App Store.
       - name: Regenerate the offline bundles
         working-directory: tools
-        run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs
+        run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs && node gen-station-index.mjs
 
       - name: Committed bundles match their generators
-        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json
 
       - name: Bundle invariants
         working-directory: tools
