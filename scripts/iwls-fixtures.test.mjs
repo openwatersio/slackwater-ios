@@ -15,7 +15,9 @@ const valid = {
   bounds: { end: "2026-09-01T00:00:00.000Z" },
   stations: [
     { key: "victoria", id: "v", officialName: "Victoria Harbour", latitude: 48, longitude: -123,
-      metadata: null, series: { wlp: samples(60) } },
+      metadata: null, series: { wlp: [...samples(60), {
+        eventDate: "2026-07-03T00:01:00.000Z", value: 1,
+      }].sort((a, b) => Date.parse(a.eventDate) - Date.parse(b.eventDate)) } },
     ...[["active", 60], ["dodd", 210], ["sechelt", 10]].map(([key, days]) => ({ key, id: key, officialName: key,
       latitude: 49, longitude: -123, metadata: { floodDirection: 1, ebbDirection: 181 },
       series: { wcsp1: samples(days), wcdp1: samples(days) } })),
@@ -45,4 +47,12 @@ test("failed refresh preserves the previous recording", async () => {
   await writeFile(recording, JSON.stringify(valid));
   await assert.rejects(refresh({ fixtureDir: dir, fetchImpl: async () => { throw new Error("offline"); }, paceMs: 0 }), /offline/);
   assert.deepEqual(JSON.parse(await readFile(recording)), valid);
+});
+
+test("validation rejects an interior recording gap", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
+  const gapped = structuredClone(valid);
+  gapped.stations.find((station) => station.key === "active").series.wcsp1.splice(1_000, 10);
+  await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(gapped));
+  await assert.rejects(prepare({ fixtureDir: dir, staged: join(dir, "staged.json") }), /15-minute grid/);
 });

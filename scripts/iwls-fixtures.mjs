@@ -39,6 +39,12 @@ export function validate(recording) {
           Math.min(...times) > end.getTime() - (target.days * 86_400_000) + 86_400_000 ||
           Math.max(...times) < end.getTime() - 86_400_000)
         throw new Error(`${target.key}: ${code} does not cover the expected ${target.days}-day window`);
+      const grid = times.filter((time) => time % 900_000 === 0);
+      const offGrid = times.length - grid.length;
+      if (times.some((time, index) => index > 0 && time <= times[index - 1]) ||
+          grid.some((time, index) => index > 0 && time - grid[index - 1] !== 900_000) ||
+          offGrid !== (target.key === "victoria" ? 1 : 0))
+        throw new Error(`${target.key}: ${code} is not a complete sorted 15-minute grid`);
     }
   }
   return recording;
