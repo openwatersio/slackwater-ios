@@ -153,11 +153,11 @@ final class UnitsAndGroupsTests: XCTestCase {
 
     private func stationFixture(_ id: String, _ name: String,
                                 _ lat: Double, _ lon: Double) -> StationItem {
-        .tide(TideStationRecord(
+        .tide(StationIndexInfo(TideStationRecord(
             id: id, name: name, region: "Test", aliases: [],
             latitude: lat, longitude: lon, timezone: "America/Vancouver",
             chartDatum: "Chart", datumOffset: 0,
-            constituents: [.init(name: "M2", amplitude: 1.0, phase: 0)]))
+            constituents: [.init(name: "M2", amplitude: 1.0, phase: 0)])))
     }
 
     /// The ordering contract the list and `StationGroups` depend on, against
