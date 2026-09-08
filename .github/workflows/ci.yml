@@ -144,7 +144,6 @@ jobs:
     # runners are free: delete that one line and the lane runs.
     if: >-
       needs.changes.outputs.app == 'true'
-      && false
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
