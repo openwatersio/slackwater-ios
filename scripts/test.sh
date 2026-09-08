@@ -102,6 +102,8 @@ case $MODE in
   unit) selection=(-only-testing:SlackwaterTests) ;;
   live) selection=(-only-testing:SlackwaterUITests/LiveFetchTests) ;;
 esac
+diagnostics=on-failure
+[[ $MODE == fast || $MODE == unit ]] && diagnostics=never
 
 for sim in "${sims[@]}"; do
   echo "=== $MODE · $sim ==="
@@ -125,6 +127,7 @@ for sim in "${sims[@]}"; do
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "platform=iOS Simulator,name=$sim" \
     -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
+    -collect-test-diagnostics "$diagnostics" \
     "${selection[@]}" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \

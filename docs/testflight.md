@@ -218,6 +218,11 @@ Run fast while iterating and offline `--full` before `scripts/testflight.sh`.
 Run `--live` separately when real-service compatibility needs checking; green
 offline runs intentionally make no claim about current IWLS availability.
 
+Fast and unit modes pass `-collect-test-diagnostics never`. Failed assertions,
+screenshots, and the result bundle remain available, while Xcode skips the
+multi-minute simulator diagnostics collection that otherwise delays routine
+failure feedback. Full and live modes retain `on-failure` diagnostics.
+
 Screenshots: `ScreenshotTestCase` reads `M1_SHOT_DIR` **inside the UI-test runner process**, so
 the script exports `TEST_RUNNER_M1_SHOT_DIR` — xcodebuild strips that prefix and sets the
 rest on the runner. A bare `M1_SHOT_DIR` in the invoking shell never arrives and the tests

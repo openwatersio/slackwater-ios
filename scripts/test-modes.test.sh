@@ -46,6 +46,7 @@ assert_has "node scripts/iwls-fixtures.mjs prepare"
 assert_has "name=iPhone 17"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
+assert_has "-collect-test-diagnostics never"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
   print -u2 -- "fixture preparation did not precede XcodeGen"
@@ -56,18 +57,21 @@ run_mode --full
 assert_count '^xcodebuild ' 2
 assert_has "name=iPad Pro 11-inch (M5)"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
+assert_has "-collect-test-diagnostics on-failure"
 assert_lacks "NationalScaleTests"
 assert_lacks "live=1"
 
 run_mode --unit
 assert_count '^xcodebuild ' 1
 assert_has "-only-testing:SlackwaterTests"
+assert_has "-collect-test-diagnostics never"
 assert_lacks "NationalScaleTests"
 
 run_mode --live
 assert_count '^xcodebuild ' 1
 assert_lacks "iwls-fixtures.mjs prepare"
 assert_has "-only-testing:SlackwaterUITests/LiveFetchTests"
+assert_has "-collect-test-diagnostics on-failure"
 assert_has "live=1 full="
 
 TEST_RUNNER_SLACKWATER_LIVE=1 TEST_RUNNER_SLACKWATER_FULL=1 run_mode
