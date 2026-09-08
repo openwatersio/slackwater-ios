@@ -42,11 +42,11 @@ class ScreenshotTestCase: XCTestCase {
         let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
         var registration: Int32 = 0
         XCTAssertEqual(name.withCString { notify_register_check($0, &registration) },
-                       NOTIFY_STATUS_OK, "could not register UI fixture checkpoint \(checkpoint)")
+                       UInt32(NOTIFY_STATUS_OK), "could not register UI fixture checkpoint \(checkpoint)")
         fixtureNotifyTokens[name] = registration
-        XCTAssertEqual(notify_set_state(registration, 1), NOTIFY_STATUS_OK,
+        XCTAssertEqual(notify_set_state(registration, 1), UInt32(NOTIFY_STATUS_OK),
                        "could not set UI fixture checkpoint \(checkpoint)")
-        XCTAssertEqual(name.withCString { notify_post($0) }, NOTIFY_STATUS_OK,
+        XCTAssertEqual(name.withCString { notify_post($0) }, UInt32(NOTIFY_STATUS_OK),
                        "could not publish UI fixture checkpoint \(checkpoint)")
     }
 
