@@ -69,8 +69,10 @@ final class IwlsFixtureTests: XCTestCase {
             HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
         }, offset: fit.offset)
         let held = Array(all[split...])
-        let predicted = engine.heights(from: Date(timeIntervalSince1970: held[0].t / 1000),
-                                       to: Date(timeIntervalSince1970: held.last!.t / 1000), step: 900)
+        let heldStart = try XCTUnwrap(held.first)
+        let heldEnd = try XCTUnwrap(held.last)
+        let predicted = engine.heights(from: Date(timeIntervalSince1970: heldStart.t / 1000),
+                                       to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: 900)
         let byTime = Dictionary(predicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.height) },
                                 uniquingKeysWith: { first, _ in first })
         let errors = held.compactMap { sample in byTime[sample.t].map { $0 - sample.v } }
@@ -87,7 +89,7 @@ final class IwlsFixtureTests: XCTestCase {
                                               dirs: try samples(dodd, "wcdp1"),
                                               floodDirection: flood)
         XCTAssertGreaterThan(projected.count, 20_000)
-        let holdoutStart = projected.last!.t - 7 * 86_400_000
+        let holdoutStart = try XCTUnwrap(projected.last).t - 7 * 86_400_000
         let training = projected.filter { $0.t < holdoutStart }
         let provisionalStart = holdoutStart - 60 * 86_400_000
         let provisional = try await ChsFitter().fit(samples: training.filter { $0.t >= provisionalStart })
@@ -95,21 +97,23 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(provisional.constituents.count, 20)
         XCTAssertGreaterThanOrEqual(full.constituents.count, 20)
 
-        func holdoutRMSE(_ fit: ChsFitResult) -> Double {
+        func holdoutRMSE(_ fit: ChsFitResult) throws -> Double {
             let engine = CurrentStation(constituents: fit.constituents.map {
                 HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
             }, floodDirection: flood, ebbDirection: ebb, offset: fit.offset)
             let held = projected.filter { $0.t >= holdoutStart }
-            let predicted = engine.speeds(from: Date(timeIntervalSince1970: held[0].t / 1000),
-                                          to: Date(timeIntervalSince1970: held.last!.t / 1000), step: 900)
+            let heldStart = try XCTUnwrap(held.first)
+            let heldEnd = try XCTUnwrap(held.last)
+            let predicted = engine.speeds(from: Date(timeIntervalSince1970: heldStart.t / 1000),
+                                          to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: 900)
             let byTime = Dictionary(predicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.speed) },
                                     uniquingKeysWith: { first, _ in first })
             let errors = held.compactMap { sample in byTime[sample.t].map { $0 - sample.v } }
             XCTAssertGreaterThan(errors.count, 600)
             return (errors.reduce(0) { $0 + $1 * $1 } / Double(errors.count)).squareRoot()
         }
-        let provisionalRMSE = holdoutRMSE(provisional)
-        let fullRMSE = holdoutRMSE(full)
+        let provisionalRMSE = try holdoutRMSE(provisional)
+        let fullRMSE = try holdoutRMSE(full)
         XCTAssertLessThan(provisionalRMSE, 0.75)
         XCTAssertLessThan(fullRMSE, 0.75)
         XCTAssertNotEqual(provisionalRMSE, fullRMSE, accuracy: 0.000_001)

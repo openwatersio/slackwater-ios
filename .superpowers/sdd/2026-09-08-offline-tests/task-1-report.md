@@ -29,6 +29,7 @@ Refresh resolves each station by coordinates and advertised series within 3 km, 
 
 - `rtk node --test scripts/iwls-fixtures.test.mjs`: 2 passed.
 - `rtk swiftc -parse Slackwater/IwlsClient.swift SlackwaterTests/IwlsFixtureTests.swift`: passed.
+- Fixture-derived prediction endpoints use `XCTUnwrap`, so corrupt inputs fail as XCTest assertions rather than process crashes.
 - `rtk git diff --check`: passed.
 - Tool tests prove prepare fails actionably for missing/corrupt input, performs no fetch, and a failed refresh preserves the prior recording.
 - XCTest decodes the staged raw responses through `IwlsFetcher.decode`, checks projection and finite/nontrivial speeds for Active, Dodd, and Sechelt, verifies the Victoria off-grid decoder probe and fit sample count, rejects malformed JSON, and verifies invalid/duplicate response handling.
