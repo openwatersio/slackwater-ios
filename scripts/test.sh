@@ -2,14 +2,42 @@
 # Run the test suite.
 #
 #   ./scripts/test.sh              fast run   — iPhone only; iterate with this
-#   ./scripts/test.sh --full       full run   — both simulators + live IWLS and
-#                                               on-device fits; before an upload
+#   ./scripts/test.sh --full       full run   — offline, both simulators + data sweep
+#   ./scripts/test.sh --unit       unit target only, one simulator
+#   ./scripts/test.sh --live       live IWLS smoke only, one simulator
 #   SHOT_DIR=/tmp/shots ./scripts/test.sh     where the UI tests save their screenshots
 #   SLACKWATER_SIMS='A,B' ./scripts/test.sh   run on other devices (CI sets this)
 #
-# One plan (TestPlans/Slackwater.xctestplan). The live-IWLS UI tests skip
-# themselves unless SLACKWATER_FULL reaches the runner; see docs/testflight.md.
+# One plan (TestPlans/Slackwater.xctestplan), selected by mode below.
 set -euo pipefail
+
+MODE=fast
+case $#:${1:-} in
+  0:) ;;
+  1:--full) MODE=full ;;
+  1:--unit) MODE=unit ;;
+  1:--live) MODE=live ;;
+  *) print -u2 "usage: $0 [--full|--unit|--live]"; exit 2 ;;
+esac
+
+# Live access is opt-in per invocation. Do not let a parent shell turn an
+# offline run live, including through the retired full-mode switch.
+unset TEST_RUNNER_SLACKWATER_LIVE SLACKWATER_LIVE
+unset TEST_RUNNER_SLACKWATER_FULL SLACKWATER_FULL
+[[ $MODE == live ]] && export TEST_RUNNER_SLACKWATER_LIVE=1
+
+sims=("iPhone 17")
+[[ $MODE == full ]] && sims+=("iPad Pro 11-inch (M5)")
+if (( ${+SLACKWATER_SIMS} )); then
+  [[ -n $SLACKWATER_SIMS ]] || { print -u2 "SLACKWATER_SIMS must name a device"; exit 2; }
+  sims=("${(@s/,/)SLACKWATER_SIMS}")
+  for sim in "${sims[@]}"; do
+    [[ -n $sim ]] || { print -u2 "SLACKWATER_SIMS contains an empty device"; exit 2; }
+  done
+fi
+if [[ $MODE == unit || $MODE == live ]]; then
+  [[ ${#sims} == 1 ]] || { print -u2 "$MODE mode requires exactly one simulator"; exit 2; }
+fi
 
 # One test run at a time on this machine. Two concurrent `xcodebuild test` runs
 # SIGKILL each other's test runner — every UI test in the losing run reports
@@ -40,21 +68,13 @@ fi
 
 cd "$(dirname "$0")/.."
 
-MODE=fast
-if [[ "${1:-}" == "--full" ]]; then
-  MODE=full
-  # TEST_RUNNER_ prefix (same mechanism as M1_SHOT_DIR below): reaches
-  # ScreenshotTestCase.skipUnlessFull, which otherwise skips the live-IWLS
-  # tests — all of them in LiveFetchTests.
-  export TEST_RUNNER_SLACKWATER_FULL=1
-fi
-
 # TEST_RUNNER_ prefix: xcodebuild strips it and sets the rest on the UI-test
 # RUNNER process, which is where ScreenshotTestCase reads M1_SHOT_DIR. A bare
 # M1_SHOT_DIR in this shell never reaches it (the tests fall back to /tmp).
 export TEST_RUNNER_M1_SHOT_DIR="${SHOT_DIR:-/tmp/slackwater-shots}"
 mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 
+[[ $MODE == live ]] || node scripts/iwls-fixtures.mjs prepare
 xcodegen generate
 
 # SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
@@ -68,9 +88,6 @@ xcodegen generate
 # — 100 s between them). The other 34 UI tests it runs are a second rendering of
 # what the iPhone leg just proved. Nineteen minutes for 100 s of unique coverage
 # is a pre-release check, not an every-commit one, so --full keeps both.
-types=("iPhone 17")
-[[ $MODE == full ]] && types+=("iPad Pro 11-inch (M5)")
-
 # The script drives its OWN devices, erased before every run.
 #
 # A simulator anyone has used accumulates state that survives app uninstalls —
@@ -115,17 +132,14 @@ own_sim() {
   printf '%s' "$udid"
 }
 
-sims=(); dests=()
-if [[ -n "${SLACKWATER_SIMS:-}" ]]; then
-  for name in "${(@s/,/)SLACKWATER_SIMS}"; do
-    sims+=("$name"); dests+=("platform=iOS Simulator,name=$name")
-  done
-else
-  for type in "${types[@]}"; do
-    udid=$(own_sim "$type")
-    sims+=("$type"); dests+=("platform=iOS Simulator,id=$udid")
-  done
-fi
+dests=()
+for sim in "${sims[@]}"; do
+  if (( ${+SLACKWATER_SIMS} )); then
+    dests+=("platform=iOS Simulator,name=$sim")
+  else
+    dests+=("platform=iOS Simulator,id=$(own_sim "$sim")")
+  fi
+done
 
 # testHybridDirectionHasFullCoverageAndMatchesBaseline sweeps all 2,776 bundled
 # stations x 20 times, each a 30-hour extremes search: 18 s, which is 86% of the
@@ -134,8 +148,15 @@ fi
 # the other data-shaped checks. -skip-testing rather than an env gate: the
 # TEST_RUNNER_ route below reaches the UI-test runner process only, never the
 # app process that hosts the unit bundle.
-skip=()
-[[ $MODE == fast ]] && skip=(-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline)
+selection=()
+case $MODE in
+  fast) selection=(-skip-testing:SlackwaterUITests/LiveFetchTests -skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline) ;;
+  full) selection=(-skip-testing:SlackwaterUITests/LiveFetchTests) ;;
+  unit) selection=(-only-testing:SlackwaterTests) ;;
+  live) selection=(-only-testing:SlackwaterUITests/LiveFetchTests) ;;
+esac
+diagnostics=on-failure
+[[ $MODE == fast || $MODE == unit ]] && diagnostics=never
 
 # One shard's share of the suite, comma-separated. CI's matrix sets exactly one
 # of these per shard (.github/workflows/ci.yml); a local run sets neither and
@@ -144,8 +165,8 @@ skip=()
 # SLACKWATER_SKIP is what makes the split safe to leave alone: the last shard
 # names no tests of its own, it skips the other three, so a class added later
 # runs there rather than running nowhere and reporting green.
-[[ -n "${SLACKWATER_ONLY:-}" ]] && for t in "${(@s/,/)SLACKWATER_ONLY}"; do skip+=("-only-testing:$t"); done
-[[ -n "${SLACKWATER_SKIP:-}" ]] && for t in "${(@s/,/)SLACKWATER_SKIP}"; do skip+=("-skip-testing:$t"); done
+[[ -n "${SLACKWATER_ONLY:-}" ]] && for t in "${(@s/,/)SLACKWATER_ONLY}"; do selection+=("-only-testing:$t"); done
+[[ -n "${SLACKWATER_SKIP:-}" ]] && for t in "${(@s/,/)SLACKWATER_SKIP}"; do selection+=("-skip-testing:$t"); done
 
 # A run is only evidence if the source held still for it. This Mac carries a
 # dozen worktrees and several agent sessions, and a second session editing a
@@ -179,7 +200,8 @@ for i in {1..$#sims}; do
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
     -testPlan Slackwater -destination "$dests[$i]" \
     -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
-    "${skip[@]}" \
+    -collect-test-diagnostics "$diagnostics" \
+    "${selection[@]}" \
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
     | tail -40

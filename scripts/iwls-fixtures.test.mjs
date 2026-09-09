@@ -1,0 +1,70 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { prepare, refresh } from "./iwls-fixtures.mjs";
+
+const samples = (days) => Array.from({ length: days * 96 + 1 }, (_, index) => ({
+  eventDate: new Date(Date.parse("2026-09-01T00:00:00Z") - (days * 96 - index) * 900_000).toISOString(), value: 1,
+}));
+const valid = {
+  schemaVersion: 1,
+  capturedAt: "2026-09-08T00:00:00.000Z",
+  bounds: { end: "2026-09-01T00:00:00.000Z" },
+  stations: [
+    { key: "victoria", id: "v", officialName: "Victoria Harbour", latitude: 48, longitude: -123,
+      metadata: null, series: { wlp: [...samples(60), {
+        eventDate: "2026-07-03T00:01:00.000Z", value: 1,
+      }].sort((a, b) => Date.parse(a.eventDate) - Date.parse(b.eventDate)) } },
+    ...[["active", 60], ["dodd", 210], ["sechelt", 10]].map(([key, days]) => ({ key, id: key, officialName: key,
+      latitude: 49, longitude: -123, metadata: { floodDirection: 1, ebbDirection: 181 },
+      series: { wcsp1: samples(days), wcdp1: samples(days) } })),
+  ],
+};
+
+test("prepare is offline and rejects missing or corrupt recordings", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
+  const staged = join(dir, "staged.json");
+  await assert.rejects(prepare({ fixtureDir: dir, staged }), /refresh/);
+  await writeFile(join(dir, "iwls-recording.json"), "nope");
+  await assert.rejects(prepare({ fixtureDir: dir, staged }), /valid JSON/);
+  await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(valid));
+  const oldFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error("prepare fetched"); };
+  try { await prepare({ fixtureDir: dir, staged }); } finally { globalThis.fetch = oldFetch; }
+  assert.deepEqual(JSON.parse(await readFile(staged)), valid);
+  const modified = (await stat(staged)).mtimeMs;
+  await new Promise((done) => setTimeout(done, 10));
+  await prepare({ fixtureDir: dir, staged });
+  assert.equal((await stat(staged)).mtimeMs, modified);
+});
+
+test("default prepare validates the committed recording without rewriting it", async () => {
+  const recording = join(import.meta.dirname, "../SlackwaterTests/Fixtures/iwls-recording.json");
+  const modified = (await stat(recording)).mtimeMs;
+  assert.equal(await prepare(), recording);
+  assert.equal((await stat(recording)).mtimeMs, modified);
+});
+
+test("failed refresh preserves the previous recording", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
+  const recording = join(dir, "iwls-recording.json");
+  await writeFile(recording, JSON.stringify(valid));
+  await assert.rejects(refresh({ fixtureDir: dir, fetchImpl: async () => { throw new Error("offline"); }, paceMs: 0 }), /offline/);
+  assert.deepEqual(JSON.parse(await readFile(recording)), valid);
+});
+
+test("validation rejects incomplete recording windows", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "iwls-fixture-"));
+  const gapped = structuredClone(valid);
+  gapped.stations.find((station) => station.key === "active").series.wcsp1.splice(1_000, 10);
+  await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(gapped));
+  await assert.rejects(prepare({ fixtureDir: dir, staged: join(dir, "staged.json") }), /15-minute grid/);
+
+  const truncated = structuredClone(valid);
+  truncated.stations.find((station) => station.key === "active").series.wcsp1.shift();
+  await writeFile(join(dir, "iwls-recording.json"), JSON.stringify(truncated));
+  await assert.rejects(prepare({ fixtureDir: dir, staged: join(dir, "staged.json") }), /15-minute grid/);
+});

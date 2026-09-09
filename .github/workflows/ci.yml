@@ -118,6 +118,9 @@ jobs:
       - run: npm ci
         working-directory: tools
 
+      - name: Fixture tooling
+        run: node --test scripts/iwls-fixtures.test.mjs
+
       # gen-chs-stations.mjs is the only generator that needs the network (the
       # DFO IWLS API), so it stays out of CI and its artefact is trusted as
       # committed. The other two read local files only, which means CI can
@@ -172,7 +175,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
       - run: brew install xcodegen
+
+      - name: Test runner modes
+        run: zsh scripts/test-modes.test.sh
 
       # MapLibre is a binary download, not a compile — the cache saves the
       # fetch, not a build. The generated xcodeproj and its Package.resolved
@@ -183,12 +193,11 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.os }}-
 
-      # Runs xcodegen, then the fast suite on the image's stock iPhone
-      # simulator. Two things stay out of this lane and ride
-      # `scripts/test.sh --full`, run by hand before an upload: the live-IWLS
-      # UI tests (they skip themselves unless SLACKWATER_FULL is set) and the
-      # iPad leg. SLACKWATER_SIMS must name ONE device — it overrides the
-      # script's fast/full device list outright.
+      # Validates the recorded fixture, runs xcodegen, then the offline fast
+      # suite on the image's stock iPhone simulator. The iPad leg and exhaustive
+      # data test use `scripts/test.sh --full`; live IWLS compatibility uses the
+      # explicit `scripts/test.sh --live` smoke. SLACKWATER_SIMS must name ONE
+      # device — it overrides the script's fast/full device list outright.
       #
       # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
       # wake it: it reports an EMPTY device list — placeholder destinations

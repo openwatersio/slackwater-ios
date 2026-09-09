@@ -121,7 +121,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     /// to be visible, or a sailor cannot tell whether the map is ready before
     /// leaving signal.
     func testChartPackCardShowsStateAndOffersRefresh() throws {
-        let app = launch("-seedGate", "-fixLat", "48.406", "-fixLon", "-122.643")
+        let app = launch("-seedGate", "-connectivityOnline",
+                         "-fixLat", "48.406", "-fixLon", "-122.643")
         app.buttons["offline-status"].firstMatch.tap()
         // The state line is the card: a VStack identifier does not surface as
         // its own element, so assert on what the user actually reads.
@@ -459,7 +460,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let seededDay = DateFormatter()
         seededDay.dateFormat = "EEEE, MMMM d"   // cell label shape, no year
         seededDay.timeZone = TimeZone(identifier: "America/Vancouver")!  // Sechelt Rapids
-        let seededLabel = seededDay.string(from: Date())
+        let seededLabel = seededDay.string(from: Self.fixtureDate)  // -nowEpoch is the app's today
         // CONTAINS, not ==: the cell for the device's own today is prefixed
         // "Today, ", and on this machine that is the same cell.
         let seededCell = app.collectionViews.buttons.matching(
@@ -505,7 +506,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // layouts (this repo's CLAUDE.md documents exactly that failure
         // class). Calendar-based add, not `addingTimeInterval` — see
         // "Calendar days are not 86,400 seconds".
-        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45, to: Date())!
+        let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45,
+                                                           to: Self.fixtureDate)!
         let targetLabelFormatter = DateFormatter()
         targetLabelFormatter.dateFormat = "EEEE, MMMM d"   // observed cell label shape:
                                                             // "Sunday, October 11" (no year)

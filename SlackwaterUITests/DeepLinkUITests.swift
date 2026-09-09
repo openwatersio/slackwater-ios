@@ -10,7 +10,7 @@
 // DeepLinkTests. `system.open` delivers the same URL `.widgetURL` does.
 import XCTest
 
-final class DeepLinkUITests: XCTestCase {
+final class DeepLinkUITests: ScreenshotTestCase {
     /// "noaa/9449880" percent-encoded exactly as `deepLink(forStationID:)`
     /// encodes it — the "/"-bearing shape, which is every id but CHS.
     private let fridayHarbor = URL(string: "slackwater://station/noaa%2F9449880")!
@@ -30,7 +30,7 @@ final class DeepLinkUITests: XCTestCase {
     /// built view hierarchy and proves nothing about scene setup.
     private func primeThenTerminate(_ args: String...) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
+        app.launchArguments = testArguments(args)
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 10),
                   "app did not finish launching before the deep link")

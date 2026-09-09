@@ -208,10 +208,8 @@ schemes:
     test:
       config: Debug
       targets: [SlackwaterTests, SlackwaterUITests]
-      # One plan (TestPlans/). The UI tests that fetch live IWLS and fit
-      # on-device — minutes each — skip themselves unless SLACKWATER_FULL
-      # reaches the runner (ScreenshotTestCase.skipUnlessFull). Drive with
-      # scripts/test.sh; `--full` sets TEST_RUNNER_SLACKWATER_FULL=1.
+      # One plan (TestPlans/). scripts/test.sh selects its offline fast/full,
+      # unit-only, or explicitly live UI subset without duplicating the plan.
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true

@@ -15,9 +15,40 @@
 // process, and the fetcher's request pacing cannot coordinate across processes.
 import UIKit
 import XCTest
+import notify
 
 class ScreenshotTestCase: XCTestCase {
     let shotDir = ProcessInfo.processInfo.environment["M1_SHOT_DIR"] ?? "/tmp"
+    static let fixtureNow = "1788868800"
+    static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
+    private var fixtureNotifyTokens: [String: Int32] = [:]
+
+    override func tearDown() {
+        for token in fixtureNotifyTokens.values { notify_cancel(token) }
+        fixtureNotifyTokens.removeAll()
+        super.tearDown()
+    }
+
+    func testArguments(_ args: [String], live: Bool = false) -> [String] {
+        var result = args + ["-noCloudSync", "-currentFillOff", "-chartPacksOff",
+                             "-nowEpoch", Self.fixtureNow]
+        if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
+            result.append("-networkKillSwitch")
+        }
+        return result
+    }
+
+    func releaseFixture(_ token: String, _ checkpoint: String) {
+        let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
+        var registration: Int32 = 0
+        XCTAssertEqual(name.withCString { notify_register_check($0, &registration) },
+                       UInt32(NOTIFY_STATUS_OK), "could not register UI fixture checkpoint \(checkpoint)")
+        fixtureNotifyTokens[name] = registration
+        XCTAssertEqual(notify_set_state(registration, 1), UInt32(NOTIFY_STATUS_OK),
+                       "could not set UI fixture checkpoint \(checkpoint)")
+        XCTAssertEqual(name.withCString { notify_post($0) }, UInt32(NOTIFY_STATUS_OK),
+                       "could not publish UI fixture checkpoint \(checkpoint)")
+    }
 
     /// Wait for a condition `waitForExistence` cannot express — hittability,
     /// keyboard focus, a label the app rewrites when the work behind it lands.
@@ -137,24 +168,36 @@ class ScreenshotTestCase: XCTestCase {
     /// whose first screen is not the list (the FTUE gate, -openMap) and
     /// mid-test relaunches on an existing app stay inline.
     func launch(_ args: String...) -> XCUIApplication {
+        launch(args)
+    }
+
+    func launch(_ args: [String]) -> XCUIApplication {
         let app = XCUIApplication()
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
+        app.launchArguments = testArguments(args)
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         return app
     }
 
-    /// The live-IWLS / on-device-fit tests (minutes each) skip themselves
-    /// outside `./scripts/test.sh --full`, which sets
-    /// TEST_RUNNER_SLACKWATER_FULL=1 — xcodebuild strips the prefix and sets
+    func launchLive(_ args: String...) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(args, live: true)
+        app.launch()
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        return app
+    }
+
+    /// The small live-IWLS compatibility smoke class skips itself outside
+    /// `./scripts/test.sh --live`, which sets
+    /// TEST_RUNNER_SLACKWATER_LIVE=1 — xcodebuild strips the prefix and sets
     /// the rest on this UI-test runner process, the same route M1_SHOT_DIR
     /// rides above.
-    func skipUnlessFull() throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_FULL"] == nil,
-                      "live-IWLS test — run ./scripts/test.sh --full")
+    func skipUnlessLive() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_LIVE"] == nil,
+                      "live IWLS smoke — run ./scripts/test.sh --live")
     }
 
     /// Units live in Settings only: toggle there.

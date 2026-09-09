@@ -35,7 +35,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // manually via simctl privacy.)
     func testM4Gate() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-resetGate"]
+        app.launchArguments = testArguments(["-resetGate"])
         app.launch()
 
         XCTAssert(app.staticTexts["See tides near you"].appears(within: 10))
@@ -50,7 +50,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         closeSearch(app)
 
         app.terminate()
-        app.launchArguments = []
+        app.launchArguments = testArguments([])
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         XCTAssertFalse(app.textFields.firstMatch.exists,
@@ -447,7 +447,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Alaska, offline, with everything the bundle knows on it. The camera
         // is stated rather than pinched into place — five synthesised pinches
         // land somewhere no assertion can name.
-        app.launchArguments = ["-seedGate", "-networkKillSwitch", "-openMap", "-mapZoom", "3.2"]
+        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2"])
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))
