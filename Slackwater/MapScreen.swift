@@ -38,6 +38,35 @@ let mapCenterOverride: CLLocationCoordinate2D? = {
 
 // MARK: - Shared style loading + camera assertion
 
+/// Whether the map has anything left to do, counted. `MapSettleMarker` is the
+/// only reader — see it for why this cannot live on the map view itself.
+final class MapSettles: ObservableObject {
+    static let shared = MapSettles()
+    @Published var count = 0
+    private init() {}
+}
+
+/// The settle count, in the accessibility tree, for the UI tests and nothing
+/// else. MLNMapView overrides `accessibilityValue` with its own zoom
+/// description ("Zoom 12x."), so a count set on the map view is swallowed and
+/// needs an element of its own.
+///
+/// Behind `-mapSettleSignal` rather than always on, because "invisible" and
+/// "not in the accessibility tree" are opposites here: a 1pt clear label is
+/// invisible to someone looking at the map and is exactly what VoiceOver would
+/// land on and read a bare number from.
+struct MapSettleMarker: View {
+    static let enabled = CommandLine.arguments.contains("-mapSettleSignal")
+    @ObservedObject private var settles = MapSettles.shared
+
+    var body: some View {
+        Text("\(settles.count)")
+            .font(.system(size: 1))
+            .foregroundStyle(.clear)
+            .accessibilityIdentifier("map-settles")
+    }
+}
+
 /// Points the map at the chart style (no error banner — the map renders what
 /// the packs and the network can reach) and re-asserts the camera after each
 /// style load. The camera must be asserted post-layout: a zoomLevel set on a
@@ -54,8 +83,27 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         self.center = center
         self.zoom = zoom
         super.init()
+        // Zero per mount, so "not zero" means THIS map has settled — a count
+        // that survived the previous mount would answer the next test's wait
+        // before its map had drawn anything.
+        MapSettles.shared.count = 0
         map.delegate = self
         map.styleURL = BASEMAP_STYLE_URL
+    }
+
+    /// The map has stopped working — tiles in, camera parked, style applied —
+    /// published where XCUITest can see it. MapLibre has always told its
+    /// delegate this; the app just never put it on the accessibility tree, so
+    /// the UI tests slept a fixed number of seconds instead and a slower
+    /// machine simply woke up too early (#331).
+    ///
+    /// A COUNT, not a flag, and that is the whole reason it works: the map is
+    /// idle at the OLD camera too. A test that pans and then waits for "idle"
+    /// is answered by the idle it was already sitting in, which is the race it
+    /// was trying to avoid, now wearing a wait. A count read before the pan
+    /// cannot be satisfied by the state before the pan.
+    func mapViewDidBecomeIdle(_ mapView: MLNMapView) {
+        MapSettles.shared.count += 1
     }
 
     /// A filled square at equal AREA with the 5pt circle pins (side r·√π —

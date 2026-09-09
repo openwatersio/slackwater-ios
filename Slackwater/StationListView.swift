@@ -378,6 +378,9 @@ struct StationListView: View {
             }
             .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))")
             .accessibilityIdentifier("map-canvas")
+            .overlay(alignment: .topLeading) {
+                if MapSettleMarker.enabled { MapSettleMarker() }
+            }
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
             // stale focus from a station visited an hour ago.

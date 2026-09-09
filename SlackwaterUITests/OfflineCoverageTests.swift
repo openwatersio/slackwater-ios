@@ -92,7 +92,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(strip.appears(within: 5), "derived-gate strip missing")
         let ink = inkFraction(strip)
         XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
-        sleep(1)  // the header's offline tile floor; MLNMapView reports nothing
+        sleep(1)  // the strip Canvas's last paint, for the shot; a Canvas publishes nothing
         save(app, "m46-derived-gate-seeded.png")
 
         // A derived gate scrubs like the other three, so it needs the same way
@@ -293,7 +293,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                        "no height readings on the Boston detail")
         XCTAssertGreaterThanOrEqual(scheduleValues(app, "\\b\\d{1,2}:\\d{2}(?:am|pm)\\b").count, 3,
                                     "no schedule on the Boston detail")
-        sleep(3)  // header map tiles: MLNMapView surfaces no load state to XCUITest
+        sleep(3)  // the detail's Canvas paint, for the shot; a Canvas publishes nothing
         save(app, "m53-us-station.png")
 
         // And the west coast, through the same path.
@@ -405,7 +405,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // strip and nothing ever looked at it.
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)
         XCTAssert(ink > 0.05, "the online-gate strip drew nothing — ink \(ink)")
-        sleep(1)  // the header's tile floor; MLNMapView reports nothing
+        sleep(1)  // the strip Canvas's last paint, for the shot; a Canvas publishes nothing
         save(app, "online-gate-seeded.png")
     }
 

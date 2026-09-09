@@ -141,7 +141,7 @@ class ScreenshotTestCase: XCTestCase {
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
+        app.launchArguments = args + ["-noCloudSync", "-currentFillOff", "-mapSettleSignal"]
         app.launch()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         return app
@@ -407,6 +407,37 @@ class ScreenshotTestCase: XCTestCase {
     /// transition actually moves and carry on from there. Two consecutive
     /// agreeing reads (`settled`) is the animation having stopped.
     func settleLayout(_ element: XCUIElement) { _ = settled { element.frame } }
+
+    /// Run `act` and wait for the map to go quiet AFTER it — tiles in, camera
+    /// parked. `MapStyler.mapViewDidBecomeIdle` counts the map's idles and
+    /// `MapSettleMarker` puts the count in the accessibility tree, precisely so
+    /// this can be a wait rather than a sleep.
+    ///
+    /// The count is read BEFORE `act` and waited on to CHANGE, which is the
+    /// whole trick: the map is idle at the old camera too, so a boolean would
+    /// be answered by the idle the map was already sitting in and hand back the
+    /// race this exists to remove.
+    ///
+    /// Then `settled`, because the first idle after `act` is not always the
+    /// last: the fill layer refreshes on a timer of its own where a test leaves
+    /// it on, and an idle landing between `act` returning and its tiles
+    /// starting would answer the wait early. Two agreeing reads cost 500 ms.
+    ///
+    /// Needs `-mapSettleSignal`, which `launch` passes; a test that builds its
+    /// own `launchArguments` has to pass it too.
+    func settleMap(_ app: XCUIApplication, after act: (() -> Void)? = nil) {
+        let marker = app.staticTexts["map-settles"].firstMatch
+        XCTAssert(marker.appears(within: 10),
+                  "no map settle marker — was the app launched with -mapSettleSignal?")
+        // With no action, the map has just been mounted and the count is its
+        // own: zero until this map settles. With one, the count is whatever
+        // the old camera left and the wait is for it to move.
+        let before = act == nil ? "0" : marker.label
+        act?()
+        XCTAssert(waitFor(marker, "label != '\(before)'", timeout: 20),
+                  "the map never went idle (settles stuck at \(before))")
+        _ = settled { marker.label }
+    }
 
     /// The strip parked. A scrub's time lands in two steps — the scroll
     /// decelerates, then the magnet snaps to the nearest stop and writes

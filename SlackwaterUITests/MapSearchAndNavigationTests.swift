@@ -87,7 +87,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
             XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
-            sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
+            // tapPin trusts SALISH_CENTER, so the camera has to be parked on it
+            settleMap(app)
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
@@ -172,7 +173,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         // the current detail's own anatomy is the tell that the pane swapped
         assertCurrentDetailRendered(app)
-        sleep(5)  // header map tiles: MLNMapView surfaces no load state to XCUITest
+        // Not tiles — there is one MLNMapView in the app and it is the
+        // full-screen pane, never the detail. This is the split's two panes
+        // finishing their layout for the shot below.
+        settleLayout(app.otherElements["timeline-strip"].firstMatch)
         save(app, "m44-ipad-landscape.png")
 
         // Regular width: the FABs live in the sidebar column; the map
@@ -287,7 +291,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 5))
-        sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
+        settleMap(app)  // the tap below needs the camera parked
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssert(app.staticTexts["Today"].appears(within: 5),
                   "the pin tap did not open a detail")
@@ -308,7 +312,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 5))
-        sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
+        settleMap(app)  // the tap below needs the camera parked
 
         // Dead centre: the camera is on the station, so the pin is the middle.
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -447,11 +451,12 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Alaska, offline, with everything the bundle knows on it. The camera
         // is stated rather than pinched into place — five synthesised pinches
         // land somewhere no assertion can name.
-        app.launchArguments = ["-seedGate", "-networkKillSwitch", "-openMap", "-mapZoom", "3.2"]
+        app.launchArguments = ["-seedGate", "-networkKillSwitch", "-openMap", "-mapZoom", "3.2",
+                               "-mapSettleSignal"]
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))
-        sleep(6)  // tiles + clustering must settle before the TIMED pinches; neither reaches XCUITest
+        settleMap(app)  // clustering must settle before the pinches below are TIMED
         save(app, "m53-map-continental.png")
 
         // Then the interaction cost, timed: zooming the clustered source at the

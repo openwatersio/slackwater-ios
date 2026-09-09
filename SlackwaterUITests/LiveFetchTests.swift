@@ -188,18 +188,22 @@ final class LiveFetchTests: ScreenshotTestCase {
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 5))
-        sleep(4)  // tiles: MLNMapView surfaces no load state to XCUITest
+        settleMap(app)
         // Malibu (50.16, -123.85) sits north-west of the camera — drag the
         // map content south-east to bring the pin into the frame's middle
         // (one full drag + one short one; two full drags left it at the edge).
-        map.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
-            .press(forDuration: 0.1, thenDragTo:
-                map.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.8)))
-        sleep(1)  // the pan's own inertia, before the second drag starts
-        map.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.35))
-            .press(forDuration: 0.1, thenDragTo:
-                map.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.62)))
-        sleep(3)  // the newly exposed tiles, for the shot — again, no predicate
+        // Idle covers the pan's own inertia as well as the tiles it exposes:
+        // a decelerating map is a rendering map.
+        settleMap(app) {
+            map.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.25))
+                .press(forDuration: 0.1, thenDragTo:
+                    map.coordinate(withNormalizedOffset: CGVector(dx: 0.65, dy: 0.8)))
+        }
+        settleMap(app) {
+            map.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.35))
+                .press(forDuration: 0.1, thenDragTo:
+                    map.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.62)))
+        }
         save(app, "m46-malibu-map.png")
     }
 
