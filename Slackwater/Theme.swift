@@ -971,6 +971,13 @@ struct WeekPickerSheet: View {
     @State private var draft = Date()
     @Environment(\.dismiss) private var dismiss
 
+    /// The one calendar this sheet uses, for both the grid and the commit.
+    private var calendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -980,6 +987,18 @@ struct WeekPickerSheet: View {
                     .tint(SN.go)
                     .padding(.horizontal, 8)
                     .accessibilityIdentifier("week-picker")
+                    // The grid must be drawn in the STATION's zone, because
+                    // that is the zone "Show" commits in. A sheet is its own
+                    // presentation hierarchy and does not inherit the
+                    // detail's `\.timeZone`, so the calendar was laid out in
+                    // the DEVICE's day while the commit took `startOfDay` in
+                    // the station's: from a device east of the station,
+                    // tapping the 8th asked for the 7th, and the week that
+                    // came back was the one before the week you pointed at.
+                    // Reading a phone in Halifax about Sechelt is exactly the
+                    // case, and so is a UTC test runner.
+                    .environment(\.timeZone, tz)
+                    .environment(\.calendar, calendar)
                 Spacer()
             }
             .background(CanvasBackground())
@@ -991,9 +1010,7 @@ struct WeekPickerSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Show") {
-                        var cal = Calendar(identifier: .gregorian)
-                        cal.timeZone = tz
-                        let picked = cal.startOfDay(for: draft)
+                        let picked = calendar.startOfDay(for: draft)
                         anchor = picked
                         onPick(picked)
                         dismiss()
