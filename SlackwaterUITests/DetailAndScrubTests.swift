@@ -141,8 +141,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(picker.waitForExistence(timeout: 5))
 
         // The graphical DatePicker's forward-month button, then a day cell.
-        app.buttons["Next Month"].firstMatch.tap()
-        app.collectionViews.buttons.element(boundBy: 10).tap()
+        stepMonth(app, "Next Month")
+        tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")

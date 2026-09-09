@@ -430,9 +430,9 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch
             .waitForExistence(timeout: 5))
-        app.buttons["Next Month"].firstMatch.tap()
-        app.buttons["Next Month"].firstMatch.tap()   // two months out — past the 30-day window
-        app.collectionViews.buttons.element(boundBy: 10).tap()
+        stepMonth(app, "Next Month")
+        stepMonth(app, "Next Month")   // two months out — past the 30-day window
+        tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch
@@ -447,12 +447,12 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(bar.exists, "the honesty card must keep the week-range bar")
         bar.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons["Previous Month"].firstMatch.tap()
-        app.buttons["Previous Month"].firstMatch.tap()
+        stepMonth(app, "Previous Month")
+        stepMonth(app, "Previous Month")
         let todayCell = app.collectionViews.buttons.matching(
             NSPredicate(format: "label CONTAINS[c] 'today'")).firstMatch
         XCTAssert(todayCell.exists, "the graphical picker labels today's cell")
-        todayCell.tap()
+        tapDay(todayCell)
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
                   "back on the seeded week, the strip must render from disk — offline")
@@ -503,12 +503,12 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // tap can no longer be "lost" against an in-flight transition either.
         var monthsAdvanced = 0
         while !targetCell.waitForExistence(timeout: 1), monthsAdvanced < 3 {
-            app.buttons["Next Month"].firstMatch.tap()
+            stepMonth(app, "Next Month")
             monthsAdvanced += 1
         }
         XCTAssert(targetCell.waitForExistence(timeout: 1),
                   "today+45d cell (\(targetLabel)) not found within 3 months forward")
-        targetCell.tap()
+        tapDay(targetCell)
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
