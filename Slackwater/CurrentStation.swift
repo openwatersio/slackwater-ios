@@ -305,6 +305,18 @@ extension CurrentEvent {
 
 // MARK: - The mixed station list (tide + current, one search)
 
+/// What a station measures — the two-way split under the five catalog kinds.
+/// `pinKind` styles a CHS port as its own pin class, but it measures tide.
+enum StationSeries {
+    case tide, current
+}
+
+/// A cross-series nearby affordance (the detail links, the second My
+/// Location card) is offered only inside this radius — far enough to reach
+/// across a strait, near enough that the station can plausibly say something
+/// about the same water.
+let nearbyStationRadiusKm = 20.0
+
 enum StationItem: Identifiable, Hashable {
     // The two NOAA cases carry identity, not the record: the list, the search
     // and the map pins need nothing else, and decoding 9.1 MB of constituents
@@ -348,6 +360,12 @@ enum StationItem: Identifiable, Hashable {
         case .chsGate, .chsCurrent: "Current · CHS"
         }
     }
+    var series: StationSeries {
+        switch self {
+        case .tide, .chs: .tide
+        case .current, .chsGate, .chsCurrent: .current
+        }
+    }
     /// Map pin class per the design tokens: tide / current / chs. A derived
     /// gate is a current gate (web chsStations.ts: series "current").
     var pinKind: String {
@@ -378,6 +396,32 @@ enum StationItem: Identifiable, Hashable {
         }
         keyed.sort { $0.km == $1.km ? $0.rank < $1.rank : $0.km < $1.km }
         return keyed.map(\.item)
+    }
+
+    /// The nearest station of one series to a point, with its distance — the
+    /// detail views' cross-series discovery link. Proximity is the only claim:
+    /// a curated `tideReference` outranks this wherever the data carries one.
+    static func nearest(_ series: StationSeries,
+                        toLat lat: Double, lon: Double) -> (item: StationItem, km: Double)? {
+        var best: (item: StationItem, km: Double)?
+        for item in all where item.series == series {
+            let km = item.km(fromLat: lat, lon: lon)
+            if best == nil || km < best!.km { best = (item, km) }
+        }
+        return best
+    }
+
+    /// The My Location cards: the nearest station, plus the nearest of the
+    /// OTHER series when it sits inside `nearbyStationRadiusKm` — a fix
+    /// beside a tide gauge still surfaces the current station behind it,
+    /// without advertising one from a coast that has none. `ranked` is the
+    /// catalog nearest-first (RankedStations), so `first` is the nearest.
+    static func heroItems(ranked: [StationItem],
+                          lat: Double, lon: Double) -> [StationItem] {
+        guard let first = ranked.first else { return [] }
+        guard let other = ranked.first(where: { $0.series != first.series }),
+              other.km(fromLat: lat, lon: lon) <= nearbyStationRadiusKm else { return [first] }
+        return [first, other]
     }
 
     /// All bundled stations, alphabetical. World coverage: no station is
@@ -479,11 +523,16 @@ enum StationItem: Identifiable, Hashable {
     /// exact bug this branch exists to fix (search ranked from Victoria in the
     /// Solent), and a default would let a future caller reintroduce it by
     /// omission rather than by decision.
-    static func search(_ query: String, near anchor: (lat: Double, lon: Double)) -> [StationItem] {
+    /// `series` narrows the scan to one series (nil: the whole catalog) —
+    /// the list's Tides/Currents filter, applied here rather than over the
+    /// results so the 60-row limit still fills with the filtered series.
+    static func search(_ query: String, near anchor: (lat: Double, lon: Double),
+                       series: StationSeries? = nil) -> [StationItem] {
         let q = Array(query.trimmingCharacters(in: .whitespaces).lowercased().utf8)
         var ranked: [(item: StationItem, rank: Int, km: Double)] = []
         ranked.reserveCapacity(128)
         for (s, key) in zip(all, searchKeys) {
+            if let series, s.series != series { continue }
             guard let rank = q.isEmpty ? 0 : key.rank(q) else { continue }
             ranked.append((s, rank, s.km(fromLat: anchor.lat, lon: anchor.lon)))
         }

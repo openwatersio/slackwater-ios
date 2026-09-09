@@ -126,6 +126,42 @@ final class NationalScaleTests: XCTestCase {
                           "a keystroke must land inside one 60 fps frame")
     }
 
+    /// The Tides/Currents narrowing: a series-filtered search returns only
+    /// that series and still fills its rows (the filter runs inside the scan,
+    /// not over the truncated results), and the nearest-of-series helper —
+    /// what the nearby links and the widget cache lean on — answers in kind.
+    func testSeriesFilterNarrowsSearchAndNearest() throws {
+        let currents = StationItem.search("", near: firstRunFix, series: .current)
+        XCTAssertEqual(currents.count, StationItem.searchLimit)
+        XCTAssertTrue(currents.allSatisfy { $0.series == .current })
+        let tides = StationItem.search("port", near: firstRunFix, series: .tide)
+        XCTAssertFalse(tides.isEmpty)
+        XCTAssertTrue(tides.allSatisfy { $0.series == .tide })
+
+        let nearest = try XCTUnwrap(
+            StationItem.nearest(.current, toLat: firstRunFix.lat, lon: firstRunFix.lon))
+        XCTAssertEqual(nearest.item.series, .current)
+        // The first-run fix is Victoria Harbour — current-gate country.
+        XCTAssertLessThan(nearest.km, nearbyStationRadiusKm)
+    }
+
+    /// The My Location cards cover both series where both exist, and never
+    /// advertise a series a coast doesn't have: Victoria gets a tide and a
+    /// current card, Portsmouth (nearest current: another continent) gets one.
+    func testHeroItemsCoverBothSeriesOnlyWhereBothAreNear() {
+        let victoria = StationItem.heroItems(
+            ranked: StationItem.rankedByDistance(StationItem.all,
+                                                 lat: firstRunFix.lat, lon: firstRunFix.lon),
+            lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertEqual(victoria.count, 2)
+        XCTAssertEqual(Set(victoria.map(\.series)), [.tide, .current])
+
+        let portsmouth = StationItem.heroItems(
+            ranked: StationItem.rankedByDistance(StationItem.all, lat: 50.80, lon: -1.11),
+            lat: 50.80, lon: -1.11)
+        XCTAssertEqual(portsmouth.map(\.series), [.tide])
+    }
+
     /// The list ranks the catalog inside `body`, which SwiftUI re-evaluates on
     /// every fit, favourite and unit switch. Memoised, a re-render is free.
     @MainActor
