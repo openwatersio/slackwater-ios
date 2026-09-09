@@ -447,12 +447,34 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(bar.exists, "the honesty card must keep the week-range bar")
         bar.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
-        stepMonth(app, "Previous Month")
-        stepMonth(app, "Previous Month")
-        let todayCell = app.collectionViews.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] 'today'")).firstMatch
-        XCTAssert(todayCell.exists, "the graphical picker labels today's cell")
-        tapDay(todayCell)
+        // Target the STATION's day, not the cell the picker labels "Today".
+        // The seeded window is anchored on `todayLocal(gate.tz)` (TestSeeds) and
+        // the picker commits `startOfDay` in that same zone, but the "Today"
+        // label is the DEVICE's day. On a runner in UTC the two are different
+        // days from 00:00 UTC until Vancouver catches up; picking the device's
+        // day asks for a window anchored 24 h later, whose +180 h end falls one
+        // day past the seeded end, and the honesty card that follows is right.
+        // That is the whole of hosted-lane failure #331 in this test: it passed
+        // for seventeen hours a day and failed for seven.
+        let seededDay = DateFormatter()
+        seededDay.dateFormat = "EEEE, MMMM d"   // cell label shape, no year
+        seededDay.timeZone = TimeZone(identifier: "America/Vancouver")!  // Sechelt Rapids
+        let seededLabel = seededDay.string(from: Date())
+        // CONTAINS, not ==: the cell for the device's own today is prefixed
+        // "Today, ", and on this machine that is the same cell.
+        let seededCell = app.collectionViews.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", seededLabel)).firstMatch
+        // Step until it is on screen rather than a fixed two taps — when the
+        // station's day is in the previous month and the device's is not, two
+        // taps land a month short.
+        var monthsBack = 0
+        while !seededCell.appears(within: 1), monthsBack < 3 {
+            stepMonth(app, "Previous Month")
+            monthsBack += 1
+        }
+        XCTAssert(seededCell.exists,
+                  "the seeded day (\(seededLabel)) is not in the picker")
+        tapDay(seededCell)
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "back on the seeded week, the strip must render from disk — offline")
