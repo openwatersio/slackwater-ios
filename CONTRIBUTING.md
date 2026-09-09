@@ -101,4 +101,4 @@ Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no loc
 
 ## AI agents
 
-Agents work here under the same policy as everyone else, with two additions: an agent never merges its own PR, and an agent doesn't open a PR for docs-only work. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.
+Agents work here under the same policy as everyone else, with one addition: an agent never merges its own PR. Docs-only work gets a PR like anything else — the `What changed` job keeps it off the macOS lane, and a docs PR that books one is a bug in that job, not a reason to skip review. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.
