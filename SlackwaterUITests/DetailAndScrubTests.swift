@@ -160,7 +160,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         stepMonth(app, "Next Month")
         tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
-
+        // The bar stays put and rewrites itself once the sheet's pick lands,
+        // so wait for the label the next line reads, not for the bar (#341).
+        XCTAssert(waitFor(bar, "label != '\(before)'"),
+                  "the bar did not move off '\(before)' after Done")
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
         XCTAssert(app.staticTexts["not this week"].appears(within: 5))
 
@@ -465,9 +468,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleScrub(app)
         XCTAssertNotEqual(scrubClock(app), clockBefore,
                           "tapping the commentary did not scrub to the stop it names")
-        // Hittable alone is true at t=0: the jump writes `scrubTime` and the
-        // pill only leaves hit-testing once the scroll's first frame lands.
-        // The label is the noun the next lines read, so it is the wait.
+        // Hittable alone is true at t=0: the jump's `scrubTime` write restarts
+        // the strip's settle timer one main-actor hop after the tap, and the
+        // pill is still hittable with the old label until then. The label is
+        // the noun the next lines read, so it is the wait.
         XCTAssert(waitFor(pill, "isHittable == true AND label ENDSWITH 'later'"),
                   "the commentary did not come back after the jump: '\(pill.label)'")
         XCTAssertNotEqual(pill.label, saidBefore,
