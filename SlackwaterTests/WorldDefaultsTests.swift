@@ -38,6 +38,12 @@ final class WorldDefaultsTests: XCTestCase {
                        portsmouth.id)
         XCTAssertFalse(LocationService.cacheNearestWidgetStation(
             lat: portsmouth.latitude, lon: portsmouth.longitude, defaults: d))
+
+        // The same fix caches the series-narrowed siblings, each of its own
+        // series — the nearest tide station here IS the any-series answer.
+        XCTAssertEqual(d.string(forKey: AppGroup.nearestTideStationKey), portsmouth.id)
+        let nearestCurrent = try XCTUnwrap(d.string(forKey: AppGroup.nearestCurrentStationKey))
+        XCTAssertEqual(StationItem.byId[nearestCurrent]?.series, .current)
     }
 
     /// Friday Harbor was pinned to the head of the station list. That is a

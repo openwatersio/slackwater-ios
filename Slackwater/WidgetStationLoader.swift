@@ -103,8 +103,14 @@ enum WidgetStationLoader {
         defaults: UserDefaults = AppGroup.defaults,
         locator: CatalogFileLocator = .shared
     ) -> String {
-        guard id == AppGroup.currentLocationStationID else { return id }
-        if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
+        let cacheKey: String? = switch id {
+        case AppGroup.currentLocationStationID: AppGroup.currentLocationStationKey
+        case AppGroup.nearestTideStationID: AppGroup.nearestTideStationKey
+        case AppGroup.nearestCurrentStationID: AppGroup.nearestCurrentStationKey
+        default: nil
+        }
+        guard let cacheKey else { return id }
+        if let cached = defaults.string(forKey: cacheKey),
            StationItem.widgetItem(id: cached, locator: locator) != nil { return cached }
         return fallbackStationID(defaults: defaults)
     }
