@@ -1071,6 +1071,20 @@ extension EnvironmentValues {
     }
 }
 
+/// `openTideDetail` generalized to any station kind: the nearby-station
+/// discovery link can land on a NOAA current, a CHS port or a gate, and each
+/// pushes a different route. Same closure-not-NavigationLink reasoning.
+private struct OpenStationItemKey: EnvironmentKey {
+    static let defaultValue: (StationItem) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openStationItem: (StationItem) -> Void {
+        get { self[OpenStationItemKey.self] }
+        set { self[OpenStationItemKey.self] = newValue }
+    }
+}
+
 /// Same reasoning as `openChsRoute` above: the detail-header title (issue #32)
 /// jumps straight to the map, focused on the detail's own station — not a
 /// NavigationLink or Button, same press-tracking hazard in the iPad split
@@ -1125,6 +1139,22 @@ struct TideAtPortLink: View {
 
     var body: some View {
         BranchLink(text: "Tide at \(port.name)", id: "tide-at-port") { openTide(port) }
+    }
+}
+
+/// The cross-series discovery affordance: the nearest station of the other
+/// series, offered by proximity alone. The distance is in the label because
+/// nearness is the whole claim — unlike `TideAtPortLink`, nothing curated
+/// says this station governs or matches this water.
+struct NearbyStationLink: View {
+    let item: StationItem
+    let km: Double
+    @Environment(\.openStationItem) private var open
+
+    var body: some View {
+        let currents = item.series == .current
+        BranchLink(text: "\(currents ? "Currents" : "Tide") at \(item.name) · \(formatNm(km))",
+                   id: currents ? "nearby-currents" : "nearby-tide") { open(item) }
     }
 }
 
@@ -1330,11 +1360,11 @@ struct ListGroups {
     let nearMe: [String]
     let recents: [String]
 
-    init(heroId: String?, favoriteIds: [String], recentIds: [String],
+    init(heroIds: [String], favoriteIds: [String], recentIds: [String],
          rankedIds: [String], nearCount: Int) {
-        favorites = favoriteIds.filter { $0 != heroId }
+        favorites = favoriteIds.filter { !heroIds.contains($0) }
         var shown = Set(favorites)
-        if let heroId { shown.insert(heroId) }
+        shown.formUnion(heroIds)
         nearMe = Array(rankedIds.filter { !shown.contains($0) }.prefix(nearCount))
         shown.formUnion(nearMe)
         recents = recentIds.filter { !shown.contains($0) }

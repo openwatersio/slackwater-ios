@@ -27,6 +27,10 @@ struct OnlineGateDetailView: View {
     @State private var anchor = Date.distantPast
     @State private var fetching = false
     @State private var fetchFailed = false
+    /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
+    /// discovery fallback when this gate carries no `tideReference`. Computed
+    /// once on appear; the body re-evaluates on every scrub tick.
+    @State private var nearbyTide: (item: StationItem, km: Double)?
 
     private var tz: TimeZone { gate.tz }
     private var calendar: Calendar {
@@ -116,7 +120,11 @@ struct OnlineGateDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: gate.latitude, longitude: gate.longitude)
-                                    if let port = pairedTide { TideAtPortLink(port: port) }
+                                    if let port = pairedTide {
+                                        TideAtPortLink(port: port)
+                                    } else if let nearby = nearbyTide {
+                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    }
                                 }
                             },
                             bottom: {
@@ -140,6 +148,11 @@ struct OnlineGateDetailView: View {
                 rebuild()
                 RecentsStore.shared.record(gate.id)
                 if window?.covers(anchor: anchor) != true, net.online { fetchNow(from: anchor) }
+                if pairedTide == nil, nearbyTide == nil,
+                   let n = StationItem.nearest(.tide, toLat: gate.latitude, lon: gate.longitude),
+                   n.km <= nearbyStationRadiusKm {
+                    nearbyTide = n
+                }
             }
             // A fetch this view did not start — the picker's prefetch — has to
             // reach it. `fetchOnlineWindow` saves and bumps the stamp; that is

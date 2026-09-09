@@ -12,6 +12,11 @@ struct StationListView: View {
     @State private var showDownloads = false
     @State private var showWidgetsGallery = false
     @State private var searching = false
+    /// Tides/Currents narrowing, nil = everything. One state for Near Me and
+    /// search, so a pick carries between the two surfaces. Session-only on
+    /// purpose: a persisted filter is a mystery ("where did the tide stations
+    /// go?") a week later.
+    @State private var seriesFilter: StationSeries?
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
@@ -117,6 +122,18 @@ struct StationListView: View {
         // above BOTH layouts, delivery rides ordinary ancestor inheritance —
         // and there's exactly one attachment, so the two layouts can't drift.
         .environment(\.openTideDetail) { path.append($0) }
+        // The nearby-station link's push — appends (a step deeper), never the
+        // path reset `open` does: the station being left stays on the back
+        // stack, exactly as TideAtPortLink behaves.
+        .environment(\.openStationItem) { item in
+            switch item {
+            case .tide(let s): path.append(NoaaRoute.tide(s))
+            case .current(let s): path.append(NoaaRoute.current(s))
+            case .chs(let info): path.append(ChsRoute.port(info))
+            case .chsGate(let gate): path.append(ChsRoute.derivedGate(gate))
+            case .chsCurrent(let gate): path.append(ChsRoute.currentGate(gate))
+            }
+        }
         // Same reasoning, same attachment point — every CHS push (an online
         // gate's honesty card, a Downloads-sheet row) rides this one closure,
         // never a NavigationLink (OpenChsRouteKey doc comment, Theme.swift).
@@ -462,28 +479,37 @@ struct StationListView: View {
         // Recents are uncollapsed (explicit picks stay exact). The rest are behind
         // the chooser.
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
-        let heroItem = fix == nil ? nil : ranked.first
-        let groups = ListGroups(heroId: heroItem?.id, favoriteIds: favorites.ids,
+        // Both series under My Location: the nearest station plus the nearest
+        // of the other series inside the nearby radius — "closest" must not
+        // mean tide or current by accident of geography.
+        let heroItems = fix == nil ? []
+            : StationItem.heroItems(ranked: ranked, lat: anchor.lat, lon: anchor.lon)
+        // The filter narrows Near Me only. The hero cards stay unfiltered
+        // (they answer "where am I", not "what am I looking for"), and
+        // Favorites/Recents are explicit picks a filter must not hide.
+        let nearIds = seriesFilter.map { series in
+            places.shownIds.filter { StationItem.byId[$0]?.series == series }
+        } ?? places.shownIds
+        let groups = ListGroups(heroIds: heroItems.map(\.id), favoriteIds: favorites.ids,
                                 // Uncollapsed on purpose: a station opened via the chooser is an explicit
                                 // pick, same principle StationGroups grants Favorites — collapsing it
                                 // would let Recents silently show and reopen the nearest namesake
                                 // instead. Near Me stays collapsed: distance ranking is not user choice.
                                 recentIds: recents.ids,
-                                rankedIds: places.shownIds,
-                                // With a hero the nearest is already on screen — 4 more; without, 5.
+                                rankedIds: nearIds,
+                                // With hero cards the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
 
         // My Location slot: the hero tile, its locating state, the amber
         // denied card, or — past the gate, with the choice never made — the ask
         // card. Keep the slot mounted while Core Location finds a fix.
         Group {
-            if let fix, let nearest = heroItem {
-                VStack(spacing: 0) {
-                    MyLocationTile(item: nearest, fix: fix, imperial: imperial) {
-                        itemCard($0, km: $0.km(fromLat: fix.lat, lon: fix.lon))
+            if let fix, !heroItems.isEmpty {
+                MyLocationTile(items: heroItems, fix: fix, imperial: imperial) { item in
+                    VStack(spacing: 0) {
+                        itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
+                        matchingButton(item, places)
                     }
-                    matchingButton(nearest, places)
-                        .padding(.horizontal, 16)
                 }
                     .transition(.opacity)
             } else if loc.authorized {
@@ -541,7 +567,14 @@ struct StationListView: View {
             }
         }
 
-        sectionLabel("Near Me")
+        HStack(alignment: .firstTextBaseline) {
+            MonoLabel(text: "Near Me")
+            Spacer(minLength: 8)
+            seriesChips
+        }
+        .padding(.horizontal, 26)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
         ForEach(items(groups.nearMe)) { item in
             VStack(spacing: 0) {
                 itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
@@ -594,6 +627,36 @@ struct StationListView: View {
 
     private func items(_ ids: [String]) -> [StationItem] {
         ids.compactMap { StationItem.byId[$0] }
+    }
+
+    /// The Tides/Currents narrowing — three quiet capsules on the Near Me
+    /// header, shared with the search overlay. Tapping the active one is a
+    /// second way back to All, for a thumb already on it.
+    private var seriesChips: some View {
+        HStack(spacing: 6) {
+            seriesChip("All", nil)
+            seriesChip("Tides", .tide)
+            seriesChip("Currents", .current)
+        }
+    }
+
+    private func seriesChip(_ label: String, _ series: StationSeries?) -> some View {
+        let selected = seriesFilter == series
+        return Button {
+            seriesFilter = selected ? nil : series
+        } label: {
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(selected ? SN.leaf : SN.foam.opacity(0.6))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .glassEffect(selected ? .regular.tint(SN.leaf.opacity(0.25)).interactive()
+                                      : .regular.interactive(), in: Capsule())
+        }
+        .buttonStyle(.plain)  // List rows: keep the tap on the chip itself
+        .accessibilityLabel("Show \(label.lowercased())")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("series-filter-\(label.lowercased())")
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -804,11 +867,14 @@ struct StationListView: View {
     }
 
     private var searchOverlay: some View {
-        ZStack {
+        // Results scroll UNDER the chips and the input, dissolving toward
+        // the bottom edge (the Weather-app search treatment): the scroll
+        // surface fills the overlay and the controls float over its faded
+        // tail, rather than owning their own slice of the screen.
+        ZStack(alignment: .bottom) {
             CanvasBackground()
-            VStack(spacing: 0) {
-                ScrollView {
-                    let results = StationItem.search(query, near: anchor)
+            ScrollView {
+                    let results = StationItem.search(query, near: anchor, series: seriesFilter)
                     LazyVStack(spacing: 12) {
                         // Nationally a two-letter query matches a thousand
                         // stations. Showing the nearest 60 is the useful
@@ -828,10 +894,38 @@ struct StationListView: View {
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
+                    .padding(.top, 14)
+                    // Room to scroll the last card clear of the floating
+                    // controls and the fade under them.
+                    .padding(.bottom, 190)
+            }
+            // The dissolve runs from just above the floating controls to the
+            // overlay's very bottom edge. A mask changes rendering only —
+            // rows inside the fade still scroll and hit-test.
+            .mask {
+                VStack(spacing: 0) {
+                    Rectangle()
+                    LinearGradient(colors: [.black, .clear],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: 170)
                 }
+            }
+            VStack(spacing: 0) {
+                // The same chips as the Near Me header — one filter, both
+                // surfaces — sitting above the input, thumb-reachable.
+                seriesChips
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
                 searchBar
             }
+            // The controls float over tappable results, and glass (unlike
+            // the flat background it replaced) is not a hit-test barrier — an
+            // unguarded tap on the input's padding would open the faded card
+            // BEHIND the field. The whole control region claims its taps and
+            // spends them on focus; the chips and the X, being buttons, still
+            // win their own.
+            .contentShape(Rectangle())
+            .onTapGesture { searchFocused = true }
         }
         .onAppear { searchFocused = true }  // keyboard up immediately
     }
@@ -888,8 +982,7 @@ struct StationListView: View {
             // since the capsule is a background, not a clip.
             .padding(.vertical, 13)
             .frame(minHeight: 48)
-            .background(Color.white.opacity(0.08), in: Capsule())
-            .overlay(Capsule().strokeBorder(SN.leaf.opacity(0.25), lineWidth: 0.5))
+            .glassEffect(.regular.interactive(), in: Capsule())
 
             Button {
                 searching = false
@@ -909,15 +1002,17 @@ struct StationListView: View {
 
 /// The My Location hero: MY LOCATION eyebrow with the location arrow and,
 /// opposite it, the fix coordinates in mono (3 decimal places), over the
-/// nearest station's ordinary card (distance rendered in its own identity
-/// column — same as every other card).
+/// nearest stations' ordinary cards (distance rendered in each card's own
+/// identity column — same as every other card). Usually two cards — the
+/// nearest tide and the nearest current station (StationItem.heroItems) —
+/// one where the other series has no nearby coverage.
 ///
 /// The coordinates share the eyebrow's row (#42): on their own line under the
 /// card they buy a full row of tile height for one short mono string, and
 /// leave the eyebrow row half-empty above it — the card ends up sandwiched in
 /// padding that encodes nothing.
 struct MyLocationTile<Card: View>: View {
-    let item: StationItem
+    let items: [StationItem]
     let fix: (lat: Double, lon: Double)
     let imperial: Bool
     @ViewBuilder let card: (StationItem) -> Card
@@ -947,8 +1042,12 @@ struct MyLocationTile<Card: View>: View {
             .padding(.horizontal, 26)
             .padding(.top, 14)
             .padding(.bottom, 4)
-            card(item)
-                .padding(.horizontal, 16)
+            VStack(spacing: 12) {
+                ForEach(items) { item in
+                    card(item)
+                        .padding(.horizontal, 16)
+                }
+            }
         }
     }
 }
