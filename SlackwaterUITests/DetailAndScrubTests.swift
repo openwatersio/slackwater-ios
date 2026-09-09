@@ -10,7 +10,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testM1Walkthrough() throws {
         // The app launches on the list — when located it ranks by distance, so
         // reach Friday Harbor through search (deterministic either way).
-        let app = launch("-seedGate")
+        // The Victoria fix is pinned because the SEARCH step below depends on
+        // it: results rank by distance from the live anchor, and the scroll
+        // loop's budget only reaches Active Pass from a Salish Sea anchor. A
+        // dev machine with a custom simulator location (or none) ranks from
+        // somewhere else entirely.
+        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // Units live in Settings only (no list pill): reset to feet first —
         // the setting persists across runs.
@@ -50,10 +55,21 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // DISTANCE, not name — Active Pass sits eighth, not first
         // (Race Passage, then five San Juan passes, are nearer to
         // the Victoria fix). Scroll for both rather than assume the fold.
+        // The results scroller fills the whole overlay — the keyboard and the
+        // floating controls are content insets, not frame — so `swipeUp()`
+        // from the ELEMENT's center starts the gesture on the keyboard and
+        // scrolls nothing. Drag inside the visible results region instead,
+        // where a thumb scrolls.
+        let overlay = app.scrollViews.firstMatch
         for name in ["Active Pass", "Deception Pass (Narrows)"] {
             let card = app.staticTexts[name].firstMatch
             var tries = 0
-            while !card.exists, tries < 8 { app.scrollViews.firstMatch.swipeUp(); tries += 1 }
+            while !card.exists, tries < 8 {
+                overlay.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.42))
+                    .press(forDuration: 0.05, thenDragTo:
+                        overlay.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)))
+                tries += 1
+            }
             XCTAssert(card.exists, "search did not find \(name)")
         }
         closeSearch(app)
