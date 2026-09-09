@@ -147,6 +147,15 @@ skip=()
 [[ -n "${SLACKWATER_ONLY:-}" ]] && for t in "${(@s/,/)SLACKWATER_ONLY}"; do skip+=("-only-testing:$t"); done
 [[ -n "${SLACKWATER_SKIP:-}" ]] && for t in "${(@s/,/)SLACKWATER_SKIP}"; do skip+=("-skip-testing:$t"); done
 
+# A run is only evidence if the source held still for it. This Mac carries a
+# dozen worktrees and several agent sessions, and a second session editing a
+# test mid-suite produces a failure that belongs to code you never ran — which
+# has already cost one wrong diagnosis, twice: an in-progress assertion read as
+# a stale-simulator problem, and a passing suite credited to the wrong commit.
+# The lock stops two xcodebuild runs colliding; nothing stopped this.
+srcmark=$(mktemp)
+trap 'rm -f "$srcmark"' EXIT
+
 for i in {1..$#sims}; do
   sim=$sims[$i]
   echo "=== $MODE · $sim ==="
@@ -176,3 +185,13 @@ for i in {1..$#sims}; do
     | tail -40
   echo "=== $MODE · $sim: $((SECONDS - start))s ==="
 done
+
+# Not fatal: the run may well be clean, and the person editing is entitled to.
+# But the result stops being evidence, and that has to be said out loud rather
+# than discovered later from a confusing failure.
+changed=$(find Slackwater SlackwaterTests SlackwaterUITests project.yml \
+  -newer "$srcmark" \( -name '*.swift' -o -name 'project.yml' \) 2>/dev/null)
+if [[ -n "$changed" ]]; then
+  echo "warning: source changed while the suite ran — this result is not evidence for any commit:"
+  printf '  %s\n' ${(f)changed}
+fi
