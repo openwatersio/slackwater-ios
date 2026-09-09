@@ -16,7 +16,12 @@ struct StationProvider: AppIntentTimelineProvider {
     private func entry(_ intent: StationConfigIntent, at date: Date) -> SlackwaterEntry {
         let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
         let id = WidgetStationLoader.resolvedStationID(selectedID)
-        let prefix = selectedID == AppGroup.currentLocationStationID ? "Current Location" : nil
+        let prefix: String? = switch selectedID {
+        case AppGroup.currentLocationStationID: "Current Location"
+        case AppGroup.nearestTideStationID: "Nearest Tide"
+        case AppGroup.nearestCurrentStationID: "Nearest Current"
+        default: nil
+        }
         // One ChsModelStore lookup, not two: the snapshot's station and the
         // card both derive from the same loaded record.
         let record = WidgetStationLoader.loadRecord(id: id)

@@ -46,6 +46,10 @@ struct CurrentDetailView: View {
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
     @State private var showDownloads = false
+    /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
+    /// discovery fallback when no curated `tideReference` pairs this station.
+    /// Computed once on appear; the body re-evaluates on every scrub tick.
+    @State private var nearbyTide: (item: StationItem, km: Double)?
     // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
     // custom `@Environment` key set above the presenting view on its own
     // (SlackwaterApp.swift's `.sheet(showDownloads)` comment has the story).
@@ -107,7 +111,11 @@ struct CurrentDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)
-                                    if let port = pairedTide { TideAtPortLink(port: port) }
+                                    if let port = pairedTide {
+                                        TideAtPortLink(port: port)
+                                    } else if let nearby = nearbyTide {
+                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    }
                                 }
                             },
                             bottom: { footer })
@@ -118,6 +126,11 @@ struct CurrentDetailView: View {
                     rebuild()
                 }
                 RecentsStore.shared.record(record.itemId)
+                if pairedTide == nil, nearbyTide == nil,
+                   let n = StationItem.nearest(.tide, toLat: record.latitude, lon: record.longitude),
+                   n.km <= nearbyStationRadiusKm {
+                    nearbyTide = n
+                }
             }
             // The refinement lands under an open page: same station, new model. The
             // curve, the schedule and the amber marking all have to follow it.

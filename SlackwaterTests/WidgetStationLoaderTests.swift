@@ -243,7 +243,14 @@ final class WidgetStationLoaderTests: XCTestCase {
         defaults.set([addedID, removed.id], forKey: AppGroup.favoritesKey)
 
         let query = StationQuery(locator: locator, defaults: defaults)
-        let suggestions = try await query.suggestedEntities()
+        let sections = query.sectionedChoices()
+        // The location-following entries lead the picker as their own section.
+        XCTAssertEqual(sections.first?.title, "Nearest Station")
+        XCTAssertEqual(sections.first?.items.map(\.id),
+                       [AppGroup.currentLocationStationID,
+                        AppGroup.nearestTideStationID,
+                        AppGroup.nearestCurrentStationID])
+        let suggestions = sections.flatMap(\.items)
         XCTAssertEqual(suggestions.first { $0.id == addedID }?.name, "Remote only")
         XCTAssertNil(suggestions.first { $0.id == removed.id })
         let resolved = try await query.entities(for: [addedID, removed.id])
@@ -291,6 +298,38 @@ final class WidgetStationLoaderTests: XCTestCase {
 
     func testDefaultUsesCurrentLocation() {
         XCTAssertEqual(WidgetStationLoader.defaultStationID(), AppGroup.currentLocationStationID)
+    }
+
+    /// The series-narrowed sentinels resolve through their own cached ids —
+    /// a Nearest Current widget must never land on the tide gauge the
+    /// any-series cache points at.
+    func testNearestSeriesSentinelsResolveTheirOwnCache() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let currentID = "current:" + CurrentStationRecord.all.first!.id
+        d.set(TideStationRecord.fridayHarborID, forKey: AppGroup.currentLocationStationKey)
+        d.set(TideStationRecord.fridayHarborID, forKey: AppGroup.nearestTideStationKey)
+        d.set(currentID, forKey: AppGroup.nearestCurrentStationKey)
+
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.nearestTideStationID, defaults: d), TideStationRecord.fridayHarborID)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.nearestCurrentStationID, defaults: d), currentID)
+    }
+
+    /// A sentinel with no cached fix falls back the same way Current
+    /// Location always has: first favorite, else most recent, else Friday
+    /// Harbor.
+    func testNearestSeriesSentinelsFallBackWithoutACache() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let favorite = TideStationRecord.fridayHarborID
+        d.set([favorite], forKey: AppGroup.favoritesKey)
+
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.nearestTideStationID, defaults: d), favorite)
+        XCTAssertEqual(WidgetStationLoader.resolvedStationID(
+            AppGroup.nearestCurrentStationID, defaults: d), favorite)
     }
 
     func testCurrentLocationResolvesCachedStation() {

@@ -17,6 +17,10 @@ struct TideDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     @State private var timeline: TimelineData?
     @State private var chsFittedAt: Date?
+    /// The nearest current-series station inside `nearbyStationRadiusKm`, or
+    /// nil. Computed once on appear — a catalog scan has no place in a body
+    /// that re-evaluates on every scrub tick.
+    @State private var nearbyCurrent: (item: StationItem, km: Double)?
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
@@ -94,10 +98,15 @@ struct TideDetailView: View {
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { tl, jump in
-                                SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
-                                             eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
-                                             onJump: jump,
-                                             latitude: record.latitude, longitude: record.longitude)
+                                VStack(spacing: 12) {
+                                    SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: record.latitude, longitude: record.longitude)
+                                    if let nearby = nearbyCurrent {
+                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    }
+                                }
                             },
                             bottom: {
                                 VStack(spacing: 14) {
@@ -113,6 +122,11 @@ struct TideDetailView: View {
                 RecentsStore.shared.record(record.id)
                 if record.isChs {
                     chsFittedAt = ChsModelStore.load(record.id)?.fittedAt
+                }
+                if nearbyCurrent == nil,
+                   let n = StationItem.nearest(.current, toLat: record.latitude, lon: record.longitude),
+                   n.km <= nearbyStationRadiusKm {
+                    nearbyCurrent = n
                 }
             }
     }

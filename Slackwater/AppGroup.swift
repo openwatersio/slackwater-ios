@@ -36,6 +36,15 @@ enum AppGroup {
     static let recentsKey = "slackwater.recents"
     static let currentLocationStationKey = "slackwater.currentLocationStation"
     static let currentLocationStationID = "slackwater:current-location"
+    // The series-narrowed siblings of Current Location: synthetic picker
+    // entries that follow the fix but resolve to the nearest station OF THAT
+    // SERIES. Cached alongside the any-series id on every fix
+    // (LocationService.cacheNearestWidgetStation), resolved in
+    // WidgetStationLoader.resolvedStationID.
+    static let nearestTideStationKey = "slackwater.nearestTideStation"
+    static let nearestTideStationID = "slackwater:nearest-tide"
+    static let nearestCurrentStationKey = "slackwater.nearestCurrentStation"
+    static let nearestCurrentStationID = "slackwater:nearest-current"
     static let premiumKey = "slackwater.premium"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
 
