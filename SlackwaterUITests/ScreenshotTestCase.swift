@@ -382,11 +382,11 @@ class ScreenshotTestCase: XCTestCase {
     /// row resizing as async status text lands, a queue re-sorting mid-
     /// promotion) compares coordinates from two different layouts. That is
     /// how CI watched a Near Me reading 550pt away "share the name's line"
-    /// (PR #22, testM50RecentsNamesFit).
+    /// (PR #22, a since-retired Recents-layout test).
     ///
     /// Settling ONE element and then reading its counterparts live is the same
     /// bug with an extra step — the reflow lands in the gap between the settle
-    /// and the next read, which is how testM50RecentsNamesFit failed again on a
+    /// and the next read, which is how that same test failed again on a
     /// 3pt shift when the row's gap is only 2pt (PR #25). So read EVERY frame
     /// a comparison needs inside this closure: it re-reads them all together
     /// until two consecutive passes agree, and hands back that ONE layout.

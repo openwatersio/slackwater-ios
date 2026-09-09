@@ -189,7 +189,7 @@ struct OfflineManagerList: View {
     @Environment(\.openChsRoute) private var openChsRoute
     @State private var fetchingOnline: Set<String> = []
     @State private var failedOnline: Set<String> = []
-    // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
+    // Glyph-in-slot sizing (issue #14): the glyph
     // scales with type, the slot scales with it so it can't overflow the row.
 
     private var queue: ChsQueue { service.queue }

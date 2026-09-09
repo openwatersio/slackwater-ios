@@ -476,7 +476,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let now = app.buttons["detail-return-now"].firstMatch
         XCTAssert(now.waitForExistence(timeout: 5), "no return-to-now after scrubbing back")
         save(app, "history-before-now.png")
-        // One read, one layout (settled — see testM50RecentsNamesFit): the
+        // One read, one layout (settled — see `settled`'s doc in ScreenshotTestCase): the
         // strip is the ruler, since the pill lives inside its chrome row.
         let places = settled { [now.frame, strip.frame] }
         XCTAssert(places[0].midX > places[1].midX,
@@ -510,7 +510,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
         save(app, "now-pill-scrubbed.png")
         // Re-reading star/now/header/back live below would be racy (settled —
-        // see testM50RecentsNamesFit). One read, one layout, four snapshots.
+        // see `settled`'s doc in ScreenshotTestCase). One read, one layout, four snapshots.
         let header = app.otherElements["detail-header"].firstMatch
         let after = settled { [star.frame, now.frame, header.frame, back.frame] }
         let starAfter = after[0], nowFrame = after[1], headerFrame = after[2]

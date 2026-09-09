@@ -246,7 +246,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // ChsFitService is actively mutating row heights here (status text
         // flips as downloads progress) — read all three rows together and wait
         // the layout out, so the order check compares one layout (see
-        // testM50RecentsNamesFit / settled).
+        // `settled`'s doc in ScreenshotTestCase).
         let rowFrames = settled { [victoria.frame, race.frame, porlier.frame] }
         XCTAssert(rowFrames[0].minY < rowFrames[1].minY, "queue is not proximity-ordered")
         XCTAssert(rowFrames[1].minY < rowFrames[2].minY, "queue is not proximity-ordered")

@@ -34,7 +34,7 @@ struct StationChooserSheet: View {
     let anchor: (lat: Double, lon: Double)
     let onPick: (StationItem) -> Void
     @Environment(\.dismiss) private var dismiss
-    // Same glyph-in-slot sizing RecentRowLabel carries (issue #14): the glyph
+    // Glyph-in-slot sizing (issue #14): the glyph
     // scales with type, the slot scales with it so it can't overflow the row.
 
     var body: some View {
