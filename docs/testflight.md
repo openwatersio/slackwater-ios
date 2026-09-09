@@ -172,9 +172,32 @@ SLACKWATER_SIMS='SimA,SimB' ./scripts/test.sh      # run on other devices
 
 ### One test run at a time (2026-08-02)
 
-Concurrent local test runs can SIGKILL each other's runners, even on different simulator devices. `scripts/test.sh` takes the machine-wide `/tmp/slackwater-test.lock` and reports when it is waiting. The kernel releases the lock when its holder exits. CI uses ephemeral GitHub-hosted Macs and does not contend with local runs.
+Two `xcodebuild test` runs on this Mac SIGKILL each other's test runner: every UI
+test in the losing run reports `Test crashed with signal kill` with **zero
+assertion failures**. It reads as a real failure and is not one. If you see that
+signature, check whether something else was testing at the same time before you
+debug the code.
 
-`SLACKWATER_SIMS` selects the devices. UI modes save screenshots in `/tmp/slackwater-shots` unless `SHOT_DIR` overrides the path.
+Five runs died this way on 2026-08-02 — 3, 6 and 16 UI tests at a time — and the
+last of them had the two runs on *different simulator devices*, so device
+separation does not avoid it. The exact kill mechanism was never pinned down; the
+CoreSimulator logs had already rolled off. The correlation with overlap was 5 for 5.
+
+Those five were CI against a local run, from when the macOS lane was self-hosted on
+this Mac. CI is GitHub-hosted now (#327), so the overlap left to guard against is
+local against local — another worktree, another agent session — which this machine
+has more of than it ever had CI runs. `scripts/test.sh` takes a machine-wide
+`lockf(1)` lock and whoever arrives second waits; it prints a line when it's
+waiting. The lock lives in the kernel, so a killed or cancelled run releases it and
+nothing wedges.
+
+Two smaller pieces of the same story:
+
+- `SLACKWATER_SIMS` names the devices to run on, overriding the fast/full list
+  outright. CI passes the runner image's stock `iPhone 17` to keep the hosted lane
+  iPhone-only; locally it is how you run on a clean device instead of the base one.
+- Every run writes screenshots to `/tmp/slackwater-shots` unless `SHOT_DIR` says
+  otherwise, so two local runs overwrite each other's images.
 
 | Mode | Devices | Contents | Wall clock |
 |---|---|---|---|

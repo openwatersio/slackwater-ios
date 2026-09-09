@@ -30,15 +30,15 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         openSearch(app, "victoria")
         XCTAssert(app.descendants(matching: .any).matching(copy)
-            .firstMatch.waitForExistence(timeout: 10),
+            .firstMatch.appears(within: 10),
                   "the pending card's status strip is missing the plain-language copy")
         closeSearch(app)
 
         openSearch(app, "malibu")
-        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.appears(within: 5),
                   "search did not find Malibu Rapids")
         XCTAssert(app.descendants(matching: .any).matching(copy)
-            .firstMatch.waitForExistence(timeout: 10),
+            .firstMatch.appears(within: 10),
                   "derived gate must show the CHS pending register before its reference is fitted")
     }
 
@@ -63,7 +63,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // the time and nothing else — the one detail kind whose reading has no
         // number in it (spec §3).
         let lead = leadReading(app)
-        XCTAssert(lead.waitForExistence(timeout: 10),
+        XCTAssert(lead.appears(within: 10),
                   "seeded reference fit did not render the derived-gate detail")
         let leadLabel = lead.label
         XCTAssertNotNil(leadLabel.range(of: "flooding|ebbing|slack",
@@ -71,17 +71,17 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                         "the derived-gate lead must speak the phase word, got '\(leadLabel)'")
         XCTAssertFalse(leadLabel.contains("kn"),
                        "a derived gate publishes no speed: '\(leadLabel)'")
-        XCTAssert(app.staticTexts["9 kn flood & ebb"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["9 kn flood & ebb"].appears(within: 5),
                   "derived gate lost the magnitude context under its tiles")
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts["● SLACK"].firstMatch.appears(within: 5),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'speeds are not predicted'")).firstMatch.exists,
                   "the shape-only note is missing")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
-            .waitForExistence(timeout: 5),
+            .appears(within: 5),
                   "derived provenance footer missing")
 
         // The strip must actually DRAW its schematic curve, droplines and
@@ -89,7 +89,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // element, so ink coverage is what a test can see (the
         // testPickingADateMovesTheWindow precedent).
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 5), "derived-gate strip missing")
+        XCTAssert(strip.appears(within: 5), "derived-gate strip missing")
         let ink = inkFraction(strip)
         XCTAssert(ink > 0.05, "the derived-gate strip drew nothing — ink \(ink)")
         sleep(1)  // the header's offline tile floor; MLNMapView reports nothing
@@ -99,11 +99,11 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // home: the Now pill on the strip's chrome row.
         scrubStrip(app)
         let now = app.buttons["detail-return-now"].firstMatch
-        XCTAssert(now.waitForExistence(timeout: 5),
+        XCTAssert(now.appears(within: 5),
                   "scrubbing a derived gate revealed no return-to-now")
         XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
         now.tap()
-        XCTAssert(now.waitForNonExistence(timeout: 10),
+        XCTAssert(now.disappears(within: 10),
                   "return-to-now did not bring the derived-gate strip home")
     }
 
@@ -128,7 +128,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // its own element, so assert on what the user actually reads.
         let state = app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'CHARTS'")).firstMatch
-        XCTAssert(state.waitForExistence(timeout: 10),
+        XCTAssert(state.appears(within: 10),
                   "the downloads manager must say what state the map is in")
         save(app, "chart-packs-manager.png")
         XCTAssert(app.buttons["charts-refresh"].firstMatch.exists,
@@ -140,11 +140,11 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5),
                   "the indicator did not open the downloads manager")
 
         let victoria = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
-        XCTAssert(victoria.waitForExistence(timeout: 5), "Victoria is not in the download queue")
+        XCTAssert(victoria.appears(within: 5), "Victoria is not in the download queue")
         if !victoria.isHittable { app.swipeUp() }  // it should already be the first row
         XCTAssert(victoria.isHittable, "download-row-chs-victoria exists but never became hittable")
         victoria.tap()
@@ -157,7 +157,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // own list ranking independently of what got pushed (same trap
         // testOnlineGateUnfetchedShowsHonestyCard's header lookup dodges).
         let header = app.otherElements["detail-header"].firstMatch
-        XCTAssert(header.waitForExistence(timeout: 5),
+        XCTAssert(header.appears(within: 5),
                   "the row tap did not push a detail")
         XCTAssert(header.staticTexts["Victoria"].firstMatch.exists,
                   "the row tap opened the wrong station's detail")
@@ -198,10 +198,10 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
 
         let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
-        XCTAssert(row.waitForExistence(timeout: 5), "the seeded failed row is missing")
+        XCTAssert(row.appears(within: 5), "the seeded failed row is missing")
         if !row.isHittable { app.swipeUp() }
         XCTAssert(row.isHittable, "download-row-chs-victoria-harbour exists but never became hittable")
         // `.accessibilityElement(children: .combine)` on the row merges its
@@ -209,7 +209,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // confirmed live (`app.buttons["Retry"]` resolves as its own element,
         // separate from the row).
         let retry = row.buttons["Retry"].firstMatch
-        XCTAssert(retry.waitForExistence(timeout: 5), "seeded chs-victoria-harbour never shows the Retry button")
+        XCTAssert(retry.appears(within: 5), "seeded chs-victoria-harbour never shows the Retry button")
         if !retry.isHittable { app.swipeUp() }
         XCTAssert(retry.isHittable, "Retry button exists but never became hittable")
         retry.tap()
@@ -262,7 +262,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-fixLat", "42.3601", "-fixLon", "-71.0589")  // Boston
 
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5),
                   "the indicator did not open the downloads manager")
         save(app, "downloads-boston.png")
 
@@ -284,7 +284,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openSearch(app, "boston")
         pickSearchResult(app, app.staticTexts["Boston"].firstMatch)
 
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10),
+        XCTAssert(app.staticTexts["Today"].appears(within: 10),
                   "an east-coast station did not open a real detail")
         XCTAssert(app.staticTexts["MA"].firstMatch.exists,
                   "the region line fell back to the Salish gazetteer")
@@ -299,10 +299,10 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         // And the west coast, through the same path.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         openSearch(app, "san francisco")
         pickSearchResult(app, app.staticTexts["San Francisco (Golden Gate)"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Today"].appears(within: 10))
     }
 
     /// A Canadian station outside the auto-fit set: visible, searchable, and
@@ -313,7 +313,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         openSearch(app, "halifax")
         let halifax = app.staticTexts["Halifax"].firstMatch
-        XCTAssert(halifax.waitForExistence(timeout: 5),
+        XCTAssert(halifax.appears(within: 5),
                   "a Canadian station 4,400 km away must still be findable offline")
         // The words on the card, not the VoiceOver phrasing: this is the one
         // assertion about what a reader actually SEES on an unqueued station.
@@ -322,7 +322,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
 
-        XCTAssert(app.staticTexts["Waiting for signal"].waitForExistence(timeout: 8),
+        XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 8),
                   "opening an undownloaded Canadian station must explain itself")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists)
@@ -337,11 +337,11 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         // Opening it put it in the download set, at the front.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
         let row = app.descendants(matching: .any)["download-row-chs-halifax"].firstMatch
-        XCTAssert(row.waitForExistence(timeout: 5),
+        XCTAssert(row.appears(within: 5),
                   "opening a station outside the auto-fit set did not add it to the queue")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'searchable everywhere'")).firstMatch.exists,
@@ -375,7 +375,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openSearch(app, "skookumchuck")
         pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "the seeded window did not render the fetched strip")
         assertCurrentDetailRendered(app)
         let pill = commentaryPill(app)
@@ -386,12 +386,12 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                   "the commentary must name a current stop, got '\(pill.label)'")
 
         let provenance = app.staticTexts["online-provenance"].firstMatch
-        XCTAssert(provenance.waitForExistence(timeout: 5), "provenance footer missing")
+        XCTAssert(provenance.appears(within: 5), "provenance footer missing")
         XCTAssert(provenance.label.contains("CHS-published"),
                   "the fetched footer must say CHS-published — never claim an on-device computation")
 
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
-            .firstMatch.waitForExistence(timeout: 5), "today's schedule row missing")
+            .firstMatch.appears(within: 5), "today's schedule row missing")
 
         // No fitted-station provisional story belongs anywhere near this page.
         XCTAssertFalse(app.staticTexts.matching(
@@ -425,19 +425,19 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         openSearch(app, "skookumchuck")
         pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "the seeded window should render before we page off it")
 
         app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
         XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch
-            .waitForExistence(timeout: 5))
-        app.buttons["Next Month"].firstMatch.tap()
-        app.buttons["Next Month"].firstMatch.tap()   // two months out — past the 30-day window
-        app.collectionViews.buttons.element(boundBy: 10).tap()
+            .appears(within: 5))
+        stepMonth(app, "Next Month")
+        stepMonth(app, "Next Month")   // two months out — past the 30-day window
+        tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch
-            .waitForExistence(timeout: 5),
+            .appears(within: 5),
                   "an uncovered week offline must show the honesty card, never a dead strip")
         XCTAssertFalse(app.otherElements["timeline-strip"].exists,
                        "the strip must be GONE, not drawn flat over data nobody has")
@@ -447,17 +447,37 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
         XCTAssert(bar.exists, "the honesty card must keep the week-range bar")
         bar.tap()
-        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons["Previous Month"].firstMatch.tap()
-        app.buttons["Previous Month"].firstMatch.tap()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
+        // Target the STATION's day, not the cell the picker labels "Today".
+        // The seeded window is anchored on `todayLocal(gate.tz)` (TestSeeds) and
+        // the picker commits `startOfDay` in that same zone, but the "Today"
+        // label is the DEVICE's day. On a runner in UTC the two are different
+        // days from 00:00 UTC until Vancouver catches up; picking the device's
+        // day asks for a window anchored 24 h later, whose +180 h end falls one
+        // day past the seeded end, and the honesty card that follows is right.
+        // That is the whole of hosted-lane failure #331 in this test: it passed
+        // for seventeen hours a day and failed for seven.
+        let seededDay = DateFormatter()
+        seededDay.dateFormat = "EEEE, MMMM d"   // cell label shape, no year
+        seededDay.timeZone = TimeZone(identifier: "America/Vancouver")!  // Sechelt Rapids
+        let seededLabel = seededDay.string(from: Self.fixtureDate)  // -nowEpoch is the app's today
+        // CONTAINS, not ==: the cell for the device's own today is prefixed
+        // "Today, ", and on this machine that is the same cell.
         let seededCell = app.collectionViews.buttons.matching(
-            NSPredicate(format: "label CONTAINS %@", formatter.string(from: Self.fixtureDate))).firstMatch
-        XCTAssert(seededCell.waitForExistence(timeout: 2), "the seeded date is absent from the picker")
-        seededCell.tap()
+            NSPredicate(format: "label CONTAINS[c] %@", seededLabel)).firstMatch
+        // Step until it is on screen rather than a fixed two taps — when the
+        // station's day is in the previous month and the device's is not, two
+        // taps land a month short.
+        var monthsBack = 0
+        while !seededCell.appears(within: 1), monthsBack < 3 {
+            stepMonth(app, "Previous Month")
+            monthsBack += 1
+        }
+        XCTAssert(seededCell.exists,
+                  "the seeded day (\(seededLabel)) is not in the picker")
+        tapDay(seededCell)
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "back on the seeded week, the strip must render from disk — offline")
     }
 
@@ -475,7 +495,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         openSearch(app, "skookumchuck")
         pickSearchResult(app, app.staticTexts["Sechelt Rapids"].firstMatch)
 
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "today's block must survive the far seed's save (single-window: it did not)")
 
         // today+45d always lands inside the seeded far block
@@ -494,7 +514,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let targetLabel = targetLabelFormatter.string(from: target)
 
         app.descendants(matching: .any)["week-range-bar"].firstMatch.tap()
-        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
         let targetCell = app.collectionViews.buttons.matching(
             NSPredicate(format: "label == %@", targetLabel)).firstMatch
         // `.exists` is a no-wait snapshot; taken right after `.tap()` it races
@@ -506,16 +526,16 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // each check up to a second for the animation to settle, so a taken
         // tap can no longer be "lost" against an in-flight transition either.
         var monthsAdvanced = 0
-        while !targetCell.waitForExistence(timeout: 1), monthsAdvanced < 3 {
-            app.buttons["Next Month"].firstMatch.tap()
+        while !targetCell.appears(within: 1), monthsAdvanced < 3 {
+            stepMonth(app, "Next Month")
             monthsAdvanced += 1
         }
-        XCTAssert(targetCell.waitForExistence(timeout: 1),
+        XCTAssert(targetCell.appears(within: 1),
                   "today+45d cell (\(targetLabel)) not found within 3 months forward")
-        targetCell.tap()
+        tapDay(targetCell)
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "a far week the app holds on disk must render offline, not honesty-card")
         XCTAssertFalse(app.descendants(matching: .any)["online-honesty-card"].firstMatch.exists)
         let ink = inkFraction(app.otherElements["timeline-strip"].firstMatch)

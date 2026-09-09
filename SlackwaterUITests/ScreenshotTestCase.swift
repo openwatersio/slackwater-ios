@@ -62,7 +62,7 @@ class ScreenshotTestCase: XCTestCase {
                  timeout: TimeInterval = 10) -> Bool {
         let met = XCTNSPredicateExpectation(predicate: NSPredicate(format: condition),
                                             object: element)
-        return XCTWaiter().wait(for: [met], timeout: timeout) == .completed
+        return XCTWaiter().wait(for: [met], timeout: scaled(timeout)) == .completed
     }
 
     /// Search lives behind the bottom-left FAB. Opens it and types with
@@ -70,18 +70,18 @@ class ScreenshotTestCase: XCTestCase {
     /// focus, so every use doubles as the keyboard-up-immediately assertion.
     func openSearch(_ app: XCUIApplication, _ text: String) {
         let fab = app.buttons["Search"].firstMatch
-        XCTAssert(fab.waitForExistence(timeout: 10), "search FAB did not appear")
+        XCTAssert(fab.appears(within: 10), "search FAB did not appear")
         // retap if dropped — once search opens the FAB is a11y-hidden, so no double-fire
         let field = app.textFields.firstMatch
         var opened = false
         for _ in 0..<3 {
             if fab.exists, fab.isHittable { fab.tap() }
-            if field.waitForExistence(timeout: 5) { opened = true; break }
+            if field.appears(within: 5) { opened = true; break }
         }
         XCTAssert(opened, "search input did not appear")
         let focused = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hasKeyboardFocus == true"), object: field)
-        XCTAssert(XCTWaiter().wait(for: [focused], timeout: 10) == .completed,
+        XCTAssert(XCTWaiter().wait(for: [focused], timeout: scaled(10)) == .completed,
                   "search field did not take keyboard focus")
         field.typeText(text)
     }
@@ -94,7 +94,7 @@ class ScreenshotTestCase: XCTestCase {
     /// keystroke re-ranks the results) and die silently. Retapping cannot
     /// double-fire — once the overlay closes, the result card is gone.
     func pickSearchResult(_ app: XCUIApplication, _ result: XCUIElement) {
-        XCTAssert(result.waitForExistence(timeout: 10), "search result did not appear")
+        XCTAssert(result.appears(within: 10), "search result did not appear")
         let field = app.textFields.firstMatch
         for _ in 0..<3 {
             // `exists`, not `isHittable`: a result under the search bar reads
@@ -102,7 +102,7 @@ class ScreenshotTestCase: XCTestCase {
             // put the tide station fourth, under the bar). The guard is for a
             // result that vanished mid-refilter, and `exists` is that test.
             if result.exists { result.tap() }
-            if field.waitForNonExistence(timeout: 5) { return }
+            if field.disappears(within: 5) { return }
         }
         XCTFail("tap on a search result never closed the search overlay")
     }
@@ -110,7 +110,7 @@ class ScreenshotTestCase: XCTestCase {
     /// The X glass circle beside the bottom input.
     func closeSearch(_ app: XCUIApplication) {
         app.buttons["Close search"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
     }
 
     /// The list's own scroll container. `app.swipeUp()` gestures at the centre
@@ -158,7 +158,7 @@ class ScreenshotTestCase: XCTestCase {
     /// a window-normalized offset (dy 0.8) misses the strip on iPad.
     func scrubStrip(_ app: XCUIApplication) {
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 5), "timeline strip missing")
+        XCTAssert(strip.appears(within: 5), "timeline strip missing")
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
             .press(forDuration: 0.3, thenDragTo:
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
@@ -178,7 +178,7 @@ class ScreenshotTestCase: XCTestCase {
         // would otherwise leak it into the next test's "clean" device.
         app.launchArguments = testArguments(args)
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         return app
     }
 
@@ -186,7 +186,7 @@ class ScreenshotTestCase: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(args, live: true)
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         return app
     }
 
@@ -204,7 +204,7 @@ class ScreenshotTestCase: XCTestCase {
     func setUnits(_ app: XCUIApplication, _ label: String) {
         app.buttons["Settings"].tap()
         let segment = app.buttons[label]
-        XCTAssert(segment.waitForExistence(timeout: 5))
+        XCTAssert(segment.appears(within: 5))
         // The sheet's two fixed statements, asserted on the way past. Every
         // caller of this helper already has them on screen, so they are checked
         // here rather than in a test of its own with its own launch and its own
@@ -216,7 +216,7 @@ class ScreenshotTestCase: XCTestCase {
                   "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
     }
 
     /// Search "friday" via the FAB → tap the tide card → detail (the overlay
@@ -224,7 +224,7 @@ class ScreenshotTestCase: XCTestCase {
     func openFridayHarbor(_ app: XCUIApplication) {
         openSearch(app, "friday")
         pickSearchResult(app, app.staticTexts["Friday Harbor"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
     }
 
     /// The share of an element's pixels that differ from its most common
@@ -281,13 +281,13 @@ class ScreenshotTestCase: XCTestCase {
         // Top of the detail, under the status bar clearance — should be
         // hittable the moment the header renders, no scroll needed.
         let title = app.descendants(matching: .any)["detail-title"].firstMatch
-        XCTAssert(title.waitForExistence(timeout: 10), "detail-title missing")
+        XCTAssert(title.appears(within: 10), "detail-title missing")
         // bounded retap (see pickSearchResult); a landed tap pops the title with the detail
         let canvas = app.otherElements["map-canvas"].firstMatch
         var shown = false
         for _ in 0..<3 {
             if title.exists, title.isHittable { title.tap() }
-            if canvas.waitForExistence(timeout: 5) { shown = true; break }
+            if canvas.appears(within: 5) { shown = true; break }
         }
         XCTAssert(shown, "the title tap did not show the map")
         XCTAssertFalse(app.otherElements["detail-header"].exists,
@@ -354,13 +354,13 @@ class ScreenshotTestCase: XCTestCase {
     /// is what says "this page is a live current detail" rather than a pending
     /// or honesty card, and both are anatomy every current kind shares.
     func assertCurrentDetailRendered(_ app: XCUIApplication, timeout: TimeInterval = 10) {
-        XCTAssert(leadReading(app).waitForExistence(timeout: timeout),
+        XCTAssert(leadReading(app).appears(within: timeout),
                   "no lead reading on the current detail")
         // Case-insensitive: the tile's eyebrow combines a MonoLabel that
         // uppercases with an accessibility label that does not.
         XCTAssert(app.descendants(matching: .any)
             .matching(NSPredicate(format: "label ==[c] 'Next max'")).firstMatch
-            .waitForExistence(timeout: timeout),
+            .appears(within: timeout),
                   "no Next max tile on the current detail")
     }
 
@@ -425,11 +425,11 @@ class ScreenshotTestCase: XCTestCase {
     /// row resizing as async status text lands, a queue re-sorting mid-
     /// promotion) compares coordinates from two different layouts. That is
     /// how CI watched a Near Me reading 550pt away "share the name's line"
-    /// (PR #22, testM50RecentsNamesFit).
+    /// (PR #22, a since-retired Recents-layout test).
     ///
     /// Settling ONE element and then reading its counterparts live is the same
     /// bug with an extra step — the reflow lands in the gap between the settle
-    /// and the next read, which is how testM50RecentsNamesFit failed again on a
+    /// and the next read, which is how that same test failed again on a
     /// 3pt shift when the row's gap is only 2pt (PR #25). So read EVERY frame
     /// a comparison needs inside this closure: it re-reads them all together
     /// until two consecutive passes agree, and hands back that ONE layout.
@@ -451,6 +451,36 @@ class ScreenshotTestCase: XCTestCase {
     /// agreeing reads (`settled`) is the animation having stopped.
     func settleLayout(_ element: XCUIElement) { _ = settled { element.frame } }
 
+    /// Step the graphical DatePicker one month and wait for it to arrive.
+    ///
+    /// The month header is a Button labelled "Month" whose VALUE is the month
+    /// on screen ("September 2026") — the only thing in the picker that says
+    /// where the calendar actually is. Both months are in the tree mid-slide,
+    /// so a cell query taken before the header changes can match the OUTGOING
+    /// month and tap a date sliding off screen. The picker then commits the
+    /// date it already had, which reads downstream as "the tap was ignored"
+    /// and fails an assertion several lines later about something else.
+    ///
+    /// That is the hosted lane's one stable failure (#331): the same test, the
+    /// same line, on unrelated branches, passing on the Mac Studio every time.
+    func stepMonth(_ app: XCUIApplication, _ direction: String) {
+        let header = app.buttons["Month"].firstMatch
+        XCTAssert(header.appears(within: 5), "the picker has no month header")
+        let before = header.value as? String ?? ""
+        app.buttons[direction].firstMatch.tap()
+        XCTAssert(waitFor(header, "value != '\(before)'", timeout: 10),
+                  "\(direction) did not move the picker off \(before)")
+    }
+
+    /// Tap a day cell once the calendar has stopped moving under it. Hittable,
+    /// not merely existing: a cell mid-slide exists at a frame it is about to
+    /// leave, and the tap lands where it used to be.
+    func tapDay(_ cell: XCUIElement) {
+        XCTAssert(waitFor(cell, "exists == true AND isHittable == true", timeout: 10),
+                  "the day cell never came to rest")
+        cell.tap()
+    }
+
     /// The strip parked. A scrub's time lands in two steps — the scroll
     /// decelerates, then the magnet snaps to the nearest stop and writes
     /// `scrubTime` when ITS animation ends (TimelineStrip's scroll
@@ -466,7 +496,44 @@ class ScreenshotTestCase: XCTestCase {
         let button = app.buttons[label].firstMatch
         if button.exists { button.tap(); return }
         let text = app.staticTexts[label].firstMatch
-        XCTAssert(text.waitForExistence(timeout: 5), "amber action \"\(label)\" is not on screen")
+        XCTAssert(text.appears(within: 5), "amber action \"\(label)\" is not on screen")
         text.tap()
+    }
+}
+
+/// How much slower this machine is than the one the waits were written on.
+///
+/// Every timeout in this target was picked on the Mac Studio. A hosted CI
+/// runner measured 1.9–2.5× slower, and a five-second wait with seconds of
+/// slack there has none here: three runs of identical code failed three
+/// DIFFERENT tests, each on an early wait rather than at the end of a long one
+/// (#331). Nothing was wrong with those four waits in particular — the whole
+/// suite sits at the edge, so tuning the ones that lost would only move the
+/// failure. CI passes TEST_RUNNER_SLACKWATER_PERF_SCALE (the same knob the
+/// unit-test wall-clock budgets read); local runs stay at 1×.
+private let uiWaitScale = Double(ProcessInfo.processInfo.environment["SLACKWATER_PERF_SCALE"] ?? "1") ?? 1
+
+/// Widening is free where it matters: a wait that is met returns when it is
+/// met, so a passing run costs nothing whatever this returns. Only a genuine
+/// failure pays, which is why the scale is capped as an ADDITION rather than
+/// applied flat — the short race waits get their full multiple (5 s → 20 s at
+/// 4×), while the five- and eight-minute CHS fit waits, already sized with
+/// slack for real download-and-fit work, gain a minute instead of becoming a
+/// twenty-minute hang.
+private func scaled(_ timeout: TimeInterval) -> TimeInterval {
+    min(timeout * uiWaitScale, timeout + 60)
+}
+
+extension XCUIElement {
+    /// `waitForExistence`, on this machine's clock. See `uiWaitScale`.
+    @discardableResult
+    func appears(within timeout: TimeInterval) -> Bool {
+        waitForExistence(timeout: scaled(timeout))
+    }
+
+    /// `waitForNonExistence`, on this machine's clock. See `uiWaitScale`.
+    @discardableResult
+    func disappears(within timeout: TimeInterval) -> Bool {
+        waitForNonExistence(timeout: scaled(timeout))
     }
 }

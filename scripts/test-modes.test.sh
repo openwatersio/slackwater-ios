@@ -4,7 +4,8 @@ set -euo pipefail
 root=${0:A:h:h}
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
-mkdir -p "$scratch/repo/scripts" "$scratch/bin"
+mkdir -p "$scratch/repo/scripts" "$scratch/repo/Slackwater" "$scratch/repo/SlackwaterTests" "$scratch/repo/SlackwaterUITests" "$scratch/bin"
+touch "$scratch/repo/project.yml"  # the source-changed sweep at the end walks these
 cp "$root/scripts/test.sh" "$scratch/repo/scripts/test.sh"
 touch "$scratch/repo/scripts/iwls-fixtures.mjs"
 log="$scratch/calls"
@@ -21,6 +22,20 @@ exit 0
 STUB
   chmod +x "$scratch/bin/$tool"
 done
+
+# `xcrun simctl` is the script's own erased device (created fresh here, so the
+# udid is whatever `create` prints); `xcrun xcresulttool` is what the ran-nothing
+# guard reads. RAN_TESTS=0 simulates a shard whose selection matched no tests.
+cat > "$scratch/bin/xcrun" <<'STUB'
+#!/bin/zsh
+print -r -- "xcrun $*" >> "$CALL_LOG"
+case "$1 $2" in
+  "simctl create") print "SIM-${3// /_}" ;;
+  "xcresulttool get") print "{\"passedTests\": ${RAN_TESTS:-1}, \"failedTests\": 0}" ;;
+esac
+exit 0
+STUB
+chmod +x "$scratch/bin/xcrun"
 
 cat > "$scratch/bin/lockf" <<'STUB'
 #!/bin/zsh
@@ -43,7 +58,9 @@ assert_count() { [[ $(grep -c -- "$1" "$log") == "$2" ]] || { print -u2 -- "wron
 
 run_mode
 assert_has "node scripts/iwls-fixtures.mjs prepare"
-assert_has "name=iPhone 17"
+assert_has "xcrun simctl create Slackwater iPhone 17 iPhone 17"
+assert_has "xcrun simctl erase SIM-Slackwater_iPhone_17"
+assert_has "id=SIM-Slackwater_iPhone_17"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
 assert_has "-collect-test-diagnostics never"
@@ -55,7 +72,8 @@ assert_lacks "live=1"
 
 run_mode --full
 assert_count '^xcodebuild ' 2
-assert_has "name=iPad Pro 11-inch (M5)"
+assert_has "xcrun simctl create Slackwater iPad Pro 11-inch (M5) iPad Pro 11-inch (M5)"
+assert_has "id=SIM-Slackwater_iPad_Pro_11-inch_(M5)"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-collect-test-diagnostics on-failure"
 assert_lacks "NationalScaleTests"
@@ -77,6 +95,23 @@ assert_has "live=1 full="
 TEST_RUNNER_SLACKWATER_LIVE=1 TEST_RUNNER_SLACKWATER_FULL=1 run_mode
 assert_lacks "live=1"
 assert_lacks "full=1"
+
+# An explicit device is taken as given: addressed by name, never erased.
+SLACKWATER_SIMS='Mine' run_mode
+assert_has "name=Mine"
+assert_lacks "simctl erase"
+assert_lacks "simctl create"
+
+# CI's shard variables reach xcodebuild; a shard that ran nothing fails.
+SLACKWATER_ONLY='A/B,C/D' SLACKWATER_SKIP='E/F' run_mode
+assert_has "-only-testing:A/B -only-testing:C/D -skip-testing:E/F"
+: > "$log"
+if PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 RAN_TESTS=0 \
+    zsh "$scratch/repo/scripts/test.sh" >/dev/null 2>&1; then
+  print -u2 -- "runner reported green after running no tests"
+  exit 1
+fi
+assert_has "xcodebuild test"
 
 for args in '--wat' '--full --live'; do
   : > "$log"

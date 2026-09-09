@@ -16,11 +16,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, token) = fixture("hold-first", "chs-victoria", fix: ("48.4235", "-123.3705"))
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
-        XCTAssert(pending.waitForExistence(timeout: 10))
+        XCTAssert(pending.appears(within: 10))
         releaseFixture(token, "chs-victoria-first-chunk")
-        XCTAssert(pending.waitForNonExistence(timeout: 30), "fixture tide fit never landed")
+        XCTAssert(pending.disappears(within: 30), "fixture tide fit never landed")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
         )).firstMatch.exists)
@@ -30,7 +30,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.launch()
         openSearch(app, "victoria")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
@@ -43,7 +43,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let fitted = app.scrollViews.firstMatch.staticTexts.matching(NSPredicate(
             format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'"
         )).firstMatch
-        XCTAssert(fitted.waitForExistence(timeout: 30))
+        XCTAssert(fitted.appears(within: 30))
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch.exists)
         pickSearchResult(app, app.staticTexts["Active Pass"].firstMatch)
@@ -62,7 +62,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "dodd")
         let badge = app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
-        XCTAssert(badge.waitForExistence(timeout: 30))
+        XCTAssert(badge.appears(within: 30))
         XCTAssert(badge.label.contains("±35 min"))
         let tildeReading = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS '~'")).firstMatch
@@ -73,7 +73,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let warning = app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'"
         )).firstMatch
-        XCTAssert(warning.waitForExistence(timeout: 5))
+        XCTAssert(warning.appears(within: 5))
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'Stay connected'"
         )).firstMatch.exists)
@@ -81,7 +81,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             format: "label CONTAINS '60 of 210 days downloaded'"
         )).firstMatch.exists)
         releaseFixture(token, "after-provisional")
-        XCTAssert(warning.waitForNonExistence(timeout: 30))
+        XCTAssert(warning.disappears(within: 30))
         assertCurrentDetailRendered(app)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'computed on this device'"
@@ -105,7 +105,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
                                    fix: ("49.1344", "-123.8171"))
         app.buttons["offline-status"].firstMatch.tap()
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(dodd.waitForExistence(timeout: 10))
+        XCTAssert(dodd.appears(within: 10))
         XCTAssert(dodd.label.contains("Downloading"))
         app.buttons["Done"].tap()
         openSearch(app, "tofino")
@@ -129,7 +129,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, _) = fixture("hold-first", "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
                                fix: ("48.4235", "-123.3705"))
         let indicator = app.buttons["offline-status"].firstMatch
-        XCTAssert(indicator.waitForExistence(timeout: 5))
+        XCTAssert(indicator.appears(within: 5))
         waitFor(indicator, "value BEGINSWITH 'Downloading'", timeout: 10)
         let gear = app.buttons["Settings"].firstMatch
         XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1)
@@ -139,7 +139,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
         let porlier = rows["download-row-chs-porlier-pass"].firstMatch
-        XCTAssert(victoria.waitForExistence(timeout: 5))
+        XCTAssert(victoria.appears(within: 5))
         let ordered = settled { [victoria.frame, race.frame, porlier.frame] }
         XCTAssert(ordered[0].minY < ordered[1].minY && ordered[1].minY < ordered[2].minY)
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists)
@@ -148,11 +148,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Weynton Passage"].firstMatch)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'first in line'"
-        )).firstMatch.waitForExistence(timeout: 5))
+        )).firstMatch.appears(within: 5))
         app.buttons["detail-back"].firstMatch.tap()
         app.buttons["offline-status"].firstMatch.tap()
         let promoted = rows["download-row-chs-weynton-passage"].firstMatch
-        XCTAssert(promoted.waitForExistence(timeout: 5))
+        XCTAssert(promoted.appears(within: 5))
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists)
         let promotedOrder = settled { [promoted.frame, porlier.frame] }
         XCTAssert(promotedOrder[0].minY < promotedOrder[1].minY)
@@ -162,9 +162,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, token) = fixture("hold-first", "chs-halifax")
         openSearch(app, "halifax")
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
-        XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
         releaseFixture(token, "chs-halifax-first-chunk")
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 30))
+        XCTAssert(app.staticTexts["Today"].appears(within: 30))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
     }
 
@@ -182,7 +182,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
                          "-seedCurrentProvisional", "-fixLat", "49.1344", "-fixLon", "-123.8171")
         app.buttons["offline-status"].firstMatch.tap()
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(row.waitForExistence(timeout: 10))
+        XCTAssert(row.appears(within: 10))
         XCTAssert(row.label.contains("Refining"))
         XCTAssert(row.label.contains("FAST ANSWER ±35 MIN"))
     }

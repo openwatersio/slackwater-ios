@@ -139,15 +139,39 @@ jobs:
         run: node --test
 
   app:
-    name: App tests
+    name: App tests · ${{ matrix.shard.name }}
     needs: changes
-    # `&& false` disables the lane while the repo is private: GitHub-hosted
-    # macOS bills at 10x there, and the fast lane is ~15 min of wall clock —
-    # about 150 billable minutes per run. Once the repo is public, hosted
-    # runners are free: delete that one line and the lane runs.
-    if: >-
-      needs.changes.outputs.app == 'true'
+    if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
+    # Four shards, because one lane was 42 minutes and feedback that slow is
+    # feedback nobody waits for. Measured on run 34318099667: 2053 s of tests
+    # behind a 521 s build, so the build — repeated per shard, in parallel and
+    # free on a public repo — is the floor and four shards sit just above it.
+    #
+    # Balanced on the RUNNER's numbers, which are not this Mac's: OfflineCoverage
+    # is 563 s here and DetailAndScrub 447 s, while on the Studio that order is
+    # reversed. Rebalance from a `test-evidence` bundle, never from a local run.
+    #
+    #   offline  563 s   map  538 s   detail  447 s   rest  ~471 s
+    #
+    # Expect ~18 minutes, set by the longest shard plus the build.
+    strategy:
+      # A failing shard must not cancel its siblings. The whole point is to see
+      # every failure in one run rather than the first one and then wait again.
+      fail-fast: false
+      matrix:
+        shard:
+          - name: offline
+            only: SlackwaterUITests/OfflineCoverageTests
+          - name: map
+            only: SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests
+          - name: detail
+            only: SlackwaterUITests/DetailAndScrubTests
+          # The catch-all names no tests — it SKIPS the other three. A class
+          # added tomorrow therefore runs here, instead of running nowhere and
+          # looking green. Never convert this one to `only`.
+          - name: rest
+            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/DetailAndScrubTests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -175,26 +199,47 @@ jobs:
       # explicit `scripts/test.sh --live` smoke. SLACKWATER_SIMS must name ONE
       # device — it overrides the script's fast/full device list outright.
       #
+      # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
+      # wake it: it reports an EMPTY device list — placeholder destinations
+      # only — and exits 70 on "Unable to find a device matching iPhone 17".
+      # Listing the devices first starts the service, and the run below then
+      # finds them. actions/runner-images#13459 collects the same one-liner in
+      # front of `-downloadPlatform`, which fails the same way for the same
+      # reason.
+      #
+      # This reads like a version problem and is not one. Apple ships no iOS
+      # 26.6 simulator runtime at all, so the image's Xcode 26.6 against its
+      # 26.5 runtime is the ordinary pairing — the same one every developer
+      # here runs locally. Pinning DEVELOPER_DIR to 26.5 also turns the lane
+      # green, which is what makes this worth writing down: it works only
+      # because switching Xcode re-enumerates the devices, so it treats the
+      # symptom and leaves a version to maintain forever.
+      - run: xcrun simctl list > /dev/null
+
       # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
       # image's default Xcode ever drifts from what the project needs, pin
       # DEVELOPER_DIR here.
-      # SLACKWATER_PERF_SCALE widens the wall-clock test budgets, which were
-      # calibrated on the Mac Studio. The first hosted run measured 1.9–2.5×
-      # slower; 4× absorbs pool variance while a real 2×+ regression on top of
-      # that still trips.
+      # SLACKWATER_PERF_SCALE widens two things calibrated on the Mac Studio:
+      # the unit tests' wall-clock budgets, and every wait in the UI target
+      # (ScreenshotTestCase's `uiWaitScale`). The first hosted run measured
+      # 1.9–2.5× slower; 4× absorbs pool variance while a real 2×+ regression
+      # on top of that still trips. Without it on the waits, three runs of
+      # identical code failed three different UI tests — see #331.
       - run: ./scripts/test.sh
         env:
           SLACKWATER_SIMS: iPhone 17
           SLACKWATER_WORKERS: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
+          SLACKWATER_ONLY: ${{ matrix.shard.only }}
+          SLACKWATER_SKIP: ${{ matrix.shard.skip }}
 
       # There is no runner to ssh into, so the evidence has to travel.
       - name: Upload screenshots and results on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-evidence
+          name: test-evidence-${{ matrix.shard.name }}
           path: |
             /tmp/slackwater-shots
             build/*.xcresult
