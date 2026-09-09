@@ -357,11 +357,22 @@ final class ScrollGate {
         calendar = cal
         // The gate flips from a scroll delegate — main thread, but not a
         // MainActor context the compiler can see.
+        //
+        // The publish is DEFERRED to the next turn of the run loop. The gate
+        // is also synced from inside `updateUIView`, so a strip that comes to
+        // rest during a SwiftUI update would otherwise publish a new timeline
+        // in the middle of the pass that is reading it — "Modifying state
+        // during view update", which SwiftUI calls undefined behavior and
+        // which showed up as a strip that never appeared. The centering code
+        // in `TimelineScrubber` avoids the same trap the same way.
         gate.onQuiet = { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.pendingPublish else { return }
                 self.pendingPublish = false
-                self.publishAround(self.lastFocus)
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    publishAround(lastFocus)
+                }
             }
         }
     }

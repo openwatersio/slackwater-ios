@@ -1343,6 +1343,14 @@ struct TimelineScrubber: UIViewRepresentable {
             centerIfNeeded(sv)
             reanchorIfResized(sv)
             publishCenter(sv)
+            // The viewport's width arrives HERE and nowhere else. `updateUIView`
+            // runs first with zero bounds, where `mountedTiles` can only answer
+            // "none", and a strip that then never scrolls — a picked week that
+            // lands on the offset it already had — would keep that empty canvas:
+            // a scroll view of the right size hosting nothing, which is a blank
+            // chart under a correct readout. Cheap to repeat, since it returns
+            // on an unchanged key.
+            refreshCanvas(sv)
         }
 
         /// Rotation (iPad portrait ↔ landscape, Stage Manager) keeps
@@ -1527,6 +1535,15 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          jumpToken: jumpToken, scrollGate: scrollGate)
             .frame(height: geo.height)
+            // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
+            // the latter reports the first width from inside the update pass,
+            // and writing the caller's state there is "Modifying state during
+            // view update" — which SwiftUI calls undefined behavior and which
+            // showed up in the result bundles as a runtime warning. This API
+            // exists to hand geometry back without that.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                onViewportWidth?(width)
+            }
             .overlay { overlay }
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
@@ -1615,7 +1632,6 @@ struct TimelineScrubStrip: View {
                 }
             }
             .allowsHitTesting(false)
-            .onChange(of: w, initial: true) { _, width in onViewportWidth?(width) }
         }
     }
 }
