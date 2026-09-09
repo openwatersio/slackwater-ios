@@ -166,6 +166,23 @@ jobs:
       # iPad leg. SLACKWATER_SIMS must name ONE device — it overrides the
       # script's fast/full device list outright.
       #
+      # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
+      # wake it: it reports an EMPTY device list — placeholder destinations
+      # only — and exits 70 on "Unable to find a device matching iPhone 17".
+      # Listing the devices first starts the service, and the run below then
+      # finds them. actions/runner-images#13459 collects the same one-liner in
+      # front of `-downloadPlatform`, which fails the same way for the same
+      # reason.
+      #
+      # This reads like a version problem and is not one. Apple ships no iOS
+      # 26.6 simulator runtime at all, so the image's Xcode 26.6 against its
+      # 26.5 runtime is the ordinary pairing — the same one every developer
+      # here runs locally. Pinning DEVELOPER_DIR to 26.5 also turns the lane
+      # green, which is what makes this worth writing down: it works only
+      # because switching Xcode re-enumerates the devices, so it treats the
+      # symptom and leaves a version to maintain forever.
+      - run: xcrun simctl list > /dev/null
+
       # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
       # image's default Xcode ever drifts from what the project needs, pin
