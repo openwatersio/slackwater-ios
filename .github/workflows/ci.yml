@@ -211,10 +211,12 @@ jobs:
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
       # image's default Xcode ever drifts from what the project needs, pin
       # DEVELOPER_DIR here.
-      # SLACKWATER_PERF_SCALE widens the wall-clock test budgets, which were
-      # calibrated on the Mac Studio. The first hosted run measured 1.9–2.5×
-      # slower; 4× absorbs pool variance while a real 2×+ regression on top of
-      # that still trips.
+      # SLACKWATER_PERF_SCALE widens two things calibrated on the Mac Studio:
+      # the unit tests' wall-clock budgets, and every wait in the UI target
+      # (ScreenshotTestCase's `uiWaitScale`). The first hosted run measured
+      # 1.9–2.5× slower; 4× absorbs pool variance while a real 2×+ regression
+      # on top of that still trips. Without it on the waits, three runs of
+      # identical code failed three different UI tests — see #331.
       - run: ./scripts/test.sh
         env:
           SLACKWATER_SIMS: iPhone 17

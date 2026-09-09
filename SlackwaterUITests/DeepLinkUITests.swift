@@ -23,7 +23,7 @@ final class DeepLinkUITests: XCTestCase {
         XCUIDevice.shared.system.open(url)
         let confirm = XCUIApplication(bundleIdentifier: "com.apple.springboard")
             .buttons["Open"].firstMatch
-        if confirm.waitForExistence(timeout: 5) { confirm.tap() }
+        if confirm.appears(within: 5) { confirm.tap() }
     }
 
     /// A cold launch: the app has to be gone, or the URL arrives at an already
@@ -32,7 +32,7 @@ final class DeepLinkUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = args + ["-noCloudSync", "-currentFillOff"]
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10),
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10),
                   "app did not finish launching before the deep link")
         app.terminate()
         return app
@@ -41,8 +41,8 @@ final class DeepLinkUITests: XCTestCase {
     private func assertStationDetail(_ app: XCUIApplication, _ message: String) {
         XCTAssert(app.wait(for: .runningForeground, timeout: 20),
                   "the deep link did not launch the app")
-        XCTAssert(app.buttons["detail-back"].firstMatch.waitForExistence(timeout: 20), message)
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.buttons["detail-back"].firstMatch.appears(within: 20), message)
+        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5),
                   "\(message) — landed on a detail, but not this station's")
     }
 

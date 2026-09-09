@@ -25,7 +25,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // Victoria is pending (or already mid-fit): identity + honest message, no numbers.
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
-        XCTAssert(pending.waitForExistence(timeout: 10))
+        XCTAssert(pending.appears(within: 10))
 
         // Live IWLS fetch (10 polite requests) + JSCore fit. The card becomes
         // a navigable tide card when the model lands — it stops being copy and
@@ -42,29 +42,29 @@ final class LiveFetchTests: ScreenshotTestCase {
         // assertions down.
         // The pending card carrying Victoria's own id is the unambiguous signal:
         // it exists while the fit is outstanding and goes away when it lands.
-        XCTAssert(pending.waitForNonExistence(timeout: 300), "Victoria never fitted — IWLS unreachable?")
+        XCTAssert(pending.disappears(within: 300), "Victoria never fitted — IWLS unreachable?")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
         // The provenance marking (device-computed vs authoritative-harmonic).
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 5))
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.appears(within: 5))
 
         // Airplane-mode day-after: relaunch offline, clock shifted to tomorrow.
         app.terminate()
         app.launchArguments = ["-networkKillSwitch", "-nowOffsetDays", "1", "-seedGate"]
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         openSearch(app, "victoria")
         // Victoria-scoped for the same reason as the online leg above: a stored
         // model means the card is never pending again, and an unscoped
         // Rising/Falling would happily match the list behind the overlay.
         let offlinePending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
-        XCTAssertFalse(offlinePending.waitForExistence(timeout: 3),
+        XCTAssertFalse(offlinePending.appears(within: 3),
                        "stored model did not survive relaunch — Victoria is pending again")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.waitForExistence(timeout: 5)
-                  || app.staticTexts["⤓ LOW"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.appears(within: 5)
+                  || app.staticTexts["⤓ LOW"].firstMatch.appears(within: 5))
     }
 
     // A validated CHS current gate (Dodd Narrows) — pending copy in the
@@ -80,12 +80,12 @@ final class LiveFetchTests: ScreenshotTestCase {
         // also pulls NOAA current cards whose Flooding/Ebbing/SLACK labels
         // false-positive the fitted wait below.
         openSearch(app, "dodd")
-        XCTAssert(app.staticTexts["Dodd Narrows"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Dodd Narrows"].firstMatch.appears(within: 5),
                   "search did not find Dodd Narrows")
         // Pending: identity + the honest currents message, no numbers. By id —
         // the copy alone matches every undownloaded station.
         let pending = app.descendants(matching: .any)["chs-pending-chs-dodd-narrows"].firstMatch
-        XCTAssert(pending.waitForExistence(timeout: 10), "currents pending copy missing")
+        XCTAssert(pending.appears(within: 10), "currents pending copy missing")
 
         // The live fit lands and the card becomes a real current card:
         // a velocity phase word or the SLACK pill — numbers, not copy.
@@ -94,7 +94,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         let overlay = app.scrollViews.firstMatch
         let fitted = overlay.staticTexts.matching(
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
-        XCTAssert(fitted.waitForExistence(timeout: 480), "Dodd Narrows never fitted — IWLS unreachable?")
+        XCTAssert(fitted.appears(within: 480), "Dodd Narrows never fitted — IWLS unreachable?")
 
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         // Full current-detail anatomy: the slack countdown and the CHS
@@ -104,17 +104,17 @@ final class LiveFetchTests: ScreenshotTestCase {
         // it (the fast answer's own footer says "60 of 210 days downloaded").
         assertCurrentDetailRendered(app)
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.waitForExistence(timeout: 300))
+            NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.appears(within: 300))
 
         // Airplane-mode day-after: the stored model predicts offline.
         app.terminate()
         app.launchArguments = ["-networkKillSwitch", "-nowOffsetDays", "1", "-seedGate"]
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
         openSearch(app, "dodd")
         let offlineFitted = app.scrollViews.firstMatch.staticTexts.matching(
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
-        XCTAssert(offlineFitted.waitForExistence(timeout: 10), "stored current model did not survive relaunch")
+        XCTAssert(offlineFitted.appears(within: 10), "stored current model did not survive relaunch")
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         assertCurrentDetailRendered(app)
     }
@@ -139,26 +139,26 @@ final class LiveFetchTests: ScreenshotTestCase {
         // page fills in live with no second tap and no back-and-forth.
         openSearch(app, "malibu")
         pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
-        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Malibu Rapids"].firstMatch.appears(within: 5),
                   "tapping the gate did not open a detail")
         // ~5 min ceiling: the in-flight station finishes, then the promoted
         // Point Atkinson runs.
         // A derived gate has no speed to lead with, so the lead itself — the
         // phase word over the time — is the page filling in.
-        XCTAssert(leadReading(app).waitForExistence(timeout: 300),
+        XCTAssert(leadReading(app).appears(within: 300),
                   "the open detail never filled in — Point Atkinson fit missing (IWLS unreachable?)")
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.descendants(matching: .any).matching(identifier: "tide-at-port")
-            .firstMatch.waitForExistence(timeout: 5),
+            .firstMatch.appears(within: 5),
                   "derived gate must link to its reference port")
-        XCTAssert(app.staticTexts["● SLACK"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["● SLACK"].firstMatch.appears(within: 5),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'speeds are not predicted'")).firstMatch.exists,
                   "the shape-only note is missing")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
-            .waitForExistence(timeout: 5),
+            .appears(within: 5),
                   "derived provenance footer missing")
         // No knots anywhere: a derived gate never shows a speed. iPhone only —
         // the iPad split keeps the sidebar (and its NOAA "kn" cards) on screen
@@ -176,10 +176,10 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         // The live card (PA fitted now): "Slack · time" line + the phase pill.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         openSearch(app, "malibu")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Slack ·'")).firstMatch.waitForExistence(timeout: 5),
+            NSPredicate(format: "label BEGINSWITH 'Slack ·'")).firstMatch.appears(within: 5),
                   "live gate card missing its next-slack line")
         closeSearch(app)
 
@@ -187,7 +187,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // Salish camera toward Jervis Inlet so the pin is on screen.
         app.buttons["Map"].tap()
         let map = app.otherElements["map-canvas"].firstMatch
-        XCTAssert(map.waitForExistence(timeout: 5))
+        XCTAssert(map.appears(within: 5))
         sleep(4)  // tiles: MLNMapView surfaces no load state to XCUITest
         // Malibu (50.16, -123.85) sits north-west of the camera — drag the
         // map content south-east to bring the pin into the frame's middle
@@ -216,7 +216,7 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         // The indicator sits beside the gear, on the same line.
         let indicator = app.buttons["offline-status"].firstMatch
-        XCTAssert(indicator.waitForExistence(timeout: 5), "no download indicator beside the gear")
+        XCTAssert(indicator.appears(within: 5), "no download indicator beside the gear")
         let gear = app.buttons["Settings"].firstMatch
         XCTAssert(gear.exists)
         XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1, "indicator must sit beside the gear")
@@ -227,11 +227,11 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         // Tapping it opens the manager directly (not Settings).
         indicator.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5),
                   "the indicator did not open the downloads manager")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Downloading Canadian tidal and current predictions'"))
-            .firstMatch.waitForExistence(timeout: 5),
+            .firstMatch.appears(within: 5),
                   "manager is missing the plain-register progress line")
 
         // Proximity order from the Victoria fix: Victoria, then Race Passage
@@ -242,7 +242,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
         let porlier = rows["download-row-chs-porlier-pass"].firstMatch
-        XCTAssert(victoria.waitForExistence(timeout: 5), "no per-station rows in the manager")
+        XCTAssert(victoria.appears(within: 5), "no per-station rows in the manager")
         // ChsFitService is actively mutating row heights here (status text
         // flips as downloads progress) — read all three rows together and wait
         // the layout out, so the order check compares one layout (see
@@ -253,7 +253,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists,
                        "the manager is listing the catalog again, not the download set")
         app.buttons["Done"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
 
         // No dead taps: the farthest station in the catalogue is last in
         // the queue and has nothing to show — tapping it still opens a detail,
@@ -262,7 +262,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Weynton Passage"].firstMatch)
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label == 'Waiting' OR label == 'Downloading…'"
-        )).firstMatch.waitForExistence(timeout: 5),
+        )).firstMatch.appears(within: 5),
                   "a queued station must expose its live queue state")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Canadian current predictions'")).firstMatch.exists,
@@ -277,11 +277,11 @@ final class LiveFetchTests: ScreenshotTestCase {
         // And the promotion is visible in the manager: the station you opened
         // is at the top, badged, ahead of the nearer ones.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
         let promoted = app.descendants(matching: .any)["download-row-chs-weynton-passage"].firstMatch
-        XCTAssert(promoted.waitForExistence(timeout: 5))
+        XCTAssert(promoted.appears(within: 5))
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists,  // MonoLabel uppercases
                   "the promoted station is not marked in the manager")
         let stillQueued = app.descendants(matching: .any)["download-row-chs-porlier-pass"].firstMatch
@@ -304,9 +304,9 @@ final class LiveFetchTests: ScreenshotTestCase {
         // By station id, not by copy. Every undownloaded Canadian station
         // says "Canadian tidal predictions", and "victoria" matches several.
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
-        XCTAssert(pending.waitForExistence(timeout: 15), "no CHS Victoria card in the results")
+        XCTAssert(pending.appears(within: 15), "no CHS Victoria card in the results")
         // timed below: wait on the card itself, not a poll grid that lands in the number
-        _ = pending.waitForNonExistence(timeout: 240)
+        _ = pending.disappears(within: 240)
         XCTAssertFalse(pending.exists, "Victoria never fitted — IWLS unreachable?")
         report("nearest tide port (60 d)", t0)
         XCTAssert(app.scrollViews.firstMatch.staticTexts.matching(
@@ -326,7 +326,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         let overlay = app.scrollViews.firstMatch
         let fitted = overlay.staticTexts.matching(
             NSPredicate(format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'")).firstMatch
-        XCTAssert(fitted.waitForExistence(timeout: 240), "Active Pass never fitted — IWLS unreachable?")
+        XCTAssert(fitted.appears(within: 240), "Active Pass never fitted — IWLS unreachable?")
         report("nearest 60-day gate → FINAL", t0)
 
         XCTAssertFalse(app.staticTexts.matching(
@@ -359,7 +359,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         // the detail.
         let badge = app.staticTexts.matching(
             NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
-        XCTAssert(badge.waitForExistence(timeout: 240),
+        XCTAssert(badge.appears(within: 240),
                   "Dodd Narrows never published its 60-day fast answer")
         XCTAssert(badge.label.contains("±35 min"),
                   "the strip must carry THIS pass's measured tolerance, not a generic hedge")
@@ -383,7 +383,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         let warning = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'")).firstMatch
-        XCTAssert(warning.waitForExistence(timeout: 10),
+        XCTAssert(warning.appears(within: 10),
                   "the provisional detail is missing its warning, naming THIS pass's measured error")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'Stay connected'")).firstMatch.exists,
@@ -393,7 +393,7 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "the footer must say how much of the model is actually here")
 
         // The refinement lands under the open page: same station, final model.
-        _ = warning.waitForNonExistence(timeout: 300)
+        _ = warning.disappears(within: 300)
         XCTAssertFalse(warning.exists, "the fast answer never refined to the full model")
         report("nearest 210-day gate → FINAL", t0)
         assertCurrentDetailRendered(app)  // the refined page is still a live detail
@@ -410,9 +410,9 @@ final class LiveFetchTests: ScreenshotTestCase {
                          "-chsFitOnly", "chs-dodd-narrows,chs-victoria,chs-active-pass",
                          "-fixLat", "49.1344", "-fixLon", "-123.8171")  // at Dodd
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(dodd.waitForExistence(timeout: 10))
+        XCTAssert(dodd.appears(within: 10))
         waitFor(dodd, "label CONTAINS 'Refining'", timeout: 300)
         XCTAssert(dodd.label.contains("Refining"),
                   "the manager never showed the usable-but-unfinished state")
@@ -433,22 +433,22 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         // Dodd (210 d, ~2.5 min of chunks) is in flight.
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(dodd.waitForExistence(timeout: 10))
+        XCTAssert(dodd.appears(within: 10))
         XCTAssert(dodd.label.contains("Downloading"), "the nearest gate should be the one in flight")
         app.buttons["Done"].tap()
 
         // Open the far tide port — the promotion the queue has to honour NOW.
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
-        XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
         let t0 = Date()
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
 
         // Within one chunk (2.5 s of pacing, plus the round trip), the gate has
         // stepped aside and the station you opened is downloading. Idle that is
@@ -492,12 +492,12 @@ final class LiveFetchTests: ScreenshotTestCase {
         // queryable, so `staticTexts["Halifax"].firstMatch` can resolve to
         // the hidden one.
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
-        XCTAssert(app.staticTexts["Downloading…"].waitForExistence(timeout: 20))
+        XCTAssert(app.staticTexts["Downloading…"].appears(within: 20))
 
         // Promotion yields the running auto-fit job at its next chunk (~2.5 s),
         // then one 60-day tide fit: ~30 s of paced requests.
         let start = Date.now
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 180),
+        XCTAssert(app.staticTexts["Today"].appears(within: 180),
                   "an opened Canadian station never fitted")
         print(String(format: "M53 on-demand fit of Halifax: %.0f s", Date.now.timeIntervalSince(start)))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty,
@@ -525,10 +525,10 @@ final class LiveFetchTests: ScreenshotTestCase {
 
         // Generous ceiling: a live IWLS fetch, not a seeded window.
         let provenance = app.staticTexts["online-provenance"].firstMatch
-        XCTAssert(provenance.waitForExistence(timeout: 300),
+        XCTAssert(provenance.appears(within: 300),
                   "Sechelt never fetched — check whether IWLS resolves/serves this gate")
 
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "the live fetch did not render the strip")
         XCTAssert(provenance.label.contains("CHS-published"),
                   "the fetched footer must say CHS-published — never claim an on-device computation")
