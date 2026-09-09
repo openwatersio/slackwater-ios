@@ -13,13 +13,18 @@ struct DerivedGateDetailView: View {
 
     @State private var live = appNow()
     @State private var scrubTime = Timeline.introStart(for: appNow())
-    @State private var timeline: TimelineData?
-    /// The local midnight the window hangs from. Only `returnToNow` and (in
-    /// Plan B) the range bar move it; everything else reads it.
+    /// Chunk cache + merged window (TimelineChunks.swift). The schematic ±1
+    /// shape needs no governed scale — its fit never moves.
+    @State private var store: TimelineWindowStore?
+    /// The local midnight the schedule week hangs from. `returnToNow`, the
+    /// picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
+    @State private var viewportPts: CGFloat = 0
     /// The strip window's slacks with their HW/LW origin (the phase call needs
     /// the flags; timeline.currentEvents carries only times).
     @State private var slacks: [DerivedSlackEvent] = []
+
+    private var timeline: TimelineData? { store?.timeline }
 
     private var gate: ChsGateInfo { record.gate }
     private var port: TideStationRecord { record.port }
@@ -36,7 +41,10 @@ struct DerivedGateDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { _ in rebuild() },
+                            onPicked: { picked in
+                                store?.jump(to: scrubTime, anchor: picked)
+                                refreshSlacks()
+                            },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
@@ -48,7 +56,9 @@ struct DerivedGateDetailView: View {
                                                    commentary: slack.map {
                                                        commentaryText("Slack", at: $0.time, from: scrubTime, now: live)
                                                    },
-                                                   onCommentary: { if let slack { scrubTime = slack.time } })
+                                                   onCommentary: { if let slack { scrubTime = slack.time } },
+                                                   scrollGate: store?.gate,
+                                                   onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
                                 Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
@@ -71,11 +81,26 @@ struct DerivedGateDetailView: View {
                             },
                             bottom: { footer })
             .onAppear {
-                if timeline == nil {
+                if store == nil {
                     anchor = todayLocal(tz)
-                    rebuild()
+                    let s = TimelineWindowStore(source: .gate(record))
+                    s.start(anchor: anchor, now: live)
+                    store = s
+                    refreshSlacks()
                 }
                 RecentsStore.shared.record(gate.id)
+            }
+            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            // Chunks landing widen the strip; the phase readout's slacks must
+            // cover whatever it now spans.
+            .onChange(of: timeline.map { $0.start...$0.end }) { _, _ in refreshSlacks() }
+            // The schedule follows a scrub that has settled outside its week.
+            .task(id: scrubTime) {
+                guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                    anchor = dayLocal(scrubTime, tz)
+                    store?.setAnchor(anchor)
+                }
             }
     }
 
@@ -136,21 +161,19 @@ struct DerivedGateDetailView: View {
 
     private func returnToNow() {
         live = appNow()
-        scrubTime = live
         // The anchor too: return-to-now from a September window has to bring
-        // the whole window back, not just park the centerline at a `now` that
-        // isn't on this strip.
+        // the whole schedule week back. The scrubber rides home animated
+        // within `Timeline.snapJumpHours` and lands unanimated past it.
         anchor = todayLocal(tz)
-        rebuild()
+        store?.jump(to: live, anchor: anchor)
+        scrubTime = live
+        refreshSlacks()
     }
 
-    /// One place the timeline is rebuilt from, so the anchor and the slacks
-    /// (derived off the same padded window) can never fall out of sync.
-    private func rebuild() {
-        let tl = TimelineData.build(gate: record, now: live, anchor: anchor)
-        timeline = tl
-        // Same padded window the strip's events were derived over, so
-        // the phase/readout and the drawn dots can never disagree.
+    /// Slacks over the merged strip plus the event pad, so the phase/readout
+    /// and the drawn dots can never disagree about a slack near an edge.
+    private func refreshSlacks() {
+        guard let tl = timeline else { slacks = []; return }
         let pad = TimelineData.eventPad
         slacks = record.engineGate.slacks(from: tl.start.addingTimeInterval(-pad),
                                           to: tl.end.addingTimeInterval(pad))
