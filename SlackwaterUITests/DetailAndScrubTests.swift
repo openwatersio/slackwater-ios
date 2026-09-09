@@ -18,7 +18,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
-        _ = strip.waitForExistence(timeout: 10)
+        _ = strip.appears(within: 10)
         settleLayout(strip)  // the intro is still sliding the strip to now
 
         // Scrub: pan the strip under the fixed centerline (drag left = later),
@@ -26,7 +26,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // one readout and combines its children, so its whole label is what a
         // test can read; comparing it across the drag is the scrub landing.
         let lead = leadReading(app)
-        XCTAssert(lead.waitForExistence(timeout: 10), "no lead reading on the tide detail")
+        XCTAssert(lead.appears(within: 10), "no lead reading on the tide detail")
         let leadBefore = lead.label
         scrubStrip(app)
         settleScrub(app)
@@ -36,7 +36,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Back to the station list (search closed itself on the pick).
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         settleLayout(app.staticTexts["Slackwater"].firstMatch)  // the pop slides the list in
         save(app, "m1-list.png")
 
@@ -44,7 +44,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openSearch(app, "pass")
         // the truncation notice is the app's own "results are rendered" signal
         _ = app.descendants(matching: .any)["search-truncated"].firstMatch
-            .waitForExistence(timeout: 10)
+            .appears(within: 10)
         save(app, "m1-search.png")
         // "pass" matches 139 stations nationally and results are ranked by
         // DISTANCE, not name — Active Pass sits eighth, not first
@@ -69,7 +69,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         setUnits(app, "Feet")
     }
 
@@ -83,11 +83,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
 
         openFridayHarbor(app)
         let lead = leadReading(app)
-        XCTAssert(lead.waitForExistence(timeout: 10), "no lead reading on the tide detail")
+        XCTAssert(lead.appears(within: 10), "no lead reading on the tide detail")
         XCTAssert(lead.label.contains("ft"),
                   "the lead must carry the height and its unit, got '\(lead.label)'")
         // Case-insensitive: the tile's eyebrow combines a MonoLabel that
@@ -105,12 +105,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
 
         let details = app.buttons["Station details"].firstMatch
-        XCTAssert(details.waitForExistence(timeout: 10), "no Station details disclosure")
+        XCTAssert(details.appears(within: 10), "no Station details disclosure")
         XCTAssertFalse(app.staticTexts["noaa/9449880"].exists,
                        "station details should start collapsed")
 
         details.tap()
-        XCTAssert(app.staticTexts["noaa/9449880"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["noaa/9449880"].appears(within: 5))
         XCTAssert(app.staticTexts["MLLW (NOAA chart datum)"].exists)
         XCTAssert(app.staticTexts["48.545°N, 123.013°W"].exists)
         XCTAssert(app.staticTexts["America/Los_Angeles"].exists)
@@ -128,17 +128,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-seedGate"]
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 10))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
 
         openFridayHarbor(app)
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
-        XCTAssert(bar.waitForExistence(timeout: 10), "no range bar above the schedule")
+        XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
         XCTAssert(bar.label.contains("–"), "the bar states a span, got '\(bar.label)'")
         let before = bar.label
 
         bar.tap()
         let picker = app.descendants(matching: .any)["week-picker"].firstMatch
-        XCTAssert(picker.waitForExistence(timeout: 5))
+        XCTAssert(picker.appears(within: 5))
 
         // The graphical DatePicker's forward-month button, then a day cell.
         app.buttons["Next Month"].firstMatch.tap()
@@ -146,7 +146,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
 
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
-        XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["not this week"].appears(within: 5))
 
         // The centerline has to move WITH the window. It does not follow on its
         // own — the strip's x/time conversions are exact inverses, so a
@@ -156,7 +156,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // week puts `scrubTime` far from now, and return-to-now is what shows
         // when it is. Without it there is no way back to today at all — the
         // range bar's "not this week" is a label, not a control.
-        XCTAssert(app.buttons["detail-return-now"].waitForExistence(timeout: 5),
+        XCTAssert(app.buttons["detail-return-now"].appears(within: 5),
                   "picking a future week left the centerline on today: no return-to-now")
 
         // And the chart has to actually DRAW. The assertion above passes on a
@@ -175,7 +175,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // home. "Today" is in the schedule's day column only when the anchor is
         // today — it is absent for the whole September week above.
         app.buttons["detail-return-now"].tap()
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Today"].appears(within: 5),
                   "return-to-now did not bring the window back to today")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
         XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
@@ -186,10 +186,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testM41DetailHeaderSunMoon() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["detail-header"].appears(within: 5),
                   "header missing from tide detail")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
-            .firstMatch.waitForExistence(timeout: 5),
+            .firstMatch.appears(within: 5),
                   "sun times missing from the schedule day header")
         XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
                        "sun rows have moved to the day header — none in the schedule")
@@ -205,14 +205,14 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // The header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].waitForExistence(timeout: 5))
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
-        XCTAssert(app.otherElements["detail-header"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["detail-header"].appears(within: 5),
                   "header missing from current detail")
         save(app, "m41-current-detail-header.png")
         XCTAssert(app.descendants(matching: .any).matching(identifier: "day-sun-d0")
-            .firstMatch.waitForExistence(timeout: 5),
+            .firstMatch.appears(within: 5),
                   "sun times missing from the current-station day header")
         XCTAssertFalse(app.staticTexts["☀ RISE"].firstMatch.exists,
                        "sun rows have moved to the day header — none in the current-station schedule")
@@ -225,17 +225,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testM42ContinuousScrubAcrossMidnight() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5),
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
         // The multi-day schedule carries day headers beyond today.
-        XCTAssert(app.staticTexts["Today"].waitForExistence(timeout: 5))
-        XCTAssert(app.staticTexts["Tomorrow"].waitForExistence(timeout: 5),
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
                   "multi-day schedule missing its Tomorrow day header")
 
         // Pan the strip: the centerline readout moves off "now".
         scrubStrip(app)
-        XCTAssert(app.buttons["Return to now"].waitForExistence(timeout: 5),
+        XCTAssert(app.buttons["Return to now"].appears(within: 5),
                   "return-to-now affordance missing after scrubbing away")
 
         // Down the multi-day list. (One swipe first: schedule-row-d1 may not
@@ -248,7 +248,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // the home-indicator band — seen on iPad landscape), so scroll until
         // it sits clear of the edge first.
         let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
-        XCTAssert(tomorrowRow.waitForExistence(timeout: 5), "no Tomorrow rows in the schedule")
+        XCTAssert(tomorrowRow.appears(within: 5), "no Tomorrow rows in the schedule")
         var tries = 0
         while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
             app.swipeUp()
@@ -260,13 +260,13 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // time/value. Its calendar context lives in the fixed day rail, so the
         // return-to-now control is the stable proof that this cross-day row
         // moved the scrub away from the present.
-        XCTAssert(app.buttons["Return to now"].firstMatch.waitForExistence(timeout: 5),
+        XCTAssert(app.buttons["Return to now"].firstMatch.appears(within: 5),
                   "readout did not follow the cross-midnight scrub")
         app.swipeDown()
 
         // Return to now restores the live reading and hides the control.
         app.buttons["Return to now"].firstMatch.tap()
-        XCTAssertFalse(app.buttons["Return to now"].firstMatch.waitForExistence(timeout: 2),
+        XCTAssertFalse(app.buttons["Return to now"].firstMatch.appears(within: 2),
                        "return-to-now did not restore the live readout")
     }
 
@@ -280,7 +280,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
 
         // First frame after appearance — no scrub, no settle yet.
-        XCTAssert(leadReading(app).waitForExistence(timeout: 5))
+        XCTAssert(leadReading(app).appears(within: 5))
         let before = scrubClock(app)
 
         // The FIRST drag on a fresh detail: the readout must move during the
@@ -308,7 +308,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 5), "timeline strip missing")
+        XCTAssert(strip.appears(within: 5), "timeline strip missing")
         // Away from now, so nothing but the rotation moves the strip.
         scrubStrip(app)
         settleScrub(app)
@@ -364,7 +364,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openSearch(app, "eastport")
         pickSearchResult(app, app.staticTexts["Eastport"].firstMatch)
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 10))
+        XCTAssert(strip.appears(within: 10))
         settleLayout(strip)
         let pill = commentaryPill(app)
         XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
@@ -430,7 +430,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 10))
+        XCTAssert(strip.appears(within: 10))
         settleLayout(strip)  // the intro is still sliding the strip to now
 
         // The pill fades in once the scrub rests, so hittability is the wait,
@@ -470,11 +470,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
-        XCTAssert(strip.waitForExistence(timeout: 5))
+        XCTAssert(strip.appears(within: 5))
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
             .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
         let now = app.buttons["detail-return-now"].firstMatch
-        XCTAssert(now.waitForExistence(timeout: 5), "no return-to-now after scrubbing back")
+        XCTAssert(now.appears(within: 5), "no return-to-now after scrubbing back")
         save(app, "history-before-now.png")
         // One read, one layout (settled — see `settled`'s doc in ScreenshotTestCase): the
         // strip is the ruler, since the pill lives inside its chrome row.
@@ -484,7 +484,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   + "\(places[0].midX) vs strip mid \(places[1].midX)")
         XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
         now.tap()
-        XCTAssert(now.waitForNonExistence(timeout: 10), "return-to-now did not bring the strip home")
+        XCTAssert(now.disappears(within: 10), "return-to-now did not bring the strip home")
         save(app, "history-after-now.png")
     }
 
@@ -496,18 +496,18 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testNowPillSitsLeftWhenScrubbedForward() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
-        XCTAssert(app.otherElements["timeline-strip"].waitForExistence(timeout: 5))
+        XCTAssert(app.otherElements["timeline-strip"].appears(within: 5))
 
         let star = app.buttons["detail-favorite"].firstMatch
         let back = app.buttons["detail-back"].firstMatch
-        XCTAssert(star.waitForExistence(timeout: 5))
+        XCTAssert(star.appears(within: 5))
         let starBefore = star.frame, backBefore = back.frame
         let now = app.buttons["detail-return-now"]
-        XCTAssert(now.waitForNonExistence(timeout: 3),
+        XCTAssert(now.disappears(within: 3),
                   "the opening slide did not settle on now")
 
         scrubStrip(app)
-        XCTAssert(now.waitForExistence(timeout: 5), "scrubbing did not reveal return-to-now")
+        XCTAssert(now.appears(within: 5), "scrubbing did not reveal return-to-now")
         save(app, "now-pill-scrubbed.png")
         // Re-reading star/now/header/back live below would be racy (settled —
         // see `settled`'s doc in ScreenshotTestCase). One read, one layout, four snapshots.
@@ -539,7 +539,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // And it still does its job — back to now, and gone again.
         now.tap()
-        _ = now.waitForNonExistence(timeout: 10)
+        _ = now.disappears(within: 10)
         XCTAssertFalse(app.buttons["detail-return-now"].exists,
                        "return-to-now did not clear after returning to now")
         XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,
@@ -556,15 +556,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // accessibility label that does not.
         let moon = app.descendants(matching: .any).matching(
             NSPredicate(format: "label ==[c] 'moon'")).firstMatch
-        XCTAssert(moon.waitForExistence(timeout: 10), "no Moon tile on the tide detail")
+        XCTAssert(moon.appears(within: 10), "no Moon tile on the tide detail")
         moon.tap()
 
-        XCTAssert(app.navigationBars["Moon"].waitForExistence(timeout: 5),
+        XCTAssert(app.navigationBars["Moon"].appears(within: 5),
                   "the Moon tile did not open its sheet")
         save(app, "moon-sheet.png")
 
         let next = app.descendants(matching: .any)["moon-next-eclipse"].firstMatch
-        XCTAssert(next.waitForExistence(timeout: 10), "no next-eclipse row in the Moon sheet")
+        XCTAssert(next.appears(within: 10), "no next-eclipse row in the Moon sheet")
         // The phase rows are destinations on the same terms — every reachable
         // time in this sheet is somewhere the scrubber can go.
         XCTAssert(app.descendants(matching: .any)["moon-next-full"].firstMatch.exists,
@@ -577,9 +577,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // months out, so the range bar has to be saying so. Both are WAITS —
         // a sheet dismissal is animated, and `exists` read on the line after
         // the tap catches it mid-flight (it did, first run).
-        XCTAssert(app.navigationBars["Moon"].waitForNonExistence(timeout: 10),
+        XCTAssert(app.navigationBars["Moon"].disappears(within: 10),
                   "the sheet stayed up after a jump")
-        XCTAssert(app.staticTexts["not this week"].waitForExistence(timeout: 10),
+        XCTAssert(app.staticTexts["not this week"].appears(within: 10),
                   "the jump did not move the window")
         save(app, "moon-sheet-jumped.png")
     }
