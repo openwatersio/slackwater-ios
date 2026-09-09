@@ -497,9 +497,13 @@ final class ScrollGate {
         timeline = TimelineData.merged(solid.compactMap { chunks[$0] }, source: source,
                                        anchor: anchor, today: todayLocal(tz))
         // Drop chunks the window has left behind; a step back rebuilds them.
-        for i in chunks.keys where i < solid.lowerBound - 1 || i > solid.upperBound + 1 {
-            chunks.removeValue(forKey: i)
-        }
+        // Keys collected before removing: mutating inside `for i in chunks.keys`
+        // is well-defined in Swift (the iterator holds the original storage and
+        // the removal copies), but leaving that for the next reader to work out
+        // is not worth the allocation this saves on a path that runs only when
+        // the window actually moves.
+        let stale = chunks.keys.filter { $0 < solid.lowerBound - 1 || $0 > solid.upperBound + 1 }
+        for i in stale { chunks.removeValue(forKey: i) }
         if scale == nil { scale = timeline.map(TimelineScale.fitting) }
     }
 
@@ -509,14 +513,25 @@ final class ScrollGate {
         guard let tl = timeline, let current = scale else { return }
         let half = viewportHours / 2 * 3600 + 3600
         let from = t.addingTimeInterval(-half), to = t.addingTimeInterval(half)
+        // One pass, no intermediate array. This runs on every scrub frame, and
+        // `map` then `min` then `max` is an allocation and three walks of the
+        // visible samples to answer what one walk answers.
         var tideMin: Double?, tideMax: Double?
         if tl.hasTide {
-            let heights = slice(tl.tidePoints, \.time, from, to).map(\.height)
-            if let mn = heights.min(), let mx = heights.max() { tideMin = mn; tideMax = mx }
+            var mn = Double.greatestFiniteMagnitude, mx = -Double.greatestFiniteMagnitude
+            for p in slice(tl.tidePoints, \.time, from, to) {
+                if p.height < mn { mn = p.height }
+                if p.height > mx { mx = p.height }
+            }
+            if mn <= mx { tideMin = mn; tideMax = mx }
         }
         var maxSpeed: Double?
         if tl.hasCurrent, !tl.speedsAreSchematic {
-            maxSpeed = slice(tl.currentPoints, \.time, from, to).map { abs($0.speed) }.max()
+            var mx = -Double.greatestFiniteMagnitude
+            for p in slice(tl.currentPoints, \.time, from, to) where abs(p.speed) > mx {
+                mx = abs(p.speed)
+            }
+            if mx >= 0 { maxSpeed = mx }
         }
         let next = ScaleGovernor.update(current, tideMin: tideMin, tideMax: tideMax, maxSpeed: maxSpeed)
         if next != current { scale = next }
