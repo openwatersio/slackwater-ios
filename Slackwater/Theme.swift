@@ -1114,7 +1114,10 @@ struct BranchLink: View {
         HStack(spacing: 5) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.caption2.weight(.semibold))
+            // Mono digits: a branch label can carry a reading (a match count,
+            // the nearby link's distance), and numbers hold their width.
             Text(text)
+                .monospacedDigit()
             if chevron {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))

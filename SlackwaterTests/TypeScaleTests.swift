@@ -104,6 +104,10 @@ extension TypeScaleTests {
             // The fast tide's rate, consumed by `Commentary`'s Text, which
             // carries the mono trait (Theme.swift).
             "TideDetailView.swift:tideRateCommentary",
+            // The nearby link's distance: formatted in NearbyStationLink's
+            // body and consumed by `BranchLink`'s one Text, which carries
+            // the mono trait (Theme.swift).
+            "Theme.swift:body",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
             "OnlineGateDetailView.swift:body",
