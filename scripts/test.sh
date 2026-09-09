@@ -183,7 +183,17 @@ for i in {1..$#sims}; do
     -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
     | tail -40
-  echo "=== $MODE · $sim: $((SECONDS - start))s ==="
+  # A shard that runs NOTHING exits 0 and reports green — which is the failure
+  # mode sharding introduces, and the one nobody would notice. A typo in
+  # SLACKWATER_ONLY, a class renamed out from under the matrix, and the lane
+  # goes green faster than ever while testing nothing. So count what ran.
+  ran=$(xcrun xcresulttool get test-results summary --path "$bundle" 2>/dev/null \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("passedTests",0)+d.get("failedTests",0))' 2>/dev/null || echo 0)
+  if [[ "$ran" == "0" ]]; then
+    echo "error: no tests ran on $sim — check SLACKWATER_ONLY/SLACKWATER_SKIP" >&2
+    exit 1
+  fi
+  echo "=== $MODE · $sim: $((SECONDS - start))s · $ran tests ==="
 done
 
 # Not fatal: the run may well be clean, and the person editing is entitled to.
