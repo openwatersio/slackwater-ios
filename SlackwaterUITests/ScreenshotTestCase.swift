@@ -408,6 +408,36 @@ class ScreenshotTestCase: XCTestCase {
     /// agreeing reads (`settled`) is the animation having stopped.
     func settleLayout(_ element: XCUIElement) { _ = settled { element.frame } }
 
+    /// Step the graphical DatePicker one month and wait for it to arrive.
+    ///
+    /// The month header is a Button labelled "Month" whose VALUE is the month
+    /// on screen ("September 2026") — the only thing in the picker that says
+    /// where the calendar actually is. Both months are in the tree mid-slide,
+    /// so a cell query taken before the header changes can match the OUTGOING
+    /// month and tap a date sliding off screen. The picker then commits the
+    /// date it already had, which reads downstream as "the tap was ignored"
+    /// and fails an assertion several lines later about something else.
+    ///
+    /// That is the hosted lane's one stable failure (#331): the same test, the
+    /// same line, on unrelated branches, passing on the Mac Studio every time.
+    func stepMonth(_ app: XCUIApplication, _ direction: String) {
+        let header = app.buttons["Month"].firstMatch
+        XCTAssert(header.waitForExistence(timeout: 5), "the picker has no month header")
+        let before = header.value as? String ?? ""
+        app.buttons[direction].firstMatch.tap()
+        XCTAssert(waitFor(header, "value != '\(before)'", timeout: 10),
+                  "\(direction) did not move the picker off \(before)")
+    }
+
+    /// Tap a day cell once the calendar has stopped moving under it. Hittable,
+    /// not merely existing: a cell mid-slide exists at a frame it is about to
+    /// leave, and the tap lands where it used to be.
+    func tapDay(_ cell: XCUIElement) {
+        XCTAssert(waitFor(cell, "exists == true AND isHittable == true", timeout: 10),
+                  "the day cell never came to rest")
+        cell.tap()
+    }
+
     /// The strip parked. A scrub's time lands in two steps — the scroll
     /// decelerates, then the magnet snaps to the nearest stop and writes
     /// `scrubTime` when ITS animation ends (TimelineStrip's scroll
