@@ -537,8 +537,9 @@ func nextCommentaryStop(_ water: (time: Date, text: String)?,
     let sun = days
         .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
         .compactMap { time, word in time.map { (time: $0, text: word) } }
+    return (sun + [water].compactMap { $0 })
         .filter { $0.time > cutoff }
-    return (sun + [water].compactMap { $0 }).min { $0.time < $1.time }
+        .min { $0.time < $1.time }
 }
 
 /// What comes next, centred on the reading line in the strip's chrome row.

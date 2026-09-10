@@ -168,6 +168,13 @@ final class DetailLeadTests: XCTestCase {
                        "the sun still stands when the water has no stop at all")
         XCTAssertNil(nextCommentaryStop(nil, sun: [day], after: at(3600)),
                      "nothing left in the day, nothing for the pill to say")
+
+        // The cutoff is the helper's own, held for both candidates: a caller
+        // that hands over the stop it is parked on still walks forward.
+        XCTAssertNil(nextCommentaryStop(high, sun: [day], after: at(3600)),
+                     "the stop under the scrub is not a stop ahead of it")
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(1990))?.text, "Sunset",
+                       "ten seconds out, the sun is still ahead")
     }
 
     /// The sun's clock is exact even when the velocities are a fast answer —
