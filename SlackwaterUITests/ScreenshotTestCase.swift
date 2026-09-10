@@ -153,6 +153,24 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssert(el.exists, "could not scroll to element")
     }
 
+    /// Bring `el` within reach inside a SHEET, where `scrollTo` cannot help:
+    /// its `listContainer` resolves to the station list still mounted behind
+    /// the presentation, so its swipes land on the wrong scroll view.
+    ///
+    /// Waits between swipes rather than swiping blind. A single speculative
+    /// swipe is right only when the row happens to start exactly one screen
+    /// away; when the sheet settles with it further down — or is still
+    /// settling, which is what a loaded machine buys — the hard assert on the
+    /// next line then fails on a row that is merely below the fold.
+    @discardableResult
+    func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
+        for _ in 0..<tries {
+            if waitFor(el, "isHittable == true", timeout: 2) { return true }
+            app.swipeUp()
+        }
+        return el.isHittable
+    }
+
     /// Pan the timeline strip under its fixed centerline (drag left = later).
     /// Targets the strip element itself so the drag lands on it at any size —
     /// a window-normalized offset (dy 0.8) misses the strip on iPad.

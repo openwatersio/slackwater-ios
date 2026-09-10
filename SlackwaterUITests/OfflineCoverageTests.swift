@@ -202,16 +202,16 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded failed row is missing")
-        if !row.isHittable { app.swipeUp() }
-        XCTAssert(row.isHittable, "download-row-chs-victoria-harbour exists but never became hittable")
+        XCTAssert(reachInSheet(row, in: app),
+                  "download-row-chs-victoria-harbour exists but never became hittable")
         // `.accessibilityElement(children: .combine)` on the row merges its
         // plain text into one label but does NOT absorb the nested Button —
         // confirmed live (`app.buttons["Retry"]` resolves as its own element,
         // separate from the row).
         let retry = row.buttons["Retry"].firstMatch
         XCTAssert(retry.appears(within: 5), "seeded chs-victoria-harbour never shows the Retry button")
-        if !retry.isHittable { app.swipeUp() }
-        XCTAssert(retry.isHittable, "Retry button exists but never became hittable")
+        XCTAssert(reachInSheet(retry, in: app),
+                  "Retry button exists but never became hittable")
         retry.tap()
         waitFor(row, "label CONTAINS 'YOU OPENED' AND label CONTAINS 'Waiting'")
 
