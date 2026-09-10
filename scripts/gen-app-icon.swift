@@ -9,7 +9,14 @@
 // gradient shows through the ring and on dark/tinted the system's own
 // backdrop does. That is the whole reason the layer is built once.
 //
-//   swift scripts/gen-app-icon.swift <appiconset-dir> [--no-glyph]
+//   swift scripts/gen-app-icon.swift <appiconset-dir> [--glyph]
+//
+// Checking the result: `xcrun simctl ui <udid> appearance dark` does NOT
+// exercise the dark variant. It flips the system UI only; home-screen icon
+// appearance is a separate SpringBoard setting that stays on Light, and no
+// simctl subcommand reaches it. The tell is that stock icons (Reminders,
+// Files) stay white in the "dark" screenshot. Verify dark and tinted by hand
+// — long-press the home screen, Edit, Customize, Dark.
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
