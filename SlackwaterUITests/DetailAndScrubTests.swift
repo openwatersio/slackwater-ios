@@ -244,10 +244,20 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
-        // The multi-day schedule carries day headers beyond today.
+        // Later days stay compact until the sailor asks for one.
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
                   "multi-day schedule missing its Tomorrow day header")
+        XCTAssert(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                  "today's rows should start expanded")
+        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
+        XCTAssertFalse(tomorrowRow.exists, "Tomorrow's rows should start collapsed")
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.exists, "Tomorrow's day header is not expandable")
+        tomorrowDay.tap()
+        XCTAssert(tomorrowRow.appears(within: 5), "Tomorrow's rows did not expand")
+        XCTAssertFalse(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                       "opening Tomorrow should collapse Today")
 
         // Pan the strip: the centerline readout moves off "now".
         scrubStrip(app)
@@ -263,7 +273,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // hugging the bottom edge "taps" without firing (the touch lands in
         // the home-indicator band — seen on iPad landscape), so scroll until
         // it sits clear of the edge first.
-        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
         XCTAssert(tomorrowRow.appears(within: 5), "no Tomorrow rows in the schedule")
         var tries = 0
         while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
