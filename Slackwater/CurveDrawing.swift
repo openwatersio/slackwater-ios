@@ -174,14 +174,26 @@ enum CurveDrawing {
     }
 
     /// The current line: blue, with the speed thread down its middle at
-    /// `CurveStyle.speedCore`. Green for slack is the run's, laid on top.
+    /// `CurveStyle.speedCore`. Its own strokes leave room for the slack run's
+    /// end caps without cutting the fill or sky below them.
     static func currentLine(_ ctx: GraphicsContext, _ line: Path,
+                            slackRuns: [Path] = [],
                             samples: [(x: CGFloat, speedKn: Double)],
                             nowX: CGFloat, width: CGFloat, height: CGFloat) {
-        strokeSplitAtNow(ctx, line, with: .color(SN.graphLine), nowX: nowX, width: width, height: height)
+        var track = ctx
+        let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
+        let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
+        for run in slackRuns {
+            let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
+            let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
+            let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
+            track.clip(to: bounds.subtracting(body))
+            track.clip(to: bounds.subtracting(round.subtracting(butt)))
+        }
+        strokeSplitAtNow(track, line, with: .color(SN.graphLine), nowX: nowX, width: width, height: height)
         let stops = speedCoreStops(samples, width: width)
         guard !stops.isEmpty else { return }
-        strokeSplitAtNow(ctx, line,
+        strokeSplitAtNow(track, line,
                          with: .linearGradient(Gradient(stops: stops),
                                                startPoint: .zero, endPoint: CGPoint(x: width, y: 0)),
                          nowX: nowX, width: width, height: height, lineWidth: CurveStyle.speedCore)
@@ -190,20 +202,10 @@ enum CurveDrawing {
     // MARK: Marks
 
     /// The slack runs: the line itself turns the go colour along each
-    /// segment, over a wider round-capped eraser so the run sits in a clear
-    /// halo and its two ends are rings, not slanted cuts. No end dots: a run
-    /// is one mark, and its opening time goes on the axis. Every eraser goes
-    /// first, in its own pass, so a later run's round cap can never bite an
-    /// earlier run's green tail when two sit close together.
+    /// segment. No end dots: a run is one mark, and its opening time goes on
+    /// the axis.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
-        for seg in segments {
-            var eraser = ctx
-            eraser.blendMode = .destinationOut
-            eraser.stroke(seg, with: .color(.black),
-                          style: StrokeStyle(lineWidth: CurveStyle.runWidth + CurveStyle.haloGap * 2,
-                                             lineCap: .round))
-        }
         for seg in segments {
             strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
                              lineWidth: CurveStyle.runWidth)

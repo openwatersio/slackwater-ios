@@ -135,6 +135,19 @@ struct StationCardGraph: View {
                 line.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
             }
 
+            // Slack: each run is a REAL sub-path of the curve (interpolated
+            // endpoints), computed by the builders from the SHARED
+            // slackWindow predicate — never re-derived here.
+            let segs = windows.filter { $0.end > $0.start }.map { w -> Path in
+                var seg = Path()
+                seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
+                for p in points where p.time > w.start && p.time < w.end {
+                    seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
+                }
+                seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
+                return seg
+            }
+
             // The area, closed to the zero line for a current and to chart
             // datum for a tide — the same line each fill is anchored at.
             var area = line
@@ -145,6 +158,7 @@ struct StationCardGraph: View {
                 CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: plotHeight, zeroY: y(0))
                 CurveDrawing.referenceLine(context, at: y(0), width: size.width)
                 CurveDrawing.currentLine(context, line,
+                                         slackRuns: segs,
                                          samples: points.map { (x: x($0.time), speedKn: $0.value) },
                                          nowX: nowX, width: size.width, height: size.height)
             } else {
@@ -200,18 +214,6 @@ struct StationCardGraph: View {
                                        valueFontSize: CurveStyle.hangValueFontSize)
             }
 
-            // Slack: each run is a REAL sub-path of the curve (interpolated
-            // endpoints), computed by the builders from the SHARED
-            // slackWindow predicate — never re-derived here.
-            let segs = windows.filter { $0.end > $0.start }.map { w -> Path in
-                var seg = Path()
-                seg.move(to: CGPoint(x: x(w.start), y: y(valueAt(w.start))))
-                for p in points where p.time > w.start && p.time < w.end {
-                    seg.addLine(to: CGPoint(x: x(p.time), y: y(p.value)))
-                }
-                seg.addLine(to: CGPoint(x: x(w.end), y: y(valueAt(w.end))))
-                return seg
-            }
             CurveDrawing.runs(context, segs, nowX: nowX, width: size.width, height: size.height)
 
             // The axis names each run's opening, and a bare slack only where
