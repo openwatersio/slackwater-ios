@@ -876,6 +876,15 @@ struct TimelineCanvas: View {
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
         let runs = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
+        let segs = runs.map { run -> Path in
+            var seg = Path()
+            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+            for p in data.currentPoints where p.time > run.start && p.time < run.end {
+                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            return seg
+        }
         seaBase(ctx, under: line, floor: geo.curBottom)
 
         // The card's fill, anchored at zero (CurveDrawing.zeroFill). A derived
@@ -904,21 +913,13 @@ struct TimelineCanvas: View {
             strokeSplitAtNow(ctx, line, with: .color(SN.graphLine))
         } else {
             CurveDrawing.currentLine(ctx, line,
+                                     slackRuns: segs,
                                      samples: data.currentPoints.map { (x: data.x($0.time), speedKn: $0.speed) },
                                      nowX: nowX, width: data.totalWidth, height: geo.height)
         }
 
         // The run is the mark (spec §5.2): the line itself turns the go
         // colour between each run's interpolated edges (CurveDrawing.runs).
-        let segs = runs.map { run -> Path in
-            var seg = Path()
-            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-            for p in data.currentPoints where p.time > run.start && p.time < run.end {
-                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
-            }
-            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-            return seg
-        }
         CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         let margin = 0.3 * 3600

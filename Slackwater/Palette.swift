@@ -154,7 +154,7 @@ enum CurveStyle {
     /// reads as a segment laid over it rather than a recolour of it.
     static let runWidth: CGFloat = 3.5
     static let nowDotDiameter: CGFloat = 7
-    /// The background-punched gap beyond a dot or slack run's end.
+    /// Clearance beyond a dot or slack run's end.
     static let haloGap: CGFloat = 2.5
     /// The area gradient at full intensity, and the tide fill's floor.
     static let fillOpacity = 0.5

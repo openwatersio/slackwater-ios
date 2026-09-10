@@ -16,13 +16,18 @@ import TideEngine
 final class RenderedStripTests: XCTestCase {
 
     @MainActor
-    func testSlackRunOnlyErasesAtItsEnds() throws {
+    func testSlackRunSeparatesOnlyFromTheCurve() throws {
         let renderer = ImageRenderer(content:
             Canvas { context, size in
-                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.blue))
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: 12))
+                line.addLine(to: CGPoint(x: 80, y: 12))
                 var run = Path()
                 run.move(to: CGPoint(x: 20, y: 12))
                 run.addLine(to: CGPoint(x: 60, y: 12))
+                CurveDrawing.currentLine(context, line, slackRuns: [run], samples: [],
+                                         nowX: 0, width: size.width, height: size.height)
                 CurveDrawing.runs(context, [run], nowX: 0, width: size.width, height: size.height)
             }
             .frame(width: 80, height: 24)
@@ -35,9 +40,13 @@ final class RenderedStripTests: XCTestCase {
                                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         let side = (9 * image.width + 40) * 4
-        XCTAssertGreaterThan(pixels[side + 2], pixels[side], "the run punched a hole beside its body")
+        XCTAssertGreaterThan(pixels[side], 200, "the run erased beside its body")
+        XCTAssertGreaterThan(pixels[side + 1], 200, "the run erased beside its body")
+        XCTAssertGreaterThan(pixels[side + 2], 200, "the run erased beside its body")
         let end = (12 * image.width + 63) * 4
-        XCTAssertGreaterThan(pixels[end], pixels[end + 2], "the run has no separation at its end")
+        XCTAssertGreaterThan(pixels[end], 200, "the end gap must preserve the layer below the curve")
+        XCTAssertGreaterThan(pixels[end + 1], 200, "the end gap must preserve the layer below the curve")
+        XCTAssertGreaterThan(pixels[end + 2], 200, "the end gap must preserve the layer below the curve")
     }
 
     private var friday: TideStationRecord {
