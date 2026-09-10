@@ -26,6 +26,12 @@ struct DerivedGateDetailView: View {
     private var tz: TimeZone { gate.tz }
     private var phase: DerivedPhase { record.engineGate.phase(at: scrubTime, slacks: slacks) }
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
+    /// The stop the pill names and its tap walks to: the next slack, or the
+    /// sun's next rise or set when that comes first.
+    private var nextStop: (time: Date, text: String)? {
+        nextCommentaryStop(nextSlack.map { (time: $0.time, text: "Slack") },
+                           sun: timeline?.days ?? [], after: scrubTime)
+    }
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
@@ -40,15 +46,15 @@ struct DerivedGateDetailView: View {
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
-                                let slack = nextSlack
+                                let next = nextStop
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    now: live, chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
-                                                   commentary: slack.map {
-                                                       commentaryText("Slack", at: $0.time, from: scrubTime, now: live)
+                                                   commentary: next.map {
+                                                       commentaryText($0.text, at: $0.time, from: scrubTime, now: live)
                                                    },
-                                                   onCommentary: { if let slack { scrubTime = slack.time } })
+                                                   onCommentary: { if let next { scrubTime = next.time } })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                                 // The web's chart note, verbatim in spirit: the curve is a shape.
                                 Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
