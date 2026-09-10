@@ -15,6 +15,31 @@ import TideEngine
 
 final class RenderedStripTests: XCTestCase {
 
+    @MainActor
+    func testSlackRunOnlyErasesAtItsEnds() throws {
+        let renderer = ImageRenderer(content:
+            Canvas { context, size in
+                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.blue))
+                var run = Path()
+                run.move(to: CGPoint(x: 20, y: 12))
+                run.addLine(to: CGPoint(x: 60, y: 12))
+                CurveDrawing.runs(context, [run], nowX: 0, width: size.width, height: size.height)
+            }
+            .frame(width: 80, height: 24)
+            .background(Color.red))
+        let image = try XCTUnwrap(renderer.uiImage?.cgImage)
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: image.width, height: image.height,
+                                              bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let side = (9 * image.width + 40) * 4
+        XCTAssertGreaterThan(pixels[side + 2], pixels[side], "the run punched a hole beside its body")
+        let end = (12 * image.width + 63) * 4
+        XCTAssertGreaterThan(pixels[end], pixels[end + 2], "the run has no separation at its end")
+    }
+
     private var friday: TideStationRecord {
         TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
     }

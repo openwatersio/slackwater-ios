@@ -190,19 +190,17 @@ enum CurveDrawing {
     // MARK: Marks
 
     /// The slack runs: the line itself turns the go colour along each
-    /// segment, over a wider round-capped eraser so the run sits in a clear
-    /// halo and its two ends are rings, not slanted cuts. No end dots: a run
-    /// is one mark, and its opening time goes on the axis. Every eraser goes
-    /// first, in its own pass, so a later run's round cap can never bite an
-    /// earlier run's green tail when two sit close together.
+    /// segment, with a gap beyond each end but no halo along its body. No end
+    /// dots: a run is one mark, and its opening time goes on the axis.
     static func runs(_ ctx: GraphicsContext, _ segments: [Path],
                      nowX: CGFloat, width: CGFloat, height: CGFloat) {
+        let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
         for seg in segments {
+            let round = seg.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
+            let butt = seg.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
             var eraser = ctx
             eraser.blendMode = .destinationOut
-            eraser.stroke(seg, with: .color(.black),
-                          style: StrokeStyle(lineWidth: CurveStyle.runWidth + CurveStyle.haloGap * 2,
-                                             lineCap: .round))
+            eraser.fill(round.subtracting(butt), with: .color(.black))
         }
         for seg in segments {
             strokeSplitAtNow(ctx, seg, with: .color(SN.go), nowX: nowX, width: width, height: height,
