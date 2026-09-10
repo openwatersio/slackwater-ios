@@ -992,6 +992,9 @@ struct TimelineScrubber: UIViewRepresentable {
     /// Bumped by a pill tap. A tap must win over whatever the strip is doing,
     /// so this bypasses the settle guard below.
     var jumpToken = 0
+    /// A tap on the day row's DATE — the one label on the strip that names a
+    /// day rather than a moment on it — opens the week picker.
+    var onPickDate: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -1021,6 +1024,8 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
+        sv.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator,
+                                                       action: #selector(Coordinator.handleTap(_:))))
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -1263,21 +1268,85 @@ struct TimelineScrubber: UIViewRepresentable {
             if let t = magnetTarget { magnetTarget = nil; parent.scrubTime = t }
         }
 
+        /// A tap: the date opens the picker, everything else on the strip
+        /// brings its own moment to the centerline. Dragging is still how you
+        /// read the curve; this is how you get across a day of it.
+        @objc func handleTap(_ g: UITapGestureRecognizer) {
+            guard let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
+            // The scroll view's own coordinate space IS the content's, so this
+            // x is a strip x and this y a canvas y.
+            let p = g.location(in: sv)
+            guard let target = tapTarget(x: p.x, y: p.y) else { parent.onPickDate(); return }
+            stopIntro()
+            // Clamped, then read back: at either end of the window the offset
+            // that would centre the tap does not exist, and parking scrubTime
+            // on an unreachable time leaves the readout disagreeing with the
+            // curve under the line. x and time are exact inverses, so a
+            // reachable tap round-trips to itself.
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            let landing = parent.data.time(atX: desired + sv.bounds.width / 2)
+            // Stop a fling first, then ride the magnet's animated path — the
+            // same landing a tapped pill gets (updateUIView's jump branch).
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+                cancelMagnet()
+                sv.contentOffset = CGPoint(x: desired, y: 0)
+                parent.scrubTime = landing
+            } else {
+                magneting = true
+                // `nudging` for the same reason the opening slide sets it: the
+                // scroll callbacks drive `scrubTime` from the offset the
+                // animation is passing through, and SwiftUI renders from that
+                // value a frame later — updateUIView's external-scrub branch
+                // reads the gap as a stale offset and pins the strip a few
+                // points into a travel that can be a screen wide.
+                nudging = true
+                magnetTarget = landing
+                sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
+            }
+        }
+
+        /// What a tap at this point on the strip means: the moment to bring to
+        /// the centerline, or nil for the date — the one label that names a day
+        /// rather than a moment, and so opens the picker.
+        private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
+            let data = parent.data
+            guard y > parent.geo.timeY + 10 else {
+                // The plot and its axis: the tapped moment, pulled onto a stop
+                // by the same magnet a drag settles into.
+                if let stop = nearest(data.snapTimes, toX: x), stop.dx < Timeline.magnetPts {
+                    return stop.time
+                }
+                return data.time(atX: x)
+            }
+            // The day row is a row of labels — each day's date at its noon, its
+            // sun times where they fall — so a tap goes to the nearest one. A
+            // sunrise is a moment on the strip and scrubs there like anything
+            // else; only the date is a different question.
+            let sun = nearest(data.visibleDays.flatMap { day in
+                [day.sunrise, day.sunset].compactMap { $0 }
+            }, toX: x)
+            let date = nearest(data.visibleDays.map { noonLocal($0.start, data.tz) }, toX: x)
+            guard let sun, sun.dx < (date?.dx ?? .greatestFiniteMagnitude) else { return nil }
+            return sun.time
+        }
+
+        /// The nearest of `times` to a strip x, and how far off it is.
+        private func nearest(_ times: [Date], toX x: CGFloat) -> (time: Date, dx: CGFloat)? {
+            times.map { (time: $0, dx: abs(parent.data.x($0) - x)) }.min { $0.dx < $1.dx }
+        }
+
         /// Prototype magnet(): after the scroll settles, the nearest stop
         /// within 46pt of the centerline pulls the strip onto itself.
         private func magnet(_ sv: UIScrollView) {
             guard !magneting else { return }
             let center = sv.contentOffset.x + sv.bounds.width / 2
-            var best: Date?
-            var bd = CGFloat.greatestFiniteMagnitude
-            for t in parent.data.snapTimes {
-                let d = abs(parent.data.x(t) - center)
-                if d < bd { bd = d; best = t }
-            }
-            guard let best, bd < Timeline.magnetPts, bd > 0.5 else { return }
+            guard let best = nearest(parent.data.snapTimes, toX: center),
+                  best.dx < Timeline.magnetPts, best.dx > 0.5 else { return }
             magneting = true
-            magnetTarget = best
-            sv.setContentOffset(CGPoint(x: parent.data.x(best) - sv.bounds.width / 2, y: 0),
+            magnetTarget = best.time
+            sv.setContentOffset(CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0),
                                 animated: true)
         }
     }
@@ -1301,6 +1370,7 @@ struct TimelineScrubStrip: View {
     /// The commentary's ink when it is a warning rather than a next event.
     var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
+    @Environment(\.openWeekPicker) private var openWeekPicker
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -1308,7 +1378,7 @@ struct TimelineScrubStrip: View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                          now: now,
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
-                         jumpToken: jumpToken)
+                         jumpToken: jumpToken, onPickDate: openWeekPicker)
             .frame(height: geo.height)
             .overlay { overlay }
             .overlay(alignment: .top) { chromeRow }

@@ -114,6 +114,71 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "tide-readout-height-range.png")
     }
 
+    /// A tap on the strip brings that moment to the centerline — the fast way
+    /// across a week that dragging measures out an hour at a time. Every label
+    /// on the strip is a moment and scrubs to itself, sunrise included; the
+    /// date under the day is the one that names a DAY rather than a moment, so
+    /// it opens the picker instead.
+    func testTappingTheStripScrubsAndTheDateOpensThePicker() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.appears(within: 10), "timeline strip missing")
+        settleLayout(strip)  // the intro is still sliding the strip to now
+        settleScrub(app)
+
+        // Well right of the centerline, in the plot box: hours away from now,
+        // whichever stop the magnet finishes on.
+        let opening = scrubClock(app)
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)).tap()
+        settleScrub(app)  // the tap rides an animated scroll to the stop
+        XCTAssertNotEqual(scrubClock(app), opening,
+                          "a tap on the strip left the centerline on \(opening)")
+        save(app, "strip-tap-scrubbed.png")
+
+        // Pick a date, for the geometry the rest of this test needs: the
+        // centerline parks on the picked day's NOON, which is where its date
+        // label is drawn, with that day's sun labels either side of it. Nothing
+        // else puts a known label under a known point of the strip — where the
+        // centerline sits on arrival depends on the clock the test runs at.
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
+        let week = bar.label
+        bar.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
+        stepMonth(app, "Next Month")
+        tapDay(app.collectionViews.buttons.element(boundBy: 10))
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+        XCTAssert(waitFor(bar, "label != '\(week)'"), "the pick did not move the window")
+        settleScrub(app)
+        let noon = scrubClock(app)
+
+        // The date, under the centerline: the picker, and the strip left where
+        // it was when the sheet goes away.
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        let picker = app.descendants(matching: .any)["week-picker"].firstMatch
+        XCTAssert(picker.appears(within: 5), "a tap on the date did not open the picker")
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssert(waitFor(picker, "exists == false"), "the picker did not close")
+
+        // The sunrise label, left of the date on the same row. Friday Harbor's
+        // sun rises 4–7 hours before noon whatever the season, so a quarter of
+        // the way across the strip is nearer the sunrise than the date by a
+        // clear margin at any anchor the picker can reach.
+        let sun = app.descendants(matching: .any)["day-sun-d0"].firstMatch
+        XCTAssert(sun.exists, "no sun times in the schedule's day column")
+        let sunrise = try XCTUnwrap(sun.label.range(of: "\\d{1,2}:\\d{2}(am|pm)",
+                                                   options: .regularExpression)
+                                        .map { String(sun.label[$0]) },
+                                    "no sunrise in '\(sun.label)'")
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.95)).tap()
+        settleScrub(app)
+        XCTAssertFalse(picker.exists, "a tap on the sunrise opened the picker")
+        XCTAssertEqual(scrubClock(app), sunrise,
+                       "the sunrise tap left the centerline on \(scrubClock(app)), not \(sunrise) (noon was \(noon))")
+        save(app, "strip-tap-sunrise.png")
+    }
+
     /// #170: provenance stays out of the primary tide-reading flow until the
     /// sailor asks for it, then exposes the support/debugging facts in place.
     func testStationDetailsAreCollapsedUntilOpened() throws {
