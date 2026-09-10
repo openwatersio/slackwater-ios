@@ -237,25 +237,42 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                        "sun rows have moved to the day header — none in the current-station schedule")
     }
 
-    // The continuous scrub — a fixed centerline with the multi-day strip
-    // panning underneath. Scrubbing across midnight lands on the next day's
-    // events; the schedule shows several days under day headers; a row tap
-    // scrubs cross-day; return-to-now comes home.
+    func testM42DayHeaderSpansTheSchedule() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.appears(within: 5), "Tomorrow's day header is not expandable")
+        XCTAssertGreaterThan(tomorrowDay.frame.width, app.windows.firstMatch.frame.width * 0.8,
+                             "the day header should span the schedule with its chevron trailing")
+    }
+
+    // The fixed centerline stays put while the multi-day strip pans underneath.
     func testM42ContinuousScrubAcrossMidnight() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
-        // The multi-day schedule carries day headers beyond today.
-        XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
-                  "multi-day schedule missing its Tomorrow day header")
-
-        // Pan the strip: the centerline readout moves off "now".
+        // Pan the strip while its midpoint is visible: the centerline readout moves off "now".
         scrubStrip(app)
         XCTAssert(app.buttons["Return to now"].appears(within: 5),
                   "return-to-now affordance missing after scrubbing away")
+
+        // Later days stay compact until the sailor asks for one.
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
+                  "multi-day schedule missing its Tomorrow day header")
+        XCTAssert(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                  "today's rows should start expanded")
+        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
+        XCTAssertFalse(tomorrowRow.exists, "Tomorrow's rows should start collapsed")
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.exists, "Tomorrow's day header is not expandable")
+        tomorrowDay.tap()
+        XCTAssert(tomorrowRow.appears(within: 5), "Tomorrow's rows did not expand")
+        XCTAssertFalse(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                       "opening Tomorrow should collapse Today")
 
         // Down the multi-day list. (One swipe first: schedule-row-d1 may not
         // be realized until it scrolls near the fold — the loop below only
@@ -266,7 +283,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // hugging the bottom edge "taps" without firing (the touch lands in
         // the home-indicator band — seen on iPad landscape), so scroll until
         // it sits clear of the edge first.
-        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
         XCTAssert(tomorrowRow.appears(within: 5), "no Tomorrow rows in the schedule")
         var tries = 0
         while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {

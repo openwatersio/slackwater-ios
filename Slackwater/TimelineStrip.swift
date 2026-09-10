@@ -1437,8 +1437,8 @@ func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
 
 /// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
 /// `anchor`, which is why this takes the anchor and `today` separately: day
-/// groups key on the first, labels read the second. Day name in a left column,
-/// rows scrub on tap, the row nearest the centerline time is highlighted. The
+/// groups key on the first, labels read the second. Dates disclose rows on tap;
+/// the row nearest the centerline time is highlighted. The
 /// prototype dims nothing for the past — the nearest-row highlight is the time
 /// cue. (The prototype's `tableEl` TOP, a flat today+54h, is what
 /// `scheduleRange` replaced.)
@@ -1453,6 +1453,7 @@ struct MultiDaySchedule: View {
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
+    @State private var expandedOffset: Int? = 0
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1474,68 +1475,87 @@ struct MultiDaySchedule: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(groups, id: \.start) { group in
+                let expanded = expandedOffset == group.offset
                 if group.start != groups.first?.start {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(relativeDayLabel(group.start, tz, today: today))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(SN.foam.opacity(0.9))
-                        if let day = days.first(where: { $0.offset == group.offset }) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                if let rise = day.sunrise {
-                                    Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(relativeDayLabel(group.start, tz, today: today))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SN.foam.opacity(0.9))
+                            if let day = days.first(where: { $0.offset == group.offset }) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    if let rise = day.sunrise {
+                                        Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                    }
+                                    if let set = day.sunset {
+                                        Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
+                                    }
                                 }
-                                if let set = day.sunset {
-                                    Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
-                                }
+                                .font(.caption2.monospaced())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
                             }
-                            .font(.caption2.monospaced())
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("day-sun-d\(group.offset)")
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.55))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    .frame(width: 74, alignment: .leading)
-                    .padding(.leading, 14)
-                    .padding(.top, 12)
-                    VStack(spacing: 0) {
-                        ForEach(group.items) { e in
-                            let on = e.id == nearestID
-                            // A tap gesture, not a Button: Button press tracking
-                            // goes dead in the iPad split layout's detail column
-                            // (regular width, below the strip) while gesture
-                            // recognizers keep working — same tap for the user.
-                            HStack(spacing: 8) {
-                                Text(chartTime(e.time, tz))
-                                    .font(.footnote.monospaced())
-                                    .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
-                                    // "7:03am" is a character shorter than
-                                    // "12:53pm": the floor keeps the values
-                                    // beside it in a column down the list.
-                                    .frame(minWidth: 58, alignment: .leading)
-                                Spacer()
-                                Text(e.value ?? "—")
-                                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
-                                pillView(e)
-                                    // 100, not 84: room for the widest
-                                    // direction-first pill ("WSW FLOOD").
-                                    .frame(width: 100, alignment: .trailing)
-                            }
-                            .padding(.vertical, 9)
-                            .padding(.trailing, 14)
-                            .background(on ? SN.leaf.opacity(0.13) : .clear)
-                            .overlay(alignment: .leading) {
-                                if on { Rectangle().fill(SN.leaf).frame(width: 2) }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture { onTap(e.time) }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("schedule-row-d\(group.offset)")
-                            if e.id != group.items.last?.id {
-                                Divider().overlay(Color.white.opacity(0.055))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation { expandedOffset = expanded ? nil : group.offset }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("schedule-day-d\(group.offset)")
+                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+
+                    if expanded {
+                        VStack(spacing: 0) {
+                            ForEach(group.items) { e in
+                                let on = e.id == nearestID
+                                // A tap gesture, not a Button: Button press tracking
+                                // goes dead in the iPad split layout's detail column
+                                // (regular width, below the strip) while gesture
+                                // recognizers keep working — same tap for the user.
+                                HStack(spacing: 8) {
+                                    Text(chartTime(e.time, tz))
+                                        .font(.footnote.monospaced())
+                                        .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
+                                        // "7:03am" is a character shorter than
+                                        // "12:53pm": the floor keeps the values
+                                        // beside it in a column down the list.
+                                        .frame(minWidth: 58, alignment: .leading)
+                                    Spacer()
+                                    Text(e.value ?? "—")
+                                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                                        .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
+                                    pillView(e)
+                                        // Room for the eclipse label at accessibility sizes.
+                                        .frame(width: 120, alignment: .trailing)
+                                }
+                                .padding(.vertical, 9)
+                                .padding(.leading, 14)
+                                .padding(.trailing, 14)
+                                .background(on ? SN.leaf.opacity(0.13) : .clear)
+                                .overlay(alignment: .leading) {
+                                    if on { Rectangle().fill(SN.leaf).frame(width: 2) }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { onTap(e.time) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("schedule-row-d\(group.offset)")
+                                if e.id != group.items.last?.id {
+                                    Divider().overlay(Color.white.opacity(0.055))
+                                }
                             }
                         }
                     }

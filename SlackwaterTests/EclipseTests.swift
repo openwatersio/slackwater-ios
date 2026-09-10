@@ -271,6 +271,27 @@ final class EclipseTests: XCTestCase {
     }
 
     @MainActor
+    func testTheEclipsePillDoesNotMakeItsScheduleRowTaller() {
+        let time = Date(timeIntervalSinceReferenceDate: 0)
+
+        func height(_ pill: SchedulePill, width: CGFloat) -> CGFloat {
+            UIHostingController(rootView:
+                MultiDaySchedule(
+                    entries: [ScheduleEntry(time: time, pill: pill, value: "9:12pm")],
+                    tz: .gmt, anchor: time, today: time, days: [], scrubTime: time,
+                    onTap: { _ in })
+                .frame(width: width)
+                .environment(\.dynamicTypeSize, .accessibility1)
+            ).sizeThatFits(in: CGSize(width: width, height: 1_000)).height
+        }
+
+        let eclipse = height(.eclipse, width: 370)
+        let high = height(.high, width: 370)
+        XCTAssertLessThanOrEqual(eclipse, high + 0.5,
+                                 "the eclipse pill wrapped onto a second line")
+    }
+
+    @MainActor
     func testTheStripMarksTheEclipse() throws {
         let (tl, _) = try eclipseTimeline()
 
