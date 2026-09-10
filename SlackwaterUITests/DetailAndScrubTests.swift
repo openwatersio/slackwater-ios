@@ -251,6 +251,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
+        // Pan the strip while its midpoint is visible: the centerline readout moves off "now".
+        scrubStrip(app)
+        XCTAssert(app.buttons["Return to now"].appears(within: 5),
+                  "return-to-now affordance missing after scrubbing away")
+
         // Later days stay compact until the sailor asks for one.
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
@@ -265,11 +270,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(tomorrowRow.appears(within: 5), "Tomorrow's rows did not expand")
         XCTAssertFalse(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
                        "opening Tomorrow should collapse Today")
-
-        // Pan the strip: the centerline readout moves off "now".
-        scrubStrip(app)
-        XCTAssert(app.buttons["Return to now"].appears(within: 5),
-                  "return-to-now affordance missing after scrubbing away")
 
         // Down the multi-day list. (One swipe first: schedule-row-d1 may not
         // be realized until it scrolls near the fold — the loop below only

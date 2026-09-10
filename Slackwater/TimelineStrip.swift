@@ -1538,9 +1538,8 @@ struct MultiDaySchedule: View {
                                         .font(.subheadline.weight(.semibold).monospacedDigit())
                                         .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                     pillView(e)
-                                        // 100, not 84: room for the widest
-                                        // direction-first pill ("WSW FLOOD").
-                                        .frame(width: 100, alignment: .trailing)
+                                        // Room for the eclipse label at accessibility sizes.
+                                        .frame(width: 120, alignment: .trailing)
                                 }
                                 .padding(.vertical, 9)
                                 .padding(.leading, 14)
@@ -1617,8 +1616,6 @@ struct MultiDaySchedule: View {
             // The kind belongs to the Moon sheet, which has room for it.
             Text("🌘 ECLIPSE")
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
                 .foregroundStyle(SN.foam)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.umbra, in: Capsule())
