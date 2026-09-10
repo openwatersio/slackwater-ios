@@ -1484,6 +1484,7 @@ struct MultiDaySchedule: View {
                         HStack(spacing: 4) {
                             Text(relativeDayLabel(group.start, tz, today: today))
                                 .font(.caption.weight(.semibold))
+                                .lineLimit(1).minimumScaleFactor(0.8)
                                 .foregroundStyle(SN.foam.opacity(0.9))
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.down")
