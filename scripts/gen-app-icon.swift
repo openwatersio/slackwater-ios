@@ -73,6 +73,12 @@ let datumWidth: CGFloat = 5
 /// `--glyph` draws it for comparison.
 let drawGlyph = CommandLine.arguments.contains("--glyph")
 
+/// How far the water is knocked back on the dark variant. There is no canvas
+/// behind it there — the system's own backdrop shows through the alpha — so
+/// the light artwork's line and fill glare against it at full strength. Only
+/// the water is dimmed: the two turn dots are the reading, and they stay lit.
+let darkWaterDim: CGFloat = 0.6
+
 // MARK: - Drawing
 
 /// `opaque` drops the alpha channel: the App Store rejects a primary icon
@@ -125,7 +131,8 @@ func toBarGlyph(_ ctx: CGContext, under p: CGPoint) {
 }
 
 /// The artwork on transparency: fill, datum rule, curve, turn dots, glyph.
-func artLayer() -> CGImage {
+/// `waterDim` scales the line and fill alpha and nothing else.
+func artLayer(waterDim: CGFloat = 1) -> CGImage {
     let ctx = context()
     let line = curvePath()
 
@@ -140,7 +147,7 @@ func artLayer() -> CGImage {
     ctx.addPath(area)
     ctx.clip()
     let grad = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                          colors: [rgb(graphLine, fillOpacity), rgb(graphLine, 0)] as CFArray,
+                          colors: [rgb(graphLine, fillOpacity * waterDim), rgb(graphLine, 0)] as CFArray,
                           locations: [0, 1])!
     ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: highPt.y), end: CGPoint(x: 0, y: datumY),
                            options: [.drawsBeforeStartLocation])
@@ -154,7 +161,7 @@ func artLayer() -> CGImage {
     ctx.strokeLineSegments(between: [CGPoint(x: 0, y: datumY), CGPoint(x: S, y: datumY)])
     ctx.restoreGState()
 
-    ctx.setStrokeColor(rgb(graphLine))
+    ctx.setStrokeColor(rgb(graphLine, waterDim))
     ctx.setLineWidth(lineWidth)
     ctx.addPath(line)
     ctx.strokePath()
@@ -221,6 +228,8 @@ let outDir = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first { !$0.
                  ?? "Slackwater/Assets.xcassets/AppIcon.appiconset")
 let art = artLayer()
 write(defaultIcon(art), outDir.appendingPathComponent("icon-1024.png"))
-write(art, outDir.appendingPathComponent("icon-1024-dark.png"))
+write(artLayer(waterDim: darkWaterDim), outDir.appendingPathComponent("icon-1024-dark.png"))
+// Tinted greyscales the undimmed artwork: iOS maps luminance onto the user's
+// tint, so knocking the water back here would only flatten it against the dots.
 write(tintedIcon(art), outDir.appendingPathComponent("icon-1024-tinted.png"))
 print("wrote 3 variants to \(outDir.path)")
