@@ -160,7 +160,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         stepMonth(app, "Next Month")
         tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
-
+        // The bar stays put and rewrites itself once the sheet's pick lands,
+        // so wait for the label the next line reads, not for the bar (#341).
+        XCTAssert(waitFor(bar, "label != '\(before)'"),
+                  "the bar did not move off '\(before)' after Done")
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
         XCTAssert(app.staticTexts["not this week"].appears(within: 5))
 
@@ -450,10 +453,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleLayout(strip)  // the intro is still sliding the strip to now
 
         // The pill fades in once the scrub rests, so hittability is the wait,
-        // not existence.
+        // not existence — and the intro seeds the scrub two hours back, so a
+        // pill that rests before the slide's first frame reads "later". Wait
+        // for the phrasing the next line asserts.
         let pill = commentaryPill(app)
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "no commentary pill on the tide detail")
+        XCTAssert(waitFor(pill, "isHittable == true AND label CONTAINS ' in '"),
+                  "no commentary pill parked on now: '\(pill.label)'")
         let saidBefore = pill.label
         XCTAssert(saidBefore.contains(" in "),
                   "parked on now, the commentary counts from the reader: '\(saidBefore)'")
@@ -463,8 +468,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleScrub(app)
         XCTAssertNotEqual(scrubClock(app), clockBefore,
                           "tapping the commentary did not scrub to the stop it names")
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after the jump")
+        // Hittable alone is true at t=0: the jump's `scrubTime` write restarts
+        // the strip's settle timer one main-actor hop after the tap, and the
+        // pill is still hittable with the old label until then. The label is
+        // the noun the next lines read, so it is the wait.
+        XCTAssert(waitFor(pill, "isHittable == true AND label ENDSWITH 'later'"),
+                  "the commentary did not come back after the jump: '\(pill.label)'")
         XCTAssertNotEqual(pill.label, saidBefore,
                           "the commentary must name the next stop, not the one just landed on")
         XCTAssert(pill.label.hasSuffix("later"),
@@ -473,8 +482,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Home again, and the count is the reader's once more.
         app.buttons["detail-return-now"].firstMatch.tap()
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after returning to now")
+        XCTAssert(waitFor(pill, "isHittable == true AND label CONTAINS ' in '"),
+                  "the commentary did not come back after returning to now: '\(pill.label)'")
         XCTAssert(pill.label.contains(" in "),
                   "back on now, the commentary counts from the reader: '\(pill.label)'")
     }
