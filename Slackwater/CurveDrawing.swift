@@ -184,8 +184,10 @@ enum CurveDrawing {
         let bounds = Path(CGRect(x: 0, y: 0, width: width, height: height))
         let capWidth = CurveStyle.runWidth + CurveStyle.haloGap * 2
         for run in slackRuns {
+            let body = run.strokedPath(.init(lineWidth: CurveStyle.runWidth, lineCap: .butt))
             let round = run.strokedPath(.init(lineWidth: capWidth, lineCap: .round))
             let butt = run.strokedPath(.init(lineWidth: capWidth, lineCap: .butt))
+            track.clip(to: bounds.subtracting(body))
             track.clip(to: bounds.subtracting(round.subtracting(butt)))
         }
         strokeSplitAtNow(track, line, with: .color(SN.graphLine), nowX: nowX, width: width, height: height)
