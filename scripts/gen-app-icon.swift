@@ -68,7 +68,10 @@ let dotRadius: CGFloat = 30
 let haloGap: CGFloat = 11
 let datumWidth: CGFloat = 5
 
-let drawGlyph = !CommandLine.arguments.contains("--no-glyph")
+/// The strip's ⤒ turn glyph is off by default: it is legible at 1024 and a
+/// smudge under the dot by 120, which is where the icon is actually read.
+/// `--glyph` draws it for comparison.
+let drawGlyph = CommandLine.arguments.contains("--glyph")
 
 // MARK: - Drawing
 
