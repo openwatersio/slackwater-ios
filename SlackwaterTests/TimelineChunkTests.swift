@@ -232,6 +232,36 @@ final class TimelineChunkTests: XCTestCase {
         XCTAssertEqual(derived.maxAbsCur, explicit.maxAbsCur)
     }
 
+    // MARK: - The rescale glide's math
+
+    /// The glide must LAND: exact at both ends, or the strip settles a hair
+    /// off the governor's fit and the deadband math argues with the drawing.
+    func testScaleLerpIsExactAtItsEndsAndClamped() {
+        let a = TimelineScale(tideMid: 1, tideSpan: 2, maxAbsCur: 3)
+        let b = TimelineScale(tideMid: 3, tideSpan: 6, maxAbsCur: 5)
+        XCTAssertEqual(TimelineScale.lerp(a, b, 0), a)
+        XCTAssertEqual(TimelineScale.lerp(a, b, 1), b)
+        XCTAssertEqual(TimelineScale.lerp(a, b, -0.5), a, "under-run clamps to the start")
+        XCTAssertEqual(TimelineScale.lerp(a, b, 1.5), b, "a display-link tick past the beat clamps to the target")
+        let mid = TimelineScale.lerp(a, b, 0.5)
+        XCTAssertEqual(mid.tideMid, 2, accuracy: 1e-12)
+        XCTAssertEqual(mid.tideSpan, 4, accuracy: 1e-12)
+        XCTAssertEqual(mid.maxAbsCur, 4, accuracy: 1e-12)
+    }
+
+    func testScaleEasingIsMonotonicAndExactAtItsEnds() {
+        XCTAssertEqual(TimelineScale.eased(0), 0)
+        XCTAssertEqual(TimelineScale.eased(1), 1)
+        var prev = -0.1
+        for i in 0...100 {
+            let v = TimelineScale.eased(Double(i) / 100)
+            XCTAssertGreaterThanOrEqual(v, prev, "easing must never move backwards")
+            prev = v
+        }
+        XCTAssertLessThan(TimelineScale.eased(0.1), 0.1, "slow out of the gate")
+        XCTAssertGreaterThan(TimelineScale.eased(0.9), 0.9, "slow into the landing")
+    }
+
     // MARK: - Canvas identity
 
     /// The strip caches its drawn canvas, so a rebuild that changes the

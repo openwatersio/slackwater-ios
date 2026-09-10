@@ -23,6 +23,7 @@ import Almanac
 import Foundation
 import SwiftUI
 import TideEngine
+import UIKit
 
 // MARK: - What a chunk is built from
 
@@ -254,6 +255,22 @@ struct TimelineScale: Equatable {
                       maxAbsCur: max(maxSpeed, 0.01) * 1.05)
     }
 
+    /// Component-wise blend for the rescale glide, `t` clamped to 0…1. Both
+    /// endpoints carry positive spans, so every blend does too.
+    static func lerp(_ a: TimelineScale, _ b: TimelineScale, _ t: Double) -> TimelineScale {
+        let f = max(0, min(1, t))
+        return TimelineScale(tideMid: a.tideMid + (b.tideMid - a.tideMid) * f,
+                             tideSpan: a.tideSpan + (b.tideSpan - a.tideSpan) * f,
+                             maxAbsCur: a.maxAbsCur + (b.maxAbsCur - a.maxAbsCur) * f)
+    }
+
+    /// Smoothstep: eases both ends, monotonic between them, and exact at 0
+    /// and 1 — the glide must LAND on the governor's target, not near it.
+    static func eased(_ t: Double) -> Double {
+        let f = max(0, min(1, t))
+        return f * f * (3 - 2 * f)
+    }
+
     static func fitting(_ data: TimelineData) -> TimelineScale {
         let heights = data.tidePoints.map(\.height)
         return fitting(tideMin: heights.min() ?? 0, tideMax: heights.max() ?? 1,
@@ -313,6 +330,58 @@ final class ScrollGate {
     var onQuiet: (() -> Void)?
 }
 
+// MARK: - The rescale glide
+
+/// Walks the drawn scale to the governor's target over a short beat — the
+/// same display-link pattern the opening slide uses, for the same reason:
+/// the strip's canvas is re-hosted on discrete values behind a
+/// UIViewRepresentable, where SwiftUI's own animation cannot reach.
+///
+/// Retargetable mid-flight: a governor that adopts again while the glide is
+/// running restarts it from wherever the scale currently is, so a fling that
+/// crosses two spring weeks bends rather than jumps. Self-terminating — the
+/// link invalidates itself on arrival, so an animator abandoned mid-glide
+/// (its page closed) lives at most one beat longer than its store.
+@MainActor final class ScaleAnimator: NSObject {
+    static let duration: TimeInterval = 0.3
+
+    private var link: CADisplayLink?
+    private var from: TimelineScale?
+    private var to: TimelineScale?
+    private var startedAt: CFTimeInterval?
+    /// Each frame's blended scale, ending exactly on the target.
+    var onFrame: (@MainActor (TimelineScale) -> Void)?
+
+    func glide(from current: TimelineScale, to target: TimelineScale) {
+        from = current
+        to = target
+        startedAt = nil
+        guard link == nil else { return }   // retarget: the running link continues
+        let l = CADisplayLink(target: self, selector: #selector(tick))
+        // The redraw this drives re-renders every mounted tile; 60 is smooth
+        // and half the cost of letting ProMotion run it at 120.
+        l.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+        l.add(to: .main, forMode: .common)
+        link = l
+    }
+
+    @objc private func tick(_ link: CADisplayLink) {
+        guard let from, let to else { return cancel() }
+        if startedAt == nil { startedAt = link.timestamp }
+        let t = (link.timestamp - (startedAt ?? link.timestamp)) / Self.duration
+        onFrame?(TimelineScale.lerp(from, to, TimelineScale.eased(t)))
+        if t >= 1 { cancel() }
+    }
+
+    func cancel() {
+        link?.invalidate()
+        link = nil
+        from = nil
+        to = nil
+        startedAt = nil
+    }
+}
+
 // MARK: - The store
 
 /// One per detail view: owns the chunk cache, builds off-main around the
@@ -323,7 +392,14 @@ final class ScrollGate {
     private let tz: TimeZone
 
     private(set) var timeline: TimelineData?
+    /// The scale the strip DRAWS — mid-glide it is between fits. The
+    /// governor never reads it; it reasons against `targetScale`, or a
+    /// half-finished glide would feed its own in-between values back into
+    /// the deadband and churn.
     private(set) var scale: TimelineScale?
+    /// Where the glide is headed: the governor's last adopted fit.
+    private var targetScale: TimelineScale?
+    private let animator = ScaleAnimator()
     let gate = ScrollGate()
 
     /// Chunk 0's local midnight — the first anchor. Never moves; chunk
@@ -375,6 +451,7 @@ final class ScrollGate {
                 }
             }
         }
+        animator.onFrame = { [weak self] in self?.scale = $0 }
     }
 
     /// First build, synchronous — the opening view needs its own chunks the
@@ -408,6 +485,7 @@ final class ScrollGate {
         lastFocus = chunkIndex(containing: center)
         publishAround(lastFocus)
         scale = timeline.map(TimelineScale.fitting)
+        targetScale = scale
         ensureBuilt((lastFocus - Self.ensureRadius)...(lastFocus + Self.ensureRadius))
     }
 
@@ -530,13 +608,16 @@ final class ScrollGate {
         // the window actually moves.
         let stale = chunks.keys.filter { $0 < solid.lowerBound - 1 || $0 > solid.upperBound + 1 }
         for i in stale { chunks.removeValue(forKey: i) }
-        if scale == nil { scale = timeline.map(TimelineScale.fitting) }
+        if scale == nil {
+            scale = timeline.map(TimelineScale.fitting)
+            targetScale = scale
+        }
     }
 
     // MARK: scale
 
     private func updateScale(around t: Date) {
-        guard let tl = timeline, let current = scale else { return }
+        guard let tl = timeline, let current = targetScale else { return }
         let half = viewportHours / 2 * 3600 + 3600
         let from = t.addingTimeInterval(-half), to = t.addingTimeInterval(half)
         // One pass, no intermediate array. This runs on every scrub frame, and
@@ -560,7 +641,21 @@ final class ScrollGate {
             if mx >= 0 { maxSpeed = mx }
         }
         let next = ScaleGovernor.update(current, tideMin: tideMin, tideMax: tideMax, maxSpeed: maxSpeed)
-        if next != current { scale = next }
+        if next != current { adopt(next) }
+    }
+
+    /// A newly adopted fit glides in: a fit that lands in one frame reads as
+    /// a pop, and the governor adopts precisely when new water is entering
+    /// the viewport — mid-fling, the worst possible moment for one. Reduce
+    /// Motion lands directly, like the opening slide and the Now jump.
+    private func adopt(_ next: TimelineScale) {
+        targetScale = next
+        guard let shown = scale, !UIAccessibility.isReduceMotionEnabled else {
+            animator.cancel()
+            scale = next
+            return
+        }
+        animator.glide(from: shown, to: next)
     }
 
     /// Contiguous sub-array with `keyPath` in [from, to], by binary search —
