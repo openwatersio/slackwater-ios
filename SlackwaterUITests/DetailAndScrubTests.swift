@@ -234,10 +234,17 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                        "sun rows have moved to the day header — none in the current-station schedule")
     }
 
-    // The continuous scrub — a fixed centerline with the multi-day strip
-    // panning underneath. Scrubbing across midnight lands on the next day's
-    // events; the schedule shows several days under day headers; a row tap
-    // scrubs cross-day; return-to-now comes home.
+    func testM42DayHeaderSpansTheSchedule() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.appears(within: 5), "Tomorrow's day header is not expandable")
+        XCTAssertGreaterThan(tomorrowDay.frame.width, app.windows.firstMatch.frame.width * 0.8,
+                             "the day header should span the schedule with its chevron trailing")
+    }
+
+    // The fixed centerline stays put while the multi-day strip pans underneath.
     func testM42ContinuousScrubAcrossMidnight() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)

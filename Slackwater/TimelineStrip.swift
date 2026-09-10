@@ -1479,36 +1479,35 @@ struct MultiDaySchedule: View {
                 if group.start != groups.first?.start {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 4) {
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(relativeDayLabel(group.start, tz, today: today))
                                 .font(.caption.weight(.semibold))
-                                .lineLimit(1).minimumScaleFactor(0.8)
                                 .foregroundStyle(SN.foam.opacity(0.9))
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(SN.foam.opacity(0.55))
-                                .rotationEffect(.degrees(expanded ? 180 : 0))
-                        }
-                        if let day = days.first(where: { $0.offset == group.offset }) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                if let rise = day.sunrise {
-                                    Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                            if let day = days.first(where: { $0.offset == group.offset }) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    if let rise = day.sunrise {
+                                        Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                    }
+                                    if let set = day.sunset {
+                                        Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
+                                    }
                                 }
-                                if let set = day.sunset {
-                                    Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
-                                }
+                                .font(.caption2.monospaced())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
                             }
-                            .font(.caption2.monospaced())
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("day-sun-d\(group.offset)")
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.55))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    .frame(width: 74, alignment: .leading)
-                    .padding(.leading, 14)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         withAnimation { expandedOffset = expanded ? nil : group.offset }
@@ -1544,6 +1543,7 @@ struct MultiDaySchedule: View {
                                         .frame(width: 100, alignment: .trailing)
                                 }
                                 .padding(.vertical, 9)
+                                .padding(.leading, 14)
                                 .padding(.trailing, 14)
                                 .background(on ? SN.leaf.opacity(0.13) : .clear)
                                 .overlay(alignment: .leading) {
@@ -1559,8 +1559,6 @@ struct MultiDaySchedule: View {
                                 }
                             }
                         }
-                    } else {
-                        Spacer(minLength: 0)
                     }
                 }
             }
@@ -1619,6 +1617,8 @@ struct MultiDaySchedule: View {
             // The kind belongs to the Moon sheet, which has room for it.
             Text("🌘 ECLIPSE")
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .foregroundStyle(SN.foam)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.umbra, in: Capsule())
