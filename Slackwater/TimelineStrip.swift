@@ -1276,8 +1276,16 @@ struct TimelineScrubber: UIViewRepresentable {
             // The scroll view's own coordinate space IS the content's, so this
             // x is a strip x and this y a canvas y.
             let p = g.location(in: sv)
-            guard let target = tapTarget(x: p.x, y: p.y) else { parent.onPickDate(); return }
+            // Whatever the strip is doing, a tap wins — including the tap that
+            // only opens the picker. Left running, the opening slide or a
+            // magnet in flight keeps writing `scrubTime` behind the sheet.
             stopIntro()
+            guard let target = tapTarget(x: p.x, y: p.y) else {
+                sv.setContentOffset(sv.contentOffset, animated: false)
+                cancelMagnet()
+                parent.onPickDate()
+                return
+            }
             // Clamped, then read back: at either end of the window the offset
             // that would centre the tap does not exist, and parking scrubTime
             // on an unreachable time leaves the readout disagreeing with the
@@ -1312,7 +1320,10 @@ struct TimelineScrubber: UIViewRepresentable {
         /// rather than a moment, and so opens the picker.
         private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
             let data = parent.data
-            guard y > parent.geo.timeY + 10 else {
+            // Between the axis times' row and the day row, from the two rows'
+            // own y's: the strip's geometry is all literal points and moves.
+            let rowSplit = (parent.geo.timeY + parent.geo.dayY) / 2
+            guard y > rowSplit else {
                 // The plot and its axis: the tapped moment, pulled onto a stop
                 // by the same magnet a drag settles into.
                 if let stop = nearest(data.snapTimes, toX: x), stop.dx < Timeline.magnetPts {
@@ -1334,7 +1345,12 @@ struct TimelineScrubber: UIViewRepresentable {
 
         /// The nearest of `times` to a strip x, and how far off it is.
         private func nearest(_ times: [Date], toX x: CGFloat) -> (time: Date, dx: CGFloat)? {
-            times.map { (time: $0, dx: abs(parent.data.x($0) - x)) }.min { $0.dx < $1.dx }
+            var best: (time: Date, dx: CGFloat)?
+            for t in times {
+                let dx = abs(parent.data.x(t) - x)
+                if dx < (best?.dx ?? .greatestFiniteMagnitude) { best = (t, dx) }
+            }
+            return best
         }
 
         /// Prototype magnet(): after the scroll settles, the nearest stop
