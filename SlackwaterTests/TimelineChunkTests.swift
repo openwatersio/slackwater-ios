@@ -317,6 +317,34 @@ final class TimelineChunkTests: XCTestCase {
                        "the parked publish lands at the next quiet moment")
     }
 
+    /// The strip must open with its PAST already drawn. Chunk 0 begins at the
+    /// anchor's own midnight, so an opening build that does not reach back
+    /// across that midnight publishes a window starting at today — the left of
+    /// the centerline blank until a background chunk lands. Evening is when a
+    /// short reach stops crossing, so this walks the clock: at every hour of
+    /// the day the opening window must already hold the look-back, and enough
+    /// of it to fill half of an iPad's viewport.
+    @MainActor func testOpeningWindowCoversTheLookBackAtEveryHour() {
+        let tz = friday.tz
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        let day = vancouverMidnight(2026, 8, 11)
+        // Half a 13-inch iPad in landscape is about 38 h of strip at 18 pt/h.
+        let halfWidestViewport = 38.0 * 3600
+
+        for hour in [0, 6, 12, 15, 18, 21, 23] {
+            let now = cal.date(bySettingHour: hour, minute: 30, second: 0, of: day)!
+            let store = TimelineWindowStore(source: .tide(friday))
+            store.start(anchor: day, now: now)
+            let tl = store.timeline
+            XCTAssertNotNil(tl, "no window at \(hour):30")
+            XCTAssertLessThanOrEqual(tl!.start, now.addingTimeInterval(-halfWidestViewport),
+                                     "at \(hour):30 the strip opens without enough past to fill the widest pane")
+            XCTAssertFalse(tl!.tidePoints.filter { $0.time < day }.isEmpty,
+                           "at \(hour):30 nothing before the anchor's midnight is drawn yet")
+        }
+    }
+
     @MainActor func testStoreJumpLandsSynchronously() {
         let anchor = todayLocal(friday.tz)
         let store = TimelineWindowStore(source: .tide(friday))

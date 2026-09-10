@@ -386,8 +386,23 @@ final class ScrollGate {
         guard origin == .distantPast else { return }
         origin = anchor
         self.anchor = anchor
-        // Cover the intro slide's look-back and half a viewport either side.
-        let reach = 15.0 * 3600
+        // `Timeline.backHours` either side, and it is the BACK one that has to
+        // be this wide. Chunk 0 begins at the anchor's own midnight, so a
+        // reach that does not clear midnight builds nothing behind today and
+        // the strip opens with its whole left side still arriving — visible
+        // as a blank past that fills in half a second later, and only from
+        // mid-afternoon on, which is when a shorter reach stops crossing.
+        //
+        // Half an iPad's viewport is around 38 hours of strip, far more than a
+        // phone's, so the pad is sized against the widest pane rather than the
+        // one it was first read on. 48 h clears both, and it is the look-back
+        // the fixed window always drew.
+        //
+        // Symmetric because `focus` can sit anywhere inside a chunk when a
+        // store is rebuilt under a parked scrub (a refined CHS model, a new
+        // slack threshold); only `start` from now is guaranteed to open at a
+        // chunk's own beginning.
+        let reach = Timeline.backHours * 3600
         let center = focus ?? now
         syncBuild(covering: center.addingTimeInterval(-reach)...center.addingTimeInterval(reach))
         lastFocus = chunkIndex(containing: center)
