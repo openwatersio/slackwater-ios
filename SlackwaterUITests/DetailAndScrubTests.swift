@@ -587,6 +587,24 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                        "the star moved when return-to-now went away")
     }
 
+    /// #187: the share button rides the header's chrome row inboard of the
+    /// star, which keeps the trailing corner it has always had. Presence and
+    /// placement only — tapping raises the system share sheet, which is
+    /// another process.
+    func testShareSitsInboardOfTheStar() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let share = app.buttons["detail-share"].firstMatch
+        let star = app.buttons["detail-favorite"].firstMatch
+        XCTAssert(share.appears(within: 5), "no share button on the tide detail")
+        XCTAssert(share.isHittable, "share is not hittable: \(share.frame)")
+        let places = settled { [share.frame, star.frame] }
+        XCTAssertEqual(places[0].midY, places[1].midY, accuracy: 0.5,
+                       "share is not on the star's row")
+        XCTAssert(places[0].maxX <= places[1].minX,
+                  "share must sit inboard of the star: \(places[0].maxX) vs \(places[1].minX)")
+    }
+
     /// #222: the Moon tile is the way into the moon's own facts, and the
     /// eclipse rows are destinations — tapping one moves the window to it.
     func testTheMoonTileOpensItsSheetAndTheEclipseRowJumps() throws {
