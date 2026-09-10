@@ -152,7 +152,7 @@ struct TideDetailView: View {
         let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
         return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
                             + Text(" \(unit)").font(ReadoutType.leadUnit),
-                        time: chartTime(scrubTime, tz),
+                        time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {
             // Word then glyph, the order the current lead reads in.
