@@ -41,15 +41,23 @@ struct CurrentDetailView: View {
 
     @State private var live = appNow()
     @State private var scrubTime = Timeline.introStart(for: appNow())
-    @State private var timeline: TimelineData?
-    /// The local midnight the window hangs from. Only `returnToNow` and (in
-    /// Plan B) the range bar move it; everything else reads it.
+    /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
+    @State private var store: TimelineWindowStore?
+    /// The local midnight the schedule week hangs from. `returnToNow`, the
+    /// picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
+    @State private var viewportPts: CGFloat = 0
     @State private var showDownloads = false
+    /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
+    /// discovery fallback when no curated `tideReference` pairs this station.
+    /// Computed once on appear; the body re-evaluates on every scrub tick.
+    @State private var nearbyTide: (item: StationItem, km: Double)?
     // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
     // custom `@Environment` key set above the presenting view on its own
     // (SlackwaterApp.swift's `.sheet(showDownloads)` comment has the story).
     @Environment(\.openChsRoute) private var openChsRoute
+
+    private var timeline: TimelineData? { store?.timeline }
 
     /// The gate identity behind a provisional fast answer — nil for a final
     /// model, which is what every readout below keys on.
@@ -78,7 +86,7 @@ struct CurrentDetailView: View {
                                                        ebbDeg: record.ebbDirection, speedUnit: speedUnit) },
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { _ in rebuild() },
+                            onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: {
                                 if let gate = provisionalGate {
@@ -98,7 +106,10 @@ struct CurrentDetailView: View {
                                                  speedUnit: speedUnit, now: live,
                                                  floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
                                                  sky: sky,
-                                                 scrubTime: $scrubTime, onReturn: returnToNow)
+                                                 scrubTime: $scrubTime, onReturn: returnToNow,
+                                                 scale: store?.scale,
+                                                 scrollGate: store?.gate,
+                                                 onViewportWidth: { viewportPts = $0 })
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
@@ -107,22 +118,43 @@ struct CurrentDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)
-                                    if let port = pairedTide { TideAtPortLink(port: port) }
+                                    if let port = pairedTide {
+                                        TideAtPortLink(port: port)
+                                    } else if let nearby = nearbyTide {
+                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    }
                                 }
                             },
                             bottom: { footer })
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onAppear {
-                if timeline == nil {
+                if store == nil {
                     anchor = todayLocal(tz)
-                    rebuild()
+                    resetStore(focus: nil)
                 }
                 RecentsStore.shared.record(record.itemId)
+                if pairedTide == nil, nearbyTide == nil,
+                   let n = StationItem.nearest(.tide, toLat: record.latitude, lon: record.longitude),
+                   n.km <= nearbyStationRadiusKm {
+                    nearbyTide = n
+                }
+            }
+            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            // The schedule follows a scrub that has settled outside its week —
+            // the strip is endless now. A cancelled sleep is a scrub still in
+            // motion, same rest rule as the chrome row's.
+            .task(id: scrubTime) {
+                guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                    anchor = dayLocal(scrubTime, tz)
+                    store?.setAnchor(anchor)
+                }
             }
             // The refinement lands under an open page: same station, new model. The
-            // curve, the schedule and the amber marking all have to follow it.
-            .onChange(of: record) { _, _ in rebuild() }
-            .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
+            // curve, the schedule and the amber marking all have to follow it —
+            // a fresh store, parked where the scrub already is.
+            .onChange(of: record) { _, _ in resetStore(focus: scrubTime) }
+            .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
     }
 
     // MARK: - Colour
@@ -167,19 +199,21 @@ struct CurrentDetailView: View {
 
     private func returnToNow() {
         live = appNow()
-        scrubTime = live
         // The anchor too: return-to-now from a September window has to bring
-        // the whole window back, not just park the centerline at a `now` that
-        // isn't on this strip.
+        // the whole schedule week back. The scrubber rides home animated
+        // within `Timeline.snapJumpHours` and lands unanimated past it.
         anchor = todayLocal(tz)
-        rebuild()
+        store?.jump(to: live, anchor: anchor)
+        scrubTime = live
     }
 
-    /// One place the timeline is rebuilt from, so the anchor and the record
-    /// can never be applied by two different code paths.
-    private func rebuild() {
-        timeline = TimelineData.build(tide: nil, current: record, now: live, anchor: anchor,
-                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+    /// One place the store is created from, so the record and the slack
+    /// threshold can never be applied by two different code paths. `focus`
+    /// nil opens around now (the intro); a focus keeps a parked scrub parked.
+    private func resetStore(focus: Date?) {
+        let s = TimelineWindowStore(source: .current(record, threshold: normalizedSlackThresholdKn(slackWindowSpeed)))
+        s.start(anchor: anchor, now: live, focus: focus)
+        store = s
     }
 }
 

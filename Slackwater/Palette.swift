@@ -154,7 +154,7 @@ enum CurveStyle {
     /// reads as a segment laid over it rather than a recolour of it.
     static let runWidth: CGFloat = 3.5
     static let nowDotDiameter: CGFloat = 7
-    /// The background-punched ring beyond a dot's or run's edge.
+    /// Clearance beyond a dot or slack run's end.
     static let haloGap: CGFloat = 2.5
     /// The area gradient at full intensity, and the tide fill's floor.
     static let fillOpacity = 0.5
@@ -211,8 +211,18 @@ struct MonoLabel: View {
 /// day-after check (relaunch offline "tomorrow").
 private let appNowOffset: TimeInterval =
     UserDefaults.standard.double(forKey: "nowOffsetDays") * 86_400
+#if DEBUG
+private let appNowEpoch = UserDefaults.standard.double(forKey: "nowEpoch")
+#endif
 
-func appNow() -> Date { Date.now.addingTimeInterval(appNowOffset) }
+func appNow() -> Date {
+#if DEBUG
+    if appNowEpoch != 0 {
+        return Date(timeIntervalSince1970: appNowEpoch).addingTimeInterval(appNowOffset)
+    }
+#endif
+    return Date.now.addingTimeInterval(appNowOffset)
+}
 
 /// Today's local midnight in `tz`, on the app clock. The anchor every detail
 /// view starts on, and the `today` half of every `Timeline.window` call.

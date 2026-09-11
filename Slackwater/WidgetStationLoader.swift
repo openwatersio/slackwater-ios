@@ -33,12 +33,19 @@ enum WidgetStationLoader {
     private static func loadRecord(id: String, directory: URL) throws -> WidgetRecord? {
         guard let item = try StationItem.widgetItem(id: id, directory: directory) else { return nil }
         switch item {
-        case .tide(let r):
+        // `widgetItem` hands back identity only (#317), so the record costs a
+        // second scan of the same mapped file. ponytail: two scans, not one;
+        // give `widgetItem` a record-returning sibling if this ever measures.
+        case .tide(let info):
+            guard let r: TideStationRecord = try catalogRecord("stations", id: info.id, directory: directory)
+            else { return nil }
             let reference: TideStationRecord? = try r.reference.flatMap {
                 try catalogRecord("stations", id: $0, directory: directory)
             }
             return .tide(r, station: r.engineStation(referenceRecord: reference))
-        case .current(let r):
+        case .current(let info):
+            guard let r: CurrentStationRecord = try catalogRecord("currents", id: info.id, directory: directory)
+            else { return nil }
             let reference: CurrentStationRecord? = try r.reference.flatMap {
                 try catalogRecord("currents", id: $0, directory: directory)
             }
@@ -96,8 +103,14 @@ enum WidgetStationLoader {
         defaults: UserDefaults = AppGroup.defaults,
         locator: CatalogFileLocator = .shared
     ) -> String {
-        guard id == AppGroup.currentLocationStationID else { return id }
-        if let cached = defaults.string(forKey: AppGroup.currentLocationStationKey),
+        let cacheKey: String? = switch id {
+        case AppGroup.currentLocationStationID: AppGroup.currentLocationStationKey
+        case AppGroup.nearestTideStationID: AppGroup.nearestTideStationKey
+        case AppGroup.nearestCurrentStationID: AppGroup.nearestCurrentStationKey
+        default: nil
+        }
+        guard let cacheKey else { return id }
+        if let cached = defaults.string(forKey: cacheKey),
            StationItem.widgetItem(id: cached, locator: locator) != nil { return cached }
         return fallbackStationID(defaults: defaults)
     }

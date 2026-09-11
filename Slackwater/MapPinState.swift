@@ -123,10 +123,12 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
 /// Absent means unsynced, and the pin honestly draws neutral.
 private func pinTone(_ item: StationItem, at now: Date, chsTones: [String: String]) -> String {
     switch item {
-    case .tide(let record):
-        return tidePinTone(record, at: now)
-    case .current(let station):
-        return currentPinColour(station, at: now)
+    // The map is not the first frame, so resolving both records here is
+    // fair game — a tone is a prediction and needs the constituents (#317).
+    case .tide(let info):
+        return info.tideRecord.map { tidePinTone($0, at: now) } ?? "unknown"
+    case .current(let info):
+        return info.currentRecord.map { currentPinColour($0, at: now) } ?? "unknown"
     case .chs, .chsGate, .chsCurrent:
         return chsTones[item.id] ?? "unknown"
     }

@@ -55,11 +55,10 @@ extension TypeScaleTests {
     /// 2. A formatter relayed through a helper `func`/computed `var` that
     ///    returns a `String`, consumed by a `Text` far away or in another
     ///    file, is invisible to line-proximity scanning — Swift puts no
-    ///    distance limit on where you can call a function. Five real sites
+    ///    distance limit on where you can call a function. Four real sites
     ///    are exactly this shape and are hand-verified into
     ///    `knownIndirections` below rather than silently passing unseen:
     ///      - `CurrentCardView.nextLine(_:)` (StationCard.swift)
-    ///      - `RecentRowLabel.reading` (StationCard.swift)
     ///      - `scheduleEntries()` in the four detail views, consumed by
     ///        `MultiDaySchedule`'s `Text(e.value ?? "—")` in a FIFTH file
     ///        (TimelineStrip.swift)
@@ -87,7 +86,6 @@ extension TypeScaleTests {
         let windowTokens = ["monospacedDigit()", ".monospaced()"]
         // See blind spot 2 above — "File.swift:declaringSymbol".
         let knownIndirections: Set<String> = [
-            "StationCard.swift:reading",
             // The card curve: the builders format extreme/axis strings whose
             // one renderer (the Canvas draw code) applies the mono trait.
             "StationCardGraph.swift:cardGraph",
@@ -106,6 +104,10 @@ extension TypeScaleTests {
             // The fast tide's rate, consumed by `Commentary`'s Text, which
             // carries the mono trait (Theme.swift).
             "TideDetailView.swift:tideRateCommentary",
+            // The nearby link's distance: formatted in NearbyStationLink's
+            // body and consumed by `BranchLink`'s one Text, which carries
+            // the mono trait (Theme.swift).
+            "Theme.swift:body",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
             "OnlineGateDetailView.swift:body",

@@ -450,6 +450,22 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
+    /// The lead's when-line is centered, so every hour must occupy one
+    /// width: a figure space stands in for a one-digit hour's missing digit,
+    /// and two-digit hours get no pad.
+    func testLeadWhenPadsOneDigitHours() {
+        var cal = Calendar(identifier: .gregorian)
+        let utc = TimeZone(identifier: "UTC")!
+        cal.timeZone = utc
+        func at(_ h: Int) -> Date {
+            cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: 5))!
+        }
+        XCTAssertEqual(leadWhen(at(7), utc), "Aug 10 · \u{2007}7:05am")
+        XCTAssertEqual(leadWhen(at(12), utc), "Aug 10 · 12:05pm")
+        XCTAssertEqual(leadWhen(at(7), utc).count, leadWhen(at(12), utc).count,
+                       "one width for every hour — the centered line must not shift")
+    }
+
     /// One clock means one FORMATTER: a 24-hour pattern anywhere in the app is
     /// a second clock, and it would print beside the 12-hour one on the same
     /// screen. Repo-wide, because the surface that reaches for its own
@@ -461,7 +477,9 @@ final class TimelineTests: XCTestCase {
     /// bare 24-hour time is a second clock.
     func testNoSourceFileSpellsATwentyFourHourPattern() throws {
         var offenders: [String] = []
-        for (name, source) in try appSources() {
+        // DeepLink.swift PARSES the share link's ISO-8601 instant with these
+        // patterns and prints nothing — a wire format read, not a second clock.
+        for (name, source) in try appSources() where name != "DeepLink.swift" {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
             where codeOnly(line).replacingOccurrences(of: "'T'HH:mm", with: "").contains("HH:mm") {
                 offenders.append("\(name):\(n + 1)")

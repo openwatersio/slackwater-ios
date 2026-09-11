@@ -16,11 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Gates the Studio lane below. There is ONE self-hosted macOS runner, shared
-  # with the scheduled jobs and with everyone's local ./scripts/test.sh, and the
-  # lane is ~15 minutes — so a docs-only change that books it puts every other
-  # session in a queue behind it. Measured: PRs whose entire diff was CLAUDE.md,
-  # or two markdown files, each took a full run.
+  # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
+  # public-repo macOS pools can queue at peak — a docs-only change should not
+  # book one. Measured: PRs whose entire diff was CLAUDE.md, or two markdown
+  # files, each took a full run.
   #
   # This is a JOB-level gate, not `on: paths-ignore`, for two reasons: the free
   # Ubuntu lane below should still run, and a workflow that never starts leaves
@@ -109,8 +108,8 @@ jobs:
     name: Data generators
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: npm
@@ -118,6 +117,9 @@ jobs:
 
       - run: npm ci
         working-directory: tools
+
+      - name: Fixture tooling
+        run: node --test scripts/iwls-fixtures.test.mjs
 
       # gen-chs-stations.mjs is the only generator that needs the network (the
       # DFO IWLS API), so it stays out of CI and its artefact is trusted as
@@ -127,66 +129,118 @@ jobs:
       # data to the App Store.
       - name: Regenerate the offline bundles
         working-directory: tools
-        run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs
+        run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs && node gen-station-index.mjs
 
       - name: Committed bundles match their generators
-        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json
 
       - name: Bundle invariants
         working-directory: tools
         run: node --test
 
   app:
-    name: App tests
+    name: App tests · ${{ matrix.shard.name }}
     needs: changes
     if: needs.changes.outputs.app == 'true'
-    # Self-hosted on the Mac Studio. GitHub-hosted macOS bills at 10x on a
-    # private repo, and the fast lane is ~15 min of wall clock — about 150
-    # billable minutes, which would exhaust the monthly allowance in roughly
-    # thirteen runs. The Studio is already the always-on scheduled-job host
-    # and keeps a warm SPM cache. See CONTRIBUTING.md.
-    runs-on: [self-hosted, macOS]
+    runs-on: macos-latest
+    # Four shards, because one lane was 42 minutes and feedback that slow is
+    # feedback nobody waits for. Measured on run 34318099667: 2053 s of tests
+    # behind a 521 s build, so the build — repeated per shard, in parallel and
+    # free on a public repo — is the floor and four shards sit just above it.
+    #
+    # Balanced on the RUNNER's numbers, which are not this Mac's: OfflineCoverage
+    # is 563 s here and DetailAndScrub 447 s, while on the Studio that order is
+    # reversed. Rebalance from a `test-evidence` bundle, never from a local run.
+    #
+    #   offline  563 s   map  538 s   detail  447 s   rest  ~471 s
+    #
+    # Expect ~18 minutes, set by the longest shard plus the build.
+    strategy:
+      # A failing shard must not cancel its siblings. The whole point is to see
+      # every failure in one run rather than the first one and then wait again.
+      fail-fast: false
+      matrix:
+        shard:
+          - name: offline
+            only: SlackwaterUITests/OfflineCoverageTests
+          - name: map
+            only: SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests
+          - name: detail
+            only: SlackwaterUITests/DetailAndScrubTests
+          # The catch-all names no tests — it SKIPS the other three. A class
+          # added tomorrow therefore runs here, instead of running nowhere and
+          # looking green. Never convert this one to `only`.
+          - name: rest
+            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/DetailAndScrubTests
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The runner is the Mac we develop on, so CI gets its own simulator
-      # devices — same device types, different instances. Sharing a device with
-      # a local `xcodebuild` run makes the two SIGKILL each other's test runner,
-      # which reads as a real test failure and is not one.
-      # Created on first run; kept afterwards. The iPad device is still created
-      # here even though the fast lane no longer uses it: a `--full` run driven
-      # by hand on this machine expects it to exist.
-      - name: CI-only simulators
-        run: |
-          latest_ios=$(xcrun simctl list runtimes | sed -n 's/^\(iOS [0-9.]*\).*/\1/p' | tail -1)
-          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPhone' \
-            || xcrun simctl create 'SlackwaterCI-iPhone' 'iPhone 17'
-          xcrun simctl list devices "$latest_ios" | grep -q 'SlackwaterCI-iPad' \
-            || xcrun simctl create 'SlackwaterCI-iPad' 'iPad Pro 11-inch (M5)'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
 
-      # Runs xcodegen, then the fast suite on the iPhone simulator. Two things
-      # stay out of this lane and ride `scripts/test.sh --full`, run by hand
-      # before an upload: the live-IWLS UI tests (they skip themselves unless
-      # SLACKWATER_FULL is set) and the iPad leg.
+      - run: brew install xcodegen
+
+      - name: Test runner modes
+        run: zsh scripts/test-modes.test.sh
+
+      # MapLibre is a binary download, not a compile — the cache saves the
+      # fetch, not a build. The generated xcodeproj and its Package.resolved
+      # are not committed, so key on project.yml, where the package pins live.
+      - uses: actions/cache@v6
+        with:
+          path: build/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # Validates the recorded fixture, runs xcodegen, then the offline fast
+      # suite on the image's stock iPhone simulator. The iPad leg and exhaustive
+      # data test use `scripts/test.sh --full`; live IWLS compatibility uses the
+      # explicit `scripts/test.sh --live` smoke. SLACKWATER_SIMS must name ONE
+      # device — it overrides the script's fast/full device list outright.
       #
-      # SLACKWATER_SIMS must name ONE device here. It overrides the script's own
-      # fast/full device list outright, so leaving the iPad in it would silently
-      # undo the split and keep booking the shared runner for ~34 minutes.
+      # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
+      # wake it: it reports an EMPTY device list — placeholder destinations
+      # only — and exits 70 on "Unable to find a device matching iPhone 17".
+      # Listing the devices first starts the service, and the run below then
+      # finds them. actions/runner-images#13459 collects the same one-liner in
+      # front of `-downloadPlatform`, which fails the same way for the same
+      # reason.
+      #
+      # This reads like a version problem and is not one. Apple ships no iOS
+      # 26.6 simulator runtime at all, so the image's Xcode 26.6 against its
+      # 26.5 runtime is the ordinary pairing — the same one every developer
+      # here runs locally. Pinning DEVELOPER_DIR to 26.5 also turns the lane
+      # green, which is what makes this worth writing down: it works only
+      # because switching Xcode re-enumerates the devices, so it treats the
+      # symptom and leaves a version to maintain forever.
+      - run: xcrun simctl list > /dev/null
+
+      # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
+      # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
+      # image's default Xcode ever drifts from what the project needs, pin
+      # DEVELOPER_DIR here.
+      # SLACKWATER_PERF_SCALE widens two things calibrated on the Mac Studio:
+      # the unit tests' wall-clock budgets, and every wait in the UI target
+      # (ScreenshotTestCase's `uiWaitScale`). The first hosted run measured
+      # 1.9–2.5× slower; 4× absorbs pool variance while a real 2×+ regression
+      # on top of that still trips. Without it on the waits, three runs of
+      # identical code failed three different UI tests — see #331.
       - run: ./scripts/test.sh
         env:
-          SLACKWATER_SIMS: SlackwaterCI-iPhone
+          SLACKWATER_SIMS: iPhone 17
+          SLACKWATER_WORKERS: 1
+          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
+          SLACKWATER_ONLY: ${{ matrix.shard.only }}
+          SLACKWATER_SKIP: ${{ matrix.shard.skip }}
 
-      # `cancel-in-progress` above kills the step's process group, but
-      # xcodebuild's helpers detach into their own groups and survive — still
-      # holding the inherited descriptor that locks /tmp/slackwater-test.lock,
-      # so the next run queues behind a ghost of the cancelled one. Kill only
-      # lock holders whose working directory is this checkout: a local run (or
-      # waiter) on this machine has a different cwd and is left alone.
-      - name: Release the test lock on cancellation
-        if: cancelled()
-        run: |
-          for pid in $(lsof -t /tmp/slackwater-test.lock 2>/dev/null); do
-            if lsof -a -p "$pid" -d cwd 2>/dev/null | grep -qF "$GITHUB_WORKSPACE"; then
-              kill -9 "$pid" 2>/dev/null || true
-            fi
-          done
+      # There is no runner to ssh into, so the evidence has to travel.
+      - name: Upload screenshots and results on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-evidence-${{ matrix.shard.name }}
+          path: |
+            /tmp/slackwater-shots
+            build/*.xcresult
+          if-no-files-found: ignore

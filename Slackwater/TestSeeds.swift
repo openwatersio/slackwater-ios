@@ -27,6 +27,10 @@ func applySeedHooksIfRequested() {
     if let id = UserDefaults.standard.string(forKey: "seedTideModel") {
         seedTideModel(stationID: id)
     }
+    if let id = UserDefaults.standard.string(forKey: "seedCurrentModel") {
+        seedCurrentModel(stationID: id,
+                         provisional: CommandLine.arguments.contains("-seedCurrentProvisional"))
+    }
     // -seedOnlineWindow <id> (UserDefaults argument domain): writes a
     // fetched-looking ChsOnlineWindow for one of the 7 online (fit-reject)
     // gates, so a UI test can land on OnlineGateDetailView's fetched
@@ -76,6 +80,24 @@ private func seedTideModel(stationID: String) {
         constituents: [Con(name: "M2", amplitude: 1.5, phase: 0),
                        Con(name: "K1", amplitude: 0.9, phase: 90)])
     try? ChsModelStore.save(model)
+}
+
+/// A stored current model. Service init classifies it through the production
+/// `isProvisional` rule, so the seed supplies data, not a second state machine.
+private func seedCurrentModel(stationID: String, provisional: Bool) {
+    guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == stationID }) else { return }
+    try? FileManager.default.removeItem(at: ChsModelStore.dir)
+    try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+    let now = appNow()
+    let days = provisional ? ChsCurrentGateInfo.provisionalDays : gate.fitDays
+    let model = ChsModel(
+        stationID: stationID, iwlsID: "seeded", iwlsName: "\(gate.name) (seeded)",
+        fittedAt: now, fitStartMs: (now.timeIntervalSince1970 - days * 86_400) * 1000,
+        fitEndMs: now.timeIntervalSince1970 * 1000, fitDays: days,
+        floodDirection: 45, ebbDirection: 225, offset: 0, rms: 0.08,
+        constituents: [Con(name: "M2", amplitude: 2.0, phase: 0),
+                       Con(name: "K1", amplitude: 0.5, phase: 90)])
+    try? ChsModelStore.saveCurrent(model)
 }
 
 /// UI-test hook (`-seedOnlineWindow <id>`): writes a
@@ -141,4 +163,15 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
     _ = try? ChsModelStore.saveOnline(window)
 }
 
+#endif
+
+/// `-scrubInstant <ISO 8601>` (UserDefaults argument domain): every detail
+/// opened this run scrubs to that moment, the way a shared link's does
+/// (`pendingScrubInstant`) — how the website screenshot walk lands on a
+/// night, a sunrise and a noon (SlackwaterUITests/WebsiteScreenshots.swift).
+#if DEBUG
+let seededScrubInstant: Date? = UserDefaults.standard.string(forKey: "scrubInstant")
+    .flatMap { ISO8601DateFormatter().date(from: $0) }
+#else
+let seededScrubInstant: Date? = nil
 #endif

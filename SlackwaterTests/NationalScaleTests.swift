@@ -122,8 +122,44 @@ final class NationalScaleTests: XCTestCase {
                      StationItem.all.count, queries.count, before * 1000, after * 1000,
                      worstBefore, StationItem.searchLimit))
         XCTAssertGreaterThan(worstBefore, 500, "pick a query that used to flood the screen")
-        XCTAssertLessThan(after / Double(queries.count), 0.016,
+        XCTAssertLessThan(after / Double(queries.count), 0.016 * perfScale,
                           "a keystroke must land inside one 60 fps frame")
+    }
+
+    /// The Tides/Currents narrowing: a series-filtered search returns only
+    /// that series and still fills its rows (the filter runs inside the scan,
+    /// not over the truncated results), and the nearest-of-series helper —
+    /// what the nearby links and the widget cache lean on — answers in kind.
+    func testSeriesFilterNarrowsSearchAndNearest() throws {
+        let currents = StationItem.search("", near: firstRunFix, series: .current)
+        XCTAssertEqual(currents.count, StationItem.searchLimit)
+        XCTAssertTrue(currents.allSatisfy { $0.series == .current })
+        let tides = StationItem.search("port", near: firstRunFix, series: .tide)
+        XCTAssertFalse(tides.isEmpty)
+        XCTAssertTrue(tides.allSatisfy { $0.series == .tide })
+
+        let nearest = try XCTUnwrap(
+            StationItem.nearest(.current, toLat: firstRunFix.lat, lon: firstRunFix.lon))
+        XCTAssertEqual(nearest.item.series, .current)
+        // The first-run fix is Victoria Harbour — current-gate country.
+        XCTAssertLessThan(nearest.km, nearbyStationRadiusKm)
+    }
+
+    /// The My Location cards cover both series where both exist, and never
+    /// advertise a series a coast doesn't have: Victoria gets a tide and a
+    /// current card, Portsmouth (nearest current: another continent) gets one.
+    func testHeroItemsCoverBothSeriesOnlyWhereBothAreNear() {
+        let victoria = StationItem.heroItems(
+            ranked: StationItem.rankedByDistance(StationItem.all,
+                                                 lat: firstRunFix.lat, lon: firstRunFix.lon),
+            lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertEqual(victoria.count, 2)
+        XCTAssertEqual(Set(victoria.map(\.series)), [.tide, .current])
+
+        let portsmouth = StationItem.heroItems(
+            ranked: StationItem.rankedByDistance(StationItem.all, lat: 50.80, lon: -1.11),
+            lat: 50.80, lon: -1.11)
+        XCTAssertEqual(portsmouth.map(\.series), [.tide])
     }
 
     /// The list ranks the catalog inside `body`, which SwiftUI re-evaluates on
@@ -179,7 +215,7 @@ final class NationalScaleTests: XCTestCase {
         PinFeaturesCache.shared.resetForTesting()
         let build = elapsed { _ = stationShapeSource() }
         print(String(format: "M53 pin source · %d stations: %.1f ms", StationItem.all.count, build * 1000))
-        XCTAssertLessThan(build, 1.45)
+        XCTAssertLessThan(build, 1.45 * perfScale)
     }
 
     /// The regression this exists for: a stale CHS tone surviving after a fit
@@ -520,6 +556,14 @@ final class NationalScaleTests: XCTestCase {
                       "once queued it stops saying \"tap to download\"")
     }
 }
+
+/// Widens the wall-clock budgets off their calibration machine. The budgets
+/// in this file were measured on the Mac Studio; a hosted CI runner ran them
+/// 1.9–2.5× slower on its first run, with pool variance on top. CI passes
+/// TEST_RUNNER_SLACKWATER_PERF_SCALE through xcodebuild (which strips the
+/// prefix); local runs stay at 1× so the budgets keep their teeth where the
+/// numbers were measured.
+private let perfScale = Double(ProcessInfo.processInfo.environment["SLACKWATER_PERF_SCALE"] ?? "1") ?? 1
 
 /// Wall clock for one block, in seconds.
 private func elapsed(_ body: () -> Void) -> TimeInterval {

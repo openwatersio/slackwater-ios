@@ -8,9 +8,14 @@
 // event) under the centerline when it's within 46pt. One implementation for
 // the tide-only and current-only details.
 import Almanac
+import Synchronization
 import SwiftUI
 import UIKit
 import TideEngine
+
+/// Hands out `TimelineData.revision`. Atomic because a timeline is built on
+/// whatever thread asked for it — chunk builds run off the main actor.
+private let timelineRevisions = Atomic<UInt64>(0)
 
 // MARK: - Fixed window + scale (prototype TMIN / TMAX / PPH)
 
@@ -110,6 +115,11 @@ enum Timeline {
     /// has not visibly moved.
     static let scrubbedSeconds = 3600.0 / Double(pph)
 
+    /// Return-to-now and pill jumps ride an animated scroll when the distance
+    /// is one the eye can follow; past this it lands unanimated — a week of
+    /// curve compressed into a 0.3s glide is a smear, not a return.
+    static let snapJumpHours = 7 * 24.0
+
     /// THE window definition. Four sites used to re-derive `today ± hours`
     /// independently — day chrome, the online-gate coverage check, the
     /// UI-test seed, and the online fetch — and with a conditional back-pad
@@ -165,6 +175,19 @@ struct TimelineDay {
 }
 
 struct TimelineData {
+    /// This timeline's identity, distinct for every one ever built in this
+    /// process and carried along by struct copies.
+    ///
+    /// The strip caches its drawn canvas and needs to know when the picture
+    /// changed. A fingerprint of SHAPE — span plus sample counts — cannot
+    /// answer that: rebuilding the same station over the same window with a
+    /// new slack threshold, or with a refined CHS model, produces an
+    /// identical span and an identical sample count and a different chart.
+    /// The cache would hold the old drawing under a readout showing the new
+    /// numbers: a stale green slack band is a safe-passage claim the app no
+    /// longer believes. Identity cannot be defeated that way, and it needs no
+    /// upkeep when a new field joins the struct.
+    let revision: UInt64 = timelineRevisions.wrappingAdd(1, ordering: .relaxed).newValue
     let tz: TimeZone
     /// The local midnight this window is built around. Geometry only.
     let anchor: Date
@@ -277,23 +300,35 @@ struct TimelineData {
 
     /// Linear interpolation over the drawn 10-min samples — the centerline dots
     /// must ride the curve as rendered (prototype _ser reads the same series).
-    func heightAt(_ t: Date) -> Double { interp(tidePoints.map { ($0.time, $0.height) }, t) }
+    func heightAt(_ t: Date) -> Double { interp(tidePoints, \.time, \.height, t) }
     /// Metres per hour under the centerline, signed like `tideRates`.
-    func rateAt(_ t: Date) -> Double { interp(tideRates.map { ($0.time, $0.rate) }, t) }
-    func velocityAt(_ t: Date) -> Double { interp(currentPoints.map { ($0.time, $0.speed) }, t) }
+    func rateAt(_ t: Date) -> Double { interp(tideRates, \.time, \.rate, t) }
+    func velocityAt(_ t: Date) -> Double { interp(currentPoints, \.time, \.speed, t) }
 
-    private func interp(_ pts: [(Date, Double)], _ t: Date) -> Double {
-        guard let first = pts.first else { return 0 }
-        var prev = first
-        for p in pts {
-            if t <= p.0 {
-                let span = p.0.timeIntervalSince(prev.0)
-                let frac = span > 0 ? t.timeIntervalSince(prev.0) / span : 0
-                return prev.1 + (p.1 - prev.1) * frac
-            }
-            prev = p
+    /// Binary search, and no intermediate array. These are the hottest calls
+    /// in the app: the riding dots, the lead readout and the commentary all
+    /// ask for a value under the centerline on every scrub frame. Mapping the
+    /// series into tuples first allocated a copy of the WHOLE window per
+    /// call — affordable when the window was a fixed 228 hours, and the first
+    /// thing to bite once it grows without bound.
+    ///
+    /// Same answers as the linear walk it replaces, boundaries included:
+    /// before the series it returns the first value, after it the last, and
+    /// exactly on a sample that sample's own value.
+    private func interp<T>(_ pts: [T], _ time: KeyPath<T, Date>, _ value: KeyPath<T, Double>,
+                           _ t: Date) -> Double {
+        guard let first = pts.first, let last = pts.last else { return 0 }
+        if t <= first[keyPath: time] { return first[keyPath: value] }
+        if t >= last[keyPath: time] { return last[keyPath: value] }
+        var lo = 0, hi = pts.count - 1
+        while lo + 1 < hi {
+            let m = (lo + hi) / 2
+            if pts[m][keyPath: time] <= t { lo = m } else { hi = m }
         }
-        return prev.1
+        let a = pts[lo], b = pts[hi]
+        let span = b[keyPath: time].timeIntervalSince(a[keyPath: time])
+        let frac = span > 0 ? t.timeIntervalSince(a[keyPath: time]) / span : 0
+        return a[keyPath: value] + (b[keyPath: value] - a[keyPath: value]) * frac
     }
 
     /// Everything both `build` overloads need before touching tide/current/
@@ -544,7 +579,12 @@ struct TimelineGeo {
     /// sky backdrop extends this far past its horizon, under the water.
     static let plotDepth = plotBottom - plotTop
 
-    init(data: TimelineData) {
+    /// `scale` nil derives the y-mapping from everything in `data` — correct
+    /// for a fixed window, and what every test renders. The infinite strip
+    /// passes the store's governed scale instead: its data span slides under
+    /// the viewport, and a scale derived from it would re-stretch the curve
+    /// on every chunk swap.
+    init(data: TimelineData, scale: TimelineScale? = nil) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
         // ONE track box, whichever track fills it. The switch resolves a
@@ -564,14 +604,13 @@ struct TimelineGeo {
         // chrome rows and the canvas height up with it.
         bodyTop = hasTide ? tideTop : curTop
         bodyBottom = hasTide ? tideBottom : curBottom
-        let heights = data.tidePoints.map(\.height)
-        let mn = heights.min() ?? 0, mx = heights.max() ?? 1
-        tideMid = (mn + mx) / 2
-        // 1.06: the readings hang INWARD from each turn (CurveStyle.hangOffset
-        // toward the plot middle), so the padding only has to clear the
-        // turn's dot and its halo.
-        tideSpan = max((mx - mn) / 2, 0.01) * 1.06
-        maxAbsCur = max(data.currentPoints.map { abs($0.speed) }.max() ?? 1, 0.01) * 1.05
+        // 1.06 / 1.05 padding live in `TimelineScale.fitting`: the readings
+        // hang INWARD from each turn (CurveStyle.hangOffset toward the plot
+        // middle), so the padding only has to clear the turn's dot and halo.
+        let s = scale ?? TimelineScale.fitting(data)
+        tideMid = s.tideMid
+        tideSpan = s.tideSpan
+        maxAbsCur = s.maxAbsCur
     }
 
     var zeroY: CGFloat { (curTop + curBottom) / 2 }
@@ -633,29 +672,63 @@ struct TimelineCanvas: View {
     /// at 18pt/h the whole transition is 27pt.
     static let twilightHours = 0.75
 
+    /// Which tiles exist as views. Nil mounts them all — the fixed-window
+    /// behaviour, and what the render tests draw. The infinite strip mounts
+    /// only the tiles near the viewport (`TimelineScrubber` recomputes this as
+    /// the offset moves): each mounted tile is a Metal-backed layer, and a
+    /// five-week merged span mounted whole would hold hundreds of MB of
+    /// texture for pixels nobody is looking at.
+    var tileRange: Range<Int>? = nil
+
+    var tileCount: Int { max(Int((data.totalWidth / Self.tileWidth).rounded(.up)), 1) }
+
     var body: some View {
-        let tiles = Array(0..<max(Int((data.totalWidth / Self.tileWidth).rounded(.up)), 1))
-        HStack(spacing: 0) {
-            ForEach(tiles, id: \.self) { i in
+        let mounted = (tileRange ?? 0..<tileCount).clamped(to: 0..<tileCount)
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(mounted), id: \.self) { i in
                 let x0 = CGFloat(i) * Self.tileWidth
                 let w = min(Self.tileWidth, data.totalWidth - x0)
                 Canvas { ctx, _ in
                     ctx.translateBy(x: -x0, y: 0)
                     ctx.clip(to: Path(CGRect(x: x0, y: 0, width: w, height: geo.height)))
-                    draw(ctx)
+                    draw(ctx, from: data.time(atX: x0), to: data.time(atX: x0 + w))
                 }
                 .frame(width: w, height: geo.height)
+                .offset(x: x0)
             }
         }
-        .frame(width: data.totalWidth, height: geo.height)
+        .frame(width: data.totalWidth, height: geo.height, alignment: .topLeading)
     }
 
-    private func draw(_ ctx: GraphicsContext) {
+    /// A tile draws its OWN hours, not the whole window. The clip already
+    /// discarded everything else, so walking the full span per tile was work
+    /// thrown away — invisible against a fixed 228h strip and quadratic-
+    /// feeling once the window slides for weeks. Cost is now proportional to
+    /// the tile.
+    private func draw(_ ctx: GraphicsContext, from t0: Date, to t1: Date) {
         // Tracks first: their night shade runs down through the axis rows,
         // and the day chrome's labels go over it.
-        if geo.hasTide { drawTide(ctx) }
-        if geo.hasCurrent { drawCurrent(ctx) }
-        drawDayChrome(ctx)
+        if geo.hasTide { drawTide(ctx, t0, t1) }
+        if geo.hasCurrent { drawCurrent(ctx, t0, t1) }
+        drawDayChrome(ctx, t0, t1)
+    }
+
+    /// The samples inside `t0…t1`, plus one either side so a curve crossing
+    /// the tile edge is drawn from off-canvas rather than starting at it.
+    /// Binary search: this runs per tile per render.
+    private func window<T>(_ pts: [T], _ time: (T) -> Date, _ t0: Date, _ t1: Date) -> ArraySlice<T> {
+        guard !pts.isEmpty else { return pts[pts.startIndex..<pts.startIndex] }
+        var lo = 0, hi = pts.count
+        while lo < hi {
+            let m = (lo + hi) / 2
+            if time(pts[m]) < t0 { lo = m + 1 } else { hi = m }
+        }
+        var lo2 = lo, hi2 = pts.count
+        while lo2 < hi2 {
+            let m = (lo2 + hi2) / 2
+            if time(pts[m]) <= t1 { lo2 = m + 1 } else { hi2 = m }
+        }
+        return pts[max(lo - 1, 0)..<min(lo2 + 1, pts.count)]
     }
 
     // MARK: Card-look primitives, shared by both tracks
@@ -685,8 +758,14 @@ struct TimelineCanvas: View {
     }
 
     /// The axis times on the bottom row, faded when passed.
-    private func axisTimes(_ ctx: GraphicsContext, _ times: [Date]) {
-        for t in thinnedAxisTimes(times, x: data.x, minGap: 64) {
+    ///
+    /// Thinned over the WHOLE window, then drawn per tile. Thinning carries
+    /// state from the first label on — which survives is a function of what
+    /// came before it — so thinning a tile's slice in isolation would let one
+    /// tile keep a label its neighbour drops, and a label would blink as it
+    /// crossed a seam. Only the drawing is per-tile.
+    private func axisTimes(_ ctx: GraphicsContext, _ times: [Date], _ t0: Date, _ t1: Date) {
+        for t in thinnedAxisTimes(times, x: data.x, minGap: 64) where t >= t0 && t <= t1 {
             ctx.draw(Text(chartTime(t, data.tz))
                         .font(.system(size: 12, weight: .medium).monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(0.7 * fade(t))),
@@ -695,19 +774,31 @@ struct TimelineCanvas: View {
     }
 
     // Day labels and sun markers — continuous across midnight.
-    private func drawDayChrome(_ ctx: GraphicsContext) {
-        for day in data.visibleDays {
-            // Day label at local noon. Fixed size, not `.caption2` — chart
+    private func drawDayChrome(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+        // A day's chrome hangs off its daylight midpoint and its sun dots, so
+        // a day whose midnight is off-tile can still print into it: widen by a
+        // day either side rather than testing the day's own start.
+        let from = t0.addingTimeInterval(-24 * 3600), to = t1.addingTimeInterval(24 * 3600)
+        for day in data.visibleDays where day.start >= from && day.start <= to {
+            // Day label at the daylight midpoint, not clock noon: the tint
+            // band is what the label names, and clock noon sits toward
+            // sunrise all DST season. Clock noon only when a polar day has
+            // no band to center on. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
+            let labelX: CGFloat = if let sr = day.sunrise, let ss = day.sunset {
+                data.x(sr.addingTimeInterval(ss.timeIntervalSince(sr) / 2))
+            } else {
+                data.x(noonLocal(day.start, data.tz))
+            }
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY),
+                     at: CGPoint(x: labelX, y: geo.dayY),
                      anchor: .center)
             ctx.draw(Text(monthDay(day.start, data.tz))
                         .font(.system(size: 10, weight: .medium).monospaced())
                         .foregroundStyle(SN.foam.opacity(0.48)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY + 17),
+                     at: CGPoint(x: labelX, y: geo.dayY + 17),
                      anchor: .center)
             // Sun rise/set dots + "↑5:24AM" labels.
             for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {
@@ -721,7 +812,7 @@ struct TimelineCanvas: View {
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
             }
         }
-        drawEclipses(ctx)
+        drawEclipses(ctx, t0, t1)
     }
 
     /// A moon at greatest eclipse, on the sun dots' row. That is the whole
@@ -739,30 +830,38 @@ struct TimelineCanvas: View {
     /// crowding them, and the times stay where they already were — the
     /// schedule row below, and the readout as you scrub. #304 is where a
     /// better answer goes; this one is deliberately quiet rather than wrong.
-    private func drawEclipses(_ ctx: GraphicsContext) {
-        for e in data.eclipses where data.contains(e.peak) {
+    private func drawEclipses(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+        for e in data.eclipses where data.contains(e.peak) && e.peak >= t0 && e.peak <= t1 {
             ctx.draw(Text("🌘").font(.system(size: 6.5)),
                      at: CGPoint(x: data.x(e.peak), y: geo.sunY), anchor: .center)
         }
     }
 
-    private func drawTide(_ ctx: GraphicsContext) {
+    private func drawTide(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+        let points = window(data.tidePoints, { $0.time }, t0, t1)
+        guard let first = points.first, let last = points.last else { return }
         var line = Path()
-        for (i, p) in data.tidePoints.enumerated() {
+        for (i, p) in points.enumerated() {
             let pt = CGPoint(x: data.x(p.time), y: geo.tideY(p.height))
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
-        seaBase(ctx, under: line, floor: geo.tideBottom)
+        // The slice's own edges close every filled shape below. Closing at
+        // 0 / totalWidth instead would drag each fill across the whole
+        // window — correct under the clip, and increasingly wasteful.
+        let xa = data.x(first.time), xb = data.x(last.time)
+        seaBase(ctx, under: line, floor: geo.tideBottom, from: xa, to: xb)
         // The card's fill, anchored at chart datum (CurveDrawing.datumFill).
         let datumY = geo.tideY(0)
         var area = line
-        area.addLine(to: CGPoint(x: data.totalWidth, y: datumY))
-        area.addLine(to: CGPoint(x: 0, y: datumY))
+        area.addLine(to: CGPoint(x: xb, y: datumY))
+        area.addLine(to: CGPoint(x: xa, y: datumY))
         area.closeSubpath()
-        let lowest = data.tidePoints.map(\.height).min() ?? 0
+        // The datum fade keys on the LOWEST water in the window, not in this
+        // tile: a per-tile minimum would step the gradient at every seam.
+        let lowest = data.tidePoints.lazy.map(\.height).min() ?? 0
         CurveDrawing.datumFill(ctx, area, plotTop: geo.tideTop, plotBottom: geo.tideBottom,
                                width: data.totalWidth, datumY: datumY, lowestY: geo.tideY(lowest))
-        nightShade(ctx, under: line)
+        nightShade(ctx, under: line, from: xa, to: xb, t0, t1)
 
         // Chart datum, the reference every printed height is quoted against.
         // Drawn only when datum is inside the plotted span; a week where the
@@ -773,7 +872,12 @@ struct TimelineCanvas: View {
         }
 
         // Rate of rise as line colour (#95): the past fade applies on top.
-        CurveDrawing.tideLine(ctx, line, rates: data.tideRates.map { (x: data.x($0.time), rate: $0.rate) },
+        // Sliced with the line it colours — the gradient still spans the full
+        // width, so every stop keeps its absolute x and the colour under the
+        // curve is identical whichever tile drew it.
+        CurveDrawing.tideLine(ctx, line,
+                              rates: window(data.tideRates, { $0.time }, t0, t1)
+                                  .map { (x: data.x($0.time), rate: $0.rate) },
                               nowX: nowX, width: data.totalWidth, height: geo.height)
 
         // Turns: a dot on the curve, the reading hanging off it toward the
@@ -781,9 +885,12 @@ struct TimelineCanvas: View {
         // the current peaks follow — and the time on the bottom row. Teal
         // for a high and amber for a low, as on the card. No unit: the lead
         // reading carries it once.
+        // A turn's label hangs off its dot, so a turn just off the tile can
+        // still print into it: the slice, not a strict tile test.
         let margin = 0.3 * 3600
-        for e in data.tideExtremes where e.time >= data.start.addingTimeInterval(margin)
-                                      && e.time <= data.end.addingTimeInterval(-margin) {
+        let turns = window(data.tideExtremes, { $0.time }, t0, t1)
+        for e in turns where e.time >= data.start.addingTimeInterval(margin)
+                          && e.time <= data.end.addingTimeInterval(-margin) {
             let p = CGPoint(x: data.x(e.time), y: geo.tideY(e.height))
             let high = e.kind == .high
             let f = fade(e.time)
@@ -796,9 +903,11 @@ struct TimelineCanvas: View {
         }
         axisTimes(ctx, data.tideExtremes.map(\.time).filter { t in
             t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
-        })
+        }, t0, t1)
 
-        drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.tideY(data.heightAt(now))))
+        if now >= t0, now <= t1 {
+            drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.tideY(data.heightAt(now))))
+        }
     }
 
     /// This station's set for one direction, nil on a derived gate.
@@ -808,10 +917,11 @@ struct TimelineCanvas: View {
     /// The sky backdrop runs on behind the plot so a body's glow can reach
     /// the water, and the translucent fills above would otherwise let it
     /// through.
-    private func seaBase(_ ctx: GraphicsContext, under line: Path, floor: CGFloat) {
+    private func seaBase(_ ctx: GraphicsContext, under line: Path, floor: CGFloat,
+                         from xa: CGFloat, to xb: CGFloat) {
         var sea = line
-        sea.addLine(to: CGPoint(x: data.totalWidth, y: floor))
-        sea.addLine(to: CGPoint(x: 0, y: floor))
+        sea.addLine(to: CGPoint(x: xb, y: floor))
+        sea.addLine(to: CGPoint(x: xa, y: floor))
         sea.closeSubpath()
         ctx.fill(sea, with: .color(SN.canvas))
     }
@@ -830,10 +940,11 @@ struct TimelineCanvas: View {
     /// ponytail: two states with a fixed twilight ramp. Sample the sun's
     /// altitude hourly through `skyPaint` if the ramp reads wrong against the
     /// sky at high latitudes, where twilight runs long.
-    private func nightShade(_ ctx: GraphicsContext, under line: Path) {
+    private func nightShade(_ ctx: GraphicsContext, under line: Path,
+                            from xa: CGFloat, to xb: CGFloat, _ t0: Date, _ t1: Date) {
         var under = line
-        under.addLine(to: CGPoint(x: data.totalWidth, y: geo.height))
-        under.addLine(to: CGPoint(x: 0, y: geo.height))
+        under.addLine(to: CGPoint(x: xb, y: geo.height))
+        under.addLine(to: CGPoint(x: xa, y: geo.height))
         under.closeSubpath()
         var water = ctx
         water.clipToLayer { mask in
@@ -857,41 +968,67 @@ struct TimelineCanvas: View {
                 ]),
                 startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
         }
-        for day in data.days {
+        // A band can start a day before this tile and end a day after it, so
+        // the day list is widened rather than clipped to the tile; `fadedBand`
+        // skips anything that lands entirely outside.
+        let from = t0.addingTimeInterval(-36 * 3600), to = t1.addingTimeInterval(36 * 3600)
+        let nights = data.days.filter { $0.start >= from && $0.start <= to }
+        for day in nights {
             guard let set = day.sunset,
                   let nextRise = data.days.first(where: { $0.offset == day.offset + 1 })?.sunrise
             else { continue }
             fadedBand(from: data.x(set), to: data.x(nextRise), color: SN.night, opacity: 0.7)
         }
-        for day in data.days {
+        for day in nights {
             guard let rise = day.sunrise, let set = day.sunset else { continue }
             fadedBand(from: data.x(rise), to: data.x(set), color: Color(hex: 0xA8CAE0), opacity: 0.14)
         }
     }
 
-    private func drawCurrent(_ ctx: GraphicsContext) {
+    private func drawCurrent(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
+        let points = window(data.currentPoints, { $0.time }, t0, t1)
+        guard let first = points.first, let last = points.last else { return }
         var line = Path()
-        for (i, p) in data.currentPoints.enumerated() {
+        for (i, p) in points.enumerated() {
             let pt = CGPoint(x: data.x(p.time), y: geo.curY(p.speed))
             i == 0 ? line.move(to: pt) : line.addLine(to: pt)
         }
-        let runs = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
-        seaBase(ctx, under: line, floor: geo.curBottom)
+        // Merged over the whole window — runs join across a seam, and the
+        // axis labels and the no-run test below must see every one of them or
+        // they would disagree from tile to tile. Only the drawn segments are
+        // cut to the tile.
+        let allRuns = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
+        let runs = allRuns.filter { $0.end >= t0 && $0.start <= t1 }
+        // The run segments, built before the line because the line clips
+        // itself around them. Walks THIS TILE's samples, not the window's,
+        // once per run it touches: the window-wide scan was the strip's worst
+        // cost, a full pass per run per tile.
+        let segs = runs.map { run -> Path in
+            var seg = Path()
+            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+            for p in points where p.time > run.start && p.time < run.end {
+                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            return seg
+        }
+        let xa = data.x(first.time), xb = data.x(last.time)
+        seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
 
         // The card's fill, anchored at zero (CurveDrawing.zeroFill). A derived
         // gate is flat steel instead: the zero-anchored blue reads as a
         // magnitude, and a ±1 schematic shape has none to report. Colour is
         // state, and this curve's magnitude is unknown.
         var area = line
-        area.addLine(to: CGPoint(x: data.totalWidth, y: geo.zeroY))
-        area.addLine(to: CGPoint(x: 0, y: geo.zeroY))
+        area.addLine(to: CGPoint(x: xb, y: geo.zeroY))
+        area.addLine(to: CGPoint(x: xa, y: geo.zeroY))
         area.closeSubpath()
         if data.speedsAreSchematic {
             ctx.fill(area, with: .color(SN.steel.opacity(0.32)))
         } else {
             CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
         }
-        nightShade(ctx, under: line)
+        nightShade(ctx, under: line, from: xa, to: xb, t0, t1)
 
         // Slack: the line every speed on this track is signed against, drawn
         // the way the tide track draws chart datum. Under the curve, so the
@@ -904,21 +1041,13 @@ struct TimelineCanvas: View {
             strokeSplitAtNow(ctx, line, with: .color(SN.graphLine))
         } else {
             CurveDrawing.currentLine(ctx, line,
-                                     samples: data.currentPoints.map { (x: data.x($0.time), speedKn: $0.speed) },
+                                     slackRuns: segs,
+                                     samples: points.map { (x: data.x($0.time), speedKn: $0.speed) },
                                      nowX: nowX, width: data.totalWidth, height: geo.height)
         }
 
         // The run is the mark (spec §5.2): the line itself turns the go
         // colour between each run's interpolated edges (CurveDrawing.runs).
-        let segs = runs.map { run -> Path in
-            var seg = Path()
-            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-            for p in data.currentPoints where p.time > run.start && p.time < run.end {
-                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
-            }
-            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-            return seg
-        }
         CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         let margin = 0.3 * 3600
@@ -926,9 +1055,11 @@ struct TimelineCanvas: View {
             t >= data.start.addingTimeInterval(margin) && t <= data.end.addingTimeInterval(-margin)
         }
         let slacks = data.currentEvents.filter { $0.kind == .slack }.map(\.time)
-        axisTimes(ctx, currentAxisMoments(runs: runs, slacks: slacks).filter(onStrip))
+        axisTimes(ctx, currentAxisMoments(runs: allRuns, slacks: slacks).filter(onStrip), t0, t1)
 
-        for e in data.currentEvents where onStrip(e.time) {
+        // A max's speed label hangs off its peak, so the slice (one event
+        // either side) rather than a strict tile test.
+        for e in window(data.currentEvents, { $0.time }, t0, t1) where onStrip(e.time) {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
@@ -936,7 +1067,7 @@ struct TimelineCanvas: View {
                 // derived gate): a hairline rather than a run — a zero-width
                 // window must not look like a window (§5.3). Where a run
                 // exists, the run is the mark.
-                if !runs.contains(where: { $0.contains(e.time) }) {
+                if !allRuns.contains(where: { $0.contains(e.time) }) {
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
@@ -959,7 +1090,9 @@ struct TimelineCanvas: View {
             }
         }
 
-        drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.curY(data.velocityAt(now))))
+        if now >= t0, now <= t1 {
+            drawNowDot(ctx, at: CGPoint(x: data.x(now), y: geo.curY(data.velocityAt(now))))
+        }
     }
 }
 
@@ -992,8 +1125,25 @@ struct TimelineScrubber: UIViewRepresentable {
     /// Bumped by a pill tap. A tap must win over whatever the strip is doing,
     /// so this bypasses the settle guard below.
     var jumpToken = 0
+    /// The store's is-it-safe-to-move-the-left-edge signal (`ScrollGate`).
+    /// Nil on a fixed window (the online gate), where nothing slides.
+    var scrollGate: ScrollGate? = nil
+    /// A tap on the day row's DATE — the one label on the strip that names a
+    /// day rather than a moment on it — opens the week picker.
+    var onPickDate: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    /// The tiles worth having mounted for this offset: the visible ones plus
+    /// one each side, so a pan never reaches an unmounted tile before the
+    /// next remount lands.
+    static func mountedTiles(offset: CGFloat, viewport: CGFloat, total: CGFloat) -> Range<Int> {
+        let count = max(Int((total / TimelineCanvas.tileWidth).rounded(.up)), 1)
+        guard viewport > 0 else { return 0..<0 }
+        let lo = max(Int(((offset - TimelineCanvas.tileWidth) / TimelineCanvas.tileWidth).rounded(.down)), 0)
+        let hi = min(Int(((offset + viewport + TimelineCanvas.tileWidth) / TimelineCanvas.tileWidth).rounded(.up)), count)
+        return lo..<max(hi, lo)
+    }
 
     /// The scroll view's bounds are zero in makeUIView and updateUIView is
     /// not re-invoked by layout, so "center now under the centerline" can't
@@ -1015,12 +1165,17 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.alwaysBounceVertical = false
         sv.contentInsetAdjustmentBehavior = .never
         sv.delegate = context.coordinator
-        let host = UIHostingController(rootView: canvas)
+        // Nothing mounted until the first update with a real width — the
+        // opening data can already span two chunks, and mounting every tile
+        // of it would allocate their textures for one throwaway frame.
+        let host = UIHostingController(rootView: canvas(tiles: 0..<0))
         host.view.backgroundColor = .clear
         host.view.frame = CGRect(x: 0, y: 0, width: data.totalWidth, height: geo.height)
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
+        sv.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator,
+                                                       action: #selector(Coordinator.handleTap(_:))))
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -1031,7 +1186,10 @@ struct TimelineScrubber: UIViewRepresentable {
     func updateUIView(_ sv: UIScrollView, context: Context) {
         let co = context.coordinator
         co.parent = self
-        co.host?.rootView = canvas
+        // Rendered from the CURRENT offset; when a branch below moves the
+        // offset, the scroll callback it fires refreshes again from the
+        // final position.
+        co.refreshCanvas(sv)
         guard sv.bounds.width > 0 else { return }
         // The window's width is a constant 228h for every anchor (the 48h
         // back-pad is unconditional, #67 item 1) — an anchor pick alone can no
@@ -1079,10 +1237,16 @@ struct TimelineScrubber: UIViewRepresentable {
             // `didEndScrollingAnimation` parks exactly on the tapped time.
             // Reduce Motion, or nothing to travel, lands directly: a
             // zero-length animated scroll may never call back.
+            // Past `snapJumpHours` of travel the ride is skipped too: a far
+            // Now tap (or a picked week) lands instantly, because a multi-week
+            // glide in 0.3s reads as a smear and the far content may not even
+            // be mounted to ride through.
             co.seenJump = jumpToken
             co.stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
-            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+            let travel = abs(desired - sv.contentOffset.x)
+            if UIAccessibility.isReduceMotionEnabled || travel < 0.5
+                || travel > CGFloat(Timeline.snapJumpHours) * Timeline.pph {
                 co.magneting = false
                 sv.contentOffset = CGPoint(x: desired, y: 0)
             } else {
@@ -1090,6 +1254,7 @@ struct TimelineScrubber: UIViewRepresentable {
                 co.magnetTarget = scrubTime
                 sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
             }
+            co.syncGate(sv)
             return
         }
         if abs(desired - sv.contentOffset.x) > 1, !sv.isDragging, !co.nudging {
@@ -1098,13 +1263,14 @@ struct TimelineScrubber: UIViewRepresentable {
                 co.cancelMagnet()
             }
             sv.contentOffset = CGPoint(x: desired, y: 0)
+            co.syncGate(sv)
         }
     }
 
-    private var canvas: TimelineCanvas {
+    private func canvas(tiles: Range<Int>?) -> TimelineCanvas {
         TimelineCanvas(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                        now: now,
-                       floodDeg: floodDeg, ebbDeg: ebbDeg)
+                       floodDeg: floodDeg, ebbDeg: ebbDeg, tileRange: tiles)
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
@@ -1130,8 +1296,61 @@ struct TimelineScrubber: UIViewRepresentable {
         /// scroll callback it fires must not write `scrubTime` back from
         /// layout.
         var reanchoring = false
+        /// Everything the drawn strip depends on — and notably NOT
+        /// `scrubTime`. The canvas is the same picture at every offset: a pan
+        /// moves it, it does not change it. Assigning `rootView` per scroll
+        /// frame (which SwiftUI invites, since the scroll callback writes
+        /// `scrubTime` and re-runs the body) re-renders every mounted tile
+        /// sixty times a second for an identical result — affordable against
+        /// a fixed 228h window, and the reason a multi-week one felt heavy.
+        ///
+        /// Keyed on the timeline's IDENTITY, never on its shape: a rebuild
+        /// with a new slack threshold or a refined CHS model lands the same
+        /// span and the same sample count, and only `revision` tells those
+        /// apart. The geometry fields are still listed because the scale is
+        /// the store's, not the data's, and can move under unchanged data.
+        struct CanvasKey: Equatable {
+            let revision: UInt64
+            let height: CGFloat
+            let tideMid: Double, tideSpan: Double, maxAbsCur: Double
+            let now: Date
+            let imperial: Bool, speedUnit: String
+            let floodDeg: Double?, ebbDeg: Double?
+            let tiles: Range<Int>
+        }
+        var canvasKey: CanvasKey?
 
         init(_ parent: TimelineScrubber) { self.parent = parent }
+
+        /// Re-host the canvas only when what it draws has actually changed:
+        /// new data, a new scale, or a pan that reached different tiles.
+        func refreshCanvas(_ sv: UIScrollView) {
+            let data = parent.data, geo = parent.geo
+            let tiles = TimelineScrubber.mountedTiles(offset: sv.contentOffset.x,
+                                                      viewport: sv.bounds.width,
+                                                      total: data.totalWidth)
+            let key = CanvasKey(revision: data.revision,
+                                height: geo.height, tideMid: geo.tideMid,
+                                tideSpan: geo.tideSpan, maxAbsCur: geo.maxAbsCur,
+                                now: parent.now, imperial: parent.imperial,
+                                speedUnit: parent.speedUnit,
+                                floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
+                                tiles: tiles)
+            guard key != canvasKey else { return }
+            canvasKey = key
+            host?.rootView = TimelineCanvas(data: data, geo: geo,
+                                            imperial: parent.imperial, speedUnit: parent.speedUnit,
+                                            now: parent.now,
+                                            floodDeg: parent.floodDeg, ebbDeg: parent.ebbDeg,
+                                            tileRange: tiles)
+        }
+
+        /// Tell the store whether the offset may be rewritten right now.
+        /// An offset write is how UIKit cancels a deceleration, so the store
+        /// holds any left-edge chunk swap until this reads quiet.
+        func syncGate(_ sv: UIScrollView) {
+            parent.scrollGate?.isQuiet = !sv.isDragging && !sv.isDecelerating && !magneting && !nudging
+        }
 
         /// Every `layoutSubviews`: the one-shot opening centre, then the
         /// width check that keeps the same time under the centerline.
@@ -1139,6 +1358,14 @@ struct TimelineScrubber: UIViewRepresentable {
             centerIfNeeded(sv)
             reanchorIfResized(sv)
             publishCenter(sv)
+            // The viewport's width arrives HERE and nowhere else. `updateUIView`
+            // runs first with zero bounds, where `mountedTiles` can only answer
+            // "none", and a strip that then never scrolls — a picked week that
+            // lands on the offset it already had — would keep that empty canvas:
+            // a scroll view of the right size hosting nothing, which is a blank
+            // chart under a correct readout. Cheap to repeat, since it returns
+            // on an unchanged key.
+            refreshCanvas(sv)
         }
 
         /// Rotation (iPad portrait ↔ landscape, Stage Manager) keeps
@@ -1204,6 +1431,7 @@ struct TimelineScrubber: UIViewRepresentable {
             }
 
             nudging = true
+            parent.scrollGate?.isQuiet = false
             introScrollView = sv
             introRange = (start, destination)
             let link = CADisplayLink(target: self, selector: #selector(advanceIntro))
@@ -1224,6 +1452,7 @@ struct TimelineScrubber: UIViewRepresentable {
             if elapsed >= Timeline.introDuration {
                 parent.scrubTime = range.destination
                 stopIntro()
+                parent.scrollGate?.isQuiet = true
             }
         }
 
@@ -1238,6 +1467,7 @@ struct TimelineScrubber: UIViewRepresentable {
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
             publishCenter(sv)
+            refreshCanvas(sv)
             guard sv.bounds.width > 0, didInitialCenter, !reanchoring else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
@@ -1245,11 +1475,16 @@ struct TimelineScrubber: UIViewRepresentable {
         /// the user grabbed it.
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
             stopIntro()
+            parent.scrollGate?.isQuiet = false
         }
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate: Bool) {
             if !willDecelerate { magnet(sv) }
+            syncGate(sv)
         }
-        func scrollViewDidEndDecelerating(_ sv: UIScrollView) { magnet(sv) }
+        func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
+            magnet(sv)
+            syncGate(sv)
+        }
         /// An external scrub interrupted the animated settle; drop its
         /// target so a late `didEndScrollingAnimation` cannot park on it.
         func cancelMagnet() {
@@ -1261,6 +1496,92 @@ struct TimelineScrubber: UIViewRepresentable {
             nudging = false
             // Park exactly on the stop, so readouts show the event's own time.
             if let t = magnetTarget { magnetTarget = nil; parent.scrubTime = t }
+            syncGate(sv)
+        }
+
+        /// A tap: the date opens the picker, everything else on the strip
+        /// brings its own moment to the centerline. Dragging is still how you
+        /// read the curve; this is how you get across a day of it.
+        @objc func handleTap(_ g: UITapGestureRecognizer) {
+            guard let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
+            // The scroll view's own coordinate space IS the content's, so this
+            // x is a strip x and this y a canvas y.
+            let p = g.location(in: sv)
+            // Whatever the strip is doing, a tap wins — including the tap that
+            // only opens the picker. Left running, the opening slide or a
+            // magnet in flight keeps writing `scrubTime` behind the sheet.
+            stopIntro()
+            guard let target = tapTarget(x: p.x, y: p.y) else {
+                sv.setContentOffset(sv.contentOffset, animated: false)
+                cancelMagnet()
+                parent.onPickDate()
+                return
+            }
+            // Clamped, then read back: at either end of the window the offset
+            // that would centre the tap does not exist, and parking scrubTime
+            // on an unreachable time leaves the readout disagreeing with the
+            // curve under the line. x and time are exact inverses, so a
+            // reachable tap round-trips to itself.
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            let landing = parent.data.time(atX: desired + sv.bounds.width / 2)
+            // Stop a fling first, then ride the magnet's animated path — the
+            // same landing a tapped pill gets (updateUIView's jump branch).
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+                cancelMagnet()
+                sv.contentOffset = CGPoint(x: desired, y: 0)
+                parent.scrubTime = landing
+            } else {
+                magneting = true
+                // `nudging` for the same reason the opening slide sets it: the
+                // scroll callbacks drive `scrubTime` from the offset the
+                // animation is passing through, and SwiftUI renders from that
+                // value a frame later — updateUIView's external-scrub branch
+                // reads the gap as a stale offset and pins the strip a few
+                // points into a travel that can be a screen wide.
+                nudging = true
+                magnetTarget = landing
+                sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
+            }
+        }
+
+        /// What a tap at this point on the strip means: the moment to bring to
+        /// the centerline, or nil for the date — the one label that names a day
+        /// rather than a moment, and so opens the picker.
+        private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
+            let data = parent.data
+            // Between the axis times' row and the day row, from the two rows'
+            // own y's: the strip's geometry is all literal points and moves.
+            let rowSplit = (parent.geo.timeY + parent.geo.dayY) / 2
+            guard y > rowSplit else {
+                // The plot and its axis: the tapped moment, pulled onto a stop
+                // by the same magnet a drag settles into.
+                if let stop = nearest(data.snapTimes, toX: x), stop.dx < Timeline.magnetPts {
+                    return stop.time
+                }
+                return data.time(atX: x)
+            }
+            // The day row is a row of labels — each day's date at its noon, its
+            // sun times where they fall — so a tap goes to the nearest one. A
+            // sunrise is a moment on the strip and scrubs there like anything
+            // else; only the date is a different question.
+            let sun = nearest(data.visibleDays.flatMap { day in
+                [day.sunrise, day.sunset].compactMap { $0 }
+            }, toX: x)
+            let date = nearest(data.visibleDays.map { noonLocal($0.start, data.tz) }, toX: x)
+            guard let sun, sun.dx < (date?.dx ?? .greatestFiniteMagnitude) else { return nil }
+            return sun.time
+        }
+
+        /// The nearest of `times` to a strip x, and how far off it is.
+        private func nearest(_ times: [Date], toX x: CGFloat) -> (time: Date, dx: CGFloat)? {
+            var best: (time: Date, dx: CGFloat)?
+            for t in times {
+                let dx = abs(parent.data.x(t) - x)
+                if dx < (best?.dx ?? .greatestFiniteMagnitude) { best = (t, dx) }
+            }
+            return best
         }
 
         /// Prototype magnet(): after the scroll settles, the nearest stop
@@ -1268,16 +1589,11 @@ struct TimelineScrubber: UIViewRepresentable {
         private func magnet(_ sv: UIScrollView) {
             guard !magneting else { return }
             let center = sv.contentOffset.x + sv.bounds.width / 2
-            var best: Date?
-            var bd = CGFloat.greatestFiniteMagnitude
-            for t in parent.data.snapTimes {
-                let d = abs(parent.data.x(t) - center)
-                if d < bd { bd = d; best = t }
-            }
-            guard let best, bd < Timeline.magnetPts, bd > 0.5 else { return }
+            guard let best = nearest(parent.data.snapTimes, toX: center),
+                  best.dx < Timeline.magnetPts, best.dx > 0.5 else { return }
             magneting = true
-            magnetTarget = best
-            sv.setContentOffset(CGPoint(x: parent.data.x(best) - sv.bounds.width / 2, y: 0),
+            magnetTarget = best.time
+            sv.setContentOffset(CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0),
                                 animated: true)
         }
     }
@@ -1301,14 +1617,30 @@ struct TimelineScrubStrip: View {
     /// The commentary's ink when it is a warning rather than a next event.
     var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
+    /// Infinite-strip plumbing, nil on a fixed window: the store's scroll
+    /// gate, and the viewport width the scale governor fits against.
+    var scrollGate: ScrollGate? = nil
+    var onViewportWidth: ((CGFloat) -> Void)? = nil
+    @Environment(\.openWeekPicker) private var openWeekPicker
     @State private var jumpToken = 0
+    @State private var settled = false
 
     var body: some View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                          now: now,
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
-                         jumpToken: jumpToken)
+                         jumpToken: jumpToken, scrollGate: scrollGate,
+                         onPickDate: openWeekPicker)
             .frame(height: geo.height)
+            // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
+            // the latter reports the first width from inside the update pass,
+            // and writing the caller's state there is "Modifying state during
+            // view update" — which SwiftUI calls undefined behavior and which
+            // showed up in the result bundles as a runtime warning. This API
+            // exists to hand geometry back without that.
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                onViewportWidth?(width)
+            }
             .overlay { overlay }
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
@@ -1324,7 +1656,7 @@ struct TimelineScrubStrip: View {
         let showNow = onReturn != nil && scrubbedAway(scrubTime, from: now)
         return ZStack {
             Commentary(text: commentary, tint: commentaryTint,
-                       scrubTime: scrubTime, ink: chromeInk) {
+                       ink: chromeInk) {
                 jumpToken += 1
                 onCommentary()
             }
@@ -1335,6 +1667,16 @@ struct TimelineScrubStrip: View {
                     if !past { Spacer(minLength: 0) }
                 }
             }
+        }
+        .opacity(settled ? 1 : 0)
+        .allowsHitTesting(settled)
+        .animation(.easeInOut(duration: 0.2), value: settled)
+        .task(id: scrubTime) {
+            // Rest = no scrub change for this long. A cancelled sleep is a
+            // scrub still in motion, not a rest.
+            settled = false
+            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            settled = true
         }
         .padding(.top, geo.chromeY)
         .padding(.horizontal, 16)
@@ -1368,6 +1710,8 @@ struct TimelineScrubStrip: View {
                 Rectangle().fill(.white.opacity(0.18))
                     .frame(width: 1, height: geo.bodyBottom - geo.padTop)
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
+                    .opacity(settled && commentary != nil ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: settled)
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas
@@ -1424,8 +1768,8 @@ func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
 
 /// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
 /// `anchor`, which is why this takes the anchor and `today` separately: day
-/// groups key on the first, labels read the second. Day name in a left column,
-/// rows scrub on tap, the row nearest the centerline time is highlighted. The
+/// groups key on the first, labels read the second. Dates disclose rows on tap;
+/// the row nearest the centerline time is highlighted. The
 /// prototype dims nothing for the past — the nearest-row highlight is the time
 /// cue. (The prototype's `tableEl` TOP, a flat today+54h, is what
 /// `scheduleRange` replaced.)
@@ -1440,6 +1784,7 @@ struct MultiDaySchedule: View {
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
+    @State private var expandedOffset: Int? = 0
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1461,68 +1806,87 @@ struct MultiDaySchedule: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(groups, id: \.start) { group in
+                let expanded = expandedOffset == group.offset
                 if group.start != groups.first?.start {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(relativeDayLabel(group.start, tz, today: today))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(SN.foam.opacity(0.9))
-                        if let day = days.first(where: { $0.offset == group.offset }) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                if let rise = day.sunrise {
-                                    Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(relativeDayLabel(group.start, tz, today: today))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SN.foam.opacity(0.9))
+                            if let day = days.first(where: { $0.offset == group.offset }) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    if let rise = day.sunrise {
+                                        Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                    }
+                                    if let set = day.sunset {
+                                        Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
+                                    }
                                 }
-                                if let set = day.sunset {
-                                    Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
-                                }
+                                .font(.caption2.monospaced())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
                             }
-                            .font(.caption2.monospaced())
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("day-sun-d\(group.offset)")
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.55))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    .frame(width: 74, alignment: .leading)
-                    .padding(.leading, 14)
-                    .padding(.top, 12)
-                    VStack(spacing: 0) {
-                        ForEach(group.items) { e in
-                            let on = e.id == nearestID
-                            // A tap gesture, not a Button: Button press tracking
-                            // goes dead in the iPad split layout's detail column
-                            // (regular width, below the strip) while gesture
-                            // recognizers keep working — same tap for the user.
-                            HStack(spacing: 8) {
-                                Text(chartTime(e.time, tz))
-                                    .font(.footnote.monospaced())
-                                    .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
-                                    // "7:03am" is a character shorter than
-                                    // "12:53pm": the floor keeps the values
-                                    // beside it in a column down the list.
-                                    .frame(minWidth: 58, alignment: .leading)
-                                Spacer()
-                                Text(e.value ?? "—")
-                                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
-                                pillView(e)
-                                    // 100, not 84: room for the widest
-                                    // direction-first pill ("WSW FLOOD").
-                                    .frame(width: 100, alignment: .trailing)
-                            }
-                            .padding(.vertical, 9)
-                            .padding(.trailing, 14)
-                            .background(on ? SN.leaf.opacity(0.13) : .clear)
-                            .overlay(alignment: .leading) {
-                                if on { Rectangle().fill(SN.leaf).frame(width: 2) }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture { onTap(e.time) }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("schedule-row-d\(group.offset)")
-                            if e.id != group.items.last?.id {
-                                Divider().overlay(Color.white.opacity(0.055))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation { expandedOffset = expanded ? nil : group.offset }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("schedule-day-d\(group.offset)")
+                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+
+                    if expanded {
+                        VStack(spacing: 0) {
+                            ForEach(group.items) { e in
+                                let on = e.id == nearestID
+                                // A tap gesture, not a Button: Button press tracking
+                                // goes dead in the iPad split layout's detail column
+                                // (regular width, below the strip) while gesture
+                                // recognizers keep working — same tap for the user.
+                                HStack(spacing: 8) {
+                                    Text(chartTime(e.time, tz))
+                                        .font(.footnote.monospaced())
+                                        .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
+                                        // "7:03am" is a character shorter than
+                                        // "12:53pm": the floor keeps the values
+                                        // beside it in a column down the list.
+                                        .frame(minWidth: 58, alignment: .leading)
+                                    Spacer()
+                                    Text(e.value ?? "—")
+                                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                                        .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
+                                    pillView(e)
+                                        // Room for the eclipse label at accessibility sizes.
+                                        .frame(width: 120, alignment: .trailing)
+                                }
+                                .padding(.vertical, 9)
+                                .padding(.leading, 14)
+                                .padding(.trailing, 14)
+                                .background(on ? SN.leaf.opacity(0.13) : .clear)
+                                .overlay(alignment: .leading) {
+                                    if on { Rectangle().fill(SN.leaf).frame(width: 2) }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { onTap(e.time) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("schedule-row-d\(group.offset)")
+                                if e.id != group.items.last?.id {
+                                    Divider().overlay(Color.white.opacity(0.055))
+                                }
                             }
                         }
                     }

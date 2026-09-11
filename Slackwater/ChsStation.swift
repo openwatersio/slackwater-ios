@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. Canadian (CHS) Salish tide stations: bundled identity
-// from the station-corrections registry (the same source slackwater-web
+// from the station-metadata registry (the same source slackwater-web
 // consumes — name/region/position/aliases only, nothing CHS-published), plus
 // the on-device fitted harmonic model store.
 //

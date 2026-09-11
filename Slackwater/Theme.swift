@@ -138,30 +138,6 @@ let brightStars: [Star] = {
     return rows.compactMap { $0.count == 3 ? Star(ra: $0[0], dec: $0[1], mag: $0[2]) : nil }
 }()
 
-// TODO: move these two into Almanac as a public `starAltAz` beside
-// `sunAltAz` before this merges — Almanac already has the sidereal time
-// (`siderealDeg`) this re-derives, and the app should not own sky math.
-/// Local mean sidereal time in degrees (Meeus 12.4, first two terms). Mean,
-/// not apparent: the equation of the equinoxes is under 0.005°.
-func localSiderealDeg(_ time: Date, longitude: Double) -> Double {
-    // Days since J2000.0; the reference date is 365.5 days after it.
-    let d = time.timeIntervalSinceReferenceDate / 86400 + 365.5
-    let gmst = 280.46061837 + 360.98564736629 * d
-    return ((gmst + longitude).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
-}
-
-/// Where a fixed star stands: azimuth from north through east, altitude
-/// above the horizon. No precession, refraction or parallax — a J2000
-/// position drifts 0.014°/yr, about a point at `skyAltitudeScale` so far.
-func starAltAz(raDeg: Double, decDeg: Double, siderealDeg: Double,
-               latitude: Double) -> (azDeg: Double, altDeg: Double) {
-    let ha = (siderealDeg - raDeg) * .pi / 180
-    let dec = decDeg * .pi / 180, lat = latitude * .pi / 180
-    let alt = asin(sin(lat) * sin(dec) + cos(lat) * cos(dec) * cos(ha))
-    let az = atan2(-sin(ha) * cos(dec), sin(dec) * cos(lat) - cos(dec) * sin(lat) * cos(ha))
-    return ((az * 180 / .pi + 360).truncatingRemainder(dividingBy: 360), alt * 180 / .pi)
-}
-
 struct SkyState {
     let latitude: Double
     /// The scrub time this state was built for — what the eclipse is read at.
@@ -171,8 +147,9 @@ struct SkyState {
     let moon: AltAz?
     let moonSpan: HorizonSpan?
     let illumination: MoonIllumination?
-    /// Local sidereal time: the one number every star's position turns on.
-    let siderealDeg: Double
+    /// Every catalog star Almanac could place, with where it stands: built
+    /// once per scrub frame here so the twinkle redraws don't recompute it.
+    let stars: [(star: Star, at: AltAz)]
     /// The eclipse underway at `time`, if any. Chosen from an array the
     /// timeline already built: this initialiser runs on EVERY scrub frame, and
     /// an eclipse search here would cost orders of magnitude more than the
@@ -194,10 +171,14 @@ struct SkyState {
          eclipses: [WindowEclipse] = []) {
         self.latitude = latitude
         self.time = time
-        siderealDeg = localSiderealDeg(time, longitude: longitude)
         eclipse = eclipses.first { $0.underway(at: time) }
         let observer = try? Observer(latitudeDeg: latitude, longitudeDeg: longitude)
         sun = observer.flatMap { try? sunAltAz(time, observer: $0) }
+        stars = observer.map { o in
+            brightStars.compactMap { s in
+                (try? starAltAz(raDeg: s.ra, decDeg: s.dec, at: time, observer: o)).map { (star: s, at: $0) }
+            }
+        } ?? []
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
         sunSpan = observer.flatMap { obs in
@@ -223,6 +204,16 @@ struct SkyState {
     var shadow: Double { eclipse?.shadow(at: time) ?? 0 }
     /// Penumbral shading right now — what a penumbral eclipse has instead.
     var wash: Double { eclipse?.wash(at: time) ?? 0 }
+
+    var moonLightAngle: Double {
+        guard let sun, let moon else { return 0 }
+        let sunAlt = sun.altDeg * .pi / 180, moonAlt = moon.altDeg * .pi / 180
+        let deltaAz = (sun.azDeg - moon.azDeg) * .pi / 180
+        // The sun's tangent direction at the moon stays continuous across the screen's azimuth seam.
+        let horizontal = cos(sunAlt) * sin(deltaAz) * (latitude >= 0 ? -1.0 : 1.0)
+        let vertical = sin(sunAlt) * cos(moonAlt) - cos(sunAlt) * sin(moonAlt) * cos(deltaAz)
+        return atan2(-vertical, horizontal)
+    }
 
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
@@ -258,15 +249,12 @@ struct SkyBackdrop: View {
                         // the scrubber moves. Off-frame and set stars cost
                         // nothing: the canvas clips them.
                         Canvas { context, _ in
-                            for (i, star) in brightStars.enumerated() {
-                                let (az, alt) = starAltAz(raDeg: star.ra, decDeg: star.dec,
-                                                          siderealDeg: sky.siderealDeg,
-                                                          latitude: sky.latitude)
-                                let haze = starHazeOpacity(altitude: alt)
+                            for (i, placed) in sky.stars.enumerated() {
+                                let haze = starHazeOpacity(altitude: placed.at.altDeg)
                                 guard haze > 0 else { continue }
-                                let point = skyPoint(azimuth: az, altitude: alt, latitude: sky.latitude,
-                                                     span: sky.sunSpan, size: size)
-                                let radius = max(0.5, 1.6 - 0.3 * CGFloat(star.mag))
+                                let point = skyPoint(azimuth: placed.at.azDeg, altitude: placed.at.altDeg,
+                                                     latitude: sky.latitude, span: sky.sunSpan, size: size)
+                                let radius = max(0.5, 1.6 - 0.3 * CGFloat(placed.star.mag))
                                 let twinkle = starTwinkle(index: i, seconds: seconds,
                                                           reduceMotion: reduceMotion)
                                 context.fill(Path(ellipseIn: CGRect(x: point.x - radius,
@@ -295,9 +283,7 @@ struct SkyBackdrop: View {
                     let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
                                          latitude: sky.latitude, span: sky.moonSpan,
                                          pad: moonGlyphSize / 2, size: size)
-                    // The lit limb faces the sun on screen, above the horizon
-                    // or not; the glow leans the same way.
-                    let toSun = sunPoint.map { atan2($0.y - point.y, $0.x - point.x) } ?? 0
+                    let toSun = sky.moonLightAngle
                     let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
                     // An eclipsed moon dims and warms, and the sky goes quiet
                     // with it: two changes to the one gradient, not a second
@@ -321,12 +307,7 @@ struct SkyBackdrop: View {
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
                         .opacity(moonGlareOpacity(distance: glare))
                     // `waxing: true` lights the +x limb; the rotation aims it.
-                    // `shadowTilt` cancels that rotation for the umbra alone: an
-                    // eclipse is the ANTI-solar point, so a shadow that swung
-                    // around with the sun's screen position would be pointing at
-                    // the one direction it cannot come from. Screen-stable is
-                    // honest at 22pt; the true first contact is the moon's
-                    // leading limb, which is #304-adjacent work.
+                    // Keep the umbra screen-stable; its physical entry direction is #304-adjacent work.
                     MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
                               umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
                         .rotationEffect(.radians(toSun))
@@ -464,6 +445,23 @@ func monthDay(_ date: Date, _ tz: TimeZone) -> String {
     formatter("MMM d", tz).string(from: date)
 }
 
+/// "Sep 10 · 3:42pm" — the lead's when. The date is here because a strip
+/// centered on night has both flanking day headers off-screen. Date only, no
+/// weekday and no TODAY/TOMORROW, for the reason `monthDay` records.
+///
+/// The line is centered under the reading, so a one-digit hour would narrow
+/// the string and shift every glyph as the scrub crosses 9:59→10:00 — many
+/// times in one pan. A figure space — digit-wide under `monospacedDigit` —
+/// stands in for the missing digit. The day's digits move too, but once per
+/// midnight rather than per pan, so they go unpadded.
+func leadWhen(_ date: Date, _ tz: TimeZone) -> String {
+    var time = chartTime(date, tz)
+    if time.prefix(while: \.isNumber).count == 1 {
+        time = "\u{2007}" + time
+    }
+    return "\(monthDay(date, tz)) · \(time)"
+}
+
 /// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
 /// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
 ///
@@ -545,20 +543,32 @@ func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date)
     return scrubbedAway(scrub, from: now) ? "\(event) \(gap) later" : "\(event) in \(gap)"
 }
 
+/// The stop the commentary names and its tap walks to: the water's next stop,
+/// or the sun's next rise or set when that comes first. Dark is an event a
+/// reader plans around the same way they plan around a slack.
+func nextCommentaryStop(_ water: (time: Date, text: String)?,
+                        sun days: [TimelineDay],
+                        after scrub: Date) -> (time: Date, text: String)? {
+    // Strictly after the scrub, so landing on a stop advances to the next.
+    let cutoff = scrub.addingTimeInterval(1)
+    let sun = days
+        .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
+        .compactMap { time, word in time.map { (time: $0, text: word) } }
+    return (sun + [water].compactMap { $0 })
+        .filter { $0.time > cutoff }
+        .min { $0.time < $1.time }
+}
+
 /// What comes next, centred on the reading line in the strip's chrome row.
-/// Tapping scrubs to it. It fades while the strip is moving and returns once
-/// the scrub has rested, so it never flickers through the events a fling
-/// passes.
+/// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
     let text: String?
     /// Set when the text is a warning about the scrub instant — a fast tide —
     /// rather than the next event; the ramp's colour, so the pill explains
     /// the line under it.
     var tint: Color? = nil
-    let scrubTime: Date
     var ink: Color = SN.foam
     let onTap: () -> Void
-    @State private var settled = false
 
     var body: some View {
         Group {
@@ -576,16 +586,6 @@ struct Commentary: View {
                 .buttonBorderShape(.capsule)
                 .accessibilityIdentifier("commentary")
             }
-        }
-        .opacity(settled ? 1 : 0)
-        .allowsHitTesting(settled)
-        .animation(.easeInOut(duration: 0.2), value: settled)
-        .task(id: scrubTime) {
-            // Rest = no scrub change for this long. A cancelled sleep is a
-            // scrub still in motion, not a rest.
-            settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
-            settled = true
         }
     }
 }
@@ -832,6 +832,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
+            .environment(\.openWeekPicker, { showPicker = true })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187). Taken on appear so it reaches only
             // the detail the link opened, but APPLIED once the timeline exists:
@@ -841,7 +842,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // and for an online gate it is also when there is anything to
             // scrub.
             .onAppear {
-                if let t = pendingScrubInstant {
+                if let t = pendingScrubInstant ?? seededScrubInstant {
                     pendingScrubInstant = nil
                     linkedInstant = t
                 }
@@ -986,6 +987,21 @@ struct WeekRangeBar: View {
     }
 }
 
+/// How the strip's day row reaches the picker the range bar owns. An
+/// environment closure rather than four more callback parameters: the strip is
+/// three views deep in every detail, and none of the layers between it and the
+/// scaffold has anything to say about dates.
+private struct OpenWeekPickerKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openWeekPicker: () -> Void {
+        get { self[OpenWeekPickerKey.self] }
+        set { self[OpenWeekPickerKey.self] = newValue }
+    }
+}
+
 /// A native graphical `DatePicker`, in a sheet.
 ///
 /// Native rather than a hand-rolled month grid: Dynamic Type, VoiceOver, and
@@ -1004,6 +1020,13 @@ struct WeekPickerSheet: View {
     @State private var draft = Date()
     @Environment(\.dismiss) private var dismiss
 
+    /// The one calendar this sheet uses, for both the grid and the commit.
+    private var calendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        return cal
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -1013,6 +1036,18 @@ struct WeekPickerSheet: View {
                     .tint(SN.go)
                     .padding(.horizontal, 8)
                     .accessibilityIdentifier("week-picker")
+                    // The grid must be drawn in the STATION's zone, because
+                    // that is the zone "Show" commits in. A sheet is its own
+                    // presentation hierarchy and does not inherit the
+                    // detail's `\.timeZone`, so the calendar was laid out in
+                    // the DEVICE's day while the commit took `startOfDay` in
+                    // the station's: from a device east of the station,
+                    // tapping the 8th asked for the 7th, and the week that
+                    // came back was the one before the week you pointed at.
+                    // Reading a phone in Halifax about Sechelt is exactly the
+                    // case, and so is a UTC test runner.
+                    .environment(\.timeZone, tz)
+                    .environment(\.calendar, calendar)
                 Spacer()
             }
             .background(CanvasBackground())
@@ -1024,9 +1059,7 @@ struct WeekPickerSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Show") {
-                        var cal = Calendar(identifier: .gregorian)
-                        cal.timeZone = tz
-                        let picked = cal.startOfDay(for: draft)
+                        let picked = calendar.startOfDay(for: draft)
                         anchor = picked
                         onPick(picked)
                         dismiss()
@@ -1104,6 +1137,20 @@ extension EnvironmentValues {
     }
 }
 
+/// `openTideDetail` generalized to any station kind: the nearby-station
+/// discovery link can land on a NOAA current, a CHS port or a gate, and each
+/// pushes a different route. Same closure-not-NavigationLink reasoning.
+private struct OpenStationItemKey: EnvironmentKey {
+    static let defaultValue: (StationItem) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    var openStationItem: (StationItem) -> Void {
+        get { self[OpenStationItemKey.self] }
+        set { self[OpenStationItemKey.self] = newValue }
+    }
+}
+
 /// Same reasoning as `openChsRoute` above: the detail-header title (issue #32)
 /// jumps straight to the map, focused on the detail's own station — not a
 /// NavigationLink or Button, same press-tracking hazard in the iPad split
@@ -1133,7 +1180,10 @@ struct BranchLink: View {
         HStack(spacing: 5) {
             Image(systemName: "arrow.triangle.branch")
                 .font(.caption2.weight(.semibold))
+            // Mono digits: a branch label can carry a reading (a match count,
+            // the nearby link's distance), and numbers hold their width.
             Text(text)
+                .monospacedDigit()
             if chevron {
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
@@ -1158,6 +1208,22 @@ struct TideAtPortLink: View {
 
     var body: some View {
         BranchLink(text: "Tide at \(port.name)", id: "tide-at-port") { openTide(port) }
+    }
+}
+
+/// The cross-series discovery affordance: the nearest station of the other
+/// series, offered by proximity alone. The distance is in the label because
+/// nearness is the whole claim — unlike `TideAtPortLink`, nothing curated
+/// says this station governs or matches this water.
+struct NearbyStationLink: View {
+    let item: StationItem
+    let km: Double
+    @Environment(\.openStationItem) private var open
+
+    var body: some View {
+        let currents = item.series == .current
+        BranchLink(text: "\(currents ? "Currents" : "Tide") at \(item.name) · \(formatNm(km))",
+                   id: currents ? "nearby-currents" : "nearby-tide") { open(item) }
     }
 }
 
@@ -1363,11 +1429,11 @@ struct ListGroups {
     let nearMe: [String]
     let recents: [String]
 
-    init(heroId: String?, favoriteIds: [String], recentIds: [String],
+    init(heroIds: [String], favoriteIds: [String], recentIds: [String],
          rankedIds: [String], nearCount: Int) {
-        favorites = favoriteIds.filter { $0 != heroId }
+        favorites = favoriteIds.filter { !heroIds.contains($0) }
         var shown = Set(favorites)
-        if let heroId { shown.insert(heroId) }
+        shown.formUnion(heroIds)
         nearMe = Array(rankedIds.filter { !shown.contains($0) }.prefix(nearCount))
         shown.formUnion(nearMe)
         recents = recentIds.filter { !shown.contains($0) }
@@ -1448,9 +1514,7 @@ enum RankedStations {
         let k = "\(Int((lat * 1000).rounded())),\(Int((lon * 1000).rounded()))"
         if k != key {
             key = k
-            ranked = StationItem.all.sorted {
-                $0.km(fromLat: lat, lon: lon) < $1.km(fromLat: lat, lon: lon)
-            }
+            ranked = StationItem.rankedByDistance(StationItem.all, lat: lat, lon: lon)
             groups = StationGroups(ranked: ranked)
         }
         return (ranked, groups)

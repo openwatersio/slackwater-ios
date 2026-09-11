@@ -39,7 +39,7 @@ final class UnitsAndGroupsTests: XCTestCase {
     // (M4.5 precedence: My Location > Favorites > Near Me > Recents)
 
     func testHeroExcludedAndNearbyRecentShowsUnderNearMe() {
-        let g = ListGroups(heroId: "a", favoriteIds: [], recentIds: ["a", "b"],
+        let g = ListGroups(heroIds: ["a"], favoriteIds: [], recentIds: ["a", "b"],
                            rankedIds: ["a", "b", "c", "d"], nearCount: 4)
         XCTAssertFalse(g.nearMe.contains("a"), "hero must not repeat in Near Me")
         XCTAssertEqual(g.nearMe, ["b", "c", "d"])
@@ -48,7 +48,7 @@ final class UnitsAndGroupsTests: XCTestCase {
     }
 
     func testFavoritesExcludedFromNearMeAndRecents() {
-        let g = ListGroups(heroId: nil, favoriteIds: ["b"], recentIds: ["b", "c", "z"],
+        let g = ListGroups(heroIds: [], favoriteIds: ["b"], recentIds: ["b", "c", "z"],
                            rankedIds: ["a", "b", "c", "d", "e"], nearCount: 3)
         XCTAssertEqual(g.favorites, ["b"])
         XCTAssertEqual(g.nearMe, ["a", "c", "d"], "Near Me backfills past excluded ids")
@@ -58,10 +58,10 @@ final class UnitsAndGroupsTests: XCTestCase {
     /// Exclusion is render-time only: drop the hero/favorite (or fall past the
     /// Near Me cut) and the persisted recent surfaces again.
     func testExclusionIsRenderTimeOnly() {
-        let hidden = ListGroups(heroId: "a", favoriteIds: ["b"], recentIds: ["a", "b"],
+        let hidden = ListGroups(heroIds: ["a"], favoriteIds: ["b"], recentIds: ["a", "b"],
                                 rankedIds: ["a", "b"], nearCount: 2)
         XCTAssertEqual(hidden.recents, [])
-        let restored = ListGroups(heroId: nil, favoriteIds: [], recentIds: ["a", "b"],
+        let restored = ListGroups(heroIds: [], favoriteIds: [], recentIds: ["a", "b"],
                                   rankedIds: ["a", "b", "c"], nearCount: 1)
         XCTAssertEqual(restored.nearMe, ["a"])
         XCTAssertEqual(restored.recents, ["b"],
@@ -147,6 +147,58 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertEqual(byId["current:noaa/PUG1744"]?.kindLabel, "Current · NOAA")
         XCTAssertEqual(byId["chs-victoria"]?.kindLabel, "Tide · CHS")
         XCTAssertEqual(byId["chs-active-pass"]?.kindLabel, "Current · CHS")
+    }
+
+    // MARK: - Distance ranking (#317)
+
+    private func stationFixture(_ id: String, _ name: String,
+                                _ lat: Double, _ lon: Double) -> StationItem {
+        .tide(StationIndexInfo(TideStationRecord(
+            id: id, name: name, region: "Test", aliases: [],
+            latitude: lat, longitude: lon, timezone: "America/Vancouver",
+            chartDatum: "Chart", datumOffset: 0,
+            constituents: [.init(name: "M2", amplitude: 1.0, phase: 0)])))
+    }
+
+    /// The ordering contract the list and `StationGroups` depend on, against
+    /// the comparator spelling it replaces.
+    func testRankedByDistanceMatchesComparatorOrder() {
+        let fix = (lat: 48.545, lon: -123.013)
+        let items = [
+            stationFixture("far", "Far Harbor", 50.0, -125.0),
+            stationFixture("wilson-north", "Point Wilson", 48.60, -123.02),
+            stationFixture("near", "Near Bay", 48.55, -123.02),
+            stationFixture("wilson-south", "Point Wilson", 48.20, -123.10),
+        ]
+        let expected = items.sorted {
+            $0.km(fromLat: fix.lat, lon: fix.lon) < $1.km(fromLat: fix.lat, lon: fix.lon)
+        }
+        let ranked = StationItem.rankedByDistance(items, lat: fix.lat, lon: fix.lon)
+        XCTAssertEqual(ranked.map(\.id), expected.map(\.id))
+        XCTAssertEqual(ranked.map(\.id), ["near", "wilson-north", "wilson-south", "far"])
+        XCTAssertEqual(StationGroups(ranked: ranked).collapse(["wilson-south", "wilson-north"]),
+                       ["wilson-north"], "the first station of a name is the nearest")
+    }
+
+    /// Co-located stations keep catalog order — the tide and current halves of
+    /// one place share coordinates, and the list must not reshuffle them.
+    func testEqualDistancesKeepCatalogOrder() {
+        let a = stationFixture("a", "Twin", 48.6, -123.0)
+        let b = stationFixture("b", "Twin", 48.6, -123.0)
+        let ranked = StationItem.rankedByDistance([a, b], lat: 48.5, lon: -123.0)
+        XCTAssertEqual(ranked.map(\.id), ["a", "b"])
+        XCTAssertEqual(StationItem.rankedByDistance([b, a], lat: 48.5, lon: -123.0).map(\.id),
+                       ["b", "a"])
+    }
+
+    /// The real catalog, not a fixture: nothing sorts ahead of a station
+    /// closer than it.
+    func testBundledCatalogRanksMonotonically() {
+        let ranked = StationItem.rankedByDistance(StationItem.all,
+                                                  lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertEqual(ranked.count, StationItem.all.count)
+        let km = ranked.map { $0.km(fromLat: firstRunFix.lat, lon: firstRunFix.lon) }
+        XCTAssertEqual(km, km.sorted())
     }
 
     // MARK: - RecentsStore auto-select skip (M52 handshake, #3)

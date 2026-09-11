@@ -18,14 +18,20 @@ Changing the bundled data additionally needs **Node 24** and a `npm install` in 
 
 ## Running the tests
 
-One test plan, driven by `scripts/test.sh`:
+One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;
+no npm install is needed for it.
 
 ```sh
-./scripts/test.sh          # ~15 min, iPhone simulator. Use this while iterating.
-./scripts/test.sh --full   # adds the iPad simulator and the live-network tests. Before a release.
+./scripts/test.sh          # offline unit + UI tests, iPhone. Use while iterating.
+./scripts/test.sh --full   # offline, both reference simulators + exhaustive data test.
+./scripts/test.sh --unit   # unit target only, one simulator.
+./scripts/test.sh --live   # live IWLS smoke only, one simulator.
 ```
 
-Fast is everything that runs on stored or mocked state. `--full` adds nine UI tests that fetch live from the CHS IWLS API and fit harmonics on-device, which is the only coverage of the network path — they skip themselves without it. It takes 35 minutes and up, mostly because the API is paced at 2.5 s per request.
+Routine modes validate and reuse the committed `SlackwaterTests/Fixtures/iwls-recording.json`, including on fresh CI runners. They never download test data. To update the recording explicitly, run `node scripts/iwls-fixtures.mjs refresh` and review the resulting Git diff. `SLACKWATER_FIXTURE_DIR` can supply a different recording for the offline `prepare` command to stage. Missing or corrupt recordings fail validation.
+
+`--live` is the separate compatibility smoke for the real IWLS service. It does
+not use the recording. `--full` stays offline and is the pre-release suite.
 
 Every `xcodebuild` invocation, by hand or by script, needs `-clonedSourcePackagesDirPath build/SourcePackages`.
 
@@ -47,13 +53,19 @@ gh pr create --fill
 
 Before you open it, run `./scripts/test.sh` and say in the description what you changed and why. Small PRs get reviewed faster. Rebase or squash rather than merge-commit, and never force-push `main` — your own branches, freely.
 
-**Docs-only changes don't need a PR.** CI's macOS lane is a single shared machine, and a PR books about fifteen minutes of it. If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
+**Docs-only changes don't need a PR.** If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
 
 ```sh
 git push -u origin docs/<topic>
 ```
 
 CI skips the app lane for those automatically, so opening one is not expensive — it's just rarely useful when there's nothing to review.
+
+## License and CLA
+
+Slackwater is licensed under [GPL-3.0](LICENSE.md). All contributors must sign the [Contributor License Agreement](CLA.md) before their pull request can be merged. The CLA grants Open Water Software, LLC the rights needed to distribute your contributions (including through the iOS App Store) while you retain full copyright ownership of your work — [docs/licensing.md](docs/licensing.md) explains why a GPL app on the App Store needs this.
+
+You will be prompted to sign the CLA automatically when you open your first pull request.
 
 ## Changing bundled station data
 
@@ -83,16 +95,16 @@ Non-visual changes do not need screenshots.
 
 Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
 
-| Job             | Where           | What it does                                                  |
-| --------------- | --------------- | ------------------------------------------------------------- |
-| What changed    | GitHub-hosted   | Decides whether the app lane needs to run                     |
-| Data generators | GitHub-hosted   | Regenerates the bundles and checks the committed copies match |
-| App tests       | Self-hosted Mac | `scripts/test.sh` on the iPhone simulator                     |
+| Job             | Where         | What it does                                                  |
+| --------------- | ------------- | ------------------------------------------------------------- |
+| What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
+| Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
+| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator                     |
 
-The macOS lane is self-hosted because GitHub-hosted macOS bills at 10× on a private repo, which would exhaust the monthly allowance in about thirteen runs. It is the same machine used for local test runs, so expect queuing — and see `CLAUDE.md` for what that contention does to live-network tests.
+Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 
 `gen-chs-stations.mjs` stays out of CI because it is the only generator that needs the network; its artifact is trusted as committed.
 
 ## AI agents
 
-Agents work here under the same policy as everyone else, with two additions: an agent never merges its own PR, and an agent doesn't open a PR for docs-only work. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.
+Agents work here under the same policy as everyone else, with one addition: an agent never merges its own PR. Docs-only work gets a PR like anything else — the `What changed` job keeps it off the macOS lane, and a docs PR that books one is a bug in that job, not a reason to skip review. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.

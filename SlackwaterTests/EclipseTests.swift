@@ -175,13 +175,58 @@ final class EclipseTests: XCTestCase {
         XCTAssertEqual(last.peak.timeIntervalSince(utc("2026-08-28T04:12:00Z")), 0, accuracy: 3600)
         XCTAssertEqual(last.kind, .partial)
 
-        let next = try XCTUnwrap(facts.next)
+        let next = try XCTUnwrap(facts.upcoming.first)
         XCTAssertGreaterThan(next.peak, utc("2026-09-07T12:00:00Z"))
 
         XCTAssertNotNil(facts.closest)
         XCTAssertNotNil(facts.farthest)
         XCTAssertGreaterThan(facts.distanceKm, 350_000)
         XCTAssertLessThan(facts.distanceKm, 410_000)
+    }
+
+    /// The sheet teaches the three kinds apart, so it lists one of each rather
+    /// than three of whatever comes next.
+    func testTheUpcomingEclipsesAreOneOfEachKindInDateOrder() throws {
+        let at = utc("2026-09-07T12:00:00Z")
+        let facts = try XCTUnwrap(moonFacts(at: at, observer: Self.victoria,
+                                            tz: TimeZone(identifier: "America/Vancouver")!))
+        let kinds = facts.upcoming.map(\.kind)
+        XCTAssertEqual(Set(kinds).count, kinds.count, "a kind is listed twice: \(kinds)")
+        XCTAssertEqual(facts.upcoming.map(\.peak), facts.upcoming.map(\.peak).sorted(),
+                       "the rows are not in date order")
+        for e in facts.upcoming {
+            XCTAssertGreaterThan(e.peak, at, "an upcoming eclipse is in the past")
+            XCTAssertTrue(e.anyContactVisible, "listed an eclipse nobody here can see")
+        }
+        // Victoria in September 2026 can see all three inside the window.
+        XCTAssertEqual(Set(kinds), [.total, .partial, .penumbral])
+    }
+
+    /// A kind with nothing visible inside five years has NO row, and that is
+    /// the design rather than a gap: walking on until a partial turns up finds
+    /// 2034 from here, and a row that far out is noise. The horizon is the
+    /// feature — see the comment in `moonFacts`.
+    func testAKindWithNothingInsideFiveYearsIsLeftOut() throws {
+        let facts = try XCTUnwrap(moonFacts(at: utc("2028-03-01T12:00:00Z"),
+                                            observer: Self.victoria,
+                                            tz: TimeZone(identifier: "America/Vancouver")!))
+        let kinds = Set(facts.upcoming.map(\.kind))
+        XCTAssertEqual(kinds, [.total, .penumbral],
+                       "expected no visible partial in the window, got \(kinds)")
+        // And the reason is distance, not a broken search: the partial exists,
+        // it is just years past where the sheet is willing to look.
+        var cursor = utc("2028-03-01T12:00:00Z")
+        var partial: WindowEclipse?
+        for _ in 0..<20 where partial == nil {
+            guard let e = try? nextLunarEclipse(after: cursor) else { break }
+            cursor = e.peak
+            guard e.kind == .partial,
+                  let v = try? lunarEclipseVisibility(e, observer: Self.victoria) else { continue }
+            let w = WindowEclipse(eclipse: e, visibility: v)
+            if w.anyContactVisible { partial = w }
+        }
+        XCTAssertGreaterThan(try XCTUnwrap(partial).peak, utc("2033-03-01T12:00:00Z"),
+                             "the partial was inside the window after all")
     }
 
     /// The sheet does its searching in a `.task`, but a sheet that renders
@@ -223,6 +268,27 @@ final class EclipseTests: XCTestCase {
         let at = anchor("2026-10-08T12:00:00Z", friday.tz)
         let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
         XCTAssertTrue(eclipseEntries(tl).isEmpty)
+    }
+
+    @MainActor
+    func testTheEclipsePillDoesNotMakeItsScheduleRowTaller() {
+        let time = Date(timeIntervalSinceReferenceDate: 0)
+
+        func height(_ pill: SchedulePill, width: CGFloat) -> CGFloat {
+            UIHostingController(rootView:
+                MultiDaySchedule(
+                    entries: [ScheduleEntry(time: time, pill: pill, value: "9:12pm")],
+                    tz: .gmt, anchor: time, today: time, days: [], scrubTime: time,
+                    onTap: { _ in })
+                .frame(width: width)
+                .environment(\.dynamicTypeSize, .accessibility1)
+            ).sizeThatFits(in: CGSize(width: width, height: 1_000)).height
+        }
+
+        let eclipse = height(.eclipse, width: 370)
+        let high = height(.high, width: 370)
+        XCTAssertLessThanOrEqual(eclipse, high + 0.5,
+                                 "the eclipse pill wrapped onto a second line")
     }
 
     @MainActor

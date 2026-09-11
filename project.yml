@@ -14,12 +14,12 @@ settings:
     # app ships — a per-target pair here silently drifts the two Info.plists
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
-    MARKETING_VERSION: 1.10.0
-    CURRENT_PROJECT_VERSION: 35
+    MARKETING_VERSION: 1.11.0
+    CURRENT_PROJECT_VERSION: 36
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
-    from: 0.2.1
+    from: 0.3.0
   TideEngine:
     url: https://github.com/openwatersio/slackwater-engine
     from: 0.7.0
@@ -136,6 +136,10 @@ targets:
       - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
       - Slackwater/CurrentStation.swift
+      # The types only; station-index.json stays out of the appex on purpose.
+      # The widget resolves one station by id through `decodeCatalogRecord`
+      # and never builds `StationItem.all`, so it never loads the index.
+      - Slackwater/StationIndex.swift
       - Slackwater/ChsStation.swift
       - Slackwater/ChsGate.swift
       - Slackwater/ChsCurrentGate.swift
@@ -204,10 +208,8 @@ schemes:
     test:
       config: Debug
       targets: [SlackwaterTests, SlackwaterUITests]
-      # One plan (TestPlans/). The UI tests that fetch live IWLS and fit
-      # on-device — minutes each — skip themselves unless SLACKWATER_FULL
-      # reaches the runner (ScreenshotTestCase.skipUnlessFull). Drive with
-      # scripts/test.sh; `--full` sets TEST_RUNNER_SLACKWATER_FULL=1.
+      # One plan (TestPlans/). scripts/test.sh selects its offline fast/full,
+      # unit-only, or explicitly live UI subset without duplicating the plan.
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true

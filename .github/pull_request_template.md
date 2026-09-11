@@ -11,7 +11,8 @@
 ## Testing
 
 - [ ] `./scripts/test.sh` passes locally
-- [ ] `./scripts/test.sh --full` (only before a TestFlight upload)
+- [ ] `./scripts/test.sh --full` offline suite (only before a TestFlight upload)
+- [ ] `./scripts/test.sh --live` (only when live IWLS compatibility needs checking)
 - [ ] `cd tools && npm test` (only if a generator or bundled data changed)
 
 ## Notes for the reviewer

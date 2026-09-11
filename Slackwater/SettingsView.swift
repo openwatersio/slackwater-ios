@@ -111,7 +111,7 @@ struct SettingsView: View {
                         Text("Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada.")
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")
                         Text("Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included.")
-                        Text("Station names & pairings: @sailingnaturali/station-corrections (MIT).")
+                        Text("Station names & pairings: @openwaters/station-metadata (MIT).")
                         Text("Prediction engine: slackwater-engine, a port of Neaps (MIT).")
                     }
 
@@ -121,7 +121,9 @@ struct SettingsView: View {
                     }
 
                     section("License") {
-                        Text("The Slackwater engine and web app are open source (MIT / GPL). This iOS app's own license is still being worked out — a copyleft structure that holds together with paid distribution — and will be published when it is.")
+                        Text("Slackwater is open source: this app under GPL-3.0, the prediction engine under MIT.")
+                        Link("Source on GitHub", destination: URL(string: "https://github.com/openwatersio/slackwater-ios")!)
+                            .foregroundStyle(SN.leaf)
                     }
 
                     section("Version") {

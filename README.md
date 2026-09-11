@@ -44,8 +44,6 @@ or visit [Slackwater support](https://slackwater.xyz/support/).
 
 - [Slackwater Engine](https://github.com/openwatersio/slackwater-engine) — the
   Swift harmonic prediction engine used by the app
-- [Slackwater Web](https://github.com/sailingnaturali/slackwater-web) — a free
-  web app and the best option for Android users
 - [Open Waters](https://openwaters.io) — the organization behind Slackwater
 
 ## Contributing
@@ -53,3 +51,11 @@ or visit [Slackwater support](https://slackwater.xyz/support/).
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
 tests and pull-request guidance. You will need Xcode 26 or later and XcodeGen;
 then run `xcodegen generate` and open `Slackwater.xcodeproj`.
+
+## License
+
+Slackwater is © Open Water Software, LLC and licensed under
+[GPL-3.0](LICENSE.md). Contributions require signing the
+[CLA](CLA.md) — [docs/licensing.md](docs/licensing.md) explains why a GPL app
+on the App Store needs one. Bundled data and third-party code are credited in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

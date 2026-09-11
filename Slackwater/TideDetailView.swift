@@ -15,11 +15,21 @@ struct TideDetailView: View {
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = Timeline.introStart(for: appNow())
-    @State private var timeline: TimelineData?
+    /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
+    @State private var store: TimelineWindowStore?
     @State private var chsFittedAt: Date?
-    /// The local midnight the window hangs from. Only `returnToNow` and (in
-    /// Plan B) the range bar move it; everything else reads it.
+    /// The nearest current-series station inside `nearbyStationRadiusKm`, or
+    /// nil. Computed once on appear — a catalog scan has no place in a body
+    /// that re-evaluates on every scrub tick.
+    @State private var nearbyCurrent: (item: StationItem, km: Double)?
+    /// The local midnight the schedule week hangs from. `returnToNow`, the
+    /// range bar's picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
+    /// The strip viewport's width, reported by the strip — the span the
+    /// scale governor fits the curve against.
+    @State private var viewportPts: CGFloat = 0
+
+    private var timeline: TimelineData? { store?.timeline }
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -43,20 +53,24 @@ struct TideDetailView: View {
     private var rateWarningColor: Color? {
         fastTide ? SN.speedColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
+    /// The stop the pill names and its tap walks to: the next turn, or the
+    /// sun's next rise or set when that comes first.
+    private var nextStop: (time: Date, text: String)? {
+        nextCommentaryStop(nextExtreme.map { (time: $0.time, text: $0.kind == .high ? "High" : "Low") },
+                           sun: timeline?.days ?? [], after: scrubTime)
+    }
     /// What the pill says: the rate while the tide is fast — it explains the
-    /// yellow line under it — else the next turn.
+    /// yellow line under it — else the next stop.
     private var commentary: String? {
         if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
-        return nextExtreme.map {
-            commentaryText($0.kind == .high ? "High" : "Low", at: $0.time, from: scrubTime, now: live)
-        }
+        return nextStop.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: live) }
     }
     private var commentaryTint: Color? {
         fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
     /// A fast tide's tap goes to this run's fastest point — the flow arrow the
     /// magnet already snaps to — so the pill then reads the peak rate. From
-    /// the peak itself, or a quiet tide, it goes to the next turn.
+    /// the peak itself, or a quiet tide, it goes to the next stop.
     private func scrubToCommentary() {
         if fastTide, let tl = timeline,
            let peak = tideFlowArrows(tl.tideRates)
@@ -64,7 +78,7 @@ struct TideDetailView: View {
                .min(by: { abs($0.time.timeIntervalSince(scrubTime)) < abs($1.time.timeIntervalSince(scrubTime)) }),
            abs(peak.time.timeIntervalSince(scrubTime)) > 1 {
             scrubTime = peak.time
-        } else if let next = nextExtreme {
+        } else if let next = nextStop {
             scrubTime = next.time
         }
     }
@@ -78,11 +92,11 @@ struct TideDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { _ in rebuild() },
+                            onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
-                                let geo = TimelineGeo(data: tl)
+                                let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
                                                    imperial: imperial, now: live,
                                                    chromeInk: sky.ink,
@@ -90,14 +104,21 @@ struct TideDetailView: View {
                                                    onReturn: returnToNow,
                                                    commentary: commentary,
                                                    commentaryTint: commentaryTint,
-                                                   onCommentary: scrubToCommentary)
+                                                   onCommentary: scrubToCommentary,
+                                                   scrollGate: store?.gate,
+                                                   onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { tl, jump in
-                                SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
-                                             eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
-                                             onJump: jump,
-                                             latitude: record.latitude, longitude: record.longitude)
+                                VStack(spacing: 12) {
+                                    SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
+                                                 eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 onJump: jump,
+                                                 latitude: record.latitude, longitude: record.longitude)
+                                    if let nearby = nearbyCurrent {
+                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    }
+                                }
                             },
                             bottom: {
                                 VStack(spacing: 14) {
@@ -106,13 +127,32 @@ struct TideDetailView: View {
                                 }
                             })
             .onAppear {
-                if timeline == nil {
+                if store == nil {
                     anchor = todayLocal(tz)
-                    rebuild()
+                    let s = TimelineWindowStore(source: .tide(record))
+                    s.start(anchor: anchor, now: live)
+                    store = s
                 }
                 RecentsStore.shared.record(record.id)
                 if record.isChs {
                     chsFittedAt = ChsModelStore.load(record.id)?.fittedAt
+                }
+                if nearbyCurrent == nil,
+                   let n = StationItem.nearest(.current, toLat: record.latitude, lon: record.longitude),
+                   n.km <= nearbyStationRadiusKm {
+                    nearbyCurrent = n
+                }
+            }
+            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            // The schedule follows a scrub that has settled somewhere outside
+            // its week — the strip is endless now, and a list still describing
+            // three weeks ago would be a lie. A cancelled sleep is a scrub
+            // still in motion, same rest rule as the chrome row's.
+            .task(id: scrubTime) {
+                guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                    anchor = dayLocal(scrubTime, tz)
+                    store?.setAnchor(anchor)
                 }
             }
     }
@@ -138,7 +178,7 @@ struct TideDetailView: View {
         let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
         return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
                             + Text(" \(unit)").font(ReadoutType.leadUnit),
-                        time: chartTime(scrubTime, tz),
+                        time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {
             // Word then glyph, the order the current lead reads in.
@@ -241,18 +281,14 @@ struct TideDetailView: View {
 
     private func returnToNow() {
         live = appNow()
-        scrubTime = live
         // The anchor too: return-to-now from a September window has to bring
-        // the whole window back, not just park the centerline at a `now` that
-        // isn't on this strip.
+        // the whole schedule week back, not just park the centerline. The
+        // strip itself rides home animated within `Timeline.snapJumpHours`
+        // and lands unanimated past it — the scrubber decides by distance;
+        // the store only guarantees now's chunks exist.
         anchor = todayLocal(tz)
-        rebuild()
-    }
-
-    /// One place the timeline is rebuilt from, so the anchor and the record
-    /// can never be applied by two different code paths.
-    private func rebuild() {
-        timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
+        store?.jump(to: live, anchor: anchor)
+        scrubTime = live
     }
 }
 

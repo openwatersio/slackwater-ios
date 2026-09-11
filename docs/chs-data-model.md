@@ -43,13 +43,7 @@ All of these are point series at a gauge. None is a field.
 
 ## 3. The licence architecture — the load-bearing section
 
-This is why the app is shaped the way it is. The canonical statement is
-`chs-online-design` §2, in the private planning repo
-(`sailingnaturali/slackwater` → `docs/superpowers/specs/2026-07-21-chs-online-design.md`),
-cited by bare name from `ChsStation.swift`, `tools/gen-chs-stations.mjs`,
-`tools/FitValidation/.../main.swift` and `spikes/chs-currents-fit/README.md`.
-The reasoning is reproduced here so that it is readable without access to that
-repo.
+This section documents the app's licence architecture. Source: [CHS online design §2](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#2-the-licence-architecture), preserved as an immutable citation. Bare `chs-online-design` references are indexed in [the docs README](README.md#archived-source-citations).
 
 Three CHS clauses interact: **clause 3** bars anyone from handing us a finished
 bundle, **clause 4** bars commercial derivatives, and **clause 10** permits the

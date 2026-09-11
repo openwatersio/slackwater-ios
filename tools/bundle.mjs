@@ -127,7 +127,7 @@ export const networkOf = (s) =>
   s.source?.name === NOAA ? "coops" : (s.id.split("-").pop() ?? "");
 
 /**
- * Everywhere station-corrections' bundled gazetteer (places.json, 9,660
+ * Everywhere station-metadata's bundled gazetteer (places.json, 9,660
  * towns) can legitimately label a station — its own countries, plus the
  * territories it also carries towns for. Matamoros, MX sits 2.8 km from
  * Brownsville, TX, inside the resolver's own 40 km derivation radius;

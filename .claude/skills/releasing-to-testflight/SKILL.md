@@ -43,8 +43,9 @@ rejected upload.** Nothing renumbers it for you.
 3. Write `docs/release-notes/<MARKETING_VERSION>.md` — what testers see as
    "What to Test". `testflight.sh` posts it to the build it just uploaded; with
    no such file it says so and the build ships with none.
-4. `./scripts/test.sh --full` — both reference simulators. The full plan covers
-   the live-IWLS and on-device-fit tests the fast plan skips. A re-upload that
+4. `./scripts/test.sh --full` — the offline suite on both reference simulators,
+   including the exhaustive data check. Run `./scripts/test.sh --live` separately
+   when the release needs a real-IWLS compatibility check. A re-upload that
    changes nothing but the version numbers can reuse the previous release's run;
    say so in the PR, and check `git diff` really is version-only.
 5. Open the release PR. Nothing reaches App Store Connect before it merges, and

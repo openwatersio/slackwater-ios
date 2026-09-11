@@ -7,11 +7,11 @@
   },
   "devDependencies": {
     "@neaps/tide-database": "^0.9.20260907",
-    "@neaps/tide-predictor": "^0.10.0",
+    "@neaps/tide-predictor": "^0.11.0",
     "tz-lookup": "^6.1.25"
   },
   "scripts": {
-    "build:data": "node gen-chs-stations.mjs && node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-chs-gates.mjs && node gen-slugs.mjs",
+    "build:data": "node gen-chs-stations.mjs && node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-chs-gates.mjs && node gen-slugs.mjs && node gen-station-index.mjs",
     "test": "npm run build:data && node --test"
   }
 }

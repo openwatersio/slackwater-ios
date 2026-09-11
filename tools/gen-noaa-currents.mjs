@@ -45,7 +45,7 @@
  *      ponytail: proximity fallback at 2 km; delete it when the registry
  *      curates NOAA pairings.
  *
- * NAMING is the tide generator's, verbatim: station-corrections resolve(),
+ * NAMING is the tide generator's, verbatim: station-metadata resolve(),
  * with a DERIVED context replaced by the nearest tide station's region —
  * the bundled gazetteer is 19 Salish towns and nationally invents nonsense
  * ("Pollock Rip Channel · near Everett, WA") — and the same dangling-
@@ -119,7 +119,7 @@ const kept = bundle.stations
       name: r.name,
       // A derived context is kept now, and outranks the borrowed one. It used
       // to be discarded in favour of the nearest tide station's region because
-      // the gazetteer behind it was 19 Salish towns; since station-corrections
+      // the gazetteer behind it was 19 Salish towns; since station-metadata
       // 2.8.0 it is a national list capped at 40 km, which is both closer to
       // this station than its neighbouring gauge and more specific than that
       // gauge's own label.

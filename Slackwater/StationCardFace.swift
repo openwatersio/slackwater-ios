@@ -218,23 +218,29 @@ struct ConditionsItem: View {
     var body: some View {
         switch reading {
         case .tide(let state, let imperial):
-            let tint = state.rising ? SN.rising : SN.falling
+            // The detail lead's glyph and inks (testTurnInksAgreeAcrossChartPillAndLead):
+            // rising wears the chart's high teal, not the flood blue — direction
+            // colour belongs to currents.
+            let tint = state.rising ? SN.graphHigh : SN.graphLow
+            let arrow = Text(Image(systemName: state.rising ? "arrow.up.right" : "arrow.down.right"))
+                .font(.caption).foregroundStyle(tint)
             let spoken = "\(formatHeight(state.height, imperial: imperial)) \(heightUnit(imperial: imperial)), \(state.rising ? "rising" : "falling")"
             let value = Text(formatHeight(state.height, imperial: imperial))
                 .font(.title3.monospacedDigit()).fontWeight(.bold)
              + Text(" \(heightUnit(imperial: imperial))")
                 .font(.body)
             if compact {
-                (value + Text(" \(state.rising ? "▲" : "▼")").font(.caption).foregroundStyle(tint))
+                (value + Text(" ") + arrow)
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .accessibilityLabel(spoken)
             } else {
                 value.foregroundStyle(.white)
                 HStack(spacing: 4) {
-                    Text(state.rising ? "Rising" : "Falling").font(.caption).foregroundStyle(tint.opacity(0.6))
-                    Text(state.rising ? "▲" : "▼").font(.caption)
-                }.foregroundStyle(tint)
+                    Text(state.rising ? "Rising" : "Falling").font(.caption)
+                        .foregroundStyle(SN.foam.opacity(0.6))
+                    arrow
+                }
             }
 
         case .current(let signed, let deg, let unit, let tilde, let inWindow):
@@ -270,10 +276,13 @@ struct ConditionsItem: View {
             } else {
                 value
                 HStack(spacing: 4) {
+                    // The word stays neutral like the detail lead's; only the
+                    // arrow speaks the phase colour. Slack keeps SN.go —
+                    // testSlackIsGreenWhereverItAppears.
                     Text(slack ? "Slack" : phase.word).font(.caption2)
-                        .foregroundStyle(tint.opacity(slack ? 1 : 0.6))
+                        .foregroundStyle(slack ? tint : SN.foam.opacity(0.6))
                     set(deg: deg, signed: signed, tint: tint, font: .caption2, arrowFirst: false)
-                }.foregroundStyle(tint)
+                }
             }
         case .gate(let phase):
             Text(phase == .flood ? "FLOOD" : phase == .ebb ? "EBB" : "SLACK")
