@@ -815,6 +815,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
+            .environment(\.openWeekPicker, { showPicker = true })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187). Taken on appear so it reaches only
             // the detail the link opened, but APPLIED once the timeline exists:
@@ -966,6 +967,21 @@ struct WeekRangeBar: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("week-range-bar")
         .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
+    }
+}
+
+/// How the strip's day row reaches the picker the range bar owns. An
+/// environment closure rather than four more callback parameters: the strip is
+/// three views deep in every detail, and none of the layers between it and the
+/// scaffold has anything to say about dates.
+private struct OpenWeekPickerKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openWeekPicker: () -> Void {
+        get { self[OpenWeekPickerKey.self] }
+        set { self[OpenWeekPickerKey.self] = newValue }
     }
 }
 
