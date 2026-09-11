@@ -556,18 +556,3 @@ final class NationalScaleTests: XCTestCase {
                       "once queued it stops saying \"tap to download\"")
     }
 }
-
-/// Widens the wall-clock budgets off their calibration machine. The budgets
-/// in this file were measured on the Mac Studio; a hosted CI runner ran them
-/// 1.9–2.5× slower on its first run, with pool variance on top. CI passes
-/// TEST_RUNNER_SLACKWATER_PERF_SCALE through xcodebuild (which strips the
-/// prefix); local runs stay at 1× so the budgets keep their teeth where the
-/// numbers were measured.
-private let perfScale = Double(ProcessInfo.processInfo.environment["SLACKWATER_PERF_SCALE"] ?? "1") ?? 1
-
-/// Wall clock for one block, in seconds.
-private func elapsed(_ body: () -> Void) -> TimeInterval {
-    let start = Date.now
-    body()
-    return Date.now.timeIntervalSince(start)
-}
