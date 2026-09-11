@@ -53,20 +53,24 @@ struct TideDetailView: View {
     private var rateWarningColor: Color? {
         fastTide ? SN.speedColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
+    /// The stop the pill names and its tap walks to: the next turn, or the
+    /// sun's next rise or set when that comes first.
+    private var nextStop: (time: Date, text: String)? {
+        nextCommentaryStop(nextExtreme.map { (time: $0.time, text: $0.kind == .high ? "High" : "Low") },
+                           sun: timeline?.days ?? [], after: scrubTime)
+    }
     /// What the pill says: the rate while the tide is fast — it explains the
-    /// yellow line under it — else the next turn.
+    /// yellow line under it — else the next stop.
     private var commentary: String? {
         if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
-        return nextExtreme.map {
-            commentaryText($0.kind == .high ? "High" : "Low", at: $0.time, from: scrubTime, now: live)
-        }
+        return nextStop.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: live) }
     }
     private var commentaryTint: Color? {
         fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
     /// A fast tide's tap goes to this run's fastest point — the flow arrow the
     /// magnet already snaps to — so the pill then reads the peak rate. From
-    /// the peak itself, or a quiet tide, it goes to the next turn.
+    /// the peak itself, or a quiet tide, it goes to the next stop.
     private func scrubToCommentary() {
         if fastTide, let tl = timeline,
            let peak = tideFlowArrows(tl.tideRates)
@@ -74,7 +78,7 @@ struct TideDetailView: View {
                .min(by: { abs($0.time.timeIntervalSince(scrubTime)) < abs($1.time.timeIntervalSince(scrubTime)) }),
            abs(peak.time.timeIntervalSince(scrubTime)) > 1 {
             scrubTime = peak.time
-        } else if let next = nextExtreme {
+        } else if let next = nextStop {
             scrubTime = next.time
         }
     }
@@ -174,7 +178,7 @@ struct TideDetailView: View {
         let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
         return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
                             + Text(" \(unit)").font(ReadoutType.leadUnit),
-                        time: chartTime(scrubTime, tz),
+                        time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {
             // Word then glyph, the order the current lead reads in.

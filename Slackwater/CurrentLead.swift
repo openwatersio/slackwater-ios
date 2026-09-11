@@ -27,8 +27,8 @@ struct CurrentLead: View {
     private var readingColor: Color { provisional ? SN.amber : ink }
 
     /// The stops the commentary walks: a window opening, its closing (the
-    /// run that begins), each max, and a bare slack where no window exists.
-    /// Strictly after the scrub, so landing on one advances to the next.
+    /// run that begins), each max, a bare slack where no window exists, and
+    /// the sun's next rise or set when it beats all of them.
     var nextSignificant: (time: Date, text: String)? {
         var stops: [(time: Date, text: String)] = []
         // The windows' own slacks, gathered once: the event loop below asks
@@ -54,11 +54,16 @@ struct CurrentLead: View {
                 stops.append((e.time, e.kind == .maxFlood ? "Max flood" : "Max ebb"))
             }
         }
-        return stops.filter { $0.time > scrubTime.addingTimeInterval(1) }.min { $0.time < $1.time }
+        // The tilde belongs to the water's numbers, not to the sun's clock,
+        // so it goes on here rather than in `commentary`.
+        let water = stops.filter { $0.time > scrubTime.addingTimeInterval(1) }
+            .min { $0.time < $1.time }
+            .map { (time: $0.time, text: "\(tilde)\($0.text)") }
+        return nextCommentaryStop(water, sun: timeline.days, after: scrubTime)
     }
 
     var commentary: String? {
-        nextSignificant.map { commentaryText("\(tilde)\($0.text)", at: $0.time, from: scrubTime, now: now) }
+        nextSignificant.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: now) }
     }
 
     /// The summary tile's number: the maximum the water is heading for. A
@@ -90,7 +95,7 @@ struct CurrentLead: View {
         let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(isSlack ? .slack : phase)
         LeadCard(value: Text("\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))").font(ReadoutType.lead.monospacedDigit())
                     + Text(" \(speedUnitLabel(speedUnit))").font(ReadoutType.leadUnit),
-                 time: chartTime(scrubTime, tz),
+                 time: leadWhen(scrubTime, tz),
                  valueColor: readingColor,
                  timeColor: ink) {
             leadState(state, ink: ink)

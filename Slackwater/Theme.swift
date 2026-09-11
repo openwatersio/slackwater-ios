@@ -445,6 +445,23 @@ func monthDay(_ date: Date, _ tz: TimeZone) -> String {
     formatter("MMM d", tz).string(from: date)
 }
 
+/// "Sep 10 · 3:42pm" — the lead's when. The date is here because a strip
+/// centered on night has both flanking day headers off-screen. Date only, no
+/// weekday and no TODAY/TOMORROW, for the reason `monthDay` records.
+///
+/// The line is centered under the reading, so a one-digit hour would narrow
+/// the string and shift every glyph as the scrub crosses 9:59→10:00 — many
+/// times in one pan. A figure space — digit-wide under `monospacedDigit` —
+/// stands in for the missing digit. The day's digits move too, but once per
+/// midnight rather than per pan, so they go unpadded.
+func leadWhen(_ date: Date, _ tz: TimeZone) -> String {
+    var time = chartTime(date, tz)
+    if time.prefix(while: \.isNumber).count == 1 {
+        time = "\u{2007}" + time
+    }
+    return "\(monthDay(date, tz)) · \(time)"
+}
+
 /// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
 /// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
 ///
@@ -524,6 +541,22 @@ func leadState(_ text: String, ink: Color = SN.foam) -> Text {
 func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date) -> String {
     let gap = countdown(from: scrub, to: time)
     return scrubbedAway(scrub, from: now) ? "\(event) \(gap) later" : "\(event) in \(gap)"
+}
+
+/// The stop the commentary names and its tap walks to: the water's next stop,
+/// or the sun's next rise or set when that comes first. Dark is an event a
+/// reader plans around the same way they plan around a slack.
+func nextCommentaryStop(_ water: (time: Date, text: String)?,
+                        sun days: [TimelineDay],
+                        after scrub: Date) -> (time: Date, text: String)? {
+    // Strictly after the scrub, so landing on a stop advances to the next.
+    let cutoff = scrub.addingTimeInterval(1)
+    let sun = days
+        .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
+        .compactMap { time, word in time.map { (time: $0, text: word) } }
+    return (sun + [water].compactMap { $0 })
+        .filter { $0.time > cutoff }
+        .min { $0.time < $1.time }
 }
 
 /// What comes next, centred on the reading line in the strip's chrome row.
@@ -799,6 +832,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
+            .environment(\.openWeekPicker, { showPicker = true })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187). Taken on appear so it reaches only
             // the detail the link opened, but APPLIED once the timeline exists:
@@ -950,6 +984,21 @@ struct WeekRangeBar: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("week-range-bar")
         .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
+    }
+}
+
+/// How the strip's day row reaches the picker the range bar owns. An
+/// environment closure rather than four more callback parameters: the strip is
+/// three views deep in every detail, and none of the layers between it and the
+/// scaffold has anything to say about dates.
+private struct OpenWeekPickerKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openWeekPicker: () -> Void {
+        get { self[OpenWeekPickerKey.self] }
+        set { self[OpenWeekPickerKey.self] = newValue }
     }
 }
 

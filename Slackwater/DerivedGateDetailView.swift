@@ -31,6 +31,12 @@ struct DerivedGateDetailView: View {
     private var tz: TimeZone { gate.tz }
     private var phase: DerivedPhase { record.engineGate.phase(at: scrubTime, slacks: slacks) }
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
+    /// The stop the pill names and its tap walks to: the next slack, or the
+    /// sun's next rise or set when that comes first.
+    private var nextStop: (time: Date, text: String)? {
+        nextCommentaryStop(nextSlack.map { (time: $0.time, text: "Slack") },
+                           sun: timeline?.days ?? [], after: scrubTime)
+    }
 
     var body: some View {
         let sky = SkyState(time: scrubTime, latitude: gate.latitude, longitude: gate.longitude,
@@ -48,15 +54,15 @@ struct DerivedGateDetailView: View {
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
-                                let slack = nextSlack
+                                let next = nextStop
                                 TimelineScrubStrip(data: tl, geo: TimelineGeo(data: tl),
                                                    now: live, chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
-                                                   commentary: slack.map {
-                                                       commentaryText("Slack", at: $0.time, from: scrubTime, now: live)
+                                                   commentary: next.map {
+                                                       commentaryText($0.text, at: $0.time, from: scrubTime, now: live)
                                                    },
-                                                   onCommentary: { if let slack { scrubTime = slack.time } },
+                                                   onCommentary: { if let next { scrubTime = next.time } },
                                                    scrollGate: store?.gate,
                                                    onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
@@ -122,7 +128,7 @@ struct DerivedGateDetailView: View {
     /// details read alike.
     private func lead(ink: Color) -> some View {
         let word = phase.word
-        return LeadCard(time: chartTime(scrubTime, tz), timeColor: ink) {
+        return LeadCard(time: leadWhen(scrubTime, tz), timeColor: ink) {
             leadState(word, ink: ink)
             Image(systemName: glyph)
                 .foregroundStyle(Self.phaseColor(phase))

@@ -114,6 +114,71 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "tide-readout-height-range.png")
     }
 
+    /// A tap on the strip brings that moment to the centerline — the fast way
+    /// across a week that dragging measures out an hour at a time. Every label
+    /// on the strip is a moment and scrubs to itself, sunrise included; the
+    /// date under the day is the one that names a DAY rather than a moment, so
+    /// it opens the picker instead.
+    func testTappingTheStripScrubsAndTheDateOpensThePicker() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.appears(within: 10), "timeline strip missing")
+        settleLayout(strip)  // the intro is still sliding the strip to now
+        settleScrub(app)
+
+        // Well right of the centerline, in the plot box: hours away from now,
+        // whichever stop the magnet finishes on.
+        let opening = scrubClock(app)
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)).tap()
+        settleScrub(app)  // the tap rides an animated scroll to the stop
+        XCTAssertNotEqual(scrubClock(app), opening,
+                          "a tap on the strip left the centerline on \(opening)")
+        save(app, "strip-tap-scrubbed.png")
+
+        // Pick a date, for the geometry the rest of this test needs: the
+        // centerline parks on the picked day's NOON, which is where its date
+        // label is drawn, with that day's sun labels either side of it. Nothing
+        // else puts a known label under a known point of the strip — where the
+        // centerline sits on arrival depends on the clock the test runs at.
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
+        let week = bar.label
+        bar.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
+        stepMonth(app, "Next Month")
+        tapDay(app.collectionViews.buttons.element(boundBy: 10))
+        app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
+        XCTAssert(waitFor(bar, "label != '\(week)'"), "the pick did not move the window")
+        settleScrub(app)
+        let noon = scrubClock(app)
+
+        // The date, under the centerline: the picker, and the strip left where
+        // it was when the sheet goes away.
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).tap()
+        let picker = app.descendants(matching: .any)["week-picker"].firstMatch
+        XCTAssert(picker.appears(within: 5), "a tap on the date did not open the picker")
+        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssert(waitFor(picker, "exists == false"), "the picker did not close")
+
+        // The sunrise label, left of the date on the same row. Friday Harbor's
+        // sun rises 4–7 hours before noon whatever the season, so a quarter of
+        // the way across the strip is nearer the sunrise than the date by a
+        // clear margin at any anchor the picker can reach.
+        let sun = app.descendants(matching: .any)["day-sun-d0"].firstMatch
+        XCTAssert(sun.exists, "no sun times in the schedule's day column")
+        let sunrise = try XCTUnwrap(sun.label.range(of: "\\d{1,2}:\\d{2}(am|pm)",
+                                                   options: .regularExpression)
+                                        .map { String(sun.label[$0]) },
+                                    "no sunrise in '\(sun.label)'")
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.95)).tap()
+        settleScrub(app)
+        XCTAssertFalse(picker.exists, "a tap on the sunrise opened the picker")
+        XCTAssertEqual(scrubClock(app), sunrise,
+                       "the sunrise tap left the centerline on \(scrubClock(app)), not \(sunrise) (noon was \(noon))")
+        save(app, "strip-tap-sunrise.png")
+    }
+
     /// #170: provenance stays out of the primary tide-reading flow until the
     /// sailor asks for it, then exposes the support/debugging facts in place.
     func testStationDetailsAreCollapsedUntilOpened() throws {
@@ -160,7 +225,10 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         stepMonth(app, "Next Month")
         tapDay(app.collectionViews.buttons.element(boundBy: 10))
         app.descendants(matching: .any)["week-picker-done"].firstMatch.tap()
-
+        // The bar stays put and rewrites itself once the sheet's pick lands,
+        // so wait for the label the next line reads, not for the bar (#341).
+        XCTAssert(waitFor(bar, "label != '\(before)'"),
+                  "the bar did not move off '\(before)' after Done")
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
         XCTAssert(app.staticTexts["not this week"].appears(within: 5))
 
@@ -234,25 +302,42 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                        "sun rows have moved to the day header — none in the current-station schedule")
     }
 
-    // The continuous scrub — a fixed centerline with the multi-day strip
-    // panning underneath. Scrubbing across midnight lands on the next day's
-    // events; the schedule shows several days under day headers; a row tap
-    // scrubs cross-day; return-to-now comes home.
+    func testM42DayHeaderSpansTheSchedule() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.appears(within: 5), "Tomorrow's day header is not expandable")
+        XCTAssertGreaterThan(tomorrowDay.frame.width, app.windows.firstMatch.frame.width * 0.8,
+                             "the day header should span the schedule with its chevron trailing")
+    }
+
+    // The fixed centerline stays put while the multi-day strip pans underneath.
     func testM42ContinuousScrubAcrossMidnight() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
-        // The multi-day schedule carries day headers beyond today.
-        XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
-                  "multi-day schedule missing its Tomorrow day header")
-
-        // Pan the strip: the centerline readout moves off "now".
+        // Pan the strip while its midpoint is visible: the centerline readout moves off "now".
         scrubStrip(app)
         XCTAssert(app.buttons["Return to now"].appears(within: 5),
                   "return-to-now affordance missing after scrubbing away")
+
+        // Later days stay compact until the sailor asks for one.
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts["Tomorrow"].appears(within: 5),
+                  "multi-day schedule missing its Tomorrow day header")
+        XCTAssert(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                  "today's rows should start expanded")
+        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
+        XCTAssertFalse(tomorrowRow.exists, "Tomorrow's rows should start collapsed")
+        let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
+        XCTAssert(tomorrowDay.exists, "Tomorrow's day header is not expandable")
+        tomorrowDay.tap()
+        XCTAssert(tomorrowRow.appears(within: 5), "Tomorrow's rows did not expand")
+        XCTAssertFalse(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
+                       "opening Tomorrow should collapse Today")
 
         // Down the multi-day list. (One swipe first: schedule-row-d1 may not
         // be realized until it scrolls near the fold — the loop below only
@@ -263,7 +348,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // hugging the bottom edge "taps" without firing (the touch lands in
         // the home-indicator band — seen on iPad landscape), so scroll until
         // it sits clear of the edge first.
-        let tomorrowRow = app.buttons.matching(identifier: "schedule-row-d1").firstMatch
         XCTAssert(tomorrowRow.appears(within: 5), "no Tomorrow rows in the schedule")
         var tries = 0
         while tomorrowRow.frame.maxY > app.windows.firstMatch.frame.maxY - 80, tries < 4 {
@@ -450,10 +534,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleLayout(strip)  // the intro is still sliding the strip to now
 
         // The pill fades in once the scrub rests, so hittability is the wait,
-        // not existence.
+        // not existence — and the intro seeds the scrub two hours back, so a
+        // pill that rests before the slide's first frame reads "later". Wait
+        // for the phrasing the next line asserts.
         let pill = commentaryPill(app)
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "no commentary pill on the tide detail")
+        XCTAssert(waitFor(pill, "isHittable == true AND label CONTAINS ' in '"),
+                  "no commentary pill parked on now: '\(pill.label)'")
         let saidBefore = pill.label
         XCTAssert(saidBefore.contains(" in "),
                   "parked on now, the commentary counts from the reader: '\(saidBefore)'")
@@ -463,8 +549,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleScrub(app)
         XCTAssertNotEqual(scrubClock(app), clockBefore,
                           "tapping the commentary did not scrub to the stop it names")
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after the jump")
+        // Hittable alone is true at t=0: the jump's `scrubTime` write restarts
+        // the strip's settle timer one main-actor hop after the tap, and the
+        // pill is still hittable with the old label until then. The label is
+        // the noun the next lines read, so it is the wait.
+        XCTAssert(waitFor(pill, "isHittable == true AND label ENDSWITH 'later'"),
+                  "the commentary did not come back after the jump: '\(pill.label)'")
         XCTAssertNotEqual(pill.label, saidBefore,
                           "the commentary must name the next stop, not the one just landed on")
         XCTAssert(pill.label.hasSuffix("later"),
@@ -473,8 +563,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Home again, and the count is the reader's once more.
         app.buttons["detail-return-now"].firstMatch.tap()
-        XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
-                  "the commentary did not come back after returning to now")
+        XCTAssert(waitFor(pill, "isHittable == true AND label CONTAINS ' in '"),
+                  "the commentary did not come back after returning to now: '\(pill.label)'")
         XCTAssert(pill.label.contains(" in "),
                   "back on now, the commentary counts from the reader: '\(pill.label)'")
     }

@@ -59,10 +59,10 @@ final class DetailLeadTests: XCTestCase {
     /// of it, an ebb max, a second window, and a bare slack with no window at
     /// all. Velocities interpolate between the listed points, which is what
     /// tells a window's CLOSING whether the run after it floods or ebbs.
-    private func timeline() -> TimelineData {
+    private func timeline(days: [TimelineDay] = []) -> TimelineData {
         TimelineData(
             tz: utc, anchor: t0, today: t0, start: at(-3600), end: at(18_000),
-            days: [], tidePoints: [], tideRates: [], tideExtremes: [],
+            days: days, tidePoints: [], tideRates: [], tideExtremes: [],
             currentPoints: [
                 CurrentPoint(time: at(-3600), speed: 0),
                 CurrentPoint(time: t0, speed: 2.4),
@@ -86,9 +86,16 @@ final class DetailLeadTests: XCTestCase {
             ])
     }
 
-    private func lead(scrub: Date, provisional: Bool = false) -> CurrentLead {
-        CurrentLead(timeline: timeline(), scrubTime: scrub, now: t0, signed: 1,
+    private func lead(scrub: Date, provisional: Bool = false,
+                      days: [TimelineDay] = []) -> CurrentLead {
+        CurrentLead(timeline: timeline(days: days), scrubTime: scrub, now: t0, signed: 1,
                     floodDeg: 0, ebbDeg: 180, speedUnit: "kn", tz: utc, provisional: provisional)
+    }
+
+    /// Sunset at 12:33, inside the fixture day and ahead of the 1:00 window.
+    private var sunsetDay: TimelineDay {
+        TimelineDay(offset: 0, start: t0, sunrise: at(-3000), sunset: at(2000),
+                    moonrise: nil, moonset: nil)
     }
 
     private func assertNext(_ scrub: Date, _ time: Date, _ text: String,
@@ -146,6 +153,40 @@ final class DetailLeadTests: XCTestCase {
         let provisional = lead(scrub: at(-100), provisional: true)
         XCTAssertEqual(try XCTUnwrap(provisional.nextMax).value, "~2.4\u{00a0}kn")
         XCTAssertEqual(provisional.commentary, "~Max flood in 1m")
+    }
+
+    /// Dark is a stop like any other: whichever comes first — the water's turn
+    /// or the sun's — is what every detail's pill names and its tap walks to.
+    func testTheSunIsAStopWhenItComesFirst() {
+        let day = sunsetDay
+        let high = (time: at(3600), text: "High")
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: t0)?.text, "Sunset",
+                       "sunset at 12:33 beats the 1:00 high")
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(2000))?.text, "High",
+                       "past sunset, the water's turn is next again")
+        XCTAssertEqual(nextCommentaryStop(nil, sun: [day], after: t0)?.text, "Sunset",
+                       "the sun still stands when the water has no stop at all")
+        XCTAssertNil(nextCommentaryStop(nil, sun: [day], after: at(3600)),
+                     "nothing left in the day, nothing for the pill to say")
+
+        // The cutoff is the helper's own, held for both candidates: a caller
+        // that hands over the stop it is parked on still walks forward.
+        XCTAssertNil(nextCommentaryStop(high, sun: [day], after: at(3600)),
+                     "the stop under the scrub is not a stop ahead of it")
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(1990))?.text, "Sunset",
+                       "ten seconds out, the sun is still ahead")
+    }
+
+    /// The sun's clock is exact even when the velocities are a fast answer —
+    /// the tilde marks the water's numbers and nothing else.
+    func testACurrentLeadWalksToTheSunUntilded() {
+        let sun = lead(scrub: at(10), provisional: true, days: [sunsetDay])
+        XCTAssertEqual(sun.nextSignificant?.time, at(2000), "sunset beats the window's opening")
+        XCTAssertEqual(sun.commentary, "Sunset in 33m")
+
+        // Past it, the water is back — and marked, because its speeds are.
+        XCTAssertEqual(lead(scrub: at(2010), provisional: true, days: [sunsetDay]).commentary,
+                       "~Slack 16m later")
     }
 
     /// The pill explains the yellow line: the rate, direction first, in the

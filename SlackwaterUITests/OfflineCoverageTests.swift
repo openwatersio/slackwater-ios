@@ -381,9 +381,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let pill = commentaryPill(app)
         XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
                   "no commentary pill on the online-gate detail")
-        XCTAssert(pill.label.hasPrefix("Slack") || pill.label.contains("Max")
-                  || pill.label.hasPrefix("Flood") || pill.label.hasPrefix("Ebb"),
-                  "the commentary must name a current stop, got '\(pill.label)'")
+        XCTAssert(namesACurrentStop(pill.label),
+                  "the commentary must name a stop, got '\(pill.label)'")
 
         let provenance = app.staticTexts["online-provenance"].firstMatch
         XCTAssert(provenance.appears(within: 5), "provenance footer missing")

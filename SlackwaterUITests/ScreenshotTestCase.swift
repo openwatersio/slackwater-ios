@@ -57,6 +57,13 @@ class ScreenshotTestCase: XCTestCase {
     /// intermittent failure, the worst thing a guard suite can carry.
     /// Returns rather than asserts — the caller's own assertion, taken after
     /// the wait, is what reports the failure and names it.
+    ///
+    /// Wait for the noun the next line reads. An element that stays in the
+    /// tree and rewrites itself — the commentary pill on a jump — is hittable
+    /// before the app has processed the tap, so `isHittable == true` alone is
+    /// satisfied at t=0 and the label is read mid-transition (#341). Put the
+    /// label condition in the predicate: `"isHittable == true AND label
+    /// CONTAINS ' in '"`. Timeout scaling cannot reach a wait that never waits.
     @discardableResult
     func waitFor(_ element: XCUIElement, _ condition: String,
                  timeout: TimeInterval = 10) -> Bool {
@@ -386,6 +393,12 @@ class ScreenshotTestCase: XCTestCase {
     /// scrubable detail has one; a current's names a slack, a run or a max.
     func commentaryPill(_ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)["commentary"].firstMatch
+    }
+
+    /// Every stop a current detail's pill may name: the water's, and the
+    /// sun's, which takes the pill whenever it comes first.
+    func namesACurrentStop(_ label: String) -> Bool {
+        ["Slack", "Max", "Flood", "Ebb", "Sunrise", "Sunset"].contains { label.contains($0) }
     }
 
     /// The schedule rows' accessibility labels — NOT every "HH:mm" label on

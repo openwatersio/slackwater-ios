@@ -775,22 +775,30 @@ struct TimelineCanvas: View {
 
     // Day labels and sun markers — continuous across midnight.
     private func drawDayChrome(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
-        // A day's chrome hangs off local noon and its sun dots, so a day
-        // whose midnight is off-tile can still print into it: widen by a day
-        // either side rather than testing the day's own start.
+        // A day's chrome hangs off its daylight midpoint and its sun dots, so
+        // a day whose midnight is off-tile can still print into it: widen by a
+        // day either side rather than testing the day's own start.
         let from = t0.addingTimeInterval(-24 * 3600), to = t1.addingTimeInterval(24 * 3600)
         for day in data.visibleDays where day.start >= from && day.start <= to {
-            // Day label at local noon. Fixed size, not `.caption2` — chart
+            // Day label at the daylight midpoint, not clock noon: the tint
+            // band is what the label names, and clock noon sits toward
+            // sunrise all DST season. Clock noon only when a polar day has
+            // no band to center on. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
+            let labelX: CGFloat = if let sr = day.sunrise, let ss = day.sunset {
+                data.x(sr.addingTimeInterval(ss.timeIntervalSince(sr) / 2))
+            } else {
+                data.x(noonLocal(day.start, data.tz))
+            }
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY),
+                     at: CGPoint(x: labelX, y: geo.dayY),
                      anchor: .center)
             ctx.draw(Text(monthDay(day.start, data.tz))
                         .font(.system(size: 10, weight: .medium).monospaced())
                         .foregroundStyle(SN.foam.opacity(0.48)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY + 17),
+                     at: CGPoint(x: labelX, y: geo.dayY + 17),
                      anchor: .center)
             // Sun rise/set dots + "↑5:24AM" labels.
             for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {
@@ -991,6 +999,19 @@ struct TimelineCanvas: View {
         // cut to the tile.
         let allRuns = mergeWindows(data.slackWindows.map { (start: $0.start, end: $0.end) })
         let runs = allRuns.filter { $0.end >= t0 && $0.start <= t1 }
+        // The run segments, built before the line because the line clips
+        // itself around them. Walks THIS TILE's samples, not the window's,
+        // once per run it touches: the window-wide scan was the strip's worst
+        // cost, a full pass per run per tile.
+        let segs = runs.map { run -> Path in
+            var seg = Path()
+            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
+            for p in points where p.time > run.start && p.time < run.end {
+                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
+            }
+            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
+            return seg
+        }
         let xa = data.x(first.time), xb = data.x(last.time)
         seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
 
@@ -1020,24 +1041,13 @@ struct TimelineCanvas: View {
             strokeSplitAtNow(ctx, line, with: .color(SN.graphLine))
         } else {
             CurveDrawing.currentLine(ctx, line,
+                                     slackRuns: segs,
                                      samples: points.map { (x: data.x($0.time), speedKn: $0.speed) },
                                      nowX: nowX, width: data.totalWidth, height: geo.height)
         }
 
         // The run is the mark (spec §5.2): the line itself turns the go
         // colour between each run's interpolated edges (CurveDrawing.runs).
-        // Walks THIS TILE's samples, not the window's, once per run it
-        // touches: the window-wide scan here was the strip's worst cost, a
-        // full pass per run per tile.
-        let segs = runs.map { run -> Path in
-            var seg = Path()
-            seg.move(to: CGPoint(x: data.x(run.start), y: geo.curY(data.velocityAt(run.start))))
-            for p in points where p.time > run.start && p.time < run.end {
-                seg.addLine(to: CGPoint(x: data.x(p.time), y: geo.curY(p.speed)))
-            }
-            seg.addLine(to: CGPoint(x: data.x(run.end), y: geo.curY(data.velocityAt(run.end))))
-            return seg
-        }
         CurveDrawing.runs(ctx, segs, nowX: nowX, width: data.totalWidth, height: geo.height)
 
         let margin = 0.3 * 3600
@@ -1118,6 +1128,9 @@ struct TimelineScrubber: UIViewRepresentable {
     /// The store's is-it-safe-to-move-the-left-edge signal (`ScrollGate`).
     /// Nil on a fixed window (the online gate), where nothing slides.
     var scrollGate: ScrollGate? = nil
+    /// A tap on the day row's DATE — the one label on the strip that names a
+    /// day rather than a moment on it — opens the week picker.
+    var onPickDate: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -1161,6 +1174,8 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
+        sv.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator,
+                                                       action: #selector(Coordinator.handleTap(_:))))
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -1484,21 +1499,101 @@ struct TimelineScrubber: UIViewRepresentable {
             syncGate(sv)
         }
 
+        /// A tap: the date opens the picker, everything else on the strip
+        /// brings its own moment to the centerline. Dragging is still how you
+        /// read the curve; this is how you get across a day of it.
+        @objc func handleTap(_ g: UITapGestureRecognizer) {
+            guard let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
+            // The scroll view's own coordinate space IS the content's, so this
+            // x is a strip x and this y a canvas y.
+            let p = g.location(in: sv)
+            // Whatever the strip is doing, a tap wins — including the tap that
+            // only opens the picker. Left running, the opening slide or a
+            // magnet in flight keeps writing `scrubTime` behind the sheet.
+            stopIntro()
+            guard let target = tapTarget(x: p.x, y: p.y) else {
+                sv.setContentOffset(sv.contentOffset, animated: false)
+                cancelMagnet()
+                parent.onPickDate()
+                return
+            }
+            // Clamped, then read back: at either end of the window the offset
+            // that would centre the tap does not exist, and parking scrubTime
+            // on an unreachable time leaves the readout disagreeing with the
+            // curve under the line. x and time are exact inverses, so a
+            // reachable tap round-trips to itself.
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            let landing = parent.data.time(atX: desired + sv.bounds.width / 2)
+            // Stop a fling first, then ride the magnet's animated path — the
+            // same landing a tapped pill gets (updateUIView's jump branch).
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+                cancelMagnet()
+                sv.contentOffset = CGPoint(x: desired, y: 0)
+                parent.scrubTime = landing
+            } else {
+                magneting = true
+                // `nudging` for the same reason the opening slide sets it: the
+                // scroll callbacks drive `scrubTime` from the offset the
+                // animation is passing through, and SwiftUI renders from that
+                // value a frame later — updateUIView's external-scrub branch
+                // reads the gap as a stale offset and pins the strip a few
+                // points into a travel that can be a screen wide.
+                nudging = true
+                magnetTarget = landing
+                sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
+            }
+        }
+
+        /// What a tap at this point on the strip means: the moment to bring to
+        /// the centerline, or nil for the date — the one label that names a day
+        /// rather than a moment, and so opens the picker.
+        private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
+            let data = parent.data
+            // Between the axis times' row and the day row, from the two rows'
+            // own y's: the strip's geometry is all literal points and moves.
+            let rowSplit = (parent.geo.timeY + parent.geo.dayY) / 2
+            guard y > rowSplit else {
+                // The plot and its axis: the tapped moment, pulled onto a stop
+                // by the same magnet a drag settles into.
+                if let stop = nearest(data.snapTimes, toX: x), stop.dx < Timeline.magnetPts {
+                    return stop.time
+                }
+                return data.time(atX: x)
+            }
+            // The day row is a row of labels — each day's date at its noon, its
+            // sun times where they fall — so a tap goes to the nearest one. A
+            // sunrise is a moment on the strip and scrubs there like anything
+            // else; only the date is a different question.
+            let sun = nearest(data.visibleDays.flatMap { day in
+                [day.sunrise, day.sunset].compactMap { $0 }
+            }, toX: x)
+            let date = nearest(data.visibleDays.map { noonLocal($0.start, data.tz) }, toX: x)
+            guard let sun, sun.dx < (date?.dx ?? .greatestFiniteMagnitude) else { return nil }
+            return sun.time
+        }
+
+        /// The nearest of `times` to a strip x, and how far off it is.
+        private func nearest(_ times: [Date], toX x: CGFloat) -> (time: Date, dx: CGFloat)? {
+            var best: (time: Date, dx: CGFloat)?
+            for t in times {
+                let dx = abs(parent.data.x(t) - x)
+                if dx < (best?.dx ?? .greatestFiniteMagnitude) { best = (t, dx) }
+            }
+            return best
+        }
+
         /// Prototype magnet(): after the scroll settles, the nearest stop
         /// within 46pt of the centerline pulls the strip onto itself.
         private func magnet(_ sv: UIScrollView) {
             guard !magneting else { return }
             let center = sv.contentOffset.x + sv.bounds.width / 2
-            var best: Date?
-            var bd = CGFloat.greatestFiniteMagnitude
-            for t in parent.data.snapTimes {
-                let d = abs(parent.data.x(t) - center)
-                if d < bd { bd = d; best = t }
-            }
-            guard let best, bd < Timeline.magnetPts, bd > 0.5 else { return }
+            guard let best = nearest(parent.data.snapTimes, toX: center),
+                  best.dx < Timeline.magnetPts, best.dx > 0.5 else { return }
             magneting = true
-            magnetTarget = best
-            sv.setContentOffset(CGPoint(x: parent.data.x(best) - sv.bounds.width / 2, y: 0),
+            magnetTarget = best.time
+            sv.setContentOffset(CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0),
                                 animated: true)
         }
     }
@@ -1526,6 +1621,7 @@ struct TimelineScrubStrip: View {
     /// gate, and the viewport width the scale governor fits against.
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
+    @Environment(\.openWeekPicker) private var openWeekPicker
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -1533,7 +1629,8 @@ struct TimelineScrubStrip: View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                          now: now,
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
-                         jumpToken: jumpToken, scrollGate: scrollGate)
+                         jumpToken: jumpToken, scrollGate: scrollGate,
+                         onPickDate: openWeekPicker)
             .frame(height: geo.height)
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
@@ -1671,8 +1768,8 @@ func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
 
 /// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off
 /// `anchor`, which is why this takes the anchor and `today` separately: day
-/// groups key on the first, labels read the second. Day name in a left column,
-/// rows scrub on tap, the row nearest the centerline time is highlighted. The
+/// groups key on the first, labels read the second. Dates disclose rows on tap;
+/// the row nearest the centerline time is highlighted. The
 /// prototype dims nothing for the past — the nearest-row highlight is the time
 /// cue. (The prototype's `tableEl` TOP, a flat today+54h, is what
 /// `scheduleRange` replaced.)
@@ -1687,6 +1784,7 @@ struct MultiDaySchedule: View {
     let days: [TimelineDay]
     let scrubTime: Date
     let onTap: (Date) -> Void
+    @State private var expandedOffset: Int? = 0
 
     private var groups: [(offset: Int, start: Date, items: [ScheduleEntry])] {
         var out: [(Int, Date, [ScheduleEntry])] = []
@@ -1708,68 +1806,87 @@ struct MultiDaySchedule: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(groups, id: \.start) { group in
+                let expanded = expandedOffset == group.offset
                 if group.start != groups.first?.start {
                     Divider().overlay(Color.white.opacity(0.08))
                 }
-                HStack(alignment: .top, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(relativeDayLabel(group.start, tz, today: today))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(SN.foam.opacity(0.9))
-                        if let day = days.first(where: { $0.offset == group.offset }) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                if let rise = day.sunrise {
-                                    Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                VStack(spacing: 0) {
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(relativeDayLabel(group.start, tz, today: today))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(SN.foam.opacity(0.9))
+                            if let day = days.first(where: { $0.offset == group.offset }) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    if let rise = day.sunrise {
+                                        Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                    }
+                                    if let set = day.sunset {
+                                        Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
+                                    }
                                 }
-                                if let set = day.sunset {
-                                    Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
-                                }
+                                .font(.caption2.monospaced())
+                                .accessibilityElement(children: .combine)
+                                .accessibilityIdentifier("day-sun-d\(group.offset)")
                             }
-                            .font(.caption2.monospaced())
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("day-sun-d\(group.offset)")
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.55))
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
                     }
-                    .frame(width: 74, alignment: .leading)
-                    .padding(.leading, 14)
-                    .padding(.top, 12)
-                    VStack(spacing: 0) {
-                        ForEach(group.items) { e in
-                            let on = e.id == nearestID
-                            // A tap gesture, not a Button: Button press tracking
-                            // goes dead in the iPad split layout's detail column
-                            // (regular width, below the strip) while gesture
-                            // recognizers keep working — same tap for the user.
-                            HStack(spacing: 8) {
-                                Text(chartTime(e.time, tz))
-                                    .font(.footnote.monospaced())
-                                    .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
-                                    // "7:03am" is a character shorter than
-                                    // "12:53pm": the floor keeps the values
-                                    // beside it in a column down the list.
-                                    .frame(minWidth: 58, alignment: .leading)
-                                Spacer()
-                                Text(e.value ?? "—")
-                                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                                    .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
-                                pillView(e)
-                                    // 100, not 84: room for the widest
-                                    // direction-first pill ("WSW FLOOD").
-                                    .frame(width: 100, alignment: .trailing)
-                            }
-                            .padding(.vertical, 9)
-                            .padding(.trailing, 14)
-                            .background(on ? SN.leaf.opacity(0.13) : .clear)
-                            .overlay(alignment: .leading) {
-                                if on { Rectangle().fill(SN.leaf).frame(width: 2) }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture { onTap(e.time) }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("schedule-row-d\(group.offset)")
-                            if e.id != group.items.last?.id {
-                                Divider().overlay(Color.white.opacity(0.055))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation { expandedOffset = expanded ? nil : group.offset }
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("schedule-day-d\(group.offset)")
+                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+
+                    if expanded {
+                        VStack(spacing: 0) {
+                            ForEach(group.items) { e in
+                                let on = e.id == nearestID
+                                // A tap gesture, not a Button: Button press tracking
+                                // goes dead in the iPad split layout's detail column
+                                // (regular width, below the strip) while gesture
+                                // recognizers keep working — same tap for the user.
+                                HStack(spacing: 8) {
+                                    Text(chartTime(e.time, tz))
+                                        .font(.footnote.monospaced())
+                                        .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
+                                        // "7:03am" is a character shorter than
+                                        // "12:53pm": the floor keeps the values
+                                        // beside it in a column down the list.
+                                        .frame(minWidth: 58, alignment: .leading)
+                                    Spacer()
+                                    Text(e.value ?? "—")
+                                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                                        .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
+                                    pillView(e)
+                                        // Room for the eclipse label at accessibility sizes.
+                                        .frame(width: 120, alignment: .trailing)
+                                }
+                                .padding(.vertical, 9)
+                                .padding(.leading, 14)
+                                .padding(.trailing, 14)
+                                .background(on ? SN.leaf.opacity(0.13) : .clear)
+                                .overlay(alignment: .leading) {
+                                    if on { Rectangle().fill(SN.leaf).frame(width: 2) }
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture { onTap(e.time) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("schedule-row-d\(group.offset)")
+                                if e.id != group.items.last?.id {
+                                    Divider().overlay(Color.white.opacity(0.055))
+                                }
                             }
                         }
                     }
