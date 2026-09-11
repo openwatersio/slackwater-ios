@@ -53,6 +53,31 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         }
     }
 
+    /// #359: the My Location tile is ONE List row carrying two cards, and a
+    /// List row activates every navigation link inside it — cards that carry
+    /// links land a tap two pushes deep, on the other hero station, with the
+    /// one you tapped underneath it on the back stack.
+    func testHeroCardOpensTheStationYouTapped() throws {
+        // Victoria fix: the hero is the CHS port "Victoria" (nearest, tide)
+        // over "Tillicum Bridge" (the nearest current inside the nearby
+        // radius) — NationalScaleTests pins that this fix gets both series.
+        let app = launch("-seedGate", "-resetRecents", "-resetFavorites",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        XCTAssert(app.staticTexts["MY LOCATION"].appears(within: 10))
+        let hero = listContainer(app).staticTexts["Victoria"].firstMatch
+        XCTAssert(hero.appears(within: 10), "the My Location tile has no Victoria card")
+        hero.tap()
+
+        let title = app.descendants(matching: .any)["detail-title"].firstMatch
+        XCTAssert(title.appears(within: 10), "the hero card opened no detail")
+        XCTAssert(title.label.contains("Victoria"),
+                  "tapping the first hero card opened \(title.label)")
+        // One back, and you are on the list — not on the other hero station.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+                  "back from the hero detail landed somewhere other than the list")
+    }
+
     // Location denied — the amber card sits in the My Location slot, above
     // Near Me ranked from the fallback.
     func testM41DeniedSlot() throws {

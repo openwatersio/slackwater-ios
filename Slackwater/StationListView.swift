@@ -36,10 +36,6 @@ struct StationListView: View {
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
-    // The rows' hidden nav links depend on fit state (navLink's .chs case),
-    // so the list must re-render when a fit lands — the card itself observes,
-    // but the link lives out here.
-    @ObservedObject private var chs = ChsFitService.shared
     // Size class, not device, picks the layout (web styles.css breakpoints):
     // regular = the ≥62rem persistent-sidebar grid; compact = the phone stack.
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
@@ -683,35 +679,14 @@ struct StationListView: View {
         }
     }
 
-    /// Row activation, per layout: compact rides the List's hidden
-    /// NavigationLink (unchanged phone behavior); regular taps drive the
-    /// detail column's path directly — a sidebar link would push inside the
-    /// sidebar, not the content pane.
+    /// Row activation in both layouts: the tap drives the path directly, never
+    /// a hidden NavigationLink behind the card. The My Location tile is ONE
+    /// List row holding two cards, and a row activates every link inside it —
+    /// one tap there pushes both stations (#359). Same
+    /// closure-not-NavigationLink rule the detail-to-detail environment keys
+    /// follow (Theme.swift), and what the search results and map pins do.
     @ViewBuilder private func activatable<V: View>(_ view: V, _ item: StationItem) -> some View {
-        if regular {
-            view.contentShape(Rectangle()).onTapGesture { open(item) }
-        } else {
-            view.background(navLink(item))
-        }
-    }
-
-    /// The row's tap target: a hidden NavigationLink behind the card, so List
-    /// rows navigate without growing the disclosure chevron.
-    @ViewBuilder private func navLink(_ item: StationItem) -> some View {
-        switch item {
-        case .tide(let info):
-            NavigationLink(value: NoaaRoute.tide(info)) { EmptyView() }.opacity(0)
-        case .current(let info):
-            NavigationLink(value: NoaaRoute.current(info)) { EmptyView() }.opacity(0)
-        // Unconditional: an unfitted station still navigates, to the page
-        // that explains why it has no numbers yet.
-        case .chs(let info):
-            NavigationLink(value: ChsRoute.port(info)) { EmptyView() }.opacity(0)
-        case .chsGate(let gate):
-            NavigationLink(value: ChsRoute.derivedGate(gate)) { EmptyView() }.opacity(0)
-        case .chsCurrent(let gate):
-            NavigationLink(value: ChsRoute.currentGate(gate)) { EmptyView() }.opacity(0)
-        }
+        view.contentShape(Rectangle()).onTapGesture { open(item) }
     }
 
     @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
