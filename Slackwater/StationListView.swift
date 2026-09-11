@@ -403,7 +403,7 @@ struct StationListView: View {
 
             // Satellite imagery shows no depths, so there is no chart-datum
             // claim to disclaim. The navigation half is not decoration:
-            // `docs/appstore-metadata.md` tells the reviewer this app marks
+            // the App Store review notes (private planning repo) tell the reviewer this app marks
             // "not for navigation" on every detail footer AND the map, and
             // that claim has to remain true on this surface.
             Text("Not for navigation.")
