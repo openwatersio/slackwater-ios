@@ -13,6 +13,7 @@ import SwiftUI
 enum HangGlyph {
     case toBar(high: Bool)
     case set(deg: Double)
+    case flow(flood: Bool)
 }
 
 enum CurveDrawing {
@@ -214,8 +215,7 @@ enum CurveDrawing {
 
     /// A reading hanging off a turn or peak in the direction `toward`
     /// (+1 down, −1 up — toward the plot's middle): the glyph nearest the
-    /// dot in `tint`, the value beyond it in `ink`. Either may be absent: a
-    /// derived gate hangs a set arrow with no speed, or nothing at all.
+    /// dot in `tint`, the value beyond it in `ink`. Either may be absent.
     static func hangLabel(_ ctx: GraphicsContext, at p: CGPoint, toward: CGFloat,
                           value: String?, glyph: HangGlyph?, tint: Color, ink: Color,
                           valueFontSize: CGFloat) {
@@ -244,6 +244,11 @@ enum CurveDrawing {
                         .foregroundStyle(tint),
                        at: .zero, anchor: .center)
             }
+        case .flow(let flood):
+            ctx.draw(Text(Image(systemName: flood ? "arrow.forward" : "arrow.backward"))
+                        .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .bold))
+                        .foregroundStyle(tint),
+                     at: glyphAt, anchor: .center)
         case nil:
             break
         }

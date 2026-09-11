@@ -42,21 +42,16 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                   "derived gate must show the CHS pending register before its reference is fitted")
     }
 
-    // #38: the derived-gate strip, offline, in the FAST plan. A derived gate
-    // is the one path where EVERY slack takes the windowless branch — no
-    // `slackWindows` by design, so every gate event draws a dropline + gutter
-    // time and never a band — and testM46MalibuDerivedGate (the only other
-    // render of it) needs a live IWLS fit, so without this test a normal run
-    // renders it nowhere. `-seedTideModel` stores a synthetic fit for the
-    // reference port (Point Atkinson) before ChsFitService's one-time directory
-    // read, so the same detail renders with no network; `-networkKillSwitch`
-    // keeps it honest. No `-chsResetModels`: the seed hook wipes the store itself
-    // (combining them would delete the seed — TestSeeds.swift's comment).
+    // The seeded reference renders Malibu's shape-only path without live IWLS.
     func testM46MalibuDerivedGateSeededOffline() throws {
         let app = launch("-seedGate", "-networkKillSwitch",
                          "-seedTideModel", "chs-point-atkinson")
 
         openSearch(app, "malibu")
+        XCTAssert(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == '25-hour curve'")).firstMatch.appears(within: 5),
+                  "the derived-gate list card has no curve")
+        save(app, "m46-derived-gate-card.png")
         pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
 
         // A derived gate predicts no speed, so its lead is the phase word over
@@ -76,18 +71,17 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
         XCTAssert(app.staticTexts["● SLACK"].firstMatch.appears(within: 5),
                   "slack rows missing from the schedule")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'speeds are not predicted'")).firstMatch.exists,
-                  "the shape-only note is missing")
+        XCTAssert(app.staticTexts["Shape only"].firstMatch.exists)
+        XCTAssert(app.staticTexts["No speed"].firstMatch.exists,
+                  "the shape-only summary is missing")
+        XCTAssert(app.staticTexts["Point Atkinson tides"].firstMatch.exists,
+                  "the shape-only summary lost its source")
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
             .appears(within: 5),
                   "derived provenance footer missing")
 
-        // The strip must actually DRAW its schematic curve, droplines and
-        // gutter times — nothing inside the Canvas is an accessibility
-        // element, so ink coverage is what a test can see (the
-        // testPickingADateMovesTheWindow precedent).
+        // Canvas marks are verified by ink coverage and the saved screenshot.
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "derived-gate strip missing")
         let ink = inkFraction(strip)

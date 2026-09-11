@@ -1,10 +1,7 @@
 // Slackwater — GPL v3. Derived-gate detail (Malibu Rapids): the gate's
 // schematic current strip with phase readout and slack times, one-tap link to
-// the reference port's tide. No speed prediction exists (spec §3), so the curve
-// is a shape, not a velocity. The derivation (reference HW/LW + fixed lag,
-// cruising-community consensus) lives in text, not on the schematic (web
-// App.tsx: "Shape only" note + slack-only rows). A derived gate has honest
-// slack TIMES and flood/ebb PHASE but NO knots.
+// the reference port's tide. A derived gate has honest slack times and phase,
+// but no speed prediction.
 import SwiftUI
 import TideEngine
 
@@ -66,16 +63,12 @@ struct DerivedGateDetailView: View {
                                                    scrollGate: store?.gate,
                                                    onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
-                                // The web's chart note, verbatim in spirit: the curve is a shape.
-                                Text("Shape only — slack times are derived from high and low water at \(port.name) (+\(Int(gate.hwLagMinutes)) min at high, +\(Int(gate.lwLagMinutes)) at low). Floods on the rising tide, ebbs on the falling one; speeds are not predicted.")
-                                    .font(.caption2)
-                                    .foregroundStyle(SN.foam.opacity(0.5))
-                                    .padding(.top, 10)
                             },
                             links: { tl, jump in
                                 VStack(alignment: .leading, spacing: 12) {
-                                    // Moon only: a derived gate has slack times and phase, no knots.
-                                    SummaryTiles(moon: sky.illumination, at: scrubTime,
+                                    SummaryTiles(primary: ("Shape only", "No speed",
+                                                           "\(port.name) tides"),
+                                                 moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: gate.latitude, longitude: gate.longitude)

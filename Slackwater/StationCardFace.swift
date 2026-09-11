@@ -30,8 +30,7 @@ struct StationCard<Trailing: View>: View {
     /// conflating them regresses both.
     var status: CardStatus? = nil
     var opacity: Double = 1
-    /// The context curve (`StationCardGraph.window` wide) behind the content; nil
-    /// for pending cards and derived gates (no magnitude to draw).
+    /// The context curve (`StationCardGraph.window` wide) behind the content.
     var graph: StationCardGraph? = nil
     /// The list's rounded clip and shadow. The widget passes false: its own
     /// container clips, and a shadow inside a widget is a smear. Without
@@ -197,11 +196,7 @@ private struct StationCardPlaceholder: View {
 /// `.current`: signed velocity — speed + set arrow + word, Slack in the go
 /// colour inside a window. `tilde` marks a provisional (60-day) reading.
 ///
-/// `.gate`: a derived gate's phase pill — the web's words, flood / ebb /
-/// slack; no speed exists to show (`DerivedGateCardState`). Slack takes
-/// SN.go, not the neutral chip flood/ebb still use — otherwise the glyph
-/// beside it reads green while this pill reads grey, the exact collision
-/// the detail views guard against (testSlackIsGreenWhereverItAppears).
+/// `.gate`: a derived gate's phase and flow arrow; no speed exists to show.
 struct ConditionsItem: View {
     enum Reading {
         case tide(CardState, imperial: Bool)
@@ -285,11 +280,13 @@ struct ConditionsItem: View {
                 }
             }
         case .gate(let phase):
-            Text(phase == .flood ? "FLOOD" : phase == .ebb ? "EBB" : "SLACK")
-                .font(.caption2.monospaced().weight(.medium)).tracking(1)
-                .foregroundStyle(phase == .slack ? SN.navyDeep : .white)
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(phase == .slack ? SN.go : Color.white.opacity(0.18), in: Capsule())
+            let tint = phase == .flood ? SN.flood : phase == .ebb ? SN.ebb : SN.go
+            HStack(spacing: 4) {
+                Text(phase.word).font(.caption2)
+                Image(systemName: phase == .flood ? "arrow.forward" : phase == .ebb
+                      ? "arrow.backward" : "arrow.right.and.line.vertical.and.arrow.left")
+            }
+            .foregroundStyle(tint)
         }
     }
 

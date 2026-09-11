@@ -98,16 +98,15 @@ struct ChsPendingCard: View {
     }
 }
 
-/// A derived current gate's card (web StationCard's derived layout): identity,
-/// "Slack · time" as the next line, and a compact phase pill — a derived gate
-/// has no speed, so the reading is never a number (chs/current.ts). Pending
-/// while the reference port is unfitted, in the same register as the ports.
+/// A derived gate's card: identity, flow direction, and a schematic curve with
+/// slack times; no speed is shown. Pending while its reference port is unfitted.
 struct ChsGateCardView: View {
     let gate: ChsGateInfo
     var km: Double? = nil
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     @State private var state: DerivedGateCardState?
+    @State private var graph: StationCardGraph?
 
     /// Phase → tone. `static` so tests can call it without mounting the view.
     static func glyphTone(_ phase: DerivedPhase?) -> StationGlyph.Tone {
@@ -139,19 +138,16 @@ struct ChsGateCardView: View {
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
-        StationCard(name: gate.name, region: gate.region, km: km) {
+        StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
             if let state {
                 ConditionsItem(reading: .gate(state.phase))
-                // A derived gate has no curve to carry the next slack, so
-                // the card keeps its line (M46: pill + next slack).
-                if let next = state.nextSlack {
-                    Text("Slack · \(cardTime(next.time, gate.tz))")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(SN.foam.opacity(0.92))
-                }
             }
         }
-        .task { if state == nil { state = record.cardState(at: appNow()) } }
+        .task {
+            let now = appNow()
+            if state == nil { state = record.cardState(at: now) }
+            if graph == nil { graph = record.cardGraph(at: now) }
+        }
     }
 }
 

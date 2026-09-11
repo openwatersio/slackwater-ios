@@ -222,12 +222,7 @@ struct TimelineData {
     /// render a different threshold than the duration it reports.
     var slackThreshold: Double = defaultSlackThresholdKn
 
-    /// True when `currentPoints` is that schematic ±1 shape rather than
-    /// measured speed. Same fiction, one step further on: the shape says
-    /// "flood, then ebb", it does not say *one knot*. Colouring it through
-    /// the absolute ramp (#97) would print a speed the app has never been
-    /// told — so the ramp is skipped and the fill goes to `SN.steel`, which
-    /// is already this app's word for a state it does not know.
+    /// True when `currentPoints` is a normalized phase shape, not measured speed.
     var speedsAreSchematic = false
 
     var hasTide: Bool { !tidePoints.isEmpty }
@@ -1015,25 +1010,16 @@ struct TimelineCanvas: View {
         let xa = data.x(first.time), xb = data.x(last.time)
         seaBase(ctx, under: line, floor: geo.curBottom, from: xa, to: xb)
 
-        // The card's fill, anchored at zero (CurveDrawing.zeroFill). A derived
-        // gate is flat steel instead: the zero-anchored blue reads as a
-        // magnitude, and a ±1 schematic shape has none to report. Colour is
-        // state, and this curve's magnitude is unknown.
         var area = line
         area.addLine(to: CGPoint(x: xb, y: geo.zeroY))
         area.addLine(to: CGPoint(x: xa, y: geo.zeroY))
         area.closeSubpath()
-        if data.speedsAreSchematic {
-            ctx.fill(area, with: .color(SN.steel.opacity(0.32)))
-        } else {
-            CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
-        }
+        CurveDrawing.zeroFill(ctx, area, plotTop: geo.curTop, plotBottom: geo.curBottom, zeroY: geo.zeroY)
         nightShade(ctx, under: line, from: xa, to: xb, t0, t1)
 
-        // Slack: the line every speed on this track is signed against, drawn
-        // the way the tide track draws chart datum. Under the curve, so the
-        // curve reads as sitting on it.
-        CurveDrawing.referenceLine(ctx, at: geo.zeroY, width: data.totalWidth)
+        if !data.speedsAreSchematic {
+            CurveDrawing.referenceLine(ctx, at: geo.zeroY, width: data.totalWidth)
+        }
 
         // The card's line: blue with the speed thread (#97). A schematic
         // shape has no speed, so no thread.
@@ -1063,11 +1049,10 @@ struct TimelineCanvas: View {
             let x = data.x(e.time)
             switch e.kind {
             case .slack:
-                // No window (a violent gate the sampling steps over, every
-                // derived gate): a hairline rather than a run — a zero-width
-                // window must not look like a window (§5.3). Where a run
-                // exists, the run is the mark.
-                if !allRuns.contains(where: { $0.contains(e.time) }) {
+                if data.speedsAreSchematic {
+                    CurveDrawing.dot(ctx, at: CGPoint(x: x, y: geo.zeroY),
+                                     color: SN.go.opacity(fade(e.time)))
+                } else if !allRuns.contains(where: { $0.contains(e.time) }) {
                     var tick = Path()
                     tick.move(to: CGPoint(x: x, y: geo.curTop))
                     tick.addLine(to: CGPoint(x: x, y: geo.curBottom))
