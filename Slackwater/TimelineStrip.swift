@@ -697,17 +697,25 @@ struct TimelineCanvas: View {
     // Day labels and sun markers — continuous across midnight.
     private func drawDayChrome(_ ctx: GraphicsContext) {
         for day in data.visibleDays {
-            // Day label at local noon. Fixed size, not `.caption2` — chart
+            // Day label at the daylight midpoint, not clock noon: the tint
+            // band is what the label names, and clock noon sits toward
+            // sunrise all DST season. Clock noon only when a polar day has
+            // no band to center on. Fixed size, not `.caption2` — chart
             // labels do not scale (current spec §7.5).
+            let labelX: CGFloat = if let sr = day.sunrise, let ss = day.sunset {
+                data.x(sr.addingTimeInterval(ss.timeIntervalSince(sr) / 2))
+            } else {
+                data.x(noonLocal(day.start, data.tz))
+            }
             ctx.draw(Text(relativeDayLabel(day.start, data.tz, today: data.today))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(SN.foam.opacity(0.85)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY),
+                     at: CGPoint(x: labelX, y: geo.dayY),
                      anchor: .center)
             ctx.draw(Text(monthDay(day.start, data.tz))
                         .font(.system(size: 10, weight: .medium).monospaced())
                         .foregroundStyle(SN.foam.opacity(0.48)),
-                     at: CGPoint(x: data.x(noonLocal(day.start, data.tz)), y: geo.dayY + 17),
+                     at: CGPoint(x: labelX, y: geo.dayY + 17),
                      anchor: .center)
             // Sun rise/set dots + "↑5:24AM" labels.
             for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {

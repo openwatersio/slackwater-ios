@@ -445,6 +445,23 @@ func monthDay(_ date: Date, _ tz: TimeZone) -> String {
     formatter("MMM d", tz).string(from: date)
 }
 
+/// "Sep 10 · 3:42pm" — the lead's when. The date is here because a strip
+/// centered on night has both flanking day headers off-screen. Date only, no
+/// weekday and no TODAY/TOMORROW, for the reason `monthDay` records.
+///
+/// The line is centered under the reading, so a one-digit hour would narrow
+/// the string and shift every glyph as the scrub crosses 9:59→10:00 — many
+/// times in one pan. A figure space — digit-wide under `monospacedDigit` —
+/// stands in for the missing digit. The day's digits move too, but once per
+/// midnight rather than per pan, so they go unpadded.
+func leadWhen(_ date: Date, _ tz: TimeZone) -> String {
+    var time = chartTime(date, tz)
+    if time.prefix(while: \.isNumber).count == 1 {
+        time = "\u{2007}" + time
+    }
+    return "\(monthDay(date, tz)) · \(time)"
+}
+
 /// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
 /// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
 ///

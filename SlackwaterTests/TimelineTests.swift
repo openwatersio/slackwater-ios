@@ -450,6 +450,22 @@ final class TimelineTests: XCTestCase {
         XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
     }
 
+    /// The lead's when-line is centered, so every hour must occupy one
+    /// width: a figure space stands in for a one-digit hour's missing digit,
+    /// and two-digit hours get no pad.
+    func testLeadWhenPadsOneDigitHours() {
+        var cal = Calendar(identifier: .gregorian)
+        let utc = TimeZone(identifier: "UTC")!
+        cal.timeZone = utc
+        func at(_ h: Int) -> Date {
+            cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: 5))!
+        }
+        XCTAssertEqual(leadWhen(at(7), utc), "Aug 10 · \u{2007}7:05am")
+        XCTAssertEqual(leadWhen(at(12), utc), "Aug 10 · 12:05pm")
+        XCTAssertEqual(leadWhen(at(7), utc).count, leadWhen(at(12), utc).count,
+                       "one width for every hour — the centered line must not shift")
+    }
+
     /// One clock means one FORMATTER: a 24-hour pattern anywhere in the app is
     /// a second clock, and it would print beside the 12-hour one on the same
     /// screen. Repo-wide, because the surface that reaches for its own
