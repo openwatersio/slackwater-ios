@@ -192,10 +192,10 @@ func shareURL(forStationID id: String, at instant: Date?, tz: TimeZone) -> URL? 
 /// spelled out (`ZZZZZ` writes "-07:00", and "Z" for UTC — both of which
 /// `stationLinkInstant(from:)` reads back).
 private func stationLinkInstant(_ instant: Date, tz: TimeZone) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.timeZone = tz
-    formatter.dateFormat = stationLinkInstantFormats[0]
-    return formatter.string(from: instant)
+    // The shared cache, not a fresh DateFormatter: minting runs inside
+    // `DetailHeader`'s body, which SwiftUI re-evaluates on every scrub tick,
+    // and building one costs ~40x reusing one. Its en_US_POSIX locale carries
+    // the Gregorian calendar that fixed-format writing needs — under a
+    // Buddhist-calendar locale this same pattern writes "2569-08-30".
+    formatter(stationLinkInstantFormats[0], tz).string(from: instant)
 }

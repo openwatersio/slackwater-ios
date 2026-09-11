@@ -177,4 +177,35 @@ final class StationLinkTests: XCTestCase {
     func testShareURLForAnUnknownStationIsNil() {
         XCTAssertNil(shareURL(forStationID: "noaa/0000000", at: nil, tz: vancouver))
     }
+
+    // MARK: - What the share button offers
+
+    /// Sharing an unscrubbed view means "now", and the bare link already says
+    /// that — so the moment rides along only once the strip is parked somewhere
+    /// else. The threshold is the Now pill's, not a second one.
+    func testTheInstantRidesAlongOnlyWhenScrubbedAway() {
+        let now = Date(timeIntervalSince1970: 1_788_125_400)
+        let nudged = now.addingTimeInterval(Timeline.scrubbedSeconds)
+        let scrubbed = now.addingTimeInterval(3 * 3600)
+
+        XCTAssertEqual(detailShareURL(stationID: "chs-dodd-narrows", scrubTime: nudged,
+                                      now: now, tz: vancouver)?.absoluteString,
+                       "https://slackwater.xyz/currents/dodd-narrows")
+        XCTAssertEqual(detailShareURL(stationID: "chs-dodd-narrows", scrubTime: scrubbed,
+                                      now: now, tz: vancouver)?.absoluteString,
+                       "https://slackwater.xyz/currents/dodd-narrows/2026-08-30T17:30-07:00")
+    }
+
+    /// The download screen wears the same header and has no strip to read a
+    /// moment off. It still shares the station.
+    func testNoScrubTimeSharesTheBareStation() {
+        XCTAssertEqual(detailShareURL(stationID: "chs-dodd-narrows", scrubTime: nil,
+                                      tz: vancouver)?.absoluteString,
+                       "https://slackwater.xyz/currents/dodd-narrows")
+    }
+
+    /// No published slug, no button — `nil` is what the header hides on.
+    func testUnknownStationOffersNothing() {
+        XCTAssertNil(detailShareURL(stationID: "noaa/0000000", scrubTime: nil, tz: vancouver))
+    }
 }

@@ -1,7 +1,19 @@
 // Slackwater — GPL v3. The detail-view header: the station name in large type
-// over its region. Back / favorite chrome sits above in fixed 44pt glass
-// circles; the readings live in the scrub card below.
+// over its region. Back / share / favorite chrome sits above in fixed 44pt
+// glass circles; the readings live in the scrub card below.
 import SwiftUI
+
+/// The link the share button offers for a station. A view scrubbed away from
+/// now shares the moment on screen; an unscrubbed one shares the bare station
+/// link, which is what "now" already means on the receiving end. The threshold
+/// is the Now pill's (`scrubbedAway`), so the button and the pill never
+/// disagree about whether the strip has moved.
+func detailShareURL(stationID: String, scrubTime: Date?,
+                    now: Date = Date(), tz: TimeZone) -> URL? {
+    shareURL(forStationID: stationID,
+             at: scrubTime.flatMap { scrubbedAway($0, from: now) ? $0 : nil },
+             tz: tz)
+}
 
 struct DetailHeader: View {
     let name: String
@@ -13,6 +25,12 @@ struct DetailHeader: View {
     /// which also strips the implicit system padding — the header supplies its
     /// own clearance, and it must be the device's actual inset (issue #50).
     let topSafeInset: CGFloat
+    /// The moment the strip is parked on, which rides along in a shared link.
+    /// Nil on the download screen, which has no strip to read one off.
+    var shareInstant: Date? = nil
+    /// The station's own zone, so a shared instant reads as the same absolute
+    /// moment wherever the receiver is.
+    var tz: TimeZone = .current
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -43,6 +61,20 @@ struct DetailHeader: View {
                     .accessibilityLabel("Back")
                     .accessibilityIdentifier("detail-back")
                     Spacer()
+                    // No published slug, no button: a share that mints nothing
+                    // is worse than no share at all.
+                    if let url = detailShareURL(stationID: favoriteId,
+                                                scrubTime: shareInstant, tz: tz) {
+                        ShareLink(item: url, preview: SharePreview(name)) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(.regular.interactive(), in: Circle())
+                        }
+                        .accessibilityLabel("Share")
+                        .accessibilityIdentifier("detail-share")
+                    }
                     let fav = favorites.contains(favoriteId)
                     Button { favorites.toggle(favoriteId) } label: {
                         Image(systemName: fav ? "star.fill" : "star")

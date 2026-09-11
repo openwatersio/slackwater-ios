@@ -790,7 +790,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         VStack(spacing: 0) {
                             DetailHeader(name: name, region: region,
                                          favoriteId: favoriteId,
-                                         topSafeInset: geo.safeAreaInsets.top)
+                                         topSafeInset: geo.safeAreaInsets.top,
+                                         shareInstant: scrubTime, tz: tz)
                             above()
                         }
                             .background {
