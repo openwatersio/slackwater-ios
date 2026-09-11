@@ -34,6 +34,7 @@ struct SlackwaterApp: App {
 /// Gate until a choice is made; list ever after.
 struct RootView: View {
     @AppStorage(seenGateKey) private var seenGate = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -42,6 +43,19 @@ struct RootView: View {
             } else {
                 GateView()
             }
+        }
+        // The refresh that survives a flight. `.onAppear` fires once per view
+        // lifetime, and re-activating a backgrounded scene does not re-appear
+        // a view that is already on screen, so the list's own `.onAppear` only
+        // covers a cold launch — a phone carried to another city needs this to
+        // stop ranking Near Me around where it took off from. It sits here
+        // rather than on the list so the gate gets it too, and does not replace
+        // that `.onAppear`: `.onChange` is not guaranteed to observe the launch
+        // transition into `.active`. `refreshIfAuthorized` never prompts and
+        // no-ops when unauthorized, so the overlap costs one coalesced
+        // `requestLocation`.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { LocationService.shared.refreshIfAuthorized() }
         }
         // A widget can be added from the gallery before the app is ever
         // opened, so a station link can arrive while the gate is still up —
