@@ -377,6 +377,12 @@ class ScreenshotTestCase: XCTestCase {
         app.descendants(matching: .any)["commentary"].firstMatch
     }
 
+    /// Every stop a current detail's pill may name: the water's, and the
+    /// sun's, which takes the pill whenever it comes first.
+    func namesACurrentStop(_ label: String) -> Bool {
+        ["Slack", "Max", "Flood", "Ebb", "Sunrise", "Sunset"].contains { label.contains($0) }
+    }
+
     /// The schedule rows' accessibility labels — NOT every "HH:mm" label on
     /// screen, which also picks up the chart annotations. Callers need the
     /// schedule scoped out of the whole hierarchy, see below.

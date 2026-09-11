@@ -116,14 +116,13 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                        "port tide rows must not appear in a gate schedule")
         XCTAssertFalse(app.staticTexts["⤓ LOW"].firstMatch.exists,
                        "port tide rows must not appear in a gate schedule")
-        // What the gate does say about slack is the commentary pill: the
-        // stop ahead, named and walked to.
+        // What the gate does say is the commentary pill: the stop ahead,
+        // named and walked to — a slack, a run, or the sun when it is nearer.
         let pill = commentaryPill(app)
         XCTAssert(waitFor(pill, "exists == true AND isHittable == true"),
                   "no commentary pill on the gate detail")
-        XCTAssert(pill.label.hasPrefix("Slack") || pill.label.contains("Max")
-                  || pill.label.hasPrefix("Flood") || pill.label.hasPrefix("Ebb"),
-                  "the commentary must name a current stop, got '\(pill.label)'")
+        XCTAssert(namesACurrentStop(pill.label),
+                  "the commentary must name a stop, got '\(pill.label)'")
         let strip = app.otherElements["timeline-strip"].firstMatch
         _ = strip.appears(within: 10)
         settleLayout(strip)  // the chart is most of this picture

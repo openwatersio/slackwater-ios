@@ -526,6 +526,22 @@ func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date)
     return scrubbedAway(scrub, from: now) ? "\(event) \(gap) later" : "\(event) in \(gap)"
 }
 
+/// The stop the commentary names and its tap walks to: the water's next stop,
+/// or the sun's next rise or set when that comes first. Dark is an event a
+/// reader plans around the same way they plan around a slack.
+func nextCommentaryStop(_ water: (time: Date, text: String)?,
+                        sun days: [TimelineDay],
+                        after scrub: Date) -> (time: Date, text: String)? {
+    // Strictly after the scrub, so landing on a stop advances to the next.
+    let cutoff = scrub.addingTimeInterval(1)
+    let sun = days
+        .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
+        .compactMap { time, word in time.map { (time: $0, text: word) } }
+    return (sun + [water].compactMap { $0 })
+        .filter { $0.time > cutoff }
+        .min { $0.time < $1.time }
+}
+
 /// What comes next, centred on the reading line in the strip's chrome row.
 /// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
