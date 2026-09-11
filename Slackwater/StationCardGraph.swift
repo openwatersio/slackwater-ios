@@ -48,7 +48,7 @@ struct StationCardGraph: View {
         let time: Date
         let value: Double
         /// The bare number for the curve; the unit prints once in the card's reading.
-        let valueText: String
+        let valueText: String?
         /// The number with its unit, for VoiceOver only.
         let spokenText: String
         let timeText: String
@@ -59,6 +59,8 @@ struct StationCardGraph: View {
         /// set arrow (↑ rotated to the bearing, "water goes this way")
         /// instead of the tide's to-bar arrows.
         var deg: Double? = nil
+        /// A derived gate knows flood versus ebb, but has no compass bearing.
+        var flow: DerivedPhase? = nil
     }
 
     let points: [Point]
@@ -88,6 +90,8 @@ struct StationCardGraph: View {
     /// Every slack instant on the curve, so the axis can print the bare
     /// instant where no run covers a slack. Only signed current curves.
     var slacks: [Date] = []
+    /// A normalized phase shape, never a speed measurement.
+    var speedsAreSchematic = false
     /// A tide curve's rate of rise (m/hr), index-aligned with `points`, for
     /// the line's rate colour. Empty on a current curve, and the preview
     /// sines — the line is then plain blue.
@@ -156,11 +160,16 @@ struct StationCardGraph: View {
             area.closeSubpath()
             if includesZero {
                 CurveDrawing.zeroFill(context, area, plotTop: 0, plotBottom: plotHeight, zeroY: y(0))
-                CurveDrawing.referenceLine(context, at: y(0), width: size.width)
-                CurveDrawing.currentLine(context, line,
-                                         slackRuns: segs,
-                                         samples: points.map { (x: x($0.time), speedKn: $0.value) },
-                                         nowX: nowX, width: size.width, height: size.height)
+                if !speedsAreSchematic {
+                    CurveDrawing.referenceLine(context, at: y(0), width: size.width)
+                    CurveDrawing.currentLine(context, line,
+                                             slackRuns: segs,
+                                             samples: points.map { (x: x($0.time), speedKn: $0.value) },
+                                             nowX: nowX, width: size.width, height: size.height)
+                } else {
+                    CurveDrawing.strokeSplitAtNow(context, line, with: .color(SN.graphLine),
+                                                  nowX: nowX, width: size.width, height: size.height)
+                }
             } else {
                 // The fill runs on under the axis row: the card has no plot
                 // box below the curve, only the labels' clear strip.
@@ -182,7 +191,7 @@ struct StationCardGraph: View {
                 let tint = (e.high ? SN.graphHigh : SN.graphLow).opacity(fade)
                 let ink = SN.foam.opacity(fade)
                 let dotAt = CGPoint(x: x(e.time), y: y(e.value))
-                let isCurrent = e.deg != nil
+                let isCurrent = e.deg != nil || e.flow != nil
                 // A tide turn is the event and gets a dot; a current peak is
                 // context inside its lobe and does not.
                 if !isCurrent {
@@ -207,9 +216,15 @@ struct StationCardGraph: View {
                 // its pointer nearest the dot (current-charts §15.1). The set
                 // arrow wears the reading's ink, not a direction colour. No
                 // unit: the card's reading states it once.
+                let glyph: HangGlyph = if let flow = e.flow {
+                    .flow(flood: flow == .flood)
+                } else if let deg = e.deg {
+                    .set(deg: deg)
+                } else {
+                    .toBar(high: e.high)
+                }
                 CurveDrawing.hangLabel(context, at: dotAt, toward: e.high ? 1 : -1,
-                                       value: e.valueText,
-                                       glyph: e.deg.map { .set(deg: $0) } ?? .toBar(high: e.high),
+                                       value: e.valueText, glyph: glyph,
                                        tint: isCurrent ? ink : tint, ink: ink,
                                        valueFontSize: CurveStyle.hangValueFontSize)
             }
@@ -232,6 +247,12 @@ struct StationCardGraph: View {
                 }
             }
 
+            if speedsAreSchematic {
+                for when in slacks where when >= start && when <= end {
+                    CurveDrawing.dot(context, at: CGPoint(x: x(when), y: y(0)), color: SN.go)
+                }
+            }
+
             // The "now" dot rides the curve one swing in from the left edge.
             CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now))))
         }
@@ -239,6 +260,35 @@ struct StationCardGraph: View {
         .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
             .map { "\($0.spokenText) at \($0.timeText)" }
             .joined(separator: ", "))
+    }
+}
+
+extension DerivedGateRecord {
+    func cardGraph(at now: Date) -> StationCardGraph {
+        let start = now.addingTimeInterval(-StationCardGraph.backWindow)
+        let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
+        let slacks = engineGate.slacks(from: start.addingTimeInterval(-StationCardGraph.swing),
+                                       to: end.addingTimeInterval(StationCardGraph.swing))
+        var points: [StationCardGraph.Point] = []
+        var t = start
+        while t <= end {
+            points.append(.init(time: t, value: engineGate.schematicSigned(at: t, slacks: slacks)))
+            t = t.addingTimeInterval(StationCardGraph.sampleStep)
+        }
+        let extremes = zip(slacks, slacks.dropFirst()).compactMap { pair -> StationCardGraph.Extreme? in
+            let (a, b) = pair
+            let time = a.time.addingTimeInterval(b.time.timeIntervalSince(a.time) / 2)
+            guard time >= start, time <= end else { return nil }
+            let value = engineGate.schematicSigned(at: time, slacks: slacks)
+            let flow = engineGate.phase(at: time, slacks: slacks)
+            return .init(time: time, value: value, valueText: nil,
+                         spokenText: flow.word, timeText: cardTime(time, gate.tz),
+                         high: flow == .flood, flow: flow)
+        }
+        return StationCardGraph(points: points, extremes: extremes, now: now,
+                                includesZero: true, tz: gate.tz,
+                                slacks: slacks.map(\.time).filter { $0 >= start && $0 <= end },
+                                speedsAreSchematic: true)
     }
 }
 
