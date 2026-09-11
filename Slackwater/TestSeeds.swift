@@ -164,3 +164,14 @@ private func seedOnline(stationID: String, offsetDays: Int?, spanDays: Int?) {
 }
 
 #endif
+
+/// `-scrubInstant <ISO 8601>` (UserDefaults argument domain): every detail
+/// opened this run scrubs to that moment, the way a shared link's does
+/// (`pendingScrubInstant`) — how the website screenshot walk lands on a
+/// night, a sunrise and a noon (SlackwaterUITests/WebsiteScreenshots.swift).
+#if DEBUG
+let seededScrubInstant: Date? = UserDefaults.standard.string(forKey: "scrubInstant")
+    .flatMap { ISO8601DateFormatter().date(from: $0) }
+#else
+let seededScrubInstant: Date? = nil
+#endif

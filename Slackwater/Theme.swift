@@ -842,7 +842,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // and for an online gate it is also when there is anything to
             // scrub.
             .onAppear {
-                if let t = pendingScrubInstant {
+                if let t = pendingScrubInstant ?? seededScrubInstant {
                     pendingScrubInstant = nil
                     linkedInstant = t
                 }
