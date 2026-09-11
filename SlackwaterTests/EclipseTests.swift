@@ -229,15 +229,17 @@ final class EclipseTests: XCTestCase {
                              "the partial was inside the window after all")
     }
 
-    /// The sheet does its searching in a `.task`, but a sheet that renders
-    /// empty for half a second is its own bug.
-    func testMoonFactsStayUnderHalfASecond() {
-        let t0 = Date()
-        _ = moonFacts(at: utc("2026-09-07T12:00:00Z"), observer: Self.victoria,
-                      tz: TimeZone(identifier: "America/Vancouver")!)
-        let elapsed = Date().timeIntervalSince(t0)
-        print("moonFacts \(elapsed * 1000) ms")
-        XCTAssertLessThan(elapsed, 0.5)
+    /// The sheet shows a progress indicator until this finishes. A local call
+    /// takes about 180 ms; 250 ms leaves 39% headroom and still catches a 2×
+    /// regression before the sheet's 500 ms user-visible limit. Hosted runners
+    /// scale the budget through `perfScale`.
+    func testMoonFactsStayWellInsideTheSheetBudget() {
+        let took = elapsed {
+            _ = moonFacts(at: utc("2026-09-07T12:00:00Z"), observer: Self.victoria,
+                          tz: TimeZone(identifier: "America/Vancouver")!)
+        }
+        print("moonFacts \(took * 1000) ms")
+        XCTAssertLessThan(took, 0.25 * perfScale)
     }
 
     // MARK: - In the schedule
@@ -360,14 +362,16 @@ final class EclipseTests: XCTestCase {
         let observer = try Observer(latitudeDeg: friday.latitude, longitudeDeg: friday.longitude)
 
         let eclipseWeek = Timeline.window(anchor: anchor("2026-08-27T12:00:00Z", friday.tz))
-        let t0 = Date()
-        let found = visibleEclipses(from: eclipseWeek.start, to: eclipseWeek.end, observer: observer)
-        let withEclipse = Date().timeIntervalSince(t0)
+        var found: [WindowEclipse] = []
+        let withEclipse = elapsed {
+            found = visibleEclipses(from: eclipseWeek.start, to: eclipseWeek.end, observer: observer)
+        }
 
         let quietWeek = Timeline.window(anchor: anchor("2026-10-08T12:00:00Z", friday.tz))
-        let t1 = Date()
-        let none = visibleEclipses(from: quietWeek.start, to: quietWeek.end, observer: observer)
-        let without = Date().timeIntervalSince(t1)
+        var none: [WindowEclipse] = []
+        let without = elapsed {
+            none = visibleEclipses(from: quietWeek.start, to: quietWeek.end, observer: observer)
+        }
 
         print("eclipse search \(withEclipse * 1000) ms found \(found.count), "
               + "quiet week \(without * 1000) ms found \(none.count)")
@@ -375,8 +379,8 @@ final class EclipseTests: XCTestCase {
         XCTAssertTrue(none.isEmpty)
         // A rebuild is a user action — opening a detail, picking a week — and
         // the eclipse search is one part of it. 50 ms is generous against the
-        // single-digit milliseconds Almanac 0.2 actually takes.
-        XCTAssertLessThan(withEclipse, 0.05)
-        XCTAssertLessThan(without, 0.05)
+        // 7 ms Almanac 0.2 takes locally, and scales for hosted runners.
+        XCTAssertLessThan(withEclipse, 0.05 * perfScale)
+        XCTAssertLessThan(without, 0.05 * perfScale)
     }
 }
