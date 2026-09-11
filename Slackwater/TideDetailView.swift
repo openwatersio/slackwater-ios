@@ -15,15 +15,21 @@ struct TideDetailView: View {
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.
     @State private var scrubTime = Timeline.introStart(for: appNow())
-    @State private var timeline: TimelineData?
+    /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
+    @State private var store: TimelineWindowStore?
     @State private var chsFittedAt: Date?
     /// The nearest current-series station inside `nearbyStationRadiusKm`, or
     /// nil. Computed once on appear — a catalog scan has no place in a body
     /// that re-evaluates on every scrub tick.
     @State private var nearbyCurrent: (item: StationItem, km: Double)?
-    /// The local midnight the window hangs from. Only `returnToNow` and (in
-    /// Plan B) the range bar move it; everything else reads it.
+    /// The local midnight the schedule week hangs from. `returnToNow`, the
+    /// range bar's picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
+    /// The strip viewport's width, reported by the strip — the span the
+    /// scale governor fits the curve against.
+    @State private var viewportPts: CGFloat = 0
+
+    private var timeline: TimelineData? { store?.timeline }
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -86,11 +92,11 @@ struct TideDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { _ in rebuild() },
+                            onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: { EmptyView() },
                             card: { tl in
-                                let geo = TimelineGeo(data: tl)
+                                let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
                                                    imperial: imperial, now: live,
                                                    chromeInk: sky.ink,
@@ -98,7 +104,9 @@ struct TideDetailView: View {
                                                    onReturn: returnToNow,
                                                    commentary: commentary,
                                                    commentaryTint: commentaryTint,
-                                                   onCommentary: scrubToCommentary)
+                                                   onCommentary: scrubToCommentary,
+                                                   scrollGate: store?.gate,
+                                                   onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(ink: sky.ink) }
                             },
                             links: { tl, jump in
@@ -119,9 +127,11 @@ struct TideDetailView: View {
                                 }
                             })
             .onAppear {
-                if timeline == nil {
+                if store == nil {
                     anchor = todayLocal(tz)
-                    rebuild()
+                    let s = TimelineWindowStore(source: .tide(record))
+                    s.start(anchor: anchor, now: live)
+                    store = s
                 }
                 RecentsStore.shared.record(record.id)
                 if record.isChs {
@@ -131,6 +141,18 @@ struct TideDetailView: View {
                    let n = StationItem.nearest(.current, toLat: record.latitude, lon: record.longitude),
                    n.km <= nearbyStationRadiusKm {
                     nearbyCurrent = n
+                }
+            }
+            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            // The schedule follows a scrub that has settled somewhere outside
+            // its week — the strip is endless now, and a list still describing
+            // three weeks ago would be a lie. A cancelled sleep is a scrub
+            // still in motion, same rest rule as the chrome row's.
+            .task(id: scrubTime) {
+                guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
+                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                    anchor = dayLocal(scrubTime, tz)
+                    store?.setAnchor(anchor)
                 }
             }
     }
@@ -259,18 +281,14 @@ struct TideDetailView: View {
 
     private func returnToNow() {
         live = appNow()
-        scrubTime = live
         // The anchor too: return-to-now from a September window has to bring
-        // the whole window back, not just park the centerline at a `now` that
-        // isn't on this strip.
+        // the whole schedule week back, not just park the centerline. The
+        // strip itself rides home animated within `Timeline.snapJumpHours`
+        // and lands unanimated past it — the scrubber decides by distance;
+        // the store only guarantees now's chunks exist.
         anchor = todayLocal(tz)
-        rebuild()
-    }
-
-    /// One place the timeline is rebuilt from, so the anchor and the record
-    /// can never be applied by two different code paths.
-    private func rebuild() {
-        timeline = TimelineData.build(tide: record, current: nil, now: live, anchor: anchor)
+        store?.jump(to: live, anchor: anchor)
+        scrubTime = live
     }
 }
 

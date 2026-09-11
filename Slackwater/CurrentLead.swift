@@ -128,19 +128,26 @@ struct CurrentScrubCard: View {
     let sky: SkyState
     @Binding var scrubTime: Date
     let onReturn: () -> Void
+    /// Infinite-strip plumbing, nil on a fixed window (the online gate):
+    /// governed y-scale, the store's scroll gate, viewport report.
+    var scale: TimelineScale? = nil
+    var scrollGate: ScrollGate? = nil
+    var onViewportWidth: ((CGFloat) -> Void)? = nil
 
     var body: some View {
         // Asked once and captured: `nextSignificant` walks every window and
         // event, and the pill's label and its tap target must name the same
         // stop anyway.
         let next = lead.nextSignificant
-        TimelineScrubStrip(data: data, geo: TimelineGeo(data: data),
+        TimelineScrubStrip(data: data, geo: TimelineGeo(data: data, scale: scale),
                            speedUnit: speedUnit, now: now,
                            chromeInk: sky.ink,
                            floodDeg: floodDeg, ebbDeg: ebbDeg,
                            scrubTime: $scrubTime, onReturn: onReturn,
                            commentary: lead.commentary,
-                           onCommentary: { if let next { scrubTime = next.time } })
+                           onCommentary: { if let next { scrubTime = next.time } },
+                           scrollGate: scrollGate,
+                           onViewportWidth: onViewportWidth)
             .overlay(alignment: .top) { lead }
     }
 }
