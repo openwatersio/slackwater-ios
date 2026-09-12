@@ -98,7 +98,7 @@ struct TideDetailView: View {
                                 scrubbedAway: scrubbedAway(scrubTime, from: live),
                                 turnIsHigh: atTurn.map { $0.kind == .high },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                heightM: scrubHeight, rising: rising),
+                                heightM: scrubHeight, rising: rising, imperial: imperial),
                             above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
