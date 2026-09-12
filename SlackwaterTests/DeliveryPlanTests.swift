@@ -61,6 +61,15 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertEqual(plan, DeliveryPlan())
     }
 
+    func testADuplicatedRuleIdPlansOnceAndDoesNotCrash() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, alert: .notification)
+        let o = occurrence(rule, eventIn: 3_600)
+
+        let plan = deliveryPlan(rules: [rule, rule], occurrences: [o], now: now, premium: true)
+
+        XCTAssertEqual(plan, DeliveryPlan(calendar: [o], notifications: [o]))
+    }
+
     func testScheduledThroughIsEachRulesLastDelivery() {
         let tide = AlertRule(stationID: "a", trigger: .tideExtreme(high: false), lead: 600, alert: .notification)
         let pass = AlertRule(stationID: "b", trigger: .slackWindowOpens, calendar: false, alert: .notification)
