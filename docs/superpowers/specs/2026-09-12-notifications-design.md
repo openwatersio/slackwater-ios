@@ -19,18 +19,18 @@ no account, no background execution.
 
 **The calendar is free. Anything that interrupts you is Premium.**
 
-- **Free:** any alert rule can write its occurrences into a Slackwater calendar. Those events
-  carry no alarms.
-- **Premium:** the same rules as local notifications, as AlarmKit alarms, and the alarm's Live
-  Activity countdown.
+- **Free:** any alert rule can write its occurrences into a Slackwater calendar, as plain events.
+- **Premium:** those calendar events carry an alarm, and the same rules arrive as local
+  notifications, AlarmKit alarms and the alarm's Live Activity countdown.
 
 This is the widgets-premium sentence applied to alerts: seeing future slack windows in your own
 calendar is "what is the water doing"; "tell me without opening the app from my pocket" is
-Premium. It ships in the existing tier with no new SKU.
+Premium. A free user can add the alarm to each event by hand; Premium saves them the chore. It
+ships in the existing tier with no new SKU.
 
-The 🔔 is widgets-premium §5 item 3 and stays the third and last upsell surface. It lives in the
-detail header beside Share and Favorite (§7.1). For a non-subscriber it opens the rule sheet,
-where the calendar works, and the interrupting options open the tier sheet.
+The alert row (§7.1) is widgets-premium §5 item 3 and stays the third and last upsell surface.
+Its **Calendar** button works for everyone, so someone who doesn't want to pay is never pushed
+toward the tier to use it. Only **Live** opens the tier sheet for a non-subscriber.
 
 ## 3. Rules
 
@@ -58,10 +58,12 @@ enum AlertTrigger: Codable, Equatable {
 enum AlertLevel: String, Codable { case none, notification, alarm }
 ```
 
-- A rule names a place the user chose. `WidgetStationLoader.resolvedStationID` runs when the rule
-  is created, so a rule never follows Current Location.
+- A rule names a place the user chose. Rules are created from a detail view, whose station id is
+  always concrete, so a rule never follows Current Location.
 - `tideCrossing` stores metres, the engine's unit, and displays in the user's units. `rising` is
   the direction of the curve at the moment the user picked.
+- A rule created from the alert row starts with a 30-minute lead. Lead and daylight-only are
+  edited from the Alerts screen (§7.3).
 - `.alarm` is offered only for `.slackWindowOpens`, `.slack` and `.currentPeak` (§5.3).
 - Rules are JSON in the App Group suite under `slackwater.alertRules`, device-local. They do not
   sync through iCloud the way favourites do: two devices holding one rule would ring the same
@@ -99,8 +101,7 @@ Every trigger reads a producer that exists today:
 | `.eclipse` | `visibleEclipses(from:to:observer:)`, at `WindowEclipse.start` |
 
 `daylightOnly` keeps an occurrence when its `event` falls between an Almanac `sunEvents` rise and
-the following set at the station's position, in the station's time zone. Days go through
-`Calendar`, never 86,400 seconds.
+the following set at the station's position.
 
 A window's opening depends on `slackThresholdKn`, which describes the user's boat, so changing the
 threshold changes every `.slackWindowOpens` occurrence (§6).
@@ -111,13 +112,18 @@ Four mechanisms, each holding the horizon it can hold without the app running.
 
 | Rung | Mechanism | Horizon | Tier |
 |---|---|---|---|
-| Plan | EventKit, a "Slackwater" calendar | 90 days | Free |
-| Heads-up | one-shot `UNCalendarNotificationTrigger` | 14 days, soonest 64 | Premium |
+| Plan | EventKit, a "Slackwater" calendar | 90 days | Free; the alarm on each event is Premium |
+| Heads-up | one-shot local notification | 14 days, soonest 64 | Premium |
 | Must not miss | AlarmKit `Alarm.Schedule.fixed(fire)` | 14 days, until `maximumLimitReached` | Premium |
 | Countdown | the alarm's Live Activity presentation | the alarm | Premium |
 
 Every delivered item opens the station at the event: `shareURL(forStationID:at:tz:)` with the
 event instant, falling back to `deepLink(forStationID:)` for a station with no published slug.
+
+**Titles lead with the place, then the event, in as few words as the context allows:**
+"Race Passage - Slack window", "Friday Harbor - Low tide", "Friday Harbor - Rising past 3.3 ft".
+Calendar events and notifications share the title. The body carries the time and, where it
+matters, the span, the threshold or the height.
 
 ### 5.1 Calendar
 
@@ -125,25 +131,29 @@ event instant, falling back to `deepLink(forStationID:)` for a station with no p
   new items" (`EKTypes.h`): it cannot read back or remove what it wrote, so a threshold change or
   a deleted rule would strand stale windows in someone's calendar.
 - The app creates one calendar titled "Slackwater" and never reads or writes any other.
-- An event is identified by its content: URL plus title. Reschedule fetches the Slackwater
-  calendar's events from now forward, removes those the plan no longer contains, and adds the
-  missing ones. Two rules that produce the same event produce one calendar entry.
-- Title names the event and station ("Slack window · Race Passage", "Low 0.4 m · Friday
-  Harbor"). A window spans its start and end; an instant is zero-length. Time zone is the
-  station's. No `EKAlarm`.
-- A slack-window rule at a busy pass writes roughly 350 events over 90 days. The calendar toggle
-  is per rule, off switches are one tap, and `daylightOnly` applies to the calendar path too.
+- For a Premium user every event carries one `EKAlarm` at `−lead`. A free user's events carry
+  none.
+- An event is identified by its content: title, start, end and alarm offset. Reschedule fetches
+  the Slackwater calendar's events from now forward, removes those the plan no longer contains,
+  and adds the missing ones. So gaining or losing Premium rewrites the future events with or
+  without their alarm, and two rules that produce the same event produce one entry.
+- A window spans its start and end; an instant is zero-length. Time zone is the station's.
+- A slack-window rule at a busy pass writes roughly 350 events over 90 days. Calendar is one tap
+  on or off per rule, and `daylightOnly` applies to the calendar too.
 
 ### 5.2 Notifications
 
 - Interruption level `.active`. `.timeSensitive` needs the time-sensitive entitlement, which
   means regenerating the Manual-signed Release profiles.
+- An interval trigger on the occurrence's absolute fire time, so it stays right when the phone
+  changes time zone.
 - Request identifier `alert.<key>`. Reschedule removes pending `alert.*` requests and adds the
   soonest 64 across all rules. iOS holds only the soonest 64 pending requests per app, so 64 is
   the platform's ceiling, not a tuning value.
-- Title "Slack window opens at Race Passage"; body "14:32–15:10 under 0.5 kn · in 30 min", in the
-  station's time zone. With `noWindow`: "Slack at 14:32 — no window under 0.5 kn".
+- Title "Race Passage - Slack window"; body "14:32–15:10, under 0.5 kn · in 30 min", in the
+  station's time zone. With `noWindow`: "Race Passage - Slack", "14:32, no window under 0.5 kn".
 - Never provisional: provisional delivery does not reach the Lock Screen.
+- A rule with both Calendar and Live on delivers both. The user asked for both.
 
 ### 5.3 Alarms and the countdown
 
@@ -156,7 +166,7 @@ event instant, falling back to `deepLink(forStationID:)` for a station with no p
   `AlarmManager.AlarmError.maximumLimitReached`.
 - `AlarmAttributes` conforms to `ActivityAttributes`. The widget extension supplies its Live
   Activity UI, which counts down with `Text(timerInterval:)` to the event and then across the
-  window. That is the Live Activity for this release.
+  window.
 - Buttons: Stop, and an Open intent that lands on the station at the event.
 
 ## 6. Scheduling
@@ -171,23 +181,23 @@ struct DeliveryPlan: Equatable {
 func deliveryPlan(_ occurrences: [AlertOccurrence], rules: [AlertRule],
                   now: Date, premium: Bool) -> DeliveryPlan
 
-@MainActor enum AlertScheduler {
-    static func reschedule() async
+@MainActor final class AlertScheduler {
+    nonisolated static func requestReschedule()
 }
 ```
 
-`deliveryPlan` is pure. `reschedule` loads rules, resolves stations through
-`WidgetStationLoader.load(id:)`, builds occurrences from now to 90 days out off the main thread,
-plans, and hands the plan to three thin writers.
+`deliveryPlan` is pure. A reschedule loads rules, resolves stations through
+`WidgetStationLoader.loadRecord(id:)`, builds occurrences from now to 90 days out off the main
+thread, plans, and hands the plan to thin writers.
 
 **Plan rules**
 
-- An occurrence whose `fire` has passed is dropped.
-- Calendar: calendar-enabled rules, events within 90 days.
-- Notifications, when Premium: `.notification` rules, `fire` within 14 days, soonest 64.
-- Alarms, when Premium: `.alarm` rules, `fire` within 14 days, soonest first.
-- Not Premium: no notifications or alarms, so the writers clear them. Rules and the calendar
-  stay; entitlement returning restores delivery on the next run.
+- Calendar: calendar-enabled rules, events still ahead and within 90 days, with an alarm when
+  Premium.
+- Notifications, when Premium: `.notification` rules, `fire` ahead and within 14 days, soonest 64.
+- Alarms, when Premium: `.alarm` rules, `fire` ahead and within 14 days, soonest first.
+- Not Premium: no notifications, alarms or calendar alarms, so the writers clear them. Rules and
+  the calendar events stay; entitlement returning restores delivery on the next run.
 
 **Runs on:** the scene becoming active; a rule added, edited, toggled or removed; the slack
 threshold changing; `PremiumStore.isPremium` changing; a CHS model finishing its fit. One run at
@@ -200,18 +210,32 @@ was opened, and the Alerts screen shows each rule's "Scheduled through" date, so
 visible rather than a silent stop.
 
 **Rule states** (Alerts screen): Scheduled through *date* · Waiting for station data (a CHS
-station not yet fitted) · Calendar, Notifications or Alarms off in Settings · Calendar only
-(an interrupting level without Premium).
+station not yet fitted) · Calendar or Notifications off in Settings · Calendar only (a Live rule
+without Premium) · Off.
 
 ## 7. Entry point
 
-### 7.1 The bell
+### 7.1 The alert row
 
-A 44 pt glass circle between Share and Favorite in `DetailHeader`, a `Button` like its
-neighbours (the tap-gesture rule for iPad split applies to schedule rows, not header chrome).
-`accessibilityIdentifier("detail-alert")`. `DetailHeader` takes `alertOffer: AlertTrigger?`;
-nil hides the bell. The header is shared, so the bell reaches all four scrubber consumers, and
-each consumer computes its own offer.
+Two buttons, **Calendar** and **Live**, in `ScrubDetailScaffold` between the strip and the summary
+tiles (Range, Moon). The scaffold takes `alertOffer: AlertTrigger?` from each consumer; nil — the
+online gate — leaves the row out. Being in the scaffold, the row reaches all four scrubber
+consumers, and each consumer computes its own offer.
+
+- **Always there.** The row is never hidden, faded or disabled while the strip moves.
+- **Counts only at rest.** The offer is read from the centerline, and the centerline only means a
+  moment once the strip stops. A tap before the strip has rested — no scrub change for 450 ms,
+  the same rule that brings the strip's chrome back (`Timeline.rest`) — does nothing.
+- **Shows the resting moment.** A button reads on when a rule for this station and the resting
+  offer has that delivery on. It updates at rest, not on every scrub frame.
+- **Calendar** toggles calendar delivery for this station and offer: it creates the rule, or
+  turns calendar on or off on the existing one. It asks for calendar access the first time.
+- **Live** does the same for notifications. A non-subscriber gets the tier sheet instead. It asks
+  for notification permission the first time. Plan 2 grows Live into the alarm and its countdown
+  on current and slack triggers.
+- A rule left with neither delivery is removed.
+- Tap gestures, not `Button`s: `Button` press tracking goes dead in the iPad split detail column,
+  which is why `ReadoutTile` and `MultiDaySchedule` use gestures.
 
 The offer comes from what sits under the centerline:
 
@@ -236,21 +260,21 @@ second.
 
 ### 7.2 Rule sheet
 
-Prefilled from the offer:
+Opened from the Alerts screen to edit one rule:
 
-- One line naming the rule ("Slack window opens · Race Passage")
+- One line naming the rule ("Race Passage - Slack window")
 - Lead: at the time, 15 min, 30 min, 1 h, 3 h, 1 day
 - Daylight only
-- Add to calendar (on)
-- Alert: None · Notification · Alarm — Alarm on current and slack triggers only
+- Add to calendar
+- Notify me — the tier sheet for a non-subscriber
+- On, and Delete
 
-For a non-subscriber the Alert row opens the tier sheet and Add to calendar works. Each
-permission is requested the first time its mechanism is chosen, never at launch.
+Each permission is requested the first time its mechanism is chosen, never at launch.
 
 ### 7.3 Alerts screen
 
-A Settings row, "Alerts", lists rules by station with their delivery and state (§6). Tap edits in
-the rule sheet; swipe deletes.
+A Settings row, "Alerts", lists rules by station with their delivery and state (§6). Tap opens the
+rule sheet; swipe deletes.
 
 ## 8. Station coverage
 
@@ -264,26 +288,28 @@ the rule sheet; swipe deletes.
 | CHS current gate, online | nil | none |
 
 Online gates predict only from a network fetch ([online-gates §1](2026-08-08-online-gates-design.md))
-and the loader returns nil for them, so nothing could be scheduled offline. The bell is hidden
-there rather than offering a rule that never fires.
+and the loader returns nil for them, so nothing could be scheduled offline. The alert row is
+left out there rather than offering a rule that never fires.
 
 ## 9. Technical shape
 
 **Files**
 
-- `Slackwater/AlertRule.swift` — `AlertRule`, `AlertTrigger`, `AlertLevel`, the store
+- `Slackwater/AlertRule.swift` — `AlertRule`, `AlertTrigger`, `AlertLevel`, the store, event names
 - `Slackwater/AlertOccurrences.swift` — `alertOccurrences`, the crossing search, the daylight filter
-- `Slackwater/AlertScheduler.swift` — `deliveryPlan`, `reschedule`, the three writers
-- `Slackwater/AlertSheet.swift`, `Slackwater/AlertsView.swift`
-- `SlackwaterWidgets/AlertLiveActivity.swift` — `ActivityConfiguration(for: AlarmAttributes<AlertAlarmMetadata>.self)`
-- `Slackwater/DetailHeader.swift` and the four detail views — the bell and each offer
+- `Slackwater/AlertPlan.swift` — `deliveryPlan`, copy, calendar event identity
+- `Slackwater/AlertScheduler.swift`, `Slackwater/AlertCalendar.swift`, `Slackwater/AlertNotifications.swift` — the run and its writers
+- `Slackwater/AlertOffer.swift`, `Slackwater/AlertRow.swift` — the offer and the row
+- `Slackwater/AlertSheet.swift`, `Slackwater/AlertsView.swift` — editing
+- `SlackwaterWidgets/AlertLiveActivity.swift` — `ActivityConfiguration(for: AlarmAttributes<AlertAlarmMetadata>.self)` (plan 2)
+- `Slackwater/Theme.swift` (`ScrubDetailScaffold`) and three detail views — the row and each offer
 
 Occurrences run in the app, which already links Almanac; the widget extension gains Live Activity
 UI and no dependency.
 
-**`project.yml`**, app target `info.properties`: `NSAlarmKitUsageDescription`,
-`NSCalendarsFullAccessUsageDescription`, `NSSupportsLiveActivities`. None is an entitlement, so
-the Manual-signed Release provisioning profiles stay as they are.
+**`project.yml`**, app target `info.properties`: `NSCalendarsFullAccessUsageDescription`, plus
+`NSAlarmKitUsageDescription` and `NSSupportsLiveActivities` with the alarms. None is an
+entitlement, so the Manual-signed Release provisioning profiles stay as they are.
 
 No engine or Almanac version change.
 
@@ -291,26 +317,26 @@ No engine or Almanac version change.
 
 **Unit** (`SlackwaterTests`, failing test first):
 
-- `AlertOccurrencesTests` — one case per trigger on the fixtures `SlackWindowTests` and
-  `TideShortcutTests` already use. Merged runs yield one occurrence; a hairline slack yields a
-  `noWindow` occurrence; for an unmerged window the opening equals `SlackWindowShortcutQuery.next`'s
-  start; crossings interpolate and respect direction; daylight filtering holds across a DST
-  transition day; an eclipse lands on `WindowEclipse.start`.
-- `DeliveryPlanTests` — lead applied; passed fires dropped; the 90-day, 14-day and 64 limits; a
-  non-Premium plan keeps the calendar and nothing else; alarms only on current and slack
-  triggers; a threshold change moves window occurrences.
-- `AlertRuleTests` — Codable round-trip; a location sentinel resolves at creation.
-- Offer selection per consumer, as pure functions of `scrubTime`, now and the loaded events.
+- Occurrences — one case per trigger on the fixtures `SlackWindowTests` and `TideShortcutTests`
+  already use. Merged runs yield one occurrence; a hairline slack yields a `noWindow` occurrence;
+  the first opening agrees with `SlackWindowShortcutQuery.next`; crossings interpolate and respect
+  direction; daylight filtering holds across a DST transition day; an eclipse lands on
+  `WindowEclipse.start`; a wider threshold opens a window earlier.
+- The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
+  non-Premium plan keeps the calendar without alarms and nothing else.
+- Copy — place-first titles, bodies per trigger, lead only on notifications; calendar identity
+  changes with the alarm.
+- The row — offer selection per consumer; what a Calendar or Live tap does to the rules.
 
-**UI:** the bell is present with the right label on tide, current and derived details, and absent
-on an online gate.
+**UI:** the row sits under tide and current strips; Live opens the tier sheet for a free user once
+the strip has rested.
 
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; an alarm rings through a Focus; calendar events land only in the Slackwater calendar
-and open the app at the event; a threshold change rewrites them; losing Premium under the StoreKit
-test configuration clears pending notifications and alarms.
+and open the app at the event; a threshold change rewrites them; gaining Premium adds the alarms
+and losing it clears pending notifications and the alarms.
 
-## 11. Spikes before the plan
+## 11. Spikes before the alarm plan
 
 1. **AlarmKit, on device.** How many `.fixed` alarms schedule before `maximumLimitReached`.
    Whether `CountdownDuration.preAlert` shows a countdown ahead of a `.fixed` alarm or only for
@@ -324,7 +350,11 @@ test configuration clears pending notifications and alarms.
 
 ## 12. Release scoping
 
-**This release:** §3–§9.
+**Plan 1:** rules, occurrences, the plan, the calendar and notification writers, the alert row,
+the Alerts screen.
+
+**Plan 2, after spike 1:** AlarmKit alarms and the countdown behind Live on current and slack
+triggers.
 
 **Next, same tier:**
 
@@ -332,7 +362,6 @@ test configuration clears pending notifications and alarms.
   and the station LAT/HAT bounds, once the #217 range UI brings both into the app. Suppressed
   where the constituent set has no Sa/Ssa amplitude.
 - Eclipse stages: a week, a day and an hour before, and at the start.
-- A scheduled ActivityKit Live Activity for notification-level rules.
 - `.timeSensitive` notifications, with the entitlement and regenerated profiles.
 
 ## 13. Launch blockers

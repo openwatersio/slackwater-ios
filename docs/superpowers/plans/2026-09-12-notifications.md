@@ -2,29 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Alert rules set from a station's 🔔, resolved on the device into dated occurrences and delivered as Slackwater calendar events (free) and local notifications (Premium).
+**Goal:** Alert rules set from a Calendar / Live row under every detail strip, resolved on the device into dated occurrences, and delivered as Slackwater calendar events (free; with alarms for Premium) and local notifications (Premium).
 
-**Architecture:** Pure functions do the work and carry the tests: a rule becomes occurrences (`alertOccurrences`), occurrences become a `DeliveryPlan`, the plan becomes copy. A main-actor `AlertScheduler` runs them on launch and on every change, then hands the result to two thin writers, EventKit and UserNotifications. The bell in the shared `DetailHeader` offers a rule derived from what sits under the scrub centerline.
+**Architecture:** Pure functions do the work and carry the tests: a rule becomes occurrences (`alertOccurrences`), occurrences become a `DeliveryPlan`, the plan becomes copy. A main-actor `AlertScheduler` runs them on launch and on every change, then hands the result to two thin writers, EventKit and UserNotifications. The alert row in the shared `ScrubDetailScaffold` offers a rule derived from what sits under the scrub centerline, and a tap only counts once the strip is at rest.
 
 **Tech Stack:** Swift 5 language mode, SwiftUI, TideEngine (slackwater-engine), Almanac, EventKit, UserNotifications, XCTest, XcodeGen.
 
 **Spec:** `docs/superpowers/specs/2026-09-12-notifications-design.md`
 
-**Scope:** Everything in the spec except AlarmKit alarms and the Live Activity countdown (spec §5.3). Spike 1 (spec §11) decides how that rung works, so it gets its own plan once the spike has run on a device. `AlertLevel` has no `.alarm` case here; plan 2 adds it.
+**Scope:** Everything in the spec except AlarmKit alarms and the Live Activity countdown (spec §5.3). Spike 1 (spec §11) decides how that rung works, so it gets its own plan once the spike has run on a device. `AlertLevel` has no `.alarm` case here; plan 2 adds it, and Live grows into it.
 
 ## Global Constraints
 
 - iOS deployment target is `26.0` (`project.yml`). No `if #available` branches.
 - No new entitlements or capabilities. Info.plist keys go in `project.yml` → `targets.Slackwater.info.properties`. This plan adds exactly one key: `NSCalendarsFullAccessUsageDescription`.
 - No background execution: no `UIBackgroundModes`, no `BGTaskScheduler`.
-- Calendar: full access (`requestFullAccessToEvents`). Write only to the calendar the app creates, titled `Slackwater`. No `EKAlarm`. Horizon 90 days.
+- Calendar: full access (`requestFullAccessToEvents`). Write only to the calendar the app creates, titled `Slackwater`. Horizon 90 days. A free user's events carry no alarm; for a Premium user each event carries exactly one `EKAlarm` at `−lead`.
 - Notifications: never provisional. Identifiers start with `alert.`. At most 64 pending; horizon 14 days. Interruption level stays the default (`.active`).
-- The calendar path is free. Notifications require `PremiumStore.shared.isPremium`.
+- Calendar events are free. Calendar alarms and notifications require `PremiumStore.shared.isPremium`.
+- Titles lead with the place, then the event in as few words as possible, joined by ` - `: `Race Passage - Slack window`. Calendar events and notifications share the title, built from `alertEventName`.
+- **The alert row:** a **Calendar** and a **Live** button in `ScrubDetailScaffold`, between the strip and the summary tiles. It is never hidden, faded or disabled while the strip moves; a tap counts only once the strip has rested for `Timeline.rest` (450 ms, the rule the strip's chrome already uses). Rules it creates start with a 30-minute lead. Calendar works for everyone; Live opens the tier sheet for a non-subscriber.
 - Rules are device-local JSON in `AppGroup.defaults` under `slackwater.alertRules`. No iCloud sync.
 - Heights are metres everywhere except display (`formatHeight`, `heightUnit`).
 - Anything meaning a day goes through `Calendar`; everything else is absolute `Date`s.
-- **Deviation from spec §5, deliberate:** notifications use `UNTimeIntervalNotificationTrigger(timeInterval:repeats: false)`, not `UNCalendarNotificationTrigger`. An occurrence is an absolute instant, and an interval trigger stays correct when the device changes time zone.
-- Station ids are `StationItem` ids, the value `DetailHeader.favoriteId` already carries. NOAA currents are `current:<id>`, e.g. `current:noaa/PUG1701`.
+- Notifications use `UNTimeIntervalNotificationTrigger(timeInterval:repeats: false)` on the absolute fire time, so they stay correct when the device changes time zone.
+- Station ids are `StationItem` ids, the value `ScrubDetailScaffold.favoriteId` already carries. NOAA currents are `current:<id>`, e.g. `current:noaa/PUG1701`.
+- Tap targets in the detail column use `.onTapGesture`, not `Button`: `Button` press tracking goes dead in the iPad split layout's detail column (`ReadoutTile`, `MultiDaySchedule`).
 - New Swift files start with `// Slackwater — GPL v3. <one-line purpose>`. Mark deliberate shortcuts with a `ponytail:` comment naming the ceiling.
 - The repo's CLAUDE.md applies: plans and specs are intent, not compiled source — if code here disagrees with the repo, trust the repo and say so in the task report.
 - **Where to work:** a worktree off `origin/main`, never the shared checkout: `git -C ~/src/openwaters/slackwater-ios worktree add -b feat/alerts ../slackwater-ios-wt-alerts origin/main`. `slackwater-ios` is branch-and-PR; never push to `main`, never merge your own PR. Commit messages end with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
@@ -43,22 +46,24 @@
 
 | File | Responsibility | Task |
 |---|---|---|
-| `Slackwater/AlertRule.swift` | `AlertTrigger`, `AlertLevel`, `AlertRule`, `AlertRuleStore`, `alertRuleSummary` | 1 |
+| `Slackwater/AlertRule.swift` | `AlertTrigger`, `AlertLevel`, `AlertRule`, `AlertRuleStore`, `alertEventName`, `alertRuleSummary` | 1 |
 | `Slackwater/AlertOccurrences.swift` | `tideCrossings`, `daylightSpans`, `slackWindowOpenings` (Task 2); `AlertOccurrence`, `AlertPlace`, `alertOccurrences`, `WidgetRecord` helpers (Task 3) | 2, 3 |
 | `Slackwater/AlertPlan.swift` | `AlertHorizon`, `DeliveryPlan`, `deliveryPlan`, `scheduledThrough`, `AlertCopy`, `alertCopy`, `alertLeads`, `alertLeadLabel`, `calendarEventKey` | 4 |
 | `Slackwater/AlertScheduler.swift` | `AlertEntry`, `ResolvedAlerts`, `resolveAlerts`, `AlertStatusSnapshot`, `AlertScheduler` | 5, 6 |
 | `Slackwater/AlertCalendar.swift` | EventKit writer | 5 |
 | `Slackwater/AlertNotifications.swift` | UserNotifications writer, delegate, `AlertTap` | 6 |
-| `Slackwater/AlertOffer.swift` | `tideAlertOffer`, `currentAlertOffer`, `derivedAlertOffer`, `isOnEclipseContact` | 7 |
-| `Slackwater/AlertSheet.swift` | The rule sheet | 7 |
+| `Slackwater/AlertOffer.swift` | `tideAlertOffer`, `currentAlertOffer`, `derivedAlertOffer`, `isOnEclipseContact`, `AlertDelivery`, `AlertRuleChange`, `alertRowLead`, `alertRowToggle`, `alertRowState` | 7 |
+| `Slackwater/AlertRow.swift` | The Calendar / Live row | 7 |
+| `Slackwater/AlertSheet.swift` | The rule sheet (edit one rule) | 8 |
 | `Slackwater/AlertsView.swift` | Alerts screen, `alertStatusText` | 8 |
 | `Slackwater/AppGroup.swift` | `alertRulesKey`, `alertCalendarKey` | 1, 5 |
-| `Slackwater/DetailHeader.swift`, `Slackwater/Theme.swift` (`ScrubDetailScaffold`), `TideDetailView.swift`, `CurrentDetailView.swift`, `DerivedGateDetailView.swift` | The bell and each view's offer | 7 |
+| `Slackwater/TimelineStrip.swift` | `Timeline.rest`, shared by the chrome and the row | 7 |
+| `Slackwater/Theme.swift` (`ScrubDetailScaffold`), `TideDetailView.swift`, `CurrentDetailView.swift`, `DerivedGateDetailView.swift` | The row and each view's offer | 7 |
 | `Slackwater/SlackwaterApp.swift`, `SettingsView.swift`, `PremiumStore.swift`, `StationListView.swift`, `project.yml` | Reschedule hooks, notification taps, Settings row, plist key | 5, 6, 8 |
 | `SlackwaterTests/AlertRuleTests.swift`, `AlertPrimitivesTests.swift`, `AlertOccurrencesTests.swift`, `DeliveryPlanTests.swift`, `AlertCopyTests.swift`, `AlertResolveTests.swift`, `AlertOfferTests.swift`, `AlertStatusTests.swift` | Unit tests | 1–8 |
-| `SlackwaterUITests/AlertBellTests.swift` | The bell on tide and current details | 7 |
+| `SlackwaterUITests/AlertRowTests.swift` | The row on tide and current details | 7 |
 
-`OnlineGateDetailView` and `ChsWaitingView` are deliberately untouched: they pass no offer, so the bell stays hidden (spec §8).
+`OnlineGateDetailView` is deliberately untouched: it passes no offer, so the row is left out (spec §8).
 
 ---
 
@@ -76,6 +81,7 @@
   - `enum AlertLevel: String, Codable { case none, notification }`
   - `struct AlertRule: Codable, Identifiable, Equatable { var id: UUID; var stationID: String; var trigger: AlertTrigger; var lead: TimeInterval; var daylightOnly: Bool; var calendar: Bool; var alert: AlertLevel; var enabled: Bool }` — memberwise init `AlertRule(stationID:trigger:lead:daylightOnly:calendar:alert:enabled:)`, all but `stationID`/`trigger` defaulted
   - `@MainActor final class AlertRuleStore: ObservableObject { static let shared; init(defaults: UserDefaults); @Published private(set) var rules: [AlertRule]; var onChange: () -> Void; func upsert(_ rule: AlertRule); func remove(_ id: UUID) }`
+  - `func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: Bool) -> String`
   - `func alertRuleSummary(_ trigger: AlertTrigger, stationName: String, imperial: Bool) -> String`
   - `AppGroup.alertRulesKey = "slackwater.alertRules"`
 
@@ -84,7 +90,7 @@
 `SlackwaterTests/AlertRuleTests.swift`:
 
 ```swift
-// Slackwater — GPL v3. Alert rules: coding, the store, and the one-line summary.
+// Slackwater — GPL v3. Alert rules: coding, the store, and the place-first names.
 import XCTest
 @testable import Slackwater
 
@@ -129,21 +135,25 @@ import XCTest
         XCTAssertTrue(rule.enabled)
     }
 
-    func testSummaryNamesTheEventAndStation() {
+    func testSummaryPutsThePlaceFirst() {
         XCTAssertEqual(alertRuleSummary(.slackWindowOpens, stationName: "Race Passage", imperial: true),
-                       "Slack window opens · Race Passage")
+                       "Race Passage - Slack window")
         XCTAssertEqual(alertRuleSummary(.slack, stationName: "Dodd Narrows", imperial: true),
-                       "Slack · Dodd Narrows")
+                       "Dodd Narrows - Slack")
         XCTAssertEqual(alertRuleSummary(.currentPeak(flood: false), stationName: "Race Passage", imperial: true),
-                       "Max ebb · Race Passage")
+                       "Race Passage - Max ebb")
         XCTAssertEqual(alertRuleSummary(.tideExtreme(high: true), stationName: "Friday Harbor", imperial: true),
-                       "High tide · Friday Harbor")
+                       "Friday Harbor - High tide")
         XCTAssertEqual(alertRuleSummary(.tideCrossing(heightM: 1, rising: true), stationName: "Friday Harbor", imperial: false),
-                       "Tide rises past 1.00 m · Friday Harbor")
+                       "Friday Harbor - Rising past 1.00 m")
         XCTAssertEqual(alertRuleSummary(.tideCrossing(heightM: 1, rising: false), stationName: "Friday Harbor", imperial: true),
-                       "Tide falls past 3.3 ft · Friday Harbor")
+                       "Friday Harbor - Falling past 3.3 ft")
         XCTAssertEqual(alertRuleSummary(.eclipse, stationName: "Friday Harbor", imperial: true),
-                       "Lunar eclipse · Friday Harbor")
+                       "Friday Harbor - Lunar eclipse")
+    }
+
+    func testAHairlineSlackIsJustSlack() {
+        XCTAssertEqual(alertEventName(.slackWindowOpens, noWindow: true, imperial: true), "Slack")
     }
 }
 ```
@@ -193,7 +203,7 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// A `StationItem` id — `current:`-prefixed for NOAA currents.
     var stationID: String
     var trigger: AlertTrigger
-    /// Seconds before the event that a notification fires.
+    /// Seconds before the event that a notification fires and a Premium calendar alarm rings.
     var lead: TimeInterval = 0
     var daylightOnly = false
     /// Free: write occurrences into the Slackwater calendar.
@@ -238,25 +248,31 @@ struct AlertRule: Codable, Identifiable, Equatable {
     }
 }
 
-/// "Slack window opens · Race Passage" — the rule sheet's headline and the Alerts list row.
-func alertRuleSummary(_ trigger: AlertTrigger, stationName: String, imperial: Bool) -> String {
-    let what: String = switch trigger {
-    case .slackWindowOpens: "Slack window opens"
+/// The event in as few words as a title allows — "Slack window", "Low tide", "Rising past 3.3 ft".
+/// The place goes in front of it (`alertRuleSummary`, `alertCopy`).
+func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: Bool) -> String {
+    switch trigger {
+    case .slackWindowOpens: noWindow ? "Slack" : "Slack window"
     case .slack: "Slack"
     case .currentPeak(let flood): flood ? "Max flood" : "Max ebb"
     case .tideExtreme(let high): high ? "High tide" : "Low tide"
     case .tideCrossing(let heightM, let rising):
-        "Tide \(rising ? "rises" : "falls") past \(formatHeight(heightM, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        "\(rising ? "Rising" : "Falling") past \(formatHeight(heightM, imperial: imperial)) \(heightUnit(imperial: imperial))"
     case .eclipse: "Lunar eclipse"
     }
-    return "\(what) · \(stationName)"
+}
+
+/// "Race Passage - Slack window": the place, then the event — the same shape calendar events
+/// and notifications are titled with.
+func alertRuleSummary(_ trigger: AlertTrigger, stationName: String, imperial: Bool) -> String {
+    "\(stationName) - \(alertEventName(trigger, imperial: imperial))"
 }
 ```
 
 - [ ] **Step 5: Run the test and watch it pass**
 
 Run: `SLACKWATER_ONLY=SlackwaterTests/AlertRuleTests ./scripts/test.sh`
-Expected: 4 tests pass.
+Expected: 5 tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -668,23 +684,26 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     switch (rule.trigger, station) {
     case (.slackWindowOpens, .current(let s, _, _)):
         found = slackWindowOpenings(s, from: from, to: to, threshold: threshold)
-            .map { ($0.event, $0.end, $0.end == nil, nil) }
+            .map { (event: $0.event, end: $0.end, noWindow: $0.end == nil, heightM: nil) }
     case (.currentPeak(let flood), .current(let s, _, _)):
         found = s.events(from: from, to: to)
             .filter { $0.kind == (flood ? .maxFlood : .maxEbb) }
-            .map { ($0.time, nil, false, nil) }
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
     case (.slack, .derived(let g, _, _)):
-        found = g.slacks(from: from, to: to).map { ($0.time, nil, false, nil) }
+        found = g.slacks(from: from, to: to)
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
     case (.tideExtreme(let high), .tide(let s, _, _)):
         found = s.extremes(from: from, to: to)
             .filter { $0.kind == (high ? .high : .low) }
-            .map { ($0.time, nil, false, $0.height) }
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
     case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
         let samples = s.heights(from: from, to: to, step: 600).map { (time: $0.time, height: $0.height) }
-        found = tideCrossings(samples, level: level, rising: rising).map { ($0, nil, false, level) }
+        found = tideCrossings(samples, level: level, rising: rising)
+            .map { (event: $0, end: nil, noWindow: false, heightM: level) }
     case (.eclipse, _):
         guard let observer = try? Observer(latitudeDeg: position.lat, longitudeDeg: position.lon) else { return [] }
-        found = visibleEclipses(from: from, to: to, observer: observer).map { ($0.start, nil, false, nil) }
+        found = visibleEclipses(from: from, to: to, observer: observer)
+            .map { (event: $0.start, end: nil, noWindow: false, heightM: nil) }
     default:
         // The trigger doesn't apply to this kind of station (spec §8).
         return []
@@ -725,7 +744,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Test: `SlackwaterTests/DeliveryPlanTests.swift`, `SlackwaterTests/AlertCopyTests.swift`
 
 **Interfaces:**
-- Consumes: Task 1 `AlertRule`, `AlertLevel`; Task 3 `AlertOccurrence`, `AlertPlace`; `formatHeight`, `heightUnit`
+- Consumes: Task 1 `AlertRule`, `AlertLevel`, `alertEventName`; Task 3 `AlertOccurrence`, `AlertPlace`; `formatHeight`, `heightUnit`
 - Produces:
   - `enum AlertHorizon { static let calendar: TimeInterval; static let notifications: TimeInterval; static let notificationLimit: Int }`
   - `struct DeliveryPlan: Equatable { var calendar: [AlertOccurrence]; var notifications: [AlertOccurrence] }`
@@ -735,7 +754,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `func alertCopy(_ rule: AlertRule, _ occurrence: AlertOccurrence, place: AlertPlace, imperial: Bool, threshold: Double, includeLead: Bool, locale: Locale = .autoupdatingCurrent) -> AlertCopy`
   - `let alertLeads: [TimeInterval]`
   - `func alertLeadLabel(_ lead: TimeInterval) -> String`
-  - `func calendarEventKey(title: String, start: Date, end: Date) -> String`
+  - `func calendarEventKey(title: String, start: Date, end: Date, alarmOffset: TimeInterval?) -> String`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -822,7 +841,7 @@ final class DeliveryPlanTests: XCTestCase {
 `SlackwaterTests/AlertCopyTests.swift`:
 
 ```swift
-// Slackwater — GPL v3. What an alert says, in the station's zone.
+// Slackwater — GPL v3. What an alert says: the place, then the event, then the time in the station's zone.
 import XCTest
 @testable import Slackwater
 
@@ -842,30 +861,30 @@ final class AlertCopyTests: XCTestCase {
 
     func testAWindowNamesItsSpanAndThreshold() {
         XCTAssertEqual(copy(.slackWindowOpens, lead: 1_800, end: event.addingTimeInterval(38 * 60)),
-                       AlertCopy(title: "Slack window opens at Race Passage",
+                       AlertCopy(title: "Race Passage - Slack window",
                                  body: "14:32–15:10, under 0.5 kn · in 30 min"))
     }
 
     func testAHairlineSlackSaysThereIsNoWindow() {
         XCTAssertEqual(copy(.slackWindowOpens, noWindow: true),
-                       AlertCopy(title: "Slack at Race Passage", body: "14:32 — no window under 0.5 kn"))
+                       AlertCopy(title: "Race Passage - Slack", body: "14:32, no window under 0.5 kn"))
     }
 
     func testTheCalendarLeavesTheLeadOut() {
         XCTAssertEqual(copy(.currentPeak(flood: true), lead: 3_600, includeLead: false),
-                       AlertCopy(title: "Max flood at Race Passage", body: "14:32"))
+                       AlertCopy(title: "Race Passage - Max flood", body: "14:32"))
     }
 
     func testTideCopyCarriesTheHeightInTheUsersUnits() {
         XCTAssertEqual(copy(.tideExtreme(high: false), heightM: 0.4, imperial: false),
-                       AlertCopy(title: "Low tide at Race Passage", body: "14:32 · 0.40 m"))
+                       AlertCopy(title: "Race Passage - Low tide", body: "14:32 · 0.40 m"))
         XCTAssertEqual(copy(.tideCrossing(heightM: 1, rising: true), lead: 86_400, heightM: 1),
-                       AlertCopy(title: "Tide rises past 3.3 ft at Race Passage", body: "14:32 · in 1 day"))
+                       AlertCopy(title: "Race Passage - Rising past 3.3 ft", body: "14:32 · in 1 day"))
     }
 
     func testSlackAndEclipse() {
-        XCTAssertEqual(copy(.slack), AlertCopy(title: "Slack at Race Passage", body: "14:32"))
-        XCTAssertEqual(copy(.eclipse), AlertCopy(title: "Lunar eclipse begins", body: "14:32 · from Race Passage"))
+        XCTAssertEqual(copy(.slack), AlertCopy(title: "Race Passage - Slack", body: "14:32"))
+        XCTAssertEqual(copy(.eclipse), AlertCopy(title: "Race Passage - Lunar eclipse", body: "14:32"))
     }
 
     func testLeadLabels() {
@@ -873,10 +892,14 @@ final class AlertCopyTests: XCTestCase {
                        ["At the time", "15 min before", "30 min before", "1 hr before", "3 hr before", "1 day before"])
     }
 
-    func testCalendarKeysChangeWhenAWindowMoves() {
-        let a = calendarEventKey(title: "Slack window opens at Race Passage", start: event, end: event.addingTimeInterval(600))
-        XCTAssertEqual(a, "Slack window opens at Race Passage|1786372320|1786372920")
-        XCTAssertNotEqual(a, calendarEventKey(title: "Slack window opens at Race Passage", start: event, end: event.addingTimeInterval(900)))
+    func testCalendarIdentityChangesWhenAWindowMovesOrTheAlarmChanges() {
+        let title = "Race Passage - Slack window"
+        let end = event.addingTimeInterval(600)
+        let plain = calendarEventKey(title: title, start: event, end: end, alarmOffset: nil)
+        XCTAssertEqual(plain, "Race Passage - Slack window|1786372320|1786372920|none")
+        XCTAssertEqual(calendarEventKey(title: title, start: event, end: end, alarmOffset: -1_800),
+                       "Race Passage - Slack window|1786372320|1786372920|-1800")
+        XCTAssertNotEqual(plain, calendarEventKey(title: title, start: event, end: event.addingTimeInterval(900), alarmOffset: nil))
     }
 }
 ```
@@ -910,6 +933,7 @@ struct DeliveryPlan: Equatable {
 
 /// Which occurrences go to the calendar (free) and which become notifications (Premium).
 /// The calendar keeps an event until it happens; a notification is gone once its fire time passes.
+/// Whether a calendar event carries an alarm is the writer's call, from the same `premium`.
 func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan {
     let live = Dictionary(uniqueKeysWithValues: rules.filter(\.enabled).map { ($0.id, $0) })
     let ordered = occurrences.sorted { $0.fire < $1.fire }
@@ -956,61 +980,52 @@ private func leadAmount(_ lead: TimeInterval) -> String {
     }
 }
 
-/// Title and body for one occurrence, times in the station's zone. The calendar passes
-/// `includeLead: false`: an event sits at its own time, so "in 30 min" means nothing there.
+/// Title and body for one occurrence. The title is the place, then the event in as few words
+/// as it takes; the body is the time in the station's zone, with the span, threshold or height
+/// where they matter. The calendar passes `includeLead: false`: an event sits at its own time,
+/// so "in 30 min" means nothing there.
 func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imperial: Bool,
                threshold: Double, includeLead: Bool, locale: Locale = .autoupdatingCurrent) -> AlertCopy {
     let clock = Date.FormatStyle(date: .omitted, time: .shortened, timeZone: place.tz).locale(locale)
     let time = o.event.formatted(clock)
     let limit = String(format: "%.1f kn", threshold)
-    let height = o.heightM.map { "\(formatHeight($0, imperial: imperial)) \(heightUnit(imperial: imperial))" }
 
-    let title: String
     var body: String
     switch rule.trigger {
     case .slackWindowOpens where o.noWindow:
-        title = "Slack at \(place.name)"
-        body = "\(time) — no window under \(limit)"
+        body = "\(time), no window under \(limit)"
     case .slackWindowOpens:
-        title = "Slack window opens at \(place.name)"
         body = o.end.map { "\(time)–\($0.formatted(clock)), under \(limit)" } ?? time
-    case .slack:
-        title = "Slack at \(place.name)"
+    case .tideExtreme:
+        body = o.heightM.map { "\(time) · \(formatHeight($0, imperial: imperial)) \(heightUnit(imperial: imperial))" } ?? time
+    case .slack, .currentPeak, .tideCrossing, .eclipse:
         body = time
-    case .currentPeak(let flood):
-        title = "\(flood ? "Max flood" : "Max ebb") at \(place.name)"
-        body = time
-    case .tideExtreme(let high):
-        title = "\(high ? "High" : "Low") tide at \(place.name)"
-        body = height.map { "\(time) · \($0)" } ?? time
-    case .tideCrossing(_, let rising):
-        title = "Tide \(rising ? "rises" : "falls") past \(height ?? "") at \(place.name)"
-        body = time
-    case .eclipse:
-        title = "Lunar eclipse begins"
-        body = "\(time) · from \(place.name)"
     }
     if includeLead, rule.lead > 0 { body += " · in \(leadAmount(rule.lead))" }
-    return AlertCopy(title: title, body: body)
+
+    let event = alertEventName(rule.trigger, noWindow: o.noWindow, imperial: imperial)
+    return AlertCopy(title: "\(place.name) - \(event)", body: body)
 }
 
-/// A calendar event's identity is its content. A moved window is a different event, so the
-/// old one is removed and the new one added.
-func calendarEventKey(title: String, start: Date, end: Date) -> String {
-    "\(title)|\(Int(start.timeIntervalSince1970))|\(Int(end.timeIntervalSince1970))"
+/// A calendar event's identity is its content, alarm included. A moved window, or an event
+/// that gains or loses its Premium alarm, is a different event: the old one is removed and
+/// the new one added.
+func calendarEventKey(title: String, start: Date, end: Date, alarmOffset: TimeInterval?) -> String {
+    let alarm = alarmOffset.map { String(Int($0)) } ?? "none"
+    return "\(title)|\(Int(start.timeIntervalSince1970))|\(Int(end.timeIntervalSince1970))|\(alarm)"
 }
 ```
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
 Run: `SLACKWATER_ONLY=SlackwaterTests/DeliveryPlanTests,SlackwaterTests/AlertCopyTests ./scripts/test.sh`
-Expected: 13 tests pass. If a copy test fails only on the dash or the clock format, print the actual string. The en_GB `.shortened` time is `14:32`, and the window body uses an en dash `–`.
+Expected: 13 tests pass. If a copy test fails only on the dash or the clock format, print the actual string. The en_GB `.shortened` time is `14:32`; the window body uses an en dash `–`; the title joins with a plain ` - `.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add Slackwater/AlertPlan.swift SlackwaterTests/DeliveryPlanTests.swift SlackwaterTests/AlertCopyTests.swift
-git commit -m "feat(alerts): delivery plan, horizons and alert copy
+git commit -m "feat(alerts): delivery plan, horizons and place-first alert copy
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -1027,7 +1042,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: Tasks 1–4; `WidgetStationLoader.loadRecord(id:)`, `.station(from:)`; `slackThresholdKn`; `PremiumStore.shared.isPremium`; `shareURL(forStationID:at:tz:)`, `deepLink(forStationID:)` (`DeepLink.swift`); `appNow()`; `unitsKey`
 - Produces:
-  - `struct AlertEntry { let occurrence: AlertOccurrence; let copy: AlertCopy; let url: URL?; let place: AlertPlace }`
+  - `struct AlertEntry { let occurrence: AlertOccurrence; let copy: AlertCopy; let url: URL?; let place: AlertPlace; var alarmOffset: TimeInterval? }`
   - `struct ResolvedAlerts: Sendable { var occurrences: [AlertOccurrence]; var places: [String: AlertPlace]; var unresolved: Set<UUID> }`
   - `func resolveAlerts(_ rules: [AlertRule], now: Date, threshold: Double) -> ResolvedAlerts`
   - `struct AlertStatusSnapshot: Equatable { var scheduledThrough: [UUID: Date]; var unresolved: Set<UUID>; var notificationsAuthorized: Bool; var calendarAuthorized: Bool }`
@@ -1101,6 +1116,8 @@ struct AlertEntry {
     let copy: AlertCopy
     let url: URL?
     let place: AlertPlace
+    /// A calendar event's alarm, relative to its start. Nil for a free user, and for notifications.
+    var alarmOffset: TimeInterval? = nil
 }
 
 struct ResolvedAlerts: Sendable {
@@ -1113,7 +1130,7 @@ struct ResolvedAlerts: Sendable {
 }
 
 /// Occurrences for every enabled rule from `now` to the calendar horizon. Off the main
-/// actor: a year-scale scan per station is real work.
+/// actor: a season-scale scan per station is real work.
 /// ponytail: two rules on one station load it twice; share the record if that ever measures.
 func resolveAlerts(_ rules: [AlertRule], now: Date, threshold: Double) -> ResolvedAlerts {
     var resolved = ResolvedAlerts()
@@ -1173,7 +1190,7 @@ struct AlertStatusSnapshot: Equatable {
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences, now: now, premium: premium)
         let byID = Dictionary(uniqueKeysWithValues: rules.map { ($0.id, $0) })
 
-        func entries(_ list: [AlertOccurrence], includeLead: Bool) -> [AlertEntry] {
+        func entries(_ list: [AlertOccurrence], includeLead: Bool, alarm: Bool) -> [AlertEntry] {
             list.compactMap { o in
                 guard let rule = byID[o.ruleID], let place = resolved.places[rule.stationID] else { return nil }
                 return AlertEntry(
@@ -1182,11 +1199,13 @@ struct AlertStatusSnapshot: Equatable {
                                     threshold: threshold, includeLead: includeLead),
                     url: shareURL(forStationID: rule.stationID, at: o.event, tz: place.tz)
                         ?? deepLink(forStationID: rule.stationID),
-                    place: place)
+                    place: place,
+                    alarmOffset: alarm ? -rule.lead : nil)
             }
         }
 
-        AlertCalendar.apply(entries(plan.calendar, includeLead: false), now: now)
+        // Premium puts an alarm on every calendar event (spec §5.1).
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false, alarm: premium), now: now)
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,
@@ -1233,7 +1252,8 @@ import EventKit
 
     /// Makes the calendar's future match `entries`: removes events no longer planned and adds
     /// the missing ones. Past events are left alone.
-    /// ponytail: runs on the main actor; a few hundred EventKit saves. Move off it if it measures.
+    /// ponytail: an event the user edited by hand (moved, a second alarm) stops matching and is
+    /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
     static func apply(_ entries: [AlertEntry], now: Date) {
         guard authorized, let calendar = slackwaterCalendar(create: !entries.isEmpty) else { return }
         let predicate = store.predicateForEvents(withStart: now,
@@ -1242,12 +1262,14 @@ import EventKit
         let existing = store.events(matching: predicate)
         let wanted = Dictionary(entries.map { entry -> (String, AlertEntry) in
             let end = entry.occurrence.end ?? entry.occurrence.event
-            return (calendarEventKey(title: entry.copy.title, start: entry.occurrence.event, end: end), entry)
+            return (calendarEventKey(title: entry.copy.title, start: entry.occurrence.event, end: end,
+                                     alarmOffset: entry.alarmOffset), entry)
         }, uniquingKeysWith: { first, _ in first })
 
         var have = Set<String>()
         for event in existing {
-            let key = calendarEventKey(title: event.title ?? "", start: event.startDate, end: event.endDate)
+            let key = calendarEventKey(title: event.title ?? "", start: event.startDate, end: event.endDate,
+                                       alarmOffset: event.alarms?.first?.relativeOffset)
             if wanted[key] == nil {
                 try? store.remove(event, span: .thisEvent, commit: false)
             } else {
@@ -1263,6 +1285,7 @@ import EventKit
             event.endDate = entry.occurrence.end ?? entry.occurrence.event
             event.timeZone = entry.place.tz
             event.url = entry.url
+            if let offset = entry.alarmOffset { event.addAlarm(EKAlarm(relativeOffset: offset)) }
             try? store.save(event, span: .thisEvent, commit: false)
         }
         try? store.commit()
@@ -1444,7 +1467,8 @@ final class AlertNotificationDelegate: NSObject, UNUserNotificationCenterDelegat
 In `Slackwater/AlertScheduler.swift`, inside `reschedule`, replace:
 
 ```swift
-        AlertCalendar.apply(entries(plan.calendar, includeLead: false), now: now)
+        // Premium puts an alarm on every calendar event (spec §5.1).
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false, alarm: premium), now: now)
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,
@@ -1455,8 +1479,9 @@ In `Slackwater/AlertScheduler.swift`, inside `reschedule`, replace:
 with:
 
 ```swift
-        AlertCalendar.apply(entries(plan.calendar, includeLead: false), now: now)
-        await AlertNotifications.apply(entries(plan.notifications, includeLead: true))
+        // Premium puts an alarm on every calendar event (spec §5.1).
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false, alarm: premium), now: now)
+        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, alarm: false))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,
@@ -1489,7 +1514,8 @@ with:
         isPremium = premium
         Self.cache(premium, into: AppGroup.defaults)
         WidgetCenter.shared.reloadAllTimelines()
-        // Gaining Premium schedules notifications; losing it clears them (notifications spec §6).
+        // Gaining Premium schedules notifications and calendar alarms; losing it clears them
+        // (notifications spec §6).
         AlertScheduler.requestReschedule()
 ```
 
@@ -1531,29 +1557,35 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: The bell, its offer, and the rule sheet
+### Task 7: The Calendar / Live row
 
 **Files:**
-- Create: `Slackwater/AlertOffer.swift`, `Slackwater/AlertSheet.swift`
-- Modify: `Slackwater/DetailHeader.swift`, `Slackwater/Theme.swift:756` and `:791-794`, `Slackwater/TideDetailView.swift:96`, `Slackwater/CurrentDetailView.swift:91`, `Slackwater/DerivedGateDetailView.swift:51`
-- Test: `SlackwaterTests/AlertOfferTests.swift`, `SlackwaterUITests/AlertBellTests.swift`
+- Create: `Slackwater/AlertOffer.swift`, `Slackwater/AlertRow.swift`
+- Modify: `Slackwater/TimelineStrip.swift:45` (add `Timeline.rest`) and `:1663` (use it), `Slackwater/Theme.swift:756` and `:916-918` (`ScrubDetailScaffold`), `Slackwater/TideDetailView.swift:96`, `Slackwater/CurrentDetailView.swift:91`, `Slackwater/DerivedGateDetailView.swift:51`
+- Test: `SlackwaterTests/AlertOfferTests.swift`, `SlackwaterUITests/AlertRowTests.swift`
 
 **Interfaces:**
-- Consumes: Tasks 1, 4, 5, 6 (`AlertRuleStore`, `alertRuleSummary`, `alertLeads`, `alertLeadLabel`, `AlertCalendar.authorized`/`requestAccess`, `AlertNotifications.requestAccess`); `PremiumStore`, `PremiumView`; `WindowEclipse.contacts`; `scrubbedAway(_:from:)`; `CanvasBackground`
+- Consumes: Tasks 1, 5, 6 (`AlertRule`, `AlertRuleStore`, `AlertCalendar.authorized`/`requestAccess`, `AlertNotifications.requestAccess`); `PremiumStore`, `PremiumView`; `WindowEclipse.contacts`; `scrubbedAway(_:from:)`; `SN`
 - Produces:
   - `func tideAlertOffer(scrubbedAway: Bool, turnIsHigh: Bool?, onEclipseContact: Bool, heightM: Double, rising: Bool) -> AlertTrigger`
   - `func currentAlertOffer(maxIsFlood: Bool?, onEclipseContact: Bool) -> AlertTrigger`
   - `func derivedAlertOffer(onEclipseContact: Bool) -> AlertTrigger`
   - `func isOnEclipseContact(_ time: Date, _ eclipses: [WindowEclipse]) -> Bool`
-  - `struct AlertSheet: View { init(rule: AlertRule, stationName: String) }`
-  - `DetailHeader.alertOffer: AlertTrigger?` and `ScrubDetailScaffold.alertOffer: AlertTrigger?` (default nil)
+  - `enum AlertDelivery { case calendar, live }`
+  - `enum AlertRuleChange: Equatable { case upsert(AlertRule), remove(UUID) }`
+  - `let alertRowLead: TimeInterval` (1 800)
+  - `func alertRowToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger, delivery: AlertDelivery) -> AlertRuleChange`
+  - `func alertRowState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger) -> (calendar: Bool, live: Bool)`
+  - `struct AlertRow: View { init(stationID: String, offer: AlertTrigger, scrubTime: Date) }`
+  - `Timeline.rest: Duration`
+  - `ScrubDetailScaffold.alertOffer: AlertTrigger?` (default nil)
 
 - [ ] **Step 1: Write the failing unit test**
 
 `SlackwaterTests/AlertOfferTests.swift`:
 
 ```swift
-// Slackwater — GPL v3. What the bell offers for the moment under the centerline (notifications spec §7.1).
+// Slackwater — GPL v3. The alert row: what it offers for the moment under the centerline, and what a tap does (notifications spec §7.1).
 import XCTest
 @testable import Slackwater
 import Almanac
@@ -1589,6 +1621,58 @@ final class AlertOfferTests: XCTestCase {
         XCTAssertFalse(isOnEclipseContact(contact.addingTimeInterval(5), eclipses))
         XCTAssertFalse(isOnEclipseContact(contact, []))
     }
+
+    func testCalendarCreatesARuleWithAThirtyMinuteLead() {
+        let change = alertRowToggle([], stationID: "noaa/9449880", offer: .tideExtreme(high: false), delivery: .calendar)
+        guard case .upsert(let rule) = change else { return XCTFail("expected a new rule") }
+        XCTAssertEqual(rule.stationID, "noaa/9449880")
+        XCTAssertEqual(rule.trigger, .tideExtreme(high: false))
+        XCTAssertEqual(rule.lead, 1_800)
+        XCTAssertTrue(rule.calendar)
+        XCTAssertEqual(rule.alert, .none)
+    }
+
+    func testLiveJoinsTheSameRuleAndARuleWithNothingLeftIsRemoved() {
+        let calendarOnly = AlertRule(stationID: "s", trigger: .slackWindowOpens, lead: 1_800)
+
+        guard case .upsert(let both) = alertRowToggle([calendarOnly], stationID: "s", offer: .slackWindowOpens, delivery: .live)
+        else { return XCTFail("expected an update") }
+        XCTAssertEqual(both.id, calendarOnly.id)
+        XCTAssertTrue(both.calendar)
+        XCTAssertEqual(both.alert, .notification)
+
+        guard case .upsert(let liveOnly) = alertRowToggle([both], stationID: "s", offer: .slackWindowOpens, delivery: .calendar)
+        else { return XCTFail("expected an update") }
+        XCTAssertFalse(liveOnly.calendar)
+        XCTAssertEqual(liveOnly.alert, .notification)
+
+        XCTAssertEqual(alertRowToggle([liveOnly], stationID: "s", offer: .slackWindowOpens, delivery: .live),
+                       .remove(calendarOnly.id))
+    }
+
+    func testADifferentOfferIsADifferentRule() {
+        let existing = AlertRule(stationID: "s", trigger: .tideCrossing(heightM: 1.4, rising: true))
+        let change = alertRowToggle([existing], stationID: "s", offer: .tideCrossing(heightM: 1.2, rising: true), delivery: .calendar)
+        guard case .upsert(let rule) = change else { return XCTFail("expected a new rule") }
+        XCTAssertNotEqual(rule.id, existing.id)
+    }
+
+    func testTheRowReadsEnabledDeliveriesAndATapWakesAnOffRule() {
+        var rule = AlertRule(stationID: "s", trigger: .slack, alert: .notification)
+        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack).calendar)
+        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack).live)
+        XCTAssertFalse(alertRowState([rule], stationID: "s", offer: .eclipse).calendar)
+
+        rule.enabled = false
+        let off = alertRowState([rule], stationID: "s", offer: .slack)
+        XCTAssertFalse(off.calendar)
+        XCTAssertFalse(off.live)
+
+        guard case .upsert(let woken) = alertRowToggle([rule], stationID: "s", offer: .slack, delivery: .calendar)
+        else { return XCTFail("expected an update") }
+        XCTAssertTrue(woken.enabled)
+        XCTAssertTrue(woken.calendar)
+    }
 }
 ```
 
@@ -1597,12 +1681,12 @@ final class AlertOfferTests: XCTestCase {
 Run: `SLACKWATER_ONLY=SlackwaterTests/AlertOfferTests ./scripts/test.sh`
 Expected: build failure, `cannot find 'tideAlertOffer' in scope`.
 
-- [ ] **Step 3: Write the offer functions**
+- [ ] **Step 3: Write the offer and toggle logic**
 
 `Slackwater/AlertOffer.swift`:
 
 ```swift
-// Slackwater — GPL v3. The rule the header's bell offers for the moment under the centerline (notifications spec §7.1).
+// Slackwater — GPL v3. What the alert row offers for the moment under the centerline, and what a tap on it does (notifications spec §7.1).
 import Foundation
 
 /// A tide detail: the extreme the strip parked on; an eclipse contact; otherwise, once scrubbed
@@ -1631,185 +1715,193 @@ func derivedAlertOffer(onEclipseContact: Bool) -> AlertTrigger {
 func isOnEclipseContact(_ time: Date, _ eclipses: [WindowEclipse]) -> Bool {
     eclipses.contains { $0.contacts.contains { abs($0.timeIntervalSince(time)) < 1 } }
 }
+
+enum AlertDelivery {
+    case calendar, live
+}
+
+enum AlertRuleChange: Equatable {
+    case upsert(AlertRule)
+    case remove(UUID)
+}
+
+/// A rule made from the row reminds half an hour ahead; the Alerts screen changes it.
+let alertRowLead: TimeInterval = 1_800
+
+/// One tap on Calendar or Live for this station and offer: turn that delivery on or off on the
+/// matching rule, create the rule with it on, or remove a rule left with nothing. Turning a
+/// delivery on also turns a rule that was switched off back on.
+func alertRowToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
+                    delivery: AlertDelivery) -> AlertRuleChange {
+    guard var rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer }) else {
+        return .upsert(AlertRule(stationID: stationID, trigger: offer, lead: alertRowLead,
+                                 calendar: delivery == .calendar,
+                                 alert: delivery == .live ? .notification : .none))
+    }
+    let wasOn = rule.enabled && (delivery == .calendar ? rule.calendar : rule.alert == .notification)
+    switch delivery {
+    case .calendar: rule.calendar = !wasOn
+    case .live: rule.alert = wasOn ? .none : .notification
+    }
+    if !wasOn { rule.enabled = true }
+    return (!rule.calendar && rule.alert == .none) ? .remove(rule.id) : .upsert(rule)
+}
+
+/// Which of the row's two buttons read on for this station and offer.
+func alertRowState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger) -> (calendar: Bool, live: Bool) {
+    guard let rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer && $0.enabled })
+    else { return (false, false) }
+    return (rule.calendar, rule.alert == .notification)
+}
 ```
 
 - [ ] **Step 4: Run the unit test and watch it pass**
 
 Run: `SLACKWATER_ONLY=SlackwaterTests/AlertOfferTests ./scripts/test.sh`
-Expected: 3 tests pass.
+Expected: 7 tests pass.
 
-- [ ] **Step 5: Write the rule sheet**
+- [ ] **Step 5: Share the strip's rest rule**
 
-`Slackwater/AlertSheet.swift`:
+In `Slackwater/TimelineStrip.swift`, directly after `static let magnetPts: CGFloat = 46    // snap radius around the centerline` (line 45), add:
 
 ```swift
-// Slackwater — GPL v3. The rule sheet the header's bell and the Alerts screen open (notifications spec §7.2).
-import SwiftUI
-
-struct AlertSheet: View {
-    @State var rule: AlertRule
-    let stationName: String
-    @ObservedObject private var premium = PremiumStore.shared
-    @ObservedObject private var store = AlertRuleStore.shared
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
-    @Environment(\.dismiss) private var dismiss
-    @State private var showPremium = false
-    @State private var saving = false
-
-    private var isNew: Bool { !store.rules.contains { $0.id == rule.id } }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(alertRuleSummary(rule.trigger, stationName: stationName, imperial: units == "imperial"))
-                        .accessibilityIdentifier("alert-summary")
-                }
-                Section("When") {
-                    Picker("Remind me", selection: $rule.lead) {
-                        ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
-                    }
-                    Toggle("Daylight only", isOn: $rule.daylightOnly)
-                }
-                Section {
-                    Toggle("Add to Calendar", isOn: $rule.calendar)
-                        .accessibilityIdentifier("alert-calendar")
-                    Toggle(isOn: notify) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Notify me")
-                            if !premium.isPremium {
-                                Text("Slackwater Premium").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("alert-notify")
-                } footer: {
-                    Text("Calendar events carry no alarms. Notifications are part of Slackwater Premium.")
-                }
-                if !isNew {
-                    Section {
-                        Toggle("On", isOn: $rule.enabled)
-                        Button("Delete Alert", role: .destructive) {
-                            store.remove(rule.id)
-                            dismiss()
-                        }
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(CanvasBackground())
-            .navigationTitle(isNew ? "New Alert" : "Alert")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { Task { await save() } }
-                        .disabled(saving || (!rule.calendar && rule.alert == .none))
-                        .accessibilityIdentifier("alert-save")
-                }
-            }
-            // The bell is the third upsell surface (widgets-premium §5): a free user who
-            // reaches for a notification sees the tier sheet here.
-            .sheet(isPresented: $showPremium) { PremiumView() }
-        }
-        .preferredColorScheme(.dark)
-    }
-
-    private var notify: Binding<Bool> {
-        Binding(get: { rule.alert == .notification },
-                set: { on in
-                    if on && !premium.isPremium {
-                        showPremium = true
-                        return
-                    }
-                    rule.alert = on ? .notification : .none
-                })
-    }
-
-    /// Each permission is asked the first time its mechanism is chosen, never at launch.
-    /// A denial still saves the rule; the Alerts screen says why it is quiet.
-    private func save() async {
-        saving = true
-        if rule.calendar && !AlertCalendar.authorized { _ = await AlertCalendar.requestAccess() }
-        if rule.alert == .notification { _ = await AlertNotifications.requestAccess() }
-        store.upsert(rule)
-        dismiss()
-    }
-}
+    /// No scrub change for this long is a strip at rest: the chrome comes back and the alert
+    /// row's taps start counting.
+    static let rest: Duration = .milliseconds(450)
 ```
 
-- [ ] **Step 6: Put the bell in the header**
-
-In `Slackwater/DetailHeader.swift`, directly after `var tz: TimeZone = .current` (line 33), add:
+In the same file, in `chromeRow`'s `.task(id: scrubTime)`, replace:
 
 ```swift
-    /// What the bell offers for the moment on screen (notifications spec §7.1). Nil — the
-    /// online gate and the download screen — hides it.
-    var alertOffer: AlertTrigger? = nil
-```
-
-Directly after `@ObservedObject private var location = LocationService.shared`, add:
-
-```swift
-    @ObservedObject private var alerts = AlertRuleStore.shared
-    @State private var alertDraft: AlertRule?
-```
-
-Directly before `let fav = favorites.contains(favoriteId)`, add the bell, which puts it between Share and the star:
-
-```swift
-                    if let offer = alertOffer {
-                        let watching = alerts.rules.contains { $0.stationID == favoriteId && $0.enabled }
-                        Button {
-                            // The same ask again edits the rule already set.
-                            alertDraft = alerts.rules.first { $0.stationID == favoriteId && $0.trigger == offer }
-                                ?? AlertRule(stationID: favoriteId, trigger: offer)
-                        } label: {
-                            Image(systemName: watching ? "bell.fill" : "bell")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                                .glassEffect(.regular.interactive(), in: Circle())
-                        }
-                        .accessibilityLabel("Alerts")
-                        .accessibilityIdentifier("detail-alert")
-                    }
-```
-
-On the outermost `VStack(spacing: 8)` in `body`, after `.accessibilityIdentifier("detail-header")`, add:
-
-```swift
-        .sheet(item: $alertDraft) { draft in AlertSheet(rule: draft, stationName: name) }
-```
-
-- [ ] **Step 7: Pass the offer through the scaffold**
-
-In `Slackwater/Theme.swift`, directly after `var topBackdrop: AnyView? = nil` (line 756), add:
-
-```swift
-    /// Forwarded to `DetailHeader`: the rule the bell offers for the moment on screen.
-    var alertOffer: AlertTrigger? = nil
-```
-
-Replace the header call at lines 791-794:
-
-```swift
-                            DetailHeader(name: name, region: region,
-                                         favoriteId: favoriteId,
-                                         topSafeInset: geo.safeAreaInsets.top,
-                                         shareInstant: scrubTime, tz: tz)
+            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
 ```
 
 with:
 
 ```swift
-                            DetailHeader(name: name, region: region,
-                                         favoriteId: favoriteId,
-                                         topSafeInset: geo.safeAreaInsets.top,
-                                         shareInstant: scrubTime, tz: tz,
-                                         alertOffer: alertOffer)
+            guard (try? await Task.sleep(for: Timeline.rest)) != nil else { return }
+```
+
+- [ ] **Step 6: Write the row**
+
+`Slackwater/AlertRow.swift`:
+
+```swift
+// Slackwater — GPL v3. Calendar and Live under the strip: set an alert for the moment on screen (notifications spec §7.1).
+import SwiftUI
+
+/// Always on screen and never disabled, so it never flickers while someone scrubs. A tap only
+/// counts once the strip has rested (`Timeline.rest`), because until then the centerline isn't
+/// a moment anyone chose. The buttons show the resting moment's rule, not every frame's.
+struct AlertRow: View {
+    let stationID: String
+    let offer: AlertTrigger
+    let scrubTime: Date
+
+    @ObservedObject private var store = AlertRuleStore.shared
+    @ObservedObject private var premium = PremiumStore.shared
+    /// True once the strip has rested on the current `scrubTime`.
+    @State private var settled = false
+    /// The offer at the last rest — what the buttons show, so they don't change every frame.
+    @State private var shown: AlertTrigger?
+    @State private var showPremium = false
+
+    var body: some View {
+        let state = alertRowState(store.rules, stationID: stationID, offer: shown ?? offer)
+        HStack(spacing: 10) {
+            button("Calendar", image: state.calendar ? "calendar.badge.checkmark" : "calendar.badge.plus",
+                   on: state.calendar, id: "alert-calendar-button") { tap(.calendar) }
+            button("Live", image: state.live ? "bell.fill" : "bell",
+                   on: state.live, id: "alert-live-button") { tap(.live) }
+        }
+        .task(id: scrubTime) {
+            // A cancelled sleep is a scrub still in motion, not a rest.
+            settled = false
+            guard (try? await Task.sleep(for: Timeline.rest)) != nil else { return }
+            shown = offer
+            settled = true
+        }
+        // The third upsell surface (widgets-premium §5): only Live leads here.
+        .sheet(isPresented: $showPremium) { PremiumView() }
+    }
+
+    private func tap(_ delivery: AlertDelivery) {
+        guard settled, let offer = shown else { return }
+        if delivery == .live && !premium.isPremium {
+            showPremium = true
+            return
+        }
+        let change = alertRowToggle(store.rules, stationID: stationID, offer: offer, delivery: delivery)
+        Task {
+            // Each permission is asked the first time its mechanism is turned on, never at launch.
+            if case .upsert(let rule) = change {
+                if delivery == .calendar, rule.calendar, !AlertCalendar.authorized {
+                    _ = await AlertCalendar.requestAccess()
+                }
+                if delivery == .live, rule.alert == .notification {
+                    _ = await AlertNotifications.requestAccess()
+                }
+            }
+            switch change {
+            case .upsert(let rule): store.upsert(rule)
+            case .remove(let id): store.remove(id)
+            }
+        }
+    }
+
+    private func button(_ title: String, image: String, on: Bool, id: String,
+                        action: @escaping () -> Void) -> some View {
+        Label(title, systemImage: image)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(on ? SN.leaf : .white)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(SN.cardFill, in: Capsule())
+            .overlay(Capsule().strokeBorder(on ? SN.leaf.opacity(0.6) : SN.cardStroke, lineWidth: on ? 1 : 0.5))
+            .contentShape(Capsule())
+            // A tap gesture, not a Button: Button press tracking goes dead in the iPad split
+            // layout's detail column (ReadoutTile, MultiDaySchedule).
+            .onTapGesture(perform: action)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(on ? [.isButton, .isSelected] : .isButton)
+            .accessibilityIdentifier(id)
+    }
+}
+```
+
+- [ ] **Step 7: Put the row between the strip and the tiles**
+
+In `Slackwater/Theme.swift`, directly after `var topBackdrop: AnyView? = nil` (line 756), add:
+
+```swift
+    /// The rule the alert row offers for the moment on screen (notifications spec §7.1). Nil —
+    /// the online gate — leaves the row out.
+    var alertOffer: AlertTrigger? = nil
+```
+
+In `scrubCard(_:)`, replace:
+
+```swift
+            card(tl)
+
+            links(tl, jump)
+                .padding(.top, 12)
+                .padding(.horizontal, 16)
+```
+
+with:
+
+```swift
+            card(tl)
+
+            if let alertOffer {
+                AlertRow(stationID: favoriteId, offer: alertOffer, scrubTime: scrubTime)
+                    .padding(.top, 12)
+                    .padding(.horizontal, 16)
+            }
+
+            links(tl, jump)
+                .padding(.top, 12)
+                .padding(.horizontal, 16)
 ```
 
 - [ ] **Step 8: Each consumer supplies its offer**
@@ -1842,71 +1934,79 @@ In `Slackwater/DerivedGateDetailView.swift`, directly after `topBackdrop: AnyVie
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
 ```
 
-`OnlineGateDetailView.swift` stays unchanged, and its bell stays hidden (spec §8).
+`OnlineGateDetailView.swift` stays unchanged, and has no row (spec §8).
 
 - [ ] **Step 9: Write the UI test**
 
-`SlackwaterUITests/AlertBellTests.swift`:
+`SlackwaterUITests/AlertRowTests.swift`:
 
 ```swift
-// Slackwater — GPL v3. The bell reaches tide and current details and opens the rule sheet.
+// Slackwater — GPL v3. The Calendar / Live row sits under tide and current strips, and Live offers Premium to a free user.
 import XCTest
 
-final class AlertBellTests: ScreenshotTestCase {
-    func testTheBellOpensARuleSheetOnATideStation() {
+final class AlertRowTests: ScreenshotTestCase {
+    func testTheRowSitsUnderATideStrip() {
         let app = launch("-seedGate")
         openFridayHarbor(app)
 
-        let bell = app.buttons["detail-alert"].firstMatch
-        XCTAssert(bell.appears(within: 5), "no bell on a tide detail")
-        bell.tap()
-
-        XCTAssert(app.staticTexts["alert-summary"].appears(within: 5), "rule sheet did not open")
-        XCTAssert(app.switches["alert-calendar"].exists)
-        XCTAssert(app.switches["alert-notify"].exists)
-        save(app, "alert-sheet-tide.png")
-        app.buttons["Cancel"].firstMatch.tap()
+        XCTAssert(app.buttons["alert-calendar-button"].firstMatch.appears(within: 5), "no Calendar button on a tide detail")
+        XCTAssert(app.buttons["alert-live-button"].firstMatch.exists, "no Live button on a tide detail")
+        save(app, "alert-row-tide.png")
     }
 
-    func testTheBellIsOnACurrentStation() {
+    func testTheRowSitsUnderACurrentStrip() {
         let app = launch("-seedGate")
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
 
-        XCTAssert(app.buttons["detail-alert"].firstMatch.appears(within: 5), "no bell on a current detail")
+        XCTAssert(app.buttons["alert-calendar-button"].firstMatch.appears(within: 5), "no Calendar button on a current detail")
+        XCTAssert(app.buttons["alert-live-button"].firstMatch.exists, "no Live button on a current detail")
+    }
+
+    func testLiveOffersPremiumToAFreeUserOnceTheStripRests() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let live = app.buttons["alert-live-button"].firstMatch
+        XCTAssert(live.appears(within: 5))
+
+        // The strip opens with a slide into place; a tap only counts once it has come to rest.
+        sleep(2)
+        live.tap()
+
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5), "Live did not open the tier sheet")
     }
 }
 ```
 
 - [ ] **Step 10: Run the UI test and look at the screenshot**
 
-Run: `SLACKWATER_ONLY=SlackwaterUITests/AlertBellTests ./scripts/test.sh`
-Expected: 2 tests pass. Open `/tmp/slackwater-shots/alert-sheet-tide.png`. Check that the header row reads back · share · bell · star, and that the sheet sits on the dark canvas.
+Run: `SLACKWATER_ONLY=SlackwaterUITests/AlertRowTests ./scripts/test.sh`
+Expected: 3 tests pass. Open `/tmp/slackwater-shots/alert-row-tide.png`. The Calendar and Live capsules should sit between the strip and the Range / Moon tiles, full width, on the dark canvas.
 
 - [ ] **Step 11: Commit**
 
 ```bash
-git add Slackwater/AlertOffer.swift Slackwater/AlertSheet.swift Slackwater/DetailHeader.swift Slackwater/Theme.swift \
+git add Slackwater/AlertOffer.swift Slackwater/AlertRow.swift Slackwater/TimelineStrip.swift Slackwater/Theme.swift \
         Slackwater/TideDetailView.swift Slackwater/CurrentDetailView.swift Slackwater/DerivedGateDetailView.swift \
-        SlackwaterTests/AlertOfferTests.swift SlackwaterUITests/AlertBellTests.swift
-git commit -m "feat(alerts): the detail bell and its rule sheet
+        SlackwaterTests/AlertOfferTests.swift SlackwaterUITests/AlertRowTests.swift
+git commit -m "feat(alerts): Calendar / Live row under the detail strip
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 8: The Alerts screen
+### Task 8: The Alerts screen and the rule sheet
 
 **Files:**
-- Create: `Slackwater/AlertsView.swift`
-- Modify: `Slackwater/SettingsView.swift` (properties at :7-14; a new section after the "Slack window" section, which ends at line 57)
+- Create: `Slackwater/AlertSheet.swift`, `Slackwater/AlertsView.swift`
+- Modify: `Slackwater/SettingsView.swift` (properties at :7-14; a new section after the "Slack window" section)
 - Test: `SlackwaterTests/AlertStatusTests.swift`
 
 **Interfaces:**
-- Consumes: Tasks 1, 5, 7 (`AlertRuleStore`, `AlertScheduler.shared.status`, `AlertStatusSnapshot`, `AlertSheet`, `alertRuleSummary`); `StationItem.byId`; `SN`, `CanvasBackground`
-- Produces: `func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: Bool, tz: TimeZone = .current, locale: Locale = .autoupdatingCurrent) -> String`; `struct AlertsView: View`
+- Consumes: Tasks 1, 4, 5, 6 (`AlertRuleStore`, `alertRuleSummary`, `alertLeads`, `alertLeadLabel`, `AlertScheduler.shared.status`, `AlertStatusSnapshot`, `AlertCalendar`, `AlertNotifications`); `PremiumStore`, `PremiumView`; `StationItem.byId`; `SN`, `CanvasBackground`
+- Produces: `func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: Bool, tz: TimeZone = .current, locale: Locale = .autoupdatingCurrent) -> String`; `struct AlertSheet: View { init(rule: AlertRule, stationName: String) }`; `struct AlertsView: View`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1964,7 +2064,99 @@ final class AlertStatusTests: XCTestCase {
 Run: `SLACKWATER_ONLY=SlackwaterTests/AlertStatusTests ./scripts/test.sh`
 Expected: build failure, `cannot find 'alertStatusText' in scope`.
 
-- [ ] **Step 3: Write the screen**
+- [ ] **Step 3: Write the rule sheet**
+
+`Slackwater/AlertSheet.swift`:
+
+```swift
+// Slackwater — GPL v3. Edit one alert rule — lead, daylight, deliveries — from the Alerts screen (notifications spec §7.2).
+import SwiftUI
+
+struct AlertSheet: View {
+    @State var rule: AlertRule
+    let stationName: String
+    @ObservedObject private var premium = PremiumStore.shared
+    @ObservedObject private var store = AlertRuleStore.shared
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @Environment(\.dismiss) private var dismiss
+    @State private var showPremium = false
+    @State private var saving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(alertRuleSummary(rule.trigger, stationName: stationName, imperial: units == "imperial"))
+                        .accessibilityIdentifier("alert-summary")
+                }
+                Section("When") {
+                    Picker("Remind me", selection: $rule.lead) {
+                        ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
+                    }
+                    Toggle("Daylight only", isOn: $rule.daylightOnly)
+                }
+                Section {
+                    Toggle("Add to Calendar", isOn: $rule.calendar)
+                    Toggle(isOn: notify) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notify me")
+                            if !premium.isPremium {
+                                Text("Slackwater Premium").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("With Slackwater Premium, calendar events carry an alarm and alerts arrive as notifications.")
+                }
+                Section {
+                    Toggle("On", isOn: $rule.enabled)
+                    Button("Delete Alert", role: .destructive) {
+                        store.remove(rule.id)
+                        dismiss()
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(CanvasBackground())
+            .navigationTitle("Alert")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { Task { await save() } }
+                        .disabled(saving || (!rule.calendar && rule.alert == .none))
+                }
+            }
+            .sheet(isPresented: $showPremium) { PremiumView() }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var notify: Binding<Bool> {
+        Binding(get: { rule.alert == .notification },
+                set: { on in
+                    if on && !premium.isPremium {
+                        showPremium = true
+                        return
+                    }
+                    rule.alert = on ? .notification : .none
+                })
+    }
+
+    /// A denial still saves the rule; the Alerts screen says why it is quiet.
+    private func save() async {
+        saving = true
+        if rule.calendar && !AlertCalendar.authorized { _ = await AlertCalendar.requestAccess() }
+        if rule.alert == .notification { _ = await AlertNotifications.requestAccess() }
+        store.upsert(rule)
+        dismiss()
+    }
+}
+```
+
+- [ ] **Step 4: Write the screen**
 
 `Slackwater/AlertsView.swift`:
 
@@ -2010,7 +2202,7 @@ struct AlertsView: View {
     var body: some View {
         List {
             if store.rules.isEmpty {
-                Text("No alerts yet. Tap the bell on any station to set one.")
+                Text("No alerts yet. Tap Calendar or Live under any station's timeline to set one.")
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
             ForEach(groups) { group in
@@ -2040,7 +2232,7 @@ struct AlertsView: View {
 }
 ```
 
-- [ ] **Step 4: Add the Settings row**
+- [ ] **Step 5: Add the Settings row**
 
 In `Slackwater/SettingsView.swift`, after `@State private var showWidgets = false` (line 14), add:
 
@@ -2060,7 +2252,7 @@ Directly after the closing brace of `section("Slack window") { … }`, which end
                         } label: {
                             HStack {
                                 Text(alerts.rules.isEmpty
-                                     ? "Set alerts from the bell on any station"
+                                     ? "Set alerts from Calendar or Live under any station's timeline"
                                      : "\(alerts.rules.count) alert\(alerts.rules.count == 1 ? "" : "s")")
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -2071,17 +2263,17 @@ Directly after the closing brace of `section("Slack window") { … }`, which end
                     }
 ```
 
-- [ ] **Step 5: Run the test and watch it pass, then compile**
+- [ ] **Step 6: Run the test and watch it pass, then compile**
 
 Run: `SLACKWATER_ONLY=SlackwaterTests/AlertStatusTests ./scripts/test.sh`
 Expected: 2 tests pass.
 Run the compile check from Global Constraints. Expected: `** TEST BUILD SUCCEEDED **`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add Slackwater/AlertsView.swift Slackwater/SettingsView.swift SlackwaterTests/AlertStatusTests.swift
-git commit -m "feat(alerts): Alerts screen with per-rule status
+git add Slackwater/AlertSheet.swift Slackwater/AlertsView.swift Slackwater/SettingsView.swift SlackwaterTests/AlertStatusTests.swift
+git commit -m "feat(alerts): Alerts screen and rule sheet
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -2097,26 +2289,27 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 Run: `./scripts/test.sh --full`
 Expected: green on both simulators. Read the result bundle (`build/results-*.xcresult`) as well as the exit code. A "Test crashed with signal kill" with zero assertion failures is machine contention, not a failure: rerun.
 
-- [ ] **Step 2: Simulator walkthrough — calendar (spec §11 spike 2)**
+- [ ] **Step 2: Simulator walkthrough — the row and the calendar (spec §11 spike 2)**
 
-Boot one simulator (`xcrun simctl boot "iPhone 17"`) and install the Debug build. Then:
+Boot one simulator (`xcrun simctl boot "iPhone 17"`), install the Debug build, and launch it without launch arguments (the walkthrough needs the real clock). Then:
 
-1. Open Friday Harbor, tap the bell, keep "Add to Calendar" on, and tap Save. Grant full calendar access.
-2. Open the Calendar app. A calendar named **Slackwater** exists and holds low-tide events for the next 90 days. Each event has its URL set and no alert.
-3. Back in Slackwater, open Settings → Alerts. The rule reads `Scheduled through <date ~90 days out>`.
-4. Delete the rule. Within a second, the future events are gone from the Slackwater calendar and the calendar itself is still there.
+1. Open Friday Harbor. Flick the strip and, while it is still gliding, tap **Calendar**: nothing happens and no permission prompt appears.
+2. Let the strip stop, then tap **Calendar**. Grant full calendar access. The button reads on.
+3. Open the Calendar app. A calendar named **Slackwater** exists and holds `Friday Harbor - Low tide` events for the next 90 days. Each event has its URL set and **no** alert.
+4. Back in Slackwater, open Settings → Alerts. The rule reads `Scheduled through <a date about 90 days out>`.
+5. Tap **Calendar** again under the strip at the same resting moment. The rule is removed, and within a second its future events are gone from the Slackwater calendar, which is still there.
 
 Record what you observed in the task report, including any step that behaved differently.
 
-- [ ] **Step 3: Simulator walkthrough — notifications**
+- [ ] **Step 3: Simulator walkthrough — Premium, alarms and notifications**
 
-1. In Xcode's StoreKit transaction manager, buy `org.openwaters.slackwater.premium.lifetime`.
-2. Open Friday Harbor and scrub the strip to a moment about 3 minutes from now. Tap the bell; the sheet offers "Tide rises/falls past …". Turn on Notify me, Save, and grant notifications.
-3. Background the app. Within about 3 minutes a banner arrives titled "Tide … past … at Friday Harbor".
-4. Tap it. Slackwater opens Friday Harbor scrubbed to the crossing.
-5. Refund the purchase in the transaction manager and foreground the app. The rule reads "Calendar only — notifications are Premium", and no further banner arrives.
-
-If the build under `-nowEpoch` makes step 2 awkward, launch without launch arguments; the walkthrough needs the real clock.
+1. On Friday Harbor at rest, tap **Live**. The Slackwater Premium sheet opens. Close it.
+2. In Xcode's StoreKit transaction manager, buy `org.openwaters.slackwater.premium.lifetime`.
+3. Tap **Calendar** once more. In the Calendar app, the new events now carry an alert 30 minutes before.
+4. Scrub the strip to a moment about 33 minutes ahead and let it rest. Tap **Live** and grant notifications. The rule's lead is 30 minutes, so its notification fires in about 3 minutes.
+5. Background the app. A banner titled `Friday Harbor - Rising past …` or `Friday Harbor - Falling past …` arrives.
+6. Tap the banner. Slackwater opens Friday Harbor scrubbed to the crossing.
+7. Refund the purchase in the transaction manager and foreground the app. The Live rule reads "Notifications are Premium" or "Calendar only — notifications are Premium", and the calendar events lose their alert.
 
 - [ ] **Step 4: Shut down every simulator you booted**
 
@@ -2129,10 +2322,11 @@ Copy this block into the PR description:
 ```markdown
 ### On a device before merge
 - [ ] A notification fires with Slackwater force-quit
-- [ ] Calendar events appear on a Mac signed into the same iCloud account
+- [ ] Calendar events appear on a Mac signed into the same iCloud account, with their alarm for a Premium account
 - [ ] Tapping a calendar event's URL opens Slackwater at the event
 - [ ] Changing Settings → Slack window → Comfort current rewrites future slack-window events
 - [ ] A rule on a CHS station that isn't downloaded reads "Waiting for station data" and schedules once it is
+- [ ] On iPad in split view, Calendar and Live respond in the detail column
 ```
 
 - [ ] **Step 6: Open the PR**
