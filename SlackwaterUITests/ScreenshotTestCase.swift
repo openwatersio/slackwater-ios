@@ -95,6 +95,19 @@ class ScreenshotTestCase: XCTestCase {
         field.typeText(text)
     }
 
+    /// Open the Downloads sheet from the list's indicator, retapping like
+    /// openSearch: a loaded runner drops taps on a button that never moved (#368).
+    func openDownloads(_ app: XCUIApplication) {
+        let indicator = app.buttons["offline-status"].firstMatch
+        let title = app.staticTexts["Downloads"]
+        for _ in 0..<3 {
+            // A sheet that arrived late obscures the indicator, so it cannot take a retap.
+            if !title.exists, indicator.exists, indicator.isHittable { indicator.tap() }
+            if title.appears(within: 5) { return }
+        }
+        XCTFail("the indicator did not open the downloads manager")
+    }
+
     /// Tap a search result and confirm the pick actually landed. The overlay
     /// closes itself on a successful pick, so the search field disappearing
     /// IS the landed signal — and the one queryable thing a dropped tap

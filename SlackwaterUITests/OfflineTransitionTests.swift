@@ -103,7 +103,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     func testPromotionYieldsAndThenResumesDownload() {
         let (app, token) = fixture("yield-resume", "chs-dodd-narrows,chs-tofino",
                                    fix: ("49.1344", "-123.8171"))
-        app.buttons["offline-status"].firstMatch.tap()
+        openDownloads(app)
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(dodd.appears(within: 10))
         XCTAssert(dodd.label.contains("Downloading"))
@@ -111,7 +111,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
         app.buttons["detail-back"].firstMatch.tap()
-        app.buttons["offline-status"].firstMatch.tap()
+        openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         releaseFixture(token, "dodd-first-chunk")
         waitFor(tofino, "label CONTAINS 'Downloading'", timeout: 10)
@@ -134,7 +134,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let gear = app.buttons["Settings"].firstMatch
         XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1)
         XCTAssertEqual(indicator.frame.midY, gear.frame.midY, accuracy: 2)
-        indicator.tap()
+        openDownloads(app)
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
@@ -150,7 +150,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             format: "label CONTAINS 'first in line'"
         )).firstMatch.appears(within: 5))
         app.buttons["detail-back"].firstMatch.tap()
-        app.buttons["offline-status"].firstMatch.tap()
+        openDownloads(app)
         let promoted = rows["download-row-chs-weynton-passage"].firstMatch
         XCTAssert(promoted.appears(within: 5))
         XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists)
@@ -180,7 +180,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     func testSeededProvisionalModelAppearsInManager() {
         let app = launch("-seedGate", "-seedCurrentModel", "chs-dodd-narrows",
                          "-seedCurrentProvisional", "-fixLat", "49.1344", "-fixLon", "-123.8171")
-        app.buttons["offline-status"].firstMatch.tap()
+        openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(row.appears(within: 10))
         XCTAssert(row.label.contains("Refining"))
