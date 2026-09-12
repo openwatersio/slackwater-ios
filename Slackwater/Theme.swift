@@ -825,6 +825,10 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                         }
                         bottom()
                             .padding(.top, 14)
+                        if let item = StationItem.byId[favoriteId] {
+                            NearbySection(item: item)
+                                .padding(.top, 28)
+                        }
                     }
                     .padding(.bottom, 42)
                 }
@@ -1153,15 +1157,15 @@ extension EnvironmentValues {
 }
 
 /// Same reasoning as `openChsRoute` above: the detail-header title (issue #32)
-/// jumps straight to the map, focused on the detail's own station — not a
-/// NavigationLink or Button, same press-tracking hazard in the iPad split
-/// detail column.
+/// and the Nearby map jump straight to the map, focused on the detail's own
+/// station at the zoom they pass — not a NavigationLink or Button, same
+/// press-tracking hazard in the iPad split detail column.
 private struct OpenMapFocusedKey: EnvironmentKey {
-    static let defaultValue: (StationItem) -> Void = { _ in }
+    static let defaultValue: (StationItem, Double) -> Void = { _, _ in }
 }
 
 extension EnvironmentValues {
-    var openMapFocused: (StationItem) -> Void {
+    var openMapFocused: (StationItem, Double) -> Void {
         get { self[OpenMapFocusedKey.self] }
         set { self[OpenMapFocusedKey.self] = newValue }
     }
@@ -1225,6 +1229,43 @@ struct NearbyStationLink: View {
         let currents = item.series == .current
         BranchLink(text: "\(currents ? "Currents" : "Tide") at \(item.name) · \(formatNm(km))",
                    id: currents ? "nearby-currents" : "nearby-tide") { open(item) }
+    }
+}
+
+/// The persisted Tides/Currents pick. Standard defaults, not the App Group:
+/// no widget reads it.
+let seriesFilterKey = "slackwater.seriesFilter"
+
+/// The Tides/Currents narrowing — three quiet capsules over one persisted
+/// filter, shared by Near Me, search and every detail's Nearby. Tapping the
+/// active one is a second way back to All, for a thumb already on it.
+struct SeriesFilterChips: View {
+    @AppStorage(seriesFilterKey) private var filter: StationSeries?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            chip("All", nil)
+            chip("Tides", .tide)
+            chip("Currents", .current)
+        }
+    }
+
+    private func chip(_ label: String, _ series: StationSeries?) -> some View {
+        let selected = filter == series
+        // A tap gesture, not a Button: Nearby puts these below the strip,
+        // where Button press tracking goes dead in the iPad split detail column.
+        return Text(label)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(selected ? SN.leaf : SN.foam.opacity(0.6))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .glassEffect(selected ? .regular.tint(SN.leaf.opacity(0.25)).interactive()
+                                  : .regular.interactive(), in: Capsule())
+            .contentShape(Capsule())
+            .onTapGesture { filter = selected ? nil : series }
+            .accessibilityLabel("Show \(label.lowercased())")
+            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityIdentifier("series-filter-\(label.lowercased())")
     }
 }
 

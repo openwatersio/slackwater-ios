@@ -30,7 +30,9 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     func testArguments(_ args: [String], live: Bool = false) -> [String] {
-        var result = args + ["-noCloudSync", "-currentFillOff", "-chartPacksOff",
+        // -resetSeriesFilter: the Tides/Currents pick persists, and one test's
+        // pick would otherwise narrow the next test's lists.
+        var result = args + ["-noCloudSync", "-resetSeriesFilter", "-currentFillOff", "-chartPacksOff",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")

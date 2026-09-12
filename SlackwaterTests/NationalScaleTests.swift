@@ -145,6 +145,31 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(nearest.km, nearbyStationRadiusKm)
     }
 
+    /// A detail's Nearby rows: nearest first, never the station itself, and
+    /// only the picked series when there is one.
+    func testNearbyRanksNeighboursAndHonoursTheSeries() throws {
+        let here = try XCTUnwrap(
+            StationItem.nearest(.tide, toLat: firstRunFix.lat, lon: firstRunFix.lon)).item
+        let any = StationItem.nearby(here, series: nil)
+        XCTAssertEqual(any.count, 6)
+        XCTAssertFalse(any.contains(here))
+        let km = any.map { $0.km(fromLat: here.latitude, lon: here.longitude) }
+        XCTAssertEqual(km, km.sorted())
+
+        let currents = StationItem.nearby(here, series: .current)
+        XCTAssertEqual(currents.count, 6)
+        XCTAssertTrue(currents.allSatisfy { $0.series == .current })
+    }
+
+    func testBearingIsTheInitialTrueCourse() {
+        XCTAssertEqual(bearingDeg(0, 0, 1, 0), 0, accuracy: 1e-9)
+        XCTAssertEqual(bearingDeg(0, 0, 0, 1), 90, accuracy: 1e-9)
+        XCTAssertEqual(bearingDeg(0, 0, -1, 0), 180, accuracy: 1e-9)
+        XCTAssertEqual(compass16(bearingDeg(0, 0, 0, -1)), "W")
+        // Victoria to Friday Harbor runs east-northeast across Haro Strait.
+        XCTAssertEqual(compass16(bearingDeg(48.4235, -123.3705, 48.5467, -123.0128)), "ENE")
+    }
+
     /// The My Location cards cover both series where both exist, and never
     /// advertise a series a coast doesn't have: Victoria gets a tide and a
     /// current card, Portsmouth (nearest current: another continent) gets one.

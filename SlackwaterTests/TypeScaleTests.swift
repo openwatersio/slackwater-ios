@@ -108,6 +108,11 @@ extension TypeScaleTests {
             // body and consumed by `BranchLink`'s one Text, which carries
             // the mono trait (Theme.swift).
             "Theme.swift:body",
+            // The chooser's and Nearby's row distances: formatted in each
+            // caller's `row` and consumed by `StationChoiceRow`'s distance
+            // Text, which carries the mono font (StationChooser.swift).
+            "StationChooser.swift:row",
+            "NearbySection.swift:row",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
             "OnlineGateDetailView.swift:body",
