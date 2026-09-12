@@ -143,8 +143,9 @@ import TideEngine
     }
 
     func testOccurrencesDoNotDriftBetweenRuns() throws {
-        // Two reschedules in different 10-minute buckets must name the same instants for every
-        // trigger, or each calendar event is removed and re-added whenever the app comes forward.
+        // Two reschedules in different 10-minute buckets must name each instant to within the
+        // calendar's matching tolerance, or its event is removed and re-added whenever the app
+        // comes forward. Instants on a minute boundary can land a minute apart; 60 s is the bound.
         let cases: [(String, AlertTrigger)] = [
             (TideStationRecord.fridayHarborID, .tideCrossing(heightM: 1.0, rising: true)),
             (TideStationRecord.fridayHarborID, .tideExtreme(high: false)),
@@ -154,16 +155,22 @@ import TideEngine
             (deception, .currentPeak(flood: false)),
         ]
         let later = now.addingTimeInterval(3_700)
+        // Clear of `later`, so an instant flooring across it can't change either run's count.
+        let cut = later.addingTimeInterval(120)
         for (id, trigger) in cases {
             let (station, position) = try load(id)
             let rule = AlertRule(stationID: id, trigger: trigger)
             let first = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
-                .filter { $0.event >= later }
+                .filter { $0.event >= cut }
             let second = alertOccurrences(rule, station: station, position: position, from: later, to: week, threshold: 0.5)
-                .filter { $0.event >= later }
+                .filter { $0.event >= cut }
             XCTAssertFalse(second.isEmpty, "\(trigger) found nothing")
-            XCTAssertEqual(second.map(\.event), first.map(\.event), "\(trigger) instants drifted between runs")
-            XCTAssertEqual(second.map(\.end), first.map(\.end), "\(trigger) window ends drifted between runs")
+            XCTAssertEqual(second.count, first.count, "\(trigger) found a different set of occurrences")
+            for (a, b) in zip(first, second) {
+                XCTAssertLessThanOrEqual(abs(a.event.timeIntervalSince(b.event)), 60, "\(trigger) instant drifted past a minute")
+                XCTAssertLessThanOrEqual(abs((a.end ?? a.event).timeIntervalSince(b.end ?? b.event)), 60,
+                                         "\(trigger) window end drifted past a minute")
+            }
         }
     }
 }

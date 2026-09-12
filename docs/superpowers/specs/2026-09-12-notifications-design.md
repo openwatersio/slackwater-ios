@@ -135,10 +135,12 @@ matters, the span, the threshold or the height.
 - The app creates one calendar titled "Slackwater" and never reads or writes any other.
 - For a Premium user every event carries one `EKAlarm` at `−lead`. A free user's events carry
   none.
-- An event is identified by its content: title, start, end and alarm offset. Reschedule fetches
-  the Slackwater calendar's events from now forward, removes those the plan no longer contains,
-  and adds the missing ones. So gaining or losing Premium rewrites the future events with or
-  without their alarm, and two rules that produce the same event produce one entry.
+- An event is identified by its content. A stored event is a planned one when their title and alarm
+  offset agree and their start and end are each within 90 seconds, because the prediction engine
+  can land an instant a second apart from one run to the next. Reschedule fetches the Slackwater
+  calendar's events from now forward, removes those the plan no longer contains, and adds the
+  missing ones. So gaining or losing Premium rewrites the future events with or without their
+  alarm, and two rules that produce the same event produce one entry.
 - A window spans its start and end; an instant is zero-length. Time zone is the station's.
 - A slack-window rule at a busy pass writes roughly 350 events over 90 days. Calendar is one tap
   on or off per rule, and `daylightOnly` applies to the calendar too.

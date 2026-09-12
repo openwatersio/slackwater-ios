@@ -49,23 +49,54 @@ final class AlertCopyTests: XCTestCase {
                        ["At the time", "15 min before", "30 min before", "1 hr before", "3 hr before", "1 day before"])
     }
 
-    func testCalendarIdentityChangesWhenAWindowMovesOrTheAlarmChanges() {
-        let title = "Race Passage - Slack window"
-        let end = event.addingTimeInterval(600)
-        let plain = calendarEventKey(title: title, start: event, end: end, alarmOffset: nil)
-        XCTAssertEqual(plain, "Race Passage - Slack window|1786372320|1786372920|none")
-        XCTAssertEqual(calendarEventKey(title: title, start: event, end: end, alarmOffset: -1_800),
-                       "Race Passage - Slack window|1786372320|1786372920|-1800")
-        XCTAssertNotEqual(plain, calendarEventKey(title: title, start: event, end: event.addingTimeInterval(900), alarmOffset: nil))
+    private func shape(_ title: String, start: TimeInterval, end: TimeInterval? = nil,
+                       alarm: TimeInterval? = nil) -> CalendarEventShape {
+        CalendarEventShape(title: title, start: event.addingTimeInterval(start),
+                           end: event.addingTimeInterval(end ?? start), alarmOffset: alarm)
+    }
+
+    func testAnEventWithinAMinuteOfThePlanIsTheSameEvent() {
+        let changes = calendarChanges(existing: [shape("Friday Harbor - High tide", start: 60)],
+                                      wanted: [shape("Friday Harbor - High tide", start: 0)],
+                                      now: event.addingTimeInterval(-3_600))
+        XCTAssertEqual(changes.remove, [])
+        XCTAssertEqual(changes.add, [])
+    }
+
+    func testAMovedWindowOrAChangedAlarmIsANewEvent() {
+        let existing = [shape("Race Passage - Slack window", start: 0, end: 600),
+                        shape("Friday Harbor - Low tide", start: 7_200)]
+        let wanted = [shape("Race Passage - Slack window", start: 0, end: 1_800),   // a threshold change moved the close
+                      shape("Friday Harbor - Low tide", start: 7_200, alarm: -1_800)] // Premium added the alarm
+
+        let changes = calendarChanges(existing: existing, wanted: wanted, now: event.addingTimeInterval(-3_600))
+
+        XCTAssertEqual(changes.remove, [0, 1])
+        XCTAssertEqual(changes.add, [0, 1])
     }
 
     func testAnEventAlreadyUnderWayIsNeverRemoved() {
-        let now = event
-        let existing: [(key: String, start: Date)] = [
-            ("open", now.addingTimeInterval(-600)),     // a slack window open right now
-            ("stale", now.addingTimeInterval(3_600)),   // moved by a threshold change
-            ("kept", now.addingTimeInterval(7_200)),
-        ]
-        XCTAssertEqual(calendarEventsToRemove(existing, wanted: ["kept"], now: now), [1])
+        let existing = [shape("Race Passage - Slack window", start: -600, end: 600),  // open right now
+                        shape("Friday Harbor - Low tide", start: 3_600)]
+
+        let changes = calendarChanges(existing: existing, wanted: [], now: event)
+
+        XCTAssertEqual(changes.remove, [1])
+        XCTAssertEqual(changes.add, [])
+    }
+
+    func testEachEventMatchesOnceAndARepeatedPlanIsAddedOnce() {
+        let now = event.addingTimeInterval(-3_600)
+        // Two planned slacks a minute apart can't both claim one existing event.
+        let claimed = calendarChanges(existing: [shape("Race Passage - Slack", start: 0)],
+                                      wanted: [shape("Race Passage - Slack", start: 0), shape("Race Passage - Slack", start: 60)],
+                                      now: now)
+        XCTAssertEqual(claimed.remove, [])
+        XCTAssertEqual(claimed.add, [1])
+        // Two rules planning the identical event write it once.
+        let repeated = calendarChanges(existing: [],
+                                       wanted: [shape("Friday Harbor - Low tide", start: 0), shape("Friday Harbor - Low tide", start: 0)],
+                                       now: now)
+        XCTAssertEqual(repeated.add, [0])
     }
 }
