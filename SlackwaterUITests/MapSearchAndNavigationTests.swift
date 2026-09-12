@@ -83,10 +83,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.appears(within: 5))
             // No header, no X — the toggle FAB (the list icon) is
-            // the way back, and the search FAB persists over the map.
+            // the way back, and the left FAB flips to My Location over the map.
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
-            XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
+            XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")
             sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
@@ -181,7 +181,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["map-canvas"].appears(within: 5),
                   "map did not take over the detail pane")
         XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
-        XCTAssert(app.buttons["Search"].exists, "search FAB missing while the map shows")
+        XCTAssert(app.buttons["My Location"].exists, "locate FAB missing while the map shows")
         app.buttons["List"].firstMatch.tap()
         XCTAssert(app.staticTexts["Pick a station"].appears(within: 5),
                   "toggle back did not land on the placeholder")
@@ -195,7 +195,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // The floating toolbar — search FAB bottom-left opens the bottom-input
     // search with the keyboard up; the X beside the input exits in one tap;
     // the map FAB toggles the surface in place and flips to the list icon (no
-    // header, no close chrome); both FABs persist over the map.
+    // header, no close chrome); over the map the left FAB becomes My Location.
     func testM45SearchFabAndMapToggle() throws {
         let app = launch("-seedGate")
 
@@ -234,10 +234,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssertLessThanOrEqual(disclaimer.frame.maxY, toggle.frame.maxY + 1,
                                  "the pill hangs below the FAB row, into the home indicator")
 
-        // The search FAB persists over the map and opens the same search.
-        openSearch(app, "friday")
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5))
-        app.buttons["Close search"].firstMatch.tap()
+        // Over the map the left FAB is My Location, not Search.
+        XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")
+        XCTAssertFalse(app.buttons["Search"].exists, "search FAB must not sit over the map")
 
         // Toggle back: list returns, the button is the map icon again.
         XCTAssert(app.buttons["List"].appears(within: 5))
@@ -488,7 +487,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Still responsive and still a map afterwards.
         XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")
-        XCTAssert(app.buttons["Search"].exists)
+        XCTAssert(app.buttons["My Location"].exists)
         app.buttons["List"].tap()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
     }

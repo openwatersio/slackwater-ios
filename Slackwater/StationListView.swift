@@ -29,6 +29,10 @@ struct StationListView: View {
     /// push/pop. Distinct from the coordinate so re-focusing the SAME
     /// station twice still counts.
     @State private var mapFocusToken = 0
+    /// The locate FAB was tapped with no fix to center on yet — the first fix
+    /// that lands recenters the map, exactly once.
+    @State private var pendingLocate = false
+    @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
@@ -215,6 +219,10 @@ struct StationListView: View {
         .onChange(of: loc.location) { _, new in
             guard let l = new else { return }
             ChsFitService.shared.prioritize(lat: l.coordinate.latitude, lon: l.coordinate.longitude)
+            if pendingLocate {
+                pendingLocate = false
+                if showMap { mapFocusToken += 1 }
+            }
         }
     }
 
@@ -231,7 +239,7 @@ struct StationListView: View {
     }
 
     /// iPhone (and iPad Slide Over): the map swaps in-place for the list;
-    /// both FABs persist over either.
+    /// both FABs persist over either (the left one as Search or My Location).
     private var stackLayout: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -770,12 +778,17 @@ struct StationListView: View {
         .padding(.top, 6)
     }
 
-    // MARK: - Floating toolbar (search bottom-left, list ⇄ map bottom-right,
-    // both persistent over list AND map)
+    // MARK: - Floating toolbar (search bottom-left over the list, My Location
+    // bottom-left over the map, list ⇄ map bottom-right over both)
 
     private var fabBar: some View {
         HStack {
-            fab("magnifyingglass", label: "Search") { openSearch() }
+            // Over the map the left FAB locates instead of searching — the
+            // list toggle is one tap away and search lives there.
+            fab(showMap ? "location" : "magnifyingglass",
+                label: showMap ? "My Location" : "Search") {
+                if showMap { locateMe() } else { openSearch() }
+            }
             Spacer()
             fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
                 showMap.toggle()
@@ -801,6 +814,21 @@ struct StationListView: View {
                 .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
         }
         .accessibilityLabel(label)
+    }
+
+    /// The map's locate FAB. With a fix: remount (`mapFocusToken`) so
+    /// `makeUIView` recenters on it — the fix is already first in `mapPane`'s
+    /// camera chain — and refresh it in the background. Without one: ask (or
+    /// re-request), and let the `.onChange(of: loc.location)` above recenter
+    /// when it lands. Denied goes to Settings, the only place the answer can
+    /// change.
+    private func locateMe() {
+        if loc.denied {
+            openURL(URL(string: UIApplication.openSettingsURLString)!)
+            return
+        }
+        if fix != nil { mapFocusToken += 1 } else { pendingLocate = true }
+        loc.request()
     }
 
     // MARK: - Search (bottom input above the keyboard, results above —
