@@ -160,6 +160,11 @@ extension TypeScaleTests {
             // the Dynamic-Type-scaled size (Theme.swift).
             "TideDetailView.swift:lead",
             "CurrentLead.swift:body",
+            // An alert's event name: its in-app readers are the rule summaries in the
+            // Alerts screen and the rule sheet, whose Text carries the mono trait
+            // (AlertsView.swift, AlertSheet.swift); its other reader is alert copy, which
+            // the system renders.
+            "AlertRule.swift:alertEventName",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = [
@@ -167,6 +172,11 @@ extension TypeScaleTests {
             // The strip's VoiceOver value: the lead in words.
             "TideDetailView.swift:spokenLead",
             "CurrentLead.swift:spoken",
+            // Alert copy is shown by Notification Center and Calendar, never by a Text of
+            // ours. The call lives in `alertCopy`, whose signature spans two lines, so the
+            // text walk climbs past it to `leadAmount` just above — the key has to match
+            // what the scanner computes (see WidgetSnapshot.swift:normalize).
+            "AlertPlan.swift:leadAmount",
         ]
         // Nor is anything in this file: its readings are GeoJSON properties
         // that MapLibre rasterizes from the basemap style's own fontstack,
