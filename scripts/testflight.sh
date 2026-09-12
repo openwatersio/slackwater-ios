@@ -100,6 +100,20 @@ fi
 if [[ $EXTERNAL == yes ]]; then
   # Waits out processing itself, so this blocks for as long as Apple takes.
   node scripts/asc.mjs promote "$BUILD"
+
+  # One GitHub release per TestFlight release, from the same notes file ASC got
+  # so the two can never disagree. Only on the external path: a bare run is a
+  # build Nightly needs, not a release, and tagging those would put two tags on
+  # one version. Never fatal — the build is uploaded and promoted by the time we
+  # get here, and a missing tag is a one-liner to add by hand.
+  git diff --quiet || echo "warning: working tree dirty — v$VERSION tags HEAD, not what was archived"
+  if [[ -f $NOTES ]]; then
+    gh release create "v$VERSION" --title "$VERSION ($BUILD)" --notes-file "$NOTES" \
+      --target "$(git rev-parse HEAD)" \
+      || echo "github release failed — by hand: gh release create v$VERSION --title '$VERSION ($BUILD)' --notes-file $NOTES"
+  else
+    echo "no $NOTES — no GitHub release for $VERSION ($BUILD)"
+  fi
 else
   echo "Nightly has it. For the external groups: node scripts/asc.mjs promote $BUILD"
 fi
