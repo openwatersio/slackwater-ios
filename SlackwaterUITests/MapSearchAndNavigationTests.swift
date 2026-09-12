@@ -434,6 +434,29 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         closeSearch(app)
     }
 
+    /// iPad search results sit in columns, not one card stretched across the
+    /// whole screen: some pair of result texts shares a row. Names, not
+    /// positions — "port" matches dozens, whichever ranks first.
+    func testSearchResultsGridOnIPad() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else {
+            throw XCTSkip("iPad-only layout test")
+        }
+        for (orientation, shot) in [(UIDeviceOrientation.portrait, "search-grid-ipad-portrait.png"),
+                                    (.landscapeLeft, "search-grid-ipad-landscape.png")] {
+            XCUIDevice.shared.orientation = orientation
+            let app = launch("-seedGate", "-resetRecents")
+            openSearch(app, "port")
+            XCTAssert(app.descendants(matching: .any)["search-truncated"].firstMatch.appears(within: 5))
+            let frames = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Port'"))
+                .allElementsBoundByIndex.prefix(12).map(\.frame)
+            XCTAssert(frames.contains { a in
+                frames.contains { b in abs(a.minY - b.minY) < 1 && b.minX - a.minX > 100 }
+            }, "no two search results share a row in \(orientation.rawValue)")
+            save(app, shot)
+            app.terminate()
+        }
+    }
+
     /// The map at continental scale. Thousands of pins is a grey smear without
     /// clustering; this walks the camera out to the whole country, times the
     /// gestures, and checks the map is still a map afterwards.

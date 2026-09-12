@@ -850,7 +850,7 @@ struct StationListView: View {
             CanvasBackground()
             ScrollView {
                     let results = StationItem.search(query, near: anchor, series: seriesFilter)
-                    LazyVStack(spacing: 12) {
+                    VStack(spacing: 12) {
                         // Nationally a two-letter query matches a thousand
                         // stations. Showing the nearest 60 is the useful
                         // answer; saying so is the honest one — and it says so
@@ -864,8 +864,17 @@ struct StationListView: View {
                                 .padding(.bottom, 2)
                                 .accessibilityIdentifier("search-truncated")
                         }
-                        ForEach(results) { item in
-                            resultCard(item)
+                        // The overlay covers the whole screen, sidebar and
+                        // detail pane alike, so on iPad one column stretched
+                        // a card built for 320–400pt across 1,300pt. Adaptive
+                        // columns cap a card below twice the minimum: one
+                        // column on iPhone, two in iPad portrait, three in
+                        // landscape, with no size-class branch.
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 12)],
+                                  spacing: 12) {
+                            ForEach(results) { item in
+                                resultCard(item)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
