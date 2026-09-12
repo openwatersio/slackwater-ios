@@ -12,6 +12,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
     @State private var showWidgets = false
+    @ObservedObject private var alerts = AlertRuleStore.shared
 
     private var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -52,6 +53,25 @@ struct SettingsView: View {
                             }
                         }
                         Text("0.1–10 kn. This changes when Slackwater marks a current as a usable slack window.")
+                    }
+
+                    section("Alerts") {
+                        NavigationLink {
+                            AlertsView()
+                                .navigationTitle("Alerts")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text(alerts.rules.isEmpty
+                                     ? "Set alerts from Calendar or Live under any station's timeline"
+                                     : "\(alerts.rules.count) alert\(alerts.rules.count == 1 ? "" : "s")")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
                     }
 
                     // The downloads manager also lives one tap from the list,
