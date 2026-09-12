@@ -98,10 +98,11 @@ struct AlertStatusSnapshot: Equatable {
 
         // Premium puts an alarm on every calendar event (spec §5.1).
         AlertCalendar.apply(entries(plan.calendar, includeLead: false, alarm: premium), now: now)
+        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, alarm: false))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,
-                                     notificationsAuthorized: false,
+                                     notificationsAuthorized: await AlertNotifications.authorized(),
                                      calendarAuthorized: AlertCalendar.authorized)
     }
 }
