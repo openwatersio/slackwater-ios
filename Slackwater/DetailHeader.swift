@@ -112,7 +112,7 @@ struct DetailHeader: View {
             .onTapGesture {
                 // Jump to the discovery map, focused on this station (#32). A
                 // catalog miss is a no-op, not a crash.
-                if let item = StationItem.byId[favoriteId] { openMapFocused(item) }
+                if let item = StationItem.byId[favoriteId] { openMapFocused(item, stationZoom) }
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isButton)

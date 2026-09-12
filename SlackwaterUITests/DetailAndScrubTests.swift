@@ -198,6 +198,45 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "station-details-expanded.png")
     }
 
+    /// Every detail closes on Nearby: the shared filter narrows its rows, a
+    /// row pushes that station, and a tap off the pins opens the full map.
+    func testNearbyFiltersOpensAStationAndOpensTheMap() throws {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+
+        let nearby = app.descendants(matching: .any)["nearby"].firstMatch
+        XCTAssert(nearby.appears(within: 10), "no Nearby section on the detail")
+        nearby.descendants(matching: .any)["series-filter-currents"].firstMatch.tap()
+        let rows = nearby.descendants(matching: .any).matching(identifier: "nearby-station")
+        XCTAssert(rows.firstMatch.appears(within: 5), "Nearby lists no stations")
+        XCTAssertEqual(rows.count, 6)
+        for row in rows.allElementsBoundByIndex {
+            XCTAssert(row.label.contains("CURRENT"), "the Currents filter let through '\(row.label)'")
+        }
+        save(app, "nearby-currents.png")
+
+        // Friday Harbor has a current station of its own, so pick a row whose
+        // name is not the page's — otherwise the title check proves nothing.
+        let row = try XCTUnwrap(rows.allElementsBoundByIndex.first { !$0.label.hasPrefix("Friday Harbor") })
+        let name = try XCTUnwrap(row.label.components(separatedBy: ", ").first)
+        row.tap()
+        let title = app.descendants(matching: .any)["detail-title"].firstMatch
+        wait(for: [expectation(for: NSPredicate(format: "label BEGINSWITH %@", name),
+                               evaluatedWith: title)], timeout: 10)
+
+        app.buttons["detail-back"].firstMatch.tap()
+        let map = nearby.descendants(matching: .any)["nearby-map"].firstMatch
+        XCTAssert(map.appears(within: 10), "back from the pushed station lost the Nearby map")
+        // A coordinate tap never scrolls, and the map sits below the rows.
+        let window = app.windows.firstMatch.frame
+        for _ in 0..<6 where map.frame.maxY > window.maxY - 40 { app.swipeUp() }
+        save(app, "nearby-map.png")
+        // The top-right corner: the framing insets every pin well clear of it.
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.05)).tap()
+        XCTAssert(app.descendants(matching: .any)["map-canvas"].firstMatch.appears(within: 10),
+                  "a tap on the Nearby map did not open the full map")
+    }
+
     /// The range bar heads the schedule card on every scrubable detail and says
     /// what span the list below it covers; tapping it opens the picker, and
     /// picking a date moves the window with the bar following.

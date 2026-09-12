@@ -12,18 +12,17 @@ struct StationListView: View {
     @State private var showDownloads = false
     @State private var showWidgetsGallery = false
     @State private var searching = false
-    /// Tides/Currents narrowing, nil = everything. One state for Near Me and
-    /// search, so a pick carries between the two surfaces. Session-only on
-    /// purpose: a persisted filter is a mystery ("where did the tide stations
-    /// go?") a week later.
-    @State private var seriesFilter: StationSeries?
+    /// Tides/Currents narrowing, nil = everything. One persisted value for
+    /// Near Me, search and every detail's Nearby, so a pick carries between
+    /// them; `SeriesFilterChips` writes it.
+    @AppStorage(seriesFilterKey) private var seriesFilter: StationSeries?
     @FocusState private var searchFocused: Bool
     // -openMap: launch straight into the map (manual offline verification hook).
     @State private var showMap = CommandLine.arguments.contains("-openMap")
-    /// One-shot: set by the map-header title tap (issue #32), read by
-    /// `mapPane` as a camera override, then cleared by `.onAppear`. The next
-    /// fix landing or user pan owns the camera after that.
-    @State private var mapFocus: StationItem?
+    /// One-shot: set by the detail-header title tap (issue #32) or the Nearby
+    /// map, read by `mapPane` as a camera override, then cleared by
+    /// `.onAppear`. The next fix landing or user pan owns the camera after that.
+    @State private var mapFocus: (item: StationItem, zoom: Double)?
     /// Bumped on every focus tap and used as `mapPane`'s `.id`, so a focus
     /// always REMOUNTS the map — even on the pin-tap path where `showMap` is
     /// already true and the map instance would otherwise survive the
@@ -93,9 +92,9 @@ struct StationListView: View {
     /// Unconditional path reset (unlike the FAB toggle's `regular && showMap`
     /// case below) — this always fires FROM a pushed detail in both layouts,
     /// where the fabBar-toggle path only needs it at regular width.
-    private var openMapFocused: (StationItem) -> Void {
-        { item in
-            mapFocus = item
+    private var openMapFocused: (StationItem, Double) -> Void {
+        { item, zoom in
+            mapFocus = (item, zoom)
             mapFocusToken += 1
             path = NavigationPath()
             showMap = true
@@ -361,11 +360,12 @@ struct StationListView: View {
     /// The in-place map surface: no header or close; the List FAB is the way
     /// back.
     private var mapPane: some View {
-        // `mapFocus` wins when set (header-title tap, issue #32): centers on
-        // that station at its own detail zoom rather than the fix/discovery
-        // camera. `.id(mapFocusToken)` forces a remount on every focus, so
-        // `makeUIView` handles the camera even on the pin-tap path where the
-        // pane is already mounted (`showMap` stayed true across the push/pop).
+        // `mapFocus` wins when set (header-title tap #32, Nearby map): centers
+        // on that station at the zoom it asked for rather than the
+        // fix/discovery camera. `.id(mapFocusToken)` forces a remount on every
+        // focus, so `makeUIView` handles the camera even on the pin-tap path
+        // where the pane is already mounted (`showMap` stayed true across the
+        // push/pop).
         //
         // A ZStack, not `.overlay` on the map: the map ignores the safe area
         // and an overlay on it inherits that frame, so the pill's offset was
@@ -376,7 +376,7 @@ struct StationListView: View {
         ZStack(alignment: .bottom) {
             MapViewRepresentable(
                 center: mapCenterOverride
-                    ?? mapFocus.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                    ?? mapFocus.map { CLLocationCoordinate2D(latitude: $0.item.latitude, longitude: $0.item.longitude) }
                     ?? fix.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
                     ?? RecentsStore.shared.lastOpened.map {
                         CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
@@ -384,7 +384,7 @@ struct StationListView: View {
                     // SALISH_CENTER only survives to here on a genuine first
                     // run: no fix, nothing ever opened.
                     ?? SALISH_CENTER,
-                zoom: mapFocus == nil ? discoveryZoom : stationZoom
+                zoom: mapFocus?.zoom ?? discoveryZoom
             ) { item in
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
@@ -566,7 +566,7 @@ struct StationListView: View {
         HStack(alignment: .firstTextBaseline) {
             MonoLabel(text: "Near Me")
             Spacer(minLength: 8)
-            seriesChips
+            SeriesFilterChips()
         }
         .padding(.horizontal, 26)
         .padding(.top, 14)
@@ -623,36 +623,6 @@ struct StationListView: View {
 
     private func items(_ ids: [String]) -> [StationItem] {
         ids.compactMap { StationItem.byId[$0] }
-    }
-
-    /// The Tides/Currents narrowing — three quiet capsules on the Near Me
-    /// header, shared with the search overlay. Tapping the active one is a
-    /// second way back to All, for a thumb already on it.
-    private var seriesChips: some View {
-        HStack(spacing: 6) {
-            seriesChip("All", nil)
-            seriesChip("Tides", .tide)
-            seriesChip("Currents", .current)
-        }
-    }
-
-    private func seriesChip(_ label: String, _ series: StationSeries?) -> some View {
-        let selected = seriesFilter == series
-        return Button {
-            seriesFilter = selected ? nil : series
-        } label: {
-            Text(label)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(selected ? SN.leaf : SN.foam.opacity(0.6))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .glassEffect(selected ? .regular.tint(SN.leaf.opacity(0.25)).interactive()
-                                      : .regular.interactive(), in: Capsule())
-        }
-        .buttonStyle(.plain)  // List rows: keep the tap on the chip itself
-        .accessibilityLabel("Show \(label.lowercased())")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityIdentifier("series-filter-\(label.lowercased())")
     }
 
     private func sectionLabel(_ text: String) -> some View {
@@ -888,7 +858,7 @@ struct StationListView: View {
             VStack(spacing: 0) {
                 // The same chips as the Near Me header — one filter, both
                 // surfaces — sitting above the input, thumb-reachable.
-                seriesChips
+                SeriesFilterChips()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
                 searchBar

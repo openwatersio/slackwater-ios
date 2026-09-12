@@ -84,32 +84,45 @@ struct StationChooserSheet: View {
             onPick(item)
             dismiss()
         } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    // The name is the same on every row — the qualifier is the
-                    // whole point, so it leads.
-                    Text(item.region.isEmpty ? item.name : item.region)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(SN.paper)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    MonoLabel(text: item.kindLabel,
-                              color: SN.foam.opacity(0.55), tracking: 1.1)
-                }
-                Spacer(minLength: 8)
-                Text(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
-                    .font(.caption.monospaced().weight(.medium))
-                    .foregroundStyle(SN.foam.opacity(0.85))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(SN.leaf.opacity(0.16), lineWidth: 0.5))
-            .contentShape(Rectangle())
+            // The name is the same on every row — the qualifier is the whole
+            // point, so it leads.
+            StationChoiceRow(title: item.region.isEmpty ? item.name : item.region,
+                             caption: item.kindLabel,
+                             distance: formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// A station row's face: a title, what it measures, and how far — the
+/// chooser's rows and a detail's Nearby rows. Callers own the tap.
+struct StationChoiceRow: View {
+    let title: String
+    let caption: String
+    let distance: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(SN.paper)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                MonoLabel(text: caption, color: SN.foam.opacity(0.55), tracking: 1.1)
+            }
+            Spacer(minLength: 8)
+            Text(distance)
+                .font(.caption.monospaced().weight(.medium))
+                .foregroundStyle(SN.foam.opacity(0.85))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(SN.leaf.opacity(0.16), lineWidth: 0.5))
+        .contentShape(Rectangle())
     }
 }

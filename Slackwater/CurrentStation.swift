@@ -30,6 +30,16 @@ func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Doubl
     distanceKm(lat1, lon1, lat2, lon2)
 }
 
+/// Initial great-circle course from the first point to the second, degrees
+/// true in 0..<360.
+func bearingDeg(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+    let p1 = lat1 * .pi / 180, p2 = lat2 * .pi / 180
+    let dl = (lon2 - lon1) * .pi / 180
+    let y = sin(dl) * cos(p2)
+    let x = cos(p1) * sin(p2) - sin(p1) * cos(p2) * cos(dl)
+    return (atan2(y, x) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
+}
+
 // MARK: - Shared station identity
 
 /// The stored identity every bundled station type carries — one search
@@ -307,7 +317,7 @@ extension CurrentEvent {
 
 /// What a station measures — the two-way split under the five catalog kinds.
 /// `pinKind` styles a CHS port as its own pin class, but it measures tide.
-enum StationSeries {
+enum StationSeries: String {
     case tide, current
 }
 
@@ -409,6 +419,13 @@ enum StationItem: Identifiable, Hashable {
             if best == nil || km < best!.km { best = (item, km) }
         }
         return best
+    }
+
+    /// A detail's Nearby rows: the stations closest to `item`, itself excluded,
+    /// narrowed to one series when there is one.
+    static func nearby(_ item: StationItem, series: StationSeries?, count: Int = 6) -> [StationItem] {
+        let candidates = all.filter { $0.id != item.id && (series == nil || $0.series == series) }
+        return Array(rankedByDistance(candidates, lat: item.latitude, lon: item.longitude).prefix(count))
     }
 
     /// The My Location cards: the nearest station, plus the nearest of the

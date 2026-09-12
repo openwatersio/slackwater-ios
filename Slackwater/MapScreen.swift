@@ -47,12 +47,15 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private weak var map: MLNMapView?
     private let center: CLLocationCoordinate2D
     private let zoom: Double
+    private let framing: [CLLocationCoordinate2D]?
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
 
-    init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
+    init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
+         framing: [CLLocationCoordinate2D]? = nil) {
         self.map = map
         self.center = center
         self.zoom = zoom
+        self.framing = framing
         super.init()
         map.delegate = self
         map.styleURL = BASEMAP_STYLE_URL
@@ -79,7 +82,13 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     }
 
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-        mapView.setCenter(center, zoomLevel: zoom, animated: false)
+        if let framing {
+            mapView.setVisibleCoordinateBounds(centeredBounds(around: center, fitting: framing),
+                                               edgePadding: UIEdgeInsets(top: 32, left: 32, bottom: 32, right: 32),
+                                               animated: false, completionHandler: nil)
+        } else {
+            mapView.setCenter(center, zoomLevel: zoom, animated: false)
+        }
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
@@ -90,6 +99,19 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fill under the pins: added first, so the pin layers appended below
         // land on top of it.
         fill?.attach(to: style, map: mapView)
+        // The framed map's own station, ringed under its pin.
+        if framing != nil, style.source(withIdentifier: "focus") == nil {
+            let point = MLNPointFeature()
+            point.coordinate = center
+            let source = MLNShapeSource(identifier: "focus", shape: point, options: nil)
+            style.addSource(source)
+            let ring = MLNCircleStyleLayer(identifier: "focus-ring", source: source)
+            ring.circleRadius = NSExpression(forConstantValue: 13)
+            ring.circleOpacity = NSExpression(forConstantValue: 0)
+            ring.circleStrokeWidth = NSExpression(forConstantValue: 2.5)
+            ring.circleStrokeColor = NSExpression(forConstantValue: UIColor(SN.leaf))
+            style.addLayer(ring)
+        }
         if style.source(withIdentifier: "stations") == nil {
             let source = stationShapeSource()
             style.addSource(source)
@@ -125,6 +147,19 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     }
 }
 
+/// The smallest bounds centred on `center` that hold every point, so fitting
+/// them keeps the station mid-frame.
+private func centeredBounds(around center: CLLocationCoordinate2D,
+                            fitting points: [CLLocationCoordinate2D]) -> MLNCoordinateBounds {
+    // ponytail: plain longitude differences, so a neighbour across the
+    // antimeridian (western Aleutians) over-widens the frame; wrap if it shows.
+    let dLat = points.map { abs($0.latitude - center.latitude) }.max() ?? 0
+    let dLon = points.map { abs($0.longitude - center.longitude) }.max() ?? 0
+    return MLNCoordinateBounds(
+        sw: CLLocationCoordinate2D(latitude: center.latitude - dLat, longitude: center.longitude - dLon),
+        ne: CLLocationCoordinate2D(latitude: center.latitude + dLat, longitude: center.longitude + dLon))
+}
+
 // MARK: - The map view
 
 struct MapViewRepresentable: UIViewRepresentable {
@@ -136,16 +171,28 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// `stationZoom` instead so a focused jump lands framed on one station,
     /// not the whole Salish Sea.
     var zoom: Double = discoveryZoom
+    /// A detail's Nearby preview: frame these stations around a ringed
+    /// `center` instead of using `zoom`, with pan and zoom off so the page
+    /// around it still scrolls.
+    var framing: [CLLocationCoordinate2D]? = nil
+    /// A tap on no pin, handed the zoom on screen.
+    var onMiss: ((Double) -> Void)? = nil
     let onSelect: (StationItem) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
+    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect, onMiss: onMiss) }
 
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero)
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
         map.showsUserLocation = LocationService.shared.authorized
-        context.coordinator.install(on: map, center: center, zoom: zoom)
+        if framing != nil {
+            map.isScrollEnabled = false
+            map.isZoomEnabled = false
+            map.isRotateEnabled = false
+            map.isPitchEnabled = false
+        }
+        context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing)
         return map
     }
 
@@ -155,14 +202,19 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
+        let onMiss: ((Double) -> Void)?
         private weak var map: MLNMapView?
         private var styler: MapStyler?
 
-        init(onSelect: @escaping (StationItem) -> Void) { self.onSelect = onSelect }
+        init(onSelect: @escaping (StationItem) -> Void, onMiss: ((Double) -> Void)?) {
+            self.onSelect = onSelect
+            self.onMiss = onMiss
+        }
 
-        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double) {
+        func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
+                     framing: [CLLocationCoordinate2D]?) {
             self.map = map
-            styler = MapStyler(map: map, center: center, zoom: zoom)
+            styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }
@@ -186,7 +238,11 @@ struct MapViewRepresentable: UIViewRepresentable {
                 onSelect(item)
                 return
             }
-            guard let cluster = nearest(["station-clusters"]) else { return }
+            guard let cluster = nearest(["station-clusters"]) else {
+                // Before the style loads nothing framed the camera, so its zoom means nothing.
+                onMiss?(map.style == nil ? stationZoom : map.zoomLevel)
+                return
+            }
             // +2 levels lands past CLUSTER_MAX_ZOOM from any clustered zoom, so
             // one tap on a cluster always breaks it into something tappable.
             map.setCenter(cluster.coordinate, zoomLevel: min(map.zoomLevel + 2, 12), animated: true)
