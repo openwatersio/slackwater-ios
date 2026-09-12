@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. App entry: one-time migration and widget-reload hookup,
 // then the root switch between the first-run gate and the station list.
 import SwiftUI
+import UserNotifications
 import WidgetKit
 
 @main
@@ -22,6 +23,8 @@ struct SlackwaterApp: App {
             AlertScheduler.requestReschedule()
         }
         AlertRuleStore.shared.onChange = { AlertScheduler.requestReschedule() }
+        // Before launch finishes, so a tap that cold-launches the app is delivered.
+        UNUserNotificationCenter.current().delegate = AlertNotificationDelegate.shared
         // Chart packs download whether or not the map is ever opened.
         DispatchQueue.main.async { ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL) }
         #if DEBUG
