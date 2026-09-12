@@ -19,7 +19,7 @@ struct DeliveryPlan: Equatable {
 /// The calendar keeps an event until it happens; a notification is gone once its fire time passes.
 /// Whether a calendar event carries an alarm is the writer's call, from the same `premium`.
 func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan {
-    let live = Dictionary(uniqueKeysWithValues: rules.filter(\.enabled).map { ($0.id, $0) })
+    let live = Dictionary(rules.filter(\.enabled).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     let ordered = occurrences.sorted { $0.fire < $1.fire }
 
     let calendar = ordered.filter {
