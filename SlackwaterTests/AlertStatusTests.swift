@@ -41,4 +41,14 @@ final class AlertStatusTests: XCTestCase {
         let notifyOnly = AlertRule(stationID: "x", trigger: .slack, calendar: false, alert: .notification)
         XCTAssertEqual(text(notifyOnly, status, premium: false), "Notifications are Premium")
     }
+
+    func testATideAndACurrentStationWithOneNameStaySeparate() {
+        let tide = AlertRule(stationID: "noaa/9449880", trigger: .tideExtreme(high: false))
+        let current = AlertRule(stationID: "current:noaa/PUG1515", trigger: .slackWindowOpens)
+
+        let groups = alertStationGroups([tide, current]) { _ in "Friday Harbor" }
+
+        XCTAssertEqual(groups.map(\.stationID), ["current:noaa/PUG1515", "noaa/9449880"])
+        XCTAssertEqual(groups.map(\.rules), [[current], [tide]])
+    }
 }
