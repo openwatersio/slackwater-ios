@@ -16,6 +16,9 @@ struct AlertRow: View {
     /// The offer at the last rest — what the buttons show, so they don't change every frame.
     @State private var shown: AlertTrigger?
     @State private var showPremium = false
+    /// True while a tap's permission prompt (if any) and store write are in flight — a second
+    /// tap in that gap must be ignored, not read the rules as they stood before the first landed.
+    @State private var applying = false
 
     var body: some View {
         let state = alertRowState(store.rules, stationID: stationID, offer: shown ?? offer)
@@ -37,15 +40,16 @@ struct AlertRow: View {
     }
 
     private func tap(_ delivery: AlertDelivery) {
-        guard settled, let offer = shown else { return }
+        guard settled, !applying, let offer = shown else { return }
         if delivery == .live && !premium.isPremium {
             showPremium = true
             return
         }
-        let change = alertRowToggle(store.rules, stationID: stationID, offer: offer, delivery: delivery)
+        applying = true
         Task {
+            defer { applying = false }
             // Each permission is asked the first time its mechanism is turned on, never at launch.
-            if case .upsert(let rule) = change {
+            if case .upsert(let rule) = alertRowToggle(store.rules, stationID: stationID, offer: offer, delivery: delivery) {
                 if delivery == .calendar, rule.calendar, !AlertCalendar.authorized {
                     _ = await AlertCalendar.requestAccess()
                 }
@@ -53,7 +57,9 @@ struct AlertRow: View {
                     _ = await AlertNotifications.requestAccess()
                 }
             }
-            switch change {
+            // Decide against the rules as they stand after the prompt, so nothing that changed
+            // while it was up can turn this tap into a duplicate.
+            switch alertRowToggle(store.rules, stationID: stationID, offer: offer, delivery: delivery) {
             case .upsert(let rule): store.upsert(rule)
             case .remove(let id): store.remove(id)
             }
