@@ -47,6 +47,9 @@ enum AppGroup {
     static let nearestCurrentStationID = "slackwater:nearest-current"
     static let premiumKey = "slackwater.premium"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
+    /// Alert rules (notifications spec §3): JSON, device-local — two devices holding one
+    /// rule would each deliver it.
+    static let alertRulesKey = "slackwater.alertRules"
 
     private static let migratedKey = "slackwater.appgroup.migrated"
     private static let arrayKeys = [favoritesKey, recentsKey]
