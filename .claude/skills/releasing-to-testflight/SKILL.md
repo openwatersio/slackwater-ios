@@ -57,6 +57,10 @@ rejected upload.** Nothing renumbers it for you.
    stashing someone else's work. Build 24 was cut that way.
 7. `node scripts/asc.mjs builds` again. Confirm the top row reads the version and
    build you intended, `VALID`, in the beta groups you expect.
+8. `gh release list` — the `--external` run tags `v<MARKETING_VERSION>` and opens
+   a GitHub release carrying the same notes file. It is the last step and never
+   fatal, so a failure there leaves a shipped build with no tag; the script
+   prints the command to run by hand.
 
 Step 7 is not optional. It is the only place the intent in `project.yml` can be
 checked against what testers will actually install — and even it only proves the
@@ -72,6 +76,7 @@ Settled, so they don't get re-litigated:
 | Does ASC accept a *lower* pre-release train? | It accepts it and no tester can install it. Builds 22 (0.6.0) and 23 (0.7.0) both went `VALID`, both reached `IN_BETA_TESTING` on the internal group — and the TestFlight app kept offering 1.0 (21), because it offers the highest version train it holds and does not even list the lower ones under Previous Builds. Two releases went nowhere this way. **`MARKETING_VERSION` must stay above 1.0** until the accidental 1.0 train (builds 1–21) is retired. |
 | Why do builds 1–21 sit under a `1.0` train? | They shipped the plist literal. The eventual real 1.0 needs a build number above 21. |
 | A build is `VALID` but a tester can't see it | Beta-group attachment, not the upload. The two groups behave differently — see below. |
+| Does a Nightly-only upload get a GitHub release? | **No.** Only `--external` tags one. A bare run is a build Nightly needs, not a release, and every build of one `MARKETING_VERSION` would want the same `v<version>` tag. Releases start at 1.12.0 (37); earlier builds were deliberately not backfilled. |
 | Why do the external groups need a flag when Nightly doesn't? | **Nightly is internal** with `hasAccessToAllBuilds`, so every upload lands there untouched. **The external groups sit behind public links**, so a build reaches them only after Apple beta review. `asc.mjs promote` does both steps; `externalState` goes `READY_FOR_BETA_SUBMISSION` → `WAITING_FOR_BETA_REVIEW` → `IN_BETA_TESTING`. |
 | Which external groups does a release go to? | **All of them.** A bare `asc.mjs promote <build>` discovers every group with `isInternalGroup: false` and adds the build to each, then submits beta review **once** (review is per build — a second submission 409s). Pass a group name to target just one. The old default named `Friends & Family` alone, which is how build 28 reached two groups where build 27 reached three, leaving the `slackwater.xyz` download button on the previous release. |
 | `Upload Symbols Failed … no dSYM for MapLibre.framework` | Pre-existing on every upload. MapLibre frames won't symbolicate in crash reports. Not a failed upload. |
