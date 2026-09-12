@@ -43,6 +43,9 @@ enum Timeline {
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+    /// No scrub change for this long is a strip at rest: the chrome comes back and the alert
+    /// row's taps start counting.
+    static let rest: Duration = .milliseconds(450)
     /// The one-shot loading affordance: show two hours of tide/current and sky
     /// motion, then settle on the live reading before the page feels delayed.
     static let introDuration: TimeInterval = 0.65
@@ -1660,7 +1663,7 @@ struct TimelineScrubStrip: View {
             // Rest = no scrub change for this long. A cancelled sleep is a
             // scrub still in motion, not a rest.
             settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            guard (try? await Task.sleep(for: Timeline.rest)) != nil else { return }
             settled = true
         }
         .padding(.top, geo.chromeY)

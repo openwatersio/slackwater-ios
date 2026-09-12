@@ -88,6 +88,12 @@ struct CurrentDetailView: View {
                             anchor: $anchor,
                             onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
+                            alertOffer: currentAlertOffer(
+                                // CurrentLead's `atMax`, read here because the lead keeps it private.
+                                maxIsFlood: timeline?.currentEvents.first {
+                                    $0.kind != .slack && abs($0.time.timeIntervalSince(scrubTime)) < 1
+                                }.map { $0.kind == .maxFlood },
+                                onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
                             above: {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
