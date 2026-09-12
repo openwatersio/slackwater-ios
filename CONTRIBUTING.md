@@ -16,6 +16,19 @@ Build and run the `Slackwater` scheme. There is no other setup — the app ships
 
 Changing the bundled data additionally needs **Node 24** and a `npm install` in `tools/`.
 
+## Trying a first launch
+
+Deleting the app from a simulator does not give you a first launch: the simulator keeps the location permission, the App Group defaults (favorites and recents), and iCloud. Erase a dedicated simulator instead, then build and run onto it:
+
+```sh
+./scripts/first-run.sh                            # erases and boots "SW First Run iPhone 17"
+./scripts/first-run.sh "iPad Pro 11-inch (M5)"    # the same for any device type
+```
+
+An erased simulator is signed out of iCloud, so it starts with no favorites. Each of these is worth its own run: answering the location prompt both ways, Location Services switched off in Settings, and Features ▸ Location ▸ None.
+
+For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
+
 ## Running the tests
 
 One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;
