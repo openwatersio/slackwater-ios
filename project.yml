@@ -171,6 +171,10 @@ targets:
         NSLocationWhenInUseUsageDescription: >-
           Your location helps find nearby tide and current predictions.
           It stays on this device.
+        NSCalendarsFullAccessUsageDescription: >-
+          Slackwater adds the tide and current events you ask for to its own
+          Slackwater calendar, and updates or removes them when they change. It
+          never reads or changes your other calendars.
         # iPhone: portrait-only, as ever. iPad: all four + no UIRequiresFullScreen
         # so Split View / Slide Over work (App Store validation 90474 requires
         # exactly this set when multitasking is supported).

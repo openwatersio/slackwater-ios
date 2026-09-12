@@ -184,7 +184,11 @@ struct SettingsView: View {
 
     private var slackWindowSpeedBinding: Binding<Double> {
         Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
-                set: { slackWindowSpeed = normalizedSlackThresholdKn($0) })
+                set: {
+                    slackWindowSpeed = normalizedSlackThresholdKn($0)
+                    // Every scheduled slack window was computed at the old threshold.
+                    AlertScheduler.requestReschedule()
+                })
     }
 
     private func widgetsButton(_ title: String) -> some View {
