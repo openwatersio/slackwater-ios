@@ -32,6 +32,9 @@ struct StationListView: View {
     /// The locate FAB was tapped with no fix to center on yet — the first fix
     /// that lands recenters the map, exactly once.
     @State private var pendingLocate = false
+    /// One-shot like `mapFocus`: the locate remount lands at `locateZoom`
+    /// instead of the discovery camera; cleared by the same `.onAppear`.
+    @State private var locateFocus = false
     @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
@@ -392,7 +395,7 @@ struct StationListView: View {
                     // SALISH_CENTER only survives to here on a genuine first
                     // run: no fix, nothing ever opened.
                     ?? SALISH_CENTER,
-                zoom: mapFocus?.zoom ?? discoveryZoom
+                zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom)
             ) { item in
                 if regular { showMap = false }  // the detail pane shows the pick
                 open(item)
@@ -402,7 +405,7 @@ struct StationListView: View {
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
             // stale focus from a station visited an hour ago.
-            .onAppear { mapFocus = nil }
+            .onAppear { mapFocus = nil; locateFocus = false }
             .ignoresSafeArea()
 
             // Satellite imagery shows no depths, so there is no chart-datum
@@ -817,8 +820,8 @@ struct StationListView: View {
     }
 
     /// The map's locate FAB. With a fix: remount (`mapFocusToken`) so
-    /// `makeUIView` recenters on it — the fix is already first in `mapPane`'s
-    /// camera chain — and refresh it in the background. Without one: ask (or
+    /// `makeUIView` recenters on it at `locateZoom` — the fix is already first
+    /// in `mapPane`'s camera chain — and refresh it in the background. Without one: ask (or
     /// re-request), and let the `.onChange(of: loc.location)` above recenter
     /// when it lands. Denied goes to Settings, the only place the answer can
     /// change.
@@ -827,6 +830,7 @@ struct StationListView: View {
             openURL(URL(string: UIApplication.openSettingsURLString)!)
             return
         }
+        locateFocus = true
         if fix != nil { mapFocusToken += 1 } else { pendingLocate = true }
         loc.request()
     }
