@@ -128,9 +128,21 @@ extension TypeScaleTests {
             // "normalize", not "build"; the key below has to match what it
             // actually computes, not what a real parser would say.
             "WidgetSnapshot.swift:normalize",
+            // An alert's event name: its in-app readers are the rule summaries in the
+            // Alerts screen and the rule sheet, whose Text carries the mono trait
+            // (AlertsView.swift, AlertSheet.swift); its other reader is alert copy, which
+            // the system renders.
+            "AlertRule.swift:alertEventName",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
-        let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
+        let knownNonVisual: Set<String> = [
+            "TideShortcuts.swift:spoken",
+            // Alert copy is shown by Notification Center and Calendar, never by a Text of
+            // ours. The call lives in `alertCopy`, whose signature spans two lines, so the
+            // text walk climbs past it to `leadAmount` just above — the key has to match
+            // what the scanner computes (see WidgetSnapshot.swift:normalize).
+            "AlertPlan.swift:leadAmount",
+        ]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
         // assumption about a file this loop may not even visit that line of
