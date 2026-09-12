@@ -15,6 +15,21 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"
 }
 
+/// Rules grouped by the station they watch — by id, since a tide and a current station can share
+/// a name (Friday Harbor has both) — in name order.
+struct AlertStationGroup: Identifiable, Equatable {
+    let stationID: String
+    let name: String
+    let rules: [AlertRule]
+    var id: String { stationID }
+}
+
+func alertStationGroups(_ rules: [AlertRule], name: (String) -> String) -> [AlertStationGroup] {
+    Dictionary(grouping: rules, by: \.stationID)
+        .map { AlertStationGroup(stationID: $0.key, name: name($0.key), rules: $0.value) }
+        .sorted { ($0.name, $0.stationID) < ($1.name, $1.stationID) }
+}
+
 struct AlertsView: View {
     @ObservedObject private var store = AlertRuleStore.shared
     @ObservedObject private var scheduler = AlertScheduler.shared
@@ -22,19 +37,7 @@ struct AlertsView: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @State private var editing: AlertRule?
 
-    private struct StationRules: Identifiable {
-        let name: String
-        let rules: [AlertRule]
-        var id: String { name }
-    }
-
     private func name(_ stationID: String) -> String { StationItem.byId[stationID]?.name ?? stationID }
-
-    private var groups: [StationRules] {
-        Dictionary(grouping: store.rules) { name($0.stationID) }
-            .map { StationRules(name: $0.key, rules: $0.value) }
-            .sorted { $0.name < $1.name }
-    }
 
     var body: some View {
         List {
@@ -42,7 +45,7 @@ struct AlertsView: View {
                 Text("No alerts yet. Tap Calendar or Live under any station's timeline to set one.")
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
-            ForEach(groups) { group in
+            ForEach(alertStationGroups(store.rules, name: { name($0) })) { group in
                 Section(group.name) {
                     ForEach(group.rules) { rule in
                         Button { editing = rule } label: {
