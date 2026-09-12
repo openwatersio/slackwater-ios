@@ -213,3 +213,17 @@ schemes:
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true
+  # First-run state on every launch, for iterating on the gate. Location stays
+  # real, so the permission prompt needs a device erased by scripts/first-run.sh.
+  Slackwater First Run:
+    build:
+      targets:
+        Slackwater: all
+    run:
+      config: Debug
+      storeKitConfiguration: Slackwater.storekit
+      commandLineArguments:
+        "-resetGate": true
+        "-resetRecents": true
+        "-resetFavorites": true   # also keeps the run off iCloud (FavoritesCloud.store)
+        "-chsResetModels": true
