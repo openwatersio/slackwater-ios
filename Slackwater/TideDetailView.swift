@@ -229,46 +229,27 @@ struct TideDetailView: View {
     }
 
     private var stationDetails: some View {
-        DisclosureGroup("Station details") {
-            VStack(alignment: .leading, spacing: 10) {
-                detailRow("Datum", record.detailsDatum)
-                Text("Heights are measured above chart datum. A negative height means there is that much less water than the charted depth shows.")
-                    .font(.caption)
-                    .foregroundStyle(SN.foam.opacity(0.55))
-                detailRow("Station", record.id)
-                detailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
-                detailRow("Time zone", record.timezone)
-                if let ref = record.referenceRecord {
-                    detailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
-                    detailRow("Prediction", "Reference highs and lows, shifted and scaled by NOAA offsets, computed on this device")
-                } else {
-                    detailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
-                }
-                if let chsFittedAt {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Downloaded")
-                        Spacer()
-                        Text(chsFittedAt, style: .relative)
-                    }
-                    .font(.caption)
-                }
+        StationDetails {
+            StationDetailRow("Datum", record.detailsDatum)
+            StationDetailNote("Heights are measured above chart datum. A negative height means there is that much less water than the charted depth shows.")
+            StationDetailRow("Station", record.id)
+            StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
+            StationDetailRow("Time zone", record.timezone)
+            if let ref = record.referenceRecord {
+                StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
+                StationDetailRow("Prediction", "Reference highs and lows, shifted and scaled by NOAA offsets, computed on this device")
+            } else {
+                StationDetailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
             }
-            .padding(.top, 8)
+            if let chsFittedAt {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Downloaded")
+                    Spacer()
+                    Text(chsFittedAt, style: .relative)
+                }
+                .font(.caption)
+            }
         }
-        .font(.subheadline)
-        .foregroundStyle(SN.foam.opacity(0.7))
-        .tint(SN.foam.opacity(0.55))
-        .padding(.horizontal, 24)
-    }
-
-    private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-            Spacer()
-            Text(value)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.caption)
     }
 
     // MARK: - Data
