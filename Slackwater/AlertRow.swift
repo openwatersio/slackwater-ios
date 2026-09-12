@@ -21,7 +21,7 @@ struct AlertRow: View {
     @State private var applying = false
 
     var body: some View {
-        let state = alertRowState(store.rules, stationID: stationID, offer: shown ?? offer)
+        let state = alertRowState(store.rules, stationID: stationID, offer: shown ?? offer, premium: premium.isPremium)
         HStack(spacing: 10) {
             button("Calendar", image: state.calendar ? "calendar.badge.checkmark" : "calendar.badge.plus",
                    on: state.calendar, id: "alert-calendar-button") { tap(.calendar) }
@@ -41,7 +41,10 @@ struct AlertRow: View {
 
     private func tap(_ delivery: AlertDelivery) {
         guard settled, !applying, let offer = shown else { return }
-        if delivery == .live && !premium.isPremium {
+        // Without Premium, Live can still be switched off — only switching it on leads to the tier sheet.
+        if delivery == .live, !premium.isPremium,
+           case .upsert(let rule) = alertRowToggle(store.rules, stationID: stationID, offer: offer, delivery: .live),
+           rule.alert == .notification {
             showPremium = true
             return
         }

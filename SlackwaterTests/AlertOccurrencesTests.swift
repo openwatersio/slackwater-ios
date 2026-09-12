@@ -23,7 +23,7 @@ import TideEngine
 
         let lows = engine.extremes(from: now, to: week).filter { $0.kind == .low && $0.time >= now && $0.time <= week }
         XCTAssertFalse(lows.isEmpty)
-        XCTAssertEqual(found.map(\.event), lows.map(\.time))
+        XCTAssertEqual(found.map(\.event), lows.map { alertMinute($0.time) })
         XCTAssertEqual(found.map(\.heightM), lows.map { Optional($0.height) })
         XCTAssertTrue(found.allSatisfy { $0.event.timeIntervalSince($0.fire) == 1_800 && $0.ruleID == rule.id })
     }
@@ -57,7 +57,7 @@ import TideEngine
 
         let floods = engine.events(from: now, to: week).filter { $0.kind == .maxFlood && $0.time >= now && $0.time <= week }
         XCTAssertFalse(floods.isEmpty)
-        XCTAssertEqual(found.map(\.event), floods.map(\.time))
+        XCTAssertEqual(found.map(\.event), floods.map { alertMinute($0.time) })
     }
 
     func testTheFirstWindowOpeningAgreesWithTheSiriAnswer() throws {
@@ -123,7 +123,7 @@ import TideEngine
         let found = alertOccurrences(rule, station: station, position: position, from: now, to: until, threshold: 0.5)
 
         let observer = try Observer(latitudeDeg: position.lat, longitudeDeg: position.lon)
-        let expected = visibleEclipses(from: now, to: until, observer: observer).map(\.start).filter { $0 >= now && $0 <= until }
+        let expected = visibleEclipses(from: now, to: until, observer: observer).map { alertMinute($0.start) }.filter { $0 >= now && $0 <= until }
         XCTAssertFalse(expected.isEmpty)
         XCTAssertEqual(found.map(\.event), expected)
     }
@@ -143,20 +143,25 @@ import TideEngine
     }
 
     func testOccurrencesDoNotDriftBetweenRuns() throws {
-        // Two reschedules a few seconds apart must name the same instants, or every calendar
-        // event is removed and re-added each time the app comes forward (spec §5.1).
+        // Two reschedules in different 10-minute buckets must name the same instants for every
+        // trigger, or each calendar event is removed and re-added whenever the app comes forward.
         let cases: [(String, AlertTrigger)] = [
             (TideStationRecord.fridayHarborID, .tideCrossing(heightM: 1.0, rising: true)),
-            (deception, .slackWindowOpens),
+            (TideStationRecord.fridayHarborID, .tideExtreme(high: false)),
+            (TideStationRecord.fridayHarborID, .tideExtreme(high: true)),
+            (deception, .slackWindowOpens),          // at 0.5 kn this includes hairline slacks
+            (deception, .currentPeak(flood: true)),
+            (deception, .currentPeak(flood: false)),
         ]
+        let later = now.addingTimeInterval(3_700)
         for (id, trigger) in cases {
             let (station, position) = try load(id)
             let rule = AlertRule(stationID: id, trigger: trigger)
-            let later = now.addingTimeInterval(37)
-            let first = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 1.0)
+            let first = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
                 .filter { $0.event >= later }
-            let second = alertOccurrences(rule, station: station, position: position, from: later, to: week, threshold: 1.0)
-            XCTAssertFalse(second.isEmpty)
+            let second = alertOccurrences(rule, station: station, position: position, from: later, to: week, threshold: 0.5)
+                .filter { $0.event >= later }
+            XCTAssertFalse(second.isEmpty, "\(trigger) found nothing")
             XCTAssertEqual(second.map(\.event), first.map(\.event), "\(trigger) instants drifted between runs")
             XCTAssertEqual(second.map(\.end), first.map(\.end), "\(trigger) window ends drifted between runs")
         }

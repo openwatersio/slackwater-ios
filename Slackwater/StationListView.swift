@@ -172,8 +172,10 @@ struct StationListView: View {
         // A tapped alert carries the same station link a share does.
         .onReceive(AlertTap.shared.$url) { url in
             guard let url else { return }
-            AlertTap.shared.url = nil
             handleDeepLink(url)
+            // Cleared on the next turn: a value set from inside its own @Published emission is
+            // overwritten when the emission finishes, and the link would open again later.
+            Task { @MainActor in AlertTap.shared.url = nil }
         }
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,

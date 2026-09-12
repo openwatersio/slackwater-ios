@@ -6,11 +6,11 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
                      tz: TimeZone = .current, locale: Locale = .autoupdatingCurrent) -> String {
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
+    if rule.calendar && !status.calendarAuthorized { return "Calendar access is off in Settings" }
     if rule.alert == .notification && !premium {
         return rule.calendar ? "Calendar only — notifications are Premium" : "Notifications are Premium"
     }
     if rule.alert == .notification && !status.notificationsAuthorized { return "Notifications are off in Settings" }
-    if rule.calendar && !status.calendarAuthorized { return "Calendar access is off in Settings" }
     guard let date = status.scheduledThrough[rule.id] else { return "Nothing coming up" }
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"
 }

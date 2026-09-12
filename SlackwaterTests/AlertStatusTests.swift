@@ -19,6 +19,10 @@ final class AlertStatusTests: XCTestCase {
         XCTAssertEqual(text(rule, status), "Scheduled through 24 Aug")
         XCTAssertEqual(text(rule, status, premium: false), "Calendar only — notifications are Premium")
 
+        status.calendarAuthorized = false
+        XCTAssertEqual(text(rule, status, premium: false), "Calendar access is off in Settings")
+        status.calendarAuthorized = true
+
         status.notificationsAuthorized = false
         XCTAssertEqual(text(rule, status), "Notifications are off in Settings")
 
