@@ -15,7 +15,13 @@ struct SlackwaterApp: App {
         // The widget-reload hook (ChsStation.swift's `WidgetReload`): a no-op
         // until the app assigns it, so the widget extension — which also
         // compiles ChsModelStore.save — never triggers its own reload.
-        WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
+        // Every CHS model save funnels through this hook, and a newly fitted station can
+        // make a waiting alert schedulable (notifications spec §6).
+        WidgetReload.trigger = {
+            WidgetCenter.shared.reloadAllTimelines()
+            AlertScheduler.requestReschedule()
+        }
+        AlertRuleStore.shared.onChange = { AlertScheduler.requestReschedule() }
         // Chart packs download whether or not the map is ever opened.
         DispatchQueue.main.async { ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL) }
         #if DEBUG
@@ -55,8 +61,14 @@ struct RootView: View {
         // no-ops when unauthorized, so the overlap costs one coalesced
         // `requestLocation`.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { LocationService.shared.refreshIfAuthorized() }
+            if phase == .active {
+                LocationService.shared.refreshIfAuthorized()
+                // Tops up the notification horizon and picks up permission changes made in Settings.
+                AlertScheduler.requestReschedule()
+            }
         }
+        // `.onChange` is not guaranteed to see the launch transition into `.active`.
+        .task { AlertScheduler.requestReschedule() }
         // A widget can be added from the gallery before the app is ever
         // opened, so a station link can arrive while the gate is still up —
         // and the handler that acts on it lives in the list, which does not

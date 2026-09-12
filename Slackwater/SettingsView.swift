@@ -153,7 +153,11 @@ struct SettingsView: View {
 
     private var slackWindowSpeedBinding: Binding<Double> {
         Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
-                set: { slackWindowSpeed = normalizedSlackThresholdKn($0) })
+                set: {
+                    slackWindowSpeed = normalizedSlackThresholdKn($0)
+                    // Every scheduled slack window was computed at the old threshold.
+                    AlertScheduler.requestReschedule()
+                })
     }
 
     @ViewBuilder private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {
