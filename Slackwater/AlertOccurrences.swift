@@ -58,3 +58,90 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
         .map { ($0, nil) }
     return (opened + hairline).sorted { $0.event < $1.event }
 }
+
+/// One dated event a rule found (notifications spec §4).
+struct AlertOccurrence: Equatable, Sendable {
+    let ruleID: UUID
+    /// The water event itself.
+    let event: Date
+    /// When a notification fires: `event − lead`.
+    let fire: Date
+    /// A window's close.
+    var end: Date? = nil
+    /// A slack no run under the threshold covers.
+    var noWindow = false
+    /// Tide triggers: the height at the event, metres.
+    var heightM: Double? = nil
+
+    var key: String { "\(ruleID.uuidString).\(Int(event.timeIntervalSince1970))" }
+}
+
+/// What copy names: the station and the zone its times read in.
+struct AlertPlace: Equatable, Sendable {
+    let name: String
+    let tz: TimeZone
+}
+
+extension WidgetRecord {
+    /// Where the sky is read from. A derived gate uses its own position, not its reference port's.
+    var alertPosition: (lat: Double, lon: Double) {
+        switch self {
+        case .tide(let r, _): (r.latitude, r.longitude)
+        case .current(let r, _): (r.latitude, r.longitude)
+        case .derived(let r): (r.gate.latitude, r.gate.longitude)
+        }
+    }
+
+    var alertPlace: AlertPlace {
+        switch self {
+        case .tide(let r, _): AlertPlace(name: r.name, tz: r.tz)
+        case .current(let r, _): AlertPlace(name: r.name, tz: r.tz)
+        case .derived(let r): AlertPlace(name: r.gate.name, tz: r.gate.tz)
+        }
+    }
+}
+
+/// Every occurrence of `rule` at `station` with its event inside `[from, to]`. Pure: the
+/// scheduler and the tests are its only callers.
+func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat: Double, lon: Double),
+                      from: Date, to: Date, threshold: Double) -> [AlertOccurrence] {
+    var found: [(event: Date, end: Date?, noWindow: Bool, heightM: Double?)]
+
+    switch (rule.trigger, station) {
+    case (.slackWindowOpens, .current(let s, _, _)):
+        found = slackWindowOpenings(s, from: from, to: to, threshold: threshold)
+            .map { (event: $0.event, end: $0.end, noWindow: $0.end == nil, heightM: nil) }
+    case (.currentPeak(let flood), .current(let s, _, _)):
+        found = s.events(from: from, to: to)
+            .filter { $0.kind == (flood ? .maxFlood : .maxEbb) }
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
+    case (.slack, .derived(let g, _, _)):
+        found = g.slacks(from: from, to: to)
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: nil) }
+    case (.tideExtreme(let high), .tide(let s, _, _)):
+        found = s.extremes(from: from, to: to)
+            .filter { $0.kind == (high ? .high : .low) }
+            .map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
+    case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
+        let samples = s.heights(from: from, to: to, step: 600).map { (time: $0.time, height: $0.height) }
+        found = tideCrossings(samples, level: level, rising: rising)
+            .map { (event: $0, end: nil, noWindow: false, heightM: level) }
+    case (.eclipse, _):
+        guard let observer = try? Observer(latitudeDeg: position.lat, longitudeDeg: position.lon) else { return [] }
+        found = visibleEclipses(from: from, to: to, observer: observer)
+            .map { (event: $0.start, end: nil, noWindow: false, heightM: nil) }
+    default:
+        // The trigger doesn't apply to this kind of station (spec §8).
+        return []
+    }
+
+    found = found.filter { $0.event >= from && $0.event <= to }
+    if rule.daylightOnly {
+        let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)
+        found = found.filter { f in spans.contains { $0.contains(f.event) } }
+    }
+    return found.map {
+        AlertOccurrence(ruleID: rule.id, event: $0.event, fire: $0.event.addingTimeInterval(-rule.lead),
+                        end: $0.end, noWindow: $0.noWindow, heightM: $0.heightM)
+    }
+}
