@@ -658,7 +658,7 @@ struct TimelineScrubStrip: View {
             // Rest = no scrub change for this long. A cancelled sleep is a
             // scrub still in motion, not a rest.
             settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            guard (try? await Task.sleep(for: Timeline.rest)) != nil else { return }
             settled = true
         }
         // The pills' 44-point semantic rows are centred on the 30-point

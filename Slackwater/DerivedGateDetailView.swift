@@ -49,6 +49,8 @@ struct DerivedGateDetailView: View {
                                 refreshSlacks()
                             },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
+                            alertOffer: derivedAlertOffer(
+                                onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
                             above: { EmptyView() },
                             card: { tl in
                                 let next = nextStop
