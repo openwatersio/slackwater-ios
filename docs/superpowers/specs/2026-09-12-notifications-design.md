@@ -68,6 +68,8 @@ enum AlertLevel: String, Codable { case none, notification, alarm }
 - Rules are JSON in the App Group suite under `slackwater.alertRules`, device-local. They do not
   sync through iCloud the way favourites do: two devices holding one rule would ring the same
   alarm twice.
+- The Slackwater calendar is not device-local: it lives in the account new events go to, so its
+  events — and a Premium user's alarms on them — appear on every device that account syncs to.
 
 ## 4. Occurrences
 
