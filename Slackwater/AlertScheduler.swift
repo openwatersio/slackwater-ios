@@ -79,8 +79,7 @@ struct AlertStatusSnapshot: Equatable {
             resolveAlerts(rules, now: now, threshold: threshold)
         }.value
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences, now: now, premium: premium)
-        // Deviation from the brief (controller ruling): uniqueKeysWithValues crashes on a
-        // duplicated rule id; keep the first the way deliveryPlan already does.
+        // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
         let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         func entries(_ list: [AlertOccurrence], includeLead: Bool, alarm: Bool) -> [AlertEntry] {

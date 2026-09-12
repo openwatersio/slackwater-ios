@@ -14,22 +14,29 @@ import EventKit
 
     /// The Slackwater calendar, created on first use in the account new events already go to,
     /// so it syncs wherever the user's calendars do. Recreated if the user deleted it.
+    /// ponytail: found by saved identifier only — a reinstall, or an identifier change after a
+    /// full sync, leaves the old Slackwater calendar behind. Match by title if that shows up.
     private static func slackwaterCalendar(create: Bool) -> EKCalendar? {
         if let id = AppGroup.defaults.string(forKey: AppGroup.alertCalendarKey),
            let existing = store.calendar(withIdentifier: id) { return existing }
         guard create else { return nil }
-        let calendar = EKCalendar(for: .event, eventStore: store)
-        calendar.title = "Slackwater"
-        guard let source = store.defaultCalendarForNewEvents?.source
-                ?? store.sources.first(where: { $0.sourceType == .local }) else { return nil }
-        calendar.source = source
-        do { try store.saveCalendar(calendar, commit: true) } catch { return nil }
-        AppGroup.defaults.set(calendar.calendarIdentifier, forKey: AppGroup.alertCalendarKey)
-        return calendar
+        // Google and Exchange accounts refuse new calendars: fall back to iCloud, then the device.
+        let sources = [store.defaultCalendarForNewEvents?.source].compactMap { $0 }
+            + store.sources.filter { $0.sourceType == .calDAV && $0.title == "iCloud" }
+            + store.sources.filter { $0.sourceType == .local }
+        for source in sources {
+            let calendar = EKCalendar(for: .event, eventStore: store)
+            calendar.title = "Slackwater"
+            calendar.source = source
+            guard (try? store.saveCalendar(calendar, commit: true)) != nil else { continue }
+            AppGroup.defaults.set(calendar.calendarIdentifier, forKey: AppGroup.alertCalendarKey)
+            return calendar
+        }
+        return nil
     }
 
-    /// Makes the calendar's future match `entries`: removes events no longer planned and adds
-    /// the missing ones. Past events are left alone.
+    /// Makes the calendar's future match `entries`: removes events that haven't started and are
+    /// no longer planned, and adds the missing ones. An event already under way is left alone.
     /// ponytail: an event the user edited by hand (moved, a second alarm) stops matching and is
     /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
     static func apply(_ entries: [AlertEntry], now: Date) {
@@ -44,16 +51,15 @@ import EventKit
                                      alarmOffset: entry.alarmOffset), entry)
         }, uniquingKeysWith: { first, _ in first })
 
-        var have = Set<String>()
-        for event in existing {
-            let key = calendarEventKey(title: event.title ?? "", start: event.startDate, end: event.endDate,
-                                       alarmOffset: event.alarms?.first?.relativeOffset)
-            if wanted[key] == nil {
-                try? store.remove(event, span: .thisEvent, commit: false)
-            } else {
-                have.insert(key)
-            }
+        let keyed = existing.map { event in
+            (key: calendarEventKey(title: event.title ?? "", start: event.startDate, end: event.endDate,
+                                   alarmOffset: event.alarms?.first?.relativeOffset),
+             start: event.startDate as Date)
         }
+        for i in calendarEventsToRemove(keyed, wanted: Set(wanted.keys), now: now) {
+            try? store.remove(existing[i], span: .thisEvent, commit: false)
+        }
+        let have = Set(keyed.map(\.key))
         for (key, entry) in wanted where !have.contains(key) {
             let event = EKEvent(eventStore: store)
             event.calendar = calendar
