@@ -91,16 +91,40 @@ func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imper
     return AlertCopy(title: "\(place.name) - \(event)", body: body)
 }
 
-/// A calendar event's identity is its content, alarm included. A moved window, or an event
-/// that gains or loses its Premium alarm, is a different event: the old one is removed and
-/// the new one added.
-func calendarEventKey(title: String, start: Date, end: Date, alarmOffset: TimeInterval?) -> String {
-    let alarm = alarmOffset.map { String(Int($0)) } ?? "none"
-    return "\(title)|\(Int(start.timeIntervalSince1970))|\(Int(end.timeIntervalSince1970))|\(alarm)"
+/// What a calendar event is compared by.
+struct CalendarEventShape: Equatable {
+    let title: String
+    let start: Date
+    let end: Date
+    let alarmOffset: TimeInterval?
 }
 
-/// Indices of the existing calendar events a reschedule removes: those that start from `now` on
-/// and are no longer planned. An event already under way — a slack window open right now — stays.
-func calendarEventsToRemove(_ existing: [(key: String, start: Date)], wanted: Set<String>, now: Date) -> [Int] {
-    existing.indices.filter { existing[$0].start >= now && !wanted.contains(existing[$0].key) }
+/// How far apart a stored event's times and a planned event's times can be and still be the same
+/// event. The engine's event search lands a second apart from one reschedule to the next, so an
+/// instant on a minute boundary can floor to either minute.
+let calendarMatchTolerance: TimeInterval = 90
+
+/// Which of the calendar's events to remove and which planned events to add. A stored event is a
+/// planned one when their title and alarm agree and both times are within `calendarMatchTolerance`;
+/// each stored event answers for one planned event. A planned event identical to an earlier one is
+/// written once. An event already under way — a slack window open right now — is never removed.
+/// ponytail: a pairwise scan, O(existing × planned) over a few hundred events per run; index by
+/// title if calendars grow into the thousands.
+func calendarChanges(existing: [CalendarEventShape], wanted: [CalendarEventShape],
+                     now: Date) -> (remove: [Int], add: [Int]) {
+    var claimed = Set<Int>()
+    var add: [Int] = []
+    for (w, plan) in wanted.enumerated() {
+        if wanted[..<w].contains(plan) { continue }
+        let match = existing.indices.first { i in
+            !claimed.contains(i)
+                && existing[i].title == plan.title
+                && existing[i].alarmOffset == plan.alarmOffset
+                && abs(existing[i].start.timeIntervalSince(plan.start)) <= calendarMatchTolerance
+                && abs(existing[i].end.timeIntervalSince(plan.end)) <= calendarMatchTolerance
+        }
+        if let match { claimed.insert(match) } else { add.append(w) }
+    }
+    let remove = existing.indices.filter { !claimed.contains($0) && existing[$0].start >= now }
+    return (remove, add)
 }

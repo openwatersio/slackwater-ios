@@ -38,6 +38,8 @@ import EventKit
 
     /// Makes the calendar's future match `entries`: removes events that haven't started and are
     /// no longer planned, and adds the missing ones. An event already under way is left alone.
+    /// It matches within a tolerance rather than by exact content, since the engine's event search
+    /// can land an instant a second apart from one reschedule to the next.
     /// ponytail: an event the user edited by hand (moved, a second alarm) stops matching and is
     /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
     static func apply(_ entries: [AlertEntry], now: Date) {
@@ -46,22 +48,20 @@ import EventKit
                                                  end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),
                                                  calendars: [calendar])
         let existing = store.events(matching: predicate)
-        let wanted = Dictionary(entries.map { entry -> (String, AlertEntry) in
-            let end = entry.occurrence.end ?? entry.occurrence.event
-            return (calendarEventKey(title: entry.copy.title, start: entry.occurrence.event, end: end,
-                                     alarmOffset: entry.alarmOffset), entry)
-        }, uniquingKeysWith: { first, _ in first })
-
-        let keyed = existing.map { event in
-            (key: calendarEventKey(title: event.title ?? "", start: event.startDate, end: event.endDate,
-                                   alarmOffset: event.alarms?.first?.relativeOffset),
-             start: event.startDate as Date)
+        let stored = existing.map { event in
+            CalendarEventShape(title: event.title ?? "", start: event.startDate, end: event.endDate,
+                               alarmOffset: event.alarms?.first?.relativeOffset)
         }
-        for i in calendarEventsToRemove(keyed, wanted: Set(wanted.keys), now: now) {
+        let planned = entries.map { entry in
+            CalendarEventShape(title: entry.copy.title, start: entry.occurrence.event,
+                               end: entry.occurrence.end ?? entry.occurrence.event, alarmOffset: entry.alarmOffset)
+        }
+        let changes = calendarChanges(existing: stored, wanted: planned, now: now)
+        for i in changes.remove {
             try? store.remove(existing[i], span: .thisEvent, commit: false)
         }
-        let have = Set(keyed.map(\.key))
-        for (key, entry) in wanted where !have.contains(key) {
+        for i in changes.add {
+            let entry = entries[i]
             let event = EKEvent(eventStore: store)
             event.calendar = calendar
             event.title = entry.copy.title
