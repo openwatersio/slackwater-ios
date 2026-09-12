@@ -308,8 +308,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
         XCTAssert(tomorrowDay.appears(within: 5), "Tomorrow's day header is not expandable")
-        XCTAssertGreaterThan(tomorrowDay.frame.width, app.windows.firstMatch.frame.width * 0.8,
-                             "the day header should span the schedule with its chevron trailing")
+        // Against today's open row, not the window: the iPad split puts the
+        // schedule in the detail column, where spanning it is ~58% of the window.
+        let todayRow = app.buttons.matching(identifier: "schedule-row-d0").firstMatch
+        XCTAssert(todayRow.appears(within: 5), "today's rows should start expanded")
+        XCTAssertGreaterThanOrEqual(tomorrowDay.frame.width, todayRow.frame.width - 1,
+                                    "the day header should span the schedule with its chevron trailing")
     }
 
     // The fixed centerline stays put while the multi-day strip pans underneath.
