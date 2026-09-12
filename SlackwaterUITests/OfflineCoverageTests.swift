@@ -117,7 +117,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     func testChartPackCardShowsStateAndOffersRefresh() throws {
         let app = launch("-seedGate", "-connectivityOnline",
                          "-fixLat", "48.406", "-fixLon", "-122.643")
-        app.buttons["offline-status"].firstMatch.tap()
+        openDownloads(app)
         // The state line is the card: a VStack identifier does not surface as
         // its own element, so assert on what the user actually reads.
         let state = app.staticTexts.matching(
@@ -133,9 +133,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-chsResetModels",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
-        app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].appears(within: 5),
-                  "the indicator did not open the downloads manager")
+        openDownloads(app)
 
         let victoria = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
         XCTAssert(victoria.appears(within: 5), "Victoria is not in the download queue")
@@ -191,8 +189,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                          "-chsFailOnly", "chs-victoria-harbour",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
 
-        app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
+        openDownloads(app)
 
         let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded failed row is missing")
@@ -255,9 +252,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-resetFavorites", "-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "42.3601", "-fixLon", "-71.0589")  // Boston
 
-        app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].appears(within: 5),
-                  "the indicator did not open the downloads manager")
+        openDownloads(app)
         save(app, "downloads-boston.png")
 
         let rows = app.descendants(matching: .any)
@@ -332,8 +327,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // Opening it put it in the download set, at the front.
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
-        app.buttons["offline-status"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Downloads"].appears(within: 5))
+        openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-halifax"].firstMatch
         XCTAssert(row.appears(within: 5),
                   "opening a station outside the auto-fit set did not add it to the queue")
