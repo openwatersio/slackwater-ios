@@ -7,9 +7,6 @@ import MapLibre
 
 // MARK: - Style building (mirrors web mapStyle.ts)
 
-/// Under the satellite raster while tiles load or are absent offline —
-/// Seascape's flat deep-water tone, not a hand-picked blue.
-private let WATER_TONE = "#e9f7ff"
 /// Pin fills fail WCAG's 3:1 on pale water, so the contrast lives on the
 /// stroke — every pin carries this ink outline (asserted in
 /// `testEveryPinOutlineClearsTheContrastFloorOnBothGrounds`).
@@ -217,11 +214,12 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     labels.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 1.1)))
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textOptional = NSExpression(forConstantValue: true)
-    labels.textColor = ink
-    // 1.5, not 1: at 1 the halo reads as fringing over satellite imagery
-    // rather than a ground the ink can sit on.
-    labels.textHaloColor = NSExpression(forConstantValue: hexColor(WATER_TONE))
-    labels.textHaloWidth = NSExpression(forConstantValue: 1.5)
+    // The basemap's own label treatment (versatiles satellite: #fff on a
+    // #000 halo, width 1), so station names read as part of the style
+    // rather than stickers on it.
+    labels.textColor = NSExpression(forConstantValue: UIColor.white)
+    labels.textHaloColor = NSExpression(forConstantValue: UIColor.black)
+    labels.textHaloWidth = NSExpression(forConstantValue: 1)
 
     return [clusters, counts, currentPins, tidePinPlate, tidePins, labels]
 }

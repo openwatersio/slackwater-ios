@@ -12,6 +12,11 @@ let defaultDiscoveryZoom = 7.35
 /// jump lands framed on one station rather than on the whole Salish Sea.
 let stationZoom = 12.5
 
+/// Where the locate FAB lands: past `LABEL_MIN_ZOOM` so "where am I" comes
+/// answered with named stations, wider than `stationZoom`'s single-station
+/// frame — a harbor, not a dot.
+let locateZoom = 10.5
+
 /// UI-test hook, like `-openMap`: `-mapZoom 3.2` (UserDefaults argument
 /// domain) opens the discovery map at a stated zoom. Synthesised pinches are
 /// not a camera — five of them land somewhere the test cannot name. Zoom 0
