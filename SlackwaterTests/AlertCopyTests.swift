@@ -58,4 +58,14 @@ final class AlertCopyTests: XCTestCase {
                        "Race Passage - Slack window|1786372320|1786372920|-1800")
         XCTAssertNotEqual(plain, calendarEventKey(title: title, start: event, end: event.addingTimeInterval(900), alarmOffset: nil))
     }
+
+    func testAnEventAlreadyUnderWayIsNeverRemoved() {
+        let now = event
+        let existing: [(key: String, start: Date)] = [
+            ("open", now.addingTimeInterval(-600)),     // a slack window open right now
+            ("stale", now.addingTimeInterval(3_600)),   // moved by a threshold change
+            ("kept", now.addingTimeInterval(7_200)),
+        ]
+        XCTAssertEqual(calendarEventsToRemove(existing, wanted: ["kept"], now: now), [1])
+    }
 }

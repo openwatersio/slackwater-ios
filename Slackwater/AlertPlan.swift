@@ -98,3 +98,9 @@ func calendarEventKey(title: String, start: Date, end: Date, alarmOffset: TimeIn
     let alarm = alarmOffset.map { String(Int($0)) } ?? "none"
     return "\(title)|\(Int(start.timeIntervalSince1970))|\(Int(end.timeIntervalSince1970))|\(alarm)"
 }
+
+/// Indices of the existing calendar events a reschedule removes: those that start from `now` on
+/// and are no longer planned. An event already under way — a slack window open right now — stays.
+func calendarEventsToRemove(_ existing: [(key: String, start: Date)], wanted: Set<String>, now: Date) -> [Int] {
+    existing.indices.filter { existing[$0].start >= now && !wanted.contains(existing[$0].key) }
+}

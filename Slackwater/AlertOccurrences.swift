@@ -3,6 +3,12 @@ import Almanac
 import Foundation
 import TideEngine
 
+/// Sample series start on a fixed 10-minute grid, so every reschedule interpolates the same
+/// instants and a calendar event keeps its identity from one run to the next.
+private func alertSampleGrid(_ t: Date) -> Date {
+    Date(timeIntervalSince1970: (t.timeIntervalSince1970 / 600).rounded(.down) * 600)
+}
+
 /// Each time a sampled height series passes `level` in the given direction, linearly
 /// interpolated between the two samples that bracket it. A sample exactly on the level
 /// counts once, on the pair that arrives at it.
@@ -48,7 +54,7 @@ func daylightSpans(from: Date, to: Date, lat: Double, lon: Double) -> [ClosedRan
 /// the caller clips to the range.
 func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
                          threshold: Double) -> [(event: Date, end: Date?)] {
-    let start = from.addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
+    let start = alertSampleGrid(from).addingTimeInterval(-21_600), stop = to.addingTimeInterval(21_600)
     let points = station.speeds(from: start, to: stop, step: 600)
     let slacks = station.events(from: start, to: stop).filter { $0.kind == .slack }.map(\.time)
     let runs = mergeWindows(slacks.compactMap { slackWindow(points, around: $0, threshold: threshold) })
@@ -123,7 +129,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
             .filter { $0.kind == (high ? .high : .low) }
             .map { (event: $0.time, end: nil, noWindow: false, heightM: $0.height) }
     case (.tideCrossing(let level, let rising), .tide(let s, _, _)):
-        let samples = s.heights(from: from, to: to, step: 600).map { (time: $0.time, height: $0.height) }
+        let samples = s.heights(from: alertSampleGrid(from), to: to, step: 600).map { (time: $0.time, height: $0.height) }
         found = tideCrossings(samples, level: level, rising: rising)
             .map { (event: $0, end: nil, noWindow: false, heightM: level) }
     case (.eclipse, _):

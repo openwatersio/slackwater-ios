@@ -141,4 +141,24 @@ import TideEngine
         // Spec §11 spike 3. If this fails, report the printed time; do not widen the budget.
         XCTAssertLessThan(took, 1.0 * perfScale)
     }
+
+    func testOccurrencesDoNotDriftBetweenRuns() throws {
+        // Two reschedules a few seconds apart must name the same instants, or every calendar
+        // event is removed and re-added each time the app comes forward (spec §5.1).
+        let cases: [(String, AlertTrigger)] = [
+            (TideStationRecord.fridayHarborID, .tideCrossing(heightM: 1.0, rising: true)),
+            (deception, .slackWindowOpens),
+        ]
+        for (id, trigger) in cases {
+            let (station, position) = try load(id)
+            let rule = AlertRule(stationID: id, trigger: trigger)
+            let later = now.addingTimeInterval(37)
+            let first = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 1.0)
+                .filter { $0.event >= later }
+            let second = alertOccurrences(rule, station: station, position: position, from: later, to: week, threshold: 1.0)
+            XCTAssertFalse(second.isEmpty)
+            XCTAssertEqual(second.map(\.event), first.map(\.event), "\(trigger) instants drifted between runs")
+            XCTAssertEqual(second.map(\.end), first.map(\.end), "\(trigger) window ends drifted between runs")
+        }
+    }
 }
