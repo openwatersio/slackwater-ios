@@ -102,6 +102,23 @@ let CLUSTER_MAX_ZOOM = 6
 /// basemap's needs and runtime labels ride along.
 private let LABEL_FONT = ["noto_sans_bold"]
 
+/// Below this zoom station names are noise: hundreds collide with each other
+/// and with the basemap's own place labels, which they crowd off the map.
+/// Until here the pins carry the story alone; the basemap's geography labels
+/// get the ink back.
+let LABEL_MIN_ZOOM = 9.5
+
+/// How much a pin grows from the discovery zoom to the per-station zoom.
+/// 5pt reads as a smear of confetti once labels appear; by `stationZoom`
+/// a pin is the subject of the frame and earns dot-marker weight. One
+/// factor for the circle radius, the square's icon scale, and the stroke,
+/// so the two kinds keep reading as one system at every zoom.
+let PIN_ZOOM_GROWTH = 1.8
+/// The growth ramp's endpoints: flat at `PIN_RADIUS` through the discovery
+/// zoom, full size at the detail-header jump zoom.
+let PIN_GROWTH_FROM = 8.0
+let PIN_GROWTH_TO = stationZoom
+
 func hexColor(_ hex: String) -> UIColor {
     let v = UInt32(hex.dropFirst(), radix: 16) ?? 0
     return UIColor(red: CGFloat((v >> 16) & 0xFF) / 255,
@@ -134,6 +151,12 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let ink = NSExpression(forConstantValue: hexColor(CHART_INK))
     let halo = NSExpression(forConstantValue: PIN_HALO)
     let font = NSExpression(forConstantValue: LABEL_FONT)
+    // The zoom ramp, once per unit it applies to: radius and stroke in
+    // points, icon scale as a factor of the image's own PIN_RADIUS sizing.
+    func grown(_ base: Double) -> NSExpression {
+        e(["interpolate", ["linear"], ["zoom"],
+           PIN_GROWTH_FROM, base, PIN_GROWTH_TO, base * PIN_ZOOM_GROWTH])
+    }
 
     let clusters = MLNCircleStyleLayer(identifier: "station-clusters", source: source)
     clusters.predicate = isCluster
@@ -157,9 +180,9 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let currentPins = MLNCircleStyleLayer(identifier: "station-pins-current", source: source)
     currentPins.predicate = NSPredicate(mglJSONObject:
         ["all", ["!", ["has", "point_count"]], ["==", ["get", "kind"], "current"]])
-    currentPins.circleRadius = NSExpression(forConstantValue: PIN_RADIUS)
+    currentPins.circleRadius = grown(PIN_RADIUS)
     currentPins.circleColor = e(PIN_STATE_COLOUR)
-    currentPins.circleStrokeWidth = halo
+    currentPins.circleStrokeWidth = grown(PIN_HALO)
     currentPins.circleStrokeColor = ink
 
     // The tide square's outline (see `squarePinImage`): a larger ink square
@@ -170,6 +193,7 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let tidePinPlate = MLNSymbolStyleLayer(identifier: "station-pins-tide-plate", source: source)
     tidePinPlate.predicate = notCurrent
     tidePinPlate.iconImageName = NSExpression(forConstantValue: "pin-square-plate")
+    tidePinPlate.iconScale = grown(1)
     tidePinPlate.iconAllowsOverlap = NSExpression(forConstantValue: true)
     tidePinPlate.iconIgnoresPlacement = NSExpression(forConstantValue: true)
     tidePinPlate.iconColor = ink
@@ -178,21 +202,26 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let tidePins = MLNSymbolStyleLayer(identifier: "station-pins-tide", source: source)
     tidePins.predicate = notCurrent
     tidePins.iconImageName = NSExpression(forConstantValue: "pin-square")
+    tidePins.iconScale = grown(1)
     tidePins.iconAllowsOverlap = NSExpression(forConstantValue: true)
     tidePins.iconIgnoresPlacement = NSExpression(forConstantValue: true)
     tidePins.iconColor = e(PIN_STATE_COLOUR)
 
     let labels = MLNSymbolStyleLayer(identifier: "station-labels", source: source)
     labels.predicate = notACluster
+    labels.minimumZoomLevel = Float(LABEL_MIN_ZOOM)
     labels.text = e(["get", "name"])
     labels.textFontNames = font
-    labels.textFontSize = NSExpression(forConstantValue: 11)
+    labels.textFontSize = e(["interpolate", ["linear"], ["zoom"],
+                             LABEL_MIN_ZOOM, 11, 13, 13])
     labels.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 1.1)))
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textOptional = NSExpression(forConstantValue: true)
     labels.textColor = ink
+    // 1.5, not 1: at 1 the halo reads as fringing over satellite imagery
+    // rather than a ground the ink can sit on.
     labels.textHaloColor = NSExpression(forConstantValue: hexColor(WATER_TONE))
-    labels.textHaloWidth = NSExpression(forConstantValue: 1)
+    labels.textHaloWidth = NSExpression(forConstantValue: 1.5)
 
     return [clusters, counts, currentPins, tidePinPlate, tidePins, labels]
 }
