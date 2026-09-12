@@ -50,8 +50,8 @@ enum AlertRuleChange: Equatable {
 let alertRowLead: TimeInterval = 1_800
 
 /// One tap on Calendar or Live for this station and offer: turn that delivery on or off on the
-/// matching rule, create the rule with it on, or remove a rule left with nothing. Turning a
-/// delivery on also turns a rule that was switched off back on.
+/// matching rule, create the rule with it on, or remove a rule left with nothing. Waking a rule
+/// that was switched off turns on only the delivery tapped, not both.
 func alertRowToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
                     delivery: AlertDelivery) -> AlertRuleChange {
     guard var rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer }) else {
@@ -59,18 +59,24 @@ func alertRowToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger
                                  calendar: delivery == .calendar,
                                  alert: delivery == .live ? .notification : .none))
     }
-    let wasOn = rule.enabled && (delivery == .calendar ? rule.calendar : rule.alert == .notification)
-    switch delivery {
-    case .calendar: rule.calendar = !wasOn
-    case .live: rule.alert = wasOn ? .none : .notification
+    if !rule.enabled {
+        // Waking a switched-off rule turns on only what was tapped; the row showed both off.
+        rule.enabled = true
+        rule.calendar = delivery == .calendar
+        rule.alert = delivery == .live ? .notification : .none
+        return .upsert(rule)
     }
-    if !wasOn { rule.enabled = true }
+    switch delivery {
+    case .calendar: rule.calendar.toggle()
+    case .live: rule.alert = rule.alert == .notification ? .none : .notification
+    }
     return (!rule.calendar && rule.alert == .none) ? .remove(rule.id) : .upsert(rule)
 }
 
-/// Which of the row's two buttons read on for this station and offer.
-func alertRowState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger) -> (calendar: Bool, live: Bool) {
+/// Which of the row's two buttons read on for this station and offer. Live reads on only with
+/// Premium: without it, notifications never fire, however the stored rule reads.
+func alertRowState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger, premium: Bool) -> (calendar: Bool, live: Bool) {
     guard let rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer && $0.enabled })
     else { return (false, false) }
-    return (rule.calendar, rule.alert == .notification)
+    return (rule.calendar, rule.alert == .notification && premium)
 }

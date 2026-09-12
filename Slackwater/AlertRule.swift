@@ -41,11 +41,26 @@ struct AlertRule: Codable, Identifiable, Equatable {
     /// so a store built in a test never reaches the system.
     var onChange: () -> Void = {}
     private let defaults: UserDefaults
+    /// Rules this build can't read — written by a newer one — kept exactly as stored and
+    /// written back, so moving between builds never loses them.
+    private var unreadable: [Any] = []
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
-        rules = defaults.data(forKey: AppGroup.alertRulesKey)
-            .flatMap { try? JSONDecoder().decode([AlertRule].self, from: $0) } ?? []
+        let stored = defaults.data(forKey: AppGroup.alertRulesKey)
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [Any] } ?? []
+        var readable: [AlertRule] = []
+        var kept: [Any] = []
+        for item in stored {
+            if let data = try? JSONSerialization.data(withJSONObject: item, options: .fragmentsAllowed),
+               let rule = try? JSONDecoder().decode(AlertRule.self, from: data) {
+                readable.append(rule)
+            } else {
+                kept.append(item)
+            }
+        }
+        rules = readable
+        unreadable = kept
     }
 
     func upsert(_ rule: AlertRule) {
@@ -63,8 +78,13 @@ struct AlertRule: Codable, Identifiable, Equatable {
     }
 
     private func persist() {
-        defaults.set(try? JSONEncoder().encode(rules), forKey: AppGroup.alertRulesKey)
-        onChange()
+        defer { onChange() }
+        // An encoding failure keeps what's stored rather than overwriting it with nothing.
+        guard let encoded = try? JSONEncoder().encode(rules),
+              let readable = try? JSONSerialization.jsonObject(with: encoded) as? [Any],
+              let data = try? JSONSerialization.data(withJSONObject: readable + unreadable)
+        else { return }
+        defaults.set(data, forKey: AppGroup.alertRulesKey)
     }
 }
 

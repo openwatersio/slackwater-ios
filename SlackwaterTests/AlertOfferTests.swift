@@ -83,12 +83,15 @@ final class AlertOfferTests: XCTestCase {
 
     func testTheRowReadsEnabledDeliveriesAndATapWakesAnOffRule() {
         var rule = AlertRule(stationID: "s", trigger: .slack, alert: .notification)
-        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack).calendar)
-        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack).live)
-        XCTAssertFalse(alertRowState([rule], stationID: "s", offer: .eclipse).calendar)
+        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack, premium: true).calendar)
+        XCTAssertTrue(alertRowState([rule], stationID: "s", offer: .slack, premium: true).live)
+        let lapsed = alertRowState([rule], stationID: "s", offer: .slack, premium: false)
+        XCTAssertTrue(lapsed.calendar)
+        XCTAssertFalse(lapsed.live)
+        XCTAssertFalse(alertRowState([rule], stationID: "s", offer: .eclipse, premium: true).calendar)
 
         rule.enabled = false
-        let off = alertRowState([rule], stationID: "s", offer: .slack)
+        let off = alertRowState([rule], stationID: "s", offer: .slack, premium: true)
         XCTAssertFalse(off.calendar)
         XCTAssertFalse(off.live)
 
@@ -96,5 +99,6 @@ final class AlertOfferTests: XCTestCase {
         else { return XCTFail("expected an update") }
         XCTAssertTrue(woken.enabled)
         XCTAssertTrue(woken.calendar)
+        XCTAssertEqual(woken.alert, .none)
     }
 }

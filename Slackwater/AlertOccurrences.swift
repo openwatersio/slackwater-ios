@@ -9,6 +9,14 @@ private func alertSampleGrid(_ t: Date) -> Date {
     Date(timeIntervalSince1970: (t.timeIntervalSince1970 / 600).rounded(.down) * 600)
 }
 
+/// An instant floored to its minute — the resolution every alert title and body reads in, and
+/// the one that keeps an occurrence the same instant from one reschedule to the next: the
+/// engine's event search can land a second apart between runs, and the calendar identifies an
+/// event by its content.
+func alertMinute(_ t: Date) -> Date {
+    Date(timeIntervalSince1970: (t.timeIntervalSince1970 / 60).rounded(.down) * 60)
+}
+
 /// Each time a sampled height series passes `level` in the given direction, linearly
 /// interpolated between the two samples that bracket it. A sample exactly on the level
 /// counts once, on the pair that arrives at it.
@@ -141,6 +149,7 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         return []
     }
 
+    found = found.map { (event: alertMinute($0.event), end: $0.end.map(alertMinute), noWindow: $0.noWindow, heightM: $0.heightM) }
     found = found.filter { $0.event >= from && $0.event <= to }
     if rule.daylightOnly {
         let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)

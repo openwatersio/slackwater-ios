@@ -14,8 +14,9 @@ import EventKit
 
     /// The Slackwater calendar, created on first use in the account new events already go to,
     /// so it syncs wherever the user's calendars do. Recreated if the user deleted it.
-    /// ponytail: found by saved identifier only — a reinstall, or an identifier change after a
-    /// full sync, leaves the old Slackwater calendar behind. Match by title if that shows up.
+    /// ponytail: found by saved identifier only — a reinstall, or an identifier change after a full
+    /// sync, leaves the old Slackwater calendar behind. Don't match by title instead: the calendar
+    /// syncs through iCloud, and adopting another device's copy would remove that device's events.
     private static func slackwaterCalendar(create: Bool) -> EKCalendar? {
         if let id = AppGroup.defaults.string(forKey: AppGroup.alertCalendarKey),
            let existing = store.calendar(withIdentifier: id) { return existing }
