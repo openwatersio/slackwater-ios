@@ -354,11 +354,10 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
     // MARK: - Station identity presentation
 
-    /// Same-named stations render as ONE entry in Near Me, with the namesakes
-    /// behind the chooser — two "Discovery Island" cards side by side look
-    /// identical. Pick the non-nearest one from that chooser and Recents
-    /// remembers exactly which one you opened: no namesake collapse on an
-    /// explicit pick.
+    /// Same-named stations render as ONE entry in the list, with the namesakes
+    /// behind the chooser on the station page — two "Discovery Island" cards
+    /// side by side look identical. Pick the non-nearest one from that chooser
+    /// and the list shows that one from then on.
     func testM50MatchingStationChooser() throws {
         // Upright: the split-layout test leaves the device in landscape, and
         // these screenshots are the ones a human reads.
@@ -383,43 +382,72 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["6.6 nm SSE"].exists,
                        "the farther namesake must not render as its own card")
 
+        // The list offers no chooser; the station page does, beside its tide
+        // link. Three since #268: the NOAA subordinate "2.6 nm SSE" (PCT1411)
+        // joined the two harmonic stations, and the count leaves out the one
+        // on screen.
+        XCTAssertFalse(listContainer(app).descendants(matching: .any)["matching-stations"].exists,
+                       "the list must not offer the chooser")
+        app.staticTexts["3.0 nm NE"].firstMatch.tap()
+        XCTAssert(app.otherElements["detail-header"].appears(within: 8), "the entry did not open its station")
         let chooserButton = app.buttons["matching-stations"].firstMatch
-        XCTAssert(chooserButton.appears(within: 5),
-                  "no matching-station affordance on a collided name")
-        // Three since #268: the NOAA subordinate "2.6 nm SSE" (PCT1411) joined
-        // the two harmonic stations.
-        XCTAssert(app.staticTexts["3 matching stations"].firstMatch.exists)
+        XCTAssert(chooserButton.appears(within: 8), "no matching-station affordance on the station page")
+        XCTAssert(chooserButton.label.contains("2 other current locations"), chooserButton.label)
         chooserButton.tap()
 
-        // The chooser: both stations, each with what it measures and how far.
-        XCTAssert(app.otherElements["station-chooser"].appears(within: 5)
-                  || app.staticTexts["3.0 nm NE"].firstMatch.appears(within: 5),
+        XCTAssert(app.descendants(matching: .any)["station-chooser"].firstMatch.appears(within: 5),
                   "the chooser sheet did not open")
-        XCTAssert(app.staticTexts["6.6 nm SSE"].firstMatch.appears(within: 5),
-                  "the chooser must offer the station the list collapsed")
+        func labelled(_ query: XCUIElementQuery, _ text: String) -> XCUIElement {
+            query.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        }
+        let rows = app.buttons.matching(identifier: "chooser-station")
+        XCTAssert(rows.firstMatch.appears(within: 5))
+        XCTAssertEqual(rows.count, 3)
+        let shownRow = labelled(rows, "3.0 nm NE of Discovery Island")
+        let farRow = labelled(rows, "6.6 nm SSE of Discovery Island")
+        XCTAssert(farRow.exists, "the chooser must offer the station the list collapsed")
+        XCTAssert(shownRow.isSelected, "the chooser must open on the station the list shows")
+        XCTAssert(labelled(rows, "from you").exists, "a row must say what its distance is from")
         XCTAssert(app.staticTexts["CURRENT · NOAA"].firstMatch.exists,  // MonoLabel uppercases
                   "a chooser row must say what it measures and whose data it is")
 
-        // Picking the collapsed one opens it — it is not lost, just quiet.
-        app.staticTexts["6.6 nm SSE"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Discovery Island"].firstMatch.appears(within: 8))
-        XCTAssert(app.otherElements["detail-header"].appears(within: 8),
-                  "the chooser pick did not open a station detail")
+        // The map holds exactly the candidates; a pin selects its row and
+        // does not open the station.
+        let pins = app.buttons.matching(identifier: "chooser-pin")
+        XCTAssert(pins.firstMatch.appears(within: 15), "the chooser map drew no pins")
+        XCTAssertEqual(pins.count, 3)
+        let farPin = labelled(pins, "6.6 nm SSE of Discovery Island")
+        farPin.tap()
+        wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: farRow)],
+             timeout: 5)
+        XCTAssert(farPin.isSelected)
+        XCTAssertFalse(shownRow.isSelected, "selection must move, not add")
+        // Opened from a station page, so a header is always under the sheet;
+        // the sheet itself staying up is what says the pin opened nothing.
+        XCTAssert(app.descendants(matching: .any)["station-chooser"].firstMatch.exists,
+                  "a pin tap closed the chooser")
+        save(app, "chooser-map.png")
 
-        // Recents keeps the station actually opened: the chooser pick is an
-        // explicit choice, not the distance ranking. Collapse it into the
-        // nearest namesake's id and Recents silently shows and reopens "3.0 nm
-        // NE" instead of the "6.6 nm SSE" station tapped. Same disambiguating
-        // field the chooser assertions above key on (each station's region is
-        // literally its bearing string), so a bare text match is unambiguous.
+        // Picking the collapsed one opens it — it is not lost, just quiet.
+        farRow.tap()
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "6.6 nm SSE"))
+            .firstMatch.appears(within: 8), "the chooser pick did not open that station")
+        save(app, "chooser-detail-link.png")
+
+        // The pick opened on top of the nearest station's page: back twice to
+        // the list, which remembers it — the chosen station takes the place's
+        // entry. Each station's region is literally its bearing string, so a
+        // bare text match is unambiguous.
+        app.buttons["detail-back"].firstMatch.tap()
+        XCTAssert(app.otherElements["detail-header"].appears(within: 5))
         app.buttons["detail-back"].firstMatch.tap()
         XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
-        let recentsLabel = app.staticTexts["RECENTS"].firstMatch
-        scrollTo(recentsLabel, in: app)
-        let recentPick = app.staticTexts["6.6 nm SSE"].firstMatch
-        scrollTo(recentPick, in: app)
-        XCTAssert(recentPick.exists,
-                  "Recents must keep the chooser-picked station, not collapse it into the nearest namesake")
+        let list = listContainer(app)
+        XCTAssert(list.staticTexts["6.6 nm SSE"].firstMatch.appears(within: 5),
+                  "the list must show the chosen station")
+        XCTAssertFalse(list.staticTexts["3.0 nm NE"].exists,
+                       "the nearest namesake kept its own entry after a pick")
+        save(app, "chooser-remembered.png")
     }
 
     /// iPad: opening a second station of the SAME kind must not keep the first
@@ -515,7 +543,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // where North Galiano WAS (Chemainus, ~1-4 nm) rather than near the
         // simulated Victoria fix ~30 nm south. Anchor the chooser on the user
         // instead and this named gate is nowhere in the list.
-        let pick = app.staticTexts["Galiano & Valdes Islands"].firstMatch
+        let pick = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Galiano & Valdes Islands")).firstMatch
         XCTAssert(pick.appears(within: 5),
                   "the chooser is ranked from the wrong position — it offered no Galiano-area station")
         pick.tap()

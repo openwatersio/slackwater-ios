@@ -115,8 +115,10 @@ struct TideDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)
-                                    if let nearby = nearbyCurrent {
-                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    StationLinksRow(stationId: record.id) {
+                                        if let nearby = nearbyCurrent {
+                                            NearbyStationLink(item: nearby.item, km: nearby.km)
+                                        }
                                     }
                                 }
                             },

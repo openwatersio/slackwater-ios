@@ -122,10 +122,12 @@ struct CurrentDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)
-                                    if let port = pairedTide {
-                                        TideAtPortLink(port: port)
-                                    } else if let nearby = nearbyTide {
-                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    StationLinksRow(stationId: record.itemId) {
+                                        if let port = pairedTide {
+                                            TideAtPortLink(port: port)
+                                        } else if let nearby = nearbyTide {
+                                            NearbyStationLink(item: nearby.item, km: nearby.km)
+                                        }
                                     }
                                 }
                             },

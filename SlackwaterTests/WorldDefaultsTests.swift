@@ -46,6 +46,21 @@ final class WorldDefaultsTests: XCTestCase {
         XCTAssertEqual(StationItem.byId[nearestCurrent]?.series, .current)
     }
 
+    /// A namesake chosen in the app is what the nearest-station widgets show.
+    func testNearestWidgetStationHonoursAChosenNamesake() throws {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let sierra = StationItem.all.filter { $0.name == "Sierra Point" }
+        let here = try XCTUnwrap(sierra.first { $0.region == "1.1 nm ENE" })
+        let far = try XCTUnwrap(sierra.first { $0.region == "3.8 nm east" })
+        d.set([far.placeKey: far.id], forKey: AppGroup.chosenStationsKey)
+
+        XCTAssertTrue(LocationService.cacheNearestWidgetStation(
+            lat: here.latitude, lon: here.longitude, defaults: d))
+        XCTAssertEqual(d.string(forKey: AppGroup.nearestCurrentStationKey), far.id)
+        XCTAssertEqual(d.string(forKey: AppGroup.currentLocationStationKey), far.id)
+    }
+
     /// Friday Harbor was pinned to the head of the station list. That is a
     /// home-water courtesy that reads as a bug from anywhere else.
     func testStationListIsNotPinnedToOneStation() throws {

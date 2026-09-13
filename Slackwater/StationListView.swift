@@ -35,12 +35,13 @@ struct StationListView: View {
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var chosen = ChosenStationsStore.shared
     // Size class, not device, picks the layout (web styles.css breakpoints):
     // regular = the ≥62rem persistent-sidebar grid; compact = the phone stack.
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
     @Environment(\.horizontalSizeClass) private var hSize
 
-    /// The place whose matching stations the chooser is offering, if open.
+    /// The replacement chooser for a removed favorite, if open.
     @State private var chooser: StationMatches?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
@@ -170,7 +171,9 @@ struct StationListView: View {
         .onOpenURL(perform: handleDeepLink)
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,
-                                anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in
+                                anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor,
+                                // Distances are from where the removed station was, named only when its tombstone can.
+                                anchorName: place.replacing.flatMap { StationTombstone.byId[$0.id]?.name }) { item in
                 if let dead = place.replacing?.id { favorites.replace(dead, with: item.id) }
                 open(item)
             }
@@ -305,7 +308,8 @@ struct StationListView: View {
     private var firstListItem: StationItem? {
         let a = anchor
         if fix == nil, let favorite = items(favorites.ids).first { return favorite }
-        return RankedStations.near(lat: a.lat, lon: a.lon).ranked.first
+        let near = RankedStations.near(lat: a.lat, lon: a.lon)
+        return near.ranked.first.flatMap { StationItem.byId[near.groups.shown($0.id)] }
     }
 
     /// The content pane before any pick — same canvas, an invitation, not blank.
@@ -473,13 +477,15 @@ struct StationListView: View {
         // Ranked once per fix, not once per render (RankedStations).
         // Same-named stations collapse to their nearest in Near Me only;
         // Recents are uncollapsed (explicit picks stay exact). The rest are behind
-        // the chooser.
+        // the chooser on each station page, and a pick there is the one shown.
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         // Both series under My Location: the nearest station plus the nearest
         // of the other series inside the nearby radius — "closest" must not
         // mean tide or current by accident of geography.
+        // A chosen namesake stands in for the nearest here too, as in Near Me.
         let heroItems = fix == nil ? []
             : StationItem.heroItems(ranked: ranked, lat: anchor.lat, lon: anchor.lon)
+                .compactMap { StationItem.byId[places.shown($0.id)] }
         // The filter narrows Near Me only. The hero cards stay unfiltered
         // (they answer "where am I", not "what am I looking for"), and
         // Favorites/Recents are explicit picks a filter must not hide.
@@ -502,10 +508,7 @@ struct StationListView: View {
         Group {
             if let fix, !heroItems.isEmpty {
                 MyLocationTile(items: heroItems, fix: fix, imperial: imperial) { item in
-                    VStack(spacing: 0) {
-                        itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
-                        matchingButton(item, places)
-                    }
+                    itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
                 }
                     .transition(.opacity)
             } else if loc.authorized {
@@ -572,15 +575,9 @@ struct StationListView: View {
         .padding(.top, 14)
         .padding(.bottom, 4)
         ForEach(items(groups.nearMe)) { item in
-            VStack(spacing: 0) {
-                itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                matchingButton(item, places)
-            }
+            itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
                 .padding(.horizontal, 16)
-                // 8 + 4 = the 12pt gap Favorites gets from its single
-                // `.padding(.bottom, 12)`. Split across the two edges because a
-                // Near Me row is a card *plus* its matching-stations link, and
-                // the link needs the slack under it, not over it.
+                // 8 + 4 = the 12pt gap Favorites gets from its single `.padding(.bottom, 12)`.
                 .padding(.top, 8)
                 .padding(.bottom, 4)
                 .swipeActions(edge: .leading) {
@@ -598,10 +595,7 @@ struct StationListView: View {
         if !recentItems.isEmpty {
             sectionLabel("Recents")
             ForEach(recentItems) { item in
-                VStack(spacing: 0) {
-                    itemCard(item)
-                    matchingButton(item, places)
-                }
+                itemCard(item)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
@@ -631,22 +625,6 @@ struct StationListView: View {
             .padding(.horizontal, 26)
             .padding(.top, 14)
             .padding(.bottom, 4)
-    }
-
-    /// The matching-station chooser's entry point: a quiet link-styled line
-    /// under an entry whose name several stations share (the web chooser's
-    /// toggle — "not right?"). Renders nothing when the name is unique, since
-    /// an affordance offering one option is noise (web StationChooser).
-    @ViewBuilder private func matchingButton(_ item: StationItem, _ places: StationGroups) -> some View {
-        let matches = places.matches(item)
-        if matches.count > 1 {
-            BranchLink(text: "\(matches.count) matching stations",
-                       id: "matching-stations", chevron: false) {
-                chooser = StationMatches(place: item.name, matches: matches)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 7)
-        }
     }
 
     /// Row activation in both layouts: the tap drives the path directly, never

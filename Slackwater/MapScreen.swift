@@ -48,14 +48,17 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private let center: CLLocationCoordinate2D
     private let zoom: Double
     private let framing: [CLLocationCoordinate2D]?
+    private let onProject: (([CGPoint]) -> Void)?
+    private var projected: [CGPoint] = []
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
 
     init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
-         framing: [CLLocationCoordinate2D]? = nil) {
+         framing: [CLLocationCoordinate2D]? = nil, onProject: (([CGPoint]) -> Void)? = nil) {
         self.map = map
         self.center = center
         self.zoom = zoom
         self.framing = framing
+        self.onProject = onProject
         super.init()
         map.delegate = self
         map.styleURL = BASEMAP_STYLE_URL
@@ -89,6 +92,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         } else {
             mapView.setCenter(center, zoomLevel: zoom, animated: false)
         }
+        // The overlay draws the pins; the station layers would add every other station.
+        guard onProject == nil else { return }
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
@@ -118,6 +123,16 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             for layer in stationPinLayers(source: source) { style.addLayer(layer) }
         }
         applyChsTones(to: style)
+    }
+
+    /// Per frame, deduplicated: the fitted camera only lands once the style
+    /// loads, and before that every coordinate projects somewhere meaningless.
+    func mapViewDidFinishRenderingFrame(_ mapView: MLNMapView, fullyRendered: Bool) {
+        guard let onProject, let framing, mapView.style != nil else { return }
+        let points = framing.map { mapView.convert($0, toPointTo: mapView) }
+        guard points != projected else { return }
+        projected = points
+        onProject(points)
     }
 
     /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
@@ -178,6 +193,9 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// A tap on no pin, handed the zoom on screen.
     var onMiss: ((Double) -> Void)? = nil
     let onSelect: (StationItem) -> Void
+    /// Set, the map draws no station layers or ring and reports where each
+    /// `framing` coordinate lands in its bounds, for an overlay to draw as pins.
+    var onProject: (([CGPoint]) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect, onMiss: onMiss) }
 
@@ -192,7 +210,8 @@ struct MapViewRepresentable: UIViewRepresentable {
             map.isRotateEnabled = false
             map.isPitchEnabled = false
         }
-        context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing)
+        context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing,
+                                    onProject: onProject)
         return map
     }
 
@@ -212,9 +231,10 @@ struct MapViewRepresentable: UIViewRepresentable {
         }
 
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
-                     framing: [CLLocationCoordinate2D]?) {
+                     framing: [CLLocationCoordinate2D]?, onProject: (([CGPoint]) -> Void)?) {
             self.map = map
-            styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing)
+            styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing,
+                               onProject: onProject)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }
