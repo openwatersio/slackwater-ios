@@ -107,7 +107,7 @@ struct SettingsView: View {
                     section("Data & attribution") {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
                         Text("Additional stations: TICON-4 harmonic constants, SEANOE — used under CC BY 4.0 (seanoe.org/data/00980/109129).")
-                        Text("Map imagery: satellite tiles by VersaTiles (versatiles.org/sources), cached on this device for offline use.")
+                        Text("Map tiles by OpenFreeMap (openfreemap.org), data © OpenStreetMap contributors, cached on this device for offline use.")
                         Text("Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada.")
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")
                         Text("Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included.")
