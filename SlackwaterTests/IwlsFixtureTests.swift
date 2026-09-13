@@ -36,6 +36,18 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertEqual(try IwlsFetcher.decode(data), [ChsSample(t: 1_767_225_600_000, v: 1)])
     }
 
+    func testRetriesOnlyDroppedConnectionsServerErrorsAndRateLimits() {
+        XCTAssert(IwlsFetcher.isRetryable(.failure(URLError(.timedOut))))
+        XCTAssert(IwlsFetcher.isRetryable(.failure(URLError(.networkConnectionLost))))
+        XCTAssert(IwlsFetcher.isRetryable(.success(500)))
+        XCTAssert(IwlsFetcher.isRetryable(.success(503)))
+        XCTAssert(IwlsFetcher.isRetryable(.success(429)))
+        XCTAssertFalse(IwlsFetcher.isRetryable(.success(400)))
+        XCTAssertFalse(IwlsFetcher.isRetryable(.success(404)))
+        XCTAssertFalse(IwlsFetcher.isRetryable(.failure(URLError(.cancelled))))
+        XCTAssertFalse(IwlsFetcher.isRetryable(.failure(CancellationError())))
+    }
+
     func testRecordedResponsesDecodeAndProjectWithoutChunkCache() throws {
         let fixture = try recording()
         XCTAssertEqual(Set(fixture.stations.map(\.key)), ["victoria", "active", "dodd", "sechelt"])
