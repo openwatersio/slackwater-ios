@@ -32,7 +32,10 @@ final class DeepLinkUITests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(args)
         app.launch()
-        XCTAssert(stationList(app).appears(within: 10),
+        let firstScreen = args.contains("-resetGate")
+            ? app.staticTexts["Tide and Current predictions nearby."].firstMatch
+            : stationList(app)
+        XCTAssert(firstScreen.appears(within: 10),
                   "app did not finish launching before the deep link")
         app.terminate()
         return app
