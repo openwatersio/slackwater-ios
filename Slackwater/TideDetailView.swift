@@ -130,7 +130,9 @@ struct TideDetailView: View {
                             })
             .onAppear {
                 if store == nil {
-                    anchor = todayLocal(tz)
+                    // A shared link may have placed the anchor already
+                    // (ScrubDetailScaffold.applyLinkedInstant) — leave it.
+                    if anchor == .distantPast { anchor = todayLocal(tz) }
                     let s = TimelineWindowStore(source: .tide(record))
                     s.start(anchor: anchor, now: live)
                     store = s

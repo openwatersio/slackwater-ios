@@ -783,9 +783,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     var topBackdrop: AnyView? = nil
     @State private var topHeight: CGFloat = 0
     @State private var showPicker = false
-    /// A shared link's moment (`pendingScrubInstant`), held from this view's
-    /// appear until the caller's first timeline lands.
-    @State private var linkedInstant: Date?
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -866,24 +863,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.timeZone, tz)
             .environment(\.openWeekPicker, { showPicker = true })
             .toolbar(.hidden, for: .navigationBar)
-            // A shared link's moment (#187). Taken on appear so it reaches only
-            // the detail the link opened, but APPLIED once the timeline exists:
-            // the caller's own onAppear sets the anchor and builds, and SwiftUI
-            // does not promise which onAppear runs first — a scrub set here
-            // would be built over. Waiting for the timeline is deterministic,
-            // and for an online gate it is also when there is anything to
-            // scrub.
-            .onAppear {
-                if let t = pendingScrubInstant ?? seededScrubInstant {
-                    pendingScrubInstant = nil
-                    linkedInstant = t
-                }
-            }
-            .onChange(of: timeline == nil) { _, isNil in
-                guard !isNil, let t = linkedInstant else { return }
-                linkedInstant = nil
-                jump(to: t)
-            }
+            // A shared link's moment (#187): on appear, and again if another
+            // link lands while this detail is already up — a second link to the
+            // open station re-pushes the same value, so nothing else re-appears.
+            .onAppear(perform: applyLinkedInstant)
+            .onChange(of: LinkedInstant.shared.pending) { _, _ in applyLinkedInstant() }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
                     // Park the centerline on the picked week when it isn't already
@@ -920,18 +904,31 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         }
     }
 
+    /// Scrub to the link's moment, if one is waiting for THIS station — or the
+    /// screenshot walk's seeded one (`seededScrubInstant`). Applied at once,
+    /// not after the caller's first timeline: an online gate only ever loads
+    /// the block covering its anchor, so a link into a cached week must set
+    /// the anchor before that lookup — and offline, with no block for today,
+    /// a timeline would never have come. SwiftUI does not promise whose
+    /// onAppear runs first, so the callers' own anchor set-up yields to an
+    /// anchor already placed (their `anchor == .distantPast` guards), and
+    /// `onPicked` builds or re-checks coverage around the new one.
+    private func applyLinkedInstant() {
+        guard let t = LinkedInstant.shared.take(for: favoriteId) ?? seededScrubInstant else { return }
+        jump(to: t)
+    }
+
     /// Park the centerline on `t`, moving the window when `t` is not on it.
     ///
     /// Shared by the two things that arrive holding an instant: a shared link
-    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is the
-    /// picker's rule inverted — move only when the moment isn't already on the
-    /// strip, so a jump to later today doesn't re-key the schedule off today.
+    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is
+    /// `linkedAnchor`'s — the picker's rule inverted, so a jump to later today
+    /// doesn't re-key the schedule off today.
     private func jump(to t: Date) {
         scrubTime = t
-        let week = Timeline.window(anchor: anchor)
-        if t < week.start || t > week.end {
-            anchor = dayLocal(t, tz)
-            onPicked(anchor)
+        if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
+            anchor = day
+            onPicked(day)
         }
     }
 
@@ -972,6 +969,15 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
     }
+}
+
+/// Where a shared link's moment `t` parks the window: nil when it is already
+/// on the strip hung from `anchor` (today's, when the detail has not set one
+/// yet), else the local midnight of its own day. The week picker's rule,
+/// inverted — a link to later today must not open on "not this week".
+func linkedAnchor(for t: Date, anchor: Date, tz: TimeZone) -> Date? {
+    let week = Timeline.window(anchor: anchor == .distantPast ? todayLocal(tz) : anchor)
+    return (t < week.start || t > week.end) ? dayLocal(t, tz) : nil
 }
 
 /// The span on screen, and the way to change it.

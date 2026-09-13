@@ -123,9 +123,25 @@ var gateSearchHandoff = false
 /// consumed by the list's first appear — same handoff, one screen later.
 var pendingDeepLink: URL?
 
-/// The moment a shared station link carried, set by `StationListView.open`
-/// and consumed by the first `ScrubDetailScaffold` to appear (#187). The link
-/// opens its station by pushing it, and the pushed detail is what owns the
-/// scrub time — so the instant waits here for it. Every `open` resets it, so
-/// a link's moment can never reach a station opened later by hand.
-var pendingScrubInstant: Date?
+/// The moment a shared station link carried, waiting for the detail of the
+/// station it named (#187). The link opens its station by pushing it, and
+/// the pushed detail is what owns the scrub time — so the instant waits here,
+/// tagged with the station, and only that station's detail may take it: a
+/// list row pushes through a bare `NavigationLink`, so nothing else resets
+/// this, and an untagged value would land on whatever opened next. Observable
+/// so a detail already on screen sees a second link arrive.
+@Observable final class LinkedInstant {
+    struct Link: Equatable {
+        let station: String   // a StationItem id
+        let at: Date
+    }
+    static let shared = LinkedInstant()
+    var pending: Link?
+
+    /// The instant for `station`, if one is waiting — and it stops waiting.
+    func take(for station: String) -> Date? {
+        guard let pending, pending.station == station else { return nil }
+        self.pending = nil
+        return pending.at
+    }
+}

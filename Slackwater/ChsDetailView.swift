@@ -150,6 +150,10 @@ struct ChsWaitingView: View {
             .ignoresSafeArea(edges: .top)
             .background(CanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
+            // A shared link's moment stops here: there is no strip to scrub,
+            // and left waiting it would follow the user to whichever station
+            // they open next (a list row pushes without resetting it).
+            .onAppear { _ = LinkedInstant.shared.take(for: favoriteId) }
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         }
     }

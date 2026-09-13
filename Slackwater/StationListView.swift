@@ -447,7 +447,7 @@ struct StationListView: View {
     /// `at` is the moment a shared link carried; the pushed detail scrubs to
     /// it (ScrubDetailScaffold). Nil — every other caller — means "now".
     private func open(_ item: StationItem, at instant: Date? = nil) {
-        pendingScrubInstant = instant
+        LinkedInstant.shared.pending = instant.map { .init(station: item.id, at: $0) }
         // Regular width: the sidebar (and its focused search field) stays on
         // screen when a detail opens, so the keyboard would sit over the new
         // detail — drop it. On iPhone the push dismisses it anyway.
