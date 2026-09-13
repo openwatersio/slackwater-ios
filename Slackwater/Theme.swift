@@ -408,6 +408,23 @@ func moonPhaseBlurb(_ name: String) -> String {
     }
 }
 
+/// Lunar geometry describes a tendency in tidal range, not a local height prediction.
+func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
+    let phaseTide: String? = switch moonPhaseName(phase: phase) {
+    case "New Moon", "Full Moon": "Spring tide"
+    case "First Quarter", "Last Quarter": "Neap tide"
+    default: nil
+    }
+    // Coastal tides can lag the astronomical event by a day or two.
+    if let perigee, abs(perigee.timeIntervalSince(at)) <= 2 * 86_400 {
+        return "Perigean \(phaseTide?.lowercased() ?? "tide")"
+    }
+    if let apogee, abs(apogee.timeIntervalSince(at)) <= 2 * 86_400 {
+        return "Apogean \(phaseTide?.lowercased() ?? "tide")"
+    }
+    return phaseTide
+}
+
 /// The moon glyph: the lit region over a dark disc that stays
 /// semi-transparent to show the sky. Lit on the right while waxing, the
 /// northern convention; the sky passes `waxing: true` and rotates toward the sun.
@@ -641,6 +658,7 @@ struct SummaryTiles: View {
     /// Read HERE, inside the presenting hierarchy where the scaffold set it,
     /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
     @Environment(\.timeZone) private var tz
+    @State private var apsides: (day: Date, perigee: Date?, apogee: Date?)?
 
     /// Non-nil only when the caller gave both somewhere to go and somewhere to
     /// stand: the sheet needs an `Observer`, and this view is the only thing
@@ -666,7 +684,11 @@ struct SummaryTiles: View {
             // Almanac throws only outside 1950–2101; the tile drops rather
             // than the row, so a primary reading still stands on its own.
             if let moon {
-                ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
+                let day = dayLocal(at, tz)
+                let dates = apsides?.day == day ? apsides : nil
+                ReadoutTile(label: "Moon", caption: moonTideLabel(
+                    phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
+                    ?? "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon", detail: sheet) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
                               umbra: eclipse?.shadow(at: at) ?? 0,
@@ -679,6 +701,12 @@ struct SummaryTiles: View {
                         .font(ReadoutType.tileText)
                 }
             }
+        }
+        .task(id: dayLocal(at, tz)) {
+            guard moon != nil else { return }
+            let day = dayLocal(at, tz)
+            let dates = await Task.detached(priority: .utility) { moonApsides(around: day) }.value
+            apsides = (day, dates.perigee, dates.apogee)
         }
     }
 }

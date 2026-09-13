@@ -767,5 +767,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(bar, "label != '\(week)'"),
                   "the jump did not move the window off '\(week)'")
         save(app, "moon-sheet-jumped.png")
+
+        moon.tap()
+        let tideLabel = app.staticTexts["moon-tide-label"].firstMatch
+        XCTAssert(tideLabel.appears(within: 10), "no named tide condition in the Moon sheet")
+        XCTAssertEqual(tideLabel.label, "Apogean spring tide")
+        let tideBlurb = app.staticTexts["moon-tide-blurb"].firstMatch
+        XCTAssert(tideBlurb.appears(within: 10), "no tide explanation in the Moon sheet")
+        XCTAssert(tideBlurb.label.contains("farther") && tideBlurb.label.contains("perigean spring tide"),
+                  "the apogean spring explanation did not describe the competing effects: \(tideBlurb.label)")
+        save(app, "moon-sheet-apogean-spring.png")
     }
 }

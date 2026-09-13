@@ -193,6 +193,39 @@ final class SkyBackdropTests: XCTestCase {
         }
     }
 
+    func testMoonTideLabelsCombinePhaseAndNearbyDistanceExtremes() {
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let near = at.addingTimeInterval(86_400)
+        let away = at.addingTimeInterval(3 * 86_400)
+
+        XCTAssertEqual(moonTideLabel(phase: 0, at: at, perigee: nil, apogee: nil), "Spring tide")
+        XCTAssertEqual(moonTideLabel(phase: 0.5, at: at, perigee: near, apogee: nil), "Perigean spring tide")
+        XCTAssertEqual(moonTideLabel(phase: 0.25, at: at, perigee: nil, apogee: near), "Apogean neap tide")
+        XCTAssertEqual(moonTideLabel(phase: 0.75, at: at, perigee: nil, apogee: nil), "Neap tide")
+        XCTAssertEqual(moonTideLabel(phase: 0.12, at: at, perigee: near, apogee: nil), "Perigean tide")
+        XCTAssertEqual(moonTideLabel(phase: 0.38, at: at, perigee: nil, apogee: near), "Apogean tide")
+        XCTAssertNil(moonTideLabel(phase: 0.12, at: at, perigee: away, apogee: nil))
+    }
+
+    func testMoonTideExplanationRelatesPhaseAndDistance() {
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let near = at.addingTimeInterval(86_400)
+
+        let apogeanSpring = moonTideExplanation(phase: 0.5, at: at, perigee: nil, apogee: near)
+        XCTAssertTrue(apogeanSpring.contains("farther"))
+        XCTAssertTrue(apogeanSpring.contains("lower highs and higher lows than during a perigean spring tide"))
+        XCTAssertFalse(apogeanSpring.contains("below-average"))
+
+        let perigeanSpring = moonTideExplanation(phase: 0, at: at, perigee: near, apogee: nil)
+        XCTAssertTrue(perigeanSpring.contains("closer"))
+        XCTAssertTrue(perigeanSpring.contains("higher highs and lower lows than during an apogean spring tide"))
+
+        let apogeanNeap = moonTideExplanation(phase: 0.25, at: at, perigee: nil, apogee: near)
+        let perigeanNeap = moonTideExplanation(phase: 0.75, at: at, perigee: near, apogee: nil)
+        XCTAssertTrue(apogeanNeap.contains("narrows the range further"))
+        XCTAssertTrue(perigeanNeap.contains("offsets some of the neap narrowing"))
+    }
+
     /// The names have to agree with Almanac's own phase convention (0 new,
     /// 0.5 full), not just with the bucket arithmetic: the 2026-08-28 full
     /// moon is the eclipse night #222 is about, and it must read "Full Moon".
