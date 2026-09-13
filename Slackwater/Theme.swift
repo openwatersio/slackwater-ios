@@ -383,6 +383,31 @@ func eclipseTileText(_ kind: LunarEclipseKind) -> String {
     }
 }
 
+/// The one-line gloss under the phase name in the Moon sheet. "Penumbral" is a
+/// term of art and reads as one; "gibbous" and "first quarter" are terms of art
+/// that do NOT, which is worse — the sheet prints them as if everyone knows.
+///
+/// Keyed on the displayed name rather than re-deriving anything, so
+/// `moonPhaseName` stays the only place the age thresholds live and this
+/// covers eclipse titles with the same switch. `SkyBackdropTests` pins the
+/// names, and pins that every one of them has a line here.
+func moonPhaseBlurb(_ name: String) -> String {
+    switch name {
+    case "New Moon": "Between us and the sun, so its lit side faces away."
+    case "Waxing Crescent": "A sliver, growing a little fuller each night."
+    case "First Quarter": "Half lit — a quarter of the way through the cycle."
+    case "Waxing Gibbous": "More than half lit, filling toward full."
+    case "Full Moon": "Opposite the sun, with the whole face we see lit."
+    case "Waning Gibbous": "Past full: more than half lit, and shrinking."
+    case "Last Quarter": "Half lit again, three quarters through the cycle."
+    case "Waning Crescent": "A thinning sliver, a few nights from new."
+    case "Penumbral Eclipse": "In Earth's faint outer shadow — a dimming, not a bite."
+    case "Partial Eclipse": "Part of the moon crossing Earth's dark inner shadow."
+    case "Total Eclipse": "Fully inside Earth's shadow, reddened by Earth's sunsets."
+    default: ""
+    }
+}
+
 /// The moon glyph: the lit region over a dark disc that stays
 /// semi-transparent to show the sky. Lit on the right while waxing, the
 /// northern convention; the sky passes `waxing: true` and rotates toward the sun.

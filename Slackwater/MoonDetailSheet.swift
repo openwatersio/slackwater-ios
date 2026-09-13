@@ -161,22 +161,34 @@ struct MoonDetailSheet: View {
     }
 
     private func head(_ facts: MoonFacts) -> some View {
-        HStack(spacing: 14) {
-            MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
-                      size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
-                      wash: eclipse?.wash(at: at) ?? 0)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(eclipse.map { eclipseTileText($0.kind) }
-                        ?? moonPhaseName(phase: facts.illumination.phase))
-                    .font(ReadoutType.tileText)
-                    .foregroundStyle(.white)
-                Text("\(Int((facts.illumination.fraction * 100).rounded()))% lit")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(SN.foam.opacity(0.55))
+        let title = eclipse.map { eclipseTileText($0.kind) }
+            ?? moonPhaseName(phase: facts.illumination.phase)
+        // Full width under the glyph, not beside it: the gloss is a sentence,
+        // and a sentence in the ~200pt left after a 54pt moon wraps to three
+        // lines and pushes the head taller than the card below it.
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 14) {
+                MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
+                          size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
+                          wash: eclipse?.wash(at: at) ?? 0)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(ReadoutType.tileText)
+                        .foregroundStyle(.white)
+                    Text("\(Int((facts.illumination.fraction * 100).rounded()))% lit")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.55))
+                }
+                Spacer()
             }
-            Spacer()
+            .accessibilityElement(children: .combine)
+
+            Text(moonPhaseBlurb(title))
+                .font(.footnote)
+                .foregroundStyle(SN.foam.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("moon-blurb")
         }
-        .accessibilityElement(children: .combine)
     }
 
     /// The sheet's one container. Rows that belong together share a card, so
