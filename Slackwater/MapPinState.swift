@@ -55,27 +55,53 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     return delta > 0
 }
 
-/// A fitted tide record's tone. Not `cardState(at:)` — that computes 30h
-/// searches the pin discards; the hybrid is the load-bearing shortcut
-/// (`testPinLayerBuildsInsideAFrame` budgets the whole source build at 0.3s).
-func tidePinTone(_ record: TideStationRecord, at now: Date) -> String {
-    guard let rising = tidePinRisingHybrid(record, at: now) else { return "unknown" }
-    return rising ? "rising" : "falling"
+/// One pin's stateful attributes, resolved together per cache rebuild: the
+/// tone the colour expressions read, and the high-zoom readout
+/// (`READOUT_MIN_ZOOM`) — a formatted reading under the name, plus, for a
+/// speed-bearing current, the bearing its flow arrow rotates to.
+struct PinState: Equatable {
+    var state: String
+    /// "3.2 ft ↑" / "1.8 kn" — formatted at build time with the app's units,
+    /// which are part of the cache key for exactly that reason.
+    var reading: String?
+    /// True bearing the water flows toward. nil inside the slack window —
+    /// a near-zero flow has no direction worth drawing.
+    var bearing: Double?
 }
 
-/// A speed-bearing current pin's tone IS its colour (#13): green exactly when
+/// A fitted tide record's pin state. The tone is not `cardState(at:)` — that
+/// computes 30h searches the pin discards; the hybrid is the load-bearing
+/// shortcut (`testPinLayerBuildsInsideAFrame` budgets the whole source build
+/// at 0.3s, and the readout's one extra height sample per pin lives inside
+/// the same budget).
+func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> PinState {
+    guard let rising = tidePinRisingHybrid(record, at: now) else { return PinState(state: "unknown") }
+    let state = rising ? "rising" : "falling"
+    guard let height = record.engineStation
+        .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
+    else { return PinState(state: state) }
+    // ↑/↓ ride the label fontstack; offline packs may not cache their glyph
+    // range, where the arrow drops and the number stands alone.
+    return PinState(state: state,
+                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial)) \(rising ? "↑" : "↓")")
+}
+
+/// A speed-bearing current pin's state IS a colour (#13): green exactly when
 /// the instant sits inside the slack window — |v| under the same
 /// `slackThresholdKn` that defines the strip's green column — and the
 /// darkened #97 ramp at the current speed otherwise. Hue no longer says
-/// flood-versus-ebb here; the detail card's arrow + cardinal carries
-/// direction (#97's own argument for taking it off hue).
-func currentPinColour(_ station: CurrentStationRecord, at now: Date) -> String {
+/// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
+/// card's arrow + cardinal) carries direction.
+func currentPinState(_ station: CurrentStationRecord, at now: Date, speedUnit: String) -> PinState {
     let signed = station.isSubordinate
         ? subordinateCurrentPinSpeed(station, at: now)
         : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
-    return abs(signed) <= slackThresholdKn
-        ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
-        : pinRampHex(forSpeedKn: abs(signed))
+    let slack = abs(signed) <= slackThresholdKn
+    return PinState(
+        state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
+                     : pinRampHex(forSpeedKn: abs(signed)),
+        reading: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
+        bearing: slack ? nil : station.setDegrees(signed: signed))
 }
 
 /// 1,549 subordinate current pins hang off 50 references, so the reference is
@@ -114,65 +140,85 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
     }
 }
 
-/// A station's state as a tone name, for the pin's colour.
+/// The units the readouts format with — read where the features build, and
+/// part of the cache key so a settings change doesn't serve stale strings.
+private func readoutUnits() -> (imperial: Bool, speedUnit: String) {
+    ((AppGroup.defaults.string(forKey: unitsKey) ?? "imperial") == "imperial",
+     AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn")
+}
+
+/// A station's pin state (tone + readout).
 ///
 /// Synchronous only: every CHS-provenance item resolves through
 /// `ChsFitService`'s async fit cache, so at style-build time all three read
-/// from `chsTones` — the tones `chsPinTones` resolved from what the offline
-/// sync has already stored, pushed in after paint (`MapStyler.applyChsTones`).
+/// from `chsStates` — what `chsPinStates` resolved from what the offline
+/// sync has already stored, pushed in after paint (`MapStyler.applyChsStates`).
 /// Absent means unsynced, and the pin honestly draws neutral.
-private func pinTone(_ item: StationItem, at now: Date, chsTones: [String: String]) -> String {
+private func pinState(_ item: StationItem, at now: Date, chsStates: [String: PinState],
+                      imperial: Bool, speedUnit: String) -> PinState {
     switch item {
     // The map is not the first frame, so resolving both records here is
-    // fair game — a tone is a prediction and needs the constituents (#317).
+    // fair game — a state is a prediction and needs the constituents (#317).
     case .tide(let info):
-        return info.tideRecord.map { tidePinTone($0, at: now) } ?? "unknown"
+        return info.tideRecord.map { tidePinState($0, at: now, imperial: imperial) }
+            ?? PinState(state: "unknown")
     case .current(let info):
-        return info.currentRecord.map { currentPinColour($0, at: now) } ?? "unknown"
+        return info.currentRecord.map { currentPinState($0, at: now, speedUnit: speedUnit) }
+            ?? PinState(state: "unknown")
     case .chs, .chsGate, .chsCurrent:
-        return chsTones[item.id] ?? "unknown"
+        return chsStates[item.id] ?? PinState(state: "unknown")
     }
 }
 
-/// CHS tones from what the offline sync has ALREADY stored. The caller hands
+/// CHS states from what the offline sync has ALREADY stored. The caller hands
 /// in the fitted records as plain dictionaries, so this cannot fetch — a
 /// station the sync has not reached is simply absent and stays neutral
 /// (issue #12; the web port learned the fetch-on-open version is a request
 /// storm against IWLS). A derived gate has no model of its own: it resolves
-/// exactly when its reference port — itself a CHS port — is fitted.
-func chsPinTones(at now: Date,
-                 tideRecords: [String: TideStationRecord],
-                 currentRecords: [String: CurrentStationRecord]) -> [String: String] {
-    var tones: [String: String] = [:]
+/// exactly when its reference port — itself a CHS port — is fitted, and it
+/// carries no readout: no speed exists to show (ChsGate.swift), and its
+/// water height belongs to the port, not the pass.
+func chsPinStates(at now: Date,
+                  tideRecords: [String: TideStationRecord],
+                  currentRecords: [String: CurrentStationRecord]) -> [String: PinState] {
+    let units = readoutUnits()
+    var states: [String: PinState] = [:]
     for item in StationItem.all {
         switch item {
         case .tide, .current:
             continue
         case .chs(let info):
             guard let record = tideRecords[info.id] else { continue }
-            tones[item.id] = tidePinTone(record, at: now)
+            states[item.id] = tidePinState(record, at: now, imperial: units.imperial)
         case .chsCurrent(let gate):
             guard let record = currentRecords[gate.id] else { continue }
-            tones[item.id] = currentPinColour(record, at: now)
+            states[item.id] = currentPinState(record, at: now, speedUnit: units.speedUnit)
         case .chsGate(let gate):
             guard let port = tideRecords[gate.reference] else { continue }
             let phase = DerivedGateRecord(gate: gate, port: port).cardState(at: now).phase
-            tones[item.id] = phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack"
+            states[item.id] = PinState(state: phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
         }
     }
-    return tones
+    return states
 }
 
-/// Every bundled station as a GeoJSON pin. Identity only — no readings.
-private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
-    [
+/// Every bundled station as a GeoJSON pin: identity, tone, and the
+/// high-zoom readout attributes when the state resolved one.
+private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
+    let units = readoutUnits()
+    return [
         "type": "FeatureCollection",
         "features": StationItem.all.map { s in
-            [
+            let state = pinState(s, at: appNow(), chsStates: chsStates,
+                                 imperial: units.imperial, speedUnit: units.speedUnit)
+            var properties: [String: Any] = ["id": s.id, "name": s.name, "kind": s.pinKind,
+                                             "state": state.state]
+            if let reading = state.reading { properties["reading"] = reading }
+            if let bearing = state.bearing { properties["bearing"] = bearing }
+            return [
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
-                "properties": ["id": s.id, "name": s.name, "kind": s.pinKind,
-                               "state": pinTone(s, at: appNow(), chsTones: chsTones)],
+                "properties": properties,
             ] as [String: Any]
         },
     ]
@@ -186,18 +232,22 @@ private func pinFeatures(chsTones: [String: String] = [:]) -> [String: Any] {
 /// scratch on every single tap — the ~0.5s `testPinLayerBuildsInsideAFrame`
 /// measures, paid again and again in one map session, not once per session.
 ///
-/// Keyed on the inputs that actually change the answer: `chsTones` (busts
+/// Keyed on the inputs that actually change the answer: `chsStates` (busts
 /// the instant a real dict arrives via `update`, called from
-/// `MapStyler.applyChsTones` after a CHS fit lands — a stale CHS tone would
-/// be a worse bug than the rebuild cost this exists to avoid) and a 30-minute
-/// time bucket, `PIN_TIDE_DIFF_DT` — the same resolution
+/// `MapStyler.applyChsStates` after a CHS fit lands — a stale CHS tone would
+/// be a worse bug than the rebuild cost this exists to avoid), the readout
+/// units, and a 30-minute time bucket, `PIN_TIDE_DIFF_DT` — the same resolution
 /// `tidePinRisingHybrid`'s own hybrid check already uses, so rebuilding more
 /// often than that buys nothing and rebuilding less often would show a tide
-/// pin that never turns.
+/// pin that never turns. The readouts inherit that bucket, so a displayed
+/// height can lag the curve by up to half an hour — the trend arrow stays
+/// honest, the number is "recently". ponytail: 30-minute readings; shrink
+/// the bucket (or split readings from tones) if that lag ever reads as a
+/// wrong number rather than an old one.
 ///
 /// Internal, not `private`, and its cache is lock-protected rather than
 /// actor-isolated: `stationSource()` runs on whatever thread builds a style,
-/// and `applyChsTones` writes from its own
+/// and `applyChsStates` writes from its own
 /// detached task, so real cross-thread access exists; a lock around a few
 /// dictionary reads is the smaller fix than moving every caller onto an
 /// actor. Internal (not private) so `NationalScaleTests` can exercise the
@@ -207,40 +257,45 @@ final class PinFeaturesCache: @unchecked Sendable {
     private let lock = NSLock()
     private var bucket: Int?
     private var slackThreshold: Double?
-    private var tones: [String: String] = [:]
+    private var units: String?
+    private var states: [String: PinState] = [:]
     private var geojson: [String: Any] = [:]
 
     private func currentBucket(_ now: Date) -> Int { Int(now.timeIntervalSince1970 / PIN_TIDE_DIFF_DT) }
 
     /// What a style build should source its pins from: whatever's cached,
     /// rebuilt only when the time bucket has moved. Serves the last-known
-    /// `chsTones` (not blank) so a remount reuses whatever `update` last
+    /// `chsStates` (not blank) so a remount reuses whatever `update` last
     /// resolved instead of flashing every CHS pin back to "unknown".
     func snapshot(now: Date = appNow()) -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
-        return rebuilt(tones, now)  // re-pushing what's cached IS "keep what we have"
+        return rebuilt(states, now)  // re-pushing what's cached IS "keep what we have"
     }
 
-    /// `applyChsTones`'s entry point: the real, resolved CHS tones. Rebuilds
+    /// `applyChsStates`'s entry point: the real, resolved CHS states. Rebuilds
     /// when they differ from what's cached, or the time bucket moved — a
     /// same-value push (a style reload that synced nothing new) is a no-op.
     @discardableResult
-    func update(tones newTones: [String: String], now: Date = appNow()) -> [String: Any] {
+    func update(states newStates: [String: PinState], now: Date = appNow()) -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
-        return rebuilt(newTones, now)
+        return rebuilt(newStates, now)
     }
 
     /// The one cache rule both entry points share. CALLER HOLDS `lock` —
     /// `NSLock` is not recursive, so this must never be called from outside
     /// one of the two methods above.
-    private func rebuilt(_ newTones: [String: String], _ now: Date) -> [String: Any] {
+    private func rebuilt(_ newStates: [String: PinState], _ now: Date) -> [String: Any] {
         let b = currentBucket(now)
         let threshold = slackThresholdKn
-        if tones != newTones || bucket != b || slackThreshold != threshold || geojson.isEmpty {
-            tones = newTones
-            geojson = pinFeatures(chsTones: newTones)
+        let u = readoutUnits()
+        let signature = "\(u.imperial)-\(u.speedUnit)"
+        if states != newStates || bucket != b || slackThreshold != threshold
+            || units != signature || geojson.isEmpty {
+            states = newStates
+            geojson = pinFeatures(chsStates: newStates)
             bucket = b
             slackThreshold = threshold
+            units = signature
         }
         return geojson
     }
@@ -254,7 +309,8 @@ final class PinFeaturesCache: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         bucket = nil
         slackThreshold = nil
-        tones = [:]
+        units = nil
+        states = [:]
         geojson = [:]
     }
 }

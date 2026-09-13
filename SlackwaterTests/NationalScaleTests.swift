@@ -264,13 +264,13 @@ final class NationalScaleTests: XCTestCase {
         // A same-value push (no real sync progress) must be a no-op — the
         // object identity check below only means something if this doesn't
         // also happen to rebuild.
-        let stillEmpty = PinFeaturesCache.shared.update(tones: [:])
+        let stillEmpty = PinFeaturesCache.shared.update(states: [:])
         XCTAssertEqual(stateFor(stillEmpty, id: chsPort.id), "unknown")
 
         // A real tone lands for exactly this station: the cache must
         // invalidate and the NEXT read must reflect it — not the stale
         // "unknown" from the cold build.
-        let synced = PinFeaturesCache.shared.update(tones: [chsPort.id: "flood"])
+        let synced = PinFeaturesCache.shared.update(states: [chsPort.id: PinState(state: "flood")])
         XCTAssertEqual(stateFor(synced, id: chsPort.id), "flood",
                        "a real CHS tone must invalidate the cache, not be served stale")
 
@@ -375,21 +375,22 @@ final class NationalScaleTests: XCTestCase {
     func testRuntimePinLayersCarryTheTapContract() throws {
         let layers = stationPinLayers(source: stationShapeSource())
         let byId = Dictionary(uniqueKeysWithValues: layers.map { ($0.identifier, $0) })
-        for id in ["station-clusters", "station-cluster-count", "station-pins-current",
+        for id in ["station-clusters", "station-cluster-count", "station-pins-dot",
+                   "station-pins-current-plate", "station-pins-current",
                    "station-pins-tide-plate", "station-pins-tide", "station-labels"] {
             XCTAssertNotNil(byId[id], "\(id) missing from the runtime pin layers")
         }
-        XCTAssertNotNil((byId["station-pins-current"] as? MLNVectorStyleLayer)?.predicate,
-                        "the current-pin layer must exclude clusters, or every cluster draws twice")
-        XCTAssertNotNil((byId["station-pins-tide"] as? MLNVectorStyleLayer)?.predicate,
-                        "the tide-pin layer must exclude clusters, or every cluster draws twice")
+        for id in ["station-pins-dot", "station-pins-current", "station-pins-tide"] {
+            XCTAssertNotNil((byId[id] as? MLNVectorStyleLayer)?.predicate,
+                            "\(id) must exclude clusters, or every cluster draws twice")
+        }
         // The labels ride the basemap's own fontstack, so offline packs cache
         // its glyph ranges as part of the style's needs. A stack of our own
         // here would be blank offline.
         // The getter normalizes the constant to an aggregate expression, so
         // assert on the stack's presence rather than expression equality.
         let labels = try XCTUnwrap(byId["station-labels"] as? MLNSymbolStyleLayer)
-        XCTAssertTrue(String(describing: labels.textFontNames).contains("noto_sans_bold"),
+        XCTAssertTrue(String(describing: labels.textFontNames).contains("Noto Sans Regular"),
                       "station labels must use the basemap style's own fontstack")
     }
 
