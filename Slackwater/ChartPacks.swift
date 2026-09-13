@@ -8,12 +8,12 @@ import Combine
 import CoreLocation
 import MapLibre
 
-/// The one basemap: the published VersaTiles satellite style, consumed
-/// verbatim. The map's `styleURL` and every offline pack's region point at
+/// The one basemap: OpenFreeMap's published fiord style (a dark vector
+/// chart), consumed verbatim. The map's `styleURL` and every offline pack's region point at
 /// this same URL — switching basemaps is changing this constant. The app's
 /// own channels (station pins, current fill) are runtime-added layers and
 /// never touch the style.
-let BASEMAP_STYLE_URL = URL(string: "https://tiles.versatiles.org/assets/styles/satellite/style.json")!
+let BASEMAP_STYLE_URL = URL(string: "https://tiles.openfreemap.org/styles/fiord")!
 
 // MARK: - Grid math (pure — ChartPackTests)
 
