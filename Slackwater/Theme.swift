@@ -1314,6 +1314,31 @@ struct NearbyStationLink: View {
     }
 }
 
+/// A station page's link row: its tide or current link on the left, the
+/// chooser for its namesakes on the right.
+struct StationLinksRow<Leading: View>: View {
+    let stationId: String
+    @ViewBuilder let leading: () -> Leading
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let chooser = StationItem.byId[stationId].map { MatchingStationsLink(item: $0) }
+        // Side by side leaves neither half room at accessibility sizes.
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 12) {
+                leading()
+                chooser
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                leading()
+                chooser.fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+}
+
 /// The persisted Tides/Currents pick. Standard defaults, not the App Group:
 /// no widget reads it.
 let seriesFilterKey = "slackwater.seriesFilter"
@@ -1400,6 +1425,81 @@ final class RecentsStore: ObservableObject {
     /// The most recently opened station, which is the best guess at where the
     /// user is when Core Location has told us nothing.
     var lastOpened: StationItem? { items.first }
+}
+
+/// The station picked in the matching-station chooser, one per series and
+/// name. The list shows it in place of the nearest namesake (`RankedStations`),
+/// and the widget's nearest-station ids resolve to it
+/// (`LocationService.cacheNearestWidgetStation`). The App Group copy is this
+/// device's truth; iCloud carries picks between devices.
+final class ChosenStationsStore: ObservableObject {
+    static let shared = ChosenStationsStore()
+    static let cloudPrefix = "slackwater.pick."
+
+    @Published private(set) var ids: [String: String]
+
+    private init() {
+        ids = AppGroup.defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
+        // Nil under both kinds of test, like favourites (FavoritesCloud.store).
+        guard let cloud = FavoritesCloud.store else { return }
+        NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.adopt(cloud) } }
+        cloud.synchronize()
+        MainActor.assumeIsolated { self.adopt(cloud) }
+    }
+
+    /// One KVS key per place, so two devices picking for the same place
+    /// resolve last-writer-wins with no merge code (see FavoritesCloud). Keys
+    /// cap at 64 bytes and a place key can run past that, so it is hashed.
+    static func cloudKey(_ placeKey: String) -> String {
+        // FNV-1a: stable across launches and devices, unlike `hashValue`.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in placeKey.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        return cloudPrefix + String(hash, radix: 16)
+    }
+
+    /// Place key → chosen id, out of `dictionaryRepresentation`. The place
+    /// comes from the id, and a pick for a station no longer bundled drops out.
+    static func picks(_ raw: [String: Any]) -> [String: String] {
+        var out: [String: String] = [:]
+        for (key, value) in raw where key.hasPrefix(cloudPrefix) {
+            guard let id = value as? String, let item = StationItem.byId[id] else { continue }
+            out[item.placeKey] = id
+        }
+        return out
+    }
+
+    @MainActor func choose(_ item: StationItem) {
+        guard ids[item.placeKey] != item.id else { return }
+        FavoritesCloud.store?.set(item.id, forKey: Self.cloudKey(item.placeKey))
+        var next = ids
+        next[item.placeKey] = item.id
+        apply(next)
+    }
+
+    /// The cloud's picks win their places. A place only this device has a
+    /// pick for is written up — how picks made before iCloud reach it.
+    @MainActor private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
+        let picks = Self.picks(cloud.dictionaryRepresentation)
+        for (place, id) in ids where picks[place] == nil {
+            cloud.set(id, forKey: Self.cloudKey(place))
+        }
+        apply(ids.merging(picks) { _, fromCloud in fromCloud })
+    }
+
+    @MainActor private func apply(_ next: [String: String]) {
+        guard next != ids else { return }
+        ids = next
+        AppGroup.defaults.set(ids, forKey: AppGroup.chosenStationsKey)
+        // Without a fix the widget ids catch up on the next one.
+        let loc = LocationService.shared
+        if loc.authorized, let c = loc.location?.coordinate,
+           LocationService.cacheNearestWidgetStation(lat: c.latitude, lon: c.longitude) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
 }
 
 // MARK: - Favorites (current-detail spec §9; prototype TidesApp savedIds)
@@ -1581,8 +1681,12 @@ struct ListGroups {
 /// Favorites are deliberately *not* collapsed: a starred station is an
 /// explicit pick, and quietly swapping it for a nearer namesake would override
 /// a choice the user made on purpose.
+///
+/// A tide and a current station sharing a name are two places: the series is
+/// a separate choice everywhere else, and a filter on one series must not hide
+/// a station behind a namesake of the other.
 struct StationGroups {
-    /// Name -> every station carrying it, nearest first.
+    /// Series and name -> every station carrying them, nearest first.
     private let byName: [String: [StationItem]]
     /// Any station id -> the id that actually renders for its name.
     private let canonical: [String: String]
@@ -1592,12 +1696,16 @@ struct StationGroups {
     let shownIds: [String]
 
     /// `ranked` is the catalog sorted nearest-first, so the first station of a
-    /// name is the nearest one — the one shown.
-    init(ranked: [StationItem]) {
+    /// name is the nearest one — the one shown, unless `chosen` (placeKey → id,
+    /// `ChosenStationsStore`) names another station of that place.
+    init(ranked: [StationItem], chosen: [String: String] = [:]) {
         var byName: [String: [StationItem]] = [:]
-        for item in ranked { byName[item.name, default: []].append(item) }
+        for item in ranked { byName[item.placeKey, default: []].append(item) }
         self.byName = byName
-        let canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
+        let shownForPlace = byName.mapValues { group in
+            group.first { $0.id == chosen[group[0].placeKey] }?.id ?? group[0].id
+        }
+        let canonical = Dictionary(ranked.map { ($0.id, shownForPlace[$0.placeKey] ?? $0.id) },
                                    uniquingKeysWith: { first, _ in first })
         self.canonical = canonical
         var seen = Set<String>()
@@ -1613,8 +1721,8 @@ struct StationGroups {
         return ids.map(shown).filter { seen.insert($0).inserted }
     }
 
-    /// Every station sharing this one's name, nearest first — the chooser's rows.
-    func matches(_ item: StationItem) -> [StationItem] { byName[item.name] ?? [item] }
+    /// Every station sharing this one's series and name, nearest first — the chooser's rows.
+    func matches(_ item: StationItem) -> [StationItem] { byName[item.placeKey] ?? [item] }
 }
 
 // MARK: - The distance-ranked catalog, memoised (M53)
@@ -1633,13 +1741,20 @@ enum RankedStations {
     private static var key = ""
     private static var ranked: [StationItem] = []
     private static var groups = StationGroups(ranked: [])
+    private static var chosen: [String: String] = [:]
 
+    /// A chooser pick regroups without re-sorting: the order depends on the fix alone.
     static func near(lat: Double, lon: Double) -> (ranked: [StationItem], groups: StationGroups) {
         let k = "\(Int((lat * 1000).rounded())),\(Int((lon * 1000).rounded()))"
-        if k != key {
+        let picks = ChosenStationsStore.shared.ids
+        let moved = k != key
+        if moved {
             key = k
             ranked = StationItem.rankedByDistance(StationItem.all, lat: lat, lon: lon)
-            groups = StationGroups(ranked: ranked)
+        }
+        if moved || picks != chosen {
+            chosen = picks
+            groups = StationGroups(ranked: ranked, chosen: picks)
         }
         return (ranked, groups)
     }

@@ -75,7 +75,7 @@ struct DerivedGateDetailView: View {
                                     if let note = gate.magnitudeNote {
                                         Text(note).font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                                     }
-                                    TideAtPortLink(port: port)
+                                    StationLinksRow(stationId: gate.id) { TideAtPortLink(port: port) }
                                 }
                             },
                             bottom: {

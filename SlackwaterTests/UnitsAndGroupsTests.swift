@@ -116,6 +116,62 @@ final class UnitsAndGroupsTests: XCTestCase {
                        "the chooser still offers both, nearest first")
     }
 
+    /// A tide and a current station sharing a name are separate entries: a
+    /// Currents filter must not lose a current behind a nearer tide namesake,
+    /// and the chooser offers one series.
+    func testSameNamedStationsCollapseWithinTheirSeries() throws {
+        let places = StationGroups(ranked: StationItem.all)
+        let alcatraz = StationItem.all.filter { $0.name == "Alcatraz Island" }
+        let tide = try XCTUnwrap(alcatraz.first { $0.series == .tide })
+        let current = try XCTUnwrap(alcatraz.first { $0.series == .current })
+        XCTAssertEqual(places.shown(tide.id), tide.id)
+        XCTAssertEqual(StationItem.byId[places.shown(current.id)]?.series, .current)
+        XCTAssertEqual(places.matches(tide).map(\.id), [tide.id])
+        XCTAssertGreaterThan(places.matches(current).count, 1)
+        XCTAssert(places.matches(current).allSatisfy { $0.series == .current })
+    }
+
+    /// A namesake picked in the chooser takes its place's entry wherever the
+    /// place ranks; the chooser itself stays nearest first.
+    func testChosenNamesakeTakesThePlace() {
+        let ranked = StationItem.rankedByDistance(StationItem.all, lat: firstRunFix.lat, lon: firstRunFix.lon)
+        let discovery = ranked.filter { $0.name == "Discovery Island" }
+        let far = discovery[2]
+        let places = StationGroups(ranked: ranked, chosen: [far.placeKey: far.id])
+        XCTAssertEqual(places.shown(discovery[0].id), far.id)
+        XCTAssertEqual(places.collapse(discovery.map(\.id)), [far.id])
+        XCTAssert(places.shownIds.contains(far.id))
+        XCTAssertFalse(places.shownIds.contains(discovery[0].id))
+        XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id))
+
+        let stale = StationGroups(ranked: ranked, chosen: [far.placeKey: "noaa/gone"])
+        XCTAssertEqual(stale.shown(far.id), discovery[0].id, "a pick that left the bundle falls back to the nearest")
+    }
+
+    /// iCloud carries one key per place: every key fits the 64-byte limit, and
+    /// a pick reads back to its place through the id it holds.
+    func testCloudPicksFitTheKeyLimitAndReadBackByPlace() {
+        let longest = StationItem.all.map { ChosenStationsStore.cloudKey($0.placeKey).utf8.count }.max() ?? 0
+        XCTAssertLessThanOrEqual(longest, 64)
+        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
+        let raw: [String: Any] = [
+            ChosenStationsStore.cloudKey(discovery[0].placeKey): discovery[1].id,
+            ChosenStationsStore.cloudPrefix + "stale": "noaa/gone",
+            "slackwater.fav.x": 1.0,
+        ]
+        XCTAssertEqual(ChosenStationsStore.picks(raw), [discovery[0].placeKey: discovery[1].id])
+    }
+
+    /// A chooser row names where its station sits, not just how far it is.
+    func testPlaceLabelSpellsOutTheLandmark() {
+        let sierra = StationItem.all.filter { $0.name == "Sierra Point" }.map(\.placeLabel)
+        XCTAssertEqual(Set(sierra), ["1.1 nm ENE of Sierra Point", "1.2 nm east of Sierra Point",
+                                     "3.8 nm east of Sierra Point"])
+        let anchor = Set(StationItem.all.filter { $0.name == "Anchor Point" }.map(\.placeLabel))
+        XCTAssert(anchor.contains("WNW of Anchor Point"), "\(anchor)")
+        XCTAssert(anchor.contains("Anchor Point, Petersburg, AK"), "\(anchor)")
+    }
+
     /// A unique name is untouched — and gets no chooser (one option is noise).
     func testUniqueNameIsItsOwnEntry() {
         let ranked = StationItem.all

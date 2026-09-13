@@ -120,10 +120,12 @@ struct OnlineGateDetailView: View {
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  onJump: jump,
                                                  latitude: gate.latitude, longitude: gate.longitude)
-                                    if let port = pairedTide {
-                                        TideAtPortLink(port: port)
-                                    } else if let nearby = nearbyTide {
-                                        NearbyStationLink(item: nearby.item, km: nearby.km)
+                                    StationLinksRow(stationId: gate.id) {
+                                        if let port = pairedTide {
+                                            TideAtPortLink(port: port)
+                                        } else if let nearby = nearbyTide {
+                                            NearbyStationLink(item: nearby.item, km: nearby.km)
+                                        }
                                     }
                                 }
                             },
