@@ -140,6 +140,7 @@ struct OnlineGateDetailView: View {
                                     honestyCard
                                     nearestGateLink
                                 }
+                                stationDetails.padding(.top, 14)
                             })
             .onAppear {
                 let today = todayLocal(tz)
@@ -233,6 +234,27 @@ struct OnlineGateDetailView: View {
     }
 
     // MARK: - Fetched: provenance footer (online-gates spec §2, inverse of the fitted footer)
+
+    /// The nod to the nerds (#170). The honest why-not — this gate's own
+    /// measured fit error — sits in the honesty card only while there is no
+    /// window; once the numbers are fetched it has nowhere else to live.
+    private var stationDetails: some View {
+        StationDetails {
+            StationDetailRow("Gate", gate.id)
+            StationDetailRow("Position", formatCoord(lat: gate.latitude, lon: gate.longitude))
+            StationDetailRow("Time zone", gate.timezone)
+            if let port = pairedTide {
+                StationDetailRow("Reference", "\(port.name), \(Int(distanceKm(gate.latitude, gate.longitude, port.latitude, port.longitude).rounded())) km away")
+            }
+            StationDetailRow("Prediction", "CHS-published predictions, fetched — never computed on this device")
+            if let note = gate.onlineNote {
+                StationDetailRow("Why not fitted", note)
+            }
+            if let window {
+                StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz))")
+            }
+        }
+    }
 
     private func provenance(_ window: ChsOnlineWindow) -> some View {
         DetailFooter {

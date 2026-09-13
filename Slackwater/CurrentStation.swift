@@ -222,10 +222,45 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
 
     var tz: TimeZone { TimeZone(identifier: timezone) ?? .current }
 
+    // MARK: - Station details (#170)
+
+    /// Z0 in words: which way the water leans once the tide is taken out of
+    /// it. Below 0.05 kn the speed formatter rounds to 0.0 and the direction
+    /// is noise, so it reads as none rather than as a confident 0.0 ebb.
+    func detailsMeanFlow(unit: String) -> String {
+        guard abs(meanFlow) >= 0.05 else { return "None measured" }
+        return "\(formatSpeed(abs(meanFlow), unit: unit)) \(speedUnitLabel(unit)) toward \(meanFlow > 0 ? "flood" : "ebb")"
+    }
+
+    /// How the prediction under this station is made, in one line.
+    var detailsPrediction: String {
+        isSubordinate
+            ? "Reference slacks and maxima, shifted and scaled by NOAA offsets, computed on this device"
+            : "\(constituents.count) harmonic constituents, computed on this device"
+    }
+
+    /// NOAA's subordinate table as the table itself states it — the four time
+    /// offsets against the reference's events and the two speed ratios. Nil
+    /// for a harmonic station, which has no table.
+    var detailsOffsets: (times: String, ratios: String)? {
+        guard isSubordinate else { return nil }
+        return ("slack before flood \(offsetMinutes(slackBeforeFloodOffset)) · max flood \(offsetMinutes(floodTimeOffset)) · slack before ebb \(offsetMinutes(slackBeforeEbbOffset)) · max ebb \(offsetMinutes(ebbTimeOffset))",
+                "flood ×\(ratioText(floodSpeedRatio)) · ebb ×\(ratioText(ebbSpeedRatio))")
+    }
+
     static let all: [CurrentStationRecord] = bundled("currents")
     static let byId: [String: CurrentStationRecord] =
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 }
+
+/// "+38 min" — a NOAA table offset, stored in seconds, as the table prints it.
+private func offsetMinutes(_ seconds: Double?) -> String {
+    let m = Int(((seconds ?? 0) / 60).rounded())
+    return m == 0 ? "0 min" : String(format: "%+d min", m)
+}
+
+/// "0.85" — a NOAA speed ratio. Two places: the table publishes two.
+private func ratioText(_ r: Double?) -> String { String(format: "%.2f", r ?? 1) }
 
 /// What every current consumer needs: a harmonic `CurrentStation` or a
 /// subordinate reduced from one, behind the same two calls.

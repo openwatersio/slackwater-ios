@@ -48,6 +48,10 @@ struct CurrentDetailView: View {
     @State private var anchor = Date.distantPast
     @State private var viewportPts: CGFloat = 0
     @State private var showDownloads = false
+    /// This gate's stored model, for the station details' fit rows — how many
+    /// days it was fitted from and when that download happened. Re-read
+    /// whenever the record changes, since a refinement replaces both.
+    @State private var chsModel: ChsModel?
     /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
     /// discovery fallback when no curated `tideReference` pairs this station.
     /// Computed once on appear; the body re-evaluates on every scrub tick.
@@ -125,7 +129,12 @@ struct CurrentDetailView: View {
                                     }
                                 }
                             },
-                            bottom: { footer })
+                            bottom: {
+                                VStack(spacing: 14) {
+                                    footer
+                                    stationDetails
+                                }
+                            })
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onAppear {
                 if store == nil {
@@ -133,6 +142,7 @@ struct CurrentDetailView: View {
                     resetStore(focus: nil)
                 }
                 RecentsStore.shared.record(record.itemId)
+                if record.isChs { chsModel = ChsModelStore.loadCurrent(record.id) }
                 if pairedTide == nil, nearbyTide == nil,
                    let n = StationItem.nearest(.tide, toLat: record.latitude, lon: record.longitude),
                    n.km <= nearbyStationRadiusKm {
@@ -153,7 +163,10 @@ struct CurrentDetailView: View {
             // The refinement lands under an open page: same station, new model. The
             // curve, the schedule and the amber marking all have to follow it —
             // a fresh store, parked where the scrub already is.
-            .onChange(of: record) { _, _ in resetStore(focus: scrubTime) }
+            .onChange(of: record) { _, r in
+                resetStore(focus: scrubTime)
+                if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
+            }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
     }
 
@@ -186,6 +199,44 @@ struct CurrentDetailView: View {
             } else {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+            }
+        }
+    }
+
+    /// The nod to the nerds (#170): the axis, the net flow the fit found under
+    /// the tide, and — for a subordinate — NOAA's table itself. Collapsed, so
+    /// none of it costs the reader who only wants the next slack anything.
+    private var stationDetails: some View {
+        StationDetails {
+            StationDetailRow("Station", record.id)
+            StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
+            StationDetailRow("Time zone", record.timezone)
+            StationDetailRow("Flood sets", "\(Int(record.floodDirection.rounded()))°T")
+            StationDetailRow("Ebb sets", "\(Int(record.ebbDirection.rounded()))°T")
+            // Z0 belongs to a harmonic fit. A subordinate has no fit of its
+            // own — its record carries no meaningful mean flow to report.
+            if !record.isSubordinate {
+                StationDetailRow("Mean flow", record.detailsMeanFlow(unit: speedUnit))
+                StationDetailNote("Mean flow is the net non-tidal drift the fit found under the tide — the river left over when the tide averages out.")
+            }
+            if let ref = record.referenceRecord {
+                StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
+            }
+            StationDetailRow("Prediction", record.detailsPrediction)
+            if let offsets = record.detailsOffsets {
+                StationDetailRow("Time offsets", offsets.times)
+                StationDetailRow("Speed ratios", offsets.ratios)
+            }
+            if let model = chsModel {
+                // The model's own window, not the gate's target: a provisional
+                // fit is 60 days of a gate whose final window is 210.
+                StationDetailRow("Fit window", "\(Int(model.fitDays ?? record.chsGate?.fitDays ?? 0)) days of CHS observations")
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Downloaded")
+                    Spacer()
+                    Text(model.fittedAt, style: .relative)
+                }
+                .font(.caption)
             }
         }
     }
