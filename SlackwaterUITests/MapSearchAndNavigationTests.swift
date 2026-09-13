@@ -463,9 +463,11 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         }
     }
 
-    /// The map at continental scale. Thousands of pins is a grey smear without
-    /// clustering; this walks the camera out to the whole country, times the
-    /// gestures, and checks the map is still a map afterwards.
+    /// The map at continental scale. Thousands of pins is a grey smear
+    /// without the far band's collision thinning; this walks the camera out
+    /// to the whole country, times the gestures — which now price the
+    /// collision engine over the whole bundle — and checks the map is still
+    /// a map afterwards.
     func testM53MapAtContinentalZoom() throws {
         let app = XCUIApplication()
         // z3.2 over the Salish camera longitude: the west coast from Mexico to
@@ -477,11 +479,11 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))
-        sleep(6)  // tiles + clustering must settle before the TIMED pinches; neither reaches XCUITest
+        sleep(6)  // tiles + symbol placement must settle before the TIMED pinches; neither reaches XCUITest
         save(app, "m53-map-continental.png")
 
-        // Then the interaction cost, timed: zooming the clustered source at the
-        // scale where an unclustered one is thousands of separate dots.
+        // Then the interaction cost, timed: zooming the collision-thinned
+        // source at the scale where every station is a candidate symbol.
         let start = Date.now
         for _ in 0..<5 { map.pinch(withScale: 1.6, velocity: 2) }
         let gestures = Date.now.timeIntervalSince(start)

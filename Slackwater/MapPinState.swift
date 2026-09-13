@@ -72,6 +72,13 @@ struct PinState: Equatable {
     /// height sits between the surrounding low and high. nil when either
     /// extreme is out of reach — the pin falls back to a dot.
     var gauge: Int?
+    /// The far-zoom thinning key (symbol-sort-key: LOWER places first, so
+    /// low sorts survive collision). Reference/harmonic stations before
+    /// subordinates, bigger signals before smaller within each — "the mouth
+    /// before upstream" falls out, because upstream stations are the
+    /// subordinates pointing their offsets at the mouth. 25 = the default
+    /// nobody computed: unknown pins thin first.
+    var sort: Double = 25
 }
 
 /// The gauge glyph's fill resolution: 0...8 covers ~12% steps, which is all
@@ -84,12 +91,18 @@ let PIN_GAUGE_BUCKETS = 8
 /// at 0.3s, and the readout's one extra height sample per pin lives inside
 /// the same budget).
 func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> PinState {
-    guard let rising = tidePinRisingHybrid(record, at: now) else { return PinState(state: "unknown") }
+    // Constituent amplitude sum as the signal-size tie-break: a subordinate
+    // ships none, so it lands a full rank behind any harmonic neighbour.
+    let sort = pinSort(subordinate: record.isSubordinate,
+                       signal: record.constituents.reduce(0) { $0 + $1.amplitude })
+    guard let rising = tidePinRisingHybrid(record, at: now) else {
+        return PinState(state: "unknown", sort: sort)
+    }
     let state = rising ? "rising" : "falling"
     let station = record.engineStation
     guard let height = station
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
-    else { return PinState(state: state) }
+    else { return PinState(state: state, sort: sort) }
     // The gauge: where the height sits between the surrounding extremes.
     // ±15h brackets any station's cycle. ponytail: a second extremes search
     // per pin on top of the hybrid — if testPinLayerBuildsInsideAFrame
@@ -108,7 +121,14 @@ func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> 
     // range, where the arrow drops and the number stands alone.
     return PinState(state: state,
                     reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial)) \(rising ? "↑" : "↓")",
-                    gauge: gauge)
+                    gauge: gauge,
+                    sort: sort)
+}
+
+/// One rank step is worth more than any signal difference: harmonics sort
+/// 0...9, subordinates 10...19, the unknown default sits past both.
+private func pinSort(subordinate: Bool, signal: Double) -> Double {
+    (subordinate ? 10 : 0) + max(0, 9 - signal)
 }
 
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
@@ -126,7 +146,9 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date, speedUnit: S
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),
         reading: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
-        bearing: station.setDegrees(signed: signed))
+        bearing: station.setDegrees(signed: signed),
+        sort: pinSort(subordinate: station.isSubordinate,
+                      signal: station.constituents.reduce(abs(station.meanFlow)) { $0 + $1.amplitude }))
 }
 
 /// 1,549 subordinate current pins hang off 50 references, so the reference is
@@ -221,7 +243,8 @@ func chsPinStates(at now: Date,
         case .chsGate(let gate):
             guard let port = tideRecords[gate.reference] else { continue }
             let phase = DerivedGateRecord(gate: gate, port: port).cardState(at: now).phase
-            states[item.id] = PinState(state: phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
+            states[item.id] = PinState(state: phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack",
+                                       sort: 19)   // a real gate, but speed-less: last of the ranked
         }
     }
     return states
@@ -237,7 +260,7 @@ private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
             let state = pinState(s, at: appNow(), chsStates: chsStates,
                                  imperial: units.imperial, speedUnit: units.speedUnit)
             var properties: [String: Any] = ["id": s.id, "name": s.name, "kind": s.pinKind,
-                                             "state": state.state]
+                                             "state": state.state, "sort": state.sort]
             if let reading = state.reading { properties["reading"] = reading }
             if let bearing = state.bearing { properties["bearing"] = bearing }
             // The full image name, not the bucket — `icon-image` reads it

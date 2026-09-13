@@ -359,30 +359,27 @@ final class NationalScaleTests: XCTestCase {
                           "near-turn straddle lag should stay a rare, bounded timing artifact")
     }
 
-    /// Clustering is what makes 3,125 pins a map rather than a smear — and the
-    /// zoom it stops at is what keeps the discovery view tappable.
-    func testStationSourceClustersOnlyBelowTheDiscoveryZoom() throws {
-        // The clustering ceiling and the opening camera are separate constants
-        // whose relationship is the invariant: the discovery camera must open
-        // on tappable stations, not clusters.
-        XCTAssertLessThan(Double(CLUSTER_MAX_ZOOM), defaultDiscoveryZoom)
-    }
-
     /// The runtime pin layers (offline-chart-packs spec §1/§5: the basemap is
     /// a style URL the app does not own; pins go in through the runtime API).
-    /// Both tap layers must exclude clusters, or every cluster draws twice —
-    /// and the tap handler hit-tests these exact identifiers.
+    /// The tap handler hit-tests these exact identifiers, in BOTH bands: the
+    /// near band draws everything from the label zoom up, the far band thins
+    /// by collision below it — a band missing its floor or ceiling either
+    /// double-draws every pin or leaves whole zooms pinless.
     func testRuntimePinLayersCarryTheTapContract() throws {
         let layers = stationPinLayers(source: stationShapeSource())
         let byId = Dictionary(uniqueKeysWithValues: layers.map { ($0.identifier, $0) })
-        for id in ["station-clusters", "station-cluster-count", "station-pins-dot",
+        for id in ["station-pins-dot-plate", "station-pins-dot",
                    "station-pins-current-plate", "station-pins-current",
-                   "station-pins-tide-plate", "station-pins-tide", "station-labels"] {
+                   "station-pins-tide-plate", "station-pins-tide",
+                   "station-pins-dot-far", "station-pins-current-far",
+                   "station-pins-tide-far", "station-labels"] {
             XCTAssertNotNil(byId[id], "\(id) missing from the runtime pin layers")
         }
         for id in ["station-pins-dot", "station-pins-current", "station-pins-tide"] {
-            XCTAssertNotNil((byId[id] as? MLNVectorStyleLayer)?.predicate,
-                            "\(id) must exclude clusters, or every cluster draws twice")
+            XCTAssertEqual(byId[id]?.minimumZoomLevel, Float(LABEL_MIN_ZOOM),
+                           "\(id) must start where its far variant stops")
+            XCTAssertEqual(byId["\(id)-far"]?.maximumZoomLevel, Float(LABEL_MIN_ZOOM),
+                           "\(id)-far must stop where the near band starts")
         }
         // The labels ride the basemap's own fontstack, so offline packs cache
         // its glyph ranges as part of the style's needs. A stack of our own
