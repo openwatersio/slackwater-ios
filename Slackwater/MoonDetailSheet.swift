@@ -13,6 +13,9 @@ struct MoonFacts {
     let set: Date?
     let nextFull: Date?
     let nextNew: Date?
+    /// Where the NEXT FULL and NEXT NEW rows scrub to: a night sky near the phase (#314).
+    let fullNight: Date?
+    let newNight: Date?
     let distanceKm: Double
     let closest: Date?
     let farthest: Date?
@@ -66,17 +69,45 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
         firstOfKind[e.kind] = e
     }
 
+    let fullAt = phases.first { $0.phase == .full }?.time
+    let newAt = phases.first { $0.phase == .new }?.time
     return MoonFacts(
         illumination: illumination,
         rise: events.first { $0.kind == .rise }?.time,
         set: events.first { $0.kind == .set }?.time,
-        nextFull: phases.first { $0.phase == .full }?.time,
-        nextNew: phases.first { $0.phase == .new }?.time,
+        nextFull: fullAt,
+        nextNew: newAt,
+        fullNight: fullAt.map { phaseNight($0, observer: observer) },
+        newNight: newAt.map { phaseNight($0, observer: observer) },
         distanceKm: position.distanceKm,
         closest: closest?.time,
         farthest: farthest?.time,
         last: previousVisibleEclipse(before: at, observer: observer),
         upcoming: firstOfKind.values.sorted { $0.peak < $1.peak })
+}
+
+/// The moment the moon stands highest in the dark night nearest `instant`; the
+/// instant itself when no night comes that close (summer near the pole).
+func phaseNight(_ instant: Date, observer: Observer) -> Date {
+    let events = (try? sunEvents(from: instant.addingTimeInterval(-36 * 3600),
+                                 to: instant.addingTimeInterval(36 * 3600),
+                                 observer: observer)) ?? []
+    // Nautical dusk to dawn: the sky paint's -12° anchor, navy overhead and stars half in.
+    let nights = events.indices.compactMap { i -> ClosedRange<Date>? in
+        guard events[i].kind == .nauticalDusk,
+              let dawn = events[i...].first(where: { $0.kind == .nauticalDawn }) else { return nil }
+        return events[i].time...dawn.time
+    }
+    func gap(_ night: ClosedRange<Date>) -> TimeInterval {
+        max(night.lowerBound.timeIntervalSince(instant), instant.timeIntervalSince(night.upperBound), 0)
+    }
+    guard let night = nights.min(by: { gap($0) < gap($1) }) else { return instant }
+    // ponytail: 20-minute samples, since Almanac has no moon transit search; a
+    // transit search would make the landing exact.
+    let samples = stride(from: night.lowerBound, through: night.upperBound, by: 20 * 60).map {
+        ($0, (try? moonAltAz($0, observer: observer).altDeg) ?? -90)
+    }
+    return samples.max { $0.1 < $1.1 }?.0 ?? instant
 }
 
 struct MoonDetailSheet: View {
@@ -106,11 +137,11 @@ struct MoonDetailSheet: View {
                             horizonCell("SET", facts.set, rising: false, facts, id: "moon-set")
                         }
                         group {
-                            phaseCell("NEXT FULL", facts.nextFull, fraction: 1,
-                                      id: "moon-next-full")
+                            phaseCell("NEXT FULL", facts.nextFull, jumpTo: facts.fullNight,
+                                      fraction: 1, id: "moon-next-full")
                             divider
-                            phaseCell("NEXT NEW", facts.nextNew, fraction: 0,
-                                      id: "moon-next-new")
+                            phaseCell("NEXT NEW", facts.nextNew, jumpTo: facts.newNight,
+                                      fraction: 0, id: "moon-next-new")
                         }
                         distance(facts)
                         group {
@@ -218,9 +249,9 @@ struct MoonDetailSheet: View {
 
     /// The next full and the next new, drawn at the shape they will be. A full
     /// disc and an unlit one say which is which before the label is read.
-    private func phaseCell(_ label: String, _ time: Date?, fraction: Double,
+    private func phaseCell(_ label: String, _ time: Date?, jumpTo: Date?, fraction: Double,
                            id: String) -> some View {
-        cell(label, value: when(time), jumpTo: time, id: id) {
+        cell(label, value: when(time), jumpTo: jumpTo, id: id) {
             MoonGlyph(fraction: fraction, waxing: true, size: 34)
                 .frame(width: 78, height: 44)
         }

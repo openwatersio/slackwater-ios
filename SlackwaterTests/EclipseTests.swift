@@ -229,6 +229,30 @@ final class EclipseTests: XCTestCase {
                              "the partial was inside the window after all")
     }
 
+    /// #314: the 2026-09-26 full moon is 9:49am in Victoria. The row still prints
+    /// that instant, but scrubs to the moon at its highest in the night before.
+    func testPhaseShortcutsLandWhereTheMoonIsHighestThatNight() throws {
+        let facts = try XCTUnwrap(moonFacts(at: utc("2026-09-20T12:00:00Z"), observer: Self.victoria,
+                                            tz: TimeZone(identifier: "America/Vancouver")!))
+        let full = try XCTUnwrap(facts.nextFull)
+        let fullNight = try XCTUnwrap(facts.fullNight)
+        XCTAssertEqual(full.timeIntervalSince(utc("2026-09-26T16:49:00Z")), 0, accuracy: 3600)
+        XCTAssertLessThan(fullNight, full)
+        XCTAssertLessThan(full.timeIntervalSince(fullNight), 12 * 3600)
+        XCTAssertLessThanOrEqual(try sunAltAz(fullNight, observer: Self.victoria).altDeg, -12)
+        let peak = try moonAltAz(fullNight, observer: Self.victoria).altDeg
+        for neighbour in [-1200.0, 1200] {
+            XCTAssertLessThanOrEqual(
+                try moonAltAz(fullNight.addingTimeInterval(neighbour), observer: Self.victoria).altDeg, peak)
+        }
+
+        // A new moon's highest dark moment is a twilight edge, so allow the edge's rounding.
+        let new = try XCTUnwrap(facts.nextNew)
+        let newNight = try XCTUnwrap(facts.newNight)
+        XCTAssertLessThan(abs(newNight.timeIntervalSince(new)), 36 * 3600)
+        XCTAssertLessThanOrEqual(try sunAltAz(newNight, observer: Self.victoria).altDeg, -11.9)
+    }
+
     /// The sheet shows a progress indicator until this finishes. A local call
     /// takes about 180 ms; 250 ms leaves 39% headroom and still catches a 2×
     /// regression before the sheet's 500 ms user-visible limit. Hosted runners
