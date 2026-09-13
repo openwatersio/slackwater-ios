@@ -1101,6 +1101,68 @@ struct DetailFooter<Note: View>: View {
     }
 }
 
+/// The collapsed provenance section (#170): where the numbers came from, for
+/// the minority who want to know, without any of it intruding on the reader
+/// who just wants the next slack. The container is shared; the rows are the
+/// caller's, because a current gate wants its set bearings and its reference
+/// offsets where a tide wants its datum.
+struct StationDetails<Rows: View>: View {
+    @ViewBuilder var rows: () -> Rows
+
+    var body: some View {
+        DisclosureGroup("Station details") {
+            VStack(alignment: .leading, spacing: 10) {
+                rows()
+            }
+            .padding(.top, 8)
+        }
+        .font(.subheadline)
+        .foregroundStyle(SN.foam.opacity(0.7))
+        .tint(SN.foam.opacity(0.55))
+        .padding(.horizontal, 24)
+    }
+}
+
+/// One label/value line inside `StationDetails`.
+struct StationDetailRow: View {
+    let label: String
+    let value: String
+
+    init(_ label: String, _ value: String) {
+        self.label = label
+        self.value = value
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer()
+            // Every value in this column is a reading — a position, a bearing,
+            // an offset, a speed — so the column carries the mono trait rather
+            // than each caller remembering it (TypeScaleTests attests to this
+            // for the formatter that reaches here through `detailsMeanFlow`).
+            Text(value)
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.caption)
+    }
+}
+
+/// A sentence inside `StationDetails` — the explanations that sit under a row
+/// rather than beside a label.
+struct StationDetailNote: View {
+    let text: String
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(SN.foam.opacity(0.55))
+    }
+}
+
 // `ProvisionalBadge` — the ⚠️ disc that used to sit beside the region on a
 // provisional card — is gone (#93). One marking per state: the fast answer is
 // now `CardStatus.refining`'s strip, which says the word and the tolerance

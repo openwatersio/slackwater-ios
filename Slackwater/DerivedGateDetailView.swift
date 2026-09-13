@@ -78,7 +78,12 @@ struct DerivedGateDetailView: View {
                                     TideAtPortLink(port: port)
                                 }
                             },
-                            bottom: { footer })
+                            bottom: {
+                                VStack(spacing: 14) {
+                                    footer
+                                    stationDetails
+                                }
+                            })
             .onAppear {
                 if store == nil {
                     anchor = todayLocal(tz)
@@ -153,6 +158,21 @@ struct DerivedGateDetailView: View {
             Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    /// The nod to the nerds (#170). The lags are the whole model here — the
+    /// two numbers every slack on this page is made of — and they exist
+    /// nowhere else in the app.
+    private var stationDetails: some View {
+        StationDetails {
+            StationDetailRow("Gate", gate.id)
+            StationDetailRow("Position", formatCoord(lat: gate.latitude, lon: gate.longitude))
+            StationDetailRow("Time zone", gate.timezone)
+            StationDetailRow("Reference", "\(port.name), \(Int(distanceKm(gate.latitude, gate.longitude, port.latitude, port.longitude).rounded())) km away")
+            StationDetailRow("Slack lags", "\(Int(gate.hwLagMinutes.rounded())) min after \(port.name) high · \(Int(gate.lwLagMinutes.rounded())) min after low")
+            StationDetailRow("Prediction", "Slack times only, derived on this device — no speed prediction exists for this pass")
+            StationDetailNote("The curve between slacks is a schematic shape, not a measured speed. Only the times it crosses zero are a claim.")
         }
     }
 

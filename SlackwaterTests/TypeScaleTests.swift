@@ -133,6 +133,10 @@ extension TypeScaleTests {
             // "normalize", not "build"; the key below has to match what it
             // actually computes, not what a real parser would say.
             "WidgetSnapshot.swift:normalize",
+            // The station-details mean flow: formatted on the record and
+            // consumed by `StationDetailRow`'s value `Text`, which carries the
+            // mono trait for its whole column (Theme.swift).
+            "CurrentStation.swift:detailsMeanFlow",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
