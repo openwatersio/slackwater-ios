@@ -158,6 +158,23 @@ final class EclipseTests: XCTestCase {
 
     // MARK: - The Moon sheet
 
+    func testMoonApsidesAreNearbyLocalDistanceExtremes() throws {
+        let at = utc("2026-09-07T12:00:00Z")
+        let apsides = moonApsides(around: at)
+        let perigee = try XCTUnwrap(apsides.perigee)
+        let apogee = try XCTUnwrap(apsides.apogee)
+
+        for (date, isClosest) in [(perigee, true), (apogee, false)] {
+            XCTAssertLessThan(abs(date.timeIntervalSince(at)), 14 * 86_400)
+            let km = try moonPosition(date).distanceKm
+            for offset in [-6.0 * 3600, 6.0 * 3600] {
+                let neighbour = try moonPosition(date.addingTimeInterval(offset)).distanceKm
+                if isClosest { XCTAssertLessThanOrEqual(km, neighbour) }
+                else { XCTAssertGreaterThanOrEqual(km, neighbour) }
+            }
+        }
+    }
+
     func testTheTileNamesTheEclipseInsteadOfThePhase() {
         XCTAssertEqual(eclipseTileText(.total), "Total Eclipse")
         XCTAssertEqual(eclipseTileText(.partial), "Partial Eclipse")
