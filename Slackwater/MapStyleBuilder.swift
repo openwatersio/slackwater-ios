@@ -191,6 +191,19 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     counts.textAllowsOverlap = NSExpression(forConstantValue: true)
     counts.textColor = ink
 
+    // The selected pin's halo: a soft ring under every pin layer, revealed
+    // by `MapViewRepresentable` swapping this layer's predicate to the
+    // picked station's id while the preview panel is up. Default: nothing.
+    let selected = MLNCircleStyleLayer(identifier: "station-selected", source: source)
+    // Matches nothing — no station has an empty id. NOT NSPredicate(value:):
+    // MapLibre's predicate converter throws on constant predicates.
+    selected.predicate = NSPredicate(mglJSONObject: ["==", ["get", "id"], ""])
+    selected.circleRadius = grown(PIN_RADIUS * 2.4)
+    selected.circleColor = ink
+    selected.circleOpacity = NSExpression(forConstantValue: 0.3)
+    selected.circleStrokeWidth = NSExpression(forConstantValue: 2)
+    selected.circleStrokeColor = ink
+
     // The stateless pin: no bearing to point, no trend to show — slack
     // currents (go-green), a derived gate's phase words, and unknown (steel).
     let dots = MLNCircleStyleLayer(identifier: "station-pins-dot", source: source)
@@ -275,6 +288,6 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     readings.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
     readings.textHaloWidth = NSExpression(forConstantValue: 1)
 
-    return [clusters, counts, dots, currentPinPlate, currentPins,
+    return [clusters, counts, selected, dots, currentPinPlate, currentPins,
             tidePinPlate, tidePins, labels, readings]
 }
