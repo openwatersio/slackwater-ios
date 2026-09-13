@@ -225,7 +225,9 @@ final class IwlsFetcher {
     /// so this costs a request exactly once — including across a job that
     /// stepped aside and came back, and across days (the grid is absolute).
     func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
-        try await cached(code, stationID: stationID, chunk: chunk) { $0 }
+        try await cached(code, stationID: stationID, chunk: chunk) {
+            $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
+        }
     }
 
     /// wlp for one chunk on the 15-min grid the fit wants. The filter holds
@@ -259,7 +261,7 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if let hit = ChsChunkStore.load(stationID, code, chunk) { return hit }
+        if let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
         let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
