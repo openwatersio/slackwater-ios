@@ -338,12 +338,12 @@ final class ColourAndFormTests: XCTestCase {
     /// strip's green column uses.
     func testCurrentPinColourIsRampOutsideWindowGoInside() {
         let still = record(speedKn: 0)
-        XCTAssertEqual(currentPinColour(still, at: refTime),
+        XCTAssertEqual(currentPinState(still, at: refTime, speedUnit: "kn").state,
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
         let fast = record(speedKn: 3.0)
-        XCTAssertEqual(currentPinColour(fast, at: refTime),
+        XCTAssertEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                        pinRampHex(forSpeedKn: 3.0), "moving pin must be the darkened ramp")
-        XCTAssertNotEqual(currentPinColour(fast, at: refTime),
+        XCTAssertNotEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                           mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
                           "a moving pin must never read go")
     }
@@ -434,18 +434,20 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             contrast(ink, water), 3.0,
             "the pin outline is under 3:1 on the water tone — every pin state relies on it")
-        // Both kinds must actually draw that outline, and the square's comes
-        // from a backing plate because MapLibre Native renders no icon-halo on
-        // its template image. One kind outlined and the other not is how this
-        // regressed the first time.
+        // Every pin form must actually draw that outline — the dot as a
+        // stroke, each glyph via its backing plate, because MapLibre Native
+        // renders no icon-halo on template images. One form outlined and the
+        // others not is how this regressed the first time.
         XCTAssertTrue(source.contains("hexColor(CHART_INK)"),
                       "the ink expression must derive from CHART_INK, never a hand-copied colour")
         XCTAssertNotNil(source.range(of: #"circleStrokeColor = ink"#),
-                        "the circle pin lost its ink stroke")
-        XCTAssertNotNil(source.range(of: #"tidePinPlate\.iconColor = ink"#, options: .regularExpression),
-                        "the tide square lost its ink backing plate")
-        XCTAssertTrue(source.contains("pin-square-plate"),
-                      "the backing-plate image must be registered, or the plate layer draws nothing")
+                        "the dot pin lost its ink stroke")
+        for plate in ["pin-triangle-plate", "pin-arrow-plate"] {
+            XCTAssertTrue(source.contains(plate),
+                          "\(plate) must back its glyph, or the plate layer draws nothing")
+        }
+        XCTAssertNotNil(source.range(of: #"colour: ink"#),
+                        "the glyph plates lost their ink colour")
     }
 
     /// The state palette's integrity: the two direction ends, slack and the

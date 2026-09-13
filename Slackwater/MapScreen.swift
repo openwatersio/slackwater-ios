@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. The discovery map: its camera, the MapLibre delegate
-// that loads the satellite style and re-registers the app's own runtime
+// that loads the basemap style and re-registers the app's own runtime
 // layers, and the tap-to-detail view hosting it.
 import SwiftUI
 import MapLibre
@@ -66,24 +66,59 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         map.styleURL = BASEMAP_STYLE_URL
     }
 
-    /// A filled square at equal AREA with the 5pt circle pins (side r·√π —
-    /// same-width reads heavier). Template image so `icon-color` can tint it
-    /// (MapLibre Native's SDF path; without it the pin ignores state).
-    /// GOTCHA: Native draws no `icon-halo-*` on this image at all, so the
-    /// outline is `inflate` — a larger backing square drawn underneath in
-    /// `CHART_INK`.
-    private func squarePinImage(radius: CGFloat = CGFloat(PIN_RADIUS),
-                                inflate: CGFloat = 0, scale: CGFloat = 3) -> UIImage {
-        let side = radius * CGFloat(Double.pi.squareRoot()) + inflate * 2
-        let size = CGSize(width: side, height: side)
+    /// A pin glyph as a white template image, so `icon-color` can tint it per
+    /// feature (MapLibre Native's SDF path; without it the pin ignores state).
+    /// GOTCHA: Native draws no `icon-halo-*` on these images at all, so the
+    /// ink outline is a PLATE — the same path stroked `inflate` wider, drawn
+    /// underneath by its own layer in `CHART_INK`.
+    private func pinGlyphImage(_ path: UIBezierPath, bounds: CGSize,
+                               inflate: CGFloat = 0, scale: CGFloat = 3) -> UIImage {
+        let size = CGSize(width: bounds.width + inflate * 2, height: bounds.height + inflate * 2)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         format.opaque = false
         let image = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            ctx.cgContext.translateBy(x: inflate, y: inflate)
             UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
+            UIColor.white.setStroke()
+            path.fill()
+            guard inflate > 0 else { return }
+            path.lineWidth = inflate * 2
+            path.lineJoinStyle = .round
+            path.stroke()
         }
         return image.withRenderingMode(.alwaysTemplate)
+    }
+
+    /// The tide trend glyph: a triangle pointing up, at equal AREA with the
+    /// r=`PIN_RADIUS` dot; the falling state rotates it 180°.
+    private func trianglePinImage(inflate: CGFloat = 0) -> UIImage {
+        let side = CGFloat(PIN_RADIUS) * 2 * (CGFloat.pi / sqrt(3)).squareRoot()
+        let height = side * sqrt(3) / 2
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: side / 2, y: 0))
+        path.addLine(to: CGPoint(x: side, y: height))
+        path.addLine(to: CGPoint(x: 0, y: height))
+        path.close()
+        return pinGlyphImage(path, bounds: CGSize(width: side, height: height), inflate: inflate)
+    }
+
+    /// The flowing-current glyph: a chunky north-pointing arrow (S-57 draws a
+    /// tidal stream as an arrow in the direction of flow — B-407.4); the
+    /// layer rotates it to the set. Head-heavy on purpose: at dot sizes the
+    /// head is what survives.
+    private func arrowPinImage(inflate: CGFloat = 0) -> UIImage {
+        let w: CGFloat = 12, h: CGFloat = 17, shaft: CGFloat = 5, head: CGFloat = 9
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: w / 2, y: 0))
+        path.addLine(to: CGPoint(x: w, y: head))
+        path.addLine(to: CGPoint(x: (w + shaft) / 2, y: head))
+        path.addLine(to: CGPoint(x: (w + shaft) / 2, y: h))
+        path.addLine(to: CGPoint(x: (w - shaft) / 2, y: h))
+        path.addLine(to: CGPoint(x: (w - shaft) / 2, y: head))
+        path.addLine(to: CGPoint(x: 0, y: head))
+        path.close()
+        return pinGlyphImage(path, bounds: CGSize(width: w, height: h), inflate: inflate)
     }
 
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -97,8 +132,10 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
-        style.setImage(squarePinImage(), forName: "pin-square")
-        style.setImage(squarePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-square-plate")
+        style.setImage(trianglePinImage(), forName: "pin-triangle")
+        style.setImage(trianglePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-triangle-plate")
+        style.setImage(arrowPinImage(), forName: "pin-arrow")
+        style.setImage(arrowPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-arrow-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below
@@ -122,7 +159,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             style.addSource(source)
             for layer in stationPinLayers(source: source) { style.addLayer(layer) }
         }
-        applyChsTones(to: style)
+        applyChsStates(to: style)
     }
 
     /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
@@ -131,16 +168,16 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// pushed into the old one. After paint by construction, so the style-construction path
     /// `testPinLayerBuildsInsideAFrame` budgets pays nothing; the 3,125-pin
     /// source rebuild runs off the main thread. Cache only, never a fetch —
-    /// `chsPinTones` takes the stored records and nothing else.
-    private func applyChsTones(to style: MLNStyle) {
+    /// `chsPinStates` takes the stored records and nothing else.
+    private func applyChsStates(to style: MLNStyle) {
         Task { @MainActor [weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
-                let tones = chsPinTones(at: appNow(), tideRecords: tides, currentRecords: currents)
-                guard !tones.isEmpty else { return nil }   // nothing synced — neutral is honest
-                let geojson = PinFeaturesCache.shared.update(tones: tones)
+                let states = chsPinStates(at: appNow(), tideRecords: tides, currentRecords: currents)
+                guard !states.isEmpty else { return nil }   // nothing synced — neutral is honest
+                let geojson = PinFeaturesCache.shared.update(states: states)
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
             guard let geojson, let style,
@@ -188,8 +225,17 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero)
-        map.attributionButtonPosition = .bottomLeft
-        map.logoViewPosition = .bottomLeft
+        // Top-right, clear of the FAB row and the locate button; white so it
+        // reads on the dark basemap.
+        map.attributionButtonPosition = .topRight
+        map.attributionButton.tintColor = .white
+        // The MapLibre wordmark is optional under its BSD license; the ⓘ
+        // button stays — it is where the tile attribution lives.
+        map.showsLogoView = false
+        // North-up, top-down only: the discovery map is a chart, not a fly-
+        // through, and every readout is placed for that camera.
+        map.isRotateEnabled = false
+        map.isPitchEnabled = false
         map.showsUserLocation = LocationService.shared.authorized
         if framing != nil {
             map.isScrollEnabled = false
@@ -238,7 +284,8 @@ struct MapViewRepresentable: UIViewRepresentable {
                     return hypot(pa.x - point.x, pa.y - point.y) < hypot(pb.x - point.x, pb.y - point.y)
                 }
             }
-            if let id = nearest(["station-pins-current", "station-pins-tide"])?.attribute(forKey: "id") as? String,
+            if let id = nearest(["station-pins-current", "station-pins-tide",
+                                 "station-pins-dot"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
                 return
