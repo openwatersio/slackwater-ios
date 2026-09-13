@@ -20,6 +20,11 @@ let stationZoom = 12.5
 /// frame — a harbor, not a dot.
 let locateZoom = 10.5
 
+/// How much of the map's height the preview panel covers, for the selection
+/// camera: handle + card + paddings + margin over the home indicator.
+/// ponytail: a constant, not a measured layout — retune if the card grows.
+let previewPanelCover: CGFloat = 240
+
 /// UI-test hook, like `-openMap`: `-mapZoom 3.2` (UserDefaults argument
 /// domain) opens the discovery map at a stated zoom. Synthesised pinches are
 /// not a camera — five of them land somewhere the test cannot name. Zoom 0
@@ -219,9 +224,17 @@ struct MapViewRepresentable: UIViewRepresentable {
     var framing: [CLLocationCoordinate2D]? = nil
     /// A tap on no pin, handed the zoom on screen.
     var onMiss: ((Double) -> Void)? = nil
+    /// The previewed station: its pin wears the `station-selected` halo and
+    /// the camera centers it in the strip the panel leaves visible.
+    var selected: StationItem?
     let onSelect: (StationItem) -> Void
+    /// A tap that hit open water (or a cluster) instead of a pin — the
+    /// preview card's dismissal path.
+    var onDeselect: () -> Void = {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect, onMiss: onMiss) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelect: onSelect, onMiss: onMiss, onDeselect: onDeselect)
+    }
 
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero)
@@ -249,17 +262,24 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     /// Camera changes arrive as remounts — `mapPane` sets `.id(mapFocusToken)`
     /// so a header-title focus rebuilds the view and `makeUIView` frames it.
-    func updateUIView(_ uiView: MLNMapView, context: Context) {}
+    /// Selection is the exception: it must move the LIVE camera (a remount
+    /// would rebuild the whole style under the preview panel).
+    func updateUIView(_ uiView: MLNMapView, context: Context) {
+        context.coordinator.apply(selection: selected)
+    }
 
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
         let onMiss: ((Double) -> Void)?
+        let onDeselect: () -> Void
         private weak var map: MLNMapView?
         private var styler: MapStyler?
 
-        init(onSelect: @escaping (StationItem) -> Void, onMiss: ((Double) -> Void)?) {
+        init(onSelect: @escaping (StationItem) -> Void, onMiss: ((Double) -> Void)?,
+             onDeselect: @escaping () -> Void) {
             self.onSelect = onSelect
             self.onMiss = onMiss
+            self.onDeselect = onDeselect
         }
 
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
@@ -268,6 +288,27 @@ struct MapViewRepresentable: UIViewRepresentable {
             styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
+        }
+
+        /// The preview selection: light the picked pin's halo, and pan it to
+        /// the center of the strip the panel leaves visible. The pan offsets
+        /// `setCenter` by half the panel's coverage rather than setting
+        /// `contentInset` — an inset shifts the ornaments and goes stale when
+        /// the panel is swiped away without the map hearing about it.
+        private var selectedId: String?
+        func apply(selection item: StationItem?) {
+            guard item?.id != selectedId, let map else { return }
+            selectedId = item?.id
+            if let halo = map.style?.layer(withIdentifier: "station-selected") as? MLNVectorStyleLayer {
+                // Empty id matches nothing; see the layer's default predicate.
+                halo.predicate = NSPredicate(mglJSONObject: ["==", ["get", "id"], item?.id ?? ""])
+            }
+            guard let item else { return }
+            let pin = map.convert(CLLocationCoordinate2D(latitude: item.latitude,
+                                                         longitude: item.longitude),
+                                  toPointTo: map)
+            let target = CGPoint(x: pin.x, y: pin.y + previewPanelCover / 2)
+            map.setCenter(map.convert(target, toCoordinateFrom: map), animated: true)
         }
 
         /// Tap → nearest station dot within a finger-sized box → detail. A
@@ -290,6 +331,7 @@ struct MapViewRepresentable: UIViewRepresentable {
                 onSelect(item)
                 return
             }
+            onDeselect()
             guard let cluster = nearest(["station-clusters"]) else {
                 // Before the style loads nothing framed the camera, so its zoom means nothing.
                 onMiss?(map.style == nil ? stationZoom : map.zoomLevel)

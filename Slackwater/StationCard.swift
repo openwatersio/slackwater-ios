@@ -15,20 +15,32 @@ struct StationCardView: View {
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
 
-    init(record: TideStationRecord, imperial: Bool, km: Double? = nil) {
+    init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false) {
         name = record.name
         region = record.region
         self.imperial = imperial
         self.km = km
         resolve = { record }
+        if eager { seed(record) }
     }
 
-    init(info: StationIndexInfo, imperial: Bool, km: Double? = nil) {
+    init(info: StationIndexInfo, imperial: Bool, km: Double? = nil, eager: Bool = false) {
         name = info.name
         region = info.region
         self.imperial = imperial
         self.km = km
         resolve = { await info.resolveTideRecord() }
+        if eager, let record = info.tideRecord { seed(record) }
+    }
+
+    /// Eager: state and curve computed IN init, so the card's first frame is
+    /// complete. The map preview panel needs this — its slide-up transition
+    /// captures the first frame, and a `.task`-resolved curve arrives after
+    /// the slide has started and animates separately from the chrome. The
+    /// list keeps the lazy path (#317: no first-frame computation per row).
+    private mutating func seed(_ record: TideStationRecord) {
+        _state = State(initialValue: record.cardState(at: appNow()))
+        _graph = State(initialValue: record.cardGraph(at: appNow(), imperial: imperial))
     }
 
     var body: some View {
@@ -39,8 +51,13 @@ struct StationCardView: View {
         }
         .task {
             guard state == nil || graph == nil, let record = await resolve() else { return }
-            if state == nil { state = record.cardState(at: appNow()) }
-            if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
+            // Animated: the resolve lands a few frames after the card
+            // appears, so an unanimated set pops the curve in mid-entrance
+            // (visible on the map preview panel's slide-up).
+            withAnimation(.easeIn(duration: 0.2)) {
+                if state == nil { state = record.cardState(at: appNow()) }
+                if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
+            }
         }
     }
 }
@@ -52,6 +69,7 @@ struct ChsCardView: View {
     let info: ChsStationInfo
     let imperial: Bool
     var km: Double? = nil
+    var eager = false
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
@@ -59,7 +77,7 @@ struct ChsCardView: View {
         // Navigation comes from the enclosing row's hidden link (itemCard).
         switch service.state(info.id) {
         case .fitted(let record):
-            StationCardView(record: record, imperial: imperial, km: km)
+            StationCardView(record: record, imperial: imperial, km: km, eager: eager)
         case .fitting:
             pending(fitting: true)
         case .pending:
@@ -145,8 +163,10 @@ struct ChsGateCardView: View {
         }
         .task {
             let now = appNow()
-            if state == nil { state = record.cardState(at: now) }
-            if graph == nil { graph = record.cardGraph(at: now) }
+            withAnimation(.easeIn(duration: 0.2)) {   // see StationCardView's task
+                if state == nil { state = record.cardState(at: now) }
+                if graph == nil { graph = record.cardGraph(at: now) }
+            }
         }
     }
 }
@@ -157,6 +177,7 @@ struct ChsGateCardView: View {
 struct ChsCurrentGateCardView: View {
     let gate: ChsCurrentGateInfo
     var km: Double? = nil
+    var eager = false
     @ObservedObject private var service = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
     /// Only ever read for an online gate — a fitted gate never touches this.
@@ -171,7 +192,8 @@ struct ChsCurrentGateCardView: View {
                 switch service.currentState(gate.id) {
                 case .fitted(let record):
                     CurrentCardView(record: record, km: km,
-                                    provisional: service.isProvisional(gate.id) ? gate : nil)
+                                    provisional: service.isProvisional(gate.id) ? gate : nil,
+                                    eager: eager)
                 case .fitting:
                     pending(fitting: true)
                 case .pending:
@@ -275,21 +297,33 @@ struct CurrentCardView: View {
     @State private var state: CurrentCardState?
     @State private var graph: StationCardGraph?
 
-    init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil) {
+    init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil,
+         eager: Bool = false) {
         name = record.name
         region = record.region
         self.km = km
         self.provisional = provisional
         fitted = record
         resolve = { record }
+        if eager { seed(record) }
     }
 
-    init(info: StationIndexInfo, km: Double? = nil) {
+    init(info: StationIndexInfo, km: Double? = nil, eager: Bool = false) {
         name = info.name
         region = info.region
         self.km = km
         fitted = nil
         resolve = { await info.resolveCurrentRecord() }
+        if eager, let record = info.currentRecord { seed(record) }
+    }
+
+    /// See `StationCardView.seed` — first frame complete for the map preview.
+    private mutating func seed(_ record: CurrentStationRecord) {
+        let unit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
+        _record = State(initialValue: record)
+        _state = State(initialValue: record.cardState(at: appNow()))
+        _graph = State(initialValue: record.cardGraph(at: appNow(), unit: unit,
+                                                      tilde: provisional != nil))
     }
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
@@ -315,8 +349,10 @@ struct CurrentCardView: View {
         .task {
             if record == nil { record = await resolve() }
             guard let record else { return }
-            if state == nil { state = record.cardState(at: appNow()) }
-            if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
+            withAnimation(.easeIn(duration: 0.2)) {   // see StationCardView's task
+                if state == nil { state = record.cardState(at: appNow()) }
+                if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
+            }
         }
         // The refinement replaces the record under an open list: recompute.
         .onChange(of: fitted) { _, refined in

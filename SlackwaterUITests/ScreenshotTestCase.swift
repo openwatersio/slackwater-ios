@@ -312,6 +312,15 @@ class ScreenshotTestCase: XCTestCase {
         map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
     }
 
+    /// A pin tap raises the preview card, not the detail — the card is the
+    /// second tap. Waits for it and taps through to the detail.
+    func tapThroughPreview(_ app: XCUIApplication) {
+        let card = app.descendants(matching: .any)
+            .matching(identifier: "map-preview-card").firstMatch
+        XCTAssert(card.appears(within: 5), "pin tap did not raise the preview card")
+        card.tap()
+    }
+
     /// Tap the detail's header title: the map comes up and the detail is gone.
     /// The camera move itself is not independently assertable — no accessibility
     /// surface exposes `MLNMapView`'s live center — so this is the navigation

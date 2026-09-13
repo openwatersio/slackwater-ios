@@ -91,8 +91,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
+            // The pin tap raises the preview card; the card opens the detail.
+            tapThroughPreview(app)
             XCTAssert(app.staticTexts["Today"].appears(within: 5),
-                      "map pin tap did not open a station detail")
+                      "the preview card tap did not open a station detail")
             XCTAssert(app.staticTexts[name].firstMatch.appears(within: 5))
             app.terminate()
         }
@@ -275,8 +277,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // for the title tap that follows.
         // `.id(mapFocusToken)` on `MapViewRepresentable` forces the remount and
         // `makeUIView` applies the focus (MapScreen.swift). iPhone-only: on iPad
-        // the split layout's `mapPane` `onSelect` resets `showMap` on a pin tap,
-        // so the scenario cannot arise there — an inline guard rather than a
+        // the preview card's tap resets `showMap` before opening, so the
+        // scenario cannot arise there — an inline guard rather than a
         // whole-test skip, so leg 1 still runs on both.
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
 
@@ -284,6 +286,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(map.appears(within: 5))
         sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapThroughPreview(app)
         XCTAssert(app.staticTexts["Today"].appears(within: 5),
                   "the pin tap did not open a detail")
         assertTitleTapFocusesMap(app)
@@ -307,6 +310,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Dead centre: the camera is on the station, so the pin is the middle.
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapThroughPreview(app)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 8),
                   "an offline station must headline what it is waiting for")
         XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
