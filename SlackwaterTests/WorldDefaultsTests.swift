@@ -1,13 +1,29 @@
 // Slackwater — GPL v3.
 // World coverage: the app must not assume the user is in the Salish Sea.
 // Bryan opened it in the Solent and got a Vancouver Island camera and a Near
-// Me list ranked from Victoria Harbour.
+// Me list ranked far from their actual location.
 
 import CoreLocation
 import XCTest
 @testable import Slackwater
 
 final class WorldDefaultsTests: XCTestCase {
+    @MainActor
+    func testFirstRunAreaHasBundledTidesAndCurrentsWithoutDownloads() {
+        let (ranked, _) = RankedStations.near(lat: firstRunFix.lat, lon: firstRunFix.lon)
+        let firstScreen = Array(ranked.prefix(5))
+        XCTAssertEqual(firstScreen.count, 5)
+        XCTAssertTrue(firstScreen.allSatisfy {
+            if case .tide = $0 { return true }
+            if case .current = $0 { return true }
+            return false
+        }, "first-run stations must ship ready to use")
+        XCTAssertTrue(firstScreen.contains { $0.series == .tide })
+        XCTAssertTrue(firstScreen.contains { $0.series == .current })
+        XCTAssertTrue(ChsFitService.autoFitSet(lat: firstRunFix.lat, lon: firstRunFix.lon).isEmpty)
+        XCTAssertTrue(ChsFitService.autoPrefetchGates(lat: firstRunFix.lat, lon: firstRunFix.lon).isEmpty)
+    }
+
     func testCachedLocationMustBeRecentAndValid() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let recent = CLLocation(coordinate: .init(latitude: 48.42, longitude: -123.37),
@@ -122,12 +138,12 @@ final class WorldDefaultsTests: XCTestCase {
         XCTAssertEqual(last.id, pompey.id)
 
         // LocationService.location is nil in a test process, so the anchor
-        // falls through to the last-opened station rather than to Victoria.
+        // falls through to the last-opened station rather than to Annapolis.
         let anchor = LocationService.shared.rankingAnchor
         XCTAssertEqual(anchor.lat, pompey.latitude, accuracy: 0.001,
                        "with no fix, the ranking anchor must follow the last opened station")
         XCTAssertNotEqual(anchor.lat, firstRunFix.lat, accuracy: 0.001,
-                          "Victoria Harbour is the first-run value only")
+                          "Chesapeake Bay is the first-run value only")
 
     }
 }

@@ -299,7 +299,7 @@ class ScreenshotTestCase: XCTestCase {
 
     /// Tap the pin at (lat, lon) on the fixed Salish camera, by mercator math.
     func tapPin(_ map: XCUIElement, _ lat: Double, _ lon: Double) {
-        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        let world = 512.0 * pow(2.0, 7.35)  // fixed map test zoom
         func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
             let x = (lon + 180) / 360 * world
             let phi = lat * .pi / 180
@@ -307,7 +307,7 @@ class ScreenshotTestCase: XCTestCase {
             return (x, y)
         }
         let frame = map.frame
-        let c = mercator(48.35, -123.05)  // SALISH_CENTER
+        let c = mercator(48.35, -123.05)  // fixed map test center
         let p = mercator(lat, lon)
         let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
         let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height

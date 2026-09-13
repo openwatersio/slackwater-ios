@@ -80,7 +80,7 @@ struct StationListView: View {
         return (l.coordinate.latitude, l.coordinate.longitude)
     }
     /// What distances are measured from: the fix, then the last-opened
-    /// station, then the Victoria fallback on a genuine first run.
+    /// station, then the Chesapeake Bay fallback on a genuine first run.
     private var anchor: (lat: Double, lon: Double) { loc.rankingAnchor }
 
     /// One definition, two attachment points (the root `.environment` below,
@@ -198,7 +198,7 @@ struct StationListView: View {
         // the next launch.
         //
         // `anchor`, not `fix` (#178): the list ranks from `rankingAnchor` —
-        // fix, then last-opened, then Victoria — and adopting only on a live
+        // fix, then last-opened, then Chesapeake Bay — and adopting only on a live
         // fix would give a user who denied location, or whose fix has not
         // landed yet, a Near Me list ranked around one place and a download
         // set built around another: every row on the first screen reading
@@ -385,9 +385,8 @@ struct StationListView: View {
                     ?? RecentsStore.shared.lastOpened.map {
                         CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
                     }
-                    // SALISH_CENTER only survives to here on a genuine first
-                    // run: no fix, nothing ever opened.
-                    ?? SALISH_CENTER,
+                    // Match the list's first-run ranking area.
+                    ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? discoveryZoom
             ) { item in
                 if regular { showMap = false }  // the detail pane shows the pick
@@ -469,7 +468,7 @@ struct StationListView: View {
 
     // The list: My Location → Favorites → Near Me → Recents, nothing else —
     // search is the discovery path for the rest of the catalog. Without a fix
-    // the ranking anchors on the Victoria fallback, and the My Location slot
+    // the ranking anchors on the Chesapeake Bay fallback, and the My Location slot
     // holds the amber denied card when location is off. Dedupe: ListGroups —
     // each station renders once, My Location > Favorites > Near Me > Recents.
     @ViewBuilder private var locatedSections: some View {
@@ -567,7 +566,7 @@ struct StationListView: View {
         }
 
         HStack(alignment: .firstTextBaseline) {
-            MonoLabel(text: "Near Me")
+            MonoLabel(text: fix == nil && recents.lastOpened == nil ? "Chesapeake Bay" : "Near Me")
             Spacer(minLength: 8)
             SeriesFilterChips()
         }

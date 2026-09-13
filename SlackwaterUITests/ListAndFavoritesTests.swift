@@ -79,13 +79,15 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     }
 
     // Location denied — the amber card sits in the My Location slot, above
-    // Near Me ranked from the fallback.
+    // The example area is labeled honestly when location is denied.
     func testM41DeniedSlot() throws {
         let app = launch("-seedGate", "-resetRecents", "-locDenied")
         XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
         XCTAssert(app.staticTexts["Go to Settings"].exists)
         XCTAssertFalse(app.staticTexts["MY LOCATION"].exists)
-        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        XCTAssert(app.staticTexts["CHESAPEAKE BAY"].exists)
+        XCTAssert(app.staticTexts["Annapolis (US Naval Academy)"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Greenbury Point"].firstMatch.exists)
     }
 
     /// Past the gate with the choice never made — the "or search" bypass, or
@@ -102,7 +104,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["See stations near you"].appears(within: 5))
         XCTAssert(app.staticTexts["Use My Location"].exists)
         XCTAssertFalse(app.staticTexts["Location unavailable"].exists)
-        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        XCTAssert(app.staticTexts["CHESAPEAKE BAY"].exists)
         save(app, "m41-location-ask.png")
     }
 
@@ -110,7 +112,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let app = launch("-seedGate", "-resetRecents", "-locAuthorizedNoFix")
         XCTAssert(app.staticTexts["MY LOCATION"].appears(within: 5))
         XCTAssert(app.staticTexts["Finding your location…"].exists)
-        XCTAssert(app.staticTexts["NEAR ME"].exists)
+        XCTAssert(app.staticTexts["CHESAPEAKE BAY"].exists)
         save(app, "m41-location-pending.png")
     }
 
