@@ -29,6 +29,10 @@ An erased simulator is signed out of iCloud, so it starts with no favorites. Eac
 
 For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
 
+## User-facing copy
+
+Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
+
 ## Running the tests
 
 One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;

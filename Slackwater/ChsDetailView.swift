@@ -247,7 +247,7 @@ struct ChsAmberCard: View {
     var icon = "exclamationmark.triangle.fill"
     /// Amber is this app's warning language and the comment on `unavailableCard`
     /// keeps it scarce on purpose. An invitation is not a warning: the location
-    /// ask card passes leaf, the same green the gate's own "Use My Location"
+    /// ask card passes leaf, the same green the gate's location
     /// button uses, so a user who simply never opted in isn't nagged in the
     /// colour reserved for something being wrong. `status` still wins when set.
     var accent = SN.amber

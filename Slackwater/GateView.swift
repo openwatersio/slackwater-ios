@@ -6,21 +6,15 @@ import SwiftUI
 
 struct GateView: View {
     @AppStorage(seenGateKey) private var seenGate = false
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @ObservedObject private var loc = LocationService.shared
     @State private var asked = false
+    private let exampleStation = StationIndex.bundled.tides.first { $0.id == "noaa/9449880" }
 
     var body: some View {
         ZStack {
             CanvasBackground()
-            // The gate is one screenful of fixed copy, and since the type
-            // scales that screenful stops fitting at the top accessibility
-            // sizes. Measured at AX5 on both devices:
-            // "See tides near you" came out "See tides nea…" and the subtitle
-            // "Turn on location and…", because SwiftUI resolves a too-short
-            // VStack by TRUNCATING its Texts, silently. A ScrollView gives the
-            // copy the height it needs; `minHeight: geo.size.height` keeps the
-            // Spacers' centred layout for every size that still fits, so
-            // nothing moves below AX5.
+            // Scroll at accessibility sizes; keep the ordinary layout centred.
             GeometryReader { geo in
               ScrollView {
                 VStack(spacing: 0) {
@@ -32,6 +26,15 @@ struct GateView: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 6)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Tide and Current predictions nearby.")
+                    Text("Keeps working offline.")
+                }
+                .font(.subheadline)
+                .foregroundStyle(SN.foam)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
 
                 Spacer()
 
@@ -39,73 +42,62 @@ struct GateView: View {
                     ProgressView()
                         .controlSize(.large)
                         .tint(SN.leaf)
-                    Text("Finding stations near you…")
+                    Text("Finding nearby tides and currents…")
                         .font(.callout)
                         .foregroundStyle(SN.foam.opacity(0.7))
                         .padding(.top, 22)
                 } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(LinearGradient(
-                                colors: SN.gateTile,
-                                startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .frame(width: 96, height: 96)
-                            .shadow(color: SN.shadow.opacity(0.4), radius: 20, y: 16)
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 40, weight: .light))
-                            .foregroundStyle(SN.foam)
+                    if let exampleStation {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Real example station")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(SN.foam)
+                            StationCardView(info: exampleStation, imperial: units == "imperial")
+                                .dynamicTypeSize(DynamicTypeSize.xSmall ... .xxxLarge)
+                        }
+                        .frame(maxWidth: 360)
+                        .padding(.horizontal, 22)
                     }
-                    Text("See tides near you")
-                        .font(.title.weight(.semibold))
-                        .foregroundStyle(SN.paper)
-                        .padding(.top, 26)
-                    Text("Turn on location to find the \nnearest tide & current stations.")
-                        .font(.subheadline)
-                        .lineSpacing(3)
+                    Text("Your location stays on this device.")
+                        .font(.caption)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(SN.foam.opacity(0.65))
-                        .frame(maxWidth: 300)
-                        .padding(.top, 10)
+                        .foregroundStyle(SN.foam)
+                        .frame(maxWidth: 320)
+                        .padding(.top, 24)
+                        .padding(.horizontal, 22)
                     Button {
                         asked = true
                         loc.request()
                     } label: {
                         HStack(spacing: 9) {
                             Image(systemName: "location.fill")
-                            Text("Use My Location")
+                            Text("Find tides near me")
                         }
                         .font(.body.weight(.semibold))
                         .foregroundStyle(SN.navyDeep)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 320)
-                        // Content sizes the capsule; `minHeight` keeps the 54pt
-                        // look at default sizes without capping growth. A fixed
-                        // `.frame(height: 54)` here silently truncated the label
-                        // at accessibility sizes ("Use My…"), because a `Text`
-                        // given too little height degrades by DROPPING CONTENT,
-                        // not by overflowing — the opposite of an `Image`, which
-                        // ignores the proposal and draws past its frame. Text
-                        // fails silently; images fail visibly. Never pin a
-                        // height around text you need read.
                         .padding(.vertical, 12)
                         .frame(minHeight: 54)
                         .background(SN.leaf, in: Capsule())
-                        .shadow(color: SN.leaf.opacity(0.3), radius: 13, y: 10)
                     }
-                    .padding(.top, 30)
+                    .padding(.top, 16)
                     .padding(.horizontal, 22)
                     Button {
                         gateSearchHandoff = true
                         seenGate = true
                     } label: {
-                        Text("Or search for a harbor, bay, or channel.")
-                            .font(.caption)
-                            .foregroundStyle(SN.foam.opacity(0.4))
+                        Text("Search for a place")
+                            .font(.subheadline)
+                            .underline()
+                            .foregroundStyle(SN.foam.opacity(0.8))
+                            .padding(.vertical, 12)
+                            .frame(minHeight: 44)
                     }
-                    .padding(.top, 16)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 22)
                 }
 
-                Spacer()
                 Spacer()
                 }
                 .frame(maxWidth: .infinity, minHeight: geo.size.height)

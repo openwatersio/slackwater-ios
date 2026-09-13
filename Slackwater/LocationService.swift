@@ -73,7 +73,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             && (status == .denied || status == .restricted))
     }
 
-    /// The gate's "Use My Location": ask, or refresh if already authorized.
+    /// The gate's location action: ask, or refresh if already authorized.
     func request() {
         guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
                 && !Self.testUndetermined else { return }
