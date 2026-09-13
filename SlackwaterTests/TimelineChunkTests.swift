@@ -388,4 +388,18 @@ final class TimelineChunkTests: XCTestCase {
                        "a picked week must be scrubable the moment the picker closes")
         XCTAssertEqual(store.timeline?.anchor, far)
     }
+
+    /// Return-to-now over chunks already on screen must still publish its anchor (#305).
+    @MainActor func testStoreJumpRepublishesTheAnchorOverTheSameChunks() {
+        let today = vancouverMidnight(2026, 8, 11)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = friday.tz
+        let now = cal.date(bySettingHour: 15, minute: 0, second: 0, of: today)!
+        let store = TimelineWindowStore(source: .tide(friday))
+        store.start(anchor: today, now: now)
+        // What the settle-follow does after a scrub back past the look-back.
+        store.setAnchor(cal.date(byAdding: .day, value: -3, to: today)!)
+        store.jump(to: now, anchor: today)
+        XCTAssertEqual(store.timeline?.anchor, today, "return-to-now left the schedule keyed to the past")
+    }
 }

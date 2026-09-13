@@ -269,7 +269,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(bar, "label != '\(before)'"),
                   "the bar did not move off '\(before)' after Done")
         XCTAssertNotEqual(bar.label, before, "the bar must follow the anchor")
-        XCTAssert(app.staticTexts["not this week"].appears(within: 5))
 
         // The centerline has to move WITH the window. It does not follow on its
         // own — the strip's x/time conversions are exact inverses, so a
@@ -278,7 +277,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // observable proof is this button: parking the centerline on the picked
         // week puts `scrubTime` far from now, and return-to-now is what shows
         // when it is. Without it there is no way back to today at all — the
-        // range bar's "not this week" is a label, not a control.
+        // range bar opens the picker, not today.
         XCTAssert(app.buttons["detail-return-now"].appears(within: 5),
                   "picking a future week left the centerline on today: no return-to-now")
 
@@ -295,11 +294,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // Back the other way, which is the same resize in reverse: today's
         // window is the WIDER one (it alone carries the 48h look-back), so a
         // fix that only handled the shrink would blank the strip on the way
-        // home. "Today" is in the schedule's day column only when the anchor is
-        // today — it is absent for the whole September week above.
+        // home. The range label, not "Today" in the day column: "Today" shows
+        // for any anchor up to six days behind today.
         app.buttons["detail-return-now"].tap()
-        XCTAssert(app.staticTexts["Today"].appears(within: 5),
-                  "return-to-now did not bring the window back to today")
+        XCTAssert(waitFor(bar, "label == '\(before)'"),
+                  "return-to-now left the bar on '\(bar.label)', not '\(before)'")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
         XCTAssert(homeInk > 0.05, "the strip drew nothing back on today — ink \(homeInk)")
     }
@@ -718,6 +717,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
     func testTheMoonTileOpensItsSheetAndTheEclipseRowJumps() throws {
         let app = launch("-seedGate")
         openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
+        let week = bar.label
         // Case-insensitive, like the Range assertion elsewhere in this file:
         // the tile's eyebrow combines an uppercasing MonoLabel with an
         // accessibility label that does not.
@@ -762,8 +764,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // the tap catches it mid-flight (it did, first run).
         XCTAssert(app.navigationBars["Moon"].disappears(within: 10),
                   "the sheet stayed up after a jump")
-        XCTAssert(app.staticTexts["not this week"].appears(within: 10),
-                  "the jump did not move the window")
+        XCTAssert(waitFor(bar, "label != '\(week)'"),
+                  "the jump did not move the window off '\(week)'")
         save(app, "moon-sheet-jumped.png")
     }
 }

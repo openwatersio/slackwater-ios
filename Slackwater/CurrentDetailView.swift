@@ -150,12 +150,14 @@ struct CurrentDetailView: View {
                 }
             }
             .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
-            // The schedule follows a scrub that has settled outside its week —
+            // The schedule follows a scrub that has settled outside its window —
             // the strip is endless now. A cancelled sleep is a scrub still in
             // motion, same rest rule as the chrome row's.
             .task(id: scrubTime) {
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
-                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
+                if let w = timeline.map({ Timeline.window(anchor: $0.anchor) }),
+                   scrubTime < w.start || scrubTime > w.end {
                     anchor = dayLocal(scrubTime, tz)
                     store?.setAnchor(anchor)
                 }

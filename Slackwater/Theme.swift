@@ -471,10 +471,11 @@ func leadWhen(_ date: Date, _ tz: TimeZone) -> String {
 /// looking at; naming a day that is not in the list below it would be the
 /// same defect as calling a Tue→Mon window "Week of Aug 9 – 16".
 ///
-/// The month repeats only when it changes, and the year appears only when the
-/// range crosses one — a bar that printed "2026" every week would be teaching
-/// the user to stop reading it.
-func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
+/// The month repeats only when it changes. The year appears when the range
+/// crosses one or is not in today's year — a bar that printed "2026" every
+/// week would be teaching the user to stop reading it, but a picked March
+/// 2027 printed bare reads as this March (#305).
+func weekRangeLabel(anchor: Date, today: Date, tz: TimeZone) -> String {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
     let last = cal.date(byAdding: .day, value: Int(Timeline.scheduleDays) - 1, to: anchor)!
@@ -483,7 +484,8 @@ func weekRangeLabel(anchor: Date, tz: TimeZone) -> String {
 
     let sameMonth = cal.isDate(anchor, equalTo: last, toGranularity: .month)
     let sameYear = cal.isDate(anchor, equalTo: last, toGranularity: .year)
-    let tailPattern = sameYear ? (sameMonth ? "d" : "MMM d") : "MMM d, yyyy"
+        && cal.isDate(anchor, equalTo: today, toGranularity: .year)
+    let tailPattern = (sameMonth ? "d" : "MMM d") + (sameYear ? "" : ", yyyy")
     return "\(head) – \(formatter(tailPattern, tz).string(from: last))"
 }
 
@@ -898,8 +900,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// Shared by the two things that arrive holding an instant: a shared link
     /// (#187) and the Moon sheet's eclipse rows (#222). The window test is the
     /// picker's rule inverted — move only when the moment isn't already on the
-    /// strip, so a jump to later today doesn't open on a week bar reading
-    /// "not this week".
+    /// strip, so a jump to later today doesn't re-key the schedule off today.
     private func jump(to t: Date) {
         scrubTime = t
         let week = Timeline.window(anchor: anchor)
@@ -967,16 +968,10 @@ struct WeekRangeBar: View {
                 Image(systemName: "calendar")
                     .font(.footnote)
                     .foregroundStyle(SN.foam.opacity(0.7))
-                Text(weekRangeLabel(anchor: anchor, tz: tz))
+                // No away badge: the strip's Now button already says it, and another week isn't a fault.
+                Text(weekRangeLabel(anchor: anchor, today: today, tz: tz))
                     .font(.subheadline.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
-                if anchor != today {
-                    // The bar is the clearest statement on screen that you are
-                    // not looking at this week, so it carries the way back.
-                    Text("not this week")
-                        .font(.caption2)
-                        .foregroundStyle(SN.amber)
-                }
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.caption.weight(.semibold))
@@ -988,7 +983,7 @@ struct WeekRangeBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("week-range-bar")
-        .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, tz: tz)). Tap to choose a date.")
+        .accessibilityLabel("Showing \(weekRangeLabel(anchor: anchor, today: today, tz: tz)). Tap to choose a date.")
     }
 }
 
