@@ -1137,7 +1137,12 @@ struct StationDetailRow: View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
             Spacer()
+            // Every value in this column is a reading — a position, a bearing,
+            // an offset, a speed — so the column carries the mono trait rather
+            // than each caller remembering it (TypeScaleTests attests to this
+            // for the formatter that reaches here through `detailsMeanFlow`).
             Text(value)
+                .monospacedDigit()
                 .multilineTextAlignment(.trailing)
         }
         .font(.caption)
