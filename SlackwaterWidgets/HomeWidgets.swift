@@ -29,8 +29,8 @@ struct NextEventView: View {
                 NextEventContentView(card: card)
             } else {
                 // Content margins are off, so the empty state pads itself.
-                Text("Open Slackwater to prepare this station")
-                    .font(.caption).foregroundStyle(.secondary).padding(16)
+                Text("Open Slackwater to download this station")
+                    .font(.caption).foregroundStyle(SN.foam.opacity(0.85)).padding(16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -61,8 +61,8 @@ struct DayCurveView: View {
             if let card = entry.card {
                 DayCurveContentView(card: card)
             } else {
-                Text("Open Slackwater to prepare this station")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("Open Slackwater to download this station")
+                    .font(.caption).foregroundStyle(SN.foam.opacity(0.85)).padding(16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

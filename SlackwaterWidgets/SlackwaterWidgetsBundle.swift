@@ -24,7 +24,7 @@ struct StationProvider: AppIntentTimelineProvider {
         }
         // One ChsModelStore lookup, not two: the snapshot's station and the
         // card both derive from the same loaded record.
-        let record = WidgetStationLoader.loadRecord(id: id)
+        let record = WidgetStationLoader.loadRecord(id: id, at: date)
         let snapshot = record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
         let card = record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
         return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
