@@ -95,35 +95,41 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         return image.withRenderingMode(.alwaysTemplate)
     }
 
-    /// The tide trend glyph: a triangle pointing up, at equal AREA with the
-    /// r=`PIN_RADIUS` dot; the falling state rotates it 180°.
-    private func trianglePinImage(inflate: CGFloat = 0) -> UIImage {
-        let side = CGFloat(PIN_RADIUS) * 2 * (CGFloat.pi / sqrt(3)).squareRoot()
-        let height = side * sqrt(3) / 2
-        let path = UIBezierPath()
-        path.move(to: CGPoint(x: side / 2, y: 0))
-        path.addLine(to: CGPoint(x: side, y: height))
-        path.addLine(to: CGPoint(x: 0, y: height))
-        path.close()
-        return pinGlyphImage(path, bounds: CGSize(width: side, height: height), inflate: inflate)
+    /// The tide gauge glyph (barrel and fill share this footprint).
+    private static let gaugeSize = CGSize(width: 8, height: 18)
+    private static let gaugeCorner: CGFloat = 2
+
+    /// The gauge barrel: the full bar, registered inflated in the shadow ink
+    /// as the plate — its filled interior doubles as the empty portion of
+    /// the barrel, so low water reads as a dark bar, not a hole.
+    private func gaugeBarrelImage(inflate: CGFloat = 0) -> UIImage {
+        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: Self.gaugeSize),
+                                cornerRadius: Self.gaugeCorner)
+        return pinGlyphImage(path, bounds: Self.gaugeSize, inflate: inflate)
     }
 
-    /// The flowing-current glyph: a chunky north-pointing arrow (S-57 draws a
-    /// tidal stream as an arrow in the direction of flow — B-407.4); the
-    /// layer rotates it to the set. Head-heavy on purpose: at dot sizes the
-    /// head is what survives.
-    private func arrowPinImage(inflate: CGFloat = 0) -> UIImage {
-        let w: CGFloat = 12, h: CGFloat = 17, shaft: CGFloat = 5, head: CGFloat = 9
-        let path = UIBezierPath()
-        path.move(to: CGPoint(x: w / 2, y: 0))
-        path.addLine(to: CGPoint(x: w, y: head))
-        path.addLine(to: CGPoint(x: (w + shaft) / 2, y: head))
-        path.addLine(to: CGPoint(x: (w + shaft) / 2, y: h))
-        path.addLine(to: CGPoint(x: (w - shaft) / 2, y: h))
-        path.addLine(to: CGPoint(x: (w - shaft) / 2, y: head))
-        path.addLine(to: CGPoint(x: 0, y: head))
-        path.close()
-        return pinGlyphImage(path, bounds: CGSize(width: w, height: h), inflate: inflate)
+    /// One fill level per bucket, anchored at the barrel's bottom on the
+    /// same canvas so the two images center-align as map icons. A 2pt floor
+    /// keeps low water visible as a sliver rather than an empty bar.
+    private func gaugeFillImage(bucket: Int) -> UIImage {
+        let fraction = Double(bucket) / Double(PIN_GAUGE_BUCKETS)
+        let height = max(2, (Self.gaugeSize.height - 2) * fraction)
+        let path = UIBezierPath(
+            roundedRect: CGRect(x: 1, y: Self.gaugeSize.height - 1 - height,
+                                width: Self.gaugeSize.width - 2, height: height),
+            cornerRadius: Self.gaugeCorner - 0.5)
+        return pinGlyphImage(path, bounds: Self.gaugeSize)
+    }
+
+    /// The flowing-current glyph: the system arrow, per S-57's tidal-stream
+    /// symbol (an arrow in the direction of flow — B-407.4); the layer
+    /// rotates it to the set. The plate is the same symbol a weight up,
+    /// scaled a step larger by its layer — an SF symbol has no path to
+    /// stroke-inflate.
+    private func arrowPinImage(weight: UIImage.SymbolWeight = .bold) -> UIImage {
+        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: weight)
+        return UIImage(systemName: "arrow.up", withConfiguration: configuration)!
+            .withRenderingMode(.alwaysTemplate)
     }
 
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -139,10 +145,12 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
-        style.setImage(trianglePinImage(), forName: "pin-triangle")
-        style.setImage(trianglePinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-triangle-plate")
+        style.setImage(gaugeBarrelImage(inflate: CGFloat(PIN_HALO)), forName: "pin-gauge-plate")
+        for bucket in 0...PIN_GAUGE_BUCKETS {
+            style.setImage(gaugeFillImage(bucket: bucket), forName: "pin-gauge-\(bucket)")
+        }
         style.setImage(arrowPinImage(), forName: "pin-arrow")
-        style.setImage(arrowPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-arrow-plate")
+        style.setImage(arrowPinImage(weight: .black), forName: "pin-arrow-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below

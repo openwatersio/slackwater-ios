@@ -64,10 +64,19 @@ struct PinState: Equatable {
     /// "3.2 ft ↑" / "1.8 kn" — formatted at build time with the app's units,
     /// which are part of the cache key for exactly that reason.
     var reading: String?
-    /// True bearing the water flows toward. nil inside the slack window —
-    /// a near-zero flow has no direction worth drawing.
+    /// True bearing the water flows toward — the arrow every current pin
+    /// wears, slack included: near slack the sign still names the set, and
+    /// the go-green fill is what says "slack".
     var bearing: Double?
+    /// Tide gauge fill, bucketed 0...PIN_GAUGE_BUCKETS: where the current
+    /// height sits between the surrounding low and high. nil when either
+    /// extreme is out of reach — the pin falls back to a dot.
+    var gauge: Int?
 }
+
+/// The gauge glyph's fill resolution: 0...8 covers ~12% steps, which is all
+/// a 10pt bar can show anyway, and keeps the registered image count small.
+let PIN_GAUGE_BUCKETS = 8
 
 /// A fitted tide record's pin state. The tone is not `cardState(at:)` — that
 /// computes 30h searches the pin discards; the hybrid is the load-bearing
@@ -77,13 +86,29 @@ struct PinState: Equatable {
 func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> PinState {
     guard let rising = tidePinRisingHybrid(record, at: now) else { return PinState(state: "unknown") }
     let state = rising ? "rising" : "falling"
-    guard let height = record.engineStation
+    let station = record.engineStation
+    guard let height = station
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
     else { return PinState(state: state) }
+    // The gauge: where the height sits between the surrounding extremes.
+    // ±15h brackets any station's cycle. ponytail: a second extremes search
+    // per pin on top of the hybrid — if testPinLayerBuildsInsideAFrame
+    // blows, derive the range from constituent amplitudes instead.
+    let gauge: Int? = {
+        let extremes = station.extremes(from: now.addingTimeInterval(-15 * 3600),
+                                        to: now.addingTimeInterval(15 * 3600))
+        guard let prev = extremes.last(where: { $0.time <= now }),
+              let next = extremes.first(where: { $0.time > now }) else { return nil }
+        let lo = min(prev.height, next.height), hi = max(prev.height, next.height)
+        guard hi - lo > 0.01 else { return nil }
+        let f = min(1, max(0, (height - lo) / (hi - lo)))
+        return Int((f * Double(PIN_GAUGE_BUCKETS)).rounded())
+    }()
     // ↑/↓ ride the label fontstack; offline packs may not cache their glyph
     // range, where the arrow drops and the number stands alone.
     return PinState(state: state,
-                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial)) \(rising ? "↑" : "↓")")
+                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial)) \(rising ? "↑" : "↓")",
+                    gauge: gauge)
 }
 
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
@@ -101,7 +126,7 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date, speedUnit: S
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),
         reading: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
-        bearing: slack ? nil : station.setDegrees(signed: signed))
+        bearing: station.setDegrees(signed: signed))
 }
 
 /// 1,549 subordinate current pins hang off 50 references, so the reference is
@@ -215,6 +240,9 @@ private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
                                              "state": state.state]
             if let reading = state.reading { properties["reading"] = reading }
             if let bearing = state.bearing { properties["bearing"] = bearing }
+            // The full image name, not the bucket — `icon-image` reads it
+            // straight off the feature, no string building in the style.
+            if let gauge = state.gauge { properties["gauge"] = "pin-gauge-\(gauge)" }
             return [
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
