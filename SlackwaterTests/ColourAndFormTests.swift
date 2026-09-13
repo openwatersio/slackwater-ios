@@ -342,7 +342,7 @@ final class ColourAndFormTests: XCTestCase {
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
         let fast = record(speedKn: 3.0)
         XCTAssertEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
-                       pinRampHex(forSpeedKn: 3.0), "moving pin must be the darkened ramp")
+                       pinRampHex(forSpeedKn: 3.0), "moving pin must be the ramp")
         XCTAssertNotEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                           mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
                           "a moving pin must never read go")
@@ -404,22 +404,15 @@ final class ColourAndFormTests: XCTestCase {
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 
-    /// The pale water's price, and the reason every pin carries an ink outline.
-    ///
-    /// On the old navy water a pin's FILL cleared WCAG's 3:1 for a non-text
-    /// mark by itself in every state. On `#e9f7ff` three of the four states
-    /// fail it outright — flood 2.65, ebb 1.97, slack 2.11 — so the contrast
-    /// moved to the boundary, which is a thing a bounded mark is allowed to do.
-    /// That makes the outline load-bearing rather than decorative: delete it,
-    /// or let the water drift lighter, and the map silently drops under the
-    /// floor in exactly the states it most needs to be read in.
-    ///
-    /// Asserts on the outline, NOT on the fills — the fills legitimately fail
-    /// now, and a test that demanded otherwise would be demanding the palette
-    /// go back to navy. The water tone is the style's only constant ground
-    /// (satellite imagery underneath is arbitrary), so it is the one floor a
-    /// test can hold.
-    func testEveryPinOutlineClearsTheContrastFloorOnTheWaterTone() throws {
+    /// The dark water's contract: the FILLS carry WCAG's 3:1 for a non-text
+    /// mark on the water tone, because the rim around every pin is a shadow
+    /// in the basemap's own halo navy — a shadow on a dark ground cannot be
+    /// the legibility guarantee, so the fills must be. Every named state and
+    /// the whole speed ramp are swept; the neutral steel is exempt on
+    /// purpose (2.6:1 — an unknown pin reading quieter than a stated one is
+    /// the design, not a regression). The water tone is the style's only
+    /// constant ground, so it is the one floor a test can hold.
+    func testEveryPinFillClearsTheContrastFloorOnTheWaterTone() throws {
         let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
@@ -429,33 +422,45 @@ final class ColourAndFormTests: XCTestCase {
                 "\(name) must stay a plain hex literal this test can read")
             return String(source[match].suffix(8).prefix(7))
         }
-        let ink = try literal("CHART_INK")
         let water = try literal("WATER_TONE")
-        XCTAssertGreaterThanOrEqual(
-            contrast(ink, water), 3.0,
-            "the pin outline is under 3:1 on the water tone — every pin state relies on it")
-        // Every pin form must actually draw that outline — the dot as a
-        // stroke, each glyph via its backing plate, because MapLibre Native
-        // renders no icon-halo on template images. One form outlined and the
-        // others not is how this regressed the first time.
+        // The named states, straight out of the live match expression.
+        let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
+        var i = 2   // past "match" and ["get", "state"]
+        while i + 1 < stateMatch.count {
+            let state = try XCTUnwrap(stateMatch[i] as? String)
+            let fill = try XCTUnwrap(stateMatch[i + 1] as? String)
+            XCTAssertGreaterThanOrEqual(contrast(fill, water), 3.0,
+                                        "the \(state) fill is under 3:1 on the water tone")
+            i += 2
+        }
+        // The ramp, over every speed a moving pin can render.
+        var kn = slackThresholdKn + 0.01
+        while kn <= 17 {
+            XCTAssertGreaterThanOrEqual(contrast(pinRampHex(forSpeedKn: kn), water), 3.0,
+                                        "the ramp at \(kn) kn is under 3:1 on the water tone")
+            kn += 0.25
+        }
+        // The shadow rim still has to be drawn — the dot as a stroke, each
+        // glyph via its backing plate, because MapLibre Native renders no
+        // icon-halo on template images. One form rimmed and the others not
+        // is how the outline era regressed the first time.
         XCTAssertTrue(source.contains("hexColor(CHART_INK)"),
-                      "the ink expression must derive from CHART_INK, never a hand-copied colour")
+                      "the rim expression must derive from CHART_INK, never a hand-copied colour")
         XCTAssertNotNil(source.range(of: #"circleStrokeColor = ink"#),
-                        "the dot pin lost its ink stroke")
-        for plate in ["pin-triangle-plate", "pin-arrow-plate"] {
+                        "the dot pin lost its shadow rim")
+        for plate in ["pin-gauge-plate", "pin-arrow-plate"] {
             XCTAssertTrue(source.contains(plate),
                           "\(plate) must back its glyph, or the plate layer draws nothing")
         }
         XCTAssertNotNil(source.range(of: #"colour: ink"#),
-                        "the glyph plates lost their ink colour")
+                        "the glyph plates lost their shadow colour")
     }
 
     /// The state palette's integrity: the two direction ends, slack and the
     /// neutral must stay four tellable-apart fills. Walks the actual match
     /// expression rather than a list of expected colours, so a new state
-    /// cannot ship unexamined. Contrast against a constant ground is not
-    /// assertable here — satellite imagery is arbitrary, so the ink outline
-    /// is the legibility guarantee, asserted above.
+    /// cannot ship unexamined. (The fills' contrast floor on the water tone
+    /// is asserted above.)
     func testPinStatePaletteStaysFourDistinctFills() throws {
         let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]
