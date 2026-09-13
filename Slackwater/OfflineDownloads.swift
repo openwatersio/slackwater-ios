@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. The offline-downloads surface, ported from
 // slackwater-web (OfflineStatus.tsx + OfflineManager.tsx and their tests):
 //
-//   OfflineStatusButton — the indicator beside the settings gear. Answers
+//   OfflineStatusButton — the downloads row in the list footer. Answers
 //     "what is this app doing about my connection" at a glance, and opens the
 //     manager on tap (web OfflineStatus's onOpen).
 //   OfflineManagerView  — the download manager: per-station state, progress,
@@ -110,28 +110,36 @@ struct OfflineStatusButton: View {
 
     var body: some View {
         Button(action: onOpen) {
-            ZStack {
-                if case .downloading(let ready, let total) = state {
-                    Circle()
-                        .trim(from: 0, to: total > 0 ? CGFloat(ready) / CGFloat(total) : 0)
-                        .stroke(SN.leaf, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .frame(width: 28, height: 28)
+            HStack(spacing: 12) {
+                ZStack {
+                    if case .downloading(let ready, let total) = state {
+                        Circle()
+                            .trim(from: 0, to: total > 0 ? CGFloat(ready) / CGFloat(total) : 0)
+                            .stroke(SN.leaf, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .frame(width: 28, height: 28)
+                    }
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(tint)
                 }
-                // Fixed, not scaled: this button is one of the two 34pt chrome
-                // circles the list header's wordmark comment is calibrated
-                // against (SlackwaterApp.swift `header`, beside the gear,
-                // which stays fixed too) — the same 320pt iPad sidebar row.
-                // Step 5b's table called this a text companion; it isn't one —
-                // reverted to its pre-Task-5 literal size (sweep finding).
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                Text("Downloads")
+                    .foregroundStyle(SN.foam)
+                Spacer(minLength: 8)
+                if case .downloading(let ready, let total) = state {
+                    Text("\(ready)/\(total)")
+                        .font(.subheadline)
+                        .foregroundStyle(tint)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(SN.foam.opacity(0.4))
             }
-            .frame(width: 34, height: 34)
-            .background(Color.white.opacity(0.08), in: Circle())
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)  // List rows: keep the tap on the control itself
+        .buttonStyle(.plain)
         .accessibilityLabel("Offline downloads")
         .accessibilityValue(spoken)
         .accessibilityIdentifier("offline-status")

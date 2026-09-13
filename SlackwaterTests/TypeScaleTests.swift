@@ -229,23 +229,8 @@ extension TypeScaleTests {
                       + offenders.joined(separator: "\n"))
     }
 
-    /// The wordmark's minimumScaleFactor is load-bearing: it shares the 320pt
-    /// iPad sidebar row with two 34pt buttons and would break as "Slackwat/er".
-    /// Every other name wraps instead of shrinking. This fails in both
-    /// directions — a blanket removal, or a fresh one creeping back in.
-    ///
-    /// **This is a SOURCE-TEXT scan, and it once counted a comment.** The
-    /// world-coverage branch fixed a mid-word break on the My Location hero
-    /// card with `allowsTightening` and wrote, correctly, `// NOT
-    /// minimumScaleFactor: testOnlyTheWordmarkShrinks allows exactly one …`
-    /// beside it. That comment — documenting the modifier's *absence* — was
-    /// counted as a second site and turned this test red on a file containing
-    /// no such modifier. The only fixes on offer were "delete the comment that
-    /// explains the rule" and "make the scan read code". Comment text is now
-    /// stripped (`codeOnly`), so prose may name the token and a real
-    /// `.minimumScaleFactor(…)` outside the wordmark still fails. Both
-    /// directions were re-proven red before this note was written.
-    func testOnlyTheWordmarkShrinks() throws {
+    /// With the list wordmark gone, no app text needs to shrink to fit.
+    func testNoTextShrinks() throws {
         var sites: [String] = []
         for (name, source) in try appSources() {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
@@ -253,14 +238,7 @@ extension TypeScaleTests {
                 sites.append("\(name):\(n + 1)")
             }
         }
-        XCTAssertEqual(sites.count, 1,
-                       "exactly one minimumScaleFactor should remain (the wordmark), found: \(sites)")
-        // `.first`, not `[0]`: the doc above promises this fails on a blanket
-        // removal, and on an empty `sites` the subscript CRASHED the whole
-        // test bundle instead — a fail, but the kind that takes the run's
-        // other results with it.
-        XCTAssertTrue(sites.first?.hasPrefix("StationListView.swift:") == true,
-                      "the survivor must be the wordmark, found \(sites)")
+        XCTAssertTrue(sites.isEmpty, "text should wrap instead of shrinking, found: \(sites)")
     }
 
     /// The nearest enclosing `func`/computed `var` above line `n`: a line

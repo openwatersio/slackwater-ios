@@ -28,9 +28,9 @@ final class WebsiteScreenshots: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = args
         app.launch()
-        // -openMap replaces the list, and its "Slackwater" title, with the map.
+        // -openMap replaces the list with the map.
         let first = extra.contains("-openMap")
-            ? app.otherElements["map-canvas"].firstMatch : app.staticTexts["Slackwater"]
+            ? app.otherElements["map-canvas"].firstMatch : stationList(app)
         XCTAssert(first.appears(within: 20), "app did not reach its first screen")
         return app
     }
