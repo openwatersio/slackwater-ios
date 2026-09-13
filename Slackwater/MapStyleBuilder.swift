@@ -86,14 +86,10 @@ func pinRampHex(forSpeedKn kn: Double) -> String {
     return String(format: "#%02x%02x%02x", l(c.r), l(c.g), l(c.b))
 }
 
-/// Cluster below this zoom, individual dots at and above it.
-///
-/// 6, not the default (maxzoom − 1), and the number is the whole point: the
-/// discovery map opens at 7.35, so the Salish view every existing user knows
-/// still shows individual, tappable stations. Clustering only takes over at
-/// the regional-and-wider zooms where 3,125 separate dots are a grey smear
-/// nobody can aim at.
-let CLUSTER_MAX_ZOOM = 6
+/// The pin shrink ramp's floor: below here every pin sits at its smallest,
+/// and the far band's collision thinning is what keeps the wide zooms
+/// legible.
+let PIN_SHRINK_FROM = 6.0
 
 /// The station labels' fontstack — the same one the basemap style's own
 /// labels use (fiord ships exactly one), so offline packs cache its glyph
@@ -123,12 +119,11 @@ let READOUT_MIN_ZOOM = locateZoom
 /// the circle radius, the square's icon scale, and the stroke, so the two
 /// kinds keep reading as one system at every zoom.
 ///
-/// Shrunk at the cluster handoff (`CLUSTER_MAX_ZOOM`): the discovery zooms
-/// show whole coastlines, where full-sized pins fuse into a quilt of
-/// touching squares — a dense shore has to read as dots. Full size where
-/// the labels arrive (`LABEL_MIN_ZOOM`), and growing past it to
-/// `stationZoom`, where a pin is the subject of the frame and earns
-/// dot-marker weight.
+/// Shrunk at `PIN_SHRINK_FROM`: the discovery zooms show whole coastlines,
+/// where full-sized pins fuse into a quilt — a dense shore has to read as
+/// marks. Full size where the labels arrive (`LABEL_MIN_ZOOM`), and growing
+/// past it to `stationZoom`, where a pin is the subject of the frame and
+/// earns dot-marker weight.
 let PIN_ZOOM_SHRINK = 0.4
 let PIN_ZOOM_GROWTH = 1.8
 let PIN_GROWTH_TO = stationZoom
@@ -140,17 +135,15 @@ func hexColor(_ hex: String) -> UIColor {
                    blue: CGFloat(v & 0xFF) / 255, alpha: 1)
 }
 
-/// Every bundled station as a clustered runtime source. Added by `MapStyler`
-/// per style load — the basemap is a style URL this app does not own, so the
-/// app's channels go in through the runtime API, never into the style JSON.
+/// Every bundled station as a runtime source — unclustered: the far band's
+/// collision thinning (priority-ranked) is the density answer. Added by
+/// `MapStyler` per style load — the basemap is a style URL this app does
+/// not own, so the app's channels go in through the runtime API, never
+/// into the style JSON.
 func stationShapeSource() -> MLNShapeSource {
     let data = try? JSONSerialization.data(withJSONObject: PinFeaturesCache.shared.snapshot())
     let shape = data.flatMap { try? MLNShape(data: $0, encoding: String.Encoding.utf8.rawValue) }
-    return MLNShapeSource(identifier: "stations", shape: shape, options: [
-        .clustered: true,
-        .clusterRadius: 46,
-        .maximumZoomLevelForClustering: Double(CLUSTER_MAX_ZOOM),
-    ])
+    return MLNShapeSource(identifier: "stations", shape: shape, options: nil)
 }
 
 /// The pin layers, bottom to top. Expressions come from the same JSON specs
@@ -158,38 +151,16 @@ func stationShapeSource() -> MLNShapeSource {
 /// drift on paint.
 func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     func e(_ json: Any) -> NSExpression { NSExpression(mglJSONObject: json) }
-    let notACluster = NSPredicate(mglJSONObject: ["!", ["has", "point_count"]])
-    let isCluster = NSPredicate(mglJSONObject: ["has", "point_count"] as [Any])
     let ink = NSExpression(forConstantValue: hexColor(CHART_INK))
-    let halo = NSExpression(forConstantValue: PIN_HALO)
     let font = NSExpression(forConstantValue: LABEL_FONT)
     // The zoom ramp, once per unit it applies to: radius and stroke in
     // points, icon scale as a factor of the image's own PIN_RADIUS sizing.
     func grown(_ base: Double) -> NSExpression {
         e(["interpolate", ["linear"], ["zoom"],
-           Double(CLUSTER_MAX_ZOOM), base * PIN_ZOOM_SHRINK,
+           PIN_SHRINK_FROM, base * PIN_ZOOM_SHRINK,
            LABEL_MIN_ZOOM, base,
            PIN_GROWTH_TO, base * PIN_ZOOM_GROWTH])
     }
-
-    let clusters = MLNCircleStyleLayer(identifier: "station-clusters", source: source)
-    clusters.predicate = isCluster
-    // Area, roughly, with the count — so a 400-station cluster reads as
-    // bigger than a 5-station one without swallowing the coast.
-    clusters.circleRadius = e(["interpolate", ["linear"], ["get", "point_count"],
-                               2, 11, 25, 16, 150, 22, 600, 30])
-    clusters.circleColor = NSExpression(forConstantValue: hexColor(PIN_NEUTRAL))
-    clusters.circleOpacity = NSExpression(forConstantValue: 0.82)
-    clusters.circleStrokeWidth = halo
-    clusters.circleStrokeColor = ink
-
-    let counts = MLNSymbolStyleLayer(identifier: "station-cluster-count", source: source)
-    counts.predicate = isCluster
-    counts.text = e(["get", "point_count_abbreviated"])
-    counts.textFontNames = font
-    counts.textFontSize = NSExpression(forConstantValue: 12)
-    counts.textAllowsOverlap = NSExpression(forConstantValue: true)
-    counts.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
 
     // The selected pin's halo: a soft ring under every pin layer, revealed
     // by `MapViewRepresentable` swapping this layer's predicate to the
@@ -205,17 +176,6 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     selected.circleOpacity = NSExpression(forConstantValue: 0.3)
     selected.circleStrokeWidth = NSExpression(forConstantValue: 2)
     selected.circleStrokeColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
-
-    // The stateless pin: no bearing to point, no gauge to fill — a derived
-    // gate's phase words, and unknown (steel).
-    let dots = MLNCircleStyleLayer(identifier: "station-pins-dot", source: source)
-    dots.predicate = NSPredicate(mglJSONObject:
-        ["all", ["!", ["has", "point_count"]], ["!", ["has", "bearing"]],
-         ["!", ["has", "gauge"]]])
-    dots.circleRadius = grown(PIN_RADIUS)
-    dots.circleColor = e(PIN_STATE_COLOUR)
-    dots.circleStrokeWidth = grown(PIN_HALO)
-    dots.circleStrokeColor = ink
 
     // Each glyph's outline (see `pinGlyphImage`): the same glyph stroked
     // wider in ink, drawn underneath, because `icon-halo-*` does not render
@@ -236,14 +196,26 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
         return layer
     }
     let upright = NSExpression(forConstantValue: 0)
+    let dotted = NSPredicate(mglJSONObject:
+        ["all", ["!", ["has", "bearing"]], ["!", ["has", "gauge"]]])
+    let flowing = NSPredicate(mglJSONObject: ["has", "bearing"] as [Any])
+    let gauged = NSPredicate(mglJSONObject: ["has", "gauge"] as [Any])
+    let setRotation = e(["get", "bearing"])
+
+    // The near band (labels and up): plate + glyph, everything drawn. The
+    // stateless dot — a derived gate's phase words, unknown steel — is a
+    // glyph like the rest, so the far band below can collide it.
+    let dotPlate = glyph("station-pins-dot-plate",
+                         image: NSExpression(forConstantValue: "pin-dot-plate"),
+                         rotation: upright, colour: ink, predicate: dotted)
+    let dots = glyph("station-pins-dot",
+                     image: NSExpression(forConstantValue: "pin-dot"),
+                     rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: dotted)
 
     // A flowing current IS an arrow toward its set (S-57 B-407.4), filled
     // with the ramp at its speed. Map-aligned: the bearing is geographic.
     // The plate is the heavier-weight symbol a step larger — an SF symbol
     // has no path to stroke-inflate (see `arrowPinImage`).
-    let flowing = NSPredicate(mglJSONObject:
-        ["all", ["!", ["has", "point_count"]], ["has", "bearing"]])
-    let setRotation = e(["get", "bearing"])
     let currentPinPlate = glyph("station-pins-current-plate",
                                 image: NSExpression(forConstantValue: "pin-arrow-plate"),
                                 rotation: setRotation, colour: ink, predicate: flowing,
@@ -251,24 +223,47 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let currentPins = glyph("station-pins-current",
                             image: NSExpression(forConstantValue: "pin-arrow"),
                             rotation: setRotation, colour: e(PIN_STATE_COLOUR), predicate: flowing)
-    for layer in [currentPinPlate, currentPins] {
-        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
-    }
 
     // A resolved tide IS a gauge: the plate draws the barrel (its rim and
     // its dark empty band), the fill layer stacks the per-bucket level on
     // top, coloured rising/falling by the same state the reading arrows
     // carry. tide and chs both land here — provenance is not kind.
-    let gauged = NSPredicate(mglJSONObject:
-        ["all", ["!", ["has", "point_count"]], ["has", "gauge"]])
     let tidePinPlate = glyph("station-pins-tide-plate",
                              image: NSExpression(forConstantValue: "pin-gauge-plate"),
                              rotation: upright, colour: ink, predicate: gauged)
     let tidePins = glyph("station-pins-tide", image: e(["get", "gauge"]),
                          rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: gauged)
+    let near = [dotPlate, dots, currentPinPlate, currentPins, tidePinPlate, tidePins]
+    for layer in near { layer.minimumZoomLevel = Float(LABEL_MIN_ZOOM) }
+
+    // The far band (below the labels): the glyph alone, plate-less, under
+    // the collision engine — overlap off, sorted by the priority the
+    // features carry ("sort", lower first), so a dense coast thins to its
+    // most significant stations instead of clustering, and reveals the rest
+    // as the zoom buys room.
+    func far(_ layer: MLNSymbolStyleLayer) -> MLNSymbolStyleLayer {
+        layer.maximumZoomLevel = Float(LABEL_MIN_ZOOM)
+        layer.iconAllowsOverlap = NSExpression(forConstantValue: false)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
+        layer.iconPadding = NSExpression(forConstantValue: 2)
+        layer.symbolSortKey = e(["get", "sort"])
+        return layer
+    }
+    let dotsFar = far(glyph("station-pins-dot-far",
+                            image: NSExpression(forConstantValue: "pin-dot"),
+                            rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: dotted))
+    let currentPinsFar = far(glyph("station-pins-current-far",
+                                   image: NSExpression(forConstantValue: "pin-arrow"),
+                                   rotation: setRotation, colour: e(PIN_STATE_COLOUR),
+                                   predicate: flowing))
+    let tidePinsFar = far(glyph("station-pins-tide-far", image: e(["get", "gauge"]),
+                                rotation: upright, colour: e(PIN_STATE_COLOUR),
+                                predicate: gauged))
+    for layer in [currentPins, currentPinPlate, currentPinsFar] {
+        layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
+    }
 
     let labels = MLNSymbolStyleLayer(identifier: "station-labels", source: source)
-    labels.predicate = notACluster
     labels.minimumZoomLevel = Float(LABEL_MIN_ZOOM)
     labels.text = e(["get", "name"])
     labels.textFontNames = font
@@ -285,8 +280,7 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // name sits below — same basemap label paint. Only pins whose state
     // resolved one carry the attribute; unknown stays a bare pin.
     let readings = MLNSymbolStyleLayer(identifier: "station-readings", source: source)
-    readings.predicate = NSPredicate(mglJSONObject:
-        ["all", ["!", ["has", "point_count"]], ["has", "reading"]])
+    readings.predicate = NSPredicate(mglJSONObject: ["has", "reading"] as [Any])
     readings.minimumZoomLevel = Float(READOUT_MIN_ZOOM)
     readings.text = e(["get", "reading"])
     readings.textFontNames = font
@@ -297,6 +291,7 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     readings.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
     readings.textHaloWidth = NSExpression(forConstantValue: 1)
 
-    return [clusters, counts, selected, dots, currentPinPlate, currentPins,
+    return [selected, dotsFar, currentPinsFar, tidePinsFar,
+            dotPlate, dots, currentPinPlate, currentPins,
             tidePinPlate, tidePins, labels, readings]
 }

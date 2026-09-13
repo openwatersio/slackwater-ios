@@ -99,6 +99,13 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private static let gaugeSize = CGSize(width: 8, height: 18)
     private static let gaugeCorner: CGFloat = 2
 
+    /// The stateless dot, as a glyph so the far band can collide it.
+    private func dotPinImage(inflate: CGFloat = 0) -> UIImage {
+        let d = CGFloat(PIN_RADIUS) * 2
+        let path = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: d, height: d))
+        return pinGlyphImage(path, bounds: CGSize(width: d, height: d), inflate: inflate)
+    }
+
     /// The gauge barrel: the full bar, registered inflated in the shadow ink
     /// as the plate — its filled interior doubles as the empty portion of
     /// the barrel, so low water reads as a dark bar, not a hole.
@@ -143,6 +150,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
+        style.setImage(dotPinImage(), forName: "pin-dot")
+        style.setImage(dotPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-dot-plate")
         style.setImage(gaugeBarrelImage(inflate: CGFloat(PIN_HALO)), forName: "pin-gauge-plate")
         for bucket in 0...PIN_GAUGE_BUCKETS {
             style.setImage(gaugeFillImage(bucket: bucket), forName: "pin-gauge-\(bucket)")
@@ -236,8 +245,8 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// the camera centers it in the strip the panel leaves visible.
     var selected: StationItem?
     let onSelect: (StationItem) -> Void
-    /// A tap that hit open water (or a cluster) instead of a pin — the
-    /// preview card's dismissal path.
+    /// A tap that hit open water instead of a pin — the preview card's
+    /// dismissal path.
     var onDeselect: () -> Void = {}
 
     func makeCoordinator() -> Coordinator {
@@ -319,9 +328,9 @@ struct MapViewRepresentable: UIViewRepresentable {
             map.setCenter(map.convert(target, toCoordinateFrom: map), animated: true)
         }
 
-        /// Tap → nearest station dot within a finger-sized box → detail. A
-        /// CLUSTER instead means "there are more stations here than pixels":
-        /// zoom into it rather than guessing which one was meant.
+        /// Tap → nearest station pin within a finger-sized box → preview.
+        /// Both bands answer: below the label zoom the pin on screen is a
+        /// `-far` variant, and the tap must hit what the user sees.
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let map else { return }
             let point = gesture.location(in: map)
@@ -334,20 +343,16 @@ struct MapViewRepresentable: UIViewRepresentable {
                 }
             }
             if let id = nearest(["station-pins-current", "station-pins-tide",
-                                 "station-pins-dot"])?.attribute(forKey: "id") as? String,
+                                 "station-pins-dot", "station-pins-current-far",
+                                 "station-pins-tide-far", "station-pins-dot-far"])?
+                .attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
                 return
             }
             onDeselect()
-            guard let cluster = nearest(["station-clusters"]) else {
-                // Before the style loads nothing framed the camera, so its zoom means nothing.
-                onMiss?(map.style == nil ? stationZoom : map.zoomLevel)
-                return
-            }
-            // +2 levels lands past CLUSTER_MAX_ZOOM from any clustered zoom, so
-            // one tap on a cluster always breaks it into something tappable.
-            map.setCenter(cluster.coordinate, zoomLevel: min(map.zoomLevel + 2, 12), animated: true)
+            // Before the style loads nothing framed the camera, so its zoom means nothing.
+            onMiss?(map.style == nil ? stationZoom : map.zoomLevel)
         }
     }
 }

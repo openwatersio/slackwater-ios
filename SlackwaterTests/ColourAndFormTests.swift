@@ -446,9 +446,7 @@ final class ColourAndFormTests: XCTestCase {
         // is how the outline era regressed the first time.
         XCTAssertTrue(source.contains("hexColor(CHART_INK)"),
                       "the rim expression must derive from CHART_INK, never a hand-copied colour")
-        XCTAssertNotNil(source.range(of: #"circleStrokeColor = ink"#),
-                        "the dot pin lost its shadow rim")
-        for plate in ["pin-gauge-plate", "pin-arrow-plate"] {
+        for plate in ["pin-dot-plate", "pin-gauge-plate", "pin-arrow-plate"] {
             XCTAssertTrue(source.contains(plate),
                           "\(plate) must back its glyph, or the plate layer draws nothing")
         }
