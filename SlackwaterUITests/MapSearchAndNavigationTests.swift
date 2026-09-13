@@ -64,21 +64,16 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // tap handling for one kind when it split the same way — so both
     // layers must prove they reach the same tap handler. The pin's screen
     // point is pure web-mercator math from the fixed camera
-    // (center 48.35,-123.05 · zoom 7.35 · 512pt world tiles — MapScreen's
-    // SALISH constants; the styler re-asserts them after style load).
+    // (center 48.35,-123.05 · zoom 7.35 · 512pt world tiles); the launch hook
+    // fixes the camera for this test.
     func testM4MapPinToDetail() throws {
         for (lat, lon, name) in [
             (48.40618896484375, -122.64311981201172, "Deception Pass (Narrows)"),  // current → circle
             (48.48500061035156, -123.08300018310547, "Kanaka Bay"),                // NOAA tide → square
         ] {
-            // The map's opening camera follows a real fix, then the
-            // last-opened station, before SALISH_CENTER —
-            // and `tapPin`'s mercator math below assumes the camera IS
-            // SALISH_CENTER. Without `-resetRecents`, a station recorded by an
-            // earlier test in this run (UserDefaults persists across launches
-            // in the same simulator) reliably steals the camera and every tap
-            // below lands on the wrong pin.
-            let app = launch("-seedGate", "-resetRecents", "-locDenied")
+            // Pin coordinates below use this fixed Salish camera.
+            let app = launch("-seedGate", "-resetRecents", "-locDenied",
+                             "-mapCenter", "48.35,-123.05")
             app.buttons["Map"].tap()
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.appears(within: 5))
@@ -87,7 +82,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
             XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
-            sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
+            sleep(5)  // tiles + the camera settling before tapPin trusts the fixed camera
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
@@ -406,20 +401,20 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     /// it is not showing.
     func testM53SearchAtNationalScale() throws {
         // `-resetRecents` is load-bearing, not hygiene: the ranking anchor is
-        // fix -> RecentsStore.lastOpened -> firstRunFix, so "the Victoria
-        // fallback" this test asserts about only holds with no recents. The
-        // full plan runs testM53OnDemandCanadianStationFitsWhenOpened (Halifax)
+        // Fix -> recents -> fallback; use a Victoria fix for this ranking check.
+        // The full plan runs testM53OnDemandCanadianStationFitsWhenOpened (Halifax)
         // immediately before this, which leaves the anchor 4,500 km east with no
         // BC or WA port inside the truncated set. The fast plan skips that test,
         // so only the full run would go red.
-        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents")
+        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // "port" matches several hundred stations nationally.
         openSearch(app, "port")
         XCTAssert(app.descendants(matching: .any)["search-truncated"].firstMatch
                     .appears(within: 5),
                   "a query matching hundreds of stations must say it truncated")
-        // Nearest-first: from the Victoria fallback the top of the list is
+        // Nearest-first: from the Victoria fix the top of the list is
         // local water, not an alphabetical trip to Alaska.
         XCTAssert(app.staticTexts["Portage Inlet"].firstMatch.exists ||
                   app.staticTexts["Port Townsend"].firstMatch.exists,
@@ -466,7 +461,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Alaska, offline, with everything the bundle knows on it. The camera
         // is stated rather than pinched into place — five synthesised pinches
         // land somewhere no assertion can name.
-        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2"])
+        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2",
+                                             "-mapCenter", "48.35,-123.05"])
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))

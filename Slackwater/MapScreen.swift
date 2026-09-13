@@ -4,11 +4,8 @@
 import SwiftUI
 import MapLibre
 
-// Discovery-map camera: frames the bundled-station core (Puget Sound through
-// the Gulf Islands / Strait of Georgia) so it opens reading as the Salish Sea.
-// The UI pin-tap test derives screen points from these same constants.
-let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.35, longitude: -123.05)
-let SALISH_ZOOM = 7.35
+// Discovery-map zoom for the chosen fix, recently opened station, or first-run bay.
+let defaultDiscoveryZoom = 7.35
 
 /// Per-station framing (prototype DATA() z: 12.2–13.2). The detail header's
 /// title tap (issue #32) jumps to the discovery map at this zoom, so a focused
@@ -21,7 +18,7 @@ let stationZoom = 12.5
 /// (whole earth) is never a real request, so it doubles as "unset".
 let discoveryZoom: Double = {
     let zoom = UserDefaults.standard.double(forKey: "mapZoom")
-    return zoom == 0 ? SALISH_ZOOM : zoom
+    return zoom == 0 ? defaultDiscoveryZoom : zoom
 }()
 
 /// `-mapCenter 48.86,-123.31` (UserDefaults argument domain): opens the
