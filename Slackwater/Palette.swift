@@ -71,9 +71,6 @@ enum SN {
     static let moonLimb = Color(hex: 0x00122C, opacity: 0.92)  // the moon's dark limb, glyph and strip
     static let umbra = Color(hex: 0x6B2A18, opacity: 0.94)     // the eclipse shadow — copper, not black
     static let umbraLabel = Color(hex: 0xD98A66)               // its text and its strip mark
-    // The gate screen's pin tile (prototype gradient), top-leading to bottom-trailing.
-    static let gateTile = [Color(hex: 0x3A6D98), Color(hex: 0x184870), Color(hex: 0x083058)]
-
     // MARK: - Speed magnitude (#97)
 
     /// The shared speed scale: yellow at the comfort threshold, orange beyond

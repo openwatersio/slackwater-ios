@@ -99,8 +99,8 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// key from an earlier answer.
     func testM41UndeterminedSlotOffersTheAsk() throws {
         let app = launch("-seedGate", "-resetRecents", "-locUndetermined")
-        XCTAssert(app.staticTexts["See stations near you"].appears(within: 5))
-        XCTAssert(app.staticTexts["Use My Location"].exists)
+        XCTAssert(app.staticTexts["Tides and currents near you"].appears(within: 5))
+        XCTAssert(app.staticTexts["Find tides near me"].exists)
         XCTAssertFalse(app.staticTexts["Location unavailable"].exists)
         XCTAssert(app.staticTexts["NEAR ME"].exists)
         save(app, "m41-location-ask.png")

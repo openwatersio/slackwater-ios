@@ -693,9 +693,9 @@ struct StationListView: View {
     /// action is the ask itself, not a trip to Settings: `.notDetermined` is
     /// the one state iOS still lets the app prompt from.
     private var askCard: some View {
-        ChsAmberCard(title: "See stations near you",
-                     headline: "Turn on location to find the nearest tide & current stations.",
-                     action: "Use My Location",
+        ChsAmberCard(title: "Tides and currents near you",
+                     headline: "Turn on location to put nearby predictions first.",
+                     action: "Find tides near me",
                      identifier: "location-ask-card",
                      icon: "location.fill",
                      accent: SN.leaf) {
@@ -707,7 +707,7 @@ struct StationListView: View {
     /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
         ChsAmberCard(title: "Location unavailable",
-                     headline: "Turn on location for Slackwater to see stations near you.",
+                     headline: "Turn on location in Settings to find nearby tides and currents.",
                      action: "Go to Settings",
                      identifier: "location-denied-card",
                      icon: "location.slash") {

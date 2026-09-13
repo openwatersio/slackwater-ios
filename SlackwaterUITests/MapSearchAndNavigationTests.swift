@@ -38,9 +38,17 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.launchArguments = testArguments(["-resetGate"])
         app.launch()
 
-        XCTAssert(app.staticTexts["See tides near you"].appears(within: 10))
-        XCTAssert(app.buttons["Use My Location"].exists)
-        app.buttons["Or search for a harbor, bay, or channel."].tap()
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssertFalse(app.staticTexts["Find the water near you"].exists)
+        XCTAssert(app.staticTexts["Real example station"].exists)
+        XCTAssert(app.staticTexts["Friday Harbor"].exists)
+        XCTAssert(app.descendants(matching: .any)["25-hour curve"].firstMatch.appears(within: 5))
+        XCTAssert(app.staticTexts["Tide and Current predictions nearby."].exists)
+        XCTAssert(app.staticTexts["Keeps working offline."].exists)
+        XCTAssert(app.staticTexts["Your location stays on this device."].exists)
+        XCTAssert(app.buttons["Find tides near me"].exists)
+        save(app, "m4-gate.png")
+        app.buttons["Search for a place"].tap()
         let field = app.textFields.firstMatch
         XCTAssert(field.appears(within: 5), "gate bypass did not open search")
         XCTAssert(waitFor(field, "hasKeyboardFocus == true"),
