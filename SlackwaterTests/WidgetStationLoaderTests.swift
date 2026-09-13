@@ -292,6 +292,45 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertFalse(s.events(from: .now, to: .now.addingTimeInterval(86_400)).isEmpty)
     }
 
+    func testWidgetRendersSavedOnlineCurrentGates() throws {
+        let now = Date()
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Vancouver"))
+        let start = dayLocal(now, tz).addingTimeInterval(-2 * 86_400)
+        let times = stride(from: start.timeIntervalSince1970,
+                           through: start.timeIntervalSince1970 + 12 * 86_400,
+                           by: 900).map { $0 }
+        let speeds = times.map { sin(($0 - start.timeIntervalSince1970) * .pi / (6 * 3_600)) }
+        for id in ["chs-tillicum-bridge", "chs-nakwakto-rapids"] {
+            let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == id })
+            let url = ChsModelStore.onlineUrl(id)
+            let previous = try? Data(contentsOf: url)
+            defer {
+                if let previous { try? previous.write(to: url) }
+                else { try? FileManager.default.removeItem(at: url) }
+            }
+            try ChsModelStore.saveOnline(ChsOnlineWindow(
+                stationID: id, iwlsName: gate.name, timezone: gate.timezone,
+                fetchedAt: now, start: start,
+                end: start.addingTimeInterval(12 * 86_400),
+                floodDirection: 290, ebbDirection: 110,
+                times: times, speeds: speeds))
+
+            let record = try XCTUnwrap(WidgetStationLoader.loadRecord(id: id, at: now), "\(id) stayed blank")
+            let card = WidgetCard.build(record, now: now)
+            XCTAssertEqual(card.name, gate.name)
+            XCTAssertGreaterThan(card.graph?.points.count ?? 0, 10)
+            let graphValues = try XCTUnwrap(card.graph?.points.map(\.value))
+            XCTAssertGreaterThan((graphValues.max() ?? 0) - (graphValues.min() ?? 0), 1)
+            let snapshot = WidgetSnapshot.build(WidgetStationLoader.station(from: record), now: now)
+            XCTAssertEqual(snapshot.curveKind, .current)
+            XCTAssertGreaterThan(snapshot.sparkline.count, 10)
+            XCTAssertNotNil(snapshot.next)
+            XCTAssertNil(WidgetStationLoader.loadRecord(
+                id: id, at: start.addingTimeInterval(11 * 86_400)),
+                "a widget must not show a curve after its downloaded window runs out")
+        }
+    }
+
     func testUnknownIdIsNil() {
         XCTAssertNil(WidgetStationLoader.load(id: "nope:missing"))
     }

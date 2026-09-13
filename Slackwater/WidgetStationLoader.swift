@@ -1,7 +1,5 @@
-// Slackwater — GPL v3. Station id → engine-ready station for the widget
-// process. Bundled NOAA records directly; CHS stations/gates only via their
-// fitted models in the shared ChsModelStore — the widget NEVER fits, never
-// touches the network, never instantiates ChsFitService.
+// Slackwater — GPL v3. Widgets use only bundled or shared saved predictions;
+// the extension never fits stations or fetches from the network.
 import Foundation
 import TideEngine
 
@@ -11,9 +9,6 @@ enum WidgetStation {
     case derived(DerivedSlackStation, tz: TimeZone, name: String)
 }
 
-/// One record per catalog kind — the loader's only decision (fitted or not,
-/// which `ChsModelStore` lookup). Everything downstream (`WidgetCard.build`,
-/// `load(id:)`) reads records, never `StationItem` again.
 enum WidgetRecord {
     case tide(TideStationRecord, station: any TidePredicting)
     case current(CurrentStationRecord, station: any CurrentPredicting)
@@ -21,16 +16,14 @@ enum WidgetRecord {
 }
 
 enum WidgetStationLoader {
-    /// One switch over the catalog. `.chs`/`.chsGate`/`.chsCurrent` go
-    /// through `ChsModelStore`'s on-device fitted models — nil when a
-    /// station isn't fitted yet.
+    /// Online gates need a saved window; widgets cannot request one themselves.
     static func loadRecord(
-        id: String, locator: CatalogFileLocator = .shared
+        id: String, at date: Date = .now, locator: CatalogFileLocator = .shared
     ) -> WidgetRecord? {
-        locator.load { directory in try loadRecord(id: id, directory: directory) }
+        locator.load { directory in try loadRecord(id: id, at: date, directory: directory) }
     }
 
-    private static func loadRecord(id: String, directory: URL) throws -> WidgetRecord? {
+    private static func loadRecord(id: String, at date: Date, directory: URL) throws -> WidgetRecord? {
         guard let item = try StationItem.widgetItem(id: id, directory: directory) else { return nil }
         switch item {
         // `widgetItem` hands back identity only (#317), so the record costs a
@@ -60,9 +53,26 @@ enum WidgetStationLoader {
             // nil when the reference port isn't fitted yet.
             return try derivedRecord(for: gate, directory: directory)
         case .chsCurrent(let info):
-            // Mirrors ChsFitService's fitted-current path (ChsFitService.swift:179-181):
-            // the "-current" suffixed model in ChsModelStore → CurrentStationRecord.
-            // Online (fit-reject) gates have no "-current" model — nil, same as unfitted.
+            if info.isOnline {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = info.tz
+                let neededStart = min(calendar.startOfDay(for: date),
+                                      date.addingTimeInterval(-StationCardGraph.backWindow))
+                let neededEnd = date.addingTimeInterval(2 * 86_400 + 6 * 3_600)
+                guard let window = ChsModelStore.loadOnline(info.id)?.blocks.first(where: {
+                    $0.start <= neededStart && $0.end >= neededEnd
+                        && $0.times.count > 1 && $0.times.count == $0.speeds.count
+                        && ($0.times.first ?? .infinity) <= neededStart.timeIntervalSince1970
+                        && ($0.times.last ?? -.infinity) >= neededEnd.timeIntervalSince1970
+                }) else { return nil }
+                // No harmonic fit exists here; the window supplies the actual predictions.
+                let record = CurrentStationRecord(
+                    id: info.id, name: info.name, region: info.region, aliases: info.aliases,
+                    latitude: info.latitude, longitude: info.longitude, timezone: info.timezone,
+                    floodDirection: window.floodDirection, ebbDirection: window.ebbDirection,
+                    meanFlow: 0, tideReference: info.tideReference, constituents: [])
+                return .current(record, station: window)
+            }
             return fittedCurrentRecord(for: info).map { .current($0, station: $0.harmonicStation) }
         }
     }
@@ -126,5 +136,32 @@ enum WidgetStationLoader {
         defaults.stringArray(forKey: AppGroup.favoritesKey)?.first
             ?? defaults.stringArray(forKey: AppGroup.recentsKey)?.first
             ?? TideStationRecord.fridayHarborID
+    }
+}
+
+extension ChsOnlineWindow: CurrentPredicting {
+    func speeds(from start: Date, to end: Date, step: TimeInterval) -> [CurrentPoint] {
+        guard step > 0, times.count > 1, times.count == speeds.count, let first = times.first,
+              let last = times.last else { return [] }
+        var result: [CurrentPoint] = []
+        var time = start.timeIntervalSince1970
+        var index = 1
+        while time <= end.timeIntervalSince1970 {
+            if time >= first && time <= last {
+                while index < times.count - 1 && times[index] < time { index += 1 }
+                let span = times[index] - times[index - 1]
+                guard span > 0 else { return [] }
+                // CHS samples are 15 minutes apart; widget readings also land between them.
+                let fraction = (time - times[index - 1]) / span
+                let value = speeds[index - 1] + (speeds[index] - speeds[index - 1]) * fraction
+                result.append(CurrentPoint(time: Date(timeIntervalSince1970: time), speed: value))
+            }
+            time += step
+        }
+        return result
+    }
+
+    func events(from start: Date, to end: Date) -> [CurrentEvent] {
+        sampleEvents(points).filter { $0.time >= start && $0.time <= end }
     }
 }
