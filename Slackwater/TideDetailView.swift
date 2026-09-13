@@ -94,6 +94,11 @@ struct TideDetailView: View {
                             anchor: $anchor,
                             onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
+                            alertOffer: tideAlertOffer(
+                                scrubbedAway: scrubbedAway(scrubTime, from: live),
+                                turnIsHigh: atTurn.map { $0.kind == .high },
+                                onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
+                                heightM: scrubHeight, rising: rising, imperial: imperial),
                             above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)

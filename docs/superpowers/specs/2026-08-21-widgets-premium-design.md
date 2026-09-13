@@ -20,8 +20,11 @@ want it, or because you want to say thanks. No nags, no trials, no countdown dis
   core never shrinks. Hard rule, unchanged.
 - **Premium (one tier):** everything on the **lock screen** — accessory widgets now, the
   slack Live Activity / Dynamic Island tile when it ships — plus, as they ship later:
-  **local threshold alerts**, boat-relative **go-windows**, and anything needing live
-  observed data (weather/swell/wind overlays).
+  **local threshold alerts** (notifications, alarms and their countdown, and alarms on alert
+  calendar events; the calendar events themselves are free —
+  [notifications design §2](2026-09-12-notifications-design.md)),
+  boat-relative **go-windows**, and anything needing live observed data (weather/swell/wind
+  overlays).
 
 Alerts move to Premium **now, before ever shipping free**, resolving the standing doc
 contradiction without shrinking anything a user ever had. (Earlier docs said free —
@@ -80,8 +83,9 @@ pressure applied on the lock screen.
 2. **In-app Widgets gallery page:** previews every widget, free and Premium side by side,
    with add-to-home/lock instructions. Doubles as discoverability for the free widgets;
    linked from Settings and from the locked lock-widget tap-through.
-3. **Later, when alerts ship:** a 🔔 button on the list view, visible only when a station
-   is selected (no clutter), opening the same tier sheet for non-subscribers.
+3. **Alerts:** the Calendar / Live row between a detail's strip and its summary tiles.
+   Calendar works for everyone; Live opens the tier sheet for non-subscribers
+   ([notifications design §2, §7.1](2026-09-12-notifications-design.md)).
 
 Nothing else. No launch interstitials, no badges, no periodic prompts, no locked rows
 scattered through Settings.

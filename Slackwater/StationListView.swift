@@ -168,6 +168,14 @@ struct StationListView: View {
         // the reforwarding gotcha those two sheets document.
         .sheet(isPresented: $showWidgetsGallery) { WidgetsGalleryView() }
         .onOpenURL(perform: handleDeepLink)
+        // A tapped alert carries the same station link a share does.
+        .onReceive(AlertTap.shared.$url) { url in
+            guard let url else { return }
+            handleDeepLink(url)
+            // Cleared on the next turn: a value set from inside its own @Published emission is
+            // overwritten when the emission finishes, and the link would open again later.
+            Task { @MainActor in AlertTap.shared.url = nil }
+        }
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,
                                 anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in
