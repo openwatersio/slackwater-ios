@@ -1032,20 +1032,24 @@ final class TimelineTests: XCTestCase {
 
     // MARK: - The range bar label (spec §5)
 
-    /// One label, four shapes it has to take. Was three tests with one assert
+    /// One label, the shapes it has to take. Was three tests with one assert
     /// each and the same two setup lines.
     func testWeekRangeLabel() {
         let tz = TimeZone(identifier: "America/Vancouver")!
+        let today = vancouverMidnight(2026, 9, 12)
         let cases: [(y: Int, m: Int, d: Int, expected: String, why: String)] = [
             // Anchor Aug 11 → groups Aug 11…Aug 17. The label names Aug 17, the
             // last day ON SCREEN, never the exclusive Aug 18 boundary.
             (2026, 8, 11, "Aug 11 – 17", "names the last day shown"),
             (2026, 8, 28, "Aug 28 – Sep 3", "spells the month when it changes"),
             (2026, 12, 29, "Dec 29 – Jan 4, 2027", "shows the year when it changes"),
-            (2026, 6, 1, "Jun 1 – 7", "a same-year range never prints a year"),
+            (2026, 6, 1, "Jun 1 – 7", "a range in today's year never prints a year"),
+            // Out of today's year, the year is all that tells next March from this one.
+            (2027, 3, 3, "Mar 3 – 9, 2027", "a later year prints it"),
+            (2025, 3, 3, "Mar 3 – 9, 2025", "an earlier year prints it"),
         ]
         for c in cases {
-            XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d), tz: tz),
+            XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d), today: today, tz: tz),
                            c.expected, c.why)
         }
     }

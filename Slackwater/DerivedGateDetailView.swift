@@ -98,10 +98,12 @@ struct DerivedGateDetailView: View {
             // Chunks landing widen the strip; the phase readout's slacks must
             // cover whatever it now spans.
             .onChange(of: timeline.map { $0.start...$0.end }) { _, _ in refreshSlacks() }
-            // The schedule follows a scrub that has settled outside its week.
+            // The schedule follows a scrub that has settled outside its window.
             .task(id: scrubTime) {
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
-                if let tl = timeline, !tl.scheduleRange.contains(scrubTime) {
+                // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
+                if let w = timeline.map({ Timeline.window(anchor: $0.anchor) }),
+                   scrubTime < w.start || scrubTime > w.end {
                     anchor = dayLocal(scrubTime, tz)
                     store?.setAnchor(anchor)
                 }

@@ -574,6 +574,8 @@ final class ScrollGate {
         return lo...hi
     }
 
+    /// `force` republishes even unchanged chunks: `jump` has just moved the
+    /// anchor, and only a publish carries it to the timeline.
     private func publishAround(_ k: Int, force: Bool = false) {
         guard var target = contiguousRun(around: k) else { return }
         // A moving left edge has to wait for the scroll to rest. Growing to
@@ -585,7 +587,7 @@ final class ScrollGate {
             pendingPublish = true
             target = published.lowerBound...max(target.upperBound, published.upperBound)
         }
-        guard target != published else { return }
+        guard force || target != published else { return }
         apply(target)
     }
 
