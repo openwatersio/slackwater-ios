@@ -178,6 +178,21 @@ final class SkyBackdropTests: XCTestCase {
         XCTAssertEqual(moonPhaseName(phase: 0.88), "Waning Crescent")
     }
 
+    /// `moonPhaseBlurb` is keyed on the displayed name, so a reworded phase or
+    /// eclipse title silently drops its gloss instead of failing to compile.
+    /// Sweeping the whole synodic month plus all three eclipse kinds is what
+    /// catches that.
+    func testEveryPhaseAndEclipseTitleHasABlurb() {
+        for step in 0...295 {
+            let name = moonPhaseName(phase: Double(step) / 295)
+            XCTAssertFalse(moonPhaseBlurb(name).isEmpty, "no blurb for \(name)")
+        }
+        for kind in [LunarEclipseKind.total, .partial, .penumbral] {
+            let name = eclipseTileText(kind)
+            XCTAssertFalse(moonPhaseBlurb(name).isEmpty, "no blurb for \(name)")
+        }
+    }
+
     /// The names have to agree with Almanac's own phase convention (0 new,
     /// 0.5 full), not just with the bucket arithmetic: the 2026-08-28 full
     /// moon is the eclipse night #222 is about, and it must read "Full Moon".
