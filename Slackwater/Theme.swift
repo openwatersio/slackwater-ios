@@ -929,6 +929,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
             anchor = day
             onPicked(day)
+        } else if anchor == .distantPast {
+            // Landed before the caller's own set-up. Place today's anchor
+            // anyway: a placed anchor is how the caller knows a moment is
+            // here, and opens its first build on `scrubTime` rather than now.
+            anchor = todayLocal(tz)
         }
     }
 

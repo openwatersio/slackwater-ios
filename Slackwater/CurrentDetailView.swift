@@ -140,10 +140,12 @@ struct CurrentDetailView: View {
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onAppear {
                 if store == nil {
-                    // A shared link may have placed the anchor already
-                    // (ScrubDetailScaffold.applyLinkedInstant) — leave it.
-                    if anchor == .distantPast { anchor = todayLocal(tz) }
-                    resetStore(focus: nil)
+                    // A shared link that landed first has placed the anchor and
+                    // the scrub (ScrubDetailScaffold.jump): open on its moment,
+                    // or the first build covers now and the strip clamps it away.
+                    let linked = anchor != .distantPast
+                    if !linked { anchor = todayLocal(tz) }
+                    resetStore(focus: linked ? scrubTime : nil)
                 }
                 RecentsStore.shared.record(record.itemId)
                 if record.isChs { chsModel = ChsModelStore.loadCurrent(record.id) }
