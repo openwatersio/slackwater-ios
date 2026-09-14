@@ -138,16 +138,70 @@ final class IwlsFetcher {
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
+        // That wait is bounded by this and NOTHING else, and the default is a
+        // week. A path the user has denied — cellular switched off for
+        // Slackwater, with no Wi-Fi — is never coming, so an unbounded wait
+        // parks the claimed job on "Downloading" and the run behind it for the
+        // life of the process. Five minutes still clears the 851 KB station
+        // list at ~3 KB/s, well under anything a ship link does.
+        // ponytail: a blunt ceiling. The honest fix is not starting a run
+        // while `Connectivity` says there is no path, and re-pumping when one
+        // returns — queue work, not client work.
+        config.timeoutIntervalForResource = 300
         return URLSession(configuration: config)
     }()
 
-    /// Whether another attempt can help, given the non-200 status a response
-    /// came back with or the error that stopped it: a dropped connection, a
-    /// struggling server (5xx) or a rate limit (429) can; any other 4xx cannot.
-    static func isRetryable(_ outcome: Result<Int, Error>) -> Bool {
+    /// How many times one request is tried in total, first attempt included.
+    static let maxAttempts = 4
+
+    /// Errors a later attempt can get past: the link dropped, stalled, or was
+    /// not there yet.
+    ///
+    /// An allowlist, deliberately. The denylist this replaced retried
+    /// everything except an explicit cancel, so a TLS failure behind a marina's
+    /// captive portal — which answers identically every time — cost four
+    /// attempts and 14 s of backoff per request before the app could say so.
+    static func isTransient(_ error: Error) -> Bool {
+        if let url = error as? URLError { return transientCodes.contains(url.code) }
+        // A socket torn down while the app was suspended arrives as a bare
+        // POSIX error, not a URLError: ECONNABORTED, ECONNRESET, ETIMEDOUT.
+        // That is the commonest drop on a phone — lock it mid-chunk and the
+        // fit used to fail on exactly the case retrying exists for.
+        let ns = error as NSError
+        return ns.domain == NSPOSIXErrorDomain && [53, 54, 60].contains(ns.code)
+    }
+
+    private static let transientCodes: Set<URLError.Code> = [
+        .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+        .networkConnectionLost, .notConnectedToInternet, .resourceUnavailable,
+        .badServerResponse, .zeroByteResource,
+    ]
+
+    /// Seconds to wait before the next attempt, or nil when another attempt
+    /// cannot help. `attempt` is 1-based and counts the try that just failed.
+    ///
+    /// Pure, and the whole retry policy: what is worth another try, and how
+    /// long to leave it. `get` below only obeys it.
+    static func retryDelay(after outcome: Result<Int, Error>, attempt: Int,
+                           retryAfter: Double? = nil) -> Double? {
+        guard attempt < maxAttempts else { return nil }
+        // ponytail: fixed 2/4/8 s, no jitter; add jitter if IWLS ever rate-limits
+        // many devices in step.
+        let backoff = pow(2, Double(attempt))
         switch outcome {
-        case .success(let status): status == 429 || (500...599).contains(status)
-        case .failure(let error): (error as? URLError).map { $0.code != .cancelled } ?? false
+        case .failure(let error):
+            return isTransient(error) ? backoff : nil
+        case .success(429):
+            // A rate limit is per WINDOW — IWLS counts 30 requests a minute —
+            // so 2, 4 and 8 s all land inside the window that just rejected
+            // us, and each retry spends another slot in it. Wait the window
+            // out, or as long as the server asked for.
+            return max(retryAfter ?? 0, 60)
+        case .success(let status):
+            // 501 and 505 are the server refusing this request's shape, and
+            // 511 is a captive portal demanding a login: same answer next time.
+            guard (500...599).contains(status), ![501, 505, 511].contains(status) else { return nil }
+            return max(retryAfter ?? 0, backoff)
         }
     }
 
@@ -161,22 +215,27 @@ final class IwlsFetcher {
             if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
             lastRequest = .now
             let outcome: Result<Int, Error>
+            var retryAfter: Double?
             do {
                 let (data, response) = try await Self.session.data(from: url)
-                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let http = response as? HTTPURLResponse
+                let code = http?.statusCode ?? 0
                 if code == 200 { return data }
+                // ponytail: seconds only. Retry-After may also be an HTTP date,
+                // which parses as nil and falls back to the floor below.
+                retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
                 outcome = .success(code)
             } catch {
                 outcome = .failure(error)
             }
-            // ponytail: fixed 2/4/8 s backoff, no jitter; add jitter if IWLS rate-limits many devices in step.
-            guard attempt <= 3, Self.isRetryable(outcome) else {
+            guard let delay = Self.retryDelay(after: outcome, attempt: attempt,
+                                              retryAfter: retryAfter) else {
                 switch outcome {
                 case .success(let code): throw ChsError.failed("HTTP \(code)")
                 case .failure(let error): throw error
                 }
             }
-            try await Task.sleep(for: .seconds(1 << attempt))
+            try await Task.sleep(for: .seconds(delay))
         }
     }
 
@@ -193,7 +252,13 @@ final class IwlsFetcher {
         func cached() -> [IwlsStation]? {
             (try? Data(contentsOf: cache)).flatMap { try? JSONDecoder().decode([IwlsStation].self, from: $0) }
         }
-        let modified = (try? cache.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        // Through FileManager, not `URL.resourceValues`: NSURL caches the values
+        // it reads and only drops them for a URL used from the main thread,
+        // and every caller here is off it (`run()` is detached, the online
+        // fetch nonisolated). A cached date would outlive the rewrite below
+        // and refetch 851 KB on every call for the life of the process. Same
+        // idiom as `ChsCurrentGate`'s window age.
+        let modified = (try? FileManager.default.attributesOfItem(atPath: cache.path))?[.modificationDate] as? Date
         // ponytail: a week-old list can hold an id IWLS has since retired; drop the cache on a 404 if that bites.
         if let modified, Date.now.timeIntervalSince(modified) < 7 * 86_400, let list = cached() { return list }
         do {
@@ -202,6 +267,13 @@ final class IwlsFetcher {
             try? FileManager.default.createDirectory(at: cache.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
             try? data.write(to: cache, options: .atomic)
+            // Re-downloadable by definition, so it has no business in a device
+            // backup (iOS Data Storage Guidelines). The chunk store beside it
+            // needs no such mark — it is purged as each fit lands.
+            var written = cache
+            var exclude = URLResourceValues()
+            exclude.isExcludedFromBackup = true
+            try? written.setResourceValues(exclude)
             return list
         } catch {
             // A stale list still resolves stations; failing here fails every queued job.
