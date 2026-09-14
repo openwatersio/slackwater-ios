@@ -229,10 +229,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(map.appears(within: 10), "back from the pushed station lost the Nearby map")
         // A coordinate tap never scrolls, and the map sits below the rows.
         let window = app.windows.firstMatch.frame
-        for _ in 0..<6 where map.frame.maxY > window.maxY - 40 { app.swipeUp() }
+        for _ in 0..<6 where map.frame.maxY > window.maxY - 40 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
+                .press(forDuration: 0.1, thenDragTo:
+                    app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.2)))
+        }
+        XCTAssert(map.frame.maxY <= window.maxY - 40, "the Nearby map stayed below the screen")
         save(app, "nearby-map.png")
-        // The top-right corner: the framing insets every pin well clear of it.
-        map.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.05)).tap()
+        // Clear of the iPad scroll bar and the iPhone's top-right station pin.
+        let tapX = UIDevice.current.userInterfaceIdiom == .pad ? 0.8 : 0.97
+        map.coordinate(withNormalizedOffset: CGVector(dx: tapX, dy: 0.05)).tap()
         XCTAssert(app.descendants(matching: .any)["map-canvas"].firstMatch.appears(within: 10),
                   "a tap on the Nearby map did not open the full map")
     }
