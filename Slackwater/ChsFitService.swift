@@ -782,10 +782,12 @@ extension CurrentStationRecord {
 
 extension ChsModelStore {
     /// UI-test hook: `-chsResetModels` wipes the store for a clean first run —
-    /// including the fetched chunks, or "first run" would silently be a resume.
+    /// including the fetched chunks and station list, or "first run" would
+    /// silently be a resume.
     static func resetIfRequested() {
         guard CommandLine.arguments.contains("-chsResetModels") else { return }
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+        try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
     }
 }

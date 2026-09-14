@@ -118,18 +118,19 @@ final class ChsProvisionalTests: XCTestCase {
                        "only the newest, uncached chunk may move")
     }
 
-    /// The resume rule: what a yielded job already fetched is on disk, and it
-    /// is served without a request — proved by asking with the network off.
+    /// Cached current data may be denser; the fit must keep a uniform time grid.
     func testCachedChunksResumeWithoutRefetching() async throws {
         let start = Date(timeIntervalSince1970: 1_784_000_000)
         let chunk = ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400))
         let missing = ChsChunk(start: start.addingTimeInterval(-7 * 86_400), end: start)
         defer { ChsChunkStore.purge("test-station") }
 
-        ChsChunkStore.save([ChsSample(t: 1, v: 2)], "test-station", "wcsp1", chunk)
+        let grid = (start.timeIntervalSince1970 / 900).rounded(.up) * 900_000
+        ChsChunkStore.save([ChsSample(t: grid, v: 2), ChsSample(t: grid + 60_000, v: 3)],
+                           "test-station", "wcsp1", chunk)
         let offline = IwlsFetcher(killSwitch: true)
         let resumed = try await offline.series("wcsp1", stationID: "test-station", chunk: chunk)
-        XCTAssertEqual(resumed, [ChsSample(t: 1, v: 2)], "a fetched chunk is never fetched twice")
+        XCTAssertEqual(resumed, [ChsSample(t: grid, v: 2)], "cached current samples must use the fit grid")
 
         do {
             _ = try await offline.series("wcsp1", stationID: "test-station", chunk: missing)
