@@ -784,4 +784,28 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "the apogean spring explanation did not describe the competing effects: \(tideBlurb.label)")
         save(app, "moon-sheet-apogean-spring.png")
     }
+
+    /// A shared moment three weeks out (#187) lands on its own clock and day.
+    /// `-scrubInstant` rides the shared link's path into the detail, so this
+    /// is the link's hand-off whichever of the scaffold's and the detail's
+    /// appears runs first: a first build around now would clamp the strip
+    /// short of the moment. The tide and harmonic-current details build their
+    /// stores separately, so both are opened.
+    func testAMomentWeeksAwayLandsOnItsClockAndDay() throws {
+        for (query, name) in [("friday", "Friday Harbor"), ("deception", "Deception Pass (Narrows)")] {
+            let app = launch("-seedGate", "-scrubInstant", "2026-09-28T13:00:00-07:00")
+            openSearch(app, query)
+            pickSearchResult(app, app.staticTexts[name].firstMatch)
+            XCTAssert(leadReading(app).appears(within: 10), "no lead reading on \(name)")
+            XCTAssert(waitFor(leadReading(app), "label CONTAINS '1:00pm'"),
+                      "\(name) did not land on the moment: \(leadReading(app).label)")
+            _ = settled { leadReading(app).label }
+            XCTAssertEqual(scrubClock(app), "1:00pm", "\(name)'s strip moved off the moment once it settled")
+            let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+            XCTAssert(bar.appears(within: 10), "no range bar on \(name)")
+            XCTAssert(bar.label.contains("Sep 28"), "\(name)'s window did not move to the moment's day: \(bar.label)")
+            save(app, "moment-weeks-away-\(query).png")
+            app.terminate()
+        }
+    }
 }

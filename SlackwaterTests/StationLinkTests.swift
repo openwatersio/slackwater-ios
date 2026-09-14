@@ -208,4 +208,34 @@ final class StationLinkTests: XCTestCase {
     func testUnknownStationOffersNothing() {
         XCTAssertNil(detailShareURL(stationID: "noaa/0000000", scrubTime: nil, tz: vancouver))
     }
+
+    // MARK: - Handing the instant to the detail
+
+    /// The nearby list, the same-name chooser and the tide-at-port link all
+    /// push by appending to the path, so nothing resets the waiting instant
+    /// between stations: only the station the link named may take it, and
+    /// taking it spends it.
+    func testLinkedInstantIsOnlyTakenByItsStation() {
+        let moment = Date(timeIntervalSince1970: 1_788_125_400)
+        LinkedInstant.shared.pending = .init(station: "chs-dodd-narrows", at: moment)
+        defer { LinkedInstant.shared.pending = nil }
+        XCTAssertNil(LinkedInstant.shared.take(for: "noaa/9449880"))
+        XCTAssertNotNil(LinkedInstant.shared.pending, "a miss must leave the instant waiting for its station")
+        XCTAssertEqual(LinkedInstant.shared.take(for: "chs-dodd-narrows"), moment)
+        XCTAssertNil(LinkedInstant.shared.take(for: "chs-dodd-narrows"), "taken once")
+    }
+
+    /// A link to later today stays on the strip the detail opens with; a
+    /// link into another week moves the window to that day's local midnight.
+    func testLinkedAnchorMovesTheWindowOnlyOffTheStrip() {
+        let today = todayLocal(vancouver)
+        XCTAssertNil(linkedAnchor(for: today.addingTimeInterval(2 * 3600), anchor: .distantPast, tz: vancouver),
+                     "later today is on the strip already")
+        let farAhead = today.addingTimeInterval(20 * 86_400 + 5 * 3600)
+        XCTAssertEqual(linkedAnchor(for: farAhead, anchor: .distantPast, tz: vancouver), dayLocal(farAhead, vancouver))
+        let farBack = today.addingTimeInterval(-20 * 86_400 + 5 * 3600)
+        XCTAssertEqual(linkedAnchor(for: farBack, anchor: .distantPast, tz: vancouver), dayLocal(farBack, vancouver))
+        // An anchor already parked on that week keeps it.
+        XCTAssertNil(linkedAnchor(for: farAhead, anchor: dayLocal(farAhead, vancouver), tz: vancouver))
+    }
 }

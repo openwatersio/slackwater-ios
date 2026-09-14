@@ -228,6 +228,11 @@ struct OnlineGateDetailView: View {
                 window = fresh
                 rebuild()
                 fetching = false
+                // The anchor moved while this was in flight (a shared link
+                // landing on appear, or a pick), and the guard above dropped
+                // its fetch. Ask for it now. `from != anchor` stops a week the
+                // service cannot supply from refetching forever.
+                if timeline == nil, from != anchor, net.online { fetchNow(from: anchor) }
             } catch {
                 fetching = false
                 fetchFailed = true
