@@ -4,7 +4,8 @@ import XCTest
 final class LiveFetchTests: ScreenshotTestCase {
     func testLiveTideFit() throws {
         try skipUnlessLive()
-        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-victoria")
+        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-victoria",
+                             "-fixLat", "48.4235", "-fixLon", "-123.3705")
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.appears(within: 15))
@@ -13,7 +14,8 @@ final class LiveFetchTests: ScreenshotTestCase {
 
     func testLiveCurrentFit() throws {
         try skipUnlessLive()
-        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-active-pass")
+        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-active-pass",
+                             "-fixLat", "48.8604", "-fixLon", "-123.3128")
         openSearch(app, "active pass")
         let fitted = app.scrollViews.firstMatch.staticTexts.matching(NSPredicate(
             format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'"

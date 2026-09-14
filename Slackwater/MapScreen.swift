@@ -200,7 +200,8 @@ struct MapViewRepresentable: UIViewRepresentable {
         let map = MLNMapView(frame: .zero)
         map.attributionButtonPosition = .bottomLeft
         map.logoViewPosition = .bottomLeft
-        map.showsUserLocation = LocationService.shared.authorized
+        // A test fix makes app ranking "authorized" without granting iOS location access.
+        map.showsUserLocation = [.authorizedWhenInUse, .authorizedAlways].contains(LocationService.shared.status)
         if framing != nil {
             map.isScrollEnabled = false
             map.isZoomEnabled = false

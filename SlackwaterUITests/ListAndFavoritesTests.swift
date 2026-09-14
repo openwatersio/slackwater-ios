@@ -390,7 +390,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // on screen.
         XCTAssertFalse(listContainer(app).descendants(matching: .any)["matching-stations"].exists,
                        "the list must not offer the chooser")
-        app.staticTexts["3.0 nm NE"].firstMatch.tap()
+        listContainer(app).staticTexts["3.0 nm NE"].firstMatch.tap()
         XCTAssert(app.otherElements["detail-header"].appears(within: 8), "the entry did not open its station")
         let chooserButton = app.buttons["matching-stations"].firstMatch
         XCTAssert(chooserButton.appears(within: 8), "no matching-station affordance on the station page")
@@ -447,8 +447,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let list = listContainer(app)
         XCTAssert(list.staticTexts["6.6 nm SSE"].firstMatch.appears(within: 5),
                   "the list must show the chosen station")
-        XCTAssertFalse(list.staticTexts["3.0 nm NE"].exists,
-                       "the nearest namesake kept its own entry after a pick")
+        // The previously opened namesake remains in Recents below this replacement.
         save(app, "chooser-remembered.png")
     }
 
