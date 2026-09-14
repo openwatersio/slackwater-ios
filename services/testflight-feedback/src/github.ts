@@ -90,16 +90,39 @@ async function ensureLabels(config: GithubConfig, labels: string[], fetchImpl: t
   }
 }
 
-async function storeAssets(config: GithubConfig, feedback: Feedback, hash: string, fetchImpl: typeof fetch): Promise<AssetRef[]> {
+async function storeAssets(config: GithubConfig, feedback: Feedback, hash: string, retry: boolean, fetchImpl: typeof fetch): Promise<AssetRef[]> {
   const directory = `intake/assets/${hash}`;
   const listing = await githubRequest(config, `/contents/${directory}`, fetchImpl);
-  let existing: Array<{ type: string; name: string; path: string }> = [];
+  let existing: Array<{ type: string; name: string; path: string; html_url: string }> = [];
   if (listing.status !== 404) {
     requireOk(listing, 'list private assets');
     existing = await listing.json() as typeof existing;
     if (!Array.isArray(existing)) throw new Error('invalid private asset directory');
   }
-  for (const asset of feedback.assets) {
+  const incoming = [...feedback.assets];
+  if (retry) {
+    const releaseResponse = await githubRequest(config, `/releases/tags/testflight-feedback-${hash}`, fetchImpl);
+    if (releaseResponse.status !== 404) {
+      requireOk(releaseResponse, 'read legacy release');
+      const release = await releaseResponse.json() as { id?: number };
+      if (!release.id) throw new Error('legacy release missing ID');
+      const listed = await githubRequest(config, `/releases/${release.id}/assets?per_page=100`, fetchImpl);
+      requireOk(listed, 'list legacy assets');
+      const legacy = await listed.json() as Array<{ id: number; name: string; state: string; size: number }>;
+      for (const asset of legacy) {
+        if (asset.state !== 'uploaded' || !asset.name.startsWith(`${hash}-`)) continue;
+        const name = asset.name.slice(hash.length + 1);
+        if (existing.some(item => item.type === 'file' && item.name === name) || incoming.some(item => item.name === name)) continue;
+        if (asset.size > 8 * 1024 * 1024) throw new Error('legacy asset exceeds size limit');
+        const downloaded = await githubRequest(config, `/releases/assets/${asset.id}`, fetchImpl, { headers: { Accept: 'application/octet-stream' } });
+        requireOk(downloaded, 'download legacy asset');
+        const bytes = new Uint8Array(await downloaded.arrayBuffer());
+        if (bytes.byteLength > 8 * 1024 * 1024) throw new Error('legacy asset exceeds size limit');
+        incoming.push({ name, mime: 'application/octet-stream', bytes });
+      }
+    }
+  }
+  for (const asset of incoming) {
     const name = asset.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
     const path = `${directory}/${name}`;
     if (!existing.some(item => item.type === 'file' && item.path === path)) {
@@ -111,12 +134,17 @@ async function storeAssets(config: GithubConfig, feedback: Feedback, hash: strin
         }),
       });
       requireOk(stored, 'store private asset');
-      existing.push({ type: 'file', name, path });
+      const result = await stored.json() as { content?: { html_url?: string } };
+      if (!result.content?.html_url) throw new Error('private asset missing link');
+      existing.push({ type: 'file', name, path, html_url: result.content.html_url });
     }
   }
   return existing
     .filter(item => item.type === 'file' && item.path.startsWith(`${directory}/`))
-    .map(item => ({ name: item.name, path: item.path, url: `https://github.com/${config.repository}/blob/main/${item.path}` }));
+    .map(item => {
+      if (!item.html_url) throw new Error('private asset missing link');
+      return { name: item.name, path: item.path, url: item.html_url };
+    });
 }
 
 export async function ingestFeedback(config: GithubConfig, feedback: Feedback, fetchImpl: typeof fetch = fetch): Promise<'created' | 'duplicate' | 'pending'> {
@@ -124,6 +152,7 @@ export async function ingestFeedback(config: GithubConfig, feedback: Feedback, f
   const key = sourceKey(feedback);
   const path = `/contents/intake/${sourceHash(feedback)}.json`;
   let marker = await readMarker(config, path, fetchImpl);
+  const retry = !!marker;
   if (marker && marker.value.source_key !== key) throw new Error('marker source mismatch');
   if (marker?.value.phase === 'complete') return 'duplicate';
   if (marker?.value.phase === 'creating') return 'pending';
@@ -133,7 +162,7 @@ export async function ingestFeedback(config: GithubConfig, feedback: Feedback, f
     if (!sha) return 'pending';
     marker = { value, sha };
   }
-  const assets = await storeAssets(config, feedback, sourceHash(feedback), fetchImpl);
+  const assets = await storeAssets(config, feedback, sourceHash(feedback), retry, fetchImpl);
   const draft = renderIssue(feedback, assets);
   await ensureLabels(config, draft.labels, fetchImpl);
   const creating: Marker = { ...marker.value, phase: 'creating', assets };

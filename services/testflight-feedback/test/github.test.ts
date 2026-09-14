@@ -56,6 +56,7 @@ test('status lookup skips an already completed source key', async () => {
 test('screenshot is stored as a private repository file and linked from its issue', async () => {
   const hash = sourceHash(feedback);
   const path = `intake/assets/${hash}/screenshot-1.png`;
+  const htmlUrl = `https://github.com/openwatersio/feedback/blob/develop/${path}`;
   let marker: { content: string; sha: string } | null = null;
   let storedImage: Uint8Array | null = null;
   let issueBody = '';
@@ -70,12 +71,12 @@ test('screenshot is stored as a private repository file and linked from its issu
       return Response.json({ content: { sha: marker.sha } }, { status: 201 });
     }
     if (url.pathname === `/repos/openwatersio/feedback/contents/intake/assets/${hash}` && method === 'GET') {
-      return storedImage ? Response.json([{ type: 'file', name: 'screenshot-1.png', path }]) : new Response(null, { status: 404 });
+      return storedImage ? Response.json([{ type: 'file', name: 'screenshot-1.png', path, html_url: htmlUrl }]) : new Response(null, { status: 404 });
     }
     if (url.pathname === `/repos/openwatersio/feedback/contents/${path}` && method === 'PUT') {
       const request = JSON.parse(String(init?.body));
       storedImage = Buffer.from(request.content, 'base64');
-      return Response.json({ content: { sha: 'blob-sha' } }, { status: 201 });
+      return Response.json({ content: { sha: 'blob-sha', html_url: htmlUrl } }, { status: 201 });
     }
     if (url.pathname.includes('/labels/') && method === 'GET') return Response.json({});
     if (url.pathname === '/repos/openwatersio/feedback/issues' && method === 'POST') {
@@ -90,7 +91,7 @@ test('screenshot is stored as a private repository file and linked from its issu
   const withImage = { ...feedback, assets: [{ name: 'screenshot-1.png', mime: 'image/png', bytes: image }] };
   assert.equal(await ingestFeedback(config, withImage, fakeFetch), 'created');
   assert.deepEqual(storedImage, Buffer.from(image));
-  assert.match(issueBody, new RegExp(`github\\.com/openwatersio/feedback/blob/main/${path}`));
+  assert.ok(issueBody.includes(htmlUrl));
   assert.match(issueBody, /"private_asset_paths":\["intake\/assets\//);
   assert.match(issueBody, /appstoreconnect\.apple\.com\/apps\/123/);
   assert.match(issueBody, /Submission ID: <code>abc<\/code>/);
@@ -99,7 +100,7 @@ test('screenshot is stored as a private repository file and linked from its issu
 test('a retry keeps an uploaded asset and does not duplicate the issue', async () => {
   let marker: { content: string; sha: string } | null = null;
   const issues: Array<{ title: string; body: string; labels: string[] }> = [];
-  const assets: Array<{ type: string; name: string; path: string }> = [];
+  const assets: Array<{ type: string; name: string; path: string; html_url: string }> = [];
   const hash = sourceHash(feedback);
   let failLabelOnce = true;
   const fakeFetch: typeof fetch = async (input, init) => {
@@ -119,9 +120,12 @@ test('a retry keeps an uploaded asset and does not duplicate the issue', async (
       return assets.length ? Response.json(assets) : new Response(null, { status: 404 });
     }
     if (url.pathname === `/repos/openwatersio/feedback/contents/intake/assets/${hash}/screenshot-1.png` && method === 'PUT') {
-      assets.push({ type: 'file', name: 'screenshot-1.png', path: `intake/assets/${hash}/screenshot-1.png` });
-      return Response.json({ content: { sha: 'blob-sha' } }, { status: 201 });
+      const path = `intake/assets/${hash}/screenshot-1.png`;
+      const html_url = `https://github.com/openwatersio/feedback/blob/develop/${path}`;
+      assets.push({ type: 'file', name: 'screenshot-1.png', path, html_url });
+      return Response.json({ content: { sha: 'blob-sha', html_url } }, { status: 201 });
     }
+    if (url.pathname === `/repos/openwatersio/feedback/releases/tags/testflight-feedback-${hash}`) return new Response(null, { status: 404 });
     if (url.pathname.includes('/labels/') && method === 'GET') {
       if (failLabelOnce) { failLabelOnce = false; return Response.json({}, { status: 500 }); }
       return Response.json({ name: decodeURIComponent(url.pathname.split('/').at(-1)!) });
@@ -142,9 +146,53 @@ test('a retry keeps an uploaded asset and does not duplicate the issue', async (
   assert.equal(issues.length, 1);
   assert.equal(assets.length, 1);
   assert.match(issues[0].body, /person@example\.com/);
-  assert.match(issues[0].body, /github\.com\/openwatersio\/feedback\/blob\/main\/intake\/assets/);
+  assert.match(issues[0].body, /github\.com\/openwatersio\/feedback\/blob\/develop\/intake\/assets/);
   assert.doesNotMatch(issues[0].title, /person@example\.com/);
   assert.doesNotMatch(Buffer.from(marker!.content, 'base64').toString(), /person@example\.com/);
+});
+
+test('a reserved legacy retry copies an existing Release asset after the Apple URL expires', async () => {
+  const hash = sourceHash(feedback);
+  const path = `intake/assets/${hash}/screenshot-1.png`;
+  const htmlUrl = `https://github.com/openwatersio/feedback/blob/develop/${path}`;
+  const marker = { source_key: '123:screenshot:abc', phase: 'reserved', issue_number: null, assets: [] };
+  let markerFile = { content: Buffer.from(JSON.stringify(marker)).toString('base64'), sha: 'initial' };
+  let storedImage: Uint8Array | null = null;
+  let issueBody = '';
+  const image = new Uint8Array([137, 80, 78, 71]);
+  const fakeFetch: typeof fetch = async (input, init) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? 'GET';
+    const route = url.pathname.replace('/repos/openwatersio/feedback', '');
+    if (!route) return Response.json({ full_name: 'openwatersio/feedback', private: true });
+    if (route === `/contents/intake/${hash}.json`) {
+      if (method === 'GET') return Response.json(markerFile);
+      const request = JSON.parse(String(init?.body));
+      markerFile = { content: request.content, sha: 'updated' };
+      return Response.json({ content: { sha: markerFile.sha } });
+    }
+    if (route === `/contents/intake/assets/${hash}`) return storedImage
+      ? Response.json([{ type: 'file', name: 'screenshot-1.png', path, html_url: htmlUrl }])
+      : new Response(null, { status: 404 });
+    if (route === `/contents/${path}` && method === 'PUT') {
+      storedImage = Buffer.from(JSON.parse(String(init?.body)).content, 'base64');
+      return Response.json({ content: { sha: 'blob-sha', html_url: htmlUrl } }, { status: 201 });
+    }
+    if (route === `/releases/tags/testflight-feedback-${hash}`) return Response.json({ id: 9 });
+    if (route === '/releases/9/assets') return Response.json([{ id: 42, name: `${hash}-screenshot-1.png`, state: 'uploaded', size: image.length }]);
+    if (route === '/releases/assets/42') return new Response(image);
+    if (route.startsWith('/labels/')) return Response.json({});
+    if (route === '/issues' && method === 'POST') {
+      const draft = JSON.parse(String(init?.body));
+      issueBody = draft.body;
+      return Response.json({ number: 7, labels: draft.labels.map((name: string) => ({ name })) }, { status: 201 });
+    }
+    throw new Error(`unexpected ${method} ${route}`);
+  };
+  const config = { repository: 'openwatersio/feedback', workflowRepository: 'openwatersio/feedback', token: 'test' };
+  assert.equal(await ingestFeedback(config, { ...feedback, omissions: ['screenshot-1-unavailable'] }, fakeFetch), 'created');
+  assert.deepEqual(storedImage, Buffer.from(image));
+  assert.ok(issueBody.includes(htmlUrl));
 });
 
 test('an ambiguous issue response leaves a marker and blocks a second create', async () => {
