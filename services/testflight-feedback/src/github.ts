@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Feedback } from './apple.ts';
 
-export type AssetRef = { id: number; name: string; url: string };
+export type AssetRef = { id?: number; path?: string; name: string; url: string };
 export type IssueDraft = { title: string; body: string; labels: string[] };
 export type GithubConfig = { repository: string; workflowRepository: string; token: string };
 type Marker = { source_key: string; phase: 'reserved' | 'creating' | 'complete'; issue_number: number | null; assets: AssetRef[] };
@@ -90,71 +90,61 @@ async function ensureLabels(config: GithubConfig, labels: string[], fetchImpl: t
   }
 }
 
-async function storeAssets(config: GithubConfig, feedback: Feedback, hash: string, fetchImpl: typeof fetch): Promise<AssetRef[]> {
-  const tag = `testflight-feedback-${hash}`;
-  let releaseResponse = await githubRequest(config, `/releases/tags/${tag}`, fetchImpl);
-  if (releaseResponse.status === 404) {
-    if (!feedback.assets.length) return [];
-    releaseResponse = await githubRequest(config, '/releases', fetchImpl, {
-      method: 'POST',
-      body: JSON.stringify({ tag_name: tag, name: tag, draft: false, prerelease: true, make_latest: 'false' }),
-    });
-    if (releaseResponse.status === 422) releaseResponse = await githubRequest(config, `/releases/tags/${tag}`, fetchImpl);
+async function storeAssets(config: GithubConfig, feedback: Feedback, hash: string, retry: boolean, fetchImpl: typeof fetch): Promise<AssetRef[]> {
+  const directory = `intake/assets/${hash}`;
+  const listing = await githubRequest(config, `/contents/${directory}`, fetchImpl);
+  let existing: Array<{ type: string; name: string; path: string; html_url: string }> = [];
+  if (listing.status !== 404) {
+    requireOk(listing, 'list private assets');
+    existing = await listing.json() as typeof existing;
+    if (!Array.isArray(existing)) throw new Error('invalid private asset directory');
   }
-  requireOk(releaseResponse, 'get private release');
-  const release = await releaseResponse.json() as { id?: number };
-  if (!release.id) throw new Error('private release missing ID');
-  const existing: Array<{ id: number; name: string; state: string }> = [];
-  for (let page = 1; ; page++) {
-    const response = await githubRequest(config, `/releases/${release.id}/assets?per_page=100&page=${page}`, fetchImpl);
-    requireOk(response, 'list private assets');
-    const batch = await response.json() as typeof existing;
-    existing.push(...batch);
-    if (batch.length < 100) break;
-  }
-  const uploaded: typeof existing = [];
-  for (const asset of existing) {
-    if (asset.state === 'starter') {
-      // GitHub may leave an empty starter asset after HTTP 502: https://docs.github.com/en/rest/releases/assets#upload-a-release-asset
-      const removed = await githubRequest(config, `/releases/assets/${asset.id}`, fetchImpl, { method: 'DELETE' });
-      if (removed.status !== 204 && removed.status !== 404) throw new Error(`delete starter asset failed: HTTP ${removed.status}`);
-      continue;
+  const incoming = [...feedback.assets];
+  if (retry) {
+    const releaseResponse = await githubRequest(config, `/releases/tags/testflight-feedback-${hash}`, fetchImpl);
+    if (releaseResponse.status !== 404) {
+      requireOk(releaseResponse, 'read legacy release');
+      const release = await releaseResponse.json() as { id?: number };
+      if (!release.id) throw new Error('legacy release missing ID');
+      const listed = await githubRequest(config, `/releases/${release.id}/assets?per_page=100`, fetchImpl);
+      requireOk(listed, 'list legacy assets');
+      const legacy = await listed.json() as Array<{ id: number; name: string; state: string; size: number }>;
+      for (const asset of legacy) {
+        if (asset.state !== 'uploaded' || !asset.name.startsWith(`${hash}-`)) continue;
+        const name = asset.name.slice(hash.length + 1);
+        if (existing.some(item => item.type === 'file' && item.name === name) || incoming.some(item => item.name === name)) continue;
+        if (asset.size > 8 * 1024 * 1024) throw new Error('legacy asset exceeds size limit');
+        const downloaded = await githubRequest(config, `/releases/assets/${asset.id}`, fetchImpl, { headers: { Accept: 'application/octet-stream' } });
+        requireOk(downloaded, 'download legacy asset');
+        const bytes = new Uint8Array(await downloaded.arrayBuffer());
+        if (bytes.byteLength > 8 * 1024 * 1024) throw new Error('legacy asset exceeds size limit');
+        incoming.push({ name, mime: 'application/octet-stream', bytes });
+      }
     }
-    if (asset.state !== 'uploaded') throw new Error('private asset has unknown state');
-    uploaded.push(asset);
   }
-  const refs: AssetRef[] = uploaded
-    .filter(asset => asset.name.startsWith(`${hash}-`))
-    .map(asset => ({
-      id: asset.id,
-      name: asset.name.slice(hash.length + 1),
-      url: `https://github.com/${config.repository}/releases/download/${tag}/${encodeURIComponent(asset.name)}`,
-    }));
-  for (const asset of feedback.assets) {
-    const name = `${hash}-${asset.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100)}`;
-    let stored = uploaded.find(item => item.name === name);
-    if (!stored) {
-      const upload = await fetchImpl(`https://uploads.github.com/repos/${config.repository}/releases/${release.id}/assets?name=${encodeURIComponent(name)}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'Content-Type': asset.mime,
-          'Content-Length': String(asset.bytes.byteLength),
-        },
-        body: Buffer.from(asset.bytes),
+  for (const asset of incoming) {
+    const name = asset.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+    const path = `${directory}/${name}`;
+    if (!existing.some(item => item.type === 'file' && item.path === path)) {
+      const stored = await githubRequest(config, `/contents/${path}`, fetchImpl, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `testflight: store private asset ${hash}`,
+          content: Buffer.from(asset.bytes).toString('base64'),
+        }),
       });
-      requireOk(upload, 'upload private asset');
-      stored = await upload.json() as { id: number; name: string; state: string };
+      requireOk(stored, 'store private asset');
+      const result = await stored.json() as { content?: { html_url?: string } };
+      if (!result.content?.html_url) throw new Error('private asset missing link');
+      existing.push({ type: 'file', name, path, html_url: result.content.html_url });
     }
-    if (!stored.id || stored.state !== 'uploaded') throw new Error('private asset is not uploaded');
-    if (!refs.some(ref => ref.id === stored.id)) refs.push({
-      id: stored.id, name: asset.name,
-      url: `https://github.com/${config.repository}/releases/download/${tag}/${encodeURIComponent(name)}`,
-    });
   }
-  return refs;
+  return existing
+    .filter(item => item.type === 'file' && item.path.startsWith(`${directory}/`))
+    .map(item => {
+      if (!item.html_url) throw new Error('private asset missing link');
+      return { name: item.name, path: item.path, url: item.html_url };
+    });
 }
 
 export async function ingestFeedback(config: GithubConfig, feedback: Feedback, fetchImpl: typeof fetch = fetch): Promise<'created' | 'duplicate' | 'pending'> {
@@ -162,6 +152,7 @@ export async function ingestFeedback(config: GithubConfig, feedback: Feedback, f
   const key = sourceKey(feedback);
   const path = `/contents/intake/${sourceHash(feedback)}.json`;
   let marker = await readMarker(config, path, fetchImpl);
+  const retry = !!marker;
   if (marker && marker.value.source_key !== key) throw new Error('marker source mismatch');
   if (marker?.value.phase === 'complete') return 'duplicate';
   if (marker?.value.phase === 'creating') return 'pending';
@@ -171,7 +162,7 @@ export async function ingestFeedback(config: GithubConfig, feedback: Feedback, f
     if (!sha) return 'pending';
     marker = { value, sha };
   }
-  const assets = await storeAssets(config, feedback, sourceHash(feedback), fetchImpl);
+  const assets = await storeAssets(config, feedback, sourceHash(feedback), retry, fetchImpl);
   const draft = renderIssue(feedback, assets);
   await ensureLabels(config, draft.labels, fetchImpl);
   const creating: Marker = { ...marker.value, phase: 'creating', assets };
@@ -267,7 +258,8 @@ export function renderIssue(feedback: Feedback, assets: AssetRef[], hash = sourc
     submitted_at: feedback.submittedAt,
     device_model: feedback.deviceModel,
     os_version: feedback.osVersion,
-    private_asset_ids: assets.map(asset => asset.id),
+    private_asset_ids: assets.flatMap(asset => asset.id === undefined ? [] : [asset.id]),
+    private_asset_paths: assets.flatMap(asset => asset.path ? [asset.path] : []),
     asset_omissions: feedback.omissions,
     triage_status: 'needs-triage',
     related_private_issue_numbers: [],
@@ -280,6 +272,8 @@ export function renderIssue(feedback: Feedback, assets: AssetRef[], hash = sourc
   const assetLinks = assets.length
     ? assets.map(asset => `- [${asset.name}](${asset.url})`).join('\n')
     : '_No assets stored._';
-  const body = `<!-- testflight-feedback:v1\n${safeMetadata}\n-->\n\n### Tester comment\n\n${fence}text\n${comment}\n${fence}\n\n### Private assets\n\n${assetLinks}\n`;
+  const submissionId = feedback.submissionId.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const appUrl = `https://appstoreconnect.apple.com/apps/${encodeURIComponent(feedback.appleAppId)}`;
+  const body = `<!-- testflight-feedback:v1\n${safeMetadata}\n-->\n\n### Tester comment\n\n${fence}text\n${comment}\n${fence}\n\n### Private assets\n\n${assetLinks}\n\n### Original feedback\n\n[Open the app in App Store Connect](${appUrl}), then check TestFlight → Feedback → ${feedback.kind === 'screenshot' ? 'Screenshots' : 'Crashes'}. Submission ID: <code>${submissionId}</code>.\n`;
   return { title, body, labels };
 }
