@@ -1,0 +1,72 @@
+# Copy to .github/workflows/testflight-poll.yml in the PRIVATE feedback repository.
+# Replace the public-code ref with a reviewed 40-character commit SHA on main.
+name: TestFlight feedback intake
+
+on:
+  # Enable after a successful private manual scan:
+  # schedule:
+  #   - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Scan Apple feedback or reconcile incomplete intake markers
+        type: choice
+        options: [scan, reconcile]
+        default: scan
+
+permissions:
+  contents: write # private intake markers and release assets
+  issues: write   # private feedback issues and labels
+
+concurrency:
+  group: testflight-feedback-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_FEEDBACK_REPO: ${{ vars.FEEDBACK_REPOSITORY }}
+    steps:
+      - name: Require the configured private destination
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$IS_PRIVATE" != true ] || [ -z "$GH_FEEDBACK_REPO" ] || [ "$GH_FEEDBACK_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo 'Feedback intake requires its configured private repository.' >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: openwatersio/slackwater-ios
+          ref: REPLACE_WITH_REVIEWED_40_CHARACTER_COMMIT_SHA
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - name: Install and verify intake
+        working-directory: services/testflight-feedback
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run check
+
+      - name: Scan or reconcile
+        working-directory: services/testflight-feedback
+        env:
+          APPLE_APP_ID: ${{ vars.APPLE_APP_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode || 'scan' }}
+        run: |
+          case "$MODE" in
+            scan) npm run poll ;;
+            reconcile) npm run poll -- reconcile ;;
+            *) echo 'Unsupported intake mode.' >&2; exit 1 ;;
+          esac
