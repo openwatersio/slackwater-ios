@@ -332,8 +332,12 @@ func pinCandidates(_ items: [StationItem]) -> [PinCandidate] {
 /// runs in a detached task).
 let allPinCandidates: [PinCandidate] = pinCandidates(StationItem.all)
 
+/// `pinned` always survives, whatever its cell holds: the station a detail
+/// page is about must appear on that page's own map, and the pin a preview
+/// panel is describing must not vanish under the panel.
 func visibleStations(in box: PinBox, zoom: Double,
-                     candidates: [PinCandidate] = allPinCandidates) -> [StationItem] {
+                     candidates: [PinCandidate] = allPinCandidates,
+                     pinned: String? = nil) -> [StationItem] {
     // Web-mercator degrees per point at this zoom (MapLibre's tile size is
     // 512). Latitude cells shrink with the mercator scale so a cell stays
     // square on screen at any latitude.
@@ -349,13 +353,22 @@ func visibleStations(in box: PinBox, zoom: Double,
         if let held = best[cell], held.rank <= c.rank { continue }
         best[cell] = c
     }
-    return best.values.map(\.item)
+    var kept = best.values.map(\.item)
+    if let pinned, !kept.contains(where: { $0.id == pinned }),
+       let item = StationItem.byId[pinned] {
+        kept.append(item)
+    }
+    return kept
 }
 
 /// The visible set as GeoJSON: identity, tone, and — only where the zoom
 /// draws them — the gauge and readout attributes.
+/// `selectedID` marks the picked pin, which the style reads to scale the
+/// symbol up and repaint its plate as a translucent halo — selection is a
+/// property of the symbol rather than a ring drawn beneath it.
 func pinFeatures(for items: [StationItem], zoom: Double,
-                 chsStates: [String: PinState] = [:], now: Date = appNow()) -> [String: Any] {
+                 chsStates: [String: PinState] = [:], now: Date = appNow(),
+                 selectedID: String? = nil) -> [String: Any] {
     let units = readoutUnits()
     let detailed = zoom >= LABEL_MIN_ZOOM
     return [
@@ -370,6 +383,7 @@ func pinFeatures(for items: [StationItem], zoom: Double,
             // The full image name, not the bucket — `icon-image` reads it
             // straight off the feature, no string building in the style.
             // The trend rides the name too: each variant bakes its caret.
+            if s.id == selectedID { properties["selected"] = true }
             if let gauge = state.gauge {
                 properties["gauge"] = "pin-gauge-\(gauge)-\(state.state == "rising" ? "up" : "down")"
             }

@@ -22,9 +22,13 @@ struct NearbySection: View {
             .padding(.horizontal, 10)
             ForEach(stations) { row($0) }
             if !stations.isEmpty {
+                // `selected: item` is this page's own station, marked the
+                // same way the discovery map marks a pin-tap pick — one
+                // treatment, one code path.
                 MapViewRepresentable(center: coordinate(item),
                                      framing: stations.map(coordinate),
                                      onMiss: { openMapFocused(item, $0) },
+                                     selected: item,
                                      onSelect: open)
                     // The representable reads its camera once, in makeUIView.
                     .id(stations.map(\.id))
