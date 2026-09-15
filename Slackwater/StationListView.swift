@@ -41,6 +41,10 @@ struct StationListView: View {
     @State private var mapPreview: StationItem?
     @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    /// Read for the map's identity, not for this view's own text: the pins'
+    /// readings are baked into the GeoJSON, so a speed-unit change has to
+    /// rebuild the source. Observing it here is what republishes the body.
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var loc = LocationService.shared
@@ -411,7 +415,11 @@ struct StationListView: View {
                 onSelect: { item in withAnimation(.snappy) { mapPreview = item } },
                 onDeselect: { withAnimation(.snappy) { mapPreview = nil } }
             )
-            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))")
+            // Units belong in the identity for the same reason the slack
+            // window does: both are baked into the pin source at build time,
+            // and `updateUIView` only carries selection. Without them a unit
+            // change sits in the old units until the 60s tick.
+            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))-\(units)-\(speedUnit)")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a

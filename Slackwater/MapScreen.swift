@@ -12,7 +12,7 @@ let defaultDiscoveryZoom = 7.35
 /// jump lands framed on one station rather than on the whole Salish Sea.
 let stationZoom = 12.5
 
-/// Where the locate FAB lands: past `LABEL_MIN_ZOOM` so "where am I" comes
+/// Where the locate FAB lands: past `READING_MIN_ZOOM` so "where am I" comes
 /// answered with named stations, wider than `stationZoom`'s single-station
 /// frame — a harbor, not a dot.
 let locateZoom = 10.5
@@ -342,7 +342,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         let units = readoutUnitSignature()
         if !force, let built = builtBox, let builtZoom, builtUnits == units,
            built.covers(view), abs(builtZoom - zoom) < PIN_ZOOM_SLACK,
-           (builtZoom >= LABEL_MIN_ZOOM) == (zoom >= LABEL_MIN_ZOOM) { return }
+           (builtZoom >= READING_MIN_ZOOM) == (zoom >= READING_MIN_ZOOM) { return }
         // A build already running cannot be joined, but the request must not
         // be thrown away: a flick fires twice and the second one carries the
         // camera the user actually stopped at, and a `select` landing here
@@ -366,7 +366,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
                 // ALREADY stored — cache only, never a fetch (issue #12; the
                 // web port learned the fetch-on-open version is a request
                 // storm against IWLS).
-                let states = chsPinStates(at: now, items: items, detailed: zoom >= LABEL_MIN_ZOOM,
+                let states = chsPinStates(at: now, items: items, detailed: zoom >= READING_MIN_ZOOM,
                                           tideRecords: tides, currentRecords: currents)
                 let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now,
                                           selectedID: selectedID)
