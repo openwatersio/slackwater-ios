@@ -110,20 +110,16 @@ private let LABEL_HALO = CHART_INK   // one shadow tone: pins' rim and text's ha
 /// get the ink back.
 let LABEL_MIN_ZOOM = 9.5
 
-/// Where the readouts (height + trend, speed + flow arrow) join the names —
-/// `locateZoom`, so the locate FAB lands on a stateful harbor, and past
-/// `LABEL_MIN_ZOOM`, so a reading never floats without its name.
+/// Where station names join the readings — `locateZoom`, so the locate FAB
+/// lands on a named harbor. (Readings start earlier, at `LABEL_MIN_ZOOM`,
+/// and place ahead of names.)
 let READOUT_MIN_ZOOM = locateZoom
 
-/// The pin size ramp's two ends, as factors of `PIN_RADIUS`. One ramp for
-/// the circle radius, the square's icon scale, and the stroke, so the two
-/// kinds keep reading as one system at every zoom.
-///
-/// Shrunk at `PIN_SHRINK_FROM`: the discovery zooms show whole coastlines,
-/// where full-sized pins fuse into a quilt — a dense shore has to read as
-/// marks. Full size where the labels arrive (`LABEL_MIN_ZOOM`), and growing
-/// past it to `stationZoom`, where a pin is the subject of the frame and
-/// earns dot-marker weight.
+/// The pin size ramp's two ends, as factors of the glyphs' drawn size. One
+/// ramp for the dot radius, every icon scale, and the stroke, so the forms
+/// keep reading as one system at every zoom. Two stops only; the
+/// exponential base is what keeps pins lean through the label band and
+/// saves the growth for the detail zooms.
 let PIN_ZOOM_SHRINK = 0.4
 let PIN_ZOOM_GROWTH = 1.8
 let PIN_GROWTH_TO = stationZoom
@@ -154,11 +150,13 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     let ink = NSExpression(forConstantValue: hexColor(CHART_INK))
     let font = NSExpression(forConstantValue: LABEL_FONT)
     // The zoom ramp, once per unit it applies to: radius and stroke in
-    // points, icon scale as a factor of the image's own PIN_RADIUS sizing.
+    // points, icon scale as a factor of the image's own drawn size. Begin
+    // and end state only; the 1.7 exponential holds marks near the small
+    // end through the label band (≈0.65× at 9.5, ≈0.85× at 10.5) and
+    // spends the growth approaching `stationZoom`.
     func grown(_ base: Double) -> NSExpression {
-        e(["interpolate", ["linear"], ["zoom"],
+        e(["interpolate", ["exponential", 1.7], ["zoom"],
            PIN_SHRINK_FROM, base * PIN_ZOOM_SHRINK,
-           LABEL_MIN_ZOOM, base,
            PIN_GROWTH_TO, base * PIN_ZOOM_GROWTH])
     }
 
@@ -169,19 +167,22 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // Matches nothing — no station has an empty id. NOT NSPredicate(value:):
     // MapLibre's predicate converter throws on constant predicates.
     selected.predicate = NSPredicate(mglJSONObject: ["==", ["get", "id"], ""])
-    // White, not the shadow tone: a highlight has to glow against the dark
-    // ground the shadows sink into.
-    selected.circleRadius = grown(PIN_RADIUS * 2.4)
-    selected.circleColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
-    selected.circleOpacity = NSExpression(forConstantValue: 0.3)
-    selected.circleStrokeWidth = NSExpression(forConstantValue: 2)
-    selected.circleStrokeColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
+    // The Nearby map's focus-ring language: a leaf stroke, nothing filled —
+    // a disc of any tone reads as a blob on the dark ground.
+    selected.circleRadius = grown(PIN_RADIUS * 2.6)
+    selected.circleOpacity = NSExpression(forConstantValue: 0)
+    selected.circleStrokeWidth = NSExpression(forConstantValue: 2.5)
+    selected.circleStrokeColor = NSExpression(forConstantValue: UIColor(SN.leaf))
 
     // Each glyph's outline (see `pinGlyphImage`): the same glyph stroked
     // wider in ink, drawn underneath, because `icon-halo-*` does not render
     // on these images. Plates are not in the tap layers — `handleTap`
     // hit-tests the glyph layers, and a plate that answered too would return
     // the same feature twice.
+    // The near band's placement contract, tier one of three (see the return
+    // below): allow-overlap TRUE so a glyph is never hidden, ignore-placement
+    // FALSE so every glyph REGISTERS its space — that registration is what
+    // makes it impossible for any text, placed later, to sit on a glyph.
     func glyph(_ id: String, image: NSExpression, rotation: NSExpression,
                colour: NSExpression, predicate: NSPredicate,
                scale: NSExpression? = nil) -> MLNSymbolStyleLayer {
@@ -191,7 +192,7 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
         layer.iconScale = scale ?? grown(1)
         layer.iconRotation = rotation
         layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
-        layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
         layer.iconColor = colour
         return layer
     }
@@ -214,12 +215,9 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
 
     // A flowing current IS an arrow toward its set (S-57 B-407.4), filled
     // with the ramp at its speed. Map-aligned: the bearing is geographic.
-    // The plate is the heavier-weight symbol a step larger — an SF symbol
-    // has no path to stroke-inflate (see `arrowPinImage`).
     let currentPinPlate = glyph("station-pins-current-plate",
                                 image: NSExpression(forConstantValue: "pin-arrow-plate"),
-                                rotation: setRotation, colour: ink, predicate: flowing,
-                                scale: grown(1.25))
+                                rotation: setRotation, colour: ink, predicate: flowing)
     let currentPins = glyph("station-pins-current",
                             image: NSExpression(forConstantValue: "pin-arrow"),
                             rotation: setRotation, colour: e(PIN_STATE_COLOUR), predicate: flowing)
@@ -228,8 +226,11 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // its dark empty band), the fill layer stacks the per-bucket level on
     // top, coloured rising/falling by the same state the reading arrows
     // carry. tide and chs both land here — provenance is not kind.
+    // The plate matches the fill's trend so barrel and caret share one
+    // silhouette; the fill layer's image name carries its trend already.
     let tidePinPlate = glyph("station-pins-tide-plate",
-                             image: NSExpression(forConstantValue: "pin-gauge-plate"),
+                             image: e(["match", ["get", "state"],
+                                       "rising", "pin-gauge-plate-up", "pin-gauge-plate-down"]),
                              rotation: upright, colour: ink, predicate: gauged)
     let tidePins = glyph("station-pins-tide", image: e(["get", "gauge"]),
                          rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: gauged)
@@ -263,35 +264,80 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
         layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
     }
 
-    let labels = MLNSymbolStyleLayer(identifier: "station-labels", source: source)
-    labels.minimumZoomLevel = Float(LABEL_MIN_ZOOM)
-    labels.text = e(["get", "name"])
-    labels.textFontNames = font
-    labels.textFontSize = e(["interpolate", ["linear"], ["zoom"],
-                             LABEL_MIN_ZOOM, 11, 13, 13])
-    labels.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: 1.1)))
+    // The glyphs keep growing toward the station zoom while an em offset
+    // One caption dressing for both text tiers — basemap label paint,
+    // priority sort, and a shared size ramp — so the two cannot drift.
+    func caption(_ id: String, text: NSExpression) -> MLNSymbolStyleLayer {
+        let layer = MLNSymbolStyleLayer(identifier: id, source: source)
+        layer.symbolSortKey = e(["get", "sort"])
+        layer.text = text
+        layer.textFontNames = font
+        layer.textFontSize = e(["interpolate", ["linear"], ["zoom"],
+                                LABEL_MIN_ZOOM, 11, PIN_GROWTH_TO, 13])
+        layer.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
+        layer.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
+        layer.textHaloWidth = NSExpression(forConstantValue: 1)
+        return layer
+    }
+
+    // Tier three, strictly space-permitting AND a zoom later than the
+    // readings: names place last, under full collision with generous
+    // padding — a name appears only where it crowds nothing, and yields
+    // everywhere else. The offset grows with the glyphs (a constant had
+    // names creeping onto the gauges as zoom rose), and its 1.4em base is
+    // what clears the name's own glyph box plus both paddings — tighter
+    // and every name self-collides and vanishes.
+    let labels = caption("station-labels", text: e(["get", "name"]))
+    labels.minimumZoomLevel = Float(READOUT_MIN_ZOOM)
+    labels.textOffset = e(["interpolate", ["linear"], ["zoom"],
+                           LABEL_MIN_ZOOM, ["literal", [0, 1]],
+                           PIN_GROWTH_TO, ["literal", [0, 2.4]]])
     labels.textAnchor = NSExpression(forConstantValue: "top")
-    labels.textOptional = NSExpression(forConstantValue: true)
-    labels.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
-    labels.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
-    labels.textHaloWidth = NSExpression(forConstantValue: 1)
+    labels.textPadding = NSExpression(forConstantValue: 4)
 
-    // The station's reading ("3.2 ft ↑" / "1.8 kn"), above the pin where the
-    // name sits below — same basemap label paint. Only pins whose state
-    // resolved one carry the attribute; unknown stays a bare pin.
-    let readings = MLNSymbolStyleLayer(identifier: "station-readings", source: source)
-    readings.predicate = NSPredicate(mglJSONObject: ["has", "reading"] as [Any])
-    readings.minimumZoomLevel = Float(READOUT_MIN_ZOOM)
-    readings.text = e(["get", "reading"])
-    readings.textFontNames = font
-    readings.textFontSize = NSExpression(forConstantValue: 11)
-    readings.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0, dy: -1.1)))
-    readings.textAnchor = NSExpression(forConstantValue: "bottom")
-    readings.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
-    readings.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
-    readings.textHaloWidth = NSExpression(forConstantValue: 1)
+    // The station's reading ("3.2 ft" / "1.8 kn") — tier two, and the ONLY
+    // text in the 9.5–10.5 band. Several candidate slots per station, tried
+    // in order, so a reading blocked on one side takes another before
+    // giving up; readings place before names, so a reading that needs a
+    // slot takes it FROM the name.
+    //
+    // One layer per glyph shape, because `textRadialOffset` spends a SINGLE
+    // distance in whichever direction the chosen anchor points: a radius
+    // that clears the gauge's height would stand an arrow's reading a
+    // glyph-height out in open water, and one that hugs the arrow drops
+    // the gauge's reading into its own bar. Each layer's radius tracks its
+    // own glyph's growth.
+    func readingLayer(_ id: String, anchors: [String],
+                      from: Double, to: Double) -> MLNSymbolStyleLayer {
+        let layer = caption(id, text: e(["get", "reading"]))
+        layer.minimumZoomLevel = Float(LABEL_MIN_ZOOM)
+        layer.textVariableAnchor = NSExpression(forConstantValue: anchors)
+        layer.textRadialOffset = e(["interpolate", ["linear"], ["zoom"],
+                                    LABEL_MIN_ZOOM, from, PIN_GROWTH_TO, to])
+        layer.textJustification = NSExpression(forConstantValue: "auto")
+        return layer
+    }
+    // A gauge is three times taller than it is wide, so its reading sits
+    // BESIDE the bar (the Navionics idiom) — close in, on whichever flank
+    // is free.
+    let tideReadings = readingLayer("station-readings-tide", anchors: ["left", "right"],
+                                    from: 0.7, to: 1.0)
+    tideReadings.predicate = gauged
+    // An arrow is nearly square: all four slots cost about the same, so it
+    // keeps them all and takes the first that is free.
+    let flowReadings = readingLayer("station-readings", anchors: ["bottom", "top", "left", "right"],
+                                    from: 0.9, to: 1.5)
+    flowReadings.predicate = NSPredicate(mglJSONObject:
+        ["all", ["has", "reading"], ["!", ["has", "gauge"]]])
 
-    return [selected, dotsFar, currentPinsFar, tidePinsFar,
+    // The placement hierarchy. MapLibre places symbols in REVERSE style
+    // order — the LAST layer claims space first — so the priority runs from
+    // the end of this array backwards: glyphs claim first (always drawn,
+    // always registered), readings route around them, names take whatever
+    // is left. The same order stacks glyphs above any text in draw order,
+    // so even a stray overlap keeps the symbol on top.
+    return [selected, labels, flowReadings, tideReadings,
+            dotsFar, currentPinsFar, tidePinsFar,
             dotPlate, dots, currentPinPlate, currentPins,
-            tidePinPlate, tidePins, labels, readings]
+            tidePinPlate, tidePins]
 }

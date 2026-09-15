@@ -58,6 +58,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private let onProject: (([CGPoint]) -> Void)?
     private var projected: [CGPoint] = []
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
+    private var refreshTimer: Timer?
+    deinit { refreshTimer?.invalidate() }
 
     init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
          framing: [CLLocationCoordinate2D]? = nil, onProject: (([CGPoint]) -> Void)? = nil) {
@@ -76,28 +78,51 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// GOTCHA: Native draws no `icon-halo-*` on these images at all, so the
     /// ink outline is a PLATE — the same path stroked `inflate` wider, drawn
     /// underneath by its own layer in `CHART_INK`.
+    /// `rounding` strokes the filled path that much wider with round joins —
+    /// the cheap way to round a silhouette's corners (the gauge caret's
+    /// tips) without re-deriving the path.
     private func pinGlyphImage(_ path: UIBezierPath, bounds: CGSize,
-                               inflate: CGFloat = 0, scale: CGFloat = 3) -> UIImage {
-        let size = CGSize(width: bounds.width + inflate * 2, height: bounds.height + inflate * 2)
+                               inflate: CGFloat = 0, rounding: CGFloat = 0,
+                               scale: CGFloat = 3) -> UIImage {
+        let pad = inflate + rounding / 2
+        let size = CGSize(width: bounds.width + pad * 2, height: bounds.height + pad * 2)
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         format.opaque = false
         let image = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            ctx.cgContext.translateBy(x: inflate, y: inflate)
+            ctx.cgContext.translateBy(x: pad, y: pad)
             UIColor.white.setFill()
             UIColor.white.setStroke()
             path.fill()
-            guard inflate > 0 else { return }
-            path.lineWidth = inflate * 2
+            let strokeWidth = rounding + inflate * 2
+            guard strokeWidth > 0 else { return }
+            path.lineWidth = strokeWidth
             path.lineJoinStyle = .round
             path.stroke()
         }
         return image.withRenderingMode(.alwaysTemplate)
     }
 
-    /// The tide gauge glyph (barrel and fill share this footprint).
-    private static let gaugeSize = CGSize(width: 8, height: 18)
-    private static let gaugeCorner: CGFloat = 2
+    /// A glyph drawn as a stroke rather than a fill (the arrow): the plate
+    /// is the same stroke `inflate` wider on each side, so the shadow rim
+    /// hugs the line work.
+    private func strokedGlyphImage(_ path: UIBezierPath, bounds: CGSize,
+                                   lineWidth: CGFloat, inflate: CGFloat = 0,
+                                   scale: CGFloat = 3) -> UIImage {
+        let size = CGSize(width: bounds.width + inflate * 2, height: bounds.height + inflate * 2)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            ctx.cgContext.translateBy(x: inflate, y: inflate)
+            UIColor.white.setStroke()
+            path.lineWidth = lineWidth + inflate * 2
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            path.stroke()
+        }
+        return image.withRenderingMode(.alwaysTemplate)
+    }
 
     /// The stateless dot, as a glyph so the far band can collide it.
     private func dotPinImage(inflate: CGFloat = 0) -> UIImage {
@@ -106,37 +131,112 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         return pinGlyphImage(path, bounds: CGSize(width: d, height: d), inflate: inflate)
     }
 
-    /// The gauge barrel: the full bar, registered inflated in the shadow ink
-    /// as the plate — its filled interior doubles as the empty portion of
-    /// the barrel, so low water reads as a dark bar, not a hole.
-    private func gaugeBarrelImage(inflate: CGFloat = 0) -> UIImage {
-        let path = UIBezierPath(roundedRect: CGRect(origin: .zero, size: Self.gaugeSize),
+    /// The tide gauge glyph: a slim barrel with a trend caret — above the
+    /// bar pointing up when rising, below it pointing down when falling
+    /// (the Navionics tide-bar idiom), gapped off the barrel so it reads as
+    /// a pointer rather than an arched cap. Every variant shares one canvas
+    /// so the icons center-align; the bar hugs the far end from the caret.
+    private static let gaugeBar = CGSize(width: 5.5, height: 15)
+    /// The caret matches the colored level's width — which IS the bar's,
+    /// now that the level is drawn full width — so pointer and level read
+    /// as one element.
+    private static let gaugeCaretWidth: CGFloat = gaugeBar.width
+    private static let gaugeCaretHeight: CGFloat = 3.2
+    /// Sized so the two COLOURED shapes end up exactly one rim apart — the
+    /// dark band between bar and caret reads as the same shadow that wraps
+    /// the rest of the glyph. (Their plates do overlap at this distance, so
+    /// the shadow is one continuous column; that is what it should be, and
+    /// with the caret as wide as the bar there is no notch where they
+    /// meet. Pushing them far enough apart for open background between the
+    /// plates costs two rims of dark and reads as a chasm.)
+    private static let gaugeCaretGap: CGFloat = gaugeRim + gaugeRounding / 2
+    private static let gaugeCanvas = CGSize(
+        width: gaugeBar.width, height: gaugeBar.height + gaugeCaretGap + gaugeCaretHeight)
+    private static let gaugeCorner: CGFloat = 1.2
+    /// The corner-softening stroke both gauge images share (see
+    /// `pinGlyphImage`'s `rounding`) — the caret's tips round like the
+    /// barrel's ends.
+    private static let gaugeRounding: CGFloat = 0.6
+    /// The shadow rim's visible thickness, uniform around the whole glyph:
+    /// the plate is the silhouette grown by this much, and the fill is the
+    /// silhouette at nominal size, so bar and caret wear the SAME rim.
+    /// (Insetting the level inside the bar instead left a 2pt rim there
+    /// against the caret's 1pt.) `inflate` is a stroke, so it spends half
+    /// its width outward — hence the doubling, less what `rounding` already
+    /// grows the silhouette by.
+    private static let gaugeRim: CGFloat = 1.6
+    private static let gaugeRimInflate: CGFloat = gaugeRim - gaugeRounding / 2
+
+    private func gaugeBarFrame(rising: Bool) -> CGRect {
+        CGRect(x: (Self.gaugeCanvas.width - Self.gaugeBar.width) / 2,
+               y: rising ? Self.gaugeCanvas.height - Self.gaugeBar.height : 0,
+               width: Self.gaugeBar.width, height: Self.gaugeBar.height)
+    }
+
+    private func gaugeCaretPath(rising: Bool) -> UIBezierPath {
+        let mid = Self.gaugeCanvas.width / 2
+        let left = mid - Self.gaugeCaretWidth / 2
+        let right = mid + Self.gaugeCaretWidth / 2
+        let h = Self.gaugeCaretHeight
+        let path = UIBezierPath()
+        if rising {
+            path.move(to: CGPoint(x: mid, y: 0))
+            path.addLine(to: CGPoint(x: right, y: h))
+            path.addLine(to: CGPoint(x: left, y: h))
+        } else {
+            let top = Self.gaugeCanvas.height - h
+            path.move(to: CGPoint(x: left, y: top))
+            path.addLine(to: CGPoint(x: right, y: top))
+            path.addLine(to: CGPoint(x: mid, y: Self.gaugeCanvas.height))
+        }
+        path.close()
+        return path
+    }
+
+    /// The gauge barrel and its caret as ONE silhouette, registered inflated
+    /// in the shadow ink as the plate — the filled interior doubles as the
+    /// empty portion of the barrel, so low water reads as a dark bar, not a
+    /// hole.
+    private func gaugeBarrelImage(rising: Bool, inflate: CGFloat = 0) -> UIImage {
+        let path = UIBezierPath(roundedRect: gaugeBarFrame(rising: rising),
                                 cornerRadius: Self.gaugeCorner)
-        return pinGlyphImage(path, bounds: Self.gaugeSize, inflate: inflate)
+        path.append(gaugeCaretPath(rising: rising))
+        return pinGlyphImage(path, bounds: Self.gaugeCanvas, inflate: inflate,
+                             rounding: Self.gaugeRounding)
     }
 
-    /// One fill level per bucket, anchored at the barrel's bottom on the
-    /// same canvas so the two images center-align as map icons. A 2pt floor
-    /// keeps low water visible as a sliver rather than an empty bar.
-    private func gaugeFillImage(bucket: Int) -> UIImage {
+    /// One fill level per bucket, anchored at the barrel's bottom, plus the
+    /// trend caret so both tint together in the state colour. A 2pt floor
+    /// keeps low water visible as a sliver rather than an empty bar. Drawn
+    /// at the barrel's OWN width — the rim comes from the plate underneath
+    /// (see `gaugeRim`), never from insetting the level.
+    private func gaugeFillImage(bucket: Int, rising: Bool) -> UIImage {
+        let bar = gaugeBarFrame(rising: rising)
         let fraction = Double(bucket) / Double(PIN_GAUGE_BUCKETS)
-        let height = max(2, (Self.gaugeSize.height - 2) * fraction)
+        let height = max(2, bar.height * fraction)
         let path = UIBezierPath(
-            roundedRect: CGRect(x: 1, y: Self.gaugeSize.height - 1 - height,
-                                width: Self.gaugeSize.width - 2, height: height),
-            cornerRadius: Self.gaugeCorner - 0.5)
-        return pinGlyphImage(path, bounds: Self.gaugeSize)
+            roundedRect: CGRect(x: bar.minX, y: bar.maxY - height,
+                                width: bar.width, height: height),
+            cornerRadius: Self.gaugeCorner)
+        path.append(gaugeCaretPath(rising: rising))
+        return pinGlyphImage(path, bounds: Self.gaugeCanvas,
+                             rounding: Self.gaugeRounding)
     }
 
-    /// The flowing-current glyph: the system arrow, per S-57's tidal-stream
-    /// symbol (an arrow in the direction of flow — B-407.4); the layer
-    /// rotates it to the set. The plate is the same symbol a weight up,
-    /// scaled a step larger by its layer — an SF symbol has no path to
-    /// stroke-inflate.
-    private func arrowPinImage(weight: UIImage.SymbolWeight = .bold) -> UIImage {
-        let configuration = UIImage.SymbolConfiguration(pointSize: 15, weight: weight)
-        return UIImage(systemName: "arrow.up", withConfiguration: configuration)!
-            .withRenderingMode(.alwaysTemplate)
+    /// The flowing-current glyph, per S-57's tidal-stream arrow (B-407.4):
+    /// a stroked shaft with a chevron head — round caps, and a head kept
+    /// smaller than the system symbol's, which read all head at pin sizes.
+    /// The layer rotates it to the set.
+    private func arrowPinImage(inflate: CGFloat = 0) -> UIImage {
+        let w: CGFloat = 10, h: CGFloat = 13, head: CGFloat = 3.6, cap: CGFloat = 1.2
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: w / 2, y: h - cap))
+        path.addLine(to: CGPoint(x: w / 2, y: cap))
+        path.move(to: CGPoint(x: w / 2 - head, y: cap + head))
+        path.addLine(to: CGPoint(x: w / 2, y: cap))
+        path.addLine(to: CGPoint(x: w / 2 + head, y: cap + head))
+        return strokedGlyphImage(path, bounds: CGSize(width: w, height: h),
+                                 lineWidth: 2.3, inflate: inflate)
     }
 
     func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -154,12 +254,19 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // re-registers here or a style swap loses it.
         style.setImage(dotPinImage(), forName: "pin-dot")
         style.setImage(dotPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-dot-plate")
-        style.setImage(gaugeBarrelImage(inflate: CGFloat(PIN_HALO)), forName: "pin-gauge-plate")
-        for bucket in 0...PIN_GAUGE_BUCKETS {
-            style.setImage(gaugeFillImage(bucket: bucket), forName: "pin-gauge-\(bucket)")
+        // The gauge's rim is its own constant (`gaugeRim`): the barrel is a
+        // filled slab already, and the dot's and arrow's full rim reads fat
+        // on one.
+        for (trend, rising) in [("up", true), ("down", false)] {
+            style.setImage(gaugeBarrelImage(rising: rising, inflate: Self.gaugeRimInflate),
+                           forName: "pin-gauge-plate-\(trend)")
+            for bucket in 0...PIN_GAUGE_BUCKETS {
+                style.setImage(gaugeFillImage(bucket: bucket, rising: rising),
+                               forName: "pin-gauge-\(bucket)-\(trend)")
+            }
         }
         style.setImage(arrowPinImage(), forName: "pin-arrow")
-        style.setImage(arrowPinImage(weight: .black), forName: "pin-arrow-plate")
+        style.setImage(arrowPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-arrow-plate")
         style.setImage(currentDirectionImage(),
                        forName: CurrentFillRenderer.directionImageID)
         // Fill under the pins: added first, so the pin layers appended below
@@ -184,6 +291,18 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             for layer in stationPinLayers(source: source) { style.addLayer(layer) }
         }
         applyChsStates(to: style)
+        // A mounted map outlives many 30-minute state buckets, and nothing
+        // else re-pushes the source — without this, a map left open wears
+        // the states it mounted with (a card saying "Flooding" beside a pin
+        // still green from the morning's slack). The minute tick is cheap:
+        // `PinFeaturesCache` only rebuilds when its bucket actually moves.
+        guard refreshTimer == nil else { return }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self, let style = self.map?.style else { return }
+            self.applyChsStates(to: style)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
     }
 
     /// Per frame, deduplicated: the fitted camera only lands once the style
@@ -202,15 +321,22 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// pushed into the old one. After paint by construction, so the style-construction path
     /// `testPinLayerBuildsInsideAFrame` budgets pays nothing; the 3,125-pin
     /// source rebuild runs off the main thread. Cache only, never a fetch —
-    /// `chsPinStates` takes the stored records and nothing else.
+    /// `chsPinStates` takes the stored records and nothing else. Also the
+    /// refresh tick's body (above): the cache serves the same geojson back
+    /// until its 30-minute bucket moves, so ticks between buckets re-push
+    /// identical data and the map draws nothing new.
     private func applyChsStates(to style: MLNStyle) {
         Task { @MainActor [weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
+                // An empty dict is honest too (nothing synced — neutral):
+                // the update must run regardless, because it is also what
+                // rolls the whole source onto a fresh time bucket for the
+                // refresh tick — a pure-NOAA map has no CHS tones and still
+                // has tides to turn.
                 let states = chsPinStates(at: appNow(), tideRecords: tides, currentRecords: currents)
-                guard !states.isEmpty else { return nil }   // nothing synced — neutral is honest
                 let geojson = PinFeaturesCache.shared.update(states: states)
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
@@ -271,9 +397,11 @@ struct MapViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> MLNMapView {
         let map = MLNMapView(frame: .zero)
         // Top-right, clear of the FAB row and the locate button; white so it
-        // reads on the dark basemap.
+        // reads on the dark basemap. Margins match the FAB row's 16pt edge
+        // inset so the ⓘ sits on the same gutter line as the buttons below.
         map.attributionButtonPosition = .topRight
         map.attributionButton.tintColor = .white
+        map.attributionButtonMargins = CGPoint(x: 16, y: 16)
         // The MapLibre wordmark is optional under its BSD license; the ⓘ
         // button stays — it is where the tile attribution lives.
         map.showsLogoView = false
