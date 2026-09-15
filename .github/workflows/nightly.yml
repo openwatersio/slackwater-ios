@@ -1,0 +1,61 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+      timezone: America/Vancouver
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Owner gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an owner on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "Nightly releases run only from main." >&2
+            exit 1
+          fi
+          admin=$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$GITHUB_TRIGGERING_ACTOR/permission" --jq '.user.permissions.admin')
+          if [[ "$admin" != true ]]; then
+            echo "$GITHUB_TRIGGERING_ACTOR is not a repository owner." >&2
+            exit 1
+          fi
+
+  release:
+    name: Release to Nightly
+    needs: authorize
+    # Server-evaluated before runner assignment, including single-job reruns.
+    if: github.triggering_actor == 'clarkbw' || github.triggering_actor == 'bkeepers'
+    runs-on:
+      group: slackwater-nightly
+      labels: [self-hosted, macOS, ARM64]
+    timeout-minutes: 180
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure the release commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Release changed main to Nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: zsh scripts/nightly.sh
