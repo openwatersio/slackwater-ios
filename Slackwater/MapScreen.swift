@@ -454,6 +454,10 @@ struct MapViewRepresentable: UIViewRepresentable {
             map.isZoomEnabled = false
             map.isRotateEnabled = false
             map.isPitchEnabled = false
+            // A framed preview is one tap target that opens the full map;
+            // the ⓘ there carries the attribution. Left in, its action
+            // sheet swallows taps meant for the thumbnail.
+            map.attributionButton.isHidden = true
         }
         context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing,
                                     onProject: onProject)

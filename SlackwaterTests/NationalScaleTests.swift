@@ -358,7 +358,9 @@ final class NationalScaleTests: XCTestCase {
         // (`visibleStations`), so no pin layer may gate itself by zoom — a
         // floor here would leave the wide zooms pinless.
         for id in ["station-pins-dot", "station-pins-current", "station-pins-tide"] {
-            XCTAssertEqual(byId[id]?.minimumZoomLevel, 0, "\(id) must draw at every zoom")
+            // Unset reads back as -infinity, not 0; either is "no floor".
+            XCTAssertLessThanOrEqual(byId[id]?.minimumZoomLevel ?? .nan, 0,
+                                     "\(id) must draw at every zoom")
         }
         // The labels ride the basemap's own fontstack, so offline packs cache
         // its glyph ranges as part of the style's needs. A stack of our own
