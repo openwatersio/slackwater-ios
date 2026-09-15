@@ -107,16 +107,22 @@ private let LABEL_FONT = ["Noto Sans Regular"]
 private let LABEL_TEXT = "#ffffff"
 private let LABEL_HALO = CHART_INK   // one shadow tone: pins' rim and text's halo
 
-/// Below this zoom station names are noise: hundreds collide with each other
-/// and with the basemap's own place labels, which they crowd off the map.
-/// Until here the pins carry the story alone; the basemap's geography labels
-/// get the ink back.
-let LABEL_MIN_ZOOM = 9.5
+/// Where the first station text appears: the readings ("3.2 ft", "1.8 kn"),
+/// alone in the 9.5-10.5 band. Below this the pins carry the story by
+/// themselves and the basemap's own geography labels get the ink back.
+/// Also the threshold the DATA reads: under it no gauge or reading is drawn,
+/// so `tidePinState` skips the height sample and the extremes search behind
+/// them outright.
+let READING_MIN_ZOOM = 9.5
 
-/// Where station names join the readings — `locateZoom`, so the locate FAB
-/// lands on a named harbor. (Readings start earlier, at `LABEL_MIN_ZOOM`,
-/// and place ahead of names.)
-let READOUT_MIN_ZOOM = locateZoom
+/// Where station names join the readings, one zoom tier later, so a reading
+/// never loses its slot to a name. `locateZoom`, so the locate FAB lands on
+/// a named harbor.
+///
+/// These two are easy to read as a matched pair and are not: the readings
+/// come first and the names second, so `READING_MIN_ZOOM` is the LOWER
+/// number. Each is named for the tier it gates.
+let NAME_MIN_ZOOM = locateZoom
 
 /// The pin size ramp's two ends, as factors of the glyphs' drawn size. One
 /// ramp for the dot radius, every icon scale, and the stroke, so the forms
@@ -260,7 +266,7 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
         layer.text = text
         layer.textFontNames = font
         layer.textFontSize = e(["interpolate", ["linear"], ["zoom"],
-                                LABEL_MIN_ZOOM, 11, PIN_GROWTH_TO, 13])
+                                READING_MIN_ZOOM, 11, PIN_GROWTH_TO, 13])
         layer.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
         layer.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
         layer.textHaloWidth = NSExpression(forConstantValue: 1)
@@ -275,9 +281,9 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // what clears the name's own glyph box plus both paddings — tighter
     // and every name self-collides and vanishes.
     let labels = caption("station-labels", text: e(["get", "name"]))
-    labels.minimumZoomLevel = Float(READOUT_MIN_ZOOM)
+    labels.minimumZoomLevel = Float(NAME_MIN_ZOOM)
     labels.textOffset = e(["interpolate", ["linear"], ["zoom"],
-                           LABEL_MIN_ZOOM, ["literal", [0, 1]],
+                           READING_MIN_ZOOM, ["literal", [0, 1]],
                            PIN_GROWTH_TO, ["literal", [0, 2.4]]])
     labels.textAnchor = NSExpression(forConstantValue: "top")
     labels.textPadding = NSExpression(forConstantValue: 4)
@@ -297,10 +303,10 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     func readingLayer(_ id: String, anchors: [String],
                       from: Double, to: Double) -> MLNSymbolStyleLayer {
         let layer = caption(id, text: e(["get", "reading"]))
-        layer.minimumZoomLevel = Float(LABEL_MIN_ZOOM)
+        layer.minimumZoomLevel = Float(READING_MIN_ZOOM)
         layer.textVariableAnchor = NSExpression(forConstantValue: anchors)
         layer.textRadialOffset = e(["interpolate", ["linear"], ["zoom"],
-                                    LABEL_MIN_ZOOM, from, PIN_GROWTH_TO, to])
+                                    READING_MIN_ZOOM, from, PIN_GROWTH_TO, to])
         layer.textJustification = NSExpression(forConstantValue: "auto")
         return layer
     }

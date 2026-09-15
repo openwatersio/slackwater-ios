@@ -224,6 +224,31 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
+    /// `covers` decides whether a camera move can reuse the set already
+    /// built, so a false yes is a screen of missing pins. The dateline is
+    /// where it gets hard: a box's two endpoints can both sit inside another
+    /// while the arc between them runs the long way around and leaves it.
+    func testCoverageIsMeasuredAsAnArcNotTwoEndpoints() {
+        let lat = (south: 0.0, north: 10.0)
+        func box(_ west: Double, _ east: Double) -> PinBox {
+            PinBox(south: lat.south, west: west, north: lat.north, east: east)
+        }
+        // The trap: both 100 and -100 are inside [-170, 170], but the arc
+        // between them crosses the antimeridian, which is not.
+        XCTAssertFalse(box(-170, 170).covers(box(100, -100)),
+                       "a wrapped box is not covered just because its ends are inside")
+        // A wrapped box does cover a narrower wrapped box inside it.
+        XCTAssertTrue(box(170, -170).covers(box(175, -175)))
+        XCTAssertFalse(box(175, -175).covers(box(170, -170)), "and not the other way")
+        // The ordinary case still works, in both directions.
+        XCTAssertTrue(box(-10, 10).covers(box(-5, 5)))
+        XCTAssertFalse(box(-5, 5).covers(box(-10, 10)))
+        // A padded box that swallowed the globe covers anything, wrapped or not.
+        XCTAssertTrue(box(-180, 180).covers(box(100, -100)))
+        // Latitude is still a plain containment test.
+        XCTAssertFalse(box(-10, 10).covers(PinBox(south: -5, west: -5, north: 5, east: 5)))
+    }
+
     /// Decimation's whole point: the work is bounded by what a screen can
     /// show. Zooming out must not multiply the pins — a continent gets the
     /// same handful of cells a harbour does, filled with its best-ranked

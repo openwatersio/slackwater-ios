@@ -43,8 +43,8 @@ private let constituentSpeed: [String: Double] = [   // degrees/hour
 func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
     // A subordinate has no cheap path: its curve is only defined by its
     // extremes, so the exact search is the only search. 2,017 of them cost
-    // ~0.26 ms each here (debug) — the pin budget in
-    // `testPinLayerBuildsInsideAFrame` was re-based for it.
+    // ~0.26 ms each here (debug), which is why the budget is per CAMERA and
+    // not per catalog (`testPinSourceBuildsForTheCameraNotTheWorld`).
     if record.isSubordinate { return tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let fallback = { tidePinRising(record, at: now, window: PIN_TIDE_FALLBACK_WINDOW) }
     let rangeProxy = record.constituents.reduce(0.0) { $0 + $1.amplitude * (constituentSpeed[$1.name] ?? 0) }
@@ -59,7 +59,7 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
 
 /// One pin's stateful attributes, resolved together per cache rebuild: the
 /// tone the colour expressions read, and the high-zoom readout
-/// (`READOUT_MIN_ZOOM`) — a formatted reading under the name, plus, for a
+/// (`NAME_MIN_ZOOM`) — a formatted reading under the name, plus, for a
 /// speed-bearing current, the bearing its flow arrow rotates to.
 struct PinState: Equatable {
     var state: String
@@ -83,11 +83,11 @@ let PIN_GAUGE_BUCKETS = 8
 
 /// A fitted tide record's pin state. The tone is not `cardState(at:)` — that
 /// computes 30h searches the pin discards; the hybrid is the load-bearing
-/// shortcut (`testPinLayerBuildsInsideAFrame` budgets the whole source build
-/// at 0.3s, and the readout's one extra height sample per pin lives inside
-/// the same budget).
+/// shortcut. `testPinSourceBuildsForTheCameraNotTheWorld` budgets the scan
+/// and the state together at 0.25s, at a harbour and over a continent alike,
+/// and the readout's one extra height sample per pin lives inside it.
 /// `detailed` is the zoom's answer to "is a gauge or a reading drawn here":
-/// below `LABEL_MIN_ZOOM` neither is, so the height sample and the extremes
+/// below `READING_MIN_ZOOM` neither is, so the height sample and the extremes
 /// search behind them are skipped outright — not narrowed, not cached, just
 /// not computed. Only the direction (the pin's colour) is always needed.
 func tidePinState(_ record: TideStationRecord, at now: Date,
@@ -118,13 +118,19 @@ func tidePinState(_ record: TideStationRecord, at now: Date,
                     gauge: gauge)
 }
 
-/// The thinning rank, from IDENTITY alone — no engine call, because
-/// decimation has to choose which stations are worth computing before any
-/// state exists. Reference/harmonic stations before subordinates, bigger
-/// signals before smaller within each; "the mouth before upstream" falls
-/// out of that, because upstream stations are the subordinates pointing
-/// their offsets at the mouth. One rank step outweighs any signal
+/// The thinning rank, from identity and constituents — no PREDICTION,
+/// because decimation has to choose which stations are worth computing
+/// before any state exists. Reference/harmonic stations before subordinates,
+/// bigger signals before smaller within each; "the mouth before upstream"
+/// falls out of that, because upstream stations are the subordinates
+/// pointing their offsets at the mouth. One rank step outweighs any signal
 /// difference: harmonics land in 0...9, subordinates in 10...19.
+///
+/// Not free, though: reading `tideRecord`/`currentRecord` is what first
+/// touches `byId` and decodes the bundled catalog. `allPinCandidates` pays
+/// that once, off the main actor inside `refreshPins`' detached task, and
+/// `pinFeatures` would have forced the same decode a moment later anyway —
+/// so it costs a cold map open, not a frame.
 func pinSortRank(_ item: StationItem) -> Double {
     func rank(_ subordinate: Bool, _ signal: Double) -> Double {
         (subordinate ? 10 : 0) + max(0, 9 - signal)
@@ -312,14 +318,20 @@ struct PinBox: Equatable {
         return l
     }
 
-    /// True when this box already holds everything `inner` needs. Tests the
-    /// spans rather than two corners: a wrapped box's corners can both be
-    /// inside while the middle is not.
+    /// True when this box already holds everything `inner` needs.
+    ///
+    /// Longitudes are compared as ARCS measured from this box's own west
+    /// edge, never as two endpoints: `[-170, 170]` contains both 100 and
+    /// -100, but the arc between them runs the long way through the
+    /// antimeridian and leaves the box. Endpoint tests said yes to that, so
+    /// a pan across the dateline skipped its rebuild and dropped the
+    /// stations beyond |178|.
     func covers(_ inner: PinBox) -> Bool {
         guard inner.south >= south, inner.north <= north else { return false }
-        guard lonSpan >= inner.lonSpan else { return false }
-        return contains(lat: inner.south, lon: inner.west)
-            && contains(lat: inner.south, lon: inner.east)
+        guard lonSpan < 360 else { return true }   // the whole world holds any arc
+        var start = (inner.west - west).truncatingRemainder(dividingBy: 360)
+        if start < 0 { start += 360 }
+        return start + inner.lonSpan <= lonSpan
     }
 }
 
@@ -331,9 +343,12 @@ struct PinBox: Equatable {
 let PIN_CELL_POINTS = 44.0
 /// How far past the viewport to build, as a fraction of its span.
 let PIN_VIEWPORT_PAD = 0.5
-/// Zoom drift tolerated before a rebuild: decimation cells scale with zoom,
-/// so a real zoom change means a different set of survivors.
-let PIN_ZOOM_SLACK = 0.5
+/// Zoom drift tolerated before a rebuild. Decimation cells scale with zoom,
+/// so drift is not cosmetic: it decides how many stations survive. 0.15 is a
+/// 23% change in cell AREA, which is about the most that can pass unnoticed;
+/// at 0.5 a held set could be missing half the pins it should have. The
+/// budget for spending it this cheaply is `refreshPins` measuring 18-53 ms.
+let PIN_ZOOM_SLACK = 0.15
 /// How often a mounted map re-resolves state for the set it already has.
 /// The states themselves only move on `PIN_TIDE_DIFF_DT` boundaries, but a
 /// viewport build is cheap enough now that the tick can be honest about the
@@ -412,7 +427,7 @@ func pinFeatures(for items: [StationItem], zoom: Double,
                  chsStates: [String: PinState] = [:], now: Date = appNow(),
                  selectedID: String? = nil) -> [String: Any] {
     let units = readoutUnits()
-    let detailed = zoom >= LABEL_MIN_ZOOM
+    let detailed = zoom >= READING_MIN_ZOOM
     return [
         "type": "FeatureCollection",
         "features": items.map { s in
