@@ -75,7 +75,7 @@ struct DerivedGateDetailView: View {
                                     if let note = gate.magnitudeNote {
                                         Text(note).font(.caption).foregroundStyle(SN.foam.opacity(0.7))
                                     }
-                                    TideAtPortLink(port: port)
+                                    StationLinksRow(stationId: gate.id) { TideAtPortLink(port: port) }
                                 }
                             },
                             bottom: {
@@ -86,9 +86,13 @@ struct DerivedGateDetailView: View {
                             })
             .onAppear {
                 if store == nil {
-                    anchor = todayLocal(tz)
+                    // A shared link that landed first has placed the anchor and
+                    // the scrub (ScrubDetailScaffold.jump): open on its moment,
+                    // or the first build covers now and the strip clamps it away.
+                    let linked = anchor != .distantPast
+                    if !linked { anchor = todayLocal(tz) }
                     let s = TimelineWindowStore(source: .gate(record))
-                    s.start(anchor: anchor, now: live)
+                    s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
                     store = s
                     refreshSlacks()
                 }

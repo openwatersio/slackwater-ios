@@ -18,6 +18,9 @@ func applySeedHooksIfRequested() {
     if CommandLine.arguments.contains("-resetSeriesFilter") {
         UserDefaults.standard.removeObject(forKey: seriesFilterKey)
     }
+    if CommandLine.arguments.contains("-resetChosenStations") {
+        AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
+    }
     // -seedTideModel <id> (UserDefaults argument domain): writes a
     // synthetic fitted model for one bundled CHS tide port, so a derived
     // gate whose reference it is (Malibu Rapids ← Point Atkinson) renders

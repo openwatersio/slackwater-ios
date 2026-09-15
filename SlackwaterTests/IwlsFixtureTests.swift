@@ -36,6 +36,49 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertEqual(try IwlsFetcher.decode(data), [ChsSample(t: 1_767_225_600_000, v: 1)])
     }
 
+    /// A dropped link is worth another try; a server refusing this request, or
+    /// a portal demanding a login, is not.
+    func testRetriesOnlyWhatAnotherAttemptCouldGetPast() {
+        func delay(_ outcome: Result<Int, Error>) -> Double? {
+            IwlsFetcher.retryDelay(after: outcome, attempt: 1)
+        }
+        XCTAssertEqual(delay(.failure(URLError(.timedOut))), 2)
+        XCTAssertEqual(delay(.failure(URLError(.networkConnectionLost))), 2)
+        // The app suspended mid-chunk: ECONNABORTED/ECONNRESET arrive as bare
+        // POSIX errors, which `error as? URLError` never matched.
+        XCTAssertEqual(delay(.failure(NSError(domain: NSPOSIXErrorDomain, code: 53))), 2)
+        XCTAssertEqual(delay(.failure(NSError(domain: NSPOSIXErrorDomain, code: 54))), 2)
+        XCTAssertEqual(delay(.success(500)), 2)
+        XCTAssertEqual(delay(.success(503)), 2)
+        // A captive portal, a refused request shape, and a cancel: identical
+        // answer next time, so the app should say so now.
+        XCTAssertNil(delay(.success(511)))
+        XCTAssertNil(delay(.success(501)))
+        XCTAssertNil(delay(.success(400)))
+        XCTAssertNil(delay(.success(404)))
+        XCTAssertNil(delay(.failure(URLError(.cancelled))))
+        XCTAssertNil(delay(.failure(URLError(.secureConnectionFailed))))
+        XCTAssertNil(delay(.failure(URLError(.dataNotAllowed))))
+        XCTAssertNil(delay(.failure(CancellationError())))
+    }
+
+    /// The backoff doubles, stops after `maxAttempts`, and never retries a rate
+    /// limit inside the minute-long window that just rejected it.
+    func testBackoffDoublesStopsAndWaitsOutARateLimitWindow() {
+        let dropped = Result<Int, Error>.failure(URLError(.timedOut))
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 1), 2)
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 2), 4)
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: dropped, attempt: 3), 8)
+        XCTAssertNil(IwlsFetcher.retryDelay(after: dropped, attempt: IwlsFetcher.maxAttempts),
+                     "the last attempt is the last word")
+        // 2/4/8 s all land inside IWLS's 30-per-minute window, and each retry
+        // spends another slot in it.
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(429), attempt: 1), 60)
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(429), attempt: 1, retryAfter: 90), 90)
+        XCTAssertEqual(IwlsFetcher.retryDelay(after: .success(503), attempt: 1, retryAfter: 30), 30,
+                       "the server's own ask outranks our backoff")
+    }
+
     func testRecordedResponsesDecodeAndProjectWithoutChunkCache() throws {
         let fixture = try recording()
         XCTAssertEqual(Set(fixture.stations.map(\.key)), ["victoria", "active", "dodd", "sechelt"])

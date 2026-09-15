@@ -30,9 +30,11 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     func testArguments(_ args: [String], live: Bool = false) -> [String] {
-        // -resetSeriesFilter: the Tides/Currents pick persists, and one test's
-        // pick would otherwise narrow the next test's lists.
-        var result = args + ["-noCloudSync", "-resetSeriesFilter", "-currentFillOff", "-chartPacksOff",
+        // -resetSeriesFilter / -resetChosenStations: the Tides/Currents pick and
+        // chooser picks persist, and one test's pick would otherwise change
+        // the next test's lists.
+        var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
+                             "-currentFillOff", "-chartPacksOff",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
@@ -95,17 +97,24 @@ class ScreenshotTestCase: XCTestCase {
         field.typeText(text)
     }
 
-    /// Open the Downloads sheet from the list's indicator, retapping like
+    /// Open the Downloads sheet from the list footer, retapping like
     /// openSearch: a loaded runner drops taps on a button that never moved (#368).
     func openDownloads(_ app: XCUIApplication) {
         let indicator = app.buttons["offline-status"].firstMatch
-        let title = app.staticTexts["Downloads"]
+        scrollTo(indicator, in: app)
+        let title = app.navigationBars["Downloads"]
         for _ in 0..<3 {
             // A sheet that arrived late obscures the indicator, so it cannot take a retap.
             if !title.exists, indicator.exists, indicator.isHittable { indicator.tap() }
             if title.appears(within: 5) { return }
         }
         XCTFail("the indicator did not open the downloads manager")
+    }
+
+    func openSettings(_ app: XCUIApplication) {
+        let button = app.buttons["Settings"].firstMatch
+        scrollTo(button, in: app)
+        button.tap()
     }
 
     /// Tap a search result and confirm the pick actually landed. The overlay
@@ -132,7 +141,11 @@ class ScreenshotTestCase: XCTestCase {
     /// The X glass circle beside the bottom input.
     func closeSearch(_ app: XCUIApplication) {
         app.buttons["Close search"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
+    }
+
+    func stationList(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["station-list"].firstMatch
     }
 
     /// The list's own scroll container. `app.swipeUp()` gestures at the centre
@@ -141,7 +154,7 @@ class ScreenshotTestCase: XCTestCase {
     /// opens on a station, so "the first scroll view" is the detail's as often
     /// as the list's: go by identifier, and only then guess.
     func listContainer(_ app: XCUIApplication) -> XCUIElement {
-        let named = app.descendants(matching: .any)["station-list"].firstMatch
+        let named = stationList(app)
         if named.exists { return named }
         for query in [app.tables, app.collectionViews, app.scrollViews] {
             let el = query.firstMatch
@@ -218,7 +231,7 @@ class ScreenshotTestCase: XCTestCase {
         // would otherwise leak it into the next test's "clean" device.
         app.launchArguments = testArguments(args)
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
         return app
     }
 
@@ -226,7 +239,7 @@ class ScreenshotTestCase: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(args, live: true)
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
         return app
     }
 
@@ -242,7 +255,7 @@ class ScreenshotTestCase: XCTestCase {
 
     /// Units live in Settings only: toggle there.
     func setUnits(_ app: XCUIApplication, _ label: String) {
-        app.buttons["Settings"].tap()
+        openSettings(app)
         let segment = app.buttons[label]
         XCTAssert(segment.appears(within: 5))
         // The sheet's two fixed statements, asserted on the way past. Every
@@ -256,7 +269,7 @@ class ScreenshotTestCase: XCTestCase {
                   "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
     }
 
     /// Search "friday" via the FAB → tap the tide card → detail (the overlay
@@ -297,7 +310,7 @@ class ScreenshotTestCase: XCTestCase {
 
     /// Tap the pin at (lat, lon) on the fixed Salish camera, by mercator math.
     func tapPin(_ map: XCUIElement, _ lat: Double, _ lon: Double) {
-        let world = 512.0 * pow(2.0, 7.35)  // SALISH_ZOOM
+        let world = 512.0 * pow(2.0, 7.35)  // fixed map test zoom
         func mercator(_ lat: Double, _ lon: Double) -> (x: Double, y: Double) {
             let x = (lon + 180) / 360 * world
             let phi = lat * .pi / 180
@@ -305,7 +318,7 @@ class ScreenshotTestCase: XCTestCase {
             return (x, y)
         }
         let frame = map.frame
-        let c = mercator(48.35, -123.05)  // SALISH_CENTER
+        let c = mercator(48.35, -123.05)  // fixed map test center
         let p = mercator(lat, lon)
         let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
         let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height

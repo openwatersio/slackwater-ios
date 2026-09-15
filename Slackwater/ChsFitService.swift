@@ -272,9 +272,9 @@ final class ChsFitService: ObservableObject {
         }
         queue = ChsQueue(jobs)
         // Never an arbitrary order, even before a fix lands: the prototype's
-        // Victoria fallback anchors the first sort, and a real fix re-sorts.
+        // The first-run fallback anchors the first sort, and a real fix re-sorts.
         //
-        // Sorts ONLY (#205). `adopt` would also enqueue Victoria's auto-fit
+        // Sorts ONLY (#205). `adopt` would also enqueue the fallback's auto-fit
         // set, and this runs on every device on Earth before any fix is known
         // — 6 Salish ports and 3 Salish gates, the gates being the 60-to-210
         // day fits, downloaded for someone who may be 4,000 km away. Jobs
@@ -782,10 +782,12 @@ extension CurrentStationRecord {
 
 extension ChsModelStore {
     /// UI-test hook: `-chsResetModels` wipes the store for a clean first run —
-    /// including the fetched chunks, or "first run" would silently be a resume.
+    /// including the fetched chunks and station list, or "first run" would
+    /// silently be a resume.
     static func resetIfRequested() {
         guard CommandLine.arguments.contains("-chsResetModels") else { return }
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+        try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
     }
 }

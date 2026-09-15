@@ -14,8 +14,8 @@ settings:
     # app ships — a per-target pair here silently drifts the two Info.plists
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
-    MARKETING_VERSION: 1.12.0
-    CURRENT_PROJECT_VERSION: 37
+    MARKETING_VERSION: 1.13.0
+    CURRENT_PROJECT_VERSION: 38
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
@@ -66,8 +66,8 @@ targets:
         # this line must stay above 1.0 until the accidental train is retired.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSLocationWhenInUseUsageDescription: >-
-          Your location is used on this device to find the nearest tide and
-          current stations. It never leaves the device.
+          Your location helps find nearby tide and current predictions.
+          It stays on this device.
         # iPhone: portrait-only, as ever. iPad: all four + no UIRequiresFullScreen
         # so Split View / Slide Over work (App Store validation 90474 requires
         # exactly this set when multitasking is supported).

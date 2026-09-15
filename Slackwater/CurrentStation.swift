@@ -442,6 +442,18 @@ enum StationItem: Identifiable, Hashable {
         case .chsGate, .chsCurrent: "Current · CHS"
         }
     }
+    /// "1.1 nm ENE of Sierra Point": NOAA regions are often a bare offset from
+    /// the named landmark. Any other region (a state, "east end") follows the name.
+    var placeLabel: String {
+        let offset = "^(\\d+(\\.\\d+)?\\s+(nm|yards?|ft|feet)\\s+)?"
+            + "(north|south|east|west|northeast|northwest|southeast|southwest"
+            + "|N|NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW)$"
+        if region.isEmpty { return name }
+        return region.range(of: offset, options: .regularExpression) != nil
+            ? "\(region) of \(name)" : "\(name), \(region)"
+    }
+    /// Series and name: the stations the matching-station chooser offers together.
+    var placeKey: String { "\(series.rawValue)|\(name)" }
     var series: StationSeries {
         switch self {
         case .tide, .chs: .tide
@@ -534,6 +546,10 @@ enum StationItem: Identifiable, Hashable {
     /// at 3,125 it is a linear scan per row per render (M53).
     static let byId: [String: StationItem] =
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+
+    /// `placeKey` → every station sharing it, so a station page finds its
+    /// namesakes without scanning the catalog on every scrub frame.
+    static let byPlace: [String: [StationItem]] = Dictionary(grouping: all, by: \.placeKey)
 
     /// Widget-safe lookup: decode only the requested large NOAA record; the
     /// three CHS identity catalogs are small enough to retain whole.

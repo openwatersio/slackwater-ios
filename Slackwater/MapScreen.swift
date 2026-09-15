@@ -4,11 +4,8 @@
 import SwiftUI
 import MapLibre
 
-// Discovery-map camera: frames the bundled-station core (Puget Sound through
-// the Gulf Islands / Strait of Georgia) so it opens reading as the Salish Sea.
-// The UI pin-tap test derives screen points from these same constants.
-let SALISH_CENTER = CLLocationCoordinate2D(latitude: 48.35, longitude: -123.05)
-let SALISH_ZOOM = 7.35
+// Discovery-map zoom for the chosen fix, recently opened station, or first-run bay.
+let defaultDiscoveryZoom = 7.35
 
 /// Per-station framing (prototype DATA() z: 12.2–13.2). The detail header's
 /// title tap (issue #32) jumps to the discovery map at this zoom, so a focused
@@ -31,7 +28,7 @@ let previewPanelCover: CGFloat = 240
 /// (whole earth) is never a real request, so it doubles as "unset".
 let discoveryZoom: Double = {
     let zoom = UserDefaults.standard.double(forKey: "mapZoom")
-    return zoom == 0 ? SALISH_ZOOM : zoom
+    return zoom == 0 ? defaultDiscoveryZoom : zoom
 }()
 
 /// `-mapCenter 48.86,-123.31` (UserDefaults argument domain): opens the
@@ -60,16 +57,19 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private let framing: [CLLocationCoordinate2D]?
     /// A framed map draws every station in its box — see `visibleStations`.
     private var decimates: Bool { framing == nil }
+    private let onProject: (([CGPoint]) -> Void)?
+    private var projected: [CGPoint] = []
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
     private var refreshTimer: Timer?
     deinit { refreshTimer?.invalidate() }
 
     init(map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
-         framing: [CLLocationCoordinate2D]? = nil) {
+         framing: [CLLocationCoordinate2D]? = nil, onProject: (([CGPoint]) -> Void)? = nil) {
         self.map = map
         self.center = center
         self.zoom = zoom
         self.framing = framing
+        self.onProject = onProject
         super.init()
         map.delegate = self
         map.styleURL = BASEMAP_STYLE_URL
@@ -249,6 +249,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         } else {
             mapView.setCenter(center, zoomLevel: zoom, animated: false)
         }
+        // The overlay draws the pins; the station layers would add every other station.
+        guard onProject == nil else { return }
         // Fires on every style load — everything runtime-added (images,
         // sources, layers) belongs to the style that loaded, so it all
         // re-registers here or a style swap loses it.
@@ -288,6 +290,16 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         }
         RunLoop.main.add(timer, forMode: .common)
         refreshTimer = timer
+    }
+
+    /// Per frame, deduplicated: the fitted camera only lands once the style
+    /// loads, and before that every coordinate projects somewhere meaningless.
+    func mapViewDidFinishRenderingFrame(_ mapView: MLNMapView, fullyRendered: Bool) {
+        guard let onProject, let framing, mapView.style != nil else { return }
+        let points = framing.map { mapView.convert($0, toPointTo: mapView) }
+        guard points != projected else { return }
+        projected = points
+        onProject(points)
     }
 
     /// The camera settled: rebuild the pins if it has left what was built
@@ -343,6 +355,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         let selectedID = selectedID
         let decimate = decimates
         Task { @MainActor [weak self, weak style] in
+
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
@@ -412,6 +425,9 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// A tap that hit open water instead of a pin — the preview card's
     /// dismissal path.
     var onDeselect: () -> Void = {}
+    /// Set, the map draws no station layers and reports where each `framing`
+    /// coordinate lands in its bounds, for an overlay to draw as pins.
+    var onProject: (([CGPoint]) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onSelect: onSelect, onMiss: onMiss, onDeselect: onDeselect)
@@ -432,14 +448,16 @@ struct MapViewRepresentable: UIViewRepresentable {
         // through, and every readout is placed for that camera.
         map.isRotateEnabled = false
         map.isPitchEnabled = false
-        map.showsUserLocation = LocationService.shared.authorized
+        // A test fix makes app ranking "authorized" without granting iOS location access.
+        map.showsUserLocation = [.authorizedWhenInUse, .authorizedAlways].contains(LocationService.shared.status)
         if framing != nil {
             map.isScrollEnabled = false
             map.isZoomEnabled = false
             map.isRotateEnabled = false
             map.isPitchEnabled = false
         }
-        context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing)
+        context.coordinator.install(on: map, center: center, zoom: zoom, framing: framing,
+                                    onProject: onProject)
         return map
     }
 
@@ -466,10 +484,11 @@ struct MapViewRepresentable: UIViewRepresentable {
         }
 
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
-                     framing: [CLLocationCoordinate2D]?) {
+                     framing: [CLLocationCoordinate2D]?, onProject: (([CGPoint]) -> Void)?) {
             self.map = map
             framed = framing != nil
-            styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing)
+            styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing,
+                               onProject: onProject)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }

@@ -45,6 +45,9 @@ enum AppGroup {
     static let nearestTideStationID = "slackwater:nearest-tide"
     static let nearestCurrentStationKey = "slackwater.nearestCurrentStation"
     static let nearestCurrentStationID = "slackwater:nearest-current"
+    /// Series-and-name → the station picked for it in the matching-station
+    /// chooser. The app folds it into the three nearest ids above.
+    static let chosenStationsKey = "slackwater.chosenStations"
     static let premiumKey = "slackwater.premium"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
 

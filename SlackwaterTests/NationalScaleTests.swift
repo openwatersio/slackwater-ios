@@ -141,7 +141,7 @@ final class NationalScaleTests: XCTestCase {
         let nearest = try XCTUnwrap(
             StationItem.nearest(.current, toLat: firstRunFix.lat, lon: firstRunFix.lon))
         XCTAssertEqual(nearest.item.series, .current)
-        // The first-run fix is Victoria Harbour — current-gate country.
+        // The first-run fix is Chesapeake Bay — current-station country.
         XCTAssertLessThan(nearest.km, nearbyStationRadiusKm)
     }
 
@@ -171,15 +171,15 @@ final class NationalScaleTests: XCTestCase {
     }
 
     /// The My Location cards cover both series where both exist, and never
-    /// advertise a series a coast doesn't have: Victoria gets a tide and a
+    /// advertise a series a coast doesn't have: Annapolis gets a tide and a
     /// current card, Portsmouth (nearest current: another continent) gets one.
     func testHeroItemsCoverBothSeriesOnlyWhereBothAreNear() {
-        let victoria = StationItem.heroItems(
+        let annapolis = StationItem.heroItems(
             ranked: StationItem.rankedByDistance(StationItem.all,
                                                  lat: firstRunFix.lat, lon: firstRunFix.lon),
             lat: firstRunFix.lat, lon: firstRunFix.lon)
-        XCTAssertEqual(victoria.count, 2)
-        XCTAssertEqual(Set(victoria.map(\.series)), [.tide, .current])
+        XCTAssertEqual(annapolis.count, 2)
+        XCTAssertEqual(Set(annapolis.map(\.series)), [.tide, .current])
 
         let portsmouth = StationItem.heroItems(
             ranked: StationItem.rankedByDistance(StationItem.all, lat: 50.80, lon: -1.11),
@@ -382,7 +382,7 @@ final class NationalScaleTests: XCTestCase {
         XCTAssertLessThan(service.queue.total, 60,
                           "the queue is the download set, not the 1,097-station catalog")
         XCTAssertGreaterThan(service.notQueued, 1_000, "the rest of Canada is on demand, not gone")
-        for (place, fix, ports, gates) in [("Victoria", firstRunFix, 6, 3),
+        for (place, fix, ports, gates) in [("Victoria", (lat: 48.4235, lon: -123.3705), 6, 3),
                                            ("Halifax", (lat: 44.65, lon: -63.57), 6, 0),
                                            ("Boston", (lat: 42.3601, lon: -71.0589), 0, 0),
                                            ("Detroit", (lat: 42.3314, lon: -83.0458), 0, 0)] {
@@ -495,7 +495,7 @@ final class NationalScaleTests: XCTestCase {
         // `StationListView.locatedSections`: hero is `ranked.first`, Near Me is
         // the next four when there is a fix.
         let firstScreen = 5
-        for (place, fix) in [("Victoria", firstRunFix),
+        for (place, fix) in [("Victoria", (lat: 48.4235, lon: -123.3705)),
                              ("Vancouver", (lat: 49.2867, lon: -123.1120)),
                              ("Nanaimo", (lat: 49.1659, lon: -123.9401))] {
             let (ranked, _) = RankedStations.near(lat: fix.lat, lon: fix.lon)
@@ -525,14 +525,15 @@ final class NationalScaleTests: XCTestCase {
     /// a coast away and a Nova Scotian must fetch none of them.
     @MainActor
     func testOnlinePrefetchIsBoundedLikeTheFitBudget() {
-        let victoria = ChsFitService.autoPrefetchGates(lat: firstRunFix.lat, lon: firstRunFix.lon)
+        let victoriaFix = (lat: 48.4235, lon: -123.3705)
+        let victoria = ChsFitService.autoPrefetchGates(lat: victoriaFix.lat, lon: victoriaFix.lon)
         XCTAssertFalse(victoria.isEmpty, "Victoria's nearest pass is 3.4 km away and must not be left to a tap")
         XCTAssertEqual(victoria.first?.id, "chs-tillicum-bridge",
                        "nearest first, like every other download decision")
         XCTAssertLessThanOrEqual(victoria.count, ChsFitService.autoFitGates)
         XCTAssertTrue(victoria.allSatisfy(\.isOnline), "a fittable gate belongs in the queue, not here")
         for gate in victoria {
-            XCTAssertLessThanOrEqual(distanceKm(gate.latitude, gate.longitude, firstRunFix.lat, firstRunFix.lon),
+            XCTAssertLessThanOrEqual(distanceKm(gate.latitude, gate.longitude, victoriaFix.lat, victoriaFix.lon),
                                      ChsFitService.autoFitRadiusKm)
         }
         XCTAssertTrue(ChsFitService.autoPrefetchGates(lat: 44.65, lon: -63.57).isEmpty,

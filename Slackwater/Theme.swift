@@ -383,6 +383,48 @@ func eclipseTileText(_ kind: LunarEclipseKind) -> String {
     }
 }
 
+/// The one-line gloss under the phase name in the Moon sheet. "Penumbral" is a
+/// term of art and reads as one; "gibbous" and "first quarter" are terms of art
+/// that do NOT, which is worse — the sheet prints them as if everyone knows.
+///
+/// Keyed on the displayed name rather than re-deriving anything, so
+/// `moonPhaseName` stays the only place the age thresholds live and this
+/// covers eclipse titles with the same switch. `SkyBackdropTests` pins the
+/// names, and pins that every one of them has a line here.
+func moonPhaseBlurb(_ name: String) -> String {
+    switch name {
+    case "New Moon": "Between us and the sun, so its lit side faces away."
+    case "Waxing Crescent": "A sliver, growing a little fuller each night."
+    case "First Quarter": "Half lit — a quarter of the way through the cycle."
+    case "Waxing Gibbous": "More than half lit, filling toward full."
+    case "Full Moon": "Opposite the sun, with the whole face we see lit."
+    case "Waning Gibbous": "Past full: more than half lit, and shrinking."
+    case "Last Quarter": "Half lit again, three quarters through the cycle."
+    case "Waning Crescent": "A thinning sliver, a few nights from new."
+    case "Penumbral Eclipse": "In Earth's faint outer shadow — a dimming, not a bite."
+    case "Partial Eclipse": "Part of the moon crossing Earth's dark inner shadow."
+    case "Total Eclipse": "Fully inside Earth's shadow, reddened by Earth's sunsets."
+    default: ""
+    }
+}
+
+/// Lunar geometry describes a tendency in tidal range, not a local height prediction.
+func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
+    let phaseTide: String? = switch moonPhaseName(phase: phase) {
+    case "New Moon", "Full Moon": "Spring tide"
+    case "First Quarter", "Last Quarter": "Neap tide"
+    default: nil
+    }
+    // Coastal tides can lag the astronomical event by a day or two.
+    if let perigee, abs(perigee.timeIntervalSince(at)) <= 2 * 86_400 {
+        return "Perigean \(phaseTide?.lowercased() ?? "tide")"
+    }
+    if let apogee, abs(apogee.timeIntervalSince(at)) <= 2 * 86_400 {
+        return "Apogean \(phaseTide?.lowercased() ?? "tide")"
+    }
+    return phaseTide
+}
+
 /// The moon glyph: the lit region over a dark disc that stays
 /// semi-transparent to show the sky. Lit on the right while waxing, the
 /// northern convention; the sky passes `waxing: true` and rotates toward the sun.
@@ -616,6 +658,7 @@ struct SummaryTiles: View {
     /// Read HERE, inside the presenting hierarchy where the scaffold set it,
     /// and handed to the sheet as a value — see `MoonDetailSheet.tz`.
     @Environment(\.timeZone) private var tz
+    @State private var apsides: (day: Date, perigee: Date?, apogee: Date?)?
 
     /// Non-nil only when the caller gave both somewhere to go and somewhere to
     /// stand: the sheet needs an `Observer`, and this view is the only thing
@@ -641,7 +684,11 @@ struct SummaryTiles: View {
             // Almanac throws only outside 1950–2101; the tile drops rather
             // than the row, so a primary reading still stands on its own.
             if let moon {
-                ReadoutTile(label: "Moon", caption: "\(Int((moon.fraction * 100).rounded()))% lit",
+                let day = dayLocal(at, tz)
+                let dates = apsides?.day == day ? apsides : nil
+                ReadoutTile(label: "Moon", caption: moonTideLabel(
+                    phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
+                    ?? "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon", detail: sheet) {
                     MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
                               umbra: eclipse?.shadow(at: at) ?? 0,
@@ -654,6 +701,12 @@ struct SummaryTiles: View {
                         .font(ReadoutType.tileText)
                 }
             }
+        }
+        .task(id: dayLocal(at, tz)) {
+            guard moon != nil else { return }
+            let day = dayLocal(at, tz)
+            let dates = await Task.detached(priority: .utility) { moonApsides(around: day) }.value
+            apsides = (day, dates.perigee, dates.apogee)
         }
     }
 }
@@ -696,7 +749,7 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
                 .foregroundStyle(captionColor)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -758,9 +811,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     var topBackdrop: AnyView? = nil
     @State private var topHeight: CGFloat = 0
     @State private var showPicker = false
-    /// A shared link's moment (`pendingScrubInstant`), held from this view's
-    /// appear until the caller's first timeline lands.
-    @State private var linkedInstant: Date?
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -841,24 +891,11 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .environment(\.timeZone, tz)
             .environment(\.openWeekPicker, { showPicker = true })
             .toolbar(.hidden, for: .navigationBar)
-            // A shared link's moment (#187). Taken on appear so it reaches only
-            // the detail the link opened, but APPLIED once the timeline exists:
-            // the caller's own onAppear sets the anchor and builds, and SwiftUI
-            // does not promise which onAppear runs first — a scrub set here
-            // would be built over. Waiting for the timeline is deterministic,
-            // and for an online gate it is also when there is anything to
-            // scrub.
-            .onAppear {
-                if let t = pendingScrubInstant ?? seededScrubInstant {
-                    pendingScrubInstant = nil
-                    linkedInstant = t
-                }
-            }
-            .onChange(of: timeline == nil) { _, isNil in
-                guard !isNil, let t = linkedInstant else { return }
-                linkedInstant = nil
-                jump(to: t)
-            }
+            // A shared link's moment (#187): on appear, and again if another
+            // link lands while this detail is already up — a second link to the
+            // open station re-pushes the same value, so nothing else re-appears.
+            .onAppear(perform: applyLinkedInstant)
+            .onChange(of: LinkedInstant.shared.pending) { _, _ in applyLinkedInstant() }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
                     // Park the centerline on the picked week when it isn't already
@@ -895,18 +932,36 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         }
     }
 
+    /// Scrub to the link's moment, if one is waiting for THIS station — or the
+    /// screenshot walk's seeded one (`seededScrubInstant`). Applied at once,
+    /// not after the caller's first timeline: an online gate only ever loads
+    /// the block covering its anchor, so a link into a cached week must set
+    /// the anchor before that lookup — and offline, with no block for today,
+    /// a timeline would never have come. SwiftUI does not promise whose
+    /// onAppear runs first, so the callers' own anchor set-up yields to an
+    /// anchor already placed (their `anchor == .distantPast` guards), and
+    /// `onPicked` builds or re-checks coverage around the new one.
+    private func applyLinkedInstant() {
+        guard let t = LinkedInstant.shared.take(for: favoriteId) ?? seededScrubInstant else { return }
+        jump(to: t)
+    }
+
     /// Park the centerline on `t`, moving the window when `t` is not on it.
     ///
     /// Shared by the two things that arrive holding an instant: a shared link
-    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is the
-    /// picker's rule inverted — move only when the moment isn't already on the
-    /// strip, so a jump to later today doesn't re-key the schedule off today.
+    /// (#187) and the Moon sheet's eclipse rows (#222). The window test is
+    /// `linkedAnchor`'s — the picker's rule inverted, so a jump to later today
+    /// doesn't re-key the schedule off today.
     private func jump(to t: Date) {
         scrubTime = t
-        let week = Timeline.window(anchor: anchor)
-        if t < week.start || t > week.end {
-            anchor = dayLocal(t, tz)
-            onPicked(anchor)
+        if let day = linkedAnchor(for: t, anchor: anchor, tz: tz) {
+            anchor = day
+            onPicked(day)
+        } else if anchor == .distantPast {
+            // Landed before the caller's own set-up. Place today's anchor
+            // anyway: a placed anchor is how the caller knows a moment is
+            // here, and opens its first build on `scrubTime` rather than now.
+            anchor = todayLocal(tz)
         }
     }
 
@@ -947,6 +1002,15 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .strokeBorder(SN.cardStroke, lineWidth: 0.5))
         .padding(.horizontal, 16)
     }
+}
+
+/// Where a shared link's moment `t` parks the window: nil when it is already
+/// on the strip hung from `anchor` (today's, when the detail has not set one
+/// yet), else the local midnight of its own day. The week picker's rule,
+/// inverted — a link to later today must not open on "not this week".
+func linkedAnchor(for t: Date, anchor: Date, tz: TimeZone) -> Date? {
+    let week = Timeline.window(anchor: anchor == .distantPast ? todayLocal(tz) : anchor)
+    return (t < week.start || t > week.end) ? dayLocal(t, tz) : nil
 }
 
 /// The span on screen, and the way to change it.
@@ -1289,6 +1353,31 @@ struct NearbyStationLink: View {
     }
 }
 
+/// A station page's link row: its tide or current link on the left, the
+/// chooser for its namesakes on the right.
+struct StationLinksRow<Leading: View>: View {
+    let stationId: String
+    @ViewBuilder let leading: () -> Leading
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let chooser = StationItem.byId[stationId].map { MatchingStationsLink(item: $0) }
+        // Side by side leaves neither half room at accessibility sizes.
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 12) {
+                leading()
+                chooser
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                leading()
+                chooser.fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+}
+
 /// The persisted Tides/Currents pick. Standard defaults, not the App Group:
 /// no widget reads it.
 let seriesFilterKey = "slackwater.seriesFilter"
@@ -1375,6 +1464,81 @@ final class RecentsStore: ObservableObject {
     /// The most recently opened station, which is the best guess at where the
     /// user is when Core Location has told us nothing.
     var lastOpened: StationItem? { items.first }
+}
+
+/// The station picked in the matching-station chooser, one per series and
+/// name. The list shows it in place of the nearest namesake (`RankedStations`),
+/// and the widget's nearest-station ids resolve to it
+/// (`LocationService.cacheNearestWidgetStation`). The App Group copy is this
+/// device's truth; iCloud carries picks between devices.
+final class ChosenStationsStore: ObservableObject {
+    static let shared = ChosenStationsStore()
+    static let cloudPrefix = "slackwater.pick."
+
+    @Published private(set) var ids: [String: String]
+
+    private init() {
+        ids = AppGroup.defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
+        // Nil under both kinds of test, like favourites (FavoritesCloud.store).
+        guard let cloud = FavoritesCloud.store else { return }
+        NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloud, queue: .main
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.adopt(cloud) } }
+        cloud.synchronize()
+        MainActor.assumeIsolated { self.adopt(cloud) }
+    }
+
+    /// One KVS key per place, so two devices picking for the same place
+    /// resolve last-writer-wins with no merge code (see FavoritesCloud). Keys
+    /// cap at 64 bytes and a place key can run past that, so it is hashed.
+    static func cloudKey(_ placeKey: String) -> String {
+        // FNV-1a: stable across launches and devices, unlike `hashValue`.
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in placeKey.utf8 { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }
+        return cloudPrefix + String(hash, radix: 16)
+    }
+
+    /// Place key → chosen id, out of `dictionaryRepresentation`. The place
+    /// comes from the id, and a pick for a station no longer bundled drops out.
+    static func picks(_ raw: [String: Any]) -> [String: String] {
+        var out: [String: String] = [:]
+        for (key, value) in raw where key.hasPrefix(cloudPrefix) {
+            guard let id = value as? String, let item = StationItem.byId[id] else { continue }
+            out[item.placeKey] = id
+        }
+        return out
+    }
+
+    @MainActor func choose(_ item: StationItem) {
+        guard ids[item.placeKey] != item.id else { return }
+        FavoritesCloud.store?.set(item.id, forKey: Self.cloudKey(item.placeKey))
+        var next = ids
+        next[item.placeKey] = item.id
+        apply(next)
+    }
+
+    /// The cloud's picks win their places. A place only this device has a
+    /// pick for is written up — how picks made before iCloud reach it.
+    @MainActor private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
+        let picks = Self.picks(cloud.dictionaryRepresentation)
+        for (place, id) in ids where picks[place] == nil {
+            cloud.set(id, forKey: Self.cloudKey(place))
+        }
+        apply(ids.merging(picks) { _, fromCloud in fromCloud })
+    }
+
+    @MainActor private func apply(_ next: [String: String]) {
+        guard next != ids else { return }
+        ids = next
+        AppGroup.defaults.set(ids, forKey: AppGroup.chosenStationsKey)
+        // Without a fix the widget ids catch up on the next one.
+        let loc = LocationService.shared
+        if loc.authorized, let c = loc.location?.coordinate,
+           LocationService.cacheNearestWidgetStation(lat: c.latitude, lon: c.longitude) {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
 }
 
 // MARK: - Favorites (current-detail spec §9; prototype TidesApp savedIds)
@@ -1556,8 +1720,12 @@ struct ListGroups {
 /// Favorites are deliberately *not* collapsed: a starred station is an
 /// explicit pick, and quietly swapping it for a nearer namesake would override
 /// a choice the user made on purpose.
+///
+/// A tide and a current station sharing a name are two places: the series is
+/// a separate choice everywhere else, and a filter on one series must not hide
+/// a station behind a namesake of the other.
 struct StationGroups {
-    /// Name -> every station carrying it, nearest first.
+    /// Series and name -> every station carrying them, nearest first.
     private let byName: [String: [StationItem]]
     /// Any station id -> the id that actually renders for its name.
     private let canonical: [String: String]
@@ -1567,12 +1735,16 @@ struct StationGroups {
     let shownIds: [String]
 
     /// `ranked` is the catalog sorted nearest-first, so the first station of a
-    /// name is the nearest one — the one shown.
-    init(ranked: [StationItem]) {
+    /// name is the nearest one — the one shown, unless `chosen` (placeKey → id,
+    /// `ChosenStationsStore`) names another station of that place.
+    init(ranked: [StationItem], chosen: [String: String] = [:]) {
         var byName: [String: [StationItem]] = [:]
-        for item in ranked { byName[item.name, default: []].append(item) }
+        for item in ranked { byName[item.placeKey, default: []].append(item) }
         self.byName = byName
-        let canonical = Dictionary(ranked.map { ($0.id, byName[$0.name]?.first?.id ?? $0.id) },
+        let shownForPlace = byName.mapValues { group in
+            group.first { $0.id == chosen[group[0].placeKey] }?.id ?? group[0].id
+        }
+        let canonical = Dictionary(ranked.map { ($0.id, shownForPlace[$0.placeKey] ?? $0.id) },
                                    uniquingKeysWith: { first, _ in first })
         self.canonical = canonical
         var seen = Set<String>()
@@ -1588,8 +1760,8 @@ struct StationGroups {
         return ids.map(shown).filter { seen.insert($0).inserted }
     }
 
-    /// Every station sharing this one's name, nearest first — the chooser's rows.
-    func matches(_ item: StationItem) -> [StationItem] { byName[item.name] ?? [item] }
+    /// Every station sharing this one's series and name, nearest first — the chooser's rows.
+    func matches(_ item: StationItem) -> [StationItem] { byName[item.placeKey] ?? [item] }
 }
 
 // MARK: - The distance-ranked catalog, memoised (M53)
@@ -1608,13 +1780,20 @@ enum RankedStations {
     private static var key = ""
     private static var ranked: [StationItem] = []
     private static var groups = StationGroups(ranked: [])
+    private static var chosen: [String: String] = [:]
 
+    /// A chooser pick regroups without re-sorting: the order depends on the fix alone.
     static func near(lat: Double, lon: Double) -> (ranked: [StationItem], groups: StationGroups) {
         let k = "\(Int((lat * 1000).rounded())),\(Int((lon * 1000).rounded()))"
-        if k != key {
+        let picks = ChosenStationsStore.shared.ids
+        let moved = k != key
+        if moved {
             key = k
             ranked = StationItem.rankedByDistance(StationItem.all, lat: lat, lon: lon)
-            groups = StationGroups(ranked: ranked)
+        }
+        if moved || picks != chosen {
+            chosen = picks
+            groups = StationGroups(ranked: ranked, chosen: picks)
         }
         return (ranked, groups)
     }

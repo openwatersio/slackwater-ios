@@ -122,7 +122,7 @@ enum WidgetStationLoader {
         guard let cacheKey else { return id }
         if let cached = defaults.string(forKey: cacheKey),
            StationItem.widgetItem(id: cached, locator: locator) != nil { return cached }
-        return fallbackStationID(defaults: defaults)
+        return fallbackStationID(defaults: defaults, locator: locator)
     }
 
     /// Current Location follows the app's latest fix and is the widget's
@@ -131,10 +131,14 @@ enum WidgetStationLoader {
         AppGroup.currentLocationStationID
     }
 
-    /// No fix: first favorite, else most-recent, else Friday Harbor.
-    static func fallbackStationID(defaults: UserDefaults = AppGroup.defaults) -> String {
-        defaults.stringArray(forKey: AppGroup.favoritesKey)?.first
-            ?? defaults.stringArray(forKey: AppGroup.recentsKey)?.first
+    /// No fix: first available favorite, else recent, else Friday Harbor.
+    static func fallbackStationID(
+        defaults: UserDefaults = AppGroup.defaults,
+        locator: CatalogFileLocator = .shared
+    ) -> String {
+        let exists = { StationItem.widgetItem(id: $0, locator: locator) != nil }
+        return defaults.stringArray(forKey: AppGroup.favoritesKey)?.first(where: exists)
+            ?? defaults.stringArray(forKey: AppGroup.recentsKey)?.first(where: exists)
             ?? TideStationRecord.fridayHarborID
     }
 }

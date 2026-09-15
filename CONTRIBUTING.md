@@ -29,6 +29,10 @@ An erased simulator is signed out of iCloud, so it starts with no favorites. Eac
 
 For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
 
+## User-facing copy
+
+Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
+
 ## Running the tests
 
 One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;
@@ -65,14 +69,6 @@ gh pr create --fill
 ```
 
 Before you open it, run `./scripts/test.sh` and say in the description what you changed and why. Small PRs get reviewed faster. Rebase or squash rather than merge-commit, and never force-push `main` — your own branches, freely.
-
-**Docs-only changes don't need a PR.** If your change touches no Swift, no `project.yml`, and no generated data, push the branch and share its URL instead of opening a PR:
-
-```sh
-git push -u origin docs/<topic>
-```
-
-CI skips the app lane for those automatically, so opening one is not expensive — it's just rarely useful when there's nothing to review.
 
 ## License and CLA
 

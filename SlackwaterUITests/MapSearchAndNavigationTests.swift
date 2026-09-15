@@ -38,9 +38,17 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.launchArguments = testArguments(["-resetGate"])
         app.launch()
 
-        XCTAssert(app.staticTexts["See tides near you"].appears(within: 10))
-        XCTAssert(app.buttons["Use My Location"].exists)
-        app.buttons["Or search for a harbor, bay, or channel."].tap()
+        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssertFalse(app.staticTexts["Find the water near you"].exists)
+        XCTAssert(app.staticTexts["Real example station"].exists)
+        XCTAssert(app.staticTexts["Friday Harbor"].exists)
+        XCTAssert(app.descendants(matching: .any)["25-hour curve"].firstMatch.appears(within: 5))
+        XCTAssert(app.staticTexts["Tide and Current predictions nearby."].exists)
+        XCTAssert(app.staticTexts["Keeps working offline."].exists)
+        XCTAssert(app.staticTexts["Your location stays on this device."].exists)
+        XCTAssert(app.buttons["Find tides near me"].exists)
+        save(app, "m4-gate.png")
+        app.buttons["Search for a place"].tap()
         let field = app.textFields.firstMatch
         XCTAssert(field.appears(within: 5), "gate bypass did not open search")
         XCTAssert(waitFor(field, "hasKeyboardFocus == true"),
@@ -52,7 +60,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.terminate()
         app.launchArguments = testArguments([])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
         XCTAssertFalse(app.textFields.firstMatch.exists,
                        "search must not reopen on relaunch — the handoff is one-shot")
     }
@@ -64,21 +72,16 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // tap handling for one kind when it split the same way — so both
     // layers must prove they reach the same tap handler. The pin's screen
     // point is pure web-mercator math from the fixed camera
-    // (center 48.35,-123.05 · zoom 7.35 · 512pt world tiles — MapScreen's
-    // SALISH constants; the styler re-asserts them after style load).
+    // (center 48.35,-123.05 · zoom 7.35 · 512pt world tiles); the launch hook
+    // fixes the camera for this test.
     func testM4MapPinToDetail() throws {
         for (lat, lon, name) in [
             (48.40618896484375, -122.64311981201172, "Deception Pass (Narrows)"),  // current → circle
             (48.48500061035156, -123.08300018310547, "Kanaka Bay"),                // NOAA tide → square
         ] {
-            // The map's opening camera follows a real fix, then the
-            // last-opened station, before SALISH_CENTER —
-            // and `tapPin`'s mercator math below assumes the camera IS
-            // SALISH_CENTER. Without `-resetRecents`, a station recorded by an
-            // earlier test in this run (UserDefaults persists across launches
-            // in the same simulator) reliably steals the camera and every tap
-            // below lands on the wrong pin.
-            let app = launch("-seedGate", "-resetRecents", "-locDenied")
+            // Pin coordinates below use this fixed Salish camera.
+            let app = launch("-seedGate", "-resetRecents", "-locDenied",
+                             "-mapCenter", "48.35,-123.05")
             app.buttons["Map"].tap()
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.appears(within: 5))
@@ -87,7 +90,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
             XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")
-            sleep(5)  // tiles + the camera settling before tapPin trusts SALISH_CENTER; neither reaches XCUITest
+            sleep(5)  // tiles + the camera settling before tapPin trusts the fixed camera
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
@@ -166,7 +169,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         openFridayHarbor(app)
         // The sidebar must still be on screen while the detail shows —
         // a split, not a push.
-        XCTAssert(app.staticTexts["Slackwater"].exists, "sidebar gone — not a split layout")
+        XCTAssert(stationList(app).exists, "sidebar gone — not a split layout")
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5))
         // A second pick replaces the detail (no stacking) — web sidebar behavior.
         openSearch(app, "deception")
@@ -190,7 +193,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         XCUIDevice.shared.orientation = .portrait
         settleLayout(app.windows.firstMatch)  // the rotation, by the window it resizes
-        XCTAssert(app.staticTexts["Slackwater"].exists, "portrait dropped the sidebar")
+        XCTAssert(stationList(app).exists, "portrait dropped the sidebar")
         save(app, "m44-ipad-portrait.png")
     }
 
@@ -243,7 +246,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Toggle back: list returns, the button is the map icon again.
         XCTAssert(app.buttons["List"].appears(within: 5))
         app.buttons["List"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
@@ -349,7 +352,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                           "a drag inside the strip no longer scrubs")
 
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the tide detail")
 
         // (b) current detail.
@@ -357,7 +360,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         assertCurrentDetailRendered(app)
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the current detail")
 
         // (c) the CHS waiting page — no chart at all, held there by the kill switch.
@@ -365,7 +368,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 10))
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the CHS waiting page")
 
         // (d) a derived gate — Malibu Rapids, likewise pending offline.
@@ -373,7 +376,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 10))
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the derived-gate detail")
 
         // Reaching the list after every detail verifies the shared edge-pop
@@ -394,7 +397,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["Pick a station"].exists,
                        "the placeholder is still what a fresh iPad launch shows")
         // The sidebar is intact — this is a selection, not a push.
-        XCTAssert(app.staticTexts["Slackwater"].exists)
+        XCTAssert(stationList(app).exists)
 
         // Don't fight the user: a deliberate pick stands, and coming back to
         // the list does not re-run the auto-select.
@@ -409,20 +412,20 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     /// it is not showing.
     func testM53SearchAtNationalScale() throws {
         // `-resetRecents` is load-bearing, not hygiene: the ranking anchor is
-        // fix -> RecentsStore.lastOpened -> firstRunFix, so "the Victoria
-        // fallback" this test asserts about only holds with no recents. The
-        // full plan runs testM53OnDemandCanadianStationFitsWhenOpened (Halifax)
+        // Fix -> recents -> fallback; use a Victoria fix for this ranking check.
+        // The full plan runs testM53OnDemandCanadianStationFitsWhenOpened (Halifax)
         // immediately before this, which leaves the anchor 4,500 km east with no
         // BC or WA port inside the truncated set. The fast plan skips that test,
         // so only the full run would go red.
-        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents")
+        let app = launch("-seedGate", "-networkKillSwitch", "-resetRecents",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         // "port" matches several hundred stations nationally.
         openSearch(app, "port")
         XCTAssert(app.descendants(matching: .any)["search-truncated"].firstMatch
                     .appears(within: 5),
                   "a query matching hundreds of stations must say it truncated")
-        // Nearest-first: from the Victoria fallback the top of the list is
+        // Nearest-first: from the Victoria fix the top of the list is
         // local water, not an alphabetical trip to Alaska.
         XCTAssert(app.staticTexts["Portage Inlet"].firstMatch.exists ||
                   app.staticTexts["Port Townsend"].firstMatch.exists,
@@ -471,7 +474,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Alaska, offline, with everything the bundle knows on it. The camera
         // is stated rather than pinched into place — five synthesised pinches
         // land somewhere no assertion can name.
-        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2"])
+        app.launchArguments = testArguments(["-seedGate", "-openMap", "-mapZoom", "3.2",
+                                             "-mapCenter", "48.35,-123.05"])
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))
@@ -495,6 +499,6 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")
         XCTAssert(app.buttons["My Location"].exists)
         app.buttons["List"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
     }
 }

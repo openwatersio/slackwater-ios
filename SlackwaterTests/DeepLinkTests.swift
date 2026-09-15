@@ -45,4 +45,11 @@ final class DeepLinkTests: XCTestCase {
     func testNoStationIDFallsBackToPremium() {
         XCTAssertEqual(deepLink(forStationID: nil), URL(string: "slackwater://premium"))
     }
+
+    func testConfiguredWidgetEntryDeepLinksToItsStation() {
+        let entry = SlackwaterEntry(date: .distantPast, snapshot: nil, card: nil,
+                                    premium: false, stationID: "current:noaa/CHB9904")
+        XCTAssertEqual(deepLink(entry),
+                       URL(string: "slackwater://station/current%3Anoaa%2FCHB9904"))
+    }
 }

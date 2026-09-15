@@ -157,7 +157,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // The sheet is gone — "Downloads" was its own nav title, so its
         // disappearance is the dismiss signal, not just the row. Checked last:
         // by now the dismiss animation has long since settled.
-        XCTAssertFalse(app.staticTexts["Downloads"].exists,
+        XCTAssertFalse(app.navigationBars["Downloads"].exists,
                        "tapping a row must dismiss the Downloads sheet")
     }
 
@@ -223,7 +223,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // throughout. The header's NAME is the tell: if the row's gesture had
         // fired instead of the button, it would have pushed Victoria
         // Harbour's detail, replacing what's shown.
-        XCTAssert(app.staticTexts["Downloads"].exists,
+        XCTAssert(app.navigationBars["Downloads"].exists,
                   "the row's onTapGesture must not have fired — the Retry button owns this tap")
         let header = app.otherElements["detail-header"].firstMatch
         if header.exists {
@@ -288,7 +288,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         // And the west coast, through the same path.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         openSearch(app, "san francisco")
         pickSearchResult(app, app.staticTexts["San Francisco (Golden Gate)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10))
@@ -326,7 +326,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
         // Opening it put it in the download set, at the front.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-halifax"].firstMatch
         XCTAssert(row.appears(within: 5),

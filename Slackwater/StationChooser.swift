@@ -1,5 +1,6 @@
 // Slackwater — GPL v3. The matching-station chooser: one place, every station
 // that answers for it.
+import CoreLocation
 import SwiftUI
 
 /// One place and every station that answers for it.
@@ -7,13 +8,9 @@ struct StationMatches: Identifiable, Hashable {
     let place: String
     /// Nearest first; always includes the entry that opened the chooser.
     let matches: [StationItem]
-    /// Set when the chooser is offering a replacement for a favorite whose
-    /// station left the bundle (issue #91): the dead id to swap out, and the
-    /// position the distances are measured from — where that station *was*,
-    /// not where the user is. A dead Haida Gwaii favorite offering Victoria
-    /// stations because that is where the phone happens to be is not an offer.
-    /// A struct rather than the tuple it wants to be: tuples aren't Hashable,
-    /// and this type is.
+    /// The station on screen for this place, selected when the chooser opens.
+    var shown: String? = nil
+    /// The removed station whose location anchors alternatives; its id is replaced if still favorited.
     struct Removed: Hashable {
         let id: String
         let lat: Double
@@ -21,21 +18,68 @@ struct StationMatches: Identifiable, Hashable {
     }
     var replacing: Removed? = nil
     var id: String { place }
+
+    /// "2 other current locations": counts only the stations not on screen,
+    /// short enough to share a row with the page's tide or current link.
+    static func linkText(others: Int, series: StationSeries) -> String {
+        "\(others) other \(series.rawValue) location\(others == 1 ? "" : "s")"
+    }
+}
+
+/// The chooser's entry point on a station page, beside its tide or current
+/// link (`StationLinksRow`). A pick is remembered for the list and widgets,
+/// and opens on top of this page when it is a different station.
+struct MatchingStationsLink: View {
+    let item: StationItem
+    @State private var place: StationMatches?
+    @Environment(\.openStationItem) private var open
+
+    var body: some View {
+        if let namesakes = StationItem.byPlace[item.placeKey], namesakes.count > 1 {
+            BranchLink(text: StationMatches.linkText(others: namesakes.count - 1, series: item.series),
+                       id: "matching-stations", chevron: false) {
+                let from = LocationService.shared.rankingAnchor
+                place = StationMatches(place: item.name,
+                                       matches: StationItem.rankedByDistance(namesakes, lat: from.lat, lon: from.lon),
+                                       shown: item.id)
+            }
+            .sheet(item: $place) { place in
+                let loc = LocationService.shared
+                StationChooserSheet(place: place, anchor: loc.rankingAnchor,
+                                    anchorName: loc.authorized && loc.location != nil ? "you" : nil) { picked in
+                    ChosenStationsStore.shared.choose(picked)
+                    if picked.id != item.id { open(picked) }
+                }
+            }
+        }
+    }
 }
 
 /// The matching-station chooser (web `StationChooser.tsx`, list-side): where
-/// several stations share a name, the list shows the nearest and this says so
-/// rather than silently hiding the rest. Each row carries the two things that
-/// aren't the name — what it measures (tide or current, NOAA or CHS) and how
-/// far it is — so the pick is informed rather than a guess between identical
-/// labels.
+/// several stations of one series share a name, the list shows the nearest
+/// and this offers the rest. Alternatives are optional, so it opens on the
+/// shown station and explains the default instead of asking for a pick. A
+/// map places every candidate; a pin selects its row, a row opens its station.
 struct StationChooserSheet: View {
     let place: StationMatches
     let anchor: (lat: Double, lon: Double)
+    /// Who or what `anchor` is, for "2.1 nm from you". Nil hides distances:
+    /// measured from a last-opened station, they would read as from the user.
+    let anchorName: String?
     let onPick: (StationItem) -> Void
+    @State private var selected: String?
+    /// Where each match lands on the map, in `place.matches` order.
+    @State private var pinPoints: [CGPoint] = []
     @Environment(\.dismiss) private var dismiss
-    // Glyph-in-slot sizing (issue #14): the glyph
-    // scales with type, the slot scales with it so it can't overflow the row.
+
+    init(place: StationMatches, anchor: (lat: Double, lon: Double), anchorName: String?,
+         onPick: @escaping (StationItem) -> Void) {
+        self.place = place
+        self.anchor = anchor
+        self.anchorName = anchorName
+        self.onPick = onPick
+        _selected = State(initialValue: place.shown)
+    }
 
     var body: some View {
         ZStack {
@@ -46,7 +90,7 @@ struct StationChooserSheet: View {
                         Text(place.place)
                             .font(.title.weight(.semibold))
                             .foregroundStyle(SN.paper)
-                        Text("\(place.matches.count) stations answer for this place — pick the one you mean.")
+                        Text(explanation)
                             .font(.footnote)
                             .foregroundStyle(SN.foam.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
@@ -66,17 +110,91 @@ struct StationChooserSheet: View {
                 .padding(.top, 24)
                 .padding(.bottom, 16)
 
-                ScrollView {
-                    VStack(spacing: 10) {
-                        ForEach(place.matches) { row($0) }
+                if !place.matches.isEmpty {
+                    map
+                        .frame(height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
+
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 10) {
+                            ForEach(place.matches) { row($0).id($0.id) }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
+                    // A nil anchor scrolls only as far as the row needs.
+                    .onChange(of: selected) { _, id in
+                        withAnimation { proxy.scrollTo(id) }
+                    }
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // Full height: the map and the rows under it need the room.
+        .presentationDetents([.large])
         .accessibilityIdentifier("station-chooser")
+    }
+
+    private var explanation: String {
+        if place.replacing != nil {
+            return "These stations are nearest to where it was. Pick one to use instead."
+        }
+        let review = "Review the other locations if you need predictions for a different part of the water."
+        guard let shown = place.matches.first(where: { $0.id == place.shown }) else { return review }
+        // "Closest" only holds when the distances are measured from a named point.
+        let lead = anchorName != nil && shown.id == place.matches.first?.id
+            ? "Slackwater is showing the closest station."
+            : "Slackwater is showing \(shown.placeLabel)."
+        return lead + " " + review
+    }
+
+    /// Pins are SwiftUI views over the map rather than map layers, so one
+    /// view carries the tap, the selection ring, and the VoiceOver element.
+    private var map: some View {
+        let lats = place.matches.map(\.latitude)
+        let lons = place.matches.map(\.longitude)
+        // Centred on the matches' bounds, so framing them fits exactly those bounds.
+        let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2,
+                                            longitude: (lons.min()! + lons.max()!) / 2)
+        return MapViewRepresentable(center: center,
+                                    framing: place.matches.map {
+                                        CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                                    },
+                                    onSelect: { _ in },
+                                    onProject: { pinPoints = $0 })
+            .overlay(alignment: .topLeading) {
+                ForEach(pinPoints.indices, id: \.self) { i in
+                    pin(place.matches[i]).position(pinPoints[i])
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("chooser-map")
+    }
+
+    private func pin(_ item: StationItem) -> some View {
+        let isSelected = item.id == selected
+        let shape = item.series == .tide ? AnyShape(Rectangle()) : AnyShape(Circle())
+        return Button { selected = item.id } label: {
+            ZStack {
+                if isSelected {
+                    Circle().strokeBorder(SN.leaf, lineWidth: 2.5).frame(width: 26, height: 26)
+                }
+                shape.fill(SN.paper)
+                    .overlay(shape.stroke(SN.canvas, lineWidth: 1.5))
+                    .frame(width: 10, height: 10)
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(spoken(item))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("chooser-pin")
     }
 
     private func row(_ item: StationItem) -> some View {
@@ -84,13 +202,27 @@ struct StationChooserSheet: View {
             onPick(item)
             dismiss()
         } label: {
-            // The name is the same on every row — the qualifier is the whole
-            // point, so it leads.
-            StationChoiceRow(title: item.region.isEmpty ? item.name : item.region,
+            StationChoiceRow(title: item.placeLabel,
                              caption: item.kindLabel,
-                             distance: formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))
+                             distance: distance(item),
+                             note: item.id == place.shown ? "Shown" : nil,
+                             selected: item.id == selected)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(item.id == selected ? .isSelected : [])
+        .accessibilityIdentifier("chooser-station")
+    }
+
+    /// "2.1 nm from you", or empty without an `anchorName`.
+    private func distance(_ item: StationItem) -> String {
+        guard let anchorName else { return "" }
+        return "\(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon))) from \(anchorName)"
+    }
+
+    private func spoken(_ item: StationItem) -> String {
+        [item.placeLabel, distance(item), item.id == place.shown ? "currently shown" : ""]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 }
 
@@ -100,6 +232,9 @@ struct StationChoiceRow: View {
     let title: String
     let caption: String
     let distance: String
+    /// A leaf mark after the caption, such as the chooser's "Shown".
+    var note: String? = nil
+    var selected = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -109,7 +244,10 @@ struct StationChoiceRow: View {
                     .foregroundStyle(SN.paper)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                MonoLabel(text: caption, color: SN.foam.opacity(0.55), tracking: 1.1)
+                HStack(spacing: 8) {
+                    MonoLabel(text: caption, color: SN.foam.opacity(0.55), tracking: 1.1)
+                    if let note { MonoLabel(text: note, tracking: 1.1) }
+                }
             }
             Spacer(minLength: 8)
             Text(distance)
@@ -119,10 +257,10 @@ struct StationChoiceRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.05),
+        .background(Color.white.opacity(selected ? 0.1 : 0.05),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(SN.leaf.opacity(0.16), lineWidth: 0.5))
+            .strokeBorder(selected ? SN.leaf : SN.leaf.opacity(0.16), lineWidth: selected ? 1.5 : 0.5))
         .contentShape(Rectangle())
     }
 }

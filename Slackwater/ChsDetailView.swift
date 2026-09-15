@@ -150,6 +150,10 @@ struct ChsWaitingView: View {
             .ignoresSafeArea(edges: .top)
             .background(CanvasBackground())
             .toolbar(.hidden, for: .navigationBar)
+            // A shared link's moment stops here: there is no strip to scrub,
+            // and left waiting it would follow the user to whichever station
+            // they open next (a list row pushes without resetting it).
+            .onAppear { _ = LinkedInstant.shared.take(for: favoriteId) }
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         }
     }
@@ -247,7 +251,7 @@ struct ChsAmberCard: View {
     var icon = "exclamationmark.triangle.fill"
     /// Amber is this app's warning language and the comment on `unavailableCard`
     /// keeps it scarce on purpose. An invitation is not a warning: the location
-    /// ask card passes leaf, the same green the gate's own "Use My Location"
+    /// ask card passes leaf, the same green the gate's location
     /// button uses, so a user who simply never opted in isn't nagged in the
     /// colour reserved for something being wrong. `status` still wins when set.
     var accent = SN.amber

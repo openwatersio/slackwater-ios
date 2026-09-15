@@ -138,6 +138,23 @@ jobs:
         working-directory: tools
         run: node --test
 
+  feedback:
+    name: TestFlight intake
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+        working-directory: services/testflight-feedback
+      - run: npm test
+        working-directory: services/testflight-feedback
+      - run: npm run check
+        working-directory: services/testflight-feedback
+
   app:
     name: App tests · ${{ matrix.shard.name }}
     needs: changes

@@ -4,14 +4,6 @@
 import SwiftUI
 import WidgetKit
 
-struct SlackwaterEntry: TimelineEntry {
-    let date: Date
-    let snapshot: WidgetSnapshot?   // nil: unknown/unfitted station
-    let card: WidgetCard?           // the medium widget's inputs
-    let premium: Bool
-    let stationID: String?          // for the widget's deepLink (Task 9)
-}
-
 struct StationProvider: AppIntentTimelineProvider {
     private func entry(_ intent: StationConfigIntent, at date: Date) -> SlackwaterEntry {
         let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()

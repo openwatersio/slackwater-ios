@@ -46,13 +46,15 @@ struct StationListView: View {
     @ObservedObject private var loc = LocationService.shared
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var chosen = ChosenStationsStore.shared
     // Size class, not device, picks the layout (web styles.css breakpoints):
     // regular = the ≥62rem persistent-sidebar grid; compact = the phone stack.
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
     @Environment(\.horizontalSizeClass) private var hSize
 
-    /// The place whose matching stations the chooser is offering, if open.
+    /// The replacement chooser for a tombstoned station, if open.
     @State private var chooser: StationMatches?
+    @State private var linkedRemovedStationID: String?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
     /// The real, fixed FAB footprint — named so the clearance below is tied
@@ -90,7 +92,7 @@ struct StationListView: View {
         return (l.coordinate.latitude, l.coordinate.longitude)
     }
     /// What distances are measured from: the fix, then the last-opened
-    /// station, then the Victoria fallback on a genuine first run.
+    /// station, then the Chesapeake Bay fallback on a genuine first run.
     private var anchor: (lat: Double, lon: Double) { loc.rankingAnchor }
 
     /// One definition, two attachment points (the root `.environment` below,
@@ -181,7 +183,9 @@ struct StationListView: View {
         .onOpenURL(perform: handleDeepLink)
         .sheet(item: $chooser) { place in
             StationChooserSheet(place: place,
-                                anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor) { item in
+                                anchor: place.replacing.map { (lat: $0.lat, lon: $0.lon) } ?? anchor,
+                                // Distances are from where the removed station was, named only when its tombstone can.
+                                anchorName: place.replacing.flatMap { StationTombstone.byId[$0.id]?.name }) { item in
                 if let dead = place.replacing?.id { favorites.replace(dead, with: item.id) }
                 open(item)
             }
@@ -206,7 +210,7 @@ struct StationListView: View {
         // the next launch.
         //
         // `anchor`, not `fix` (#178): the list ranks from `rankingAnchor` —
-        // fix, then last-opened, then Victoria — and adopting only on a live
+        // fix, then last-opened, then Chesapeake Bay — and adopting only on a live
         // fix would give a user who denied location, or whose fix has not
         // landed yet, a Near Me list ranked around one place and a download
         // set built around another: every row on the first screen reading
@@ -320,7 +324,8 @@ struct StationListView: View {
     private var firstListItem: StationItem? {
         let a = anchor
         if fix == nil, let favorite = items(favorites.ids).first { return favorite }
-        return RankedStations.near(lat: a.lat, lon: a.lon).ranked.first
+        let near = RankedStations.near(lat: a.lat, lon: a.lon)
+        return near.ranked.first.flatMap { StationItem.byId[near.groups.shown($0.id)] }
     }
 
     /// The content pane before any pick — same canvas, an invitation, not blank.
@@ -343,7 +348,7 @@ struct StationListView: View {
     }
 
     /// The list surface both layouts share: canvas + grouped List. Search
-    /// lives on the floating button — no top bar.
+    /// lives on the floating button; utilities are at the end of the list.
     private var listPane: some View {
             ZStack {
                 CanvasBackground()
@@ -352,8 +357,12 @@ struct StationListView: View {
                 // no separators, no insets.
                 List {
                     Group {
-                        header
+                        if let id = linkedRemovedStationID {
+                            sectionLabel("Station unavailable")
+                            removedCard(id).padding(.bottom, 12)
+                        }
                         locatedSections
+                        footer
                         // max: never shrinks below the intended footprint + margin at small text sizes.
                         Color.clear.frame(height: max(fabClearance, Self.fabClearanceBase))  // scroll clear of the FABs
                     }
@@ -396,9 +405,8 @@ struct StationListView: View {
                     ?? RecentsStore.shared.lastOpened.map {
                         CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
                     }
-                    // SALISH_CENTER only survives to here on a genuine first
-                    // run: no fix, nothing ever opened.
-                    ?? SALISH_CENTER,
+                    // Match the list's first-run ranking area.
+                    ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
                 selected: mapPreview,
                 onSelect: { item in withAnimation(.snappy) { mapPreview = item } },
@@ -493,7 +501,19 @@ struct StationListView: View {
         case "premium": showWidgetsGallery = true
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
-            if let item = StationItem.byId[stationID(from: url)] { open(item) }
+            let id = stationID(from: url)
+            if let item = StationItem.byId[id] {
+                open(item)
+            } else if StationTombstone.byId[id] != nil {
+                path = NavigationPath()
+                showMap = false
+                showSettings = false
+                showDownloads = false
+                showWidgetsGallery = false
+                searching = false
+                chooser = nil
+                linkedRemovedStationID = id
+            }
         default: break
         }
     }
@@ -505,7 +525,8 @@ struct StationListView: View {
     /// `at` is the moment a shared link carried; the pushed detail scrubs to
     /// it (ScrubDetailScaffold). Nil — every other caller — means "now".
     private func open(_ item: StationItem, at instant: Date? = nil) {
-        pendingScrubInstant = instant
+        linkedRemovedStationID = nil
+        LinkedInstant.shared.pending = instant.map { .init(station: item.id, at: $0) }
         // Regular width: the sidebar (and its focused search field) stays on
         // screen when a detail opens, so the keyboard would sit over the new
         // detail — drop it. On iPhone the push dismisses it anyway.
@@ -524,9 +545,9 @@ struct StationListView: View {
         }
     }
 
-    // The list: My Location → Favorites → Near Me → Recents, nothing else —
+    // The stations: My Location → Favorites → Near Me → Recents —
     // search is the discovery path for the rest of the catalog. Without a fix
-    // the ranking anchors on the Victoria fallback, and the My Location slot
+    // the ranking anchors on the Chesapeake Bay fallback, and the My Location slot
     // holds the amber denied card when location is off. Dedupe: ListGroups —
     // each station renders once, My Location > Favorites > Near Me > Recents.
     @ViewBuilder private var locatedSections: some View {
@@ -534,20 +555,23 @@ struct StationListView: View {
         // Ranked once per fix, not once per render (RankedStations).
         // Same-named stations collapse to their nearest in Near Me only;
         // Recents are uncollapsed (explicit picks stay exact). The rest are behind
-        // the chooser.
+        // the chooser on each station page, and a pick there is the one shown.
         let (ranked, places) = RankedStations.near(lat: anchor.lat, lon: anchor.lon)
         // Both series under My Location: the nearest station plus the nearest
         // of the other series inside the nearby radius — "closest" must not
         // mean tide or current by accident of geography.
+        // A chosen namesake stands in for the nearest here too, as in Near Me.
         let heroItems = fix == nil ? []
             : StationItem.heroItems(ranked: ranked, lat: anchor.lat, lon: anchor.lon)
+                .compactMap { StationItem.byId[places.shown($0.id)] }
         // The filter narrows Near Me only. The hero cards stay unfiltered
         // (they answer "where am I", not "what am I looking for"), and
         // Favorites/Recents are explicit picks a filter must not hide.
         let nearIds = seriesFilter.map { series in
             places.shownIds.filter { StationItem.byId[$0]?.series == series }
         } ?? places.shownIds
-        let groups = ListGroups(heroIds: heroItems.map(\.id), favoriteIds: favorites.ids,
+        let groups = ListGroups(heroIds: heroItems.map(\.id),
+                                favoriteIds: favorites.ids.filter { $0 != linkedRemovedStationID },
                                 // Uncollapsed on purpose: a station opened via the chooser is an explicit
                                 // pick, same principle StationGroups grants Favorites — collapsing it
                                 // would let Recents silently show and reopen the nearest namesake
@@ -563,10 +587,7 @@ struct StationListView: View {
         Group {
             if let fix, !heroItems.isEmpty {
                 MyLocationTile(items: heroItems, fix: fix, imperial: imperial) { item in
-                    VStack(spacing: 0) {
-                        itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
-                        matchingButton(item, places)
-                    }
+                    itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
                 }
                     .transition(.opacity)
             } else if loc.authorized {
@@ -612,20 +633,12 @@ struct StationListView: View {
                 } else {
                     removedCard(id)  // ChsAmberCard brings its own horizontal inset
                         .padding(.bottom, 12)
-                        // Red destructive, unlike a live favorite's neutral
-                        // unfavorite: there is no Recents to re-file to, so
-                        // this really is deletion and says so.
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { favorites.forget(id) } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
                 }
             }
         }
 
         HStack(alignment: .firstTextBaseline) {
-            MonoLabel(text: "Near Me")
+            MonoLabel(text: fix == nil && recents.lastOpened == nil ? "Chesapeake Bay" : "Near Me")
             Spacer(minLength: 8)
             SeriesFilterChips()
         }
@@ -633,15 +646,9 @@ struct StationListView: View {
         .padding(.top, 14)
         .padding(.bottom, 4)
         ForEach(items(groups.nearMe)) { item in
-            VStack(spacing: 0) {
-                itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
-                matchingButton(item, places)
-            }
+            itemCard(item, km: item.km(fromLat: anchor.lat, lon: anchor.lon))
                 .padding(.horizontal, 16)
-                // 8 + 4 = the 12pt gap Favorites gets from its single
-                // `.padding(.bottom, 12)`. Split across the two edges because a
-                // Near Me row is a card *plus* its matching-stations link, and
-                // the link needs the slack under it, not over it.
+                // 8 + 4 = the 12pt gap Favorites gets from its single `.padding(.bottom, 12)`.
                 .padding(.top, 8)
                 .padding(.bottom, 4)
                 .swipeActions(edge: .leading) {
@@ -652,17 +659,14 @@ struct StationListView: View {
                 }
         }
 
-        // Recents at the very bottom: recently viewed, most recent
+        // Recents after Near Me: recently viewed, most recent
         // first, minus everything already shown above. Same cards as Near Me;
         // no distance — a recent is an explicit pick, not a ranked one.
         let recentItems = items(groups.recents)
         if !recentItems.isEmpty {
             sectionLabel("Recents")
             ForEach(recentItems) { item in
-                VStack(spacing: 0) {
-                    itemCard(item)
-                    matchingButton(item, places)
-                }
+                itemCard(item)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
@@ -694,22 +698,6 @@ struct StationListView: View {
             .padding(.bottom, 4)
     }
 
-    /// The matching-station chooser's entry point: a quiet link-styled line
-    /// under an entry whose name several stations share (the web chooser's
-    /// toggle — "not right?"). Renders nothing when the name is unique, since
-    /// an affordance offering one option is noise (web StationChooser).
-    @ViewBuilder private func matchingButton(_ item: StationItem, _ places: StationGroups) -> some View {
-        let matches = places.matches(item)
-        if matches.count > 1 {
-            BranchLink(text: "\(matches.count) matching stations",
-                       id: "matching-stations", chevron: false) {
-                chooser = StationMatches(place: item.name, matches: matches)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 7)
-        }
-    }
-
     /// Row activation in both layouts: the tap drives the path directly, never
     /// a hidden NavigationLink behind the card. The My Location tile is ONE
     /// List row holding two cards, and a row activates every link inside it —
@@ -735,30 +723,33 @@ struct StationListView: View {
         }
     }
 
-    /// A favorite whose station has left the bundle (issue #91). Stations come
-    /// and go — CHS withdrew 28 in one release — and a starred one that simply
-    /// stopped appearing is the worst of the options: no crash, no row, no
-    /// explanation, and a dead id sitting in UserDefaults forever. So the row
-    /// stays, says what happened, and offers the nearest stations to where that
-    /// station used to be.
-    ///
-    /// The tombstone list is what makes the name renderable at all; without one
-    /// (a favorite from a bundle older than tombstones, say) the card is
-    /// nameless and the replacements come from where the user is instead.
+    /// Explains a tombstoned station and offers alternatives near its last location.
     @ViewBuilder private func removedCard(_ id: String) -> some View {
         let gone = StationTombstone.byId[id]
         let origin = gone.map { (lat: $0.latitude, lon: $0.longitude) } ?? anchor
+        let isFavorite = favorites.contains(id)
         ChsAmberCard(title: gone?.name ?? "Station removed",
                      headline: gone.map { "\($0.region) — no longer published." }
                         ?? "This station is no longer published.",
                      expectation: "It has been withdrawn from the hydrographic "
-                        + "service, so it has no readings to show. Swipe to remove it.",
-                     action: "Pick a replacement",
+                        + "service, so it has no readings to show."
+                        + (isFavorite ? " Swipe to remove it." : ""),
+                     action: isFavorite ? "Pick a replacement" : "Pick another station",
                      identifier: "removed-station-card",
                      icon: "mappin.slash") {
             chooser = StationMatches(place: gone?.name ?? "Removed station",
                                      matches: nearest(to: origin),
                                      replacing: .init(id: id, lat: origin.lat, lon: origin.lon))
+        }
+        .swipeActions(edge: .trailing) {
+            if isFavorite {
+                Button(role: .destructive) {
+                    favorites.forget(id)
+                    if linkedRemovedStationID == id { linkedRemovedStationID = nil }
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
         }
     }
 
@@ -776,9 +767,9 @@ struct StationListView: View {
     /// action is the ask itself, not a trip to Settings: `.notDetermined` is
     /// the one state iOS still lets the app prompt from.
     private var askCard: some View {
-        ChsAmberCard(title: "See stations near you",
-                     headline: "Turn on location to find the nearest tide & current stations.",
-                     action: "Use My Location",
+        ChsAmberCard(title: "Tides and currents near you",
+                     headline: "Turn on location to put nearby predictions first.",
+                     action: "Find tides near me",
                      identifier: "location-ask-card",
                      icon: "location.fill",
                      accent: SN.leaf) {
@@ -790,7 +781,7 @@ struct StationListView: View {
     /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
         ChsAmberCard(title: "Location unavailable",
-                     headline: "Turn on location for Slackwater to see stations near you.",
+                     headline: "Turn on location in Settings to find nearby tides and currents.",
                      action: "Go to Settings",
                      identifier: "location-denied-card",
                      icon: "location.slash") {
@@ -800,35 +791,41 @@ struct StationListView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            Text("Slackwater")
-                .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(SN.paper)
-                // The wordmark never wraps: in the 320pt iPad sidebar it shares
-                // the row with two 34pt buttons and would break as "Slackwat/er".
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .layoutPriority(1)
-            Spacer(minLength: 8)
-            // Offline / online / downloading, beside the gear — and the way in
-            // to the downloads manager (web OfflineStatus).
-            OfflineStatusButton { showDownloads = true }
-            // Units live in Settings only — no list-header pill.
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(SN.foam.opacity(0.8))
-                    .frame(width: 34, height: 34)
-                    .background(Color.white.opacity(0.08), in: Circle())
+    private var footer: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 0) {
+                OfflineStatusButton { showDownloads = true }
+                Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
+                Button {
+                    showSettings = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "gearshape").frame(width: 28)
+                        Text("Settings")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.4))
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)  // List rows: keep the tap on the gear itself
-            .accessibilityLabel("Settings")
+            .font(.body)
+            .foregroundStyle(SN.foam)
+            .padding(.horizontal, 16)
+            .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 20))
+
+            VStack(spacing: 4) {
+                Text("Slackwater").font(.subheadline.weight(.semibold))
+                Text("by Open Waters").font(.caption)
+            }
+            .foregroundStyle(SN.foam.opacity(0.55))
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 6)
+        .padding(.horizontal, 16)
+        .padding(.top, 24)
     }
 
     // MARK: - Floating toolbar (search bottom-left over the list, My Location
@@ -1076,10 +1073,8 @@ struct MyLocationTile<Card: View>: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(SN.foam.opacity(0.55))
                     // Deliberately neither shrunk to fit nor line-limited: the
-                    // wordmark is the only text in the app allowed to scale
-                    // down (TypeScaleTests `testOnlyTheWordmarkShrinks` — a
-                    // line scan, so naming the modifier here would fail it),
-                    // and a truncated position is worse than a wrapped one.
+                    // A truncated position is worse than a wrapped one,
+                    // and no app text shrinks to fit (TypeScaleTests).
                     // At the largest accessibility sizes this wraps and the
                     // row grows.
             }

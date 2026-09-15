@@ -14,6 +14,7 @@ final class DeepLinkUITests: ScreenshotTestCase {
     /// "noaa/9449880" percent-encoded exactly as `deepLink(forStationID:)`
     /// encodes it — the "/"-bearing shape, which is every id but CHS.
     private let fridayHarbor = URL(string: "slackwater://station/noaa%2F9449880")!
+    private let removedStation = URL(string: "slackwater://station/chs-north-galiano")!
 
     /// `system.open` routes through SpringBoard, which asks before handing a
     /// custom scheme to an app. Tap through it so the test measures the app and
@@ -32,7 +33,10 @@ final class DeepLinkUITests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(args)
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10),
+        let firstScreen = args.contains("-resetGate")
+            ? app.staticTexts["Tide and Current predictions nearby."].firstMatch
+            : stationList(app)
+        XCTAssert(firstScreen.appears(within: 10),
                   "app did not finish launching before the deep link")
         app.terminate()
         return app
@@ -60,5 +64,31 @@ final class DeepLinkUITests: ScreenshotTestCase {
         let app = primeThenTerminate("-resetGate")
         openDeepLink(fridayHarbor)
         assertStationDetail(app, "deep link was dropped on the first-run gate")
+    }
+
+    func testDeepLinkToRemovedStationShowsItsExplanation() {
+        let app = primeThenTerminate("-seedGate", "-resetFavorites", "-resetRecents")
+        openDeepLink(removedStation)
+
+        XCTAssert(app.wait(for: .runningForeground, timeout: 20),
+                  "the deep link did not launch the app")
+        XCTAssert(app.descendants(matching: .any)["removed-station-card"].firstMatch
+            .appears(within: 10), "the removed station deep link opened an unexplained list")
+        XCTAssert(app.staticTexts["North Galiano"].firstMatch.exists,
+                  "the removed station explanation did not use its tombstone")
+    }
+
+    func testDeepLinkToRemovedStationClosesSearch() {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-seedGate", "-resetFavorites", "-resetRecents"])
+        app.launch()
+        openSearch(app, "Friday")
+
+        openDeepLink(removedStation)
+
+        XCTAssert(app.textFields.firstMatch.disappears(within: 10),
+                  "search stayed over the removed station explanation")
+        XCTAssert(app.descendants(matching: .any)["removed-station-card"].firstMatch
+            .appears(within: 10), "the warm deep link did not reveal the removed station")
     }
 }

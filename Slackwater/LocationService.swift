@@ -6,13 +6,12 @@ import WidgetKit
 
 let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
 
-/// Victoria Harbour — the last-resort ranking anchor, used only on a first run
+/// Annapolis, Chesapeake Bay — the last-resort ranking anchor, used only on a first run
 /// with no fix and nothing opened yet. Everywhere else the anchor follows the
 /// user: a real fix first, then the station they last opened (prototype
 /// NearMe.dc.html FALLBACK: denied/undetermined still gets a Near Me list).
-/// Before world coverage this was `fallbackFix` and it was the ONLY fallback,
-/// which is why the app opened in the Solent and ranked from Vancouver Island.
-let firstRunFix = (lat: 48.4235, lon: -123.3705)
+/// NOAA tides and currents here ship with the app and work on first launch.
+let firstRunFix = (lat: 38.9750, lon: -76.4550)
 
 final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = LocationService()
@@ -74,7 +73,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
             && (status == .denied || status == .restricted))
     }
 
-    /// The gate's "Use My Location": ask, or refresh if already authorized.
+    /// The gate's location action: ask, or refresh if already authorized.
     func request() {
         guard Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
                 && !Self.testUndetermined else { return }
@@ -129,26 +128,30 @@ extension LocationService {
 
     /// One pass over the catalog caches all three "nearest" ids the widget
     /// sentinels resolve through: any series, nearest tide, nearest current.
-    /// True when any of them changed — the caller's reload signal.
+    /// A namesake picked in the chooser stands in for the nearest, as it does
+    /// in the list. True when any of them changed — the caller's reload signal.
     static func cacheNearestWidgetStation(
         lat: Double, lon: Double, defaults: UserDefaults = AppGroup.defaults
     ) -> Bool {
-        var any: (km: Double, id: String)?
-        var tide: (km: Double, id: String)?
-        var current: (km: Double, id: String)?
+        var any: (km: Double, item: StationItem)?
+        var tide: (km: Double, item: StationItem)?
+        var current: (km: Double, item: StationItem)?
         for item in StationItem.all {
             let km = item.km(fromLat: lat, lon: lon)
-            if any == nil || km < any!.km { any = (km, item.id) }
+            if any == nil || km < any!.km { any = (km, item) }
             switch item.series {
-            case .tide: if tide == nil || km < tide!.km { tide = (km, item.id) }
-            case .current: if current == nil || km < current!.km { current = (km, item.id) }
+            case .tide: if tide == nil || km < tide!.km { tide = (km, item) }
+            case .current: if current == nil || km < current!.km { current = (km, item) }
             }
         }
+        let chosen = defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
         var changed = false
         for (nearest, key) in [(any, AppGroup.currentLocationStationKey),
                                (tide, AppGroup.nearestTideStationKey),
                                (current, AppGroup.nearestCurrentStationKey)] {
-            guard let id = nearest?.id, defaults.string(forKey: key) != id else { continue }
+            guard let item = nearest?.item else { continue }
+            let id = chosen[item.placeKey].flatMap { StationItem.byId[$0]?.id } ?? item.id
+            guard defaults.string(forKey: key) != id else { continue }
             defaults.set(id, forKey: key)
             changed = true
         }

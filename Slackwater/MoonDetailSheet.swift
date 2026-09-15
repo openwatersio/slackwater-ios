@@ -29,6 +29,55 @@ struct MoonFacts {
     let upcoming: [WindowEclipse]
 }
 
+/// Almanac has no apsis search; the Moon tile runs these samples off the scrub path.
+func moonApsides(around at: Date) -> (perigee: Date?, apogee: Date?) {
+    var samples: [(time: Date, km: Double)] = []
+    var t = at.addingTimeInterval(-15 * 86_400)
+    let stop = at.addingTimeInterval(15 * 86_400)
+    while t <= stop {
+        if let km = try? moonPosition(t).distanceKm { samples.append((t, km)) }
+        t = t.addingTimeInterval(6 * 3600)
+    }
+    guard samples.count >= 3 else { return (nil, nil) }
+    var perigee: Date?
+    var apogee: Date?
+    for i in 1..<(samples.count - 1) {
+        let sample = samples[i]
+        if sample.km <= samples[i - 1].km, sample.km <= samples[i + 1].km,
+           perigee == nil || abs(sample.time.timeIntervalSince(at)) < abs(perigee!.timeIntervalSince(at)) {
+            perigee = sample.time
+        }
+        if sample.km >= samples[i - 1].km, sample.km >= samples[i + 1].km,
+           apogee == nil || abs(sample.time.timeIntervalSince(at)) < abs(apogee!.timeIntervalSince(at)) {
+            apogee = sample.time
+        }
+    }
+    return (perigee, apogee)
+}
+
+func moonTideExplanation(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String {
+    switch moonTideLabel(phase: phase, at: at, perigee: perigee, apogee: apogee) {
+    case "Perigean spring tide":
+        "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near perigee the Moon is closer, so its tidal effect is stronger: higher highs and lower lows than during an apogean spring tide."
+    case "Apogean spring tide":
+        "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near apogee the Moon is farther away, so its tidal effect is weaker: lower highs and higher lows than during a perigean spring tide."
+    case "Perigean neap tide":
+        "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near perigee, the closer Moon's stronger effect offsets some of the neap narrowing."
+    case "Apogean neap tide":
+        "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near apogee, the farther Moon's weaker effect narrows the range further."
+    case "Perigean tide":
+        "The Moon is near perigee, its closest point to Earth. Its stronger tidal effect tends to widen the range, raising highs and lowering lows compared with apogee."
+    case "Apogean tide":
+        "The Moon is near apogee, its farthest point from Earth. Its weaker tidal effect tends to narrow the range, lowering highs and raising lows compared with perigee."
+    case "Spring tide":
+        "The Sun and Moon line up, reinforcing each other's tidal effects. The wider range tends to bring higher highs and lower lows."
+    case "Neap tide":
+        "The Sun and Moon are at right angles, so their tidal effects partly offset. The narrower range tends to bring lower highs and higher lows."
+    default:
+        "Between spring and neap alignments, the tidal range is changing. The Moon's distance also matters: closer at perigee tends to widen the range, farther at apogee to narrow it."
+    }
+}
+
 func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
     guard let illumination = try? moonIllumination(at),
           let position = try? moonPosition(at) else { return nil }
@@ -40,20 +89,7 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
     let events = (try? moonEvents(from: dayStart, to: dayEnd, observer: observer)) ?? []
     let phases = (try? searchMoonPhases(from: at, to: at.addingTimeInterval(45 * 86_400))) ?? []
 
-    // Almanac has no apogee/perigee search, so sample it: 6-hour steps across
-    // half a month either side resolve a perigee to within a few hours, and a
-    // few hours is enough to name the date, which is all this line does.
-    var closest: (time: Date, km: Double)?
-    var farthest: (time: Date, km: Double)?
-    var t = at.addingTimeInterval(-15 * 86_400)
-    let stop = at.addingTimeInterval(15 * 86_400)
-    while t <= stop {
-        if let km = try? moonPosition(t).distanceKm {
-            if closest == nil || km < closest!.km { closest = (t, km) }
-            if farthest == nil || km > farthest!.km { farthest = (t, km) }
-        }
-        t = t.addingTimeInterval(6 * 3600)
-    }
+    let apsides = moonApsides(around: at)
 
     // Five years, and no further. Walking forward one eclipse at a time until
     // all three kinds turn up is both slower and worse: from a fixed observer
@@ -80,8 +116,8 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
         fullNight: fullAt.map { phaseNight($0, observer: observer) },
         newNight: newAt.map { phaseNight($0, observer: observer) },
         distanceKm: position.distanceKm,
-        closest: closest?.time,
-        farthest: farthest?.time,
+        closest: apsides.perigee,
+        farthest: apsides.apogee,
         last: previousVisibleEclipse(before: at, observer: observer),
         upcoming: firstOfKind.values.sorted { $0.peak < $1.peak })
 }
@@ -192,22 +228,48 @@ struct MoonDetailSheet: View {
     }
 
     private func head(_ facts: MoonFacts) -> some View {
-        HStack(spacing: 14) {
-            MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
-                      size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
-                      wash: eclipse?.wash(at: at) ?? 0)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(eclipse.map { eclipseTileText($0.kind) }
-                        ?? moonPhaseName(phase: facts.illumination.phase))
-                    .font(ReadoutType.tileText)
-                    .foregroundStyle(.white)
-                Text("\(Int((facts.illumination.fraction * 100).rounded()))% lit")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(SN.foam.opacity(0.55))
+        let phase = moonPhaseName(phase: facts.illumination.phase)
+        let title = eclipse.map { eclipseTileText($0.kind) } ?? phase
+        let tideLabel = moonTideLabel(phase: facts.illumination.phase, at: at,
+                                       perigee: facts.closest, apogee: facts.farthest)
+        let tideText = moonTideExplanation(phase: facts.illumination.phase, at: at,
+                                            perigee: facts.closest, apogee: facts.farthest)
+        // Full width under the glyph, not beside it: the gloss is a sentence,
+        // and a sentence in the ~200pt left after a 54pt moon wraps to three
+        // lines and pushes the head taller than the card below it.
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 14) {
+                MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
+                          size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
+                          wash: eclipse?.wash(at: at) ?? 0)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(ReadoutType.tileText)
+                        .foregroundStyle(.white)
+                    Text("\(Int((facts.illumination.fraction * 100).rounded()))% lit")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.55))
+                }
+                Spacer()
             }
-            Spacer()
+            .accessibilityElement(children: .combine)
+
+            Text(moonPhaseBlurb(title))
+                .font(.footnote)
+                .foregroundStyle(SN.foam.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("moon-blurb")
+            Text(tideLabel ?? "Tidal range")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 10)
+                .accessibilityIdentifier("moon-tide-label")
+            Text(tideText)
+                .font(.footnote)
+                .foregroundStyle(SN.foam.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("moon-tide-blurb")
         }
-        .accessibilityElement(children: .combine)
     }
 
     /// The sheet's one container. Rows that belong together share a card, so

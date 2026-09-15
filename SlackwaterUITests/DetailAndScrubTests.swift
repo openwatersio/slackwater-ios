@@ -41,8 +41,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Back to the station list (search closed itself on the pick).
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
-        settleLayout(app.staticTexts["Slackwater"].firstMatch)  // the pop slides the list in
+        XCTAssert(stationList(app).appears(within: 5))
+        settleLayout(stationList(app).firstMatch)  // the pop slides the list in
         save(app, "m1-list.png")
 
         // Search mid-query: name + region substring both match (bottom input).
@@ -85,7 +85,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         setUnits(app, "Feet")
     }
 
@@ -99,7 +99,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(["-seedGate"])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
 
         openFridayHarbor(app)
         let lead = leadReading(app)
@@ -229,10 +229,16 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(map.appears(within: 10), "back from the pushed station lost the Nearby map")
         // A coordinate tap never scrolls, and the map sits below the rows.
         let window = app.windows.firstMatch.frame
-        for _ in 0..<6 where map.frame.maxY > window.maxY - 40 { app.swipeUp() }
+        for _ in 0..<6 where map.frame.maxY > window.maxY - 40 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
+                .press(forDuration: 0.1, thenDragTo:
+                    app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.2)))
+        }
+        XCTAssert(map.frame.maxY <= window.maxY - 40, "the Nearby map stayed below the screen")
         save(app, "nearby-map.png")
-        // The top-right corner: the framing insets every pin well clear of it.
-        map.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.05)).tap()
+        // Clear of the iPad scroll bar and the iPhone's top-right station pin.
+        let tapX = UIDevice.current.userInterfaceIdiom == .pad ? 0.8 : 0.97
+        map.coordinate(withNormalizedOffset: CGVector(dx: tapX, dy: 0.05)).tap()
         XCTAssert(app.descendants(matching: .any)["map-canvas"].firstMatch.appears(within: 10),
                   "a tap on the Nearby map did not open the full map")
     }
@@ -248,7 +254,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(["-seedGate"])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
 
         openFridayHarbor(app)
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
@@ -327,7 +333,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // The header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),
@@ -767,5 +773,39 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(bar, "label != '\(week)'"),
                   "the jump did not move the window off '\(week)'")
         save(app, "moon-sheet-jumped.png")
+
+        moon.tap()
+        let tideLabel = app.staticTexts["moon-tide-label"].firstMatch
+        XCTAssert(tideLabel.appears(within: 10), "no named tide condition in the Moon sheet")
+        XCTAssertEqual(tideLabel.label, "Apogean spring tide")
+        let tideBlurb = app.staticTexts["moon-tide-blurb"].firstMatch
+        XCTAssert(tideBlurb.appears(within: 10), "no tide explanation in the Moon sheet")
+        XCTAssert(tideBlurb.label.contains("farther") && tideBlurb.label.contains("perigean spring tide"),
+                  "the apogean spring explanation did not describe the competing effects: \(tideBlurb.label)")
+        save(app, "moon-sheet-apogean-spring.png")
+    }
+
+    /// A shared moment three weeks out (#187) lands on its own clock and day.
+    /// `-scrubInstant` rides the shared link's path into the detail, so this
+    /// is the link's hand-off whichever of the scaffold's and the detail's
+    /// appears runs first: a first build around now would clamp the strip
+    /// short of the moment. The tide and harmonic-current details build their
+    /// stores separately, so both are opened.
+    func testAMomentWeeksAwayLandsOnItsClockAndDay() throws {
+        for (query, name) in [("friday", "Friday Harbor"), ("deception", "Deception Pass (Narrows)")] {
+            let app = launch("-seedGate", "-scrubInstant", "2026-09-28T13:00:00-07:00")
+            openSearch(app, query)
+            pickSearchResult(app, app.staticTexts[name].firstMatch)
+            XCTAssert(leadReading(app).appears(within: 10), "no lead reading on \(name)")
+            XCTAssert(waitFor(leadReading(app), "label CONTAINS '1:00pm'"),
+                      "\(name) did not land on the moment: \(leadReading(app).label)")
+            _ = settled { leadReading(app).label }
+            XCTAssertEqual(scrubClock(app), "1:00pm", "\(name)'s strip moved off the moment once it settled")
+            let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+            XCTAssert(bar.appears(within: 10), "no range bar on \(name)")
+            XCTAssert(bar.label.contains("Sep 28"), "\(name)'s window did not move to the moment's day: \(bar.label)")
+            save(app, "moment-weeks-away-\(query).png")
+            app.terminate()
+        }
     }
 }
