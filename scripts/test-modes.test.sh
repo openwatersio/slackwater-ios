@@ -64,6 +64,7 @@ assert_has "id=SIM-Slackwater_iPhone_17"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
 assert_has "-collect-test-diagnostics never"
+assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
   print -u2 -- "fixture preparation did not precede XcodeGen"

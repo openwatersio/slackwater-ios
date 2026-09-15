@@ -198,6 +198,7 @@ for i in {1..$#sims}; do
   # on 16 GB; set SLACKWATER_WORKERS to the machine's budget (CI sets 1 — a
   # hosted arm runner has ~7 GB).
   xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
+    -derivedDataPath build/DerivedData \
     -testPlan Slackwater -destination "$dests[$i]" \
     -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
     -collect-test-diagnostics "$diagnostics" \
