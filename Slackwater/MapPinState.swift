@@ -63,8 +63,9 @@ func tidePinRisingHybrid(_ record: TideStationRecord, at now: Date) -> Bool? {
 /// speed-bearing current, the bearing its flow arrow rotates to.
 struct PinState: Equatable {
     var state: String
-    /// "3.2 ft ↑" / "1.8 kn" — formatted at build time with the app's units,
-    /// which are part of the cache key for exactly that reason.
+    /// "3.2 ft" / "1.8 kn" — formatted at build time with the app's units,
+    /// so a unit change has to rebuild the source (`MapStyler.refreshPins`
+    /// watches for it) rather than restyle it.
     var reading: String?
     /// True bearing the water flows toward — the arrow every current pin
     /// wears, slack included: near slack the sign still names the set, and
@@ -200,6 +201,13 @@ final class ReferenceCurrentEvents: @unchecked Sendable {
 
 /// The units the readouts format with — read where the features build, and
 /// part of the cache key so a settings change doesn't serve stale strings.
+/// The units as one comparable token, for callers deciding whether a built
+/// source's readings are still in the right unit.
+func readoutUnitSignature() -> String {
+    let u = readoutUnits()
+    return "\(u.imperial)-\(u.speedUnit)"
+}
+
 private func readoutUnits() -> (imperial: Bool, speedUnit: String) {
     ((AppGroup.defaults.string(forKey: unitsKey) ?? "imperial") == "imperial",
      AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn")
@@ -276,18 +284,42 @@ struct PinBox: Equatable {
         return west <= east ? (lon >= west && lon <= east) : (lon >= west || lon <= east)
     }
 
+    /// Longitude span, always positive, wrapping the antimeridian.
+    var lonSpan: Double { east - west < 0 ? east - west + 360 : east - west }
+
     /// Grown by `fraction` of its own span on every side — the slack that
-    /// lets a small pan reuse the set already built.
+    /// lets a small pan reuse the set already built. Longitudes rewrap into
+    /// -180...180, so a box growing across the dateline stays a box the
+    /// `contains` test can answer (21 stations sit beyond |178°|, and
+    /// `ChartPacks.stationSpecs` splits its packs there for the same
+    /// reason).
     func padded(by fraction: Double) -> PinBox {
         let dLat = (north - south) * fraction
-        let dLon = (east - west < 0 ? east - west + 360 : east - west) * fraction
-        return PinBox(south: max(-90, south - dLat), west: west - dLon,
-                      north: min(90, north + dLat), east: east + dLon)
+        let dLon = lonSpan * fraction
+        // A pad that swallows the globe has no seam left to wrap around.
+        guard lonSpan + dLon * 2 < 360 else {
+            return PinBox(south: max(-90, south - dLat), west: -180,
+                          north: min(90, north + dLat), east: 180)
+        }
+        return PinBox(south: max(-90, south - dLat), west: PinBox.wrap(west - dLon),
+                      north: min(90, north + dLat), east: PinBox.wrap(east + dLon))
     }
 
-    /// True when `inner` needs pins this box does not already cover.
+    static func wrap(_ lon: Double) -> Double {
+        var l = lon.truncatingRemainder(dividingBy: 360)
+        if l > 180 { l -= 360 }
+        if l < -180 { l += 360 }
+        return l
+    }
+
+    /// True when this box already holds everything `inner` needs. Tests the
+    /// spans rather than two corners: a wrapped box's corners can both be
+    /// inside while the middle is not.
     func covers(_ inner: PinBox) -> Bool {
-        contains(lat: inner.south, lon: inner.west) && contains(lat: inner.north, lon: inner.east)
+        guard inner.south >= south, inner.north <= north else { return false }
+        guard lonSpan >= inner.lonSpan else { return false }
+        return contains(lat: inner.south, lon: inner.west)
+            && contains(lat: inner.south, lon: inner.east)
     }
 }
 
@@ -335,9 +367,15 @@ let allPinCandidates: [PinCandidate] = pinCandidates(StationItem.all)
 /// `pinned` always survives, whatever its cell holds: the station a detail
 /// page is about must appear on that page's own map, and the pin a preview
 /// panel is describing must not vanish under the panel.
+/// `decimate: false` keeps every station in the box — a detail page's
+/// Nearby map lists its stations as rows directly above itself, so thinning
+/// them would draw fewer pins than the list claims, and the ones dropped
+/// would be the NEAREST (the frame's zoom is set by the farthest station,
+/// which makes the cells coarse). That set is already bounded by the
+/// nearby radius, so there is nothing to bound.
 func visibleStations(in box: PinBox, zoom: Double,
                      candidates: [PinCandidate] = allPinCandidates,
-                     pinned: String? = nil) -> [StationItem] {
+                     pinned: String? = nil, decimate: Bool = true) -> [StationItem] {
     // Web-mercator degrees per point at this zoom (MapLibre's tile size is
     // 512). Latitude cells shrink with the mercator scale so a cell stays
     // square on screen at any latitude.
@@ -345,6 +383,10 @@ func visibleStations(in box: PinBox, zoom: Double,
     let cellLon = PIN_CELL_POINTS * degPerPoint
     let midLat = (box.south + box.north) / 2
     let cellLat = max(cellLon * cos(midLat * .pi / 180), 1e-9)
+    guard decimate else {
+        let kept = candidates.filter { box.contains(lat: $0.lat, lon: $0.lon) }.map(\.item)
+        return kept
+    }
     var best: [Int64: PinCandidate] = [:]
     best.reserveCapacity(256)
     for c in candidates where box.contains(lat: c.lat, lon: c.lon) {
