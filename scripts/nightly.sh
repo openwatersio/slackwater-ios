@@ -37,7 +37,7 @@ git switch -C "$BRANCH" "$BASE_SHA"
 sed -i '' -E "s/^([[:space:]]*CURRENT_PROJECT_VERSION: )[0-9]+$/\\1$NEXT_BUILD/" project.yml
 git diff --check
 git add project.yml
-git commit -m "Prepare Slackwater nightly $VERSION ($NEXT_BUILD)"
+git commit -m "Prepare Slackwater nightly $VERSION ($NEXT_BUILD) [skip ci]"
 HEAD_SHA=$(git rev-parse HEAD)
 git push origin "HEAD:$BRANCH"
 
