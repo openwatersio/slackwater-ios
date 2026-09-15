@@ -15,6 +15,7 @@ for tool in node open xcodegen xcodebuild; do
   cat > "$scratch/bin/$tool" <<'STUB'
 #!/bin/zsh
 print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-}" >> "$CALL_LOG"
+[[ ${0:t} == open && $* == '-a DeviceHub' && ${NO_DEVICE_HUB:-0} == 1 ]] && exit 1
 [[ ${0:t} == node && ${FAIL_PREPARE:-0} == 1 ]] && {
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
   exit 1
@@ -162,5 +163,10 @@ assert_has "xcodebuild test"
 : > "$log"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/first-run.sh" >/dev/null
 assert_has "open -a DeviceHub"
+
+: > "$log"
+PATH="$scratch/bin:$PATH" CALL_LOG="$log" NO_DEVICE_HUB=1 \
+  zsh "$scratch/repo/scripts/first-run.sh" >/dev/null 2>&1
+assert_has "open -a Simulator"
 
 print "runner mode checks passed"
