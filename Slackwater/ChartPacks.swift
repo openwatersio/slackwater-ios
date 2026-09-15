@@ -217,12 +217,14 @@ final class ChartPackManager: NSObject, ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.setNeedsReconcile() }
             .store(in: &cancellables)
-        // The CHS download set is the other half of "starred or downloaded":
-        // a station whose model is on disk gets chart coverage too, so the
-        // map matches the data wherever the user has chosen to work offline.
-        ChsFitService.shared.$queue
-            .map { $0.jobs.filter { $0.status == .ready }.map(\.id) }
+        RecentsStore.shared.$ids
             .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.setNeedsReconcile() }
+            .store(in: &cancellables)
+        Connectivity.shared.$online
+            .removeDuplicates()
+            .filter { $0 }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.setNeedsReconcile() }
             .store(in: &cancellables)
@@ -276,10 +278,7 @@ final class ChartPackManager: NSObject, ObservableObject {
                 (lat: $0.coordinate.latitude, lon: $0.coordinate.longitude)
               }
             : nil
-        let downloaded = ChsFitService.shared.queue.jobs
-            .filter { $0.status == .ready }
-            .map(\.id)
-        let stations = Set(FavoritesStore.shared.ids + downloaded)
+        let stations = Set(FavoritesStore.shared.ids + RecentsStore.shared.ids)
             .compactMap { id -> (String, Double, Double)? in
                 guard let item = StationItem.byId[id] else { return nil }
                 return (id, item.latitude, item.longitude)

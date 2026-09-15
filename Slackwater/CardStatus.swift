@@ -3,7 +3,7 @@
 // what "queued" means — stays on the detail views, which have room for it.
 import SwiftUI
 
-/// What a station card is waiting on. Six states with no reading at all, plus
+/// What a station card is waiting on. Seven states with no reading at all, plus
 /// `.refining` — the one state that HAS a reading and isn't final yet.
 ///
 /// One enum rather than a sentence built at each site: the online-gate path
@@ -15,6 +15,7 @@ enum CardStatus: Equatable {
     case downloading
     /// Online and in the download set, but not its turn yet.
     case queued
+    case retrying
     /// Not connected — nothing moves until signal returns.
     case offline
     /// Fetched before; the stored window no longer covers the window on screen.
@@ -23,7 +24,7 @@ enum CardStatus: Equatable {
     /// Never fetched and not queued (M53 — most of Canada): opening it is what
     /// starts it, which stays true offline, so this outranks `.offline`.
     case notDownloaded
-    /// The last attempt didn't finish.
+    /// Another attempt would get the same answer.
     case failed
     /// Showing the 60-day fast answer while the full model downloads. Carries
     /// this gate's own measured slack tolerance ("±35 min") — the number the
@@ -32,7 +33,7 @@ enum CardStatus: Equatable {
 
     var showsPlaceholder: Bool {
         switch self {
-        case .downloading, .queued, .notDownloaded: true
+        case .downloading, .queued, .retrying, .notDownloaded: true
         default: false
         }
     }
@@ -41,6 +42,7 @@ enum CardStatus: Equatable {
         switch self {
         case .downloading: "arrow.down.circle"
         case .queued: "clock"
+        case .retrying: "arrow.clockwise"
         case .offline: "wifi.slash"
         case .expired: "clock.badge.exclamationmark"
         case .notDownloaded: "arrow.down.circle.dotted"
@@ -54,6 +56,7 @@ enum CardStatus: Equatable {
         switch self {
         case .downloading: "Downloading"
         case .queued: "Queued"
+        case .retrying: "Retrying"
         case .offline: "Offline"
         case .expired: "Expired"
         case .notDownloaded: "Tap to download"
@@ -69,10 +72,11 @@ enum CardStatus: Equatable {
         switch self {
         case .downloading: return "Downloading — \(once)"
         case .queued: return "Queued — \(once)"
+        case .retrying: return "Retrying — Slackwater tries again on its own. \(once)"
         case .offline: return "Offline — needs a moment of signal. \(once)"
         case .expired: return "Expired — the downloaded predictions no longer cover the dates on screen. Open it to fetch more."
         case .notDownloaded: return "Tap to download — \(once)"
-        case .failed: return "Download failed — open it to retry."
+        case .failed: return "Download unavailable — open the station for details."
         case .refining(let tolerance):
             let howWrong = tolerance.map { ", slack accurate to \($0)" } ?? ""
             return "Refining — showing the fast answer\(howWrong). The full model is still downloading."
@@ -89,7 +93,7 @@ enum CardStatus: Equatable {
         switch self {
         case .downloading: SN.leaf
         case .expired, .failed, .refining: SN.amber
-        case .queued, .offline, .notDownloaded: SN.foam.opacity(0.85)
+        case .queued, .retrying, .offline, .notDownloaded: SN.foam.opacity(0.85)
         }
     }
 }

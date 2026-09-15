@@ -76,14 +76,8 @@ struct ChsDetailView: View {
                 }
             }
         }
-        // Viewing is the strongest possible signal of what to download next,
-        // and M51 made it act like one: the running job steps aside at its next
-        // CHUNK boundary (~2.5 s), not its next station boundary (up to ~2.5
-        // min for a 210-day gate). Nothing paid for is thrown away — chunks are
-        // cached, so the yielded job resumes exactly where it stopped.
-        //
-        // An online gate has no job — it was never queued (isOnline never
-        // queued, ChsFitService.candidates) — so there is nothing to promote.
+        // Viewing moves pending work to the front without interrupting the
+        // station already downloading. Online gates never join this queue.
         .onAppear { if !isOnlineGate { service.promote(route.jobID) } }
     }
 
@@ -156,21 +150,18 @@ struct ChsWaitingView: View {
             .onAppear { _ = LinkedInstant.shared.take(for: favoriteId) }
             .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
         }
+        .onAppear { RecentsStore.shared.record(favoriteId) }
     }
 
     private var status: CardStatus {
-        if !net.online { return .offline }
-        switch job?.status {
-        case .failed: return .failed
-        case .downloading: return .downloading
-        default: return .queued
-        }
+        cardStatus(id: jobID)
     }
 
     private var title: String {
         switch status {
         case .downloading: "Downloading…"
         case .queued: "Waiting"
+        case .retrying: "Retrying"
         case .offline: "Waiting for signal"
         case .failed: "Download failed"
         default: status.label
@@ -202,6 +193,9 @@ struct ChsWaitingView: View {
         if !net.online {
             return "\(what) need a moment of signal — Canadian \(series) predictions download once, then work offline."
         }
+        if status == .retrying {
+            return "\(what) didn't finish downloading. Trying again shortly."
+        }
         switch job?.status {
         case .failed:
             return "\(what) didn't finish downloading."
@@ -221,11 +215,17 @@ struct ChsWaitingView: View {
         if job?.status == .failed {
             return "Try this station again here. Once it downloads, it works offline — with no signal — for good."
         }
+        if status == .retrying {
+            return "Slackwater retries on its own, and again whenever your signal comes back. Once it downloads, this station works offline for good."
+        }
+        if let job, job.status == .downloading, job.total > 0 {
+            return "Downloading \(job.done) of \(job.total) requests. After that this station works offline for good."
+        }
         let queued = service.queue.position(jobID).map { at -> String in
             at <= 1 ? "It's first in line — moved to the front because you opened it."
                     : "It's \(ordinal(at)) in line — moved up because you opened it."
         } ?? ""
-        return "\(queued) Usually \(durationPhrase(service.queue.waitSeconds(jobID))). It downloads once; after that this station works offline, with no signal, for good."
+        return "\(queued) At the current speed, \(durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))). It downloads once; after that this station works offline for good."
     }
 
     private var footer: some View {

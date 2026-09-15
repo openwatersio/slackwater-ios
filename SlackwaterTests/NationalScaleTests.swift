@@ -7,9 +7,8 @@
 //   2. The SCALE work, MEASURED rather than asserted — search and the distance
 //      ranking each run the old shape beside the new one in the same test, so
 //      the numbers in the commit message are numbers, not vibes.
-//   3. The CANADA rule — the download set is the nearest few plus what you
-//      opened, and it has to fit in a first run somebody will sit through,
-//      from any fix.
+//   3. The CANADA rule — Low Data Mode stays bounded and normal mode takes
+//      every station in the active radius.
 import MapLibre
 import XCTest
 @testable import Slackwater
@@ -396,9 +395,8 @@ final class NationalScaleTests: XCTestCase {
 
     // MARK: - Canada on demand
 
-    /// The download set is the nearest few, not the country — it budgets the
-    /// two series separately (ten nearest anything is ten Victoria harbour
-    /// gauges and no passes), and it fits in a first run from either coast.
+    /// Low Data Mode keeps the first-run budget bounded while preserving the
+    /// normal 150 km download radius.
     @MainActor
     func testAutoFitSetIsBoundedAndAffordableFromAnyFix() {
         let service = ChsFitService.shared
@@ -409,8 +407,8 @@ final class NationalScaleTests: XCTestCase {
                                            ("Halifax", (lat: 44.65, lon: -63.57), 6, 0),
                                            ("Boston", (lat: 42.3601, lon: -71.0589), 0, 0),
                                            ("Detroit", (lat: 42.3314, lon: -83.0458), 0, 0)] {
-            let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon)
-            let seconds = set.reduce(0) { $0 + $1.estimatedSeconds }
+            let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon, constrained: true)
+            let seconds = set.reduce(0) { $0 + $1.estimatedSeconds() }
             let far = set.map { distanceKm($0.latitude, $0.longitude, fix.lat, fix.lon) }.max() ?? 0
             print(String(format: "M53 auto-fit from %@: %d ports + %d gates, ~%.1f min, within %.0f km",
                          place, set.filter { !$0.isCurrent }.count, set.filter(\.isCurrent).count,
@@ -481,7 +479,7 @@ final class NationalScaleTests: XCTestCase {
                        "every fittable gate is either already queued or one tap from it")
         XCTAssertTrue(everyGate.contains { $0.id == "chs-great-bras-dor" },
                       "the Atlantic gate no fix is ever within 150 km of is the point of this")
-        let seconds = everyGate.reduce(0) { $0 + $1.estimatedSeconds }
+        let seconds = everyGate.reduce(0) { $0 + $1.estimatedSeconds() }
         XCTAssertLessThan(seconds, 30 * 60,
                           "all of Canada's gates must stay minutes, not an afternoon")
         print(String(format: "#8 bulk currents: %d gates, ~%.0f min", everyGate.count, seconds / 60))
@@ -495,11 +493,12 @@ final class NationalScaleTests: XCTestCase {
         for (place, fix) in [("Bellingham", (lat: 48.7519, lon: -122.4787)),
                              ("Port Angeles", (lat: 48.1181, lon: -123.4307)),
                              ("Eastport ME", (lat: 44.9062, lon: -66.9899))] {
-            let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon)
+            let set = ChsFitService.autoFitSet(lat: fix.lat, lon: fix.lon, constrained: true)
             XCTAssertEqual(set.filter { !$0.isCurrent }.count, ChsFitService.autoFitPorts,
                            "\(place) is inside the radius and must still get its ports")
         }
-        XCTAssertFalse(ChsFitService.autoFitSet(lat: 48.7519, lon: -122.4787).filter(\.isCurrent).isEmpty,
+        XCTAssertFalse(ChsFitService.autoFitSet(lat: 48.7519, lon: -122.4787,
+                                                constrained: true).filter(\.isCurrent).isEmpty,
                        "Bellingham has Salish passes in reach and must fit them")
     }
 
@@ -542,14 +541,12 @@ final class NationalScaleTests: XCTestCase {
         }
     }
 
-    /// The online prefetch keeps the auto-fit budget's shape — nearest first,
-    /// capped, and radius-limited — so it cannot become the bulk download M53
-    /// removed. Halifax is the check that matters: the nearest online gate is
-    /// a coast away and a Nova Scotian must fetch none of them.
+    /// Low Data Mode keeps online prefetch nearest-first, capped, and radius-limited.
     @MainActor
     func testOnlinePrefetchIsBoundedLikeTheFitBudget() {
         let victoriaFix = (lat: 48.4235, lon: -123.3705)
-        let victoria = ChsFitService.autoPrefetchGates(lat: victoriaFix.lat, lon: victoriaFix.lon)
+        let victoria = ChsFitService.autoPrefetchGates(lat: victoriaFix.lat, lon: victoriaFix.lon,
+                                                       constrained: true)
         XCTAssertFalse(victoria.isEmpty, "Victoria's nearest pass is 3.4 km away and must not be left to a tap")
         XCTAssertEqual(victoria.first?.id, "chs-tillicum-bridge",
                        "nearest first, like every other download decision")

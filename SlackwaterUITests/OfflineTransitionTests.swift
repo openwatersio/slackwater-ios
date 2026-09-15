@@ -100,8 +100,8 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         )).firstMatch.exists)
     }
 
-    func testPromotionYieldsAndThenResumesDownload() {
-        let (app, token) = fixture("yield-resume", "chs-dodd-narrows,chs-tofino",
+    func testPromotionReordersQueueWithoutInterruptingDownload() {
+        let (app, token) = fixture("no-interrupt", "chs-dodd-narrows,chs-tofino",
                                    fix: ("49.1344", "-123.8171"))
         openDownloads(app)
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
@@ -114,15 +114,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         releaseFixture(token, "dodd-first-chunk")
-        waitFor(tofino, "label CONTAINS 'Downloading'", timeout: 10)
-        XCTAssert(tofino.label.contains("Downloading"))
-        XCTAssert(dodd.label.contains("Waiting"))
-        releaseFixture(token, "tofino-first-chunk")
-        waitFor(dodd, "label CONTAINS 'Downloading'", timeout: 20)
-        XCTAssert(dodd.label.contains("Downloading"))
-        releaseFixture(token, "dodd-resumed")
         waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30)
         XCTAssert(dodd.label.contains("Available offline"))
+        XCTAssert(tofino.label.contains("Downloading"))
+        releaseFixture(token, "tofino-first-chunk")
+        waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30)
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {

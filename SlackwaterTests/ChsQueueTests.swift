@@ -6,6 +6,21 @@ import XCTest
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
+    func testOnlyNamedCausesArePermanent() {
+        XCTAssert(ChsError.isPermanent(ChsError.permanent("no IWLS station serves wlp")))
+        XCTAssertFalse(ChsError.isPermanent(ChsError.transient("HTTP 503")))
+        XCTAssertFalse(ChsError.isPermanent(URLError(.timedOut)))
+        XCTAssertFalse(ChsError.isPermanent(NSError(domain: NSPOSIXErrorDomain, code: 54)))
+        XCTAssertFalse(ChsError.isPermanent(DecodingError.dataCorrupted(
+            .init(codingPath: [], debugDescription: "IWLS served nonsense"))))
+    }
+
+    func testServiceKeepsAReadableFailureReason() {
+        XCTAssertEqual(ChsFitService.reason(ChsError.permanent("no station")), "no station")
+        XCTAssertEqual(ChsFitService.reason(ChsError.transient("HTTP 503")), "HTTP 503")
+        XCTAssertEqual(ChsFitService.reason(ChsError.networkDisabled), "no connection")
+    }
+
     func testDownloadPriorityOrdersActivityThenUrgency() {
         let states: [(String, ManagedDownloadState, Int?)] = [
             ("permanent", .permanent, nil),
@@ -31,6 +46,48 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertFalse(downloadIsReady(.expired))
         XCTAssertFalse(downloadIsReady(.failed))
     }
+
+    func testRowStatusSaysWhatIsHappening() {
+        var q = ChsQueue([job("a", 48.4, -123.3)])
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Waiting")
+
+        q.set("a", .downloading)
+        q.setProgress("a", done: 12, total: 31)
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Downloading · 12 of 31")
+
+        q.deferRetry("a", error: "dropped", at: t0)
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Retrying in 1 min")
+
+        q.set("a", .failed)
+        q.note("a", error: "IWLS serves no wlp here")
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0),
+                       "Unavailable · IWLS serves no wlp here")
+
+        q.set("a", .ready)
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Available offline")
+    }
+
+    func testRetryingSortsWithQueuedWork() {
+        XCTAssertEqual(downloadSortRank(.retrying, remainingDays: nil),
+                       downloadSortRank(.queued, remainingDays: nil))
+        XCTAssertLessThan(downloadSortRank(.retrying, remainingDays: nil),
+                          downloadSortRank(.failed, remainingDays: nil))
+    }
+
+    func testRetryingCardStatusReadsAsWorkInProgress() {
+        let status = CardStatus.retrying
+        XCTAssertEqual(status.label, "Retrying")
+        XCTAssertEqual(status.tint, SN.foam.opacity(0.85))
+        XCTAssert(status.showsPlaceholder)
+        XCTAssert(status.accessibilityLabel.contains("on its own"))
+    }
+
+    func testOnlineGateCardUsesTheServiceFetchState() {
+        XCTAssertEqual(onlineGateStatus(nil, online: true, state: .fetching), .downloading)
+        XCTAssertEqual(onlineGateStatus(nil, online: true,
+                                        state: .deferred(t0.addingTimeInterval(60))), .retrying)
+        XCTAssertEqual(onlineGateStatus(nil, online: true, state: .failed("no data")), .failed)
+    }
     private func job(_ id: String, _ lat: Double, _ lon: Double,
                      current: Bool = false, days: Double = 60) -> ChsJob {
         ChsJob(id: id, name: id, region: "test", isCurrent: current,
@@ -40,6 +97,78 @@ final class ChsQueueTests: XCTestCase {
     /// Victoria-ish origin, and three stations at increasing distance.
     private func queue() -> ChsQueue {
         ChsQueue([job("far", 50.5, -126.9), job("near", 48.43, -123.37), job("mid", 49.3, -123.1)])
+    }
+
+    private let t0 = Date(timeIntervalSince1970: 1_760_000_000)
+
+    func testADeferredJobIsSkippedUntilItsClockRunsOut() {
+        var q = queue()
+        q.prioritize(lat: 48.4235, lon: -123.3705)
+        q.set("near", .downloading)
+        q.deferRetry("near", error: "HTTP 503", at: t0)
+
+        XCTAssertEqual(q.job("near")?.status, .pending)
+        XCTAssertEqual(q.job("near")?.attempts, 1)
+        XCTAssertEqual(q.job("near")?.lastError, "HTTP 503")
+        XCTAssertEqual(q.nextPending(at: t0)?.id, "mid")
+        XCTAssertEqual(q.nextPending(at: t0.addingTimeInterval(61))?.id, "near")
+        XCTAssertEqual(q.deferred(at: t0), 1)
+        XCTAssertEqual(q.deferred(at: t0.addingTimeInterval(61)), 0)
+    }
+
+    func testBackoffDoublesToAFifteenMinuteCeiling() {
+        XCTAssertEqual(ChsQueue.backoff(attempts: 1), 60)
+        XCTAssertEqual(ChsQueue.backoff(attempts: 2), 120)
+        XCTAssertEqual(ChsQueue.backoff(attempts: 3), 240)
+        XCTAssertEqual(ChsQueue.backoff(attempts: 4), 480)
+        XCTAssertEqual(ChsQueue.backoff(attempts: 5), 900)
+        XCTAssertEqual(ChsQueue.backoff(attempts: 50), 900)
+    }
+
+    func testAJobCarriesProgressForItsCurrentAttempt() {
+        var q = queue()
+        q.set("near", .downloading)
+        q.setProgress("near", done: 3, total: 11)
+        XCTAssertEqual(q.job("near")?.done, 3)
+        XCTAssertEqual(q.job("near")?.total, 11)
+        q.deferRetry("near", error: "dropped", at: t0)
+        XCTAssertEqual(q.job("near")?.done, 0)
+    }
+
+    func testTheEstimateScalesWithObservedRequestTime() {
+        let port = job("port", 48.4, -123.3)
+        XCTAssertEqual(port.estimatedSeconds(perRequest: 10),
+                       port.estimatedSeconds(perRequest: 2.5) * 4,
+                       accuracy: 0.001)
+    }
+
+    func testEarliestRetryIsTheNextJobDue() {
+        var q = queue()
+        q.set("far", .downloading)
+        q.deferRetry("far", error: "dropped", at: t0)
+        q.set("near", .downloading)
+        q.deferRetry("near", error: "dropped", at: t0.addingTimeInterval(30))
+        XCTAssertEqual(q.earliestRetry(after: t0), t0.addingTimeInterval(60))
+        XCTAssertNil(q.earliestRetry(after: t0.addingTimeInterval(120)))
+    }
+
+    func testPromoteReconnectAndRetryNowClearTheRightFailures() {
+        var q = queue()
+        q.set("far", .downloading)
+        q.deferRetry("far", error: "dropped", at: t0)
+        q.promote("far")
+        XCTAssertNil(q.job("far")?.retryAfter)
+        XCTAssertEqual(q.job("far")?.attempts, 0)
+
+        q.set("mid", .downloading)
+        q.deferRetry("mid", error: "dropped", at: t0)
+        q.set("near", .failed)
+        q.clearBackoffs()
+        XCTAssertNil(q.job("mid")?.retryAfter)
+        XCTAssertEqual(q.job("near")?.status, .failed)
+
+        q.retryNow()
+        XCTAssertEqual(q.job("near")?.status, .pending)
     }
 
     func testPrioritizeOrdersClosestFirst() {
@@ -92,12 +221,63 @@ final class ChsQueueTests: XCTestCase {
         XCTAssertEqual(downloads.online.map(\.id), [online.id])
     }
 
+    @MainActor
+    func testAutoFitTakesEverythingInReachWithTheBudgetedNineStillFirst() {
+        let victoria = (lat: 48.4235, lon: -123.3705)
+        let full = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon, constrained: false)
+        let near = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon, constrained: true)
+
+        XCTAssertEqual(near.count, ChsFitService.autoFitPorts + ChsFitService.autoFitGates)
+        XCTAssertGreaterThan(full.count, near.count)
+        XCTAssertEqual(Array(full.prefix(near.count)).map(\.id), near.map(\.id))
+        XCTAssert(full.allSatisfy {
+            distanceKm($0.latitude, $0.longitude, victoria.lat, victoria.lon)
+                <= ChsFitService.autoFitRadiusKm
+        })
+        XCTAssertEqual(Set(full.map(\.id)).count, full.count)
+
+        let tail = Array(full.dropFirst(near.count))
+        let firstPort = tail.firstIndex { !$0.isCurrent } ?? tail.count
+        let lastGate = tail.lastIndex { $0.isCurrent } ?? -1
+        XCTAssertLessThan(lastGate, firstPort)
+        XCTAssert(ChsFitService.autoFitSet(lat: 42.3601, lon: -71.0589,
+                                           constrained: false).isEmpty)
+    }
+
+    @MainActor
+    func testOnlinePrefetchAlsoTakesEverythingInReachUnlessConstrained() {
+        let full = ChsFitService.autoPrefetchGates(lat: 48.4235, lon: -123.3705,
+                                                   constrained: false)
+        let near = ChsFitService.autoPrefetchGates(lat: 48.4235, lon: -123.3705,
+                                                   constrained: true)
+        XCTAssertGreaterThan(full.count, near.count)
+        XCTAssertEqual(near.count, ChsFitService.autoFitGates)
+        XCTAssertEqual(Array(full.prefix(near.count)).map(\.id), near.map(\.id))
+    }
+
+    @MainActor
+    func testAnOnlineGateFailureIsRememberedAndDeferred() throws {
+        let service = ChsFitService.shared
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.isOnline })
+        service.resetOnlineStateForTesting()
+        XCTAssertEqual(service.onlineState(gate.id), .idle)
+
+        service.noteOnlineFailure(gate.id, error: "dropped", permanent: false, at: t0)
+        XCTAssertEqual(service.onlineState(gate.id, at: t0),
+                       .deferred(t0.addingTimeInterval(60)))
+        XCTAssertEqual(service.onlineState(gate.id, at: t0.addingTimeInterval(61)), .idle)
+
+        service.noteOnlineFailure(gate.id, error: "no flood axis", permanent: true, at: t0)
+        XCTAssertEqual(service.onlineState(gate.id, at: t0.addingTimeInterval(3600)),
+                       .failed("no flood axis"))
+    }
+
     func testPromotingAFailedStationRequeuesIt() {
         var q = queue()
         q.set("far", .failed)
         q.promote("far")
         XCTAssertEqual(q.status("far"), .pending)
-        XCTAssertEqual(q.nextPending?.id, "far")
+        XCTAssertEqual(q.nextPending()?.id, "far")
     }
 
     /// A ready station has nothing to download — promoting it would only
@@ -114,12 +294,12 @@ final class ChsQueueTests: XCTestCase {
     func testNextPendingIsTheHeadAndSkipsClaimedOrFinishedJobs() {
         var q = queue()
         q.prioritize(lat: 48.4235, lon: -123.3705)
-        XCTAssertEqual(q.nextPending?.id, "near")
+        XCTAssertEqual(q.nextPending()?.id, "near")
         q.set("near", .downloading)
-        XCTAssertEqual(q.nextPending?.id, "mid", "a claimed job is never handed out twice")
+        XCTAssertEqual(q.nextPending()?.id, "mid", "a claimed job is never handed out twice")
         q.set("mid", .ready)
         q.set("far", .failed)
-        XCTAssertNil(q.nextPending, "a failed job stays failed until it is retried")
+        XCTAssertNil(q.nextPending(), "a failed job stays failed until it is retried")
     }
 
     func testCounts() {
@@ -143,7 +323,7 @@ final class ChsQueueTests: XCTestCase {
         q.set("near", .ready)
         q.set("mid", .failed)
         q.set("far", .failed)
-        q.retryFailed()
+        q.retryNow()
         XCTAssertEqual(q.status("near"), .ready)
         XCTAssertEqual(q.status("mid"), .pending)
         XCTAssertEqual(q.status("far"), .pending)
@@ -170,48 +350,17 @@ final class ChsQueueTests: XCTestCase {
     func testA60DayGateCostsAThirdOfA210DayGate() {
         let fast = job("fast", 48.9, -123.3, current: true, days: 60)
         let full = job("full", 49.1, -123.8, current: true, days: 210)
-        XCTAssertEqual(fast.estimatedSeconds, 21 * 2.5, accuracy: 0.01)   // 10 chunks × 2 + metadata
-        XCTAssertEqual(full.estimatedSeconds, 63 * 2.5, accuracy: 0.01)   // 31 chunks × 2 + metadata
+        XCTAssertEqual(fast.estimatedSeconds(), 21 * 2.5, accuracy: 0.01)   // 10 chunks × 2 + metadata
+        XCTAssertEqual(full.estimatedSeconds(), 63 * 2.5, accuracy: 0.01)   // 31 chunks × 2 + metadata
     }
 
-    // MARK: - M51: stepping aside at a chunk boundary
-
-    /// The whole point: a 210-day gate in flight does not make you wait 2.5 min
-    /// for the station you just opened.
-    func testTheRunningJobStepsAsideForAStationYouOpened() {
+    func testPromotionReordersPendingWorkWithoutInterruptingTheActiveJob() {
         var q = queue()
         q.prioritize(lat: 48.4235, lon: -123.3705)
         q.set("near", .downloading)
-        XCTAssertFalse(q.shouldYield(running: "near"), "nobody is waiting on us")
         q.promote("far")
-        XCTAssert(q.shouldYield(running: "near"), "the station the user opened is at the head, waiting")
-    }
-
-    /// Proximity alone never interrupts: only an explicit open does.
-    func testAMerelyCloserStationDoesNotInterrupt() {
-        var q = queue()
-        q.set("far", .downloading)
-        q.prioritize(lat: 48.4235, lon: -123.3705)
-        XCTAssertFalse(q.shouldYield(running: "far"),
-                       "a re-sort re-orders the queue; it does not throw away a download in flight")
-    }
-
-    /// Between two stations the user opened, the newest open wins — and the
-    /// pair can never hand the download back and forth, because that order is
-    /// strict in one direction.
-    func testTheMostRecentlyOpenedStationWinsAndCannotPingPong() {
-        var q = queue()
-        q.promote("far")            // opened first
-        q.set("far", .downloading)
-        q.promote("mid")            // opened second, while `far` is in flight
-        XCTAssertEqual(q.nextPending?.id, "mid", "the newest open leads the queue")
-        XCTAssert(q.shouldYield(running: "far"), "an earlier open still steps aside for a later one")
-
-        // …and once `mid` has the download, `far` waiting behind it changes nothing.
-        q.set("far", .pending)
-        q.set("mid", .downloading)
-        XCTAssertEqual(q.nextPending?.id, "far")
-        XCTAssertFalse(q.shouldYield(running: "mid"), "no thrash: the newest open is never yielded from")
+        XCTAssertEqual(q.status("near"), .downloading)
+        XCTAssertEqual(q.nextPending()?.id, "far")
     }
 
     func testDurationPhraseIsCoarse() {

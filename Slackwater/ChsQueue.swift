@@ -39,15 +39,20 @@ struct ChsJob: Identifiable, Hashable {
     /// four gates validated at 60 d, 210 d for the rest (M51).
     let fitDays: Double
     var status: ChsJobStatus = .pending
+    var attempts = 0
+    var retryAfter: Date?
+    var lastError: String?
+    var done = 0
+    var total = 0
 
-    /// Rough wall-clock cost of this job, seconds: IwlsFetcher paces one
-    /// request every 2.5 s, the window divides into 7-day chunks (+1 for grid
-    /// alignment), and a gate reads two series plus one metadata call.
-    /// ponytail: an estimate, not a measurement; it only ever feeds "about N
-    /// min", so a live moving average would be precision nobody reads.
-    var estimatedSeconds: Double {
+    /// Number of IWLS requests needed for the fit window.
+    var requestCount: Double {
         let chunks = (fitDays / 7).rounded(.up) + 1
-        return (chunks * (isCurrent ? 2 : 1) + (isCurrent ? 1 : 0)) * 2.5
+        return chunks * (isCurrent ? 2 : 1) + (isCurrent ? 1 : 0)
+    }
+
+    func estimatedSeconds(perRequest: Double = 2.5) -> Double {
+        requestCount * perRequest
     }
 }
 
@@ -67,32 +72,14 @@ struct ChsQueue {
     /// A run is still in flight: something is queued or downloading.
     var active: Bool { jobs.contains { $0.status == .pending || $0.status == .downloading } }
     var complete: Bool { total > 0 && ready == total }
-    /// The next job a worker should claim — first `.pending` in queue order.
-    var nextPending: ChsJob? { jobs.first { $0.status == .pending } }
+    func nextPending(at now: Date = appNow()) -> ChsJob? {
+        jobs.first { $0.status == .pending && ($0.retryAfter ?? .distantPast) <= now }
+    }
 
     func status(_ id: String) -> ChsJobStatus? { jobs.first { $0.id == id }?.status }
     func job(_ id: String) -> ChsJob? { jobs.first { $0.id == id } }
     /// Did the user jump this one up the queue? Drives the manager's badge.
     func isPromoted(_ id: String) -> Bool { promoted.contains(id) }
-
-    /// Should the job currently downloading step aside? Only for a station the
-    /// user actually opened, waiting at the head of the queue. The fit loop
-    /// asks this at every chunk boundary, so "I opened this" costs one chunk
-    /// (~2.5 s) instead of the rest of a 210-day gate (~2.5 min).
-    ///
-    /// Between two stations the user opened, the one opened MOST RECENTLY wins
-    /// — `promoted` is newest-first, so this is a strict order and the pair can
-    /// never hand the download back and forth (the newest can only be yielded
-    /// TO, never yielded FROM).
-    func shouldYield(running id: String) -> Bool {
-        guard let next = nextPending, next.id != id, isPromoted(next.id) else { return false }
-        return promotionRank(next.id) < promotionRank(id)
-    }
-
-    /// 0 = the station opened most recently; Int.max = never opened.
-    private func promotionRank(_ id: String) -> Int {
-        promoted.firstIndex(of: id) ?? .max
-    }
 
     /// 1-based position among the stations still to come; nil once it is ready.
     func position(_ id: String) -> Int? {
@@ -101,16 +88,15 @@ struct ChsQueue {
     }
 
     /// Seconds until `id` is usable: everything ahead of it, plus itself.
-    func waitSeconds(_ id: String) -> Double {
+    func waitSeconds(_ id: String, perRequest: Double = 2.5) -> Double {
         let waiting = jobs.filter { $0.status == .pending || $0.status == .downloading }
         guard let at = waiting.firstIndex(where: { $0.id == id }) else { return 0 }
-        return waiting[...at].reduce(0) { $0 + $1.estimatedSeconds }
+        return waiting[...at].reduce(0) { $0 + $1.estimatedSeconds(perRequest: perRequest) }
     }
 
-    /// Put a station into the download set. The set is NOT the catalog (M53):
-    /// it is the nearest few plus whatever has been opened plus whatever is
-    /// already on disk, so at national scale the manager has a finite list and
-    /// a first run has a finite cost. Adding an id already here is a no-op —
+    /// Put a station into the download set. It contains the stations in the
+    /// active radius plus anything opened or already on disk. Adding an id
+    /// already here is a no-op —
     /// re-adding must never reset a job that is downloading or done.
     mutating func add(_ job: ChsJob) {
         guard !jobs.contains(where: { $0.id == job.id }) else { return }
@@ -123,6 +109,17 @@ struct ChsQueue {
         jobs[i].status = status
     }
 
+    mutating func note(_ id: String, error: String) {
+        guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
+        jobs[i].lastError = error
+    }
+
+    mutating func setProgress(_ id: String, done: Int, total: Int) {
+        guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
+        jobs[i].done = done
+        jobs[i].total = total
+    }
+
     /// The station being viewed jumps the queue. Also un-fails it: opening a
     /// station that failed is the clearest possible "try this one again".
     /// A ready station is left alone — nothing to download, and pinning it
@@ -132,11 +129,14 @@ struct ChsQueue {
         promoted.removeAll { $0 == id }
         promoted.insert(id, at: 0)
         if current == .failed { set(id, .pending) }
+        if let i = jobs.firstIndex(where: { $0.id == id }) {
+            jobs[i].retryAfter = nil
+            jobs[i].attempts = 0
+        }
         reorder()
     }
 
-    /// Put favorites ahead of proximity without giving them opened-station
-    /// yield semantics. Missing ids are ignored; the service adds their jobs.
+    /// Put favorites ahead of proximity. Missing ids are ignored; the service adds their jobs.
     mutating func prefer(_ ids: [String]) {
         preferred = ids
         reorder()
@@ -148,10 +148,43 @@ struct ChsQueue {
         reorder()
     }
 
-    /// The manager's retry: re-queue the failures, leave everything else be.
-    /// (Web restartAll — never re-downloads a ready station.)
-    mutating func retryFailed() {
-        for job in jobs where job.status == .failed { set(job.id, .pending) }
+    static func backoff(attempts: Int) -> TimeInterval {
+        min(pow(2, Double(max(attempts, 1) - 1)) * 60, 15 * 60)
+    }
+
+    mutating func deferRetry(_ id: String, error: String, at now: Date = appNow()) {
+        guard let i = jobs.firstIndex(where: { $0.id == id }) else { return }
+        jobs[i].attempts += 1
+        jobs[i].lastError = error
+        jobs[i].retryAfter = now.addingTimeInterval(Self.backoff(attempts: jobs[i].attempts))
+        jobs[i].done = 0
+        jobs[i].status = .pending
+    }
+
+    func earliestRetry(after now: Date = appNow()) -> Date? {
+        jobs.compactMap { job in
+            guard job.status == .pending, let due = job.retryAfter, due > now else { return nil }
+            return due
+        }.min()
+    }
+
+    func deferred(at now: Date = appNow()) -> Int {
+        jobs.count { $0.status == .pending && ($0.retryAfter ?? .distantPast) > now }
+    }
+
+    mutating func clearBackoffs() {
+        for i in jobs.indices where jobs[i].status == .pending {
+            jobs[i].retryAfter = nil
+            jobs[i].attempts = 0
+        }
+    }
+
+    mutating func retryNow() {
+        clearBackoffs()
+        for i in jobs.indices where jobs[i].status == .failed {
+            jobs[i].status = .pending
+            jobs[i].attempts = 0
+        }
     }
 
     private mutating func reorder() {

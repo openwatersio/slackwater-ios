@@ -30,10 +30,10 @@ final class ChsFitter {
         ctx.evaluateScript("var console = {log:function(){},warn:function(){},error:function(){},info:function(){},debug:function(){}};")
         for name in ["chs-bundle", "chs-glue"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "js") else {
-                throw ChsError.failed("\(name).js missing from bundle")
+                throw ChsError.permanent("\(name).js missing from bundle")
             }
             ctx.evaluateScript(try String(contentsOf: url, encoding: .utf8))
-            if let e = jsError { throw ChsError.failed("\(name).js: \(e)") }
+            if let e = jsError { throw ChsError.permanent("\(name).js: \(e)") }
         }
         context = ctx
         return ctx
@@ -45,7 +45,7 @@ final class ChsFitter {
         jsError = nil
         guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [json]),
               jsError == nil, let str = out.toString() else {
-            throw ChsError.failed(jsError ?? "fitTides returned nothing")
+            throw ChsError.permanent(jsError ?? "fitTides returned nothing")
         }
         return try JSONDecoder().decode(ChsFitResult.self, from: Data(str.utf8))
     }

@@ -161,75 +161,33 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                        "tapping a row must dismiss the Downloads sheet")
     }
 
-    /// The row's own tap gesture and the Retry button (`service.promote`, shown
-    /// only on a `.failed` job) are siblings in the same `HStack` — the Retry
-    /// button ahead of `.contentShape`/`.onTapGesture` in the modifier chain,
-    /// per the row-tap comment. This proves the button wins the hit test
-    /// rather than the row's gesture swallowing it (#33). `-chsFailOnly`
-    /// (ChsFitService.swift) marks a job `.failed` at launch, no network
-    /// attempt — a real fetch failure isn't deterministic for a fast test, and
-    /// `-networkKillSwitch` keeps every OTHER job inert too (`run()`'s claim
-    /// loop only ever touches `.pending` jobs, so the seeded `.failed` status
-    /// sticks until something explicitly retries it).
-    ///
-    /// Seeded on Victoria HARBOUR, deliberately NOT plain Victoria: at regular
-    /// width the split layout auto-selects a first detail on `.onAppear`
-    /// (StationListView.swift), and under this test's Victoria fix that is the
-    /// nearest station — chs-victoria itself. `ChsDetailView.onAppear`
-    /// unconditionally promotes whatever route it shows, so seeding
-    /// chs-victoria as `.failed` is self-defeating on iPad: auto-select
-    /// opens it and silently un-fails it before this test ever touches the
-    /// sheet (confirmed live — the Retry button and the "still failed"
-    /// precondition are gone by the very first read). Victoria
-    /// Harbour is the second-nearest port — queued (inside the auto-fit set's
-    /// nearest 6 ports) but never auto-selected — so it stays genuinely
-    /// `.failed` until this test's own tap.
-    func testDownloadsRowRetryButtonWinsOverRowTap() throws {
+    func testTappingADeferredRowOpensTheStation() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
-                         "-chsFailOnly", "chs-victoria-harbour",
-                         "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
+                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria-harbour",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openDownloads(app)
-
         let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
-        XCTAssert(row.appears(within: 5), "the seeded failed row is missing")
-        XCTAssert(reachInSheet(row, in: app),
-                  "download-row-chs-victoria-harbour exists but never became hittable")
-        // `.accessibilityElement(children: .combine)` on the row merges its
-        // plain text into one label but does NOT absorb the nested Button —
-        // confirmed live (`app.buttons["Retry"]` resolves as its own element,
-        // separate from the row).
-        let retry = row.buttons["Retry"].firstMatch
-        XCTAssert(retry.appears(within: 5), "seeded chs-victoria-harbour never shows the Retry button")
-        XCTAssert(reachInSheet(retry, in: app),
-                  "Retry button exists but never became hittable")
-        retry.tap()
-        waitFor(row, "label CONTAINS 'YOU OPENED' AND label CONTAINS 'Waiting'")
+        XCTAssert(row.appears(within: 5), "the seeded deferred row is missing")
+        XCTAssert(reachInSheet(row, in: app), "the deferred row never became hittable")
+        XCTAssert(row.label.contains("Retrying in"), "deferred row says: \(row.label)")
+        XCTAssertFalse(row.buttons["Retry"].exists)
+        save(app, "resilient-downloads-after.png")
 
-        // Promote's own visible effect proves the BUTTON's action ran: the
-        // failed row flips to promoted+pending — "YOU OPENED" and "Waiting"
-        // replace the Retry pill. The row renders EITHER the Retry button OR
-        // `statusText(job)`, never both (OfflineDownloads.swift's `row(_:)`),
-        // so "Waiting" in the label already implies Retry is gone.
-        let label = row.label
-        XCTAssert(label.contains("YOU OPENED") && label.contains("Waiting"),
-                  "tapping Retry did not promote the row — expected \"YOU OPENED\"/\"Waiting\" in its label, got \"\(label)\"")
+        row.tap()
+        XCTAssert(app.descendants(matching: .any)["chs-waiting-warning"].appears(within: 5),
+                  "tapping the row did not open the station")
+    }
 
-        // And the row tap's OWN effect never fired: the sheet is still up.
-        // NOT a bare "no detail-header exists" check — on iPad the split
-        // layout auto-selects Victoria's OWN detail underneath this sheet
-        // regardless of anything this test does (the same auto-select the
-        // doc comment above routes around), so a header legitimately exists
-        // throughout. The header's NAME is the tell: if the row's gesture had
-        // fired instead of the button, it would have pushed Victoria
-        // Harbour's detail, replacing what's shown.
-        XCTAssert(app.navigationBars["Downloads"].exists,
-                  "the row's onTapGesture must not have fired — the Retry button owns this tap")
-        let header = app.otherElements["detail-header"].firstMatch
-        if header.exists {
-            XCTAssertFalse(header.staticTexts["Victoria Harbour"].firstMatch.exists,
-                           "no detail should have opened — the button, not the row, must have handled the tap")
-        }
+    func testRetryNowAppearsWhileSomethingIsDeferred() throws {
+        let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria-harbour",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+
+        openDownloads(app)
+        let retry = app.buttons["downloads-retry-now"].firstMatch
+        XCTAssert(retry.appears(within: 5), "a deferred job should offer Retry now")
+        XCTAssert(reachInSheet(retry, in: app), "Retry now never became hittable")
     }
 
     /// #205: far from Canadian water, nothing downloads and the manager is

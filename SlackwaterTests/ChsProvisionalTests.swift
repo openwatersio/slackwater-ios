@@ -5,7 +5,7 @@
 //   2. a gate only offers a fast answer when its MEASURED 60-day slack error
 //      cleared the usefulness floor, and the copy names that gate's own number;
 //   3. the 60-day chunks are the newest chunks of the full plan, cached, so a
-//      job that stepped aside resumes without paying for the same bytes twice.
+//      a retry resumes without paying for the same bytes twice.
 import XCTest
 @testable import Slackwater
 
