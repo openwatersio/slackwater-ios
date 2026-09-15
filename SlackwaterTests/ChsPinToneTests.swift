@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Issue #12: CHS pins take colour from what the offline
-// sync has ALREADY stored. These exercise the cache→tone resolver
-// (`chsPinTones`), which by construction cannot fetch: it takes the stored
+// sync has ALREADY stored. These exercise the cache→state resolver
+// (`chsPinStates`), which by construction cannot fetch: it takes the stored
 // records as plain dictionaries, and a station the sync has not reached is
 // absent from the result — the map draws it neutral, honestly.
 import XCTest
@@ -23,7 +23,8 @@ final class ChsPinToneTests: XCTestCase {
     /// Nothing synced → nothing resolved. Every CHS pin stays neutral, and no
     /// path exists that could reach the network for the missing ones.
     func testUnsyncedStationsStayNeutral() {
-        XCTAssertTrue(chsPinTones(at: now, tideRecords: [:], currentRecords: [:]).isEmpty)
+        XCTAssertTrue(chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                 tideRecords: [:], currentRecords: [:]).isEmpty)
     }
 
     /// A fitted CHS tide port resolves rising/falling exactly like a bundled
@@ -34,10 +35,11 @@ final class ChsPinToneTests: XCTestCase {
         let references = Set(ChsGateInfo.all.map(\.reference))
         let info = try XCTUnwrap(ChsStationInfo.all.first { !references.contains($0.id) })
         let record = port(info.id)
-        let tones = chsPinTones(at: now, tideRecords: [info.id: record], currentRecords: [:])
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [info.id: record], currentRecords: [:])
         let expected = try XCTUnwrap(tidePinRisingHybrid(record, at: now)) ? "rising" : "falling"
-        XCTAssertEqual(tones[info.id], expected)
-        XCTAssertEqual(tones.count, 1, "a station the sync has not reached must stay neutral")
+        XCTAssertEqual(states[info.id]?.state, expected)
+        XCTAssertEqual(states.count, 1, "a station the sync has not reached must stay neutral")
     }
 
     /// A fitted CHS current gate resolves flood/ebb/slack through the same
@@ -49,9 +51,10 @@ final class ChsPinToneTests: XCTestCase {
             latitude: gate.latitude, longitude: gate.longitude, timezone: gate.timezone,
             floodDirection: 90, ebbDirection: 270, meanFlow: 0, tideReference: nil,
             constituents: [.init(name: "M2", amplitude: 2.0, phase: 0)])
-        let tones = chsPinTones(at: now, tideRecords: [:], currentRecords: [gate.id: record])
-        XCTAssertEqual(tones[gate.id], currentPinColour(record, at: now))
-        XCTAssertTrue((tones[gate.id] ?? "").hasPrefix("#"),
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [:], currentRecords: [gate.id: record])
+        XCTAssertEqual(states[gate.id]?.state, currentPinState(record, at: now, speedUnit: "kn").state)
+        XCTAssertTrue((states[gate.id]?.state ?? "").hasPrefix("#"),
                       "a fitted gate is speed-bearing: its tone is a colour literal (#13)")
     }
 
@@ -60,11 +63,13 @@ final class ChsPinToneTests: XCTestCase {
     /// fitted, and stays neutral otherwise.
     func testDerivedGateFollowsItsReferencePort() throws {
         let gate = try XCTUnwrap(ChsGateInfo.all.first)
-        XCTAssertNil(chsPinTones(at: now, tideRecords: [:], currentRecords: [:])[gate.id],
+        XCTAssertNil(chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                  tideRecords: [:], currentRecords: [:])[gate.id],
                      "no fitted reference → neutral")
         let reference = port(gate.reference)
-        let tones = chsPinTones(at: now, tideRecords: [gate.reference: reference], currentRecords: [:])
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [gate.reference: reference], currentRecords: [:])
         let phase = DerivedGateRecord(gate: gate, port: reference).cardState(at: now).phase
-        XCTAssertEqual(tones[gate.id], phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
+        XCTAssertEqual(states[gate.id]?.state, phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
     }
 }

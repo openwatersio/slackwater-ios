@@ -53,6 +53,31 @@ protocol StationIdentity {
     var longitude: Double { get }
 }
 
+/// The identity fields flattened off whichever payload a `StationItem`
+/// holds — see `StationItem.fields` for why this is a struct and not an
+/// existential. Conforms to the protocol itself, so anything written
+/// against `StationIdentity` (`searchRank`, `km(fromLat:lon:)`) works on it
+/// unchanged.
+struct StationFields: StationIdentity {
+    let id: String
+    let name: String
+    let region: String
+    let aliases: [String]
+    let latitude: Double
+    let longitude: Double
+
+    /// `id` overrides the payload's own — the one caller that needs it is
+    /// the namespaced current case.
+    init(_ s: some StationIdentity, id: String? = nil) {
+        self.id = id ?? s.id
+        name = s.name
+        region = s.region
+        aliases = s.aliases
+        latitude = s.latitude
+        longitude = s.longitude
+    }
+}
+
 extension StationIdentity {
     /// Name, region, then alias — same ranking as the web (search.ts): a name
     /// match is what the user typed on purpose; region/aliases are how you find
@@ -373,27 +398,39 @@ enum StationItem: Identifiable, Hashable {
     case chsGate(ChsGateInfo)  // derived current gate: slack from a reference port's fitted tide
     case chsCurrent(ChsCurrentGateInfo)  // validated CHS gate: real velocities, fitted on-device
 
-    /// The payload's shared identity — one switch, not one per field.
-    var info: StationIdentity {
+    /// The identity every payload carries, copied out by ONE switch instead
+    /// of one per field.
+    ///
+    /// Concrete, NOT `any StationIdentity`: these payloads are wider than an
+    /// existential's inline buffer, so every boxed read heap-allocates. The
+    /// map's decimation scan reads coordinates for all 7,329 stations on
+    /// every camera move and measured 200 ms a pass through the box; this
+    /// costs a few retains.
+    var fields: StationFields {
         switch self {
-        case .tide(let s): s
-        case .current(let s): s
-        case .chs(let s): s
-        case .chsGate(let s): s
-        case .chsCurrent(let s): s
+        case .tide(let s): StationFields(s)
+        // Friday Harbor has both a tide and a current station, so currents
+        // are namespaced. Only this one case is prefixed, and that asymmetry
+        // is now load-bearing rather than tidy: the id is PERSISTED —
+        // favorites, recents, the nearest-station caches and the widget's
+        // configured station are all stored under this exact string (see
+        // `AppGroup`) — so giving every kind a prefix would orphan what
+        // users have already saved, which is how `itemId` earned its
+        // warning (fresh-install bug, 2026-08-08).
+        case .current(let s): StationFields(s, id: "current:" + s.id)
+        case .chs(let s): StationFields(s)
+        case .chsGate(let s): StationFields(s)
+        case .chsCurrent(let s): StationFields(s)
         }
     }
 
-    var id: String {
-        // Friday Harbor has both a tide and a current station.
-        if case .current(let s) = self { return "current:" + s.id }
-        return info.id
-    }
-    var name: String { info.name }
-    var region: String { info.region }
-    func searchRank(_ query: String) -> Int? { info.searchRank(query) }
-    var latitude: Double { info.latitude }
-    var longitude: Double { info.longitude }
+    var id: String { fields.id }
+    var name: String { fields.name }
+    var region: String { fields.region }
+    var latitude: Double { fields.latitude }
+    var longitude: Double { fields.longitude }
+    func searchRank(_ query: String) -> Int? { fields.searchRank(query) }
+
     /// "Current · NOAA" — what this station measures and whose data it is.
     /// The matching-station chooser's disambiguator: when two entries share a
     /// name, series and provider are the difference that isn't distance.
@@ -559,7 +596,9 @@ enum StationItem: Identifiable, Hashable {
         let bytes: [UInt8]
         let regionStart: Int
         let aliasStart: Int
-        init(_ s: StationIdentity) {
+        // Generic, not an existential: the payload is concrete at every call
+        // site below, so this is a direct read of stored properties.
+        init(_ s: some StationIdentity) {
             let name = Array(s.name.lowercased().utf8), region = Array(s.region.lowercased().utf8)
             bytes = name + [1] + region + [1] + Array(s.aliases.joined(separator: "\u{1}").utf8)
             regionStart = name.count + 1
@@ -576,7 +615,7 @@ enum StationItem: Identifiable, Hashable {
             return offset < regionStart ? 0 : offset < aliasStart ? 1 : 2
         }
     }
-    static let searchKeys: [SearchKey] = all.map { SearchKey($0.info) }
+    static let searchKeys: [SearchKey] = all.map { SearchKey($0.fields) }
 
     /// Matches, best first. Rank is the web's (name > region > alias) and
     /// DISTANCE breaks the tie — the other thing national scale forces, since

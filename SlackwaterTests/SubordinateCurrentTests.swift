@@ -39,7 +39,7 @@ final class SubordinateCurrentTests: XCTestCase {
         let speeds = bonita.engineStation.speeds(from: day, to: day.addingTimeInterval(86_400), step: 600).map(\.speed)
         XCTAssertGreaterThan(speeds.max()! - speeds.min()!, 0.5)
         XCTAssertNotEqual(bonita.cardState(at: day).signed, 0)
-        XCTAssertNotEqual(currentPinColour(bonita, at: day), "unknown")
+        XCTAssertNotEqual(currentPinState(bonita, at: day, speedUnit: "kn").state, "unknown")
     }
 
     /// The pin's per-reference shortcut must agree with the engine's own
@@ -50,7 +50,7 @@ final class SubordinateCurrentTests: XCTestCase {
             let exact = bonita.engineStation.speeds(from: t, to: t.addingTimeInterval(1), step: 1).first!.speed
             let exactColour = abs(exact) <= slackThresholdKn
                 ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN) : pinRampHex(forSpeedKn: abs(exact))
-            XCTAssertEqual(currentPinColour(bonita, at: t), exactColour, "hour \(hour)")
+            XCTAssertEqual(currentPinState(bonita, at: t, speedUnit: "kn").state, exactColour, "hour \(hour)")
         }
     }
 
@@ -70,7 +70,7 @@ final class SubordinateCurrentTests: XCTestCase {
     func testBinReferencedSubordinateCurveIsNotFlat() {
         let speeds = friarRoads.engineStation.speeds(from: day, to: day.addingTimeInterval(86_400), step: 600).map(\.speed)
         XCTAssertGreaterThan(speeds.max()! - speeds.min()!, 0.5)
-        XCTAssertNotEqual(currentPinColour(friarRoads, at: day), "unknown")
+        XCTAssertNotEqual(currentPinState(friarRoads, at: day, speedUnit: "kn").state, "unknown")
     }
 
     func testAReferenceOnlyBinIsInTheCatalogButNotAStation() {

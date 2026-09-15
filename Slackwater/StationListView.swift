@@ -29,7 +29,22 @@ struct StationListView: View {
     /// push/pop. Distinct from the coordinate so re-focusing the SAME
     /// station twice still counts.
     @State private var mapFocusToken = 0
+    /// The locate FAB was tapped with no fix to center on yet — the first fix
+    /// that lands recenters the map, exactly once.
+    @State private var pendingLocate = false
+    /// One-shot like `mapFocus`: the locate remount lands at `locateZoom`
+    /// instead of the discovery camera; cleared by the same `.onAppear`.
+    @State private var locateFocus = false
+    /// The pin-tap preview: the tapped station's card over the map, one tap
+    /// from its full detail. Tapping open water (or swiping the card down)
+    /// dismisses it.
+    @State private var mapPreview: StationItem?
+    @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    /// Read for the map's identity, not for this view's own text: the pins'
+    /// readings are baked into the GeoJSON, so a speed-unit change has to
+    /// rebuild the source. Observing it here is what republishes the body.
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var loc = LocationService.shared
@@ -218,6 +233,10 @@ struct StationListView: View {
         .onChange(of: loc.location) { _, new in
             guard let l = new else { return }
             ChsFitService.shared.prioritize(lat: l.coordinate.latitude, lon: l.coordinate.longitude)
+            if pendingLocate {
+                pendingLocate = false
+                if showMap { mapFocusToken += 1 }
+            }
         }
     }
 
@@ -234,7 +253,7 @@ struct StationListView: View {
     }
 
     /// iPhone (and iPad Slide Over): the map swaps in-place for the list;
-    /// both FABs persist over either.
+    /// both FABs persist over either (the left one as Search or My Location).
     private var stackLayout: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -391,33 +410,83 @@ struct StationListView: View {
                     }
                     // Match the list's first-run ranking area.
                     ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
-                zoom: mapFocus?.zoom ?? discoveryZoom
-            ) { item in
-                if regular { showMap = false }  // the detail pane shows the pick
-                open(item)
-            }
-            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))")
+                zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
+                selected: mapPreview,
+                onSelect: { item in withAnimation(.snappy) { mapPreview = item } },
+                onDeselect: { withAnimation(.snappy) { mapPreview = nil } }
+            )
+            // Units belong in the identity for the same reason the slack
+            // window does: both are baked into the pin source at build time,
+            // and `updateUIView` only carries selection. Without them a unit
+            // change sits in the old units until the 60s tick.
+            .id("\(mapFocusToken)-\(normalizedSlackThresholdKn(slackWindowSpeed))-\(units)-\(speedUnit)")
             .accessibilityIdentifier("map-canvas")
             // Consumed once: the next appearance of this pane (fab toggle, a
             // fresh pick) starts from the fix/discovery camera again, not a
-            // stale focus from a station visited an hour ago.
-            .onAppear { mapFocus = nil }
+            // stale focus from a station visited an hour ago. The preview
+            // resets with it.
+            .onAppear { mapFocus = nil; locateFocus = false; mapPreview = nil }
             .ignoresSafeArea()
 
-            // Satellite imagery shows no depths, so there is no chart-datum
+            // The basemap shows no depths, so there is no chart-datum
             // claim to disclaim. The navigation half is not decoration:
             // the App Store review notes (private planning repo) tell the reviewer this app marks
             // "not for navigation" on every detail footer AND the map, and
-            // that claim has to remain true on this surface.
+            // that claim has to remain true on this surface. Glass, like the
+            // FABs it sits between — one material for the whole toolbar row.
             Text("Not for navigation.")
                 .font(.caption2)
-                .foregroundStyle(SN.foam.opacity(0.85))
+                .foregroundStyle(SN.foam)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(SN.canvas.opacity(0.82), in: Capsule())
+                .glassEffect(.regular, in: Capsule())
+                .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
                 .accessibilityIdentifier("map-disclaimer")
                 .padding(.bottom, Self.fabBarBottomPadding)   // the FAB row's own baseline
+
+            // The pin-tap preview: our own bottom panel, NOT a `.sheet` —
+            // `.sheet(item:)` re-negotiates detents when the item swaps and
+            // UIKit falls back to full height, an iteration of fixed and
+            // measured detents could not stop. Here the panel hugs the card
+            // by construction. `.id(item.id)` is load-bearing: without it a
+            // second pin tap updates the same card view and its `@State`
+            // graph never re-resolves — the new station wears the old one's
+            // curve.
+            if let item = mapPreview {
+                previewPanel(item)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .background(SN.canvas.ignoresSafeArea())
+    }
+
+    /// The preview panel: drag handle over the station's ordinary card on a
+    /// canvas slab. Swipe down (or tap open water) dismisses; tapping the
+    /// card opens the detail.
+    /// The card itself over the map — no slab, no grabber. `StationCard`
+    /// already brings its own rounded chrome and shadow, so wrapping it in a
+    /// second container just drew a box around a box. The canvas backing is
+    /// still needed: the card's own fill is 5% white, made for the list's
+    /// dark ground, and over imagery it would be a ghost.
+    private func previewPanel(_ item: StationItem) -> some View {
+        cardFace(item, eager: true)
+            .id(item.id)
+            .frame(minHeight: 168)   // a fresh card is short until its curve resolves
+            .background(SN.canvas, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                mapPreview = nil
+                if regular { showMap = false }  // the detail pane shows the pick
+                open(item)
+            }
+            .accessibilityIdentifier("map-preview-card")
+            .accessibilityAddTraits(.isButton)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+            .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
+                guard drag.translation.height > 40 else { return }
+                withAnimation(.snappy) { mapPreview = nil }
+            })
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit
@@ -766,12 +835,17 @@ struct StationListView: View {
         .padding(.top, 24)
     }
 
-    // MARK: - Floating toolbar (search bottom-left, list ⇄ map bottom-right,
-    // both persistent over list AND map)
+    // MARK: - Floating toolbar (search bottom-left over the list, My Location
+    // bottom-left over the map, list ⇄ map bottom-right over both)
 
     private var fabBar: some View {
         HStack {
-            fab("magnifyingglass", label: "Search") { openSearch() }
+            // Over the map the left FAB locates instead of searching — the
+            // list toggle is one tap away and search lives there.
+            fab(showMap ? "location" : "magnifyingglass",
+                label: showMap ? "My Location" : "Search") {
+                if showMap { locateMe() } else { openSearch() }
+            }
             Spacer()
             fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
                 showMap.toggle()
@@ -784,6 +858,11 @@ struct StationListView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, Self.fabBarBottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        // The FABs sit above the map pane in the layout ZStack, so they would
+        // float ON the preview panel. Duck while it owns the bottom edge.
+        .opacity(mapPreview == nil ? 1 : 0)
+        .allowsHitTesting(mapPreview == nil)
+        .animation(.snappy, value: mapPreview == nil)
     }
 
     /// The toolbar button: 56pt glass circle.
@@ -797,6 +876,22 @@ struct StationListView: View {
                 .shadow(color: SN.shadow.opacity(0.4), radius: 10, y: 6)
         }
         .accessibilityLabel(label)
+    }
+
+    /// The map's locate FAB. With a fix: remount (`mapFocusToken`) so
+    /// `makeUIView` recenters on it at `locateZoom` — the fix is already first
+    /// in `mapPane`'s camera chain — and refresh it in the background. Without one: ask (or
+    /// re-request), and let the `.onChange(of: loc.location)` above recenter
+    /// when it lands. Denied goes to Settings, the only place the answer can
+    /// change.
+    private func locateMe() {
+        if loc.denied {
+            openURL(URL(string: UIApplication.openSettingsURLString)!)
+            return
+        }
+        locateFocus = true
+        if fix != nil { mapFocusToken += 1 } else { pendingLocate = true }
+        loc.request()
     }
 
     // MARK: - Search (bottom input above the keyboard, results above —
@@ -880,24 +975,30 @@ struct StationListView: View {
         .onAppear { searchFocused = true }  // keyboard up immediately
     }
 
+    /// The station's ordinary card, by kind — what a search result and the
+    /// map's pin-tap preview both render. `eager` resolves the curve in init
+    /// (first frame complete, for the preview's slide-up); the derived-gate
+    /// card has no eager path and keeps its fade-in.
+    @ViewBuilder private func cardFace(_ item: StationItem, eager: Bool = false) -> some View {
+        switch item {
+        case .tide(let s): StationCardView(info: s, imperial: imperial, eager: eager)
+        case .current(let s): CurrentCardView(info: s, eager: eager)
+        case .chs(let info): ChsCardView(info: info, imperial: imperial, eager: eager)
+        case .chsGate(let gate): ChsGateCardView(gate: gate)
+        case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate, eager: eager)
+        }
+    }
+
     /// A search result: the ordinary card, tapping opens the detail and
     /// closes search (the overlay sits outside the nav stacks, so results
     /// drive `open` directly rather than riding hidden links).
-    @ViewBuilder private func resultCard(_ item: StationItem) -> some View {
-        Group {
-            switch item {
-            case .tide(let s): StationCardView(info: s, imperial: imperial)
-            case .current(let s): CurrentCardView(info: s)
-            case .chs(let info): ChsCardView(info: info, imperial: imperial)
-            case .chsGate(let gate): ChsGateCardView(gate: gate)
-            case .chsCurrent(let gate): ChsCurrentGateCardView(gate: gate)
+    private func resultCard(_ item: StationItem) -> some View {
+        cardFace(item)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                searching = false
+                open(item)
             }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            searching = false
-            open(item)
-        }
     }
 
     /// The bottom bar: input pill + the X glass circle beside it —

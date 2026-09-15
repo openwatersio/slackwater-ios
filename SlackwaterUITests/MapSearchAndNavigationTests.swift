@@ -86,16 +86,18 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
             let map = app.otherElements["map-canvas"].firstMatch
             XCTAssert(map.appears(within: 5))
             // No header, no X — the toggle FAB (the list icon) is
-            // the way back, and the search FAB persists over the map.
+            // the way back, and the left FAB flips to My Location over the map.
             XCTAssertFalse(app.staticTexts["MAP"].exists, "map must carry no header chrome")
             XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
-            XCTAssert(app.buttons["Search"].exists, "search FAB missing over the map")
+            XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")
             sleep(5)  // tiles + the camera settling before tapPin trusts the fixed camera
             // One map shot, not one per pin — the second lap would overwrite it.
             if name == "Deception Pass (Narrows)" { save(app, "m41-map-zoom.png") }
             tapPin(map, lat, lon)
+            // The pin tap raises the preview card; the card opens the detail.
+            tapThroughPreview(app)
             XCTAssert(app.staticTexts["Today"].appears(within: 5),
-                      "map pin tap did not open a station detail")
+                      "the preview card tap did not open a station detail")
             XCTAssert(app.staticTexts[name].firstMatch.appears(within: 5))
             app.terminate()
         }
@@ -184,7 +186,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["map-canvas"].appears(within: 5),
                   "map did not take over the detail pane")
         XCTAssert(app.buttons["List"].exists, "toggle FAB did not flip to the list icon")
-        XCTAssert(app.buttons["Search"].exists, "search FAB missing while the map shows")
+        XCTAssert(app.buttons["My Location"].exists, "locate FAB missing while the map shows")
         app.buttons["List"].firstMatch.tap()
         XCTAssert(app.staticTexts["Pick a station"].appears(within: 5),
                   "toggle back did not land on the placeholder")
@@ -198,7 +200,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
     // The floating toolbar — search FAB bottom-left opens the bottom-input
     // search with the keyboard up; the X beside the input exits in one tap;
     // the map FAB toggles the surface in place and flips to the list icon (no
-    // header, no close chrome); both FABs persist over the map.
+    // header, no close chrome); over the map the left FAB becomes My Location.
     func testM45SearchFabAndMapToggle() throws {
         let app = launch("-seedGate")
 
@@ -237,10 +239,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssertLessThanOrEqual(disclaimer.frame.maxY, toggle.frame.maxY + 1,
                                  "the pill hangs below the FAB row, into the home indicator")
 
-        // The search FAB persists over the map and opens the same search.
-        openSearch(app, "friday")
-        XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5))
-        app.buttons["Close search"].firstMatch.tap()
+        // Over the map the left FAB is My Location, not Search.
+        XCTAssert(app.buttons["My Location"].exists, "locate FAB missing over the map")
+        XCTAssertFalse(app.buttons["Search"].exists, "search FAB must not sit over the map")
 
         // Toggle back: list returns, the button is the map icon again.
         XCTAssert(app.buttons["List"].appears(within: 5))
@@ -279,8 +280,8 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // for the title tap that follows.
         // `.id(mapFocusToken)` on `MapViewRepresentable` forces the remount and
         // `makeUIView` applies the focus (MapScreen.swift). iPhone-only: on iPad
-        // the split layout's `mapPane` `onSelect` resets `showMap` on a pin tap,
-        // so the scenario cannot arise there — an inline guard rather than a
+        // the preview card's tap resets `showMap` before opening, so the
+        // scenario cannot arise there — an inline guard rather than a
         // whole-test skip, so leg 1 still runs on both.
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
 
@@ -288,6 +289,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(map.appears(within: 5))
         sleep(5)  // tiles + camera for the tap below; neither reaches XCUITest
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapThroughPreview(app)
         XCTAssert(app.staticTexts["Today"].appears(within: 5),
                   "the pin tap did not open a detail")
         assertTitleTapFocusesMap(app)
@@ -311,6 +313,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Dead centre: the camera is on the station, so the pin is the middle.
         map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapThroughPreview(app)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 8),
                   "an offline station must headline what it is waiting for")
         XCTAssert(app.staticTexts["Race Passage"].firstMatch.exists)
@@ -460,9 +463,11 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         }
     }
 
-    /// The map at continental scale. Thousands of pins is a grey smear without
-    /// clustering; this walks the camera out to the whole country, times the
-    /// gestures, and checks the map is still a map afterwards.
+    /// The map at continental scale. Thousands of pins is a grey smear
+    /// without the far band's collision thinning; this walks the camera out
+    /// to the whole country, times the gestures — which now price the
+    /// collision engine over the whole bundle — and checks the map is still
+    /// a map afterwards.
     func testM53MapAtContinentalZoom() throws {
         let app = XCUIApplication()
         // z3.2 over the Salish camera longitude: the west coast from Mexico to
@@ -474,11 +479,11 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.launch()
         let map = app.otherElements["map-canvas"].firstMatch
         XCTAssert(map.appears(within: 15))
-        sleep(6)  // tiles + clustering must settle before the TIMED pinches; neither reaches XCUITest
+        sleep(6)  // tiles + symbol placement must settle before the TIMED pinches; neither reaches XCUITest
         save(app, "m53-map-continental.png")
 
-        // Then the interaction cost, timed: zooming the clustered source at the
-        // scale where an unclustered one is thousands of separate dots.
+        // Then the interaction cost, timed: zooming the collision-thinned
+        // source at the scale where every station is a candidate symbol.
         let start = Date.now
         for _ in 0..<5 { map.pinch(withScale: 1.6, velocity: 2) }
         let gestures = Date.now.timeIntervalSince(start)
@@ -492,7 +497,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Still responsive and still a map afterwards.
         XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")
-        XCTAssert(app.buttons["Search"].exists)
+        XCTAssert(app.buttons["My Location"].exists)
         app.buttons["List"].tap()
         XCTAssert(stationList(app).appears(within: 5))
     }

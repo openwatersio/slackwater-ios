@@ -142,6 +142,12 @@ extension TypeScaleTests {
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
+        // Nor is anything in this file: its readings are GeoJSON properties
+        // that MapLibre rasterizes from the basemap style's own fontstack,
+        // and no SwiftUI view reads them. Whole-file rather than per-symbol
+        // because the owner walk misreads both sites (blind spot 2) — a
+        // multi-line `func` signature is not the line ending in `{`.
+        let nonVisualFiles: Set<String> = ["MapPinState.swift"]
         // The `detail:` exemption below rests on one fact: StationCard's own
         // `Text(detail)` is hardcoded `.monospacedDigit()`. That's an
         // assumption about a file this loop may not even visit that line of
@@ -207,6 +213,7 @@ extension TypeScaleTests {
                 let lo = max(0, n - 4), hi = min(lines.count, n + 5)
                 let window = lines[lo..<hi].joined(separator: "\n")
                 if windowTokens.contains(where: window.contains) { continue }
+                if nonVisualFiles.contains(name) { continue }
                 if let owner = enclosingDeclaration(lines, n),
                    knownIndirections.contains("\(name):\(owner)")
                     || knownNonVisual.contains("\(name):\(owner)") { continue }

@@ -265,7 +265,7 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssert(app.staticTexts["Not for navigation."].exists,
                   "the settings sheet lost its disclaimer")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'VersaTiles'")).firstMatch.exists,
+            NSPredicate(format: "label CONTAINS 'OpenFreeMap'")).firstMatch.exists,
                   "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
@@ -323,6 +323,15 @@ class ScreenshotTestCase: XCTestCase {
         let nx = (frame.midX + (p.x - c.x) - frame.minX) / frame.width
         let ny = (frame.midY + (p.y - c.y) - frame.minY) / frame.height
         map.coordinate(withNormalizedOffset: CGVector(dx: nx, dy: ny)).tap()
+    }
+
+    /// A pin tap raises the preview card, not the detail — the card is the
+    /// second tap. Waits for it and taps through to the detail.
+    func tapThroughPreview(_ app: XCUIApplication) {
+        let card = app.descendants(matching: .any)
+            .matching(identifier: "map-preview-card").firstMatch
+        XCTAssert(card.appears(within: 5), "pin tap did not raise the preview card")
+        card.tap()
     }
 
     /// Tap the detail's header title: the map comes up and the detail is gone.

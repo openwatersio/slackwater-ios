@@ -266,7 +266,7 @@ The practical list. Each of these has cost someone time.
   ~10 kn; Sechelt Rapids runs ~16 and is simply not in the sample.
 - **Zero of the 22 gates carry a flow axis in the registry.** It arrives with the
   fit or the fetched window. Anything drawing direction has staged availability
-  and must degrade honestly — `chsPinTones` (`MapScreen.swift`) already models
+  and must degrade honestly — `chsPinStates` (`MapPinState.swift`) already models
   this: a station the sync has not reached is absent and draws neutral.
 - **Online gates are never queued.** They have no download state, so queue-shaped
   UI does not apply to them.

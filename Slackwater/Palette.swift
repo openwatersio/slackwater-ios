@@ -54,9 +54,16 @@ enum SN {
     /// The station-card curve's palette (Neaps dark mode, packages/react
     /// styles.css) — full saturation for the card's hero element, unlike
     /// flood/floodLabel, which are muted to sit inside the timeline strip.
+    /// high/low double as the TIDE TREND pair: a rising tide is not a flood
+    /// current, so it wears the ink of the curve it is climbing, never the
+    /// direction axis (`testTurnInksAgreeAcrossChartPillAndLead`). Raw hexes
+    /// for the same reason flood/ebb carry them — MapStyleBuilder formats
+    /// them into the map's colour strings.
     static let graphLine = Color(hex: 0x38BDF8)  // sky-400
-    static let graphHigh = Color(hex: 0x2DD4BF)  // teal-400
-    static let graphLow = Color(hex: 0xFBBF24)   // amber-400
+    static let graphHighHex: UInt32 = 0x2DD4BF   // teal-400
+    static let graphLowHex: UInt32 = 0xFBBF24    // amber-400
+    static let graphHigh = Color(hex: graphHighHex)
+    static let graphLow = Color(hex: graphLowHex)
     static let cardStroke = leaf.opacity(0.16)
     static let cardFill = Color.white.opacity(0.05)
     static let night = Color(hex: 0x00101F)        // prototype night band
