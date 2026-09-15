@@ -41,8 +41,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Back to the station list (search closed itself on the pick).
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
-        settleLayout(app.staticTexts["Slackwater"].firstMatch)  // the pop slides the list in
+        XCTAssert(stationList(app).appears(within: 5))
+        settleLayout(stationList(app).firstMatch)  // the pop slides the list in
         save(app, "m1-list.png")
 
         // Search mid-query: name + region substring both match (bottom input).
@@ -85,7 +85,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         setUnits(app, "Feet")
     }
 
@@ -99,7 +99,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(["-seedGate"])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
 
         openFridayHarbor(app)
         let lead = leadReading(app)
@@ -254,7 +254,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let app = XCUIApplication()
         app.launchArguments = testArguments(["-seedGate"])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
 
         openFridayHarbor(app)
         let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
@@ -333,7 +333,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // The header carries the current-station detail too.
         app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),

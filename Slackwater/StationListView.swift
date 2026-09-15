@@ -332,7 +332,7 @@ struct StationListView: View {
     }
 
     /// The list surface both layouts share: canvas + grouped List. Search
-    /// lives on the floating button — no top bar.
+    /// lives on the floating button; utilities are at the end of the list.
     private var listPane: some View {
             ZStack {
                 CanvasBackground()
@@ -341,8 +341,8 @@ struct StationListView: View {
                 // no separators, no insets.
                 List {
                     Group {
-                        header
                         locatedSections
+                        footer
                         // max: never shrinks below the intended footprint + margin at small text sizes.
                         Color.clear.frame(height: max(fabClearance, Self.fabClearanceBase))  // scroll clear of the FABs
                     }
@@ -466,7 +466,7 @@ struct StationListView: View {
         }
     }
 
-    // The list: My Location → Favorites → Near Me → Recents, nothing else —
+    // The stations: My Location → Favorites → Near Me → Recents —
     // search is the discovery path for the rest of the catalog. Without a fix
     // the ranking anchors on the Chesapeake Bay fallback, and the My Location slot
     // holds the amber denied card when location is off. Dedupe: ListGroups —
@@ -587,7 +587,7 @@ struct StationListView: View {
                 }
         }
 
-        // Recents at the very bottom: recently viewed, most recent
+        // Recents after Near Me: recently viewed, most recent
         // first, minus everything already shown above. Same cards as Near Me;
         // no distance — a recent is an explicit pick, not a ranked one.
         let recentItems = items(groups.recents)
@@ -716,35 +716,41 @@ struct StationListView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            Text("Slackwater")
-                .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(SN.paper)
-                // The wordmark never wraps: in the 320pt iPad sidebar it shares
-                // the row with two 34pt buttons and would break as "Slackwat/er".
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .layoutPriority(1)
-            Spacer(minLength: 8)
-            // Offline / online / downloading, beside the gear — and the way in
-            // to the downloads manager (web OfflineStatus).
-            OfflineStatusButton { showDownloads = true }
-            // Units live in Settings only — no list-header pill.
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(SN.foam.opacity(0.8))
-                    .frame(width: 34, height: 34)
-                    .background(Color.white.opacity(0.08), in: Circle())
+    private var footer: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 0) {
+                OfflineStatusButton { showDownloads = true }
+                Rectangle().fill(SN.foam.opacity(0.12)).frame(height: 1)
+                Button {
+                    showSettings = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "gearshape").frame(width: 28)
+                        Text("Settings")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(SN.foam.opacity(0.4))
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)  // List rows: keep the tap on the gear itself
-            .accessibilityLabel("Settings")
+            .font(.body)
+            .foregroundStyle(SN.foam)
+            .padding(.horizontal, 16)
+            .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 20))
+
+            VStack(spacing: 4) {
+                Text("Slackwater").font(.subheadline.weight(.semibold))
+                Text("by Open Waters").font(.caption)
+            }
+            .foregroundStyle(SN.foam.opacity(0.55))
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 6)
+        .padding(.horizontal, 16)
+        .padding(.top, 24)
     }
 
     // MARK: - Floating toolbar (search bottom-left, list ⇄ map bottom-right,
@@ -960,10 +966,8 @@ struct MyLocationTile<Card: View>: View {
                     .font(.caption2.monospaced())
                     .foregroundStyle(SN.foam.opacity(0.55))
                     // Deliberately neither shrunk to fit nor line-limited: the
-                    // wordmark is the only text in the app allowed to scale
-                    // down (TypeScaleTests `testOnlyTheWordmarkShrinks` — a
-                    // line scan, so naming the modifier here would fail it),
-                    // and a truncated position is worse than a wrapped one.
+                    // A truncated position is worse than a wrapped one,
+                    // and no app text shrinks to fit (TypeScaleTests).
                     // At the largest accessibility sizes this wraps and the
                     // row grows.
             }

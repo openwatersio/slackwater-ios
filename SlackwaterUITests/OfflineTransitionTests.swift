@@ -129,11 +129,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let (app, _) = fixture("hold-first", "chs-victoria,chs-race-passage,chs-porlier-pass,chs-weynton-passage",
                                fix: ("48.4235", "-123.3705"))
         let indicator = app.buttons["offline-status"].firstMatch
+        scrollTo(indicator, in: app)
         XCTAssert(indicator.appears(within: 5))
         waitFor(indicator, "value BEGINSWITH 'Downloading'", timeout: 10)
         let gear = app.buttons["Settings"].firstMatch
-        XCTAssert(indicator.frame.maxX <= gear.frame.minX + 1)
-        XCTAssertEqual(indicator.frame.midY, gear.frame.midY, accuracy: 2)
+        XCTAssert(indicator.frame.maxY <= gear.frame.minY + 1)
         openDownloads(app)
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch

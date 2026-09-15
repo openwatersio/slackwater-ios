@@ -60,7 +60,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         app.terminate()
         app.launchArguments = testArguments([])
         app.launch()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 10))
+        XCTAssert(stationList(app).appears(within: 10))
         XCTAssertFalse(app.textFields.firstMatch.exists,
                        "search must not reopen on relaunch — the handoff is one-shot")
     }
@@ -167,7 +167,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         openFridayHarbor(app)
         // The sidebar must still be on screen while the detail shows —
         // a split, not a push.
-        XCTAssert(app.staticTexts["Slackwater"].exists, "sidebar gone — not a split layout")
+        XCTAssert(stationList(app).exists, "sidebar gone — not a split layout")
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5))
         // A second pick replaces the detail (no stacking) — web sidebar behavior.
         openSearch(app, "deception")
@@ -191,7 +191,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         XCUIDevice.shared.orientation = .portrait
         settleLayout(app.windows.firstMatch)  // the rotation, by the window it resizes
-        XCTAssert(app.staticTexts["Slackwater"].exists, "portrait dropped the sidebar")
+        XCTAssert(stationList(app).exists, "portrait dropped the sidebar")
         save(app, "m44-ipad-portrait.png")
     }
 
@@ -245,7 +245,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // Toggle back: list returns, the button is the map icon again.
         XCTAssert(app.buttons["List"].appears(within: 5))
         app.buttons["List"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
         XCTAssert(app.buttons["Map"].exists, "toggle did not flip back to the map icon")
     }
 
@@ -349,7 +349,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                           "a drag inside the strip no longer scrubs")
 
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the tide detail")
 
         // (b) current detail.
@@ -357,7 +357,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         assertCurrentDetailRendered(app)
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the current detail")
 
         // (c) the CHS waiting page — no chart at all, held there by the kill switch.
@@ -365,7 +365,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 10))
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the CHS waiting page")
 
         // (d) a derived gate — Malibu Rapids, likewise pending offline.
@@ -373,7 +373,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         pickSearchResult(app, app.staticTexts["Malibu Rapids"].firstMatch)
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 10))
         edgeSwipeBack(app)
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5),
+        XCTAssert(stationList(app).appears(within: 5),
                   "edge swipe did not pop the derived-gate detail")
 
         // Reaching the list after every detail verifies the shared edge-pop
@@ -394,7 +394,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssertFalse(app.staticTexts["Pick a station"].exists,
                        "the placeholder is still what a fresh iPad launch shows")
         // The sidebar is intact — this is a selection, not a push.
-        XCTAssert(app.staticTexts["Slackwater"].exists)
+        XCTAssert(stationList(app).exists)
 
         // Don't fight the user: a deliberate pick stands, and coming back to
         // the list does not re-run the auto-select.
@@ -494,6 +494,6 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(app.buttons["List"].exists, "the map chrome stopped responding")
         XCTAssert(app.buttons["Search"].exists)
         app.buttons["List"].tap()
-        XCTAssert(app.staticTexts["Slackwater"].appears(within: 5))
+        XCTAssert(stationList(app).appears(within: 5))
     }
 }
