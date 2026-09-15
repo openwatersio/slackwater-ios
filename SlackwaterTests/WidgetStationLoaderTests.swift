@@ -410,4 +410,18 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertEqual(WidgetStationLoader.fallbackStationID(defaults: d),
                        TideStationRecord.fridayHarborID)
     }
+
+    func testFallbackSkipsRemovedSavedStations() {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let removed = "chs-north-galiano"
+        let live = TideStationRecord.fridayHarborID
+
+        d.set([removed, live], forKey: AppGroup.favoritesKey)
+        XCTAssertEqual(WidgetStationLoader.fallbackStationID(defaults: d), live)
+
+        d.set([removed], forKey: AppGroup.favoritesKey)
+        d.set([removed, live], forKey: AppGroup.recentsKey)
+        XCTAssertEqual(WidgetStationLoader.fallbackStationID(defaults: d), live)
+    }
 }

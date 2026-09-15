@@ -10,13 +10,7 @@ struct StationMatches: Identifiable, Hashable {
     let matches: [StationItem]
     /// The station on screen for this place, selected when the chooser opens.
     var shown: String? = nil
-    /// Set when the chooser is offering a replacement for a favorite whose
-    /// station left the bundle (issue #91): the dead id to swap out, and the
-    /// position the distances are measured from — where that station *was*,
-    /// not where the user is. A dead Haida Gwaii favorite offering Victoria
-    /// stations because that is where the phone happens to be is not an offer.
-    /// A struct rather than the tuple it wants to be: tuples aren't Hashable,
-    /// and this type is.
+    /// The removed station whose location anchors alternatives; its id is replaced if still favorited.
     struct Removed: Hashable {
         let id: String
         let lat: Double
@@ -148,7 +142,7 @@ struct StationChooserSheet: View {
 
     private var explanation: String {
         if place.replacing != nil {
-            return "These stations are nearest to where it was. Pick one to replace this favorite."
+            return "These stations are nearest to where it was. Pick one to use instead."
         }
         let review = "Review the other locations if you need predictions for a different part of the water."
         guard let shown = place.matches.first(where: { $0.id == place.shown }) else { return review }
