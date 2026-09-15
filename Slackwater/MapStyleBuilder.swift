@@ -63,9 +63,13 @@ let PIN_HALO: Double = 1.5
 let PIN_STATE_COLOUR: [Any] = [
     "to-color", ["get", "state"],
     ["match", ["get", "state"],
-     "rising", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
+     // A tide's trend is the curve's own pair (teal/amber), the same inks
+     // the card lead, the chart's turn dots and the schedule pills draw. A
+     // current's direction is the flood/ebb axis. They are different claims
+     // about different water, so they do not share a blue.
+     "rising", mapHex(SN.graphHighHex, darkenedBy: PIN_STATE_DARKEN),
+     "falling", mapHex(SN.graphLowHex, darkenedBy: PIN_STATE_DARKEN),
      "flood", mapHex(SN.floodHex, darkenedBy: PIN_STATE_DARKEN),
-     "falling", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
      "ebb", mapHex(SN.ebbHex, darkenedBy: PIN_STATE_DARKEN),
      "slack", mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
      PIN_NEUTRAL] as [Any],   // unknown — SN.steel, already 3.25:1 on land
@@ -169,10 +173,10 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // shown by the same `selected` property the glyph scale reads, so no
     // predicate has to be swapped at runtime.
     //
-    // White, and that is not a free choice: green is slack and blue is
-    // flood/rising everywhere else on this map, so a selection in either
-    // would be making a claim about the water. White is the one tone the
-    // state palette has not spent.
+    // White, and that is not a free choice: green is slack, blue is flood,
+    // teal is a rising tide and amber is a falling one, so a selection in
+    // any of them would be making a claim about the water. White is the one
+    // tone the state palette has not spent.
     let selected = MLNCircleStyleLayer(identifier: "station-selected", source: source)
     selected.predicate = NSPredicate(mglJSONObject: ["has", "selected"] as [Any])
     selected.circleRadius = grown(PIN_RADIUS * PIN_SELECTED_DISC)

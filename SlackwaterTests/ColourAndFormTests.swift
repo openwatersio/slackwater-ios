@@ -116,13 +116,14 @@ final class ColourAndFormTests: XCTestCase {
         try scan("Slackwater/CurveDrawing.swift", from: "enum CurveDrawing {", to: { $0 == "}" }, atLeast: 40)
     }
 
-    /// A high is one ink and a low is the other, on all three surfaces a tide
-    /// detail stacks: the chart's turn dots, the schedule row's pill, and the
-    /// lead's glyph. They sit within a screen of each other, so a row whose
-    /// pill disagreed with the dot it scrubs to would read as two events.
-    /// Source text rather than rendered colour — the failure mode is a
-    /// surface reaching for `SN.rising`/`SN.flood` (the direction axis) or a
-    /// literal, not a token resolving wrong.
+    /// A high is one ink and a low is the other, on every surface that names
+    /// a tide's trend: the chart's turn dots, the schedule row's pill, the
+    /// lead's glyph, the station card's arrow, and the map's gauge fill. They
+    /// sit within a screen of each other, so a row whose pill disagreed with
+    /// the dot it scrubs to would read as two events. Mostly source text
+    /// rather than rendered colour — the failure mode is a surface reaching
+    /// for `SN.rising`/`SN.flood` (the direction axis) or a literal, not a
+    /// token resolving wrong.
     func testTurnInksAgreeAcrossChartPillAndLead() throws {
         let strip = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = strip.components(separatedBy: .newlines)
@@ -144,6 +145,27 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertTrue(try repoSource("Slackwater/TideDetailView.swift")
                         .contains("(up ? SN.graphHigh : SN.graphLow)"),
                       "the tide lead's glyph must draw the same two inks")
+
+        // The station card's conditions arrow, the same pair one screen back.
+        XCTAssertTrue(try repoSource("Slackwater/StationCardFace.swift")
+                        .contains("state.rising ? SN.graphHigh : SN.graphLow"),
+                      "the card's tide arrow must draw the same two inks")
+
+        // And the map's tide gauge, the fourth surface — a rising gauge that
+        // wore the flood blue would say "flood current" on a chart where the
+        // current pins beside it mean exactly that.
+        XCTAssertEqual(mapPinHex("rising"), mapHex(SN.graphHighHex, darkenedBy: PIN_STATE_DARKEN),
+                       "the map's rising gauge must draw the chart's high ink")
+        XCTAssertEqual(mapPinHex("falling"), mapHex(SN.graphLowHex, darkenedBy: PIN_STATE_DARKEN),
+                       "the map's falling gauge must draw the chart's low ink")
+    }
+
+    /// The tone `PIN_STATE_COLOUR`'s match assigns to one named state.
+    private func mapPinHex(_ state: String) -> String? {
+        guard let match = PIN_STATE_COLOUR[2] as? [Any] else { return nil }
+        return stride(from: 2, to: match.count - 1, by: 2)
+            .first { match[$0] as? String == state }
+            .flatMap { match[$0 + 1] as? String }
     }
 
     /// Green means slack and only slack. A ramp that passes through green puts
@@ -297,11 +319,13 @@ final class ColourAndFormTests: XCTestCase {
     /// hand-maintained nothing tied them to `Palette.swift`: retarget `SN.flood`
     /// and the map kept the old blue — two blues both meaning flood, and not
     /// one failing test. They are derived from the token hexes now; this
-    /// asserts the wiring, i.e. that `rising` reaches flood and not ebb.
+    /// asserts the wiring, and in particular that a tide's `rising` reaches
+    /// the curve's high ink while a current's `flood` reaches the direction
+    /// axis. The two are not the same claim and must not share a colour.
     func testMapPinHexesTrackTheTokens() throws {
         let expected: [String: UInt32] = [
-            "rising": SN.floodHex, "flood": SN.floodHex,
-            "falling": SN.ebbHex, "ebb": SN.ebbHex,
+            "rising": SN.graphHighHex, "falling": SN.graphLowHex,
+            "flood": SN.floodHex, "ebb": SN.ebbHex,
             "slack": SN.goHex,
         ]
         // #13: the expression is now to-color(state, match(...)) — a state
@@ -454,12 +478,18 @@ final class ColourAndFormTests: XCTestCase {
                         "the glyph plates lost their shadow colour")
     }
 
-    /// The state palette's integrity: the two direction ends, slack and the
-    /// neutral must stay four tellable-apart fills. Walks the actual match
-    /// expression rather than a list of expected colours, so a new state
-    /// cannot ship unexamined. (The fills' contrast floor on the water tone
-    /// is asserted above.)
-    func testPinStatePaletteStaysFourDistinctFills() throws {
+    /// The state palette's integrity: the tide's two trend inks, the
+    /// current's two direction ends, slack and the neutral must stay six
+    /// tellable-apart fills. Walks the actual match expression rather than a
+    /// list of expected colours, so a new state cannot ship unexamined.
+    ///
+    /// Six, not four, because a rising tide and a flood current are separate
+    /// claims that used to share the blue. The closest pair the six contain
+    /// is the falling-tide amber against the ebb amber, measured at ΔE 20 —
+    /// wider than the flood blue against the neutral steel, which is 17 and
+    /// has always shipped. (The fills' contrast floor on the water tone is
+    /// asserted above.)
+    func testPinStatePaletteStaysDistinctFills() throws {
         let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]
         var i = 2   // past "match" and ["get", "state"]
@@ -468,7 +498,7 @@ final class ColourAndFormTests: XCTestCase {
                 try XCTUnwrap(stateMatch[i + 1] as? String)
             i += 2
         }
-        XCTAssertEqual(Set(fills.values).count, 4,
-                       "the pin palette must keep four distinct fills: \(fills)")
+        XCTAssertEqual(Set(fills.values).count, 6,
+                       "the pin palette must keep six distinct fills: \(fills)")
     }
 }
