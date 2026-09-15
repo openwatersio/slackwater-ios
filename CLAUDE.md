@@ -61,7 +61,7 @@ Not with CI — every lane is GitHub-hosted since #327. Shared with the other wo
 - **Screenshots land in `/tmp` under a bare `xcodebuild`.** `scripts/test.sh` sets `TEST_RUNNER_M1_SHOT_DIR` (default `/tmp/slackwater-shots`); pass it yourself otherwise. For anything visual, open the screenshot.
 - **Read the result bundle, not just the exit code** — `build/results-$MODE-$sim.xcresult`. A run killed by contention reports "Test crashed with signal kill" with zero assertion failures; a bundle with no `Info.plist` means the run died mid-write.
 - **A `scripts/test.sh --live` smoke that fails under load may pass alone.** Routine suites are offline; re-run the live selection before blaming your change.
-- **"Timed out trying to boot simulator after waiting 60.00s" is a stale `Simulator.app`, not your code.** `killall Simulator` clears it and is safe while headless tests run — the app is only a viewer.
+- **"Timed out trying to boot simulator after waiting 60.00s" is a stale simulator viewer, not your code.** `killall DeviceHub 2>/dev/null || killall Simulator` clears it and is safe while headless tests run — the app is only a viewer.
 - **Shut down every simulator you boot** (`xcrun simctl shutdown <udid>` — never `shutdown all`; another session may be mid-test on its own device).
 
 ## Reading a CI failure
