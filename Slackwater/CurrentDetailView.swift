@@ -31,6 +31,11 @@ func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speed
     return out.sorted { $0.time < $1.time }
 }
 
+func subordinateCurrentFooter(stationName: String, referenceName: String) -> String {
+    let reference = stationName == referenceName ? "" : "\(referenceName)'s "
+    return "NOAA subordinate station: \(reference)slacks and maxima, corrected by published offsets"
+}
+
 struct CurrentDetailView: View {
     let record: CurrentStationRecord
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
@@ -201,7 +206,7 @@ struct CurrentDetailView: View {
             } else if let ref = record.referenceRecord {
                 // A different accuracy class: NOAA's table offsets against the
                 // reference's events, with a drawn curve between them.
-                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA subordinate station: \(ref.name)'s slacks and maxima, corrected by published offsets")
+                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(subordinateCurrentFooter(stationName: record.name, referenceName: ref.name))")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else {
