@@ -7,10 +7,11 @@ trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/repo/scripts" "$scratch/repo/Slackwater" "$scratch/repo/SlackwaterTests" "$scratch/repo/SlackwaterUITests" "$scratch/bin"
 touch "$scratch/repo/project.yml"  # the source-changed sweep at the end walks these
 cp "$root/scripts/test.sh" "$scratch/repo/scripts/test.sh"
+cp "$root/scripts/first-run.sh" "$scratch/repo/scripts/first-run.sh"
 touch "$scratch/repo/scripts/iwls-fixtures.mjs"
 log="$scratch/calls"
 
-for tool in node xcodegen xcodebuild; do
+for tool in node open xcodegen xcodebuild; do
   cat > "$scratch/bin/$tool" <<'STUB'
 #!/bin/zsh
 print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-}" >> "$CALL_LOG"
@@ -157,5 +158,9 @@ assert_lacks "xcodebuild"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/test.sh" --live >/dev/null
 assert_count '^lockf ' 2
 assert_has "xcodebuild test"
+
+: > "$log"
+PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/first-run.sh" >/dev/null
+assert_has "open -a DeviceHub"
 
 print "runner mode checks passed"
