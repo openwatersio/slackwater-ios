@@ -61,17 +61,17 @@ struct ChsCardView: View {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial, km: km)
         case .fitting:
-            pending(fitting: true)
+            pending()
         case .pending:
             pending()
         case .failed:
-            pending(failed: true)
+            pending()
         }
     }
 
-    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+    private func pending() -> ChsPendingCard {
         ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
-                       status: cardStatus(id: info.id, fitting: fitting, failed: failed))
+                       status: cardStatus(id: info.id))
     }
 }
 
@@ -123,18 +123,18 @@ struct ChsGateCardView: View {
         case .fitted(let port):
             fittedCard(DerivedGateRecord(gate: gate, port: port))
         case .fitting:
-            pending(fitting: true)
+            pending()
         case .pending:
             pending()
         case .failed:
-            pending(failed: true)
+            pending()
         }
     }
 
     /// A derived gate waits on its reference PORT's tidal download.
-    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+    private func pending() -> ChsPendingCard {
         ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.reference, fitting: fitting, failed: failed))
+                       status: cardStatus(id: gate.reference))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -173,11 +173,11 @@ struct ChsCurrentGateCardView: View {
                     CurrentCardView(record: record, km: km,
                                     provisional: service.isProvisional(gate.id) ? gate : nil)
                 case .fitting:
-                    pending(fitting: true)
+                    pending()
                 case .pending:
                     pending()
                 case .failed:
-                    pending(failed: true)
+                    pending()
                 }
             }
         }
@@ -200,9 +200,9 @@ struct ChsCurrentGateCardView: View {
         onlineStore = ChsModelStore.loadOnline(gate.id)
     }
 
-    private func pending(fitting: Bool = false, failed: Bool = false) -> ChsPendingCard {
+    private func pending() -> ChsPendingCard {
         ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.id, fitting: fitting, failed: failed))
+                       status: cardStatus(id: gate.id))
     }
 
     /// The 7 online (fit-reject) gates: a covering fetched window
@@ -220,7 +220,8 @@ struct ChsCurrentGateCardView: View {
             // former (.notDownloaded), non-nil is the latter (.expired); it
             // doesn't read the block's own covered-to date.
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                           status: onlineGateStatus(onlineStore?.blocks.last, online: net.online))
+                           status: onlineGateStatus(onlineStore?.blocks.last, online: net.online,
+                                                    state: service.onlineState(gate.id)))
         }
     }
 }
@@ -453,14 +454,17 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
 /// Where a fittable CHS station stands, in precedence order: what is happening
 /// right now beats what is merely true. Replaces the five sentences
 /// `chsPendingMessage` used to build.
-@MainActor func cardStatus(id: String, fitting: Bool = false, failed: Bool = false) -> CardStatus {
-    if fitting { return .downloading }
-    if failed { return .failed }
-    // Not in the download set at all (M53 — most of Canada). Opening it is what
-    // downloads it, so this is the honest state connected or not; it must not
-    // claim a queue it isn't in.
-    if !ChsFitService.shared.isQueued(id) { return .notDownloaded }
-    return Connectivity.shared.online ? .queued : .offline
+@MainActor func cardStatus(id: String) -> CardStatus {
+    guard let job = ChsFitService.shared.queue.job(id) else { return .notDownloaded }
+    switch job.status {
+    case .downloading: return .downloading
+    case .failed: return .failed
+    case .ready: return .queued
+    case .pending:
+        guard Connectivity.shared.online else { return .offline }
+        if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
+        return .queued
+    }
 }
 
 /// The 7 online (fit-reject) gates: never queued, never fitted, so the only
@@ -469,9 +473,16 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
 ///
 /// Pure, and split from the view for it: the nil/stale distinction is the bug
 /// #93 named, and it needs a test that doesn't build a card.
-func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool) -> CardStatus {
+func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool,
+                      state: ChsFitService.OnlineFetchState = .idle) -> CardStatus {
     // Offline first: with no signal, neither tapping nor waiting fetches
     // anything, so "get online" is the only true thing to say.
     guard online else { return .offline }
+    switch state {
+    case .fetching: return .downloading
+    case .deferred: return .retrying
+    case .failed: return .failed
+    case .idle: break
+    }
     return window == nil ? .notDownloaded : .expired
 }

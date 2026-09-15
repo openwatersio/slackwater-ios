@@ -3,6 +3,22 @@ import TideEngine
 @testable import Slackwater
 
 final class IwlsFixtureTests: XCTestCase {
+    func testAnExhaustedRateLimitRemainsRetryableByTheQueue() {
+        XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 429)))
+        XCTAssert(ChsError.isPermanent(IwlsFetcher.terminalError(status: 404)))
+        XCTAssertFalse(ChsError.isPermanent(IwlsFetcher.terminalError(status: 503)))
+    }
+
+    func testThePacerSerialisesAcrossFetchers() async {
+        let pacer = IwlsPacer(interval: 0.1)
+        let start = Date.now
+        async let first: Void? = try? pacer.wait()
+        async let second: Void? = try? pacer.wait()
+        async let third: Void? = try? pacer.wait()
+        _ = await (first, second, third)
+        XCTAssertGreaterThanOrEqual(Date.now.timeIntervalSince(start), 0.2)
+    }
+
     struct Recording: Decodable {
         struct Station: Decodable {
             struct Metadata: Decodable { let floodDirection: Double?; let ebbDirection: Double? }

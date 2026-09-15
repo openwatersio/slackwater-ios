@@ -4,6 +4,7 @@
 // post-split single-track anatomy, minus everything fit/provisional (there is
 // no fast answer here, only the real published numbers or an honest why-not).
 import SwiftUI
+import Combine
 import TideEngine
 
 struct OnlineGateDetailView: View {
@@ -25,8 +26,7 @@ struct OnlineGateDetailView: View {
     /// The local midnight the window hangs from. Only `returnToNow` and (in
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
-    @State private var fetching = false
-    @State private var fetchFailed = false
+    @State private var fetchState: ChsFitService.OnlineFetchState = .idle
     /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
     /// discovery fallback when this gate carries no `tideReference`. Computed
     /// once on appear; the body re-evaluates on every scrub tick.
@@ -147,6 +147,7 @@ struct OnlineGateDetailView: View {
             .onAppear {
                 let today = todayLocal(tz)
                 if anchor == .distantPast { anchor = today }
+                fetchState = ChsFitService.shared.onlineState(gate.id)
                 if window == nil { window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) }
                 rebuild()
                 RecentsStore.shared.record(gate.id)
@@ -170,6 +171,8 @@ struct OnlineGateDetailView: View {
                 window = ChsModelStore.loadOnline(gate.id)?.block(covering: anchor) ?? window
                 rebuild()
             }
+            .onReceive(ChsFitService.shared.$onlineStates
+                .map { $0[gate.id] ?? .idle }.removeDuplicates()) { fetchState = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
@@ -190,7 +193,7 @@ struct OnlineGateDetailView: View {
     /// for that week yet, so there is nothing to apologise for. If they do
     /// land there and it is missing, `applyAnchor` below says so properly.
     private func prefetchNextBlock() {
-        guard let window, net.online, !fetching else { return }
+        guard let window, net.online, fetchState != .fetching else { return }
         let from = prefetchAnchor(after: window, tz: tz)
         Task { try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) }
     }
@@ -211,31 +214,16 @@ struct OnlineGateDetailView: View {
     /// identical card, with no way out but the back button. (Named `from`, not
     /// `anchor`, so it cannot be mistaken for this view's `@State anchor`.)
     private func fetchNow(from: Date) {
-        guard !fetching else { return }
-        fetching = true
-        fetchFailed = false
+        guard ChsFitService.shared.onlineState(gate.id) != .fetching else { return }
         Task { @MainActor in
-            do {
-                // Persists itself and bumps ChsFitService.onlineFetchStamp on
-                // success — this view's own `window` update below is for its
-                // OWN redraw; the stamp is what tells any other still-mounted
-                // card/detail for this gate to reload the disk copy too.
-                //
-                // What comes back is the MERGED window, not just the block
-                // that was fetched, so assigning it never narrows what this
-                // view knows it has.
-                let fresh = try await ChsFitService.fetchOnlineWindow(for: gate, from: from)
+            if let fresh = try? await ChsFitService.fetchOnlineWindow(for: gate, from: from) {
                 window = fresh
                 rebuild()
-                fetching = false
                 // The anchor moved while this was in flight (a shared link
                 // landing on appear, or a pick), and the guard above dropped
                 // its fetch. Ask for it now. `from != anchor` stops a week the
                 // service cannot supply from refetching forever.
                 if timeline == nil, from != anchor, net.online { fetchNow(from: anchor) }
-            } catch {
-                fetching = false
-                fetchFailed = true
             }
         }
     }
@@ -274,7 +262,7 @@ struct OnlineGateDetailView: View {
             Button("Refresh") { fetchNow(from: todayLocal(tz)) }
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
-                .disabled(fetching || !net.online)
+                .disabled(fetchState == .fetching || !net.online)
         }
     }
 
@@ -289,14 +277,13 @@ struct OnlineGateDetailView: View {
     }
 
     private var downloadStatus: CardStatus {
-        if fetching { return .downloading }
-        if fetchFailed { return .failed }
-        return onlineGateStatus(window, online: net.online)
+        onlineGateStatus(window, online: net.online, state: fetchState)
     }
 
     private var downloadTitle: String {
         switch downloadStatus {
         case .downloading: "Downloading"
+        case .retrying: "Waiting to retry"
         case .failed: "Download failed"
         case .offline: "Waiting for signal"
         case .expired: "Offline download expired"
@@ -307,6 +294,7 @@ struct OnlineGateDetailView: View {
     private var downloadAction: String {
         switch downloadStatus {
         case .downloading: "Downloading…"
+        case .retrying: "Retry now"
         case .failed: "Retry"
         case .expired: "Download"
         case .offline: "Connect to download"
@@ -327,8 +315,8 @@ struct OnlineGateDetailView: View {
         if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
             text += " \(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))."
         }
-        if fetchFailed {
-            text += " The last attempt didn't finish."
+        if case .deferred = fetchState {
+            text += " Slackwater will try again automatically."
         }
         return text
     }

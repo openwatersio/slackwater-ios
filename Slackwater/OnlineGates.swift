@@ -61,9 +61,18 @@ extension ChsFitService {
     private func onlineFetchTask(for gate: ChsCurrentGateInfo,
                                  from anchor: Date?) -> Task<ChsOnlineWindow, Error> {
         if let existing = onlineFetch(for: gate.id) { return existing }
+        beginOnlineFetch(gate)
         let task = Task { @MainActor in
             defer { ChsFitService.shared.setOnlineFetch(nil, for: gate.id) }
-            return try await ChsFitService.runOnlineFetch(for: gate, from: anchor)
+            do {
+                let window = try await ChsFitService.runOnlineFetch(for: gate, from: anchor)
+                finishOnlineFetch(gate.id)
+                return window
+            } catch {
+                noteOnlineFailure(gate.id, error: Self.reason(error),
+                                  permanent: ChsError.isPermanent(error))
+                throw error
+            }
         }
         setOnlineFetch(task, for: gate.id)
         return task
@@ -79,7 +88,7 @@ extension ChsFitService {
                                        series: "wcsp1", in: list)
         let meta = try await fetcher.metadata(stationID: station.id)
         guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-            throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
+            throw ChsError.permanent("\(gate.name): IWLS metadata has no flood axis")
         }
         let (start, end) = Self.onlineFetchSpan(anchor: anchor, today: todayLocal(gate.tz))
         // Same absolute 7-day grid `chunkPlan` uses for the fit path — the
@@ -98,7 +107,7 @@ extension ChsFitService {
         // start/end below and stick forever — a zero-sample window that
         // still reads as "covers the strip". Fail the fetch instead: the
         // caller already turns any thrown error into the honesty card + retry.
-        guard !projected.isEmpty else { throw ChsError.failed("\(gate.name): IWLS returned an empty series") }
+        guard !projected.isEmpty else { throw ChsError.permanent("\(gate.name): IWLS returned an empty series") }
         // A chunk IWLS truncates mid-series (a short response, a gap at one
         // edge) must not be saved under the full requested start/end — that
         // would make `covers` pass on a window with a hole in it and

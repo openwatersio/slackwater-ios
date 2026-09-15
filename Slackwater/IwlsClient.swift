@@ -28,7 +28,7 @@ struct ChsSample: Codable, Equatable { let t: Double; let v: Double }
 struct ChsChunk: Equatable { let start: Date; let end: Date }
 
 /// Fetched chunks, on disk, keyed by what identifies them and nothing else —
-/// so a job that stepped aside mid-download resumes where it stopped instead of
+/// so a job that retries mid-download resumes where it stopped instead of
 /// paying for the same bytes twice. Purged per station once its final fit lands
 /// (the harmonic model is the artifact; the samples were only scaffolding).
 enum ChsChunkStore {
@@ -59,12 +59,27 @@ enum ChsChunkStore {
     }
 }
 
+actor IwlsPacer {
+    private let interval: TimeInterval
+    private var last = Date.distantPast
+
+    init(interval: TimeInterval = 2.5) { self.interval = interval }
+
+    func wait() async throws {
+        let now = Date.now
+        let slot = max(now, last.addingTimeInterval(interval))
+        last = slot
+        let gap = slot.timeIntervalSince(now)
+        if gap > 0 { try await Task.sleep(for: .seconds(gap)) }
+    }
+}
+
 /// Polite serial IWLS client: one request at a time, 2.5 s apart (~24/min,
 /// safely under the documented 3/s and 30/min caps), 7-day chunks.
 final class IwlsFetcher {
     static let base = "https://api-iwls.dfo-mpo.gc.ca/api/v1"
     private let killSwitch: Bool
-    private var lastRequest = Date.distantPast
+    static let pacer = IwlsPacer()
     private var fixtureRequests: [String: Int] = [:]
 
 #if DEBUG
@@ -86,7 +101,7 @@ final class IwlsFetcher {
         var registration: Int32 = 0
         let status = name.withCString { notify_register_check($0, &registration) }
         guard status == NOTIFY_STATUS_OK else {
-            throw ChsError.failed("could not register UI fixture checkpoint: \(checkpoint)")
+            throw ChsError.permanent("could not register UI fixture checkpoint: \(checkpoint)")
         }
         defer { notify_cancel(registration) }
         for _ in 0..<1_200 {
@@ -94,7 +109,7 @@ final class IwlsFetcher {
             if notify_get_state(registration, &state) == NOTIFY_STATUS_OK, state == 1 { return }
             try await Task.sleep(for: .milliseconds(50))
         }
-        throw ChsError.failed("UI fixture checkpoint timed out: \(checkpoint)")
+        throw ChsError.permanent("UI fixture checkpoint timed out: \(checkpoint)")
     }
 
     private static func fixtureStations() -> [IwlsStation] {
@@ -205,38 +220,49 @@ final class IwlsFetcher {
         }
     }
 
+    static func terminalError(status code: Int) -> ChsError {
+        (400...499).contains(code) && code != 429
+            ? .permanent("HTTP \(code)") : .transient("HTTP \(code)")
+    }
+
     private func get(_ path: String) async throws -> Data {
         guard !killSwitch else { throw ChsError.networkDisabled }
         let url = URL(string: Self.base + path)!
         var attempt = 0
         while true {
             attempt += 1
-            let wait = 2.5 - Date.now.timeIntervalSince(lastRequest)
-            if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
-            lastRequest = .now
-            let outcome: Result<Int, Error>
-            var retryAfter: Double?
-            do {
-                let (data, response) = try await Self.session.data(from: url)
-                let http = response as? HTTPURLResponse
-                let code = http?.statusCode ?? 0
-                if code == 200 { return data }
-                // ponytail: seconds only. Retry-After may also be an HTTP date,
-                // which parses as nil and falls back to the floor below.
-                retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
-                outcome = .success(code)
-            } catch {
-                outcome = .failure(error)
-            }
-            guard let delay = Self.retryDelay(after: outcome, attempt: attempt,
-                                              retryAfter: retryAfter) else {
-                switch outcome {
-                case .success(let code): throw ChsError.failed("HTTP \(code)")
+            let result = await request(url)
+            if let data = result.data { return data }
+            guard let delay = Self.retryDelay(after: result.outcome, attempt: attempt,
+                                              retryAfter: result.retryAfter) else {
+                switch result.outcome {
+                case .success(let code):
+                    throw Self.terminalError(status: code)
                 case .failure(let error): throw error
                 }
             }
             try await Task.sleep(for: .seconds(delay))
         }
+    }
+
+    private func request(_ url: URL) async
+        -> (data: Data?, outcome: Result<Int, Error>, retryAfter: Double?) {
+        let began = Date.now
+        let result: (Data?, Result<Int, Error>, Double?)
+        do {
+            try await Self.pacer.wait()
+            let (data, response) = try await Self.session.data(from: url)
+            let http = response as? HTTPURLResponse
+            let code = http?.statusCode ?? 0
+            let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
+            result = (code == 200 ? data : nil, .success(code), retryAfter)
+        } catch {
+            result = (nil, .failure(error), nil)
+        }
+        await MainActor.run {
+            ChsFitService.shared.observeRequest(seconds: Date.now.timeIntervalSince(began))
+        }
+        return result
     }
 
     /// The raw /stations JSON, beside the chunk store: at ~850 KB it is the
@@ -294,8 +320,7 @@ final class IwlsFetcher {
     }
 
     /// A current series (wcsp1/wcdp1) for one chunk. Cached on disk,
-    /// so this costs a request exactly once — including across a job that
-    /// stepped aside and came back, and across days (the grid is absolute).
+    /// so this costs a request exactly once across retries and days.
     func series(_ code: String, stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
         try await cached(code, stationID: stationID, chunk: chunk) {
             $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
@@ -320,16 +345,12 @@ final class IwlsFetcher {
             if Self.fixtureScenario == "hold-first", count == 0 {
                 try await Self.waitForFixtureRelease("\(stationID)-first-chunk")
             }
-            if Self.fixtureScenario == "yield-resume", count == 0 {
+            if Self.fixtureScenario == "no-interrupt", count == 0 {
                 if stationID == "chs-dodd-narrows", code == "wcsp1" {
                     try await Self.waitForFixtureRelease("dodd-first-chunk")
                 } else if stationID == "chs-tofino", code == "wlp" {
                     try await Self.waitForFixtureRelease("tofino-first-chunk")
                 }
-            }
-            if Self.fixtureScenario == "yield-resume", count == 1,
-               stationID == "chs-dodd-narrows", code == "wcsp1" {
-                try await Self.waitForFixtureRelease("dodd-resumed")
             }
         }
 #endif

@@ -131,8 +131,9 @@ final class TimelineTests: XCTestCase {
     func testOnlineGatesShareTheDownloadSurfaceAndCopy() throws {
         let manager = try repoSource("Slackwater/OfflineDownloads.swift")
         let detail = try repoSource("Slackwater/OnlineGateDetailView.swift")
+        let service = try repoSource("Slackwater/ChsFitService.swift")
         XCTAssertTrue(manager.contains("case .online(let gate): onlineRow(gate)"))
-        XCTAssertTrue(manager.contains(".onChange(of: net.online)"))
+        XCTAssertTrue(service.contains("private func observeConnectivity()"))
         XCTAssertTrue(detail.contains("Button(\"Refresh\")"))
         XCTAssertFalse(detail.contains("No offline prediction here"))
     }

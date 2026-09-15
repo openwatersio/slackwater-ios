@@ -195,8 +195,7 @@ struct StationListView: View {
         // First connected launch: the auto-fit set around where this list is
         // ranked downloads in the background, nearest-first, and the nearby
         // online gates prefetch (`ChsFitService.autoFitSet` /
-        // `autoPrefetchGates`). Partial failure retries from the manager or
-        // the next launch.
+        // `autoPrefetchGates`). Interrupted work retries automatically.
         //
         // `anchor`, not `fix` (#178): the list ranks from `rankingAnchor` —
         // fix, then last-opened, then Chesapeake Bay — and adopting only on a live

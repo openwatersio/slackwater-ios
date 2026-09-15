@@ -79,6 +79,15 @@ final class ChartPackTests: XCTestCase {
         XCTAssertEqual(packs.count, 10)
     }
 
+    func testStationDiscsCoverOnlyTheStationsPassedIn() {
+        let packs = desiredChartPacks(
+            fix: (lat: 48.4235, lon: -123.3705),
+            stations: [(id: "chs-victoria-harbour", lat: 48.4243, lon: -123.3709)])
+        XCTAssertEqual(packs.filter { $0.key.hasPrefix("station/") }.count, 1)
+        XCTAssert(packs.contains { $0.key == "world" })
+        XCTAssertEqual(packs.filter { $0.key.hasPrefix("area/") }.count, 9)
+    }
+
     func testTwoStationsInOneCellShareTheAreaPack() {
         // Deception Pass and Seattle sit in the same z5 cell.
         let packs = desiredChartPacks(fix: nil,

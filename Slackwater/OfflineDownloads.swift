@@ -23,13 +23,13 @@ import SwiftUI
 import Network
 
 enum ManagedDownloadState: Equatable {
-    case downloading, queued, failed, expired, notDownloaded, available, permanent
+    case downloading, queued, retrying, failed, expired, notDownloaded, available, permanent
 }
 
 func downloadSortRank(_ state: ManagedDownloadState, remainingDays: Int?) -> Int {
     switch state {
     case .downloading: 0
-    case .queued: 100_000
+    case .queued, .retrying: 100_000
     case .failed, .expired, .notDownloaded: 200_000
     case .available where (remainingDays ?? 0) <= 3: 200_000
     case .available: 300_000 + (remainingDays ?? 0)
@@ -39,6 +39,25 @@ func downloadSortRank(_ state: ManagedDownloadState, remainingDays: Int?) -> Int
 
 func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
     state == .available || state == .permanent
+}
+
+func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
+               provisional: Bool = false, at now: Date = appNow()) -> String {
+    if provisional { return "Refining…" }
+    switch job.status {
+    case .ready: return "Available offline"
+    case .failed: return job.lastError.map { "Unavailable · \($0)" } ?? "Unavailable"
+    case .downloading:
+        return job.total > 0 ? "Downloading · \(job.done) of \(job.total)" : "Downloading…"
+    case .pending:
+        guard online else { return "Waiting for signal" }
+        if let due = job.retryAfter, due > now {
+            let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
+            return "Retrying in \(minutes) min"
+        }
+        return position.map { $0 <= 1 ? "Waiting · next" : "Waiting · \(ordinal($0)) in line" }
+            ?? "Waiting"
+    }
 }
 
 private enum ManagedDownload: Identifiable {
@@ -59,7 +78,8 @@ private enum ManagedDownload: Identifiable {
 final class Connectivity: ObservableObject {
     static let shared = Connectivity()
 
-    @Published private(set) var online: Bool
+    @Published private(set) var online = false
+    @Published private(set) var constrained = true
     private let monitor = NWPathMonitor()
 
     private init() {
@@ -70,14 +90,24 @@ final class Connectivity: ObservableObject {
         #else
         let forcedOnline = false
         #endif
-        online = !networkKillSwitch || forcedOnline
-        guard online else { return }
 #if DEBUG
-        if IwlsFetcher.usesFixture || forcedOnline { return }
+        if IwlsFetcher.usesFixture || forcedOnline {
+            online = true
+            constrained = false
+            return
+        }
 #endif
+        guard !networkKillSwitch else {
+            constrained = false
+            return
+        }
         monitor.pathUpdateHandler = { [weak self] path in
             let up = path.status == .satisfied
-            Task { @MainActor in self?.online = up }
+            let constrained = path.isConstrained
+            Task { @MainActor in
+                self?.online = up
+                self?.constrained = constrained
+            }
         }
         monitor.start(queue: .global(qos: .utility))
     }
@@ -106,6 +136,13 @@ struct OfflineStatusButton: View {
             return .downloading(ready: queue.ready, total: queue.total)
         }
         return net.online ? .online : .offline
+    }
+
+    private var hasPermanentFailure: Bool {
+        service.queue.failed > 0 || service.onlineStates.values.contains {
+            if case .failed = $0 { return true }
+            return false
+        }
     }
 
     var body: some View {
@@ -157,8 +194,8 @@ struct OfflineStatusButton: View {
     /// or no signal with stations still missing. Everything else is calm.
     private var tint: Color {
         switch state {
-        case .downloading: service.queue.failed > 0 ? SN.amber : SN.leaf
-        case .online: service.queue.failed > 0 ? SN.amber : SN.foam.opacity(0.8)
+        case .downloading: hasPermanentFailure ? SN.amber : SN.leaf
+        case .online: hasPermanentFailure ? SN.amber : SN.foam.opacity(0.8)
         case .offline: service.queue.complete ? SN.leaf : SN.amber
         }
     }
@@ -203,8 +240,6 @@ struct OfflineManagerList: View {
     @ObservedObject private var charts = ChartPackManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openChsRoute) private var openChsRoute
-    @State private var fetchingOnline: Set<String> = []
-    @State private var failedOnline: Set<String> = []
     // Glyph-in-slot sizing (issue #14): the glyph
     // scales with type, the slot scales with it so it can't overflow the row.
 
@@ -246,7 +281,7 @@ struct OfflineManagerList: View {
     var body: some View {
         ScrollView {
             // Lazy, and the list is bounded by construction (M53): the queue
-            // is the DOWNLOAD SET — the nearest few, whatever you opened, and
+            // is the DOWNLOAD SET — the active radius, whatever you opened, and
             // whatever is already on disk — not the 1,097-station catalog.
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
@@ -265,12 +300,6 @@ struct OfflineManagerList: View {
         }
         .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
-        .onChange(of: net.online) { _, online in
-            guard online else { return }
-            for id in Array(failedOnline) {
-                if let gate = onlineGates.first(where: { $0.id == id }) { fetch(gate) }
-            }
-        }
     }
 
     // MARK: Summary
@@ -302,18 +331,14 @@ struct OfflineManagerList: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("download-all-currents")
             }
-            if failedCount > 0 {
-                Button {
-                    service.retryFailed()
-                    for id in Array(failedOnline) {
-                        if let gate = onlineGates.first(where: { $0.id == id }) { fetch(gate) }
-                    }
-                } label: {
-                    Text("Retry \(failedCount) failed")
+            if deferredCount > 0 {
+                Button { service.retryNow() } label: {
+                    Text("Retry now")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(SN.amber)
+                        .foregroundStyle(SN.leaf)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("downloads-retry-now")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -366,7 +391,7 @@ struct OfflineManagerList: View {
                 : "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected."
         }
         if state.failed > 0 {
-            return "Some map areas didn't finish.\(held) They resume on their own when you're connected."
+            return "Some map areas haven't finished.\(held) They resume on their own when you're connected."
         }
         if state.downloading {
             return net.online
@@ -377,7 +402,7 @@ struct OfflineManagerList: View {
     }
 
     /// What the manager is honest about at national scale (M53): this list is
-    /// the download SET, not the catalog. "Done" means the nearest stations
+    /// the download SET, not the catalog. "Done" means the nearby stations
     /// are on the device — and the sentence has to say, every time, that the
     /// rest of Canada is one tap away rather than missing.
     private var summaryLine: String {
@@ -397,7 +422,7 @@ struct OfflineManagerList: View {
         if !net.online {
             return "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.\(onDemandLine)"
         }
-        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. Usually \(durationPhrase(remainingSeconds)) for the rest. Expiring downloads can be refreshed below.\(onDemandLine)"
+        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.\(onDemandLine)"
     }
 
     private var onDemandLine: String {
@@ -408,27 +433,33 @@ struct OfflineManagerList: View {
 
     private var remainingSeconds: Double {
         queue.jobs.filter { $0.status == .pending || $0.status == .downloading }
-            .reduce(0) { $0 + $1.estimatedSeconds }
+            .reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
     }
 
     private var allGates: [ChsJob] { service.gatesToDownload }
-    private var allGatesSeconds: Double { allGates.reduce(0) { $0 + $1.estimatedSeconds } }
+    private var allGatesSeconds: Double {
+        allGates.reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
+    }
 
     private var readyCount: Int { downloads.filter { downloadIsReady(managedState($0).state) }.count }
-    private var failedCount: Int { queue.failed + failedOnline.count }
+    private var failedCount: Int {
+        queue.failed + onlineGates.count {
+            if case .failed = service.onlineState($0.id) { return true }
+            return false
+        }
+    }
+    private var deferredCount: Int {
+        queue.deferred() + onlineGates.count {
+            if case .deferred = service.onlineState($0.id) { return true }
+            return false
+        }
+    }
 
     // MARK: Rows
 
-    /// Web OfflineManager STATUS_TEXT, verbatim — except for the gate that is
-    /// usable but not finished, which the web has no equivalent of.
     private func statusText(_ job: ChsJob) -> String {
-        if service.isProvisional(job.id) { return "Refining…" }
-        switch job.status {
-        case .pending: return "Waiting"
-        case .downloading: return "Downloading…"
-        case .ready: return "Available offline"
-        case .failed: return "Failed"
-        }
+        rowStatus(job, online: net.online, position: queue.position(job.id),
+                  provisional: service.isProvisional(job.id))
     }
 
     private func statusTint(_ job: ChsJob) -> Color {
@@ -456,12 +487,18 @@ struct OfflineManagerList: View {
         switch download {
         case .fitted(let job):
             if job.status == .downloading || service.isProvisional(job.id) { return (.downloading, nil) }
-            if job.status == .pending { return (.queued, nil) }
+            if job.status == .pending {
+                return ((job.retryAfter ?? .distantPast) > appNow() ? .retrying : .queued, nil)
+            }
             if job.status == .failed { return (.failed, nil) }
             return (.permanent, nil)
         case .online(let gate):
-            if fetchingOnline.contains(gate.id) { return (.downloading, nil) }
-            if failedOnline.contains(gate.id) { return (.failed, nil) }
+            switch service.onlineState(gate.id) {
+            case .fetching: return (.downloading, nil)
+            case .failed: return (.failed, nil)
+            case .deferred: return (.retrying, nil)
+            case .idle: break
+            }
             guard onlineWindow(gate) != nil else { return (.notDownloaded, nil) }
             let days = remainingDays(gate) ?? 0
             return (days < 0 ? .expired : .available, days)
@@ -474,8 +511,14 @@ struct OfflineManagerList: View {
     }
 
     private func onlineStatus(_ gate: ChsCurrentGateInfo) -> String {
-        if fetchingOnline.contains(gate.id) { return "Downloading…" }
-        if failedOnline.contains(gate.id) { return "Download failed" }
+        switch service.onlineState(gate.id) {
+        case .fetching: return "Downloading…"
+        case .deferred(let due):
+            let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
+            return "Retrying in \(minutes) min"
+        case .failed(let reason): return "Unavailable · \(reason)"
+        case .idle: break
+        }
         guard let window = onlineWindow(gate) else { return "Not downloaded" }
         return onlineDownloadValidity(end: window.offlineValidUntil, calendar: gateCalendar(gate))
     }
@@ -484,20 +527,6 @@ struct OfflineManagerList: View {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = gate.tz
         return calendar
-    }
-
-    private func fetch(_ gate: ChsCurrentGateInfo) {
-        guard net.online, !fetchingOnline.contains(gate.id) else { return }
-        fetchingOnline.insert(gate.id)
-        failedOnline.remove(gate.id)
-        Task { @MainActor in
-            do {
-                _ = try await ChsFitService.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz))
-            } catch {
-                failedOnline.insert(gate.id)
-            }
-            fetchingOnline.remove(gate.id)
-        }
     }
 
     private func onlineRow(_ gate: ChsCurrentGateInfo) -> some View {
@@ -516,19 +545,17 @@ struct OfflineManagerList: View {
             VStack(alignment: .trailing, spacing: 5) {
                 Text(onlineStatus(gate))
                     .font(.footnote)
-                    .foregroundStyle(failedOnline.contains(gate.id) ? SN.amber : SN.leaf)
+                    .foregroundStyle({
+                        switch service.onlineState(gate.id) {
+                        case .failed: return SN.amber
+                        case .deferred: return SN.foam.opacity(0.5)
+                        default: return SN.leaf
+                        }
+                    }())
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
-                if fetchingOnline.contains(gate.id) {
+                if service.onlineState(gate.id) == .fetching {
                     ProgressView().tint(SN.leaf)
-                } else {
-                    Button { fetch(gate) } label: {
-                        Text(onlineWindow(gate) == nil ? "Download" : "Refresh")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(net.online ? SN.leaf : SN.foam.opacity(0.45))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!net.online)
                 }
             }
         }
@@ -603,20 +630,9 @@ struct OfflineManagerList: View {
                 }
             }
             Spacer(minLength: 8)
-            if job.status == .failed {
-                Button { service.promote(job.id) } label: {
-                    Text("Retry")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(SN.amber)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(SN.amber.opacity(0.14), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            } else {
-                Text(statusText(job))
-                    .font(.footnote)
-                    .foregroundStyle(statusTint(job))
-            }
+            Text(statusText(job))
+                .font(.footnote)
+                .foregroundStyle(statusTint(job))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -625,10 +641,7 @@ struct OfflineManagerList: View {
         // Gesture, never a Button/NavigationLink wrapper: this sheet can be
         // presented over the iPad split detail column, where Button press
         // tracking goes dead below the strip but tap gestures keep working
-        // (same rule `activatable`/`TideAtPortLink` follow). The Retry button
-        // above sits inside this HStack, ahead of the gesture in the
-        // hierarchy, so its own tap still wins there — this only catches taps
-        // elsewhere on the row.
+        // (same rule `activatable`/`TideAtPortLink` follow).
         .contentShape(Rectangle())
         .onTapGesture {
             guard let route = route(for: job) else { return }

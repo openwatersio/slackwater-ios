@@ -3,6 +3,7 @@
 // run itself. No region UX — the stations near a fix auto-fit in the
 // background; each one lands as its fit completes.
 import CoreLocation
+import Combine
 import Foundation
 
 /// True when launched with `-networkKillSwitch` (UI tests' honest airplane-mode
@@ -19,7 +20,7 @@ let networkKillSwitch: Bool = {
 enum ChsState {
     case pending      // queued: no model yet, waiting its turn
     case fitting
-    case failed       // this run tried and could not finish it
+    case failed       // another attempt would get the same answer
     case fitted(TideStationRecord)
 }
 
@@ -41,6 +42,7 @@ final class ChsFitService: ObservableObject {
     /// records live beside it; the queue owns status, so there is exactly one
     /// place a station's state can disagree with itself: none.
     @Published private(set) var queue = ChsQueue()
+    @Published private(set) var observedSecondsPerRequest = 2.5
 
     /// Readable (the map's pin-tone resolve reads it beside `currentRecords`);
     /// written only by the fit run.
@@ -78,6 +80,22 @@ final class ChsFitService: ObservableObject {
     }
     func bumpOnlineFetchStamp() { onlineFetchStamp += 1 }
 
+    func observeRequest(seconds: TimeInterval) {
+        observedSecondsPerRequest += 0.2 * (max(seconds, 2.5) - observedSecondsPerRequest)
+    }
+
+    enum OnlineFetchState: Equatable {
+        case idle
+        case fetching
+        case deferred(Date)
+        case failed(String)
+    }
+
+    @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
+    private var onlineAttempts: [String: Int] = [:]
+    private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
+    private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
+
     /// UI-test hook: `-chsFitOnly <id,id>` scopes the fit run to those station
     /// ids — a REAL live fit, bounded to one gate's fetch time.
     private static let fitOnly: Set<String>? = {
@@ -86,75 +104,30 @@ final class ChsFitService: ObservableObject {
         return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
     }()
 
-    /// UI-test hook: `-chsFailOnly <id,id>` marks jobs `.failed` at launch, no
-    /// network attempt — a `.failed` row (and its Retry button) otherwise only
-    /// happens after a real fetch fails, which isn't deterministic for a fast
-    /// test. `run()`'s claim loop only ever touches `.pending` jobs, so this
-    /// status sticks until something explicitly retries it.
+    /// UI-test hook: `-chsFailOnly <id,id>` marks jobs `.failed` at launch.
     private static let failOnly: Set<String> = {
         guard let at = CommandLine.arguments.firstIndex(of: "-chsFailOnly"),
               CommandLine.arguments.indices.contains(at + 1) else { return [] }
         return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
     }()
 
+    private static let deferOnly: Set<String> = {
+        guard let at = CommandLine.arguments.firstIndex(of: "-chsDeferOnly"),
+              CommandLine.arguments.indices.contains(at + 1) else { return [] }
+        return Set(CommandLine.arguments[at + 1].split(separator: ",").map(String.init))
+    }()
+
     private var started = false
     private var running = false
-    /// Online gates this launch has already tried to prefetch (`prefetchOnlineGates`).
-    private var attempted: Set<String> = []
+    private var retryTimer: Task<Void, Never>?
+    private var connectivity: AnyCancellable?
+    private var dataMode: AnyCancellable?
     private var onlinePending: [ChsCurrentGateInfo] = []
     private var onlinePreferred: [String] = []
     private var onlineOrigin: (lat: Double, lon: Double)?
     private var onlineRunning = false
 
-    /// What downloads WITHOUT being asked for.
-    ///
-    /// Not "every Canadian station" — affordable at 21 stations and not at
-    /// 1,097: bulk-downloading
-    /// Canada is about 4.4 hours of politely paced IWLS requests, which is not
-    /// a thing to do to somebody's first run or their cellular plan.
-    ///
-    /// The replacement is NOT "the nearest ten", which is the obvious answer
-    /// and is wrong. Canadian tide gauges cluster: the ten nearest a Victoria
-    /// fix are ten gauges inside 6 km of each other — Selkirk Water, three
-    /// separate Gorge gauges, Portage Inlet — and not one current gate. It
-    /// would have downloaded the harbour six times and none of the passes,
-    /// which are the reason the app exists.
-    ///
-    /// So the two series are budgeted separately, and the numbers are measured
-    /// against the fetcher's 2.5 s pacing:
-    ///   - 6 tide ports, ~25 s each => ~2.5 min, anywhere in reach.
-    ///   - 3 current gates, 52 s (60-day) to 158 s (210-day) => ~4-6 min in
-    ///     the Salish, and a 210-day gate publishes its usable fast answer
-    ///     partway through rather than at the end.
-    /// ~8.5 min of background download in the worst case, 2.5 min away from
-    /// the gates. The nearest tide port is still usable at ~30 s — the number
-    /// that matters most, and it does not move.
-    ///
-    /// The radius guards BOTH series, and it is what keeps a first run honest
-    /// away from Canadian water (#205). Gating only the gates would look
-    /// sufficient from a Canadian fix — a Nova Scotian's nearest gate is
-    /// 305 km off, so they fit no Salish passes either way — and is not
-    /// sufficient anywhere else: unguarded ports adopt the nearest 6 from any
-    /// fix on Earth, which from Massachusetts is three St. Lawrence river
-    /// gauges at Montréal plus three Bay of Fundy stations across the Gulf of
-    /// Maine, ~400 km off, in a list whose nearest entry is NOAA Boston
-    /// Harbor at 1 km. 150 km is about a long day's passage at 6 knots.
-    ///
-    /// The radius cannot starve a real user: it only ever drops stations
-    /// further away than every station that outranks them, so nothing it drops
-    /// could have reached Near Me, and #178's "the first screen is covered by
-    /// what the first run downloads" still holds. Ports inside the radius,
-    /// measured against the shipped bundle: Nanaimo 129, Vancouver 106,
-    /// Victoria 94, Charlottetown 74, Saint John 71, Halifax 61, Prince Rupert
-    /// 51, Québec 42, St John's 38, Montréal 10, Iqaluit 5 — and Bellingham
-    /// 84, Port Angeles 80, Seattle 28, so a Puget Sound sailor keeps Gulf
-    /// Islands coverage. Boston, Portland ME, Toronto, Ottawa, Winnipeg,
-    /// Calgary and Whitehorse get zero, which is the point.
-    ///
-    /// Everything else stays visible, searchable and one tap from downloading:
-    /// opening a station adds it to this set and jumps it to the front.
-    /// ponytail: constants, not settings. Make them settings when somebody
-    /// asks — a region picker is the thing nobody has asked for.
+    /// The first nine jobs lead; unconstrained paths continue through every station within 150 km.
     static let autoFitPorts = 6
     static let autoFitGates = 3
     static let autoFitRadiusKm = 150.0
@@ -177,47 +150,37 @@ final class ChsFitService: ObservableObject {
         return jobs.filter { fitOnly?.contains($0.id) ?? true }
     }()
 
-    /// The online (fit-reject) gates a fix fetches on its own.
-    ///
-    /// These are the other half of "what downloads without being asked", and
-    /// until #178 there was no such half: `candidates` excludes them at the
-    /// source, so they can never be queued, `onlineGateStatus` renders
-    /// `.notDownloaded` while no window is on disk, and the ONLY thing that
-    /// ever fetched one was opening its detail. Tillicum Bridge is 3.4 km from
-    /// downtown Victoria and Second Narrows is in Vancouver harbour — both land
-    /// in Near Me on a first run and both said "Tap to download" forever.
-    ///
-    /// Same budget shape as the fitted gates deliberately: nearest first, at
-    /// most `autoFitGates`, and only within `autoFitRadiusKm` so a Halifax
-    /// first run fetches no Salish passes. Far cheaper than the fitted set —
-    /// one `Timeline.onlineFetchDays` window each, not a 60-to-210-day fit.
-    static func autoPrefetchGates(lat: Double, lon: Double) -> [ChsCurrentGateInfo] {
-        ChsCurrentGateInfo.all
+    /// Online gates use the same radius and Low Data Mode brake as fitted jobs.
+    static func autoPrefetchGates(lat: Double, lon: Double,
+                                  constrained: Bool = false) -> [ChsCurrentGateInfo] {
+        let gates = ChsCurrentGateInfo.all
             .filter { $0.isOnline && distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitRadiusKm }
             .sorted {
                 let a = distanceKm($0.latitude, $0.longitude, lat, lon)
                 let b = distanceKm($1.latitude, $1.longitude, lat, lon)
                 return a == b ? $0.id < $1.id : a < b
             }
-            .prefix(autoFitGates).map { $0 }
+        return constrained ? Array(gates.prefix(autoFitGates)) : gates
     }
 
     /// The stations a fix downloads on its own: the nearest ports and the
     /// nearest gates, out of those inside `autoFitRadiusKm`.
-    static func autoFitSet(lat: Double, lon: Double) -> [ChsJob] {
-        func nearest(_ jobs: [ChsJob], _ count: Int) -> [ChsJob] {
+    static func autoFitSet(lat: Double, lon: Double, constrained: Bool = false) -> [ChsJob] {
+        func byDistance(_ jobs: [ChsJob]) -> [ChsJob] {
             jobs.sorted {
                 let a = distanceKm($0.latitude, $0.longitude, lat, lon)
                 let b = distanceKm($1.latitude, $1.longitude, lat, lon)
                 return a == b ? $0.id < $1.id : a < b
-            }.prefix(count).map { $0 }
+            }
         }
         let near = candidates.filter {
             distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitRadiusKm
         }
-        let ports = near.filter { !$0.isCurrent }
-        let gates = near.filter { $0.isCurrent }
-        return nearest(ports, autoFitPorts) + nearest(gates, autoFitGates)
+        let ports = byDistance(near.filter { !$0.isCurrent })
+        let gates = byDistance(near.filter { $0.isCurrent })
+        let budgeted = Array(ports.prefix(autoFitPorts)) + Array(gates.prefix(autoFitGates))
+        guard !constrained else { return budgeted }
+        return budgeted + Array(gates.dropFirst(autoFitGates)) + Array(ports.dropFirst(autoFitPorts))
     }
 
     /// The CHS artifacts behind favorite rows. NOAA rows are bundled; derived
@@ -284,6 +247,8 @@ final class ChsFitService: ObservableObject {
         queue.prioritize(lat: firstRunFix.lat, lon: firstRunFix.lon)
         markFailOnly()
         Self.sweepOrphans(files)
+        observeConnectivity()
+        observeDataMode()
     }
 
     /// Which files under `ChsModels/` belong to no station the bundle still
@@ -340,20 +305,18 @@ final class ChsFitService: ObservableObject {
     /// ACCRETE: a fix moving from Victoria to Halifax adds Halifax's nearest
     /// ports, and never drops what Victoria already paid for.
     private func adopt(lat: Double, lon: Double) {
-        for job in Self.autoFitSet(lat: lat, lon: lon) { queue.add(job) }
+        for job in Self.autoFitSet(lat: lat, lon: lon,
+                                   constrained: Connectivity.shared.constrained) { queue.add(job) }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
     }
 
-    /// Re-assert the `-chsFailOnly` hook over whatever is now in the queue.
-    /// The hook means "these ids are failed for this whole launch", and a job
-    /// it names may join the queue at any adopt — `queue.set` is a no-op on an
-    /// id that is not there yet, so marking once at init would only cover the
-    /// jobs already on disk. `chs-victoria-harbour`, the seeded id in
-    /// `testDownloadsRowRetryButtonWinsOverRowTap`, arrives with the list's
-    /// first adopt and would otherwise render `.pending` with no Retry button.
+    /// Re-assert the UI-test hooks over jobs added by a later location fix.
     private func markFailOnly() {
         for id in Self.failOnly { queue.set(id, .failed) }
+        for id in Self.deferOnly where queue.job(id)?.retryAfter == nil {
+            queue.deferRetry(id, error: "waiting to retry")
+        }
     }
 
     func state(_ id: String) -> ChsState {
@@ -410,9 +373,7 @@ final class ChsFitService: ObservableObject {
         prefetchOnlineGates(ChsCurrentGateInfo.all.filter(\.isOnline))
     }
 
-    /// Start the download run: nearest-first, one station at a time. Partial
-    /// failure is fine — whatever fit is stored; the rest are retryable from
-    /// the manager and retry on the next connected launch.
+    /// Start the nearest-first download run once.
     func startIfNeeded() {
         guard !started else { return }
         started = true
@@ -427,7 +388,8 @@ final class ChsFitService: ObservableObject {
         onlineOrigin = (lat, lon)
         let favoriteGates = favorites.map { applyFavorites($0, after: visibleID) } ?? []
         pump()
-        prefetchOnlineGates(favoriteGates + Self.autoPrefetchGates(lat: lat, lon: lon))
+        prefetchOnlineGates(favoriteGates + Self.autoPrefetchGates(
+            lat: lat, lon: lon, constrained: Connectivity.shared.constrained))
     }
 
     /// Queue the visible station, then favorites, before the nearby tail.
@@ -448,25 +410,67 @@ final class ChsFitService: ObservableObject {
         return downloads.online
     }
 
-    /// Fetch the nearby online gates once per launch (#178).
-    ///
-    /// Serial, in one task: `IwlsFetcher` paces itself per instance, and each
-    /// fetch here builds its own — running three at once would be three
-    /// unpaced request streams alongside the fit queue's. `attempted` is what
-    /// keeps this to once per gate: `prioritize` fires on every fix update,
-    /// and a gate that failed must not re-fetch on every GPS twitch.
-    ///
-    /// Offline marks nothing, so a launch in airplane mode doesn't spend the
-    /// one attempt on a fetch that could never have worked — the next fix
-    /// update (or the next launch) tries again. This is also the kill switch:
-    /// `Connectivity` reports offline under `-networkKillSwitch` by
-    /// construction, so UI tests' airplane mode stays honest here for free.
-    /// ponytail: per-launch, per-gate. Opening the gate's detail is still the
-    /// manual retry, and the manager's retry-all is still queue-only.
+    func onlineState(_ id: String, at now: Date = appNow()) -> OnlineFetchState {
+        guard let state = onlineStates[id] else { return .idle }
+        if case .deferred(let due) = state, due <= now { return .idle }
+        return state
+    }
+
+    func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
+                           at now: Date = appNow()) {
+        onlineRetryTimers[id]?.cancel()
+        guard !permanent else {
+            onlineStates[id] = .failed(error)
+            return
+        }
+        let attempts = (onlineAttempts[id] ?? 0) + 1
+        onlineAttempts[id] = attempts
+        let due = now.addingTimeInterval(ChsQueue.backoff(attempts: attempts))
+        onlineStates[id] = .deferred(due)
+        guard let gate = onlineDesired[id] else { return }
+        onlineRetryTimers[id] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(due.timeIntervalSinceNow, 1)))
+            guard !Task.isCancelled else { return }
+            self?.onlineStates[id] = .idle
+            self?.prefetchOnlineGates([gate])
+        }
+    }
+
+    func fetchOnline(_ gate: ChsCurrentGateInfo) {
+        guard Connectivity.shared.online, onlineState(gate.id) != .fetching else { return }
+        onlineDesired[gate.id] = gate
+        onlineRetryTimers[gate.id]?.cancel()
+        onlineStates[gate.id] = .idle
+        onlineAttempts[gate.id] = 0
+        Task { try? await Self.fetchOnlineWindow(for: gate, from: todayLocal(gate.tz)) }
+    }
+
+    func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
+        onlineDesired[gate.id] = gate
+        onlineStates[gate.id] = .fetching
+    }
+
+    func finishOnlineFetch(_ id: String) {
+        onlineStates[id] = .idle
+        onlineAttempts[id] = 0
+    }
+
+#if DEBUG
+    func resetOnlineStateForTesting() {
+        for timer in onlineRetryTimers.values { timer.cancel() }
+        onlineStates = [:]
+        onlineAttempts = [:]
+        onlineRetryTimers = [:]
+        onlineDesired = [:]
+    }
+#endif
+
+    /// Adds online gates to the serial prefetch queue; transient failures schedule themselves again.
     private func prefetchOnlineGates(_ gates: [ChsCurrentGateInfo]) {
         guard Connectivity.shared.online else { return }
+        for gate in gates { onlineDesired[gate.id] = gate }
         var due: [ChsCurrentGateInfo] = []
-        for gate in gates where !attempted.contains(gate.id) {
+        for gate in gates where onlineState(gate.id) == .idle {
             if !due.contains(where: { $0.id == gate.id }) { due.append(gate) }
         }
         for gate in due { onlinePending.removeAll { $0.id == gate.id } }
@@ -487,7 +491,6 @@ final class ChsFitService: ObservableObject {
         Task {
             while !onlinePending.isEmpty {
                 let gate = onlinePending.removeFirst()
-                attempted.insert(gate.id)
                 // A covering window already on disk is the common case after
                 // the first launch — nothing to fetch, and the fetch is the
                 // expensive part, so check before spending it.
@@ -511,22 +514,78 @@ final class ChsFitService: ObservableObject {
         pump()
     }
 
-    /// The manager's retry-all: re-queue the failures and run again.
-    func retryFailed() {
-        queue.retryFailed()
+    func retryNow() {
+        queue.retryNow()
+        for id in Array(onlineStates.keys) where onlineState(id) != .fetching {
+            onlineRetryTimers[id]?.cancel()
+            onlineStates[id] = .idle
+            onlineAttempts[id] = 0
+        }
         pump()
+        prefetchOnlineGates(Array(onlineDesired.values))
     }
 
     private func pump() {
-        guard !running, !networkKillSwitch, queue.nextPending != nil else { return }
+        guard !running, !networkKillSwitch, Connectivity.shared.online else { return }
+        guard queue.nextPending() != nil else { return scheduleRetryPump() }
         running = true
         Task.detached(priority: .utility) { [self] in await run() }
+    }
+
+    private func scheduleRetryPump() {
+        retryTimer?.cancel()
+        guard let due = queue.earliestRetry() else { return }
+        retryTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(due.timeIntervalSinceNow, 1)))
+            guard !Task.isCancelled else { return }
+            self?.pump()
+        }
+    }
+
+    private func observeConnectivity() {
+        connectivity = Connectivity.shared.$online
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] online in
+                guard online else { return }
+                Task { @MainActor in
+                    self?.queue.clearBackoffs()
+                    self?.pump()
+                    guard let self else { return }
+                    let deferred = self.onlineStates.compactMap { id, state in
+                        if case .deferred = state { return id }
+                        return nil
+                    }
+                    for id in deferred {
+                        self.onlineRetryTimers[id]?.cancel()
+                        self.onlineStates[id] = .idle
+                        self.onlineAttempts[id] = 0
+                    }
+                    self.prefetchOnlineGates(Array(self.onlineDesired.values))
+                }
+            }
+    }
+
+    private func observeDataMode() {
+        dataMode = Connectivity.shared.$constrained
+            .removeDuplicates()
+            .dropFirst()
+            .filter { !$0 }
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let origin = self.onlineOrigin else { return }
+                    self.adopt(lat: origin.lat, lon: origin.lon)
+                    self.pump()
+                    self.prefetchOnlineGates(Self.autoPrefetchGates(
+                        lat: origin.lat, lon: origin.lon, constrained: false))
+                }
+            }
     }
 
     /// Claim the head of the queue. Sync find-then-mark on the main actor, so
     /// the loop can never hand the same job out twice (web offlineSync.worker).
     private func claimNext() -> ChsJob? {
-        guard let job = queue.nextPending else { return nil }
+        guard let job = queue.nextPending() else { return nil }
         queue.set(job.id, .downloading)
         return job
     }
@@ -542,14 +601,12 @@ final class ChsFitService: ObservableObject {
         let fetcher = IwlsFetcher()
         let fitter = ChsFitter()
         guard let list = try? await fetcher.stationList() else {
-            // No station list, no fit is possible this run. Fail the queued
-            // jobs rather than leaving them on "Waiting" forever — the manager
-            // can then say so, and offer the retry.
             await MainActor.run {
                 for job in self.queue.jobs where job.status == .pending {
-                    self.queue.set(job.id, .failed)
+                    self.queue.deferRetry(job.id, error: "station list unavailable")
                 }
                 self.running = false
+                self.scheduleRetryPump()
             }
             return
         }
@@ -557,7 +614,7 @@ final class ChsFitService: ObservableObject {
             do {
                 if job.isCurrent {
                     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
-                    else { throw ChsError.failed("no bundled gate \(job.id)") }
+                    else { throw ChsError.permanent("no bundled gate \(job.id)") }
                     let model = try await fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.saveCurrent(model)
                     await MainActor.run {
@@ -568,7 +625,7 @@ final class ChsFitService: ObservableObject {
                     ChsChunkStore.purge(model.iwlsID)
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
-                    else { throw ChsError.failed("no bundled port \(job.id)") }
+                    else { throw ChsError.permanent("no bundled port \(job.id)") }
                     let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
                     try ChsModelStore.save(model)
                     await MainActor.run {
@@ -577,21 +634,35 @@ final class ChsFitService: ObservableObject {
                     }
                     ChsChunkStore.purge(model.iwlsID)
                 }
-            } catch ChsError.yielded {
-                // Stepped aside for a station the user opened. Everything
-                // fetched is on disk, so resuming costs only what is missing.
-                await MainActor.run { self.queue.set(job.id, .pending) }
             } catch {
-                // Printed, not swallowed: the row only ever says "Failed", so
-                // without this the reason is gone and diagnosing one station
-                // means re-deriving it from the IWLS API by hand.
                 print("CHS fit FAILED \(job.id): \(error)")
-                // ponytail: no retry ladder — the manager's retry and the next
-                // connected launch are the retries.
-                await MainActor.run { self.queue.set(job.id, .failed) }
+                await MainActor.run {
+                    let reason = Self.reason(error)
+                    if ChsError.isPermanent(error) {
+                        self.queue.set(job.id, .failed)
+                        self.queue.note(job.id, error: reason)
+                    } else {
+                        self.queue.deferRetry(job.id, error: reason)
+                    }
+                }
             }
         }
-        await MainActor.run { self.running = false }
+        await MainActor.run {
+            self.running = false
+            self.scheduleRetryPump()
+        }
+    }
+
+    nonisolated static func reason(_ error: Error) -> String {
+        switch error {
+        case let chs as ChsError:
+            switch chs {
+            case .permanent(let reason), .transient(let reason): return reason
+            case .networkDisabled: return "no connection"
+            }
+        case let url as URLError: return url.localizedDescription
+        default: return (error as NSError).localizedDescription
+        }
     }
 
     /// 60 d @ 15 min ending yesterday — a validated fit window. Deliberately
@@ -606,17 +677,20 @@ final class ChsFitService: ObservableObject {
         // anchor the window a day off (#230).
         let end = todayLocal(info.tz)
         let plan = Self.chunkPlan(days: Self.tideFitDays, end: end)
+        await MainActor.run { self.queue.setProgress(info.id, done: 0, total: plan.count) }
         var samples: [ChsSample] = []
-        for chunk in plan {
+        for (index, chunk) in plan.enumerated() {
             samples += try await fetcher.wlp(stationID: station.id, chunk: chunk)
-            if await MainActor.run(body: { self.queue.shouldYield(running: info.id) }) { throw ChsError.yielded }
+            await MainActor.run {
+                self.queue.setProgress(info.id, done: index + 1, total: plan.count)
+            }
         }
         samples.sort { $0.t < $1.t }
         // IWLS advertises wlp on stations it serves no water for, and can retire
         // one after this build's bundle was minted. Say so, rather than handing
         // the fitter nothing and reporting whatever JSCore makes of it.
         guard !samples.isEmpty else {
-            throw ChsError.failed("\(info.name): IWLS served no wlp samples over \(Int(Self.tideFitDays)) d")
+            throw ChsError.permanent("\(info.name): IWLS served no wlp samples over \(Int(Self.tideFitDays)) d")
         }
         let start = plan.last?.start ?? end
         let fit = try await fitter.fit(samples: samples)
@@ -642,21 +716,28 @@ final class ChsFitService: ObservableObject {
                                         fetcher: IwlsFetcher, fitter: ChsFitter) async throws -> ChsModel {
         let station = try Self.resolve(name: gate.name, latitude: gate.latitude, longitude: gate.longitude,
                                        series: "wcsp1", in: list)
-        let meta = try await fetcher.metadata(stationID: station.id)
-        guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
-            throw ChsError.failed("\(gate.name): IWLS metadata has no flood axis")
-        }
         let end = todayLocal(gate.tz)
         let plan = Self.chunkPlan(days: gate.fitDays, end: end)
+        let total = plan.count * 2 + 1
+        await MainActor.run { self.queue.setProgress(gate.id, done: 0, total: total) }
+        let meta = try await fetcher.metadata(stationID: station.id)
+        await MainActor.run { self.queue.setProgress(gate.id, done: 1, total: total) }
+        guard let flood = meta.floodDirection, let ebb = meta.ebbDirection else {
+            throw ChsError.permanent("\(gate.name): IWLS metadata has no flood axis")
+        }
         let provisionalCut = end.addingTimeInterval(-ChsCurrentGateInfo.provisionalDays * 86_400)
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []
         var fastAnswerDone = !gate.offersProvisional
 
-        for chunk in plan {
+        for (index, chunk) in plan.enumerated() {
             speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
-            if await MainActor.run(body: { self.queue.shouldYield(running: gate.id) }) { throw ChsError.yielded }
+            await MainActor.run {
+                self.queue.setProgress(gate.id, done: index * 2 + 2, total: total)
+            }
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
-            if await MainActor.run(body: { self.queue.shouldYield(running: gate.id) }) { throw ChsError.yielded }
+            await MainActor.run {
+                self.queue.setProgress(gate.id, done: index * 2 + 3, total: total)
+            }
             // The trailing 60 days are in: publish the fast answer and carry on.
             guard !fastAnswerDone, chunk.start <= provisionalCut else { continue }
             fastAnswerDone = true
@@ -684,7 +765,7 @@ final class ChsFitService: ObservableObject {
                                           fitter: ChsFitter) async throws -> ChsModel {
         let samples = project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
         guard !samples.isEmpty else {
-            throw ChsError.failed("\(gate.name): IWLS served no wcsp1/wcdp1 samples over \(Int(fitDays)) d")
+            throw ChsError.permanent("\(gate.name): IWLS served no wcsp1/wcdp1 samples over \(Int(fitDays)) d")
         }
         let fit = try await fitter.fit(samples: samples)
         print("CHS current fit \(gate.id) @ \(Int(fitDays)) d: \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.2f", fit.rms)) kn")
@@ -747,10 +828,10 @@ final class ChsFitService: ObservableObject {
         guard let best = candidates.min(by: {
             distanceKm(latitude, longitude, $0.latitude, $0.longitude) <
             distanceKm(latitude, longitude, $1.latitude, $1.longitude)
-        }) else { throw ChsError.failed("no IWLS station serves \(series)") }
+        }) else { throw ChsError.permanent("no IWLS station serves \(series)") }
         let km = distanceKm(latitude, longitude, best.latitude, best.longitude)
         guard km <= resolveToleranceKm else {
-            throw ChsError.failed("\(name): nearest \(series) station \(best.officialName) is \(String(format: "%.1f", km)) km away")
+            throw ChsError.permanent("\(name): nearest \(series) station \(best.officialName) is \(String(format: "%.1f", km)) km away")
         }
         return best
     }
@@ -759,12 +840,13 @@ final class ChsFitService: ObservableObject {
 
 enum ChsError: Error {
     case networkDisabled
-    /// Stepped aside at a chunk boundary for a station the user opened. Not a
-    /// failure: the job goes back to `.pending` with its chunks on disk.
-    case yielded
-    /// Anything terminal for this job. No catch site reads the string; it is
-    /// for the thrown error's description only.
-    case failed(String)
+    case permanent(String)
+    case transient(String)
+
+    static func isPermanent(_ error: Error) -> Bool {
+        guard case .permanent = error as? ChsError else { return false }
+        return true
+    }
 }
 
 extension CurrentStationRecord {
