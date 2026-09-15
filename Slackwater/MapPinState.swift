@@ -117,10 +117,9 @@ func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> 
         let f = min(1, max(0, (height - lo) / (hi - lo)))
         return Int((f * Double(PIN_GAUGE_BUCKETS)).rounded())
     }()
-    // ↑/↓ ride the label fontstack; offline packs may not cache their glyph
-    // range, where the arrow drops and the number stands alone.
+    // No trend arrow in the text — the gauge's caret carries it.
     return PinState(state: state,
-                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial)) \(rising ? "↑" : "↓")",
+                    reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))",
                     gauge: gauge,
                     sort: sort)
 }
@@ -265,7 +264,10 @@ private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
             if let bearing = state.bearing { properties["bearing"] = bearing }
             // The full image name, not the bucket — `icon-image` reads it
             // straight off the feature, no string building in the style.
-            if let gauge = state.gauge { properties["gauge"] = "pin-gauge-\(gauge)" }
+            // The trend rides the name too: each variant bakes its caret.
+            if let gauge = state.gauge {
+                properties["gauge"] = "pin-gauge-\(gauge)-\(state.state == "rising" ? "up" : "down")"
+            }
             return [
                 "type": "Feature",
                 "geometry": ["type": "Point", "coordinates": [s.longitude, s.latitude]],
