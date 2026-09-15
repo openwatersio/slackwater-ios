@@ -14,7 +14,7 @@ Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.m
 
 - **NOAA CO-OPS** harmonic constituents and current predictions — United States government work, public domain.
 - **TICON-4** harmonic constants, [SEANOE](https://www.seanoe.org/data/00980/109129/) — CC BY 4.0.
-- **VersaTiles** satellite tiles — imagery sources at [versatiles.org/sources](https://versatiles.org/sources), cached on the device for offline use.
+- **OpenFreeMap** basemap tiles, [openfreemap.org](https://openfreemap.org) — © [OpenMapTiles](https://openmaptiles.org), data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors under [ODbL](https://opendatacommons.org/licenses/odbl/). Cached on the device for offline use.
 - **GSC Canada West Coast Topo-Bathymetric DEM** — Canadian channel bathymetry. Contains information licensed under the [Open Government Licence – Canada](https://open.canada.ca/en/open-government-licence-canada).
 - **NOAA National Bathymetric Source** — United States channel bathymetry, public domain.
 
