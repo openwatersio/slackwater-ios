@@ -37,6 +37,17 @@ final class CurrentStationDetailsTests: XCTestCase {
         XCTAssertTrue(sub.detailsPrediction.contains("NOAA offsets"))
     }
 
+    func testSubordinateFooterOmitsAnIdenticalReferenceName() {
+        XCTAssertEqual(
+            subordinateCurrentFooter(stationName: "Bolivar Roads", referenceName: "Bolivar Roads"),
+            "NOAA subordinate station: slacks and maxima, corrected by published offsets"
+        )
+        XCTAssertEqual(
+            subordinateCurrentFooter(stationName: "Point Bonita", referenceName: "Golden Gate"),
+            "NOAA subordinate station: Golden Gate's slacks and maxima, corrected by published offsets"
+        )
+    }
+
     private func record(meanFlow: Double) -> CurrentStationRecord {
         CurrentStationRecord(
             id: "noaa/TEST", name: "Test", region: "Test", aliases: [],
