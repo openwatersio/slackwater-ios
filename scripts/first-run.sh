@@ -18,5 +18,5 @@ udid=$(xcrun simctl list devices available | grep -F "$sim (" | head -1 \
 xcrun simctl shutdown "$udid" 2>/dev/null || true
 xcrun simctl erase "$udid"
 xcrun simctl boot "$udid"
-open -a Simulator
+open -a DeviceHub
 echo "Erased and booted '$sim'. Choose it in Xcode and run."
