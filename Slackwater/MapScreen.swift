@@ -124,7 +124,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         return image.withRenderingMode(.alwaysTemplate)
     }
 
-    /// The stateless dot, as a glyph so the far band can collide it.
+    /// The stateless dot, drawn as a glyph like the other two forms.
     private func dotPinImage(inflate: CGFloat = 0) -> UIImage {
         let d = CGFloat(PIN_RADIUS) * 2
         let path = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: d, height: d))
@@ -288,53 +288,73 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             style.addSource(source)
             for layer in stationPinLayers(source: source) { style.addLayer(layer) }
         }
-        applyChsStates(to: style)
-        // A mounted map outlives many 30-minute state buckets, and nothing
-        // else re-pushes the source — without this, a map left open wears
-        // the states it mounted with (a card saying "Flooding" beside a pin
-        // still green from the morning's slack). The minute tick is cheap:
-        // `PinFeaturesCache` only rebuilds when its bucket actually moves.
+        refreshPins(force: true)
+        // A mounted map outlives many state buckets, and a camera that never
+        // moves never asks for a rebuild — without this, a map left open
+        // wears the states it mounted with (a card saying "Flooding" beside
+        // a pin still green from the morning's slack).
         guard refreshTimer == nil else { return }
-        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self, let style = self.map?.style else { return }
-            self.applyChsStates(to: style)
+        let timer = Timer(timeInterval: PIN_REFRESH_S, repeats: true) { [weak self] _ in
+            self?.refreshPins(force: true)
         }
         RunLoop.main.add(timer, forMode: .common)
         refreshTimer = timer
     }
 
-    /// Issue #12: colour the CHS pins from what the offline sync has ALREADY
-    /// stored. Runs here, per style load, because that is the only place it
-    /// can survive: setting a style rebuilds every source, discarding anything
-    /// pushed into the old one. After paint by construction, so the style-construction path
-    /// `testPinLayerBuildsInsideAFrame` budgets pays nothing; the 3,125-pin
-    /// source rebuild runs off the main thread. Cache only, never a fetch —
-    /// `chsPinStates` takes the stored records and nothing else. Also the
-    /// refresh tick's body (above): the cache serves the same geojson back
-    /// until its 30-minute bucket moves, so ticks between buckets re-push
-    /// identical data and the map draws nothing new.
-    private func applyChsStates(to style: MLNStyle) {
-        Task { @MainActor [weak style] in
+    /// The camera settled: rebuild the pins if it has left what was built
+    /// for. Fires on idle, never mid-gesture.
+    func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+        refreshPins()
+    }
+
+    /// What the last build covered, so a pan inside it costs nothing.
+    private var builtBox: PinBox?
+    private var builtZoom: Double?
+    private var building = false
+
+    /// Rebuild the visible set when the camera has moved off what is built —
+    /// out of the padded box, or far enough in zoom to change which stations
+    /// survive decimation (or which of them draw a gauge).
+    private func refreshPins(force: Bool = false) {
+        guard let map, let style = map.style else { return }
+        let bounds = map.visibleCoordinateBounds
+        let view = PinBox(south: bounds.sw.latitude, west: bounds.sw.longitude,
+                          north: bounds.ne.latitude, east: bounds.ne.longitude)
+        let zoom = map.zoomLevel
+        if !force, !building, let built = builtBox, let builtZoom,
+           built.covers(view), abs(builtZoom - zoom) < PIN_ZOOM_SLACK,
+           (builtZoom >= LABEL_MIN_ZOOM) == (zoom >= LABEL_MIN_ZOOM) { return }
+        guard !building else { return }
+        building = true
+
+        let box = view.padded(by: PIN_VIEWPORT_PAD)
+        Task { @MainActor [weak self, weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
-                // An empty dict is honest too (nothing synced — neutral):
-                // the update must run regardless, because it is also what
-                // rolls the whole source onto a fresh time bucket for the
-                // refresh tick — a pure-NOAA map has no CHS tones and still
-                // has tides to turn.
-                let states = chsPinStates(at: appNow(), tideRecords: tides, currentRecords: currents)
-                let geojson = PinFeaturesCache.shared.update(states: states)
+                let items = visibleStations(in: box, zoom: zoom)
+                let now = appNow()
+                // CHS pins take their state from what the offline sync has
+                // ALREADY stored — cache only, never a fetch (issue #12; the
+                // web port learned the fetch-on-open version is a request
+                // storm against IWLS).
+                let states = chsPinStates(at: now, items: items, detailed: zoom >= LABEL_MIN_ZOOM,
+                                          tideRecords: tides, currentRecords: currents)
+                let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now)
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
+            self?.building = false
             guard let geojson, let style,
                   let source = style.source(withIdentifier: "stations") as? MLNShapeSource,
                   let shape = try? MLNShape(data: geojson, encoding: String.Encoding.utf8.rawValue)
             else { return }
             source.shape = shape
+            self?.builtBox = box
+            self?.builtZoom = zoom
         }
     }
+
 }
 
 /// The smallest bounds centred on `center` that hold every point, so fitting
@@ -457,8 +477,6 @@ struct MapViewRepresentable: UIViewRepresentable {
         }
 
         /// Tap → nearest station pin within a finger-sized box → preview.
-        /// Both bands answer: below the label zoom the pin on screen is a
-        /// `-far` variant, and the tap must hit what the user sees.
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let map else { return }
             let point = gesture.location(in: map)
@@ -471,9 +489,7 @@ struct MapViewRepresentable: UIViewRepresentable {
                 }
             }
             if let id = nearest(["station-pins-current", "station-pins-tide",
-                                 "station-pins-dot", "station-pins-current-far",
-                                 "station-pins-tide-far", "station-pins-dot-far"])?
-                .attribute(forKey: "id") as? String,
+                                 "station-pins-dot"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
                 return

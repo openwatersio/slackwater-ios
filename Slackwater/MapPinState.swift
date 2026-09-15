@@ -1,5 +1,7 @@
-// Slackwater — GPL v3. What colour a station's map pin takes: the tide and
-// current tone derivations, and the cache the pin source is built from.
+// Slackwater — GPL v3. What a station's map pin says: the tide and current
+// state derivations, and the VISIBLE SET the pin source is built from — the
+// stations inside the camera's box, thinned to one per grid cell, so the
+// app predicts water for what is on screen and nothing else.
 import Foundation
 import TideEngine
 
@@ -72,13 +74,6 @@ struct PinState: Equatable {
     /// height sits between the surrounding low and high. nil when either
     /// extreme is out of reach — the pin falls back to a dot.
     var gauge: Int?
-    /// The far-zoom thinning key (symbol-sort-key: LOWER places first, so
-    /// low sorts survive collision). Reference/harmonic stations before
-    /// subordinates, bigger signals before smaller within each — "the mouth
-    /// before upstream" falls out, because upstream stations are the
-    /// subordinates pointing their offsets at the mouth. 25 = the default
-    /// nobody computed: unknown pins thin first.
-    var sort: Double = 25
 }
 
 /// The gauge glyph's fill resolution: 0...8 covers ~12% steps, which is all
@@ -90,23 +85,22 @@ let PIN_GAUGE_BUCKETS = 8
 /// shortcut (`testPinLayerBuildsInsideAFrame` budgets the whole source build
 /// at 0.3s, and the readout's one extra height sample per pin lives inside
 /// the same budget).
-func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> PinState {
-    // Constituent amplitude sum as the signal-size tie-break: a subordinate
-    // ships none, so it lands a full rank behind any harmonic neighbour.
-    let sort = pinSort(subordinate: record.isSubordinate,
-                       signal: record.constituents.reduce(0) { $0 + $1.amplitude })
+/// `detailed` is the zoom's answer to "is a gauge or a reading drawn here":
+/// below `LABEL_MIN_ZOOM` neither is, so the height sample and the extremes
+/// search behind them are skipped outright — not narrowed, not cached, just
+/// not computed. Only the direction (the pin's colour) is always needed.
+func tidePinState(_ record: TideStationRecord, at now: Date,
+                  imperial: Bool, detailed: Bool) -> PinState {
     guard let rising = tidePinRisingHybrid(record, at: now) else {
-        return PinState(state: "unknown", sort: sort)
+        return PinState(state: "unknown")
     }
     let state = rising ? "rising" : "falling"
     let station = record.engineStation
-    guard let height = station
+    guard detailed, let height = station
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
-    else { return PinState(state: state, sort: sort) }
+    else { return PinState(state: state) }
     // The gauge: where the height sits between the surrounding extremes.
-    // ±15h brackets any station's cycle. ponytail: a second extremes search
-    // per pin on top of the hybrid — if testPinLayerBuildsInsideAFrame
-    // blows, derive the range from constituent amplitudes instead.
+    // ±15h brackets any station's cycle.
     let gauge: Int? = {
         let extremes = station.extremes(from: now.addingTimeInterval(-15 * 3600),
                                         to: now.addingTimeInterval(15 * 3600))
@@ -120,14 +114,33 @@ func tidePinState(_ record: TideStationRecord, at now: Date, imperial: Bool) -> 
     // No trend arrow in the text — the gauge's caret carries it.
     return PinState(state: state,
                     reading: "\(formatHeight(height, imperial: imperial)) \(heightUnit(imperial: imperial))",
-                    gauge: gauge,
-                    sort: sort)
+                    gauge: gauge)
 }
 
-/// One rank step is worth more than any signal difference: harmonics sort
-/// 0...9, subordinates 10...19, the unknown default sits past both.
-private func pinSort(subordinate: Bool, signal: Double) -> Double {
-    (subordinate ? 10 : 0) + max(0, 9 - signal)
+/// The thinning rank, from IDENTITY alone — no engine call, because
+/// decimation has to choose which stations are worth computing before any
+/// state exists. Reference/harmonic stations before subordinates, bigger
+/// signals before smaller within each; "the mouth before upstream" falls
+/// out of that, because upstream stations are the subordinates pointing
+/// their offsets at the mouth. One rank step outweighs any signal
+/// difference: harmonics land in 0...9, subordinates in 10...19.
+func pinSortRank(_ item: StationItem) -> Double {
+    func rank(_ subordinate: Bool, _ signal: Double) -> Double {
+        (subordinate ? 10 : 0) + max(0, 9 - signal)
+    }
+    switch item {
+    case .tide(let info):
+        guard let r = info.tideRecord else { return 25 }
+        return rank(r.isSubordinate, r.constituents.reduce(0) { $0 + $1.amplitude })
+    case .current(let info):
+        guard let r = info.currentRecord else { return 25 }
+        return rank(r.isSubordinate, r.constituents.reduce(abs(r.meanFlow)) { $0 + $1.amplitude })
+    // A CHS port or gate ships identity only until it is fitted, so there is
+    // no signal to rank by — they sit mid-table, ahead of the unknown
+    // default. A derived gate is real but speed-less: last of the ranked.
+    case .chs, .chsCurrent: return 5
+    case .chsGate: return 19
+    }
 }
 
 /// A speed-bearing current pin's state IS a colour (#13): green exactly when
@@ -136,7 +149,8 @@ private func pinSort(subordinate: Bool, signal: Double) -> Double {
 /// darkened #97 ramp at the current speed otherwise. Hue no longer says
 /// flood-versus-ebb here; at readout zooms the flow arrow (and the detail
 /// card's arrow + cardinal) carries direction.
-func currentPinState(_ station: CurrentStationRecord, at now: Date, speedUnit: String) -> PinState {
+func currentPinState(_ station: CurrentStationRecord, at now: Date,
+                     speedUnit: String, detailed: Bool = true) -> PinState {
     let signed = station.isSubordinate
         ? subordinateCurrentPinSpeed(station, at: now)
         : station.engineStation.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
@@ -144,10 +158,8 @@ func currentPinState(_ station: CurrentStationRecord, at now: Date, speedUnit: S
     return PinState(
         state: slack ? mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN)
                      : pinRampHex(forSpeedKn: abs(signed)),
-        reading: "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
-        bearing: station.setDegrees(signed: signed),
-        sort: pinSort(subordinate: station.isSubordinate,
-                      signal: station.constituents.reduce(abs(station.meanFlow)) { $0 + $1.amplitude }))
+        reading: detailed ? "\(formatSpeed(abs(signed), unit: speedUnit)) \(speedUnitLabel(speedUnit))" : nil,
+        bearing: station.setDegrees(signed: signed))
 }
 
 /// 1,549 subordinate current pins hang off 50 references, so the reference is
@@ -162,8 +174,8 @@ private func subordinateCurrentPinSpeed(_ station: CurrentStationRecord, at now:
     return SubordinateStation.speed(at: now, along: sub.reduce(ReferenceCurrentEvents.shared.events(of: ref, at: now)))
 }
 
-/// Lock-protected like `PinFeaturesCache`, and keyed on its 30-minute bucket,
-/// because a style build asks for each pin with its own `appNow()`.
+/// Keyed on a 30-minute bucket, because one build asks for every subordinate
+/// off the same reference with its own `appNow()`.
 final class ReferenceCurrentEvents: @unchecked Sendable {
     static let shared = ReferenceCurrentEvents()
     /// 8 h brackets any current's window (the engine's own pad) and 9 h clears
@@ -198,19 +210,21 @@ private func readoutUnits() -> (imperial: Bool, speedUnit: String) {
 /// Synchronous only: every CHS-provenance item resolves through
 /// `ChsFitService`'s async fit cache, so at style-build time all three read
 /// from `chsStates` — what `chsPinStates` resolved from what the offline
-/// sync has already stored, pushed in after paint (`MapStyler.applyChsStates`).
+/// sync has already stored, resolved alongside the visible set
+/// (`MapStyler.refreshPins`).
 /// Absent means unsynced, and the pin honestly draws neutral.
 private func pinState(_ item: StationItem, at now: Date, chsStates: [String: PinState],
-                      imperial: Bool, speedUnit: String) -> PinState {
+                      imperial: Bool, speedUnit: String, detailed: Bool) -> PinState {
     switch item {
     // The map is not the first frame, so resolving both records here is
     // fair game — a state is a prediction and needs the constituents (#317).
     case .tide(let info):
-        return info.tideRecord.map { tidePinState($0, at: now, imperial: imperial) }
+        return info.tideRecord.map { tidePinState($0, at: now, imperial: imperial, detailed: detailed) }
             ?? PinState(state: "unknown")
     case .current(let info):
-        return info.currentRecord.map { currentPinState($0, at: now, speedUnit: speedUnit) }
-            ?? PinState(state: "unknown")
+        return info.currentRecord.map {
+            currentPinState($0, at: now, speedUnit: speedUnit, detailed: detailed)
+        } ?? PinState(state: "unknown")
     case .chs, .chsGate, .chsCurrent:
         return chsStates[item.id] ?? PinState(state: "unknown")
     }
@@ -224,42 +238,133 @@ private func pinState(_ item: StationItem, at now: Date, chsStates: [String: Pin
 /// exactly when its reference port — itself a CHS port — is fitted, and it
 /// carries no readout: no speed exists to show (ChsGate.swift), and its
 /// water height belongs to the port, not the pass.
-func chsPinStates(at now: Date,
+/// Scoped to the visible set for the same reason everything else is: a
+/// Canadian port the camera is nowhere near has no pin to colour.
+func chsPinStates(at now: Date, items: [StationItem], detailed: Bool,
                   tideRecords: [String: TideStationRecord],
                   currentRecords: [String: CurrentStationRecord]) -> [String: PinState] {
     let units = readoutUnits()
     var states: [String: PinState] = [:]
-    for item in StationItem.all {
+    for item in items {
         switch item {
         case .tide, .current:
             continue
         case .chs(let info):
             guard let record = tideRecords[info.id] else { continue }
-            states[item.id] = tidePinState(record, at: now, imperial: units.imperial)
+            states[item.id] = tidePinState(record, at: now, imperial: units.imperial,
+                                           detailed: detailed)
         case .chsCurrent(let gate):
             guard let record = currentRecords[gate.id] else { continue }
-            states[item.id] = currentPinState(record, at: now, speedUnit: units.speedUnit)
+            states[item.id] = currentPinState(record, at: now, speedUnit: units.speedUnit,
+                                              detailed: detailed)
         case .chsGate(let gate):
             guard let port = tideRecords[gate.reference] else { continue }
             let phase = DerivedGateRecord(gate: gate, port: port).cardState(at: now).phase
-            states[item.id] = PinState(state: phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack",
-                                       sort: 19)   // a real gate, but speed-less: last of the ranked
+            states[item.id] = PinState(state: phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
         }
     }
     return states
 }
 
-/// Every bundled station as a GeoJSON pin: identity, tone, and the
-/// high-zoom readout attributes when the state resolved one.
-private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
+/// The camera's own box, so the visible-set math stays testable without a
+/// MapLibre view. `west > east` means the box wraps the antimeridian.
+struct PinBox: Equatable {
+    var south, west, north, east: Double
+
+    func contains(lat: Double, lon: Double) -> Bool {
+        guard lat >= south, lat <= north else { return false }
+        return west <= east ? (lon >= west && lon <= east) : (lon >= west || lon <= east)
+    }
+
+    /// Grown by `fraction` of its own span on every side — the slack that
+    /// lets a small pan reuse the set already built.
+    func padded(by fraction: Double) -> PinBox {
+        let dLat = (north - south) * fraction
+        let dLon = (east - west < 0 ? east - west + 360 : east - west) * fraction
+        return PinBox(south: max(-90, south - dLat), west: west - dLon,
+                      north: min(90, north + dLat), east: east + dLon)
+    }
+
+    /// True when `inner` needs pins this box does not already cover.
+    func covers(_ inner: PinBox) -> Bool {
+        contains(lat: inner.south, lon: inner.west) && contains(lat: inner.north, lon: inner.east)
+    }
+}
+
+/// The decimation grid's cell, in points — a touch target. One station
+/// survives per cell, so the pin work is bounded by SCREEN AREA (a phone
+/// holds a couple of hundred cells) rather than by how much world the camera
+/// happens to cover. At the detail zooms the cells are small enough that
+/// nearly every station survives anyway.
+let PIN_CELL_POINTS = 44.0
+/// How far past the viewport to build, as a fraction of its span.
+let PIN_VIEWPORT_PAD = 0.5
+/// Zoom drift tolerated before a rebuild: decimation cells scale with zoom,
+/// so a real zoom change means a different set of survivors.
+let PIN_ZOOM_SLACK = 0.5
+/// How often a mounted map re-resolves state for the set it already has.
+/// The states themselves only move on `PIN_TIDE_DIFF_DT` boundaries, but a
+/// viewport build is cheap enough now that the tick can be honest about the
+/// clock rather than clever about buckets.
+let PIN_REFRESH_S: TimeInterval = 60
+
+/// The stations a camera actually needs: inside the box, then thinned to the
+/// best-ranked one per grid cell.
+///
+/// This is where the map stopped computing the planet. Thinning here rather
+/// than in the collision engine also makes the choice deterministic — the
+/// highest-ranked station in a patch of water wins every time, instead of
+/// whichever symbol the placer happened to reach first.
+/// A station reduced to what decimation needs — coordinates and rank, with
+/// neither re-derived per camera move. Both are fixed for the life of the
+/// process; the rank in particular costs a record lookup and a constituent
+/// sum, which has no business running on every pan.
+struct PinCandidate {
+    let lat: Double, lon: Double, rank: Double
+    let item: StationItem
+}
+
+func pinCandidates(_ items: [StationItem]) -> [PinCandidate] {
+    items.map { PinCandidate(lat: $0.latitude, lon: $0.longitude, rank: pinSortRank($0), item: $0) }
+}
+
+/// Built once, on first use, off the main thread (the first build already
+/// runs in a detached task).
+let allPinCandidates: [PinCandidate] = pinCandidates(StationItem.all)
+
+func visibleStations(in box: PinBox, zoom: Double,
+                     candidates: [PinCandidate] = allPinCandidates) -> [StationItem] {
+    // Web-mercator degrees per point at this zoom (MapLibre's tile size is
+    // 512). Latitude cells shrink with the mercator scale so a cell stays
+    // square on screen at any latitude.
+    let degPerPoint = 360 / (512 * pow(2, zoom))
+    let cellLon = PIN_CELL_POINTS * degPerPoint
+    let midLat = (box.south + box.north) / 2
+    let cellLat = max(cellLon * cos(midLat * .pi / 180), 1e-9)
+    var best: [Int64: PinCandidate] = [:]
+    best.reserveCapacity(256)
+    for c in candidates where box.contains(lat: c.lat, lon: c.lon) {
+        let cell = Int64((c.lon / cellLon).rounded(.down)) &* 1_000_003
+            &+ Int64((c.lat / cellLat).rounded(.down))
+        if let held = best[cell], held.rank <= c.rank { continue }
+        best[cell] = c
+    }
+    return best.values.map(\.item)
+}
+
+/// The visible set as GeoJSON: identity, tone, and — only where the zoom
+/// draws them — the gauge and readout attributes.
+func pinFeatures(for items: [StationItem], zoom: Double,
+                 chsStates: [String: PinState] = [:], now: Date = appNow()) -> [String: Any] {
     let units = readoutUnits()
+    let detailed = zoom >= LABEL_MIN_ZOOM
     return [
         "type": "FeatureCollection",
-        "features": StationItem.all.map { s in
-            let state = pinState(s, at: appNow(), chsStates: chsStates,
-                                 imperial: units.imperial, speedUnit: units.speedUnit)
+        "features": items.map { s in
+            let state = pinState(s, at: now, chsStates: chsStates, imperial: units.imperial,
+                                 speedUnit: units.speedUnit, detailed: detailed)
             var properties: [String: Any] = ["id": s.id, "name": s.name, "kind": s.pinKind,
-                                             "state": state.state, "sort": state.sort]
+                                             "state": state.state, "sort": pinSortRank(s)]
             if let reading = state.reading { properties["reading"] = reading }
             if let bearing = state.bearing { properties["bearing"] = bearing }
             // The full image name, not the bucket — `icon-image` reads it
@@ -275,95 +380,4 @@ private func pinFeatures(chsStates: [String: PinState] = [:]) -> [String: Any] {
             ] as [String: Any]
         },
     ]
-}
-
-/// Caches `pinFeatures`' output across `MapStyler` instantiations.
-///
-/// `StationListView.mapPane` remounts `MapViewRepresentable` via
-/// `.id(mapFocusToken)` on every pin focus, so without this cache
-/// `MapStyler.init` rebuilds the whole world bundle's tide/current tones from
-/// scratch on every single tap — the ~0.5s `testPinLayerBuildsInsideAFrame`
-/// measures, paid again and again in one map session, not once per session.
-///
-/// Keyed on the inputs that actually change the answer: `chsStates` (busts
-/// the instant a real dict arrives via `update`, called from
-/// `MapStyler.applyChsStates` after a CHS fit lands — a stale CHS tone would
-/// be a worse bug than the rebuild cost this exists to avoid), the readout
-/// units, and a 30-minute time bucket, `PIN_TIDE_DIFF_DT` — the same resolution
-/// `tidePinRisingHybrid`'s own hybrid check already uses, so rebuilding more
-/// often than that buys nothing and rebuilding less often would show a tide
-/// pin that never turns. The readouts inherit that bucket, so a displayed
-/// height can lag the curve by up to half an hour — the trend arrow stays
-/// honest, the number is "recently". ponytail: 30-minute readings; shrink
-/// the bucket (or split readings from tones) if that lag ever reads as a
-/// wrong number rather than an old one.
-///
-/// Internal, not `private`, and its cache is lock-protected rather than
-/// actor-isolated: `stationSource()` runs on whatever thread builds a style,
-/// and `applyChsStates` writes from its own
-/// detached task, so real cross-thread access exists; a lock around a few
-/// dictionary reads is the smaller fix than moving every caller onto an
-/// actor. Internal (not private) so `NationalScaleTests` can exercise the
-/// cache/invalidate contract directly and reset it between measurements.
-final class PinFeaturesCache: @unchecked Sendable {
-    static let shared = PinFeaturesCache()
-    private let lock = NSLock()
-    private var bucket: Int?
-    private var slackThreshold: Double?
-    private var units: String?
-    private var states: [String: PinState] = [:]
-    private var geojson: [String: Any] = [:]
-
-    private func currentBucket(_ now: Date) -> Int { Int(now.timeIntervalSince1970 / PIN_TIDE_DIFF_DT) }
-
-    /// What a style build should source its pins from: whatever's cached,
-    /// rebuilt only when the time bucket has moved. Serves the last-known
-    /// `chsStates` (not blank) so a remount reuses whatever `update` last
-    /// resolved instead of flashing every CHS pin back to "unknown".
-    func snapshot(now: Date = appNow()) -> [String: Any] {
-        lock.lock(); defer { lock.unlock() }
-        return rebuilt(states, now)  // re-pushing what's cached IS "keep what we have"
-    }
-
-    /// `applyChsStates`'s entry point: the real, resolved CHS states. Rebuilds
-    /// when they differ from what's cached, or the time bucket moved — a
-    /// same-value push (a style reload that synced nothing new) is a no-op.
-    @discardableResult
-    func update(states newStates: [String: PinState], now: Date = appNow()) -> [String: Any] {
-        lock.lock(); defer { lock.unlock() }
-        return rebuilt(newStates, now)
-    }
-
-    /// The one cache rule both entry points share. CALLER HOLDS `lock` —
-    /// `NSLock` is not recursive, so this must never be called from outside
-    /// one of the two methods above.
-    private func rebuilt(_ newStates: [String: PinState], _ now: Date) -> [String: Any] {
-        let b = currentBucket(now)
-        let threshold = slackThresholdKn
-        let u = readoutUnits()
-        let signature = "\(u.imperial)-\(u.speedUnit)"
-        if states != newStates || bucket != b || slackThreshold != threshold
-            || units != signature || geojson.isEmpty {
-            states = newStates
-            geojson = pinFeatures(chsStates: newStates)
-            bucket = b
-            slackThreshold = threshold
-            units = signature
-        }
-        return geojson
-    }
-
-    /// Test-only: forces the next `snapshot`/`update` to rebuild from
-    /// scratch. Without this, whichever test happens to touch the (process-
-    /// lifetime) shared cache first "warms" it for every test after —
-    /// including `testPinLayerBuildsInsideAFrame`, which needs a genuinely
-    /// cold build or it stops measuring the cost it exists to catch.
-    func resetForTesting() {
-        lock.lock(); defer { lock.unlock() }
-        bucket = nil
-        slackThreshold = nil
-        units = nil
-        states = [:]
-        geojson = [:]
-    }
 }

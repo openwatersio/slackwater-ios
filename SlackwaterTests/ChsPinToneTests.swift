@@ -23,7 +23,8 @@ final class ChsPinToneTests: XCTestCase {
     /// Nothing synced → nothing resolved. Every CHS pin stays neutral, and no
     /// path exists that could reach the network for the missing ones.
     func testUnsyncedStationsStayNeutral() {
-        XCTAssertTrue(chsPinStates(at: now, tideRecords: [:], currentRecords: [:]).isEmpty)
+        XCTAssertTrue(chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                 tideRecords: [:], currentRecords: [:]).isEmpty)
     }
 
     /// A fitted CHS tide port resolves rising/falling exactly like a bundled
@@ -34,7 +35,8 @@ final class ChsPinToneTests: XCTestCase {
         let references = Set(ChsGateInfo.all.map(\.reference))
         let info = try XCTUnwrap(ChsStationInfo.all.first { !references.contains($0.id) })
         let record = port(info.id)
-        let states = chsPinStates(at: now, tideRecords: [info.id: record], currentRecords: [:])
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [info.id: record], currentRecords: [:])
         let expected = try XCTUnwrap(tidePinRisingHybrid(record, at: now)) ? "rising" : "falling"
         XCTAssertEqual(states[info.id]?.state, expected)
         XCTAssertEqual(states.count, 1, "a station the sync has not reached must stay neutral")
@@ -49,7 +51,8 @@ final class ChsPinToneTests: XCTestCase {
             latitude: gate.latitude, longitude: gate.longitude, timezone: gate.timezone,
             floodDirection: 90, ebbDirection: 270, meanFlow: 0, tideReference: nil,
             constituents: [.init(name: "M2", amplitude: 2.0, phase: 0)])
-        let states = chsPinStates(at: now, tideRecords: [:], currentRecords: [gate.id: record])
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [:], currentRecords: [gate.id: record])
         XCTAssertEqual(states[gate.id]?.state, currentPinState(record, at: now, speedUnit: "kn").state)
         XCTAssertTrue((states[gate.id]?.state ?? "").hasPrefix("#"),
                       "a fitted gate is speed-bearing: its tone is a colour literal (#13)")
@@ -60,10 +63,12 @@ final class ChsPinToneTests: XCTestCase {
     /// fitted, and stays neutral otherwise.
     func testDerivedGateFollowsItsReferencePort() throws {
         let gate = try XCTUnwrap(ChsGateInfo.all.first)
-        XCTAssertNil(chsPinStates(at: now, tideRecords: [:], currentRecords: [:])[gate.id],
+        XCTAssertNil(chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                  tideRecords: [:], currentRecords: [:])[gate.id],
                      "no fitted reference → neutral")
         let reference = port(gate.reference)
-        let states = chsPinStates(at: now, tideRecords: [gate.reference: reference], currentRecords: [:])
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                    tideRecords: [gate.reference: reference], currentRecords: [:])
         let phase = DerivedGateRecord(gate: gate, port: reference).cardState(at: now).phase
         XCTAssertEqual(states[gate.id]?.state, phase == .flood ? "flood" : phase == .ebb ? "ebb" : "slack")
     }
