@@ -58,6 +58,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private let center: CLLocationCoordinate2D
     private let zoom: Double
     private let framing: [CLLocationCoordinate2D]?
+    /// A framed map draws every station in its box — see `visibleStations`.
+    private var decimates: Bool { framing == nil }
     private let fill = currentFillEnabled() ? CurrentFillRenderer() : nil
     private var refreshTimer: Timer?
     deinit { refreshTimer?.invalidate() }
@@ -297,7 +299,12 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     /// What the last build covered, so a pan inside it costs nothing.
     private var builtBox: PinBox?
     private var builtZoom: Double?
+    /// The units the built readings were formatted in — a change means the
+    /// strings in the source are wrong, not merely stale.
+    private var builtUnits: String?
     private var building = false
+    /// A refresh asked for while one was in flight — replayed on completion.
+    private var pendingRefresh = false
     /// The pin the preview panel is showing, marked in the source so the
     /// style can draw it as selected.
     private var selectedID: String?
@@ -320,20 +327,28 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         let view = PinBox(south: bounds.sw.latitude, west: bounds.sw.longitude,
                           north: bounds.ne.latitude, east: bounds.ne.longitude)
         let zoom = map.zoomLevel
-        if !force, !building, let built = builtBox, let builtZoom,
+        let units = readoutUnitSignature()
+        if !force, let built = builtBox, let builtZoom, builtUnits == units,
            built.covers(view), abs(builtZoom - zoom) < PIN_ZOOM_SLACK,
            (builtZoom >= LABEL_MIN_ZOOM) == (zoom >= LABEL_MIN_ZOOM) { return }
-        guard !building else { return }
+        // A build already running cannot be joined, but the request must not
+        // be thrown away: a flick fires twice and the second one carries the
+        // camera the user actually stopped at, and a `select` landing here
+        // would otherwise leave the disc on the previous pin.
+        guard !building else { pendingRefresh = true; return }
         building = true
+        pendingRefresh = false
 
         let box = view.padded(by: PIN_VIEWPORT_PAD)
         let selectedID = selectedID
+        let decimate = decimates
         Task { @MainActor [weak self, weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
-                let items = visibleStations(in: box, zoom: zoom, pinned: selectedID)
+                let items = visibleStations(in: box, zoom: zoom, pinned: selectedID,
+                                            decimate: decimate)
                 let now = appNow()
                 // CHS pins take their state from what the offline sync has
                 // ALREADY stored — cache only, never a fetch (issue #12; the
@@ -346,6 +361,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
             self?.building = false
+            defer { if self?.pendingRefresh == true { self?.refreshPins(force: true) } }
             guard let geojson, let style,
                   let source = style.source(withIdentifier: "stations") as? MLNShapeSource,
                   let shape = try? MLNShape(data: geojson, encoding: String.Encoding.utf8.rawValue)
@@ -353,6 +369,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
             source.shape = shape
             self?.builtBox = box
             self?.builtZoom = zoom
+            self?.builtUnits = units
         }
     }
 

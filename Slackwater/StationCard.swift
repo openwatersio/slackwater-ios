@@ -1,6 +1,31 @@
 import SwiftUI
 import TideEngine
 
+/// One eager seed, remembered. A preview shows one card at a time, so a
+/// single entry is the whole cache; it holds for a minute, the same
+/// freshness the map's own pins carry (`PIN_REFRESH_S`).
+///
+/// Lock-protected rather than actor-isolated: SwiftUI calls `init` wherever
+/// it rebuilds a body, and a lock around one comparison is smaller than
+/// moving every card initialiser onto an actor.
+final class SeedCache<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var key: String?
+    private var at = Date.distantPast
+    private var cached: Value?
+
+    func value(for key: String, now: Date, build: () -> Value) -> Value {
+        lock.lock(); defer { lock.unlock() }
+        if self.key == key, let cached, now.timeIntervalSince(at) < PIN_REFRESH_S { return cached }
+        let value = build()
+        (self.key, at, cached) = (key, now, value)
+        return value
+    }
+}
+
+private let tideSeeds = SeedCache<(CardState, StationCardGraph)>()
+private let currentSeeds = SeedCache<(CurrentCardState, StationCardGraph)>()
+
 /// Layout A: kind glyph left, identity (name/region/distance), state right.
 /// Fraunces name, big height numeral.
 struct StationCardView: View {
@@ -34,13 +59,23 @@ struct StationCardView: View {
     }
 
     /// Eager: state and curve computed IN init, so the card's first frame is
-    /// complete. The map preview panel needs this — its slide-up transition
-    /// captures the first frame, and a `.task`-resolved curve arrives after
-    /// the slide has started and animates separately from the chrome. The
-    /// list keeps the lazy path (#317: no first-frame computation per row).
+    /// complete. The map preview panel needs this — its entrance captures
+    /// the first frame, and a `.task`-resolved curve arrives after the slide
+    /// has started and animates separately from the chrome. The list keeps
+    /// the lazy path (#317: no first-frame computation per row).
+    ///
+    /// Memoised, because `init` runs on every body pass of the view holding
+    /// the card while `State(initialValue:)` keeps only the first — without
+    /// the cache this put a full prediction on the main thread every time
+    /// `StationListView` republished, and it observes `LocationService`,
+    /// which publishes continuously while the map is up.
     private mutating func seed(_ record: TideStationRecord) {
-        _state = State(initialValue: record.cardState(at: appNow()))
-        _graph = State(initialValue: record.cardGraph(at: appNow(), imperial: imperial))
+        let now = appNow()
+        let seeded = tideSeeds.value(for: "\(record.id)-\(imperial)", now: now) {
+            (record.cardState(at: now), record.cardGraph(at: now, imperial: imperial))
+        }
+        _state = State(initialValue: seeded.0)
+        _graph = State(initialValue: seeded.1)
     }
 
     var body: some View {
@@ -310,13 +345,18 @@ struct CurrentCardView: View {
         if eager, let record = info.currentRecord { seed(record) }
     }
 
-    /// See `StationCardView.seed` — first frame complete for the map preview.
+    /// See `StationCardView.seed` — first frame complete for the map
+    /// preview, memoised for the same reason.
     private mutating func seed(_ record: CurrentStationRecord) {
         let unit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
+        let now = appNow()
+        let tilde = provisional != nil
+        let seeded = currentSeeds.value(for: "\(record.id)-\(unit)-\(tilde)", now: now) {
+            (record.cardState(at: now), record.cardGraph(at: now, unit: unit, tilde: tilde))
+        }
         _record = State(initialValue: record)
-        _state = State(initialValue: record.cardState(at: appNow()))
-        _graph = State(initialValue: record.cardGraph(at: appNow(), unit: unit,
-                                                      tilde: provisional != nil))
+        _state = State(initialValue: seeded.0)
+        _graph = State(initialValue: seeded.1)
     }
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
