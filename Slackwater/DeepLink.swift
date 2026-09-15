@@ -1,9 +1,15 @@
-// Slackwater — GPL v3. The widget's `slackwater://station/<id>` deep link:
-// percent-encoding shared by the widget extension (HomeWidgets.swift, which
-// wraps this for its `SlackwaterEntry`) and the app's tests, so a round-trip
-// test can exercise the exact encoding a widget tap produces without linking
-// against appex-only types.
+// Slackwater — GPL v3. Deep links shared by the app and widget extension.
 import Foundation
+import WidgetKit
+
+// Shared with the app target so unit tests cover the widget entry-to-URL boundary.
+struct SlackwaterEntry: TimelineEntry {
+    let date: Date
+    let snapshot: WidgetSnapshot?
+    let card: WidgetCard?
+    let premium: Bool
+    let stationID: String?
+}
 
 /// RFC 3986 "unreserved" only. `.urlPathAllowed` looked like the obvious
 /// choice (it does escape ":", e.g. "current:PUG1515") but it does NOT escape
@@ -26,6 +32,8 @@ func deepLink(forStationID id: String?) -> URL? {
     else { return URL(string: "slackwater://premium") }
     return URL(string: "slackwater://station/\(encoded)")
 }
+
+func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
 
 /// The station id back out of a `slackwater://station/<id>` URL — the inverse
 /// of `deepLink(forStationID:)`, and the only safe read of it. The id IS the

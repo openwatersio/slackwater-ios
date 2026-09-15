@@ -69,8 +69,3 @@ struct DayCurveView: View {
         .widgetURL(deepLink(entry))
     }
 }
-
-/// The encoding itself (the character set + the fallback-to-premium rule)
-/// lives in `Slackwater/DeepLink.swift` (M3): a shared, appex-and-app file
-/// so a round-trip test can exercise it without linking `SlackwaterEntry`.
-func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
