@@ -270,19 +270,6 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // Fill under the pins: added first, so the pin layers appended below
         // land on top of it.
         fill?.attach(to: style, map: mapView)
-        // The framed map's own station, ringed under its pin.
-        if framing != nil, style.source(withIdentifier: "focus") == nil {
-            let point = MLNPointFeature()
-            point.coordinate = center
-            let source = MLNShapeSource(identifier: "focus", shape: point, options: nil)
-            style.addSource(source)
-            let ring = MLNCircleStyleLayer(identifier: "focus-ring", source: source)
-            ring.circleRadius = NSExpression(forConstantValue: 13)
-            ring.circleOpacity = NSExpression(forConstantValue: 0)
-            ring.circleStrokeWidth = NSExpression(forConstantValue: 2.5)
-            ring.circleStrokeColor = NSExpression(forConstantValue: UIColor(SN.leaf))
-            style.addLayer(ring)
-        }
         if style.source(withIdentifier: "stations") == nil {
             let source = stationShapeSource()
             style.addSource(source)
@@ -311,6 +298,18 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
     private var builtBox: PinBox?
     private var builtZoom: Double?
     private var building = false
+    /// The pin the preview panel is showing, marked in the source so the
+    /// style can draw it as selected.
+    private var selectedID: String?
+
+    /// The panel picked a station (or dismissed): re-mark the source. The
+    /// style reads `selected` off the feature to scale the symbol and turn
+    /// its plate into a halo.
+    func select(_ id: String?) {
+        guard id != selectedID else { return }
+        selectedID = id
+        refreshPins(force: true)
+    }
 
     /// Rebuild the visible set when the camera has moved off what is built —
     /// out of the padded box, or far enough in zoom to change which stations
@@ -328,12 +327,13 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         building = true
 
         let box = view.padded(by: PIN_VIEWPORT_PAD)
+        let selectedID = selectedID
         Task { @MainActor [weak self, weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
-                let items = visibleStations(in: box, zoom: zoom)
+                let items = visibleStations(in: box, zoom: zoom, pinned: selectedID)
                 let now = appNow()
                 // CHS pins take their state from what the offline sync has
                 // ALREADY stored — cache only, never a fetch (issue #12; the
@@ -341,7 +341,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
                 // storm against IWLS).
                 let states = chsPinStates(at: now, items: items, detailed: zoom >= LABEL_MIN_ZOOM,
                                           tideRecords: tides, currentRecords: currents)
-                let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now)
+                let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now,
+                                          selectedID: selectedID)
                 return try? JSONSerialization.data(withJSONObject: geojson)
             }.value
             self?.building = false
@@ -450,25 +451,28 @@ struct MapViewRepresentable: UIViewRepresentable {
         func install(on map: MLNMapView, center: CLLocationCoordinate2D, zoom: Double,
                      framing: [CLLocationCoordinate2D]?) {
             self.map = map
+            framed = framing != nil
             styler = MapStyler(map: map, center: center, zoom: zoom, framing: framing)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
             map.addGestureRecognizer(tap)
         }
 
-        /// The preview selection: light the picked pin's halo, and pan it to
+        /// The preview selection: mark the picked pin in the source (the
+        /// style scales it up and turns its plate into a halo), and pan it to
         /// the center of the strip the panel leaves visible. The pan offsets
         /// `setCenter` by half the panel's coverage rather than setting
         /// `contentInset` — an inset shifts the ornaments and goes stale when
         /// the panel is swiped away without the map hearing about it.
         private var selectedId: String?
+        private var framed = false
         func apply(selection item: StationItem?) {
             guard item?.id != selectedId, let map else { return }
             selectedId = item?.id
-            if let halo = map.style?.layer(withIdentifier: "station-selected") as? MLNVectorStyleLayer {
-                // Empty id matches nothing; see the layer's default predicate.
-                halo.predicate = NSPredicate(mglJSONObject: ["==", ["get", "id"], item?.id ?? ""])
-            }
-            guard let item else { return }
+            styler?.select(item?.id)
+            // A framed map (a detail page's Nearby) already points where it
+            // means to; only the preview panel's map recenters, to clear the
+            // panel covering the bottom of the screen.
+            guard let item, !framed else { return }
             let pin = map.convert(CLLocationCoordinate2D(latitude: item.latitude,
                                                          longitude: item.longitude),
                                   toPointTo: map)

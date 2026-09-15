@@ -119,6 +119,13 @@ let READOUT_MIN_ZOOM = locateZoom
 /// keep reading as one system at every zoom. Two stops only; the
 /// exponential base is what keeps pins lean through the label band and
 /// saves the growth for the detail zooms.
+/// The picked pin sits on a translucent disc of this radius — the whole of
+/// the selection treatment. It rides a `selected` property on the feature
+/// itself, so it falls out of the data rather than out of layers swapped at
+/// runtime.
+let PIN_SELECTED_DISC = 3.4
+let PIN_SELECTED_DISC_OPACITY = 0.18
+
 let PIN_ZOOM_SHRINK = 0.4
 let PIN_ZOOM_GROWTH = 1.8
 let PIN_GROWTH_TO = stationZoom
@@ -158,19 +165,19 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
            PIN_GROWTH_TO, base * PIN_ZOOM_GROWTH])
     }
 
-    // The selected pin's halo: a soft ring under every pin layer, revealed
-    // by `MapViewRepresentable` swapping this layer's predicate to the
-    // picked station's id while the preview panel is up. Default: nothing.
+    // The picked pin sits on a disc — drawn under every pin layer, and
+    // shown by the same `selected` property the glyph scale reads, so no
+    // predicate has to be swapped at runtime.
+    //
+    // White, and that is not a free choice: green is slack and blue is
+    // flood/rising everywhere else on this map, so a selection in either
+    // would be making a claim about the water. White is the one tone the
+    // state palette has not spent.
     let selected = MLNCircleStyleLayer(identifier: "station-selected", source: source)
-    // Matches nothing — no station has an empty id. NOT NSPredicate(value:):
-    // MapLibre's predicate converter throws on constant predicates.
-    selected.predicate = NSPredicate(mglJSONObject: ["==", ["get", "id"], ""])
-    // The Nearby map's focus-ring language: a leaf stroke, nothing filled —
-    // a disc of any tone reads as a blob on the dark ground.
-    selected.circleRadius = grown(PIN_RADIUS * 2.6)
-    selected.circleOpacity = NSExpression(forConstantValue: 0)
-    selected.circleStrokeWidth = NSExpression(forConstantValue: 2.5)
-    selected.circleStrokeColor = NSExpression(forConstantValue: UIColor(SN.leaf))
+    selected.predicate = NSPredicate(mglJSONObject: ["has", "selected"] as [Any])
+    selected.circleRadius = grown(PIN_RADIUS * PIN_SELECTED_DISC)
+    selected.circleColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
+    selected.circleOpacity = NSExpression(forConstantValue: PIN_SELECTED_DISC_OPACITY)
 
     // Each glyph's outline (see `pinGlyphImage`): the same glyph stroked
     // wider in ink, drawn underneath, because `icon-halo-*` does not render

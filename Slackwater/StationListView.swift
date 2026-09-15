@@ -35,9 +35,9 @@ struct StationListView: View {
     /// One-shot like `mapFocus`: the locate remount lands at `locateZoom`
     /// instead of the discovery camera; cleared by the same `.onAppear`.
     @State private var locateFocus = false
-    /// The pin-tap preview: the tapped station's card in a dismissable
-    /// bottom sheet over the map, one tap from its full detail. Tapping open
-    /// water (or swiping the sheet down) dismisses it.
+    /// The pin-tap preview: the tapped station's card over the map, one tap
+    /// from its full detail. Tapping open water (or swiping the card down)
+    /// dismisses it.
     @State private var mapPreview: StationItem?
     @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
@@ -447,34 +447,31 @@ struct StationListView: View {
     /// The preview panel: drag handle over the station's ordinary card on a
     /// canvas slab. Swipe down (or tap open water) dismisses; tapping the
     /// card opens the detail.
+    /// The card itself over the map — no slab, no grabber. `StationCard`
+    /// already brings its own rounded chrome and shadow, so wrapping it in a
+    /// second container just drew a box around a box. The canvas backing is
+    /// still needed: the card's own fill is 5% white, made for the list's
+    /// dark ground, and over imagery it would be a ghost.
     private func previewPanel(_ item: StationItem) -> some View {
-        VStack(spacing: 6) {
-            Capsule()
-                .fill(SN.foam.opacity(0.35))
-                .frame(width: 36, height: 5)
-                .padding(.top, 8)
-            cardFace(item, eager: true)
-                .id(item.id)
-                .frame(minHeight: 168)   // a fresh card is short until its curve resolves
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    mapPreview = nil
-                    if regular { showMap = false }  // the detail pane shows the pick
-                    open(item)
-                }
-                .accessibilityIdentifier("map-preview-card")
-                .accessibilityAddTraits(.isButton)
-                .padding([.horizontal, .bottom], 10)
-        }
-        .frame(maxWidth: .infinity)
-        .background(SN.canvas, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
-        .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
-            guard drag.translation.height > 40 else { return }
-            withAnimation(.snappy) { mapPreview = nil }
-        })
+        cardFace(item, eager: true)
+            .id(item.id)
+            .frame(minHeight: 168)   // a fresh card is short until its curve resolves
+            .background(SN.canvas, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                mapPreview = nil
+                if regular { showMap = false }  // the detail pane shows the pick
+                open(item)
+            }
+            .accessibilityIdentifier("map-preview-card")
+            .accessibilityAddTraits(.isButton)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+            .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
+                guard drag.translation.height > 40 else { return }
+                withAnimation(.snappy) { mapPreview = nil }
+            })
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit

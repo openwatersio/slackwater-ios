@@ -51,13 +51,8 @@ struct StationCardView: View {
         }
         .task {
             guard state == nil || graph == nil, let record = await resolve() else { return }
-            // Animated: the resolve lands a few frames after the card
-            // appears, so an unanimated set pops the curve in mid-entrance
-            // (visible on the map preview panel's slide-up).
-            withAnimation(.easeIn(duration: 0.2)) {
-                if state == nil { state = record.cardState(at: appNow()) }
-                if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
-            }
+            if state == nil { state = record.cardState(at: appNow()) }
+            if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
         }
     }
 }
@@ -163,10 +158,8 @@ struct ChsGateCardView: View {
         }
         .task {
             let now = appNow()
-            withAnimation(.easeIn(duration: 0.2)) {   // see StationCardView's task
-                if state == nil { state = record.cardState(at: now) }
-                if graph == nil { graph = record.cardGraph(at: now) }
-            }
+            if state == nil { state = record.cardState(at: now) }
+            if graph == nil { graph = record.cardGraph(at: now) }
         }
     }
 }
@@ -349,10 +342,8 @@ struct CurrentCardView: View {
         .task {
             if record == nil { record = await resolve() }
             guard let record else { return }
-            withAnimation(.easeIn(duration: 0.2)) {   // see StationCardView's task
-                if state == nil { state = record.cardState(at: appNow()) }
-                if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
-            }
+            if state == nil { state = record.cardState(at: appNow()) }
+            if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
         }
         // The refinement replaces the record under an open list: recompute.
         .onChange(of: fitted) { _, refined in
