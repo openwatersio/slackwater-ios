@@ -87,8 +87,7 @@ func pinRampHex(forSpeedKn kn: Double) -> String {
 }
 
 /// The pin shrink ramp's floor: below here every pin sits at its smallest,
-/// and the far band's collision thinning is what keeps the wide zooms
-/// legible.
+/// and the data layer's decimation is what keeps the wide zooms legible.
 let PIN_SHRINK_FROM = 6.0
 
 /// The station labels' fontstack — the same one the basemap style's own
@@ -131,15 +130,14 @@ func hexColor(_ hex: String) -> UIColor {
                    blue: CGFloat(v & 0xFF) / 255, alpha: 1)
 }
 
-/// Every bundled station as a runtime source — unclustered: the far band's
-/// collision thinning (priority-ranked) is the density answer. Added by
-/// `MapStyler` per style load — the basemap is a style URL this app does
-/// not own, so the app's channels go in through the runtime API, never
-/// into the style JSON.
+/// The pins' runtime source, EMPTY at style load. There is no world build
+/// any more: `MapStyler` fills this from the camera's own visible set and
+/// refills it as the camera moves, so the app never predicts tides for
+/// stations nobody is looking at. Added per style load because the basemap
+/// is a style URL this app does not own — the app's channels go in through
+/// the runtime API, never into the style JSON.
 func stationShapeSource() -> MLNShapeSource {
-    let data = try? JSONSerialization.data(withJSONObject: PinFeaturesCache.shared.snapshot())
-    let shape = data.flatMap { try? MLNShape(data: $0, encoding: String.Encoding.utf8.rawValue) }
-    return MLNShapeSource(identifier: "stations", shape: shape, options: nil)
+    MLNShapeSource(identifier: "stations", shape: nil, options: nil)
 }
 
 /// The pin layers, bottom to top. Expressions come from the same JSON specs
@@ -234,33 +232,11 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
                              rotation: upright, colour: ink, predicate: gauged)
     let tidePins = glyph("station-pins-tide", image: e(["get", "gauge"]),
                          rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: gauged)
-    let near = [dotPlate, dots, currentPinPlate, currentPins, tidePinPlate, tidePins]
-    for layer in near { layer.minimumZoomLevel = Float(LABEL_MIN_ZOOM) }
-
-    // The far band (below the labels): the glyph alone, plate-less, under
-    // the collision engine — overlap off, sorted by the priority the
-    // features carry ("sort", lower first), so a dense coast thins to its
-    // most significant stations instead of clustering, and reveals the rest
-    // as the zoom buys room.
-    func far(_ layer: MLNSymbolStyleLayer) -> MLNSymbolStyleLayer {
-        layer.maximumZoomLevel = Float(LABEL_MIN_ZOOM)
-        layer.iconAllowsOverlap = NSExpression(forConstantValue: false)
-        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
-        layer.iconPadding = NSExpression(forConstantValue: 2)
-        layer.symbolSortKey = e(["get", "sort"])
-        return layer
-    }
-    let dotsFar = far(glyph("station-pins-dot-far",
-                            image: NSExpression(forConstantValue: "pin-dot"),
-                            rotation: upright, colour: e(PIN_STATE_COLOUR), predicate: dotted))
-    let currentPinsFar = far(glyph("station-pins-current-far",
-                                   image: NSExpression(forConstantValue: "pin-arrow"),
-                                   rotation: setRotation, colour: e(PIN_STATE_COLOUR),
-                                   predicate: flowing))
-    let tidePinsFar = far(glyph("station-pins-tide-far", image: e(["get", "gauge"]),
-                                rotation: upright, colour: e(PIN_STATE_COLOUR),
-                                predicate: gauged))
-    for layer in [currentPins, currentPinPlate, currentPinsFar] {
+    // One band, every zoom. Density is settled in the DATA now — the source
+    // only ever holds the camera's own decimated set (`visibleStations`), so
+    // there is no longer a wide-zoom band that needs its own plate-less,
+    // collision-thinned copy of every layer.
+    for layer in [currentPins, currentPinPlate] {
         layer.iconRotationAlignment = NSExpression(forConstantValue: "map")
     }
 
@@ -337,7 +313,6 @@ func stationPinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
     // is left. The same order stacks glyphs above any text in draw order,
     // so even a stray overlap keeps the symbol on top.
     return [selected, labels, flowReadings, tideReadings,
-            dotsFar, currentPinsFar, tidePinsFar,
             dotPlate, dots, currentPinPlate, currentPins,
             tidePinPlate, tidePins]
 }

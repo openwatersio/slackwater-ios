@@ -392,8 +392,28 @@ enum StationItem: Identifiable, Hashable {
     var name: String { info.name }
     var region: String { info.region }
     func searchRank(_ query: String) -> Int? { info.searchRank(query) }
-    var latitude: Double { info.latitude }
-    var longitude: Double { info.longitude }
+    // Switched, not `info.latitude`: `info` is an `any StationIdentity`, and
+    // the map's decimation scan reads these for every station in the bundle
+    // on every camera move — boxing 7,329 existentials to fetch a Double
+    // measured 200 ms a pass.
+    var latitude: Double {
+        switch self {
+        case .tide(let s): s.latitude
+        case .current(let s): s.latitude
+        case .chs(let s): s.latitude
+        case .chsGate(let s): s.latitude
+        case .chsCurrent(let s): s.latitude
+        }
+    }
+    var longitude: Double {
+        switch self {
+        case .tide(let s): s.longitude
+        case .current(let s): s.longitude
+        case .chs(let s): s.longitude
+        case .chsGate(let s): s.longitude
+        case .chsCurrent(let s): s.longitude
+        }
+    }
     /// "Current · NOAA" — what this station measures and whose data it is.
     /// The matching-station chooser's disambiguator: when two entries share a
     /// name, series and provider are the difference that isn't distance.
