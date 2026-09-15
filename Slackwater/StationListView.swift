@@ -41,8 +41,9 @@ struct StationListView: View {
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
     @Environment(\.horizontalSizeClass) private var hSize
 
-    /// The replacement chooser for a removed favorite, if open.
+    /// The replacement chooser for a tombstoned station, if open.
     @State private var chooser: StationMatches?
+    @State private var linkedRemovedStationID: String?
     /// Regular width opens the first row once, on the first appearance only.
     @State private var didAutoSelect = false
     /// The real, fixed FAB footprint — named so the clearance below is tied
@@ -341,6 +342,10 @@ struct StationListView: View {
                 // no separators, no insets.
                 List {
                     Group {
+                        if let id = linkedRemovedStationID {
+                            sectionLabel("Station unavailable")
+                            removedCard(id).padding(.bottom, 12)
+                        }
                         locatedSections
                         footer
                         // max: never shrinks below the intended footprint + margin at small text sizes.
@@ -435,7 +440,19 @@ struct StationListView: View {
         case "premium": showWidgetsGallery = true
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
-            if let item = StationItem.byId[stationID(from: url)] { open(item) }
+            let id = stationID(from: url)
+            if let item = StationItem.byId[id] {
+                open(item)
+            } else if StationTombstone.byId[id] != nil {
+                path = NavigationPath()
+                showMap = false
+                showSettings = false
+                showDownloads = false
+                showWidgetsGallery = false
+                searching = false
+                chooser = nil
+                linkedRemovedStationID = id
+            }
         default: break
         }
     }
@@ -447,6 +464,7 @@ struct StationListView: View {
     /// `at` is the moment a shared link carried; the pushed detail scrubs to
     /// it (ScrubDetailScaffold). Nil — every other caller — means "now".
     private func open(_ item: StationItem, at instant: Date? = nil) {
+        linkedRemovedStationID = nil
         LinkedInstant.shared.pending = instant.map { .init(station: item.id, at: $0) }
         // Regular width: the sidebar (and its focused search field) stays on
         // screen when a detail opens, so the keyboard would sit over the new
@@ -491,7 +509,8 @@ struct StationListView: View {
         let nearIds = seriesFilter.map { series in
             places.shownIds.filter { StationItem.byId[$0]?.series == series }
         } ?? places.shownIds
-        let groups = ListGroups(heroIds: heroItems.map(\.id), favoriteIds: favorites.ids,
+        let groups = ListGroups(heroIds: heroItems.map(\.id),
+                                favoriteIds: favorites.ids.filter { $0 != linkedRemovedStationID },
                                 // Uncollapsed on purpose: a station opened via the chooser is an explicit
                                 // pick, same principle StationGroups grants Favorites — collapsing it
                                 // would let Recents silently show and reopen the nearest namesake
@@ -553,14 +572,6 @@ struct StationListView: View {
                 } else {
                     removedCard(id)  // ChsAmberCard brings its own horizontal inset
                         .padding(.bottom, 12)
-                        // Red destructive, unlike a live favorite's neutral
-                        // unfavorite: there is no Recents to re-file to, so
-                        // this really is deletion and says so.
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { favorites.forget(id) } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
                 }
             }
         }
@@ -651,30 +662,33 @@ struct StationListView: View {
         }
     }
 
-    /// A favorite whose station has left the bundle (issue #91). Stations come
-    /// and go — CHS withdrew 28 in one release — and a starred one that simply
-    /// stopped appearing is the worst of the options: no crash, no row, no
-    /// explanation, and a dead id sitting in UserDefaults forever. So the row
-    /// stays, says what happened, and offers the nearest stations to where that
-    /// station used to be.
-    ///
-    /// The tombstone list is what makes the name renderable at all; without one
-    /// (a favorite from a bundle older than tombstones, say) the card is
-    /// nameless and the replacements come from where the user is instead.
+    /// Explains a tombstoned station and offers alternatives near its last location.
     @ViewBuilder private func removedCard(_ id: String) -> some View {
         let gone = StationTombstone.byId[id]
         let origin = gone.map { (lat: $0.latitude, lon: $0.longitude) } ?? anchor
+        let isFavorite = favorites.contains(id)
         ChsAmberCard(title: gone?.name ?? "Station removed",
                      headline: gone.map { "\($0.region) — no longer published." }
                         ?? "This station is no longer published.",
                      expectation: "It has been withdrawn from the hydrographic "
-                        + "service, so it has no readings to show. Swipe to remove it.",
-                     action: "Pick a replacement",
+                        + "service, so it has no readings to show."
+                        + (isFavorite ? " Swipe to remove it." : ""),
+                     action: isFavorite ? "Pick a replacement" : "Pick another station",
                      identifier: "removed-station-card",
                      icon: "mappin.slash") {
             chooser = StationMatches(place: gone?.name ?? "Removed station",
                                      matches: nearest(to: origin),
                                      replacing: .init(id: id, lat: origin.lat, lon: origin.lon))
+        }
+        .swipeActions(edge: .trailing) {
+            if isFavorite {
+                Button(role: .destructive) {
+                    favorites.forget(id)
+                    if linkedRemovedStationID == id { linkedRemovedStationID = nil }
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
         }
     }
 
