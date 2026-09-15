@@ -749,7 +749,7 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
                 .foregroundStyle(captionColor)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
