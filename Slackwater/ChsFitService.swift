@@ -122,7 +122,7 @@ final class ChsFitService: ObservableObject {
     private var retryTimer: Task<Void, Never>?
     private var connectivity: AnyCancellable?
     private var dataMode: AnyCancellable?
-    private var onlinePending: [ChsCurrentGateInfo] = []
+    @Published private var onlinePending: [ChsCurrentGateInfo] = []
     private var onlinePreferred: [String] = []
     private var onlineOrigin: (lat: Double, lon: Double)?
     private var onlineRunning = false
@@ -414,6 +414,12 @@ final class ChsFitService: ObservableObject {
         guard let state = onlineStates[id] else { return .idle }
         if case .deferred(let due) = state, due <= now { return .idle }
         return state
+    }
+
+    func onlinePosition(_ id: String) -> Int? {
+        if onlineState(id) == .fetching { return 1 }
+        guard let index = onlinePending.firstIndex(where: { $0.id == id }) else { return nil }
+        return index + 1 + (onlineRunning ? 1 : 0)
     }
 
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,

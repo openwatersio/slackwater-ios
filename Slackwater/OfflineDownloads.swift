@@ -497,7 +497,8 @@ struct OfflineManagerList: View {
             case .fetching: return (.downloading, nil)
             case .failed: return (.failed, nil)
             case .deferred: return (.retrying, nil)
-            case .idle: break
+            case .idle:
+                if service.onlinePosition(gate.id) != nil { return (.queued, nil) }
             }
             guard onlineWindow(gate) != nil else { return (.notDownloaded, nil) }
             let days = remainingDays(gate) ?? 0
@@ -517,7 +518,10 @@ struct OfflineManagerList: View {
             let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
             return "Retrying in \(minutes) min"
         case .failed(let reason): return "Unavailable · \(reason)"
-        case .idle: break
+        case .idle:
+            if let position = service.onlinePosition(gate.id) {
+                return position <= 1 ? "Waiting · next" : "Waiting · \(ordinal(position)) in line"
+            }
         }
         guard let window = onlineWindow(gate) else { return "Not downloaded" }
         return onlineDownloadValidity(end: window.offlineValidUntil, calendar: gateCalendar(gate))

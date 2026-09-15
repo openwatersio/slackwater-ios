@@ -3,7 +3,7 @@
 // what "queued" means — stays on the detail views, which have room for it.
 import SwiftUI
 
-/// What a station card is waiting on. Seven states with no reading at all, plus
+/// What a station card is waiting on. States with no reading at all, plus
 /// `.refining` — the one state that HAS a reading and isn't final yet.
 ///
 /// One enum rather than a sentence built at each site: the online-gate path
@@ -16,6 +16,9 @@ enum CardStatus: Equatable {
     /// Online and in the download set, but not its turn yet.
     case queued
     case retrying
+    /// Not in the automatic download set. The card stays a skeleton without
+    /// telling someone to tap; opening a station remains ordinary navigation.
+    case notQueued
     /// Not connected — nothing moves until signal returns.
     case offline
     /// Fetched before; the stored window no longer covers the window on screen.
@@ -33,19 +36,27 @@ enum CardStatus: Equatable {
 
     var showsPlaceholder: Bool {
         switch self {
-        case .downloading, .queued, .retrying, .notDownloaded: true
+        case .downloading, .queued, .retrying, .notQueued, .notDownloaded: true
         default: false
         }
     }
+
+    var showsAutomaticStatus: Bool {
+        switch self {
+        case .downloading, .queued, .retrying: true
+        default: false
+        }
+    }
+
+    var showsIndicator: Bool { self != .notQueued }
 
     var icon: String {
         switch self {
         case .downloading: "arrow.down.circle"
         case .queued: "clock"
-        case .retrying: "arrow.clockwise"
+        case .retrying, .notQueued: "clock"
         case .offline: "wifi.slash"
-        case .expired: "clock.badge.exclamationmark"
-        case .notDownloaded: "arrow.down.circle.dotted"
+        case .expired, .notDownloaded: "wifi.slash"
         case .failed: "exclamationmark.triangle.fill"
         case .refining: "brain"
         }
@@ -57,10 +68,11 @@ enum CardStatus: Equatable {
         case .downloading: "Downloading"
         case .queued: "Queued"
         case .retrying: "Retrying"
+        case .notQueued: ""
         case .offline: "Offline"
         case .expired: "Expired"
-        case .notDownloaded: "Tap to download"
-        case .failed: "Download failed"
+        case .notDownloaded: "Not downloaded"
+        case .failed: "Failed"
         case .refining(let tolerance): tolerance.map { "Refining · \($0)" } ?? "Refining"
         }
     }
@@ -73,10 +85,11 @@ enum CardStatus: Equatable {
         case .downloading: return "Downloading — \(once)"
         case .queued: return "Queued — \(once)"
         case .retrying: return "Retrying — Slackwater tries again on its own. \(once)"
+        case .notQueued: return "Predictions are not downloaded."
         case .offline: return "Offline — needs a moment of signal. \(once)"
-        case .expired: return "Expired — the downloaded predictions no longer cover the dates on screen. Open it to fetch more."
-        case .notDownloaded: return "Tap to download — \(once)"
-        case .failed: return "Download unavailable — open the station for details."
+        case .expired: return "Expired — get back online to download current predictions."
+        case .notDownloaded: return "Not downloaded — get back online to download predictions."
+        case .failed: return "Station unavailable."
         case .refining(let tolerance):
             let howWrong = tolerance.map { ", slack accurate to \($0)" } ?? ""
             return "Refining — showing the fast answer\(howWrong). The full model is still downloading."
@@ -92,8 +105,8 @@ enum CardStatus: Equatable {
     var tint: Color {
         switch self {
         case .downloading: SN.leaf
-        case .expired, .failed, .refining: SN.amber
-        case .queued, .retrying, .offline, .notDownloaded: SN.foam.opacity(0.85)
+        case .failed, .refining: SN.amber
+        case .queued, .retrying, .notQueued, .offline, .expired, .notDownloaded: SN.foam.opacity(0.85)
         }
     }
 }
@@ -110,17 +123,16 @@ func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar 
     return "Available offline for \(days) more days"
 }
 
-/// Compact status below the identity row. Active queue states are icon-only;
-/// actionable and exceptional states keep their text.
+/// Compact status used in the reading slot for automatic work and below the
+/// identity row for offline or exceptional states.
 struct CardStatusStrip: View {
     let status: CardStatus
+    var detail: String? = nil
 
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: status.icon)
-            if status != .downloading && status != .queued {
-                Text(status.label)
-            }
+            Text(detail ?? status.label)
         }
         .font(.caption)
         .foregroundStyle(status.tint)
@@ -128,7 +140,8 @@ struct CardStatusStrip: View {
         // instead (see StationCard's name).
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(status.accessibilityLabel)
+        .accessibilityLabel(detail.map { "\($0). \(status.accessibilityLabel)" }
+                            ?? status.accessibilityLabel)
         // No accessibilityIdentifier of its own, deliberately: a pending card
         // stamps `chs-pending-<id>` (M53) on the whole shell, and SwiftUI
         // PROPAGATES a container's identifier down over every descendant's —

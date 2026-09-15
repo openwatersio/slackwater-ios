@@ -252,9 +252,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Today"].appears(within: 10))
     }
 
-    /// A Canadian station outside the auto-fit set: visible, searchable, and
-    /// honest — it is not queued, and it says opening it is what downloads it.
-    /// Held offline so the state is deterministic.
+    /// A Canadian station outside the auto-fit set stays visible and searchable.
+    /// Held offline so the card explains why no download is available.
     func testM53CanadianStationOnDemand() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
 
@@ -262,10 +261,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let halifax = app.staticTexts["Halifax"].firstMatch
         XCTAssert(halifax.appears(within: 5),
                   "a Canadian station 4,400 km away must still be findable offline")
-        // The words on the card, not the VoiceOver phrasing: this is the one
-        // assertion about what a reader actually SEES on an unqueued station.
-        XCTAssert(app.staticTexts["Tap to download"].firstMatch.exists,
-                  "an unqueued station must not claim to be queued")
+        XCTAssert(app.staticTexts["Not downloaded"].firstMatch.exists,
+                  "an offline station must explain why no reading is available")
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
 
