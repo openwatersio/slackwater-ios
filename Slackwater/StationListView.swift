@@ -201,8 +201,8 @@ struct StationListView: View {
         // fix, then last-opened, then Chesapeake Bay — and adopting only on a live
         // fix would give a user who denied location, or whose fix has not
         // landed yet, a Near Me list ranked around one place and a download
-        // set built around another: every row on the first screen reading
-        // "Tap to download". `adopt` is accretive and `prioritize`
+        // set built around another: every row on the first screen left outside
+        // the automatic queue. `adopt` is accretive and `prioritize`
         // re-sorts, so a real fix landing later still wins on `.onChange`.
         .task {
             ChsFitService.shared.prioritize(lat: anchor.lat, lon: anchor.lon,

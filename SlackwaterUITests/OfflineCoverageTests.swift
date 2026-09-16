@@ -23,10 +23,9 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // whether Victoria is in the download set at all.
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
-        // The visible card is an icon and two words (#93), but the
-        // plain-language copy still has to reach VoiceOver, which is the reader
-        // with the LEAST context, not the most.
-        let copy = NSPredicate(format: "label CONTAINS 'download once, then work offline'")
+        // The visible card is an icon and two words (#93), but the action that
+        // makes progress possible still has to reach VoiceOver.
+        let copy = NSPredicate(format: "label CONTAINS 'get back online'")
 
         openSearch(app, "victoria")
         XCTAssert(app.descendants(matching: .any).matching(copy)
@@ -252,9 +251,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Today"].appears(within: 10))
     }
 
-    /// A Canadian station outside the auto-fit set: visible, searchable, and
-    /// honest — it is not queued, and it says opening it is what downloads it.
-    /// Held offline so the state is deterministic.
+    /// A Canadian station outside the auto-fit set stays visible and searchable.
+    /// Held offline so the card explains why no download is available.
     func testM53CanadianStationOnDemand() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch")
 
@@ -262,10 +260,8 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         let halifax = app.staticTexts["Halifax"].firstMatch
         XCTAssert(halifax.appears(within: 5),
                   "a Canadian station 4,400 km away must still be findable offline")
-        // The words on the card, not the VoiceOver phrasing: this is the one
-        // assertion about what a reader actually SEES on an unqueued station.
-        XCTAssert(app.staticTexts["Tap to download"].firstMatch.exists,
-                  "an unqueued station must not claim to be queued")
+        XCTAssert(app.staticTexts["Not downloaded"].firstMatch.exists,
+                  "an offline station must explain why no reading is available")
         // The card, by id — see testM53OnDemandCanadianStationFitsWhenOpened.
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
 

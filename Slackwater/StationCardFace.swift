@@ -24,11 +24,13 @@ struct StationCard<Trailing: View>: View {
     let name: String
     let region: String
     var km: Double? = nil
-    /// What this card is waiting on — an icon and two words below the whole
-    /// row, at full card width (#93). Kept as its own slot rather than a flag
+    /// What this card is waiting on. Automatic work occupies the otherwise
+    /// empty reading slot; offline and failure states sit below the row. Kept
+    /// as its own slot rather than a flag
     /// on `detail`: the two differ in opacity, width, and font treatment, and
     /// conflating them regresses both.
     var status: CardStatus? = nil
+    var statusDetail: String? = nil
     var opacity: Double = 1
     /// The context curve (`StationCardGraph.window` wide) behind the content.
     var graph: StationCardGraph? = nil
@@ -47,8 +49,7 @@ struct StationCard<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
 
     /// The identity row — the only thing `extras` changes, and so the only
-    /// thing `ViewThatFits` measures. `message` and the card chrome sit
-    /// outside it in `body`; see the note there for why that matters.
+    /// thing `ViewThatFits` measures.
     @ViewBuilder
     func content(extras: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
@@ -83,7 +84,13 @@ struct StationCard<Trailing: View>: View {
             }
             Spacer(minLength: 8)
             // Same rhythm as the identity column's name/region stack.
-            VStack(alignment: .trailing, spacing: 2) { trailing() }
+            VStack(alignment: .trailing, spacing: 2) {
+                if let status, status.showsAutomaticStatus {
+                    CardStatusStrip(status: status, detail: statusDetail)
+                } else {
+                    trailing()
+                }
+            }
         }
     }
 
@@ -102,7 +109,7 @@ struct StationCard<Trailing: View>: View {
             // the card measures ~4.1:1, under AA for caption text where the
             // full-strength 4.71:1 clears it (docs/testflight.md).
             .opacity(opacity)
-            // The status strip sits OUTSIDE the ViewThatFits, and that
+            // Offline and failure status sits OUTSIDE the ViewThatFits, and that
             // placement is load-bearing: `ViewThatFits` compares each
             // candidate's IDEAL width, and a `Text`'s ideal width is its
             // unwrapped single line — measured inside the candidates, a long
@@ -112,8 +119,8 @@ struct StationCard<Trailing: View>: View {
             // both candidates, so it has no business being measured by the
             // picker — shorter copy does not change that, it only shrinks the
             // window in which the bug would be visible.
-            if let status {
-                CardStatusStrip(status: status)
+            if let status, status.showsIndicator, !status.showsAutomaticStatus {
+                CardStatusStrip(status: status, detail: statusDetail)
                     .padding(.top, 10)
             }
         }
@@ -134,8 +141,8 @@ struct StationCard<Trailing: View>: View {
                 // where any builder's last sample lands.
                 if let graph {
                     graph.padding(.top, 54).padding(.horizontal, -3)
-                } else if placeholder, let status {
-                    StationCardPlaceholder(animated: status == .downloading)
+                } else if placeholder {
+                    StationCardPlaceholder()
                         .padding(.top, 54).padding(.horizontal, -3)
                 }
             }
@@ -145,25 +152,10 @@ struct StationCard<Trailing: View>: View {
     }
 }
 
-/// A data-free echo of the card curve and its time axis. Only an active
-/// download moves; queued and on-demand rows stay flat.
+/// A data-free echo of the card curve and its time axis.
 private struct StationCardPlaceholder: View {
-    let animated: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        if animated && !reduceMotion {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                let phase = timeline.date.timeIntervalSinceReferenceDate
-                    .truncatingRemainder(dividingBy: 1.4) / 1.4
-                marks.foregroundStyle(LinearGradient(
-                    colors: [SN.foam.opacity(0.12), SN.foam.opacity(0.34), SN.foam.opacity(0.12)],
-                    startPoint: UnitPoint(x: phase - 0.45, y: 0.5),
-                    endPoint: UnitPoint(x: phase + 0.45, y: 0.5)))
-            }
-        } else {
-            marks.foregroundStyle(SN.foam.opacity(0.2))
-        }
+        marks.foregroundStyle(SN.foam.opacity(0.2))
     }
 
     private var marks: some View {

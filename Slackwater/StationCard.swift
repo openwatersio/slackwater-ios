@@ -1,6 +1,35 @@
 import SwiftUI
 import TideEngine
 
+func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -> String {
+    switch job.status {
+    case .downloading:
+        return job.total > 0 ? "\(max(job.total - job.done, 0)) of \(job.total) to go" : "Downloading"
+    case .pending:
+        if let due = job.retryAfter {
+            guard due > now else { return "Retrying" }
+            let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
+            return "Retrying in \(minutes) min"
+        }
+        return position.map { $0 <= 1 ? "Next" : "\(ordinal($0)) in line" } ?? "Queued"
+    case .ready: return "Queued"
+    case .failed: return "Failed"
+    }
+}
+
+func onlineCardDownloadLabel(state: ChsFitService.OnlineFetchState, position: Int?,
+                             at now: Date = appNow()) -> String? {
+    switch state {
+    case .fetching: return "Downloading"
+    case .deferred(let due):
+        guard due > now else { return "Retrying" }
+        let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
+        return "Retrying in \(minutes) min"
+    case .idle: return position.map { $0 <= 1 ? "Next" : "\(ordinal($0)) in line" }
+    case .failed: return nil
+    }
+}
+
 /// Layout A: kind glyph left, identity (name/region/distance), state right.
 /// Fraunces name, big height numeral.
 struct StationCardView: View {
@@ -70,8 +99,9 @@ struct ChsCardView: View {
     }
 
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
-                       status: cardStatus(id: info.id))
+        let status = listCardStatus(id: info.id)
+        return ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
+                              status: status, detail: cardStatusDetail(id: info.id, status: status))
     }
 }
 
@@ -84,10 +114,12 @@ struct ChsPendingCard: View {
     let id: String
     var km: Double? = nil
     let status: CardStatus
+    var detail: String? = nil
 
     var body: some View {
         StationCard(name: name, region: region, km: km,
                     status: status,
+                    statusDetail: detail,
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
             // Named per station. "Some card on screen says 'Canadian tidal
@@ -133,8 +165,9 @@ struct ChsGateCardView: View {
 
     /// A derived gate waits on its reference PORT's tidal download.
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.reference))
+        let status = listCardStatus(id: gate.reference)
+        return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
+                              status: status, detail: cardStatusDetail(id: gate.reference, status: status))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -201,8 +234,9 @@ struct ChsCurrentGateCardView: View {
     }
 
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.id))
+        let status = listCardStatus(id: gate.id)
+        return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
+                              status: status, detail: cardStatusDetail(id: gate.id, status: status))
     }
 
     /// The 7 online (fit-reject) gates: a covering fetched window
@@ -214,14 +248,19 @@ struct ChsCurrentGateCardView: View {
         if let block = onlineStore?.block(covering: today) {
             OnlineGateCardView(gate: gate, window: block, km: km)
         } else {
-            // Never fetched and fetched-but-run-out are different states and
-            // print different strings (#93):
-            // `onlineGateStatus` only null-checks `blocks.last` — nil is the
-            // former (.notDownloaded), non-nil is the latter (.expired); it
-            // doesn't read the block's own covered-to date.
+            let previous = onlineStore?.blocks.last
+            let fetchState = service.onlineState(gate.id)
+            let position = service.onlinePosition(gate.id)
+            // The list distinguishes never fetched from expired (#93), while
+            // the shared detail status remains `.offline` so it cannot offer
+            // a download action without a connection.
+            let status = onlineGateStatus(previous, online: net.online,
+                                          state: fetchState, position: position)
+            let listStatus = status == .offline
+                ? (previous == nil ? CardStatus.notDownloaded : .expired) : status
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                           status: onlineGateStatus(onlineStore?.blocks.last, online: net.online,
-                                                    state: service.onlineState(gate.id)))
+                           status: listStatus,
+                           detail: onlineCardDownloadLabel(state: fetchState, position: position))
         }
     }
 }
@@ -455,7 +494,9 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
 /// right now beats what is merely true. Replaces the five sentences
 /// `chsPendingMessage` used to build.
 @MainActor func cardStatus(id: String) -> CardStatus {
-    guard let job = ChsFitService.shared.queue.job(id) else { return .notDownloaded }
+    guard let job = ChsFitService.shared.queue.job(id) else {
+        return Connectivity.shared.online ? .notQueued : .notDownloaded
+    }
     switch job.status {
     case .downloading: return .downloading
     case .failed: return .failed
@@ -467,6 +508,18 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
     }
 }
 
+@MainActor func listCardStatus(id: String) -> CardStatus {
+    let status = cardStatus(id: id)
+    return status == .offline ? .notDownloaded : status
+}
+
+@MainActor func cardStatusDetail(id: String, status: CardStatus) -> String? {
+    guard status.showsAutomaticStatus else { return nil }
+    let queue = ChsFitService.shared.queue
+    guard let job = queue.job(id) else { return nil }
+    return cardDownloadLabel(job, position: queue.position(id))
+}
+
 /// The 7 online (fit-reject) gates: never queued, never fitted, so the only
 /// question is what is on disk. Called with a window that does NOT cover the
 /// strip on screen — a covering one renders as an ordinary reading.
@@ -474,7 +527,9 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
 /// Pure, and split from the view for it: the nil/stale distinction is the bug
 /// #93 named, and it needs a test that doesn't build a card.
 func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool,
-                      state: ChsFitService.OnlineFetchState = .idle) -> CardStatus {
+                      state: ChsFitService.OnlineFetchState = .idle,
+                      position: Int? = nil) -> CardStatus {
+    if case .failed = state { return .failed }
     // Offline first: with no signal, neither tapping nor waiting fetches
     // anything, so "get online" is the only true thing to say.
     guard online else { return .offline }
@@ -482,7 +537,6 @@ func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool,
     case .fetching: return .downloading
     case .deferred: return .retrying
     case .failed: return .failed
-    case .idle: break
+    case .idle: return position == nil ? .notQueued : .queued
     }
-    return window == nil ? .notDownloaded : .expired
 }

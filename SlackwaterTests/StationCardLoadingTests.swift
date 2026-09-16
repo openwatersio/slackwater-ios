@@ -26,12 +26,38 @@ final class StationCardLoadingTests: XCTestCase {
     }
 
     @MainActor
-    func testActiveQueueStatesShowOnlyTheirIcons() {
-        let reference = statusSize(.notDownloaded).width
+    func testAutomaticQueueStatesShowTheirProgress() {
+        XCTAssertGreaterThan(statusSize(.downloading, detail: "19 of 31 to go").width, 80)
+        XCTAssertGreaterThan(statusSize(.queued, detail: "4th in line").width, 60)
+    }
 
-        XCTAssertLessThan(statusSize(.downloading).width, reference * 0.3)
-        XCTAssertLessThan(statusSize(.queued).width, reference * 0.3)
-        XCTAssertGreaterThan(reference, 60, "Tap to download should remain visible")
+    func testQueueCardCopyUsesProgressPositionAndRetryTime() {
+        var downloading = job(status: .downloading)
+        downloading.done = 12
+        downloading.total = 31
+        XCTAssertEqual(cardDownloadLabel(downloading, position: 1, at: t0), "19 of 31 to go")
+
+        XCTAssertEqual(cardDownloadLabel(job(), position: 4, at: t0), "4th in line")
+        XCTAssertEqual(cardDownloadLabel(job(), position: 1, at: t0), "Next")
+
+        var retrying = job()
+        retrying.retryAfter = t0.addingTimeInterval(60)
+        XCTAssertEqual(cardDownloadLabel(retrying, position: 2, at: t0), "Retrying in 1 min")
+        retrying.retryAfter = t0
+        XCTAssertEqual(cardDownloadLabel(retrying, position: 2, at: t0), "Retrying")
+    }
+
+    func testOfflineOnlineGateDetailsRequireSignal() {
+        XCTAssertEqual(onlineGateStatus(nil, online: false), .offline)
+        XCTAssertEqual(onlineGateStatus(window(), online: false), .offline)
+        XCTAssertEqual(onlineGateStatus(nil, online: false, state: .failed("gone")), .failed)
+        XCTAssertEqual(CardStatus.notDownloaded.label, "Not downloaded")
+        XCTAssertEqual(CardStatus.failed.label, "Failed")
+    }
+
+    func testOnlineGateWaitingInTheAutomaticQueueShowsItsPosition() {
+        XCTAssertEqual(onlineGateStatus(nil, online: true, state: .idle, position: 3), .queued)
+        XCTAssertEqual(onlineCardDownloadLabel(state: .idle, position: 3, at: t0), "3rd in line")
     }
 
     @MainActor
@@ -45,10 +71,23 @@ final class StationCardLoadingTests: XCTestCase {
     }
 
     @MainActor
-    private func statusSize(_ status: CardStatus) -> CGSize {
-        UIHostingController(rootView: CardStatusStrip(status: status))
+    private func statusSize(_ status: CardStatus, detail: String? = nil) -> CGSize {
+        UIHostingController(rootView: CardStatusStrip(status: status, detail: detail))
             .sizeThatFits(in: CGSize(width: 300, height: 100))
     }
+
+    private func job(status: ChsJobStatus = .pending) -> ChsJob {
+        ChsJob(id: "test", name: "Test", region: "BC", isCurrent: false,
+               latitude: 48, longitude: -123, fitDays: 60, status: status)
+    }
+
+    private func window() -> ChsOnlineWindow {
+        ChsOnlineWindow(stationID: "test", iwlsName: "Test", timezone: "UTC",
+                        fetchedAt: t0, start: t0, end: t0.addingTimeInterval(86_400),
+                        floodDirection: 0, ebbDirection: 180, times: [], speeds: [])
+    }
+
+    private let t0 = Date(timeIntervalSince1970: 1_760_000_000)
 
     private func lowerHalf(_ image: UIImage) throws -> UIImage {
         let source = try XCTUnwrap(image.cgImage)
