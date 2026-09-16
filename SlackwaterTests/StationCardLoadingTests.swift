@@ -47,9 +47,9 @@ final class StationCardLoadingTests: XCTestCase {
         XCTAssertEqual(cardDownloadLabel(retrying, position: 2, at: t0), "Retrying")
     }
 
-    func testOfflineCardsNameWhyTheyNeedSignal() {
-        XCTAssertEqual(onlineGateStatus(nil, online: false), .notDownloaded)
-        XCTAssertEqual(onlineGateStatus(window(), online: false), .expired)
+    func testOfflineOnlineGateDetailsRequireSignal() {
+        XCTAssertEqual(onlineGateStatus(nil, online: false), .offline)
+        XCTAssertEqual(onlineGateStatus(window(), online: false), .offline)
         XCTAssertEqual(onlineGateStatus(nil, online: false, state: .failed("gone")), .failed)
         XCTAssertEqual(CardStatus.notDownloaded.label, "Not downloaded")
         XCTAssertEqual(CardStatus.failed.label, "Failed")

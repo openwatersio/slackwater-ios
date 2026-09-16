@@ -250,13 +250,13 @@ final class ChsCurrentGateTests: XCTestCase {
                        "past the edge it must fail, not silently render a hole")
     }
 
-    /// Without signal, an empty and an expired download explain why no reading
-    /// is available. Online work is automatic and carries no action prompt.
-    func testOnlineGateStatusSeparatesNeverFetchedFromExpired() {
+    /// Detail views keep the offline state so they never offer a download
+    /// action that cannot succeed without a connection.
+    func testOnlineGateStatusRequiresSignalWhenOffline() {
         XCTAssertEqual(onlineGateStatus(nil, online: true), .notQueued)
         XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: true), .notQueued)
-        XCTAssertEqual(onlineGateStatus(nil, online: false), .notDownloaded)
-        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .expired)
+        XCTAssertEqual(onlineGateStatus(nil, online: false), .offline)
+        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .offline)
     }
 
     func testOnlineDownloadValidityUsesRelativeCalendarDays() {

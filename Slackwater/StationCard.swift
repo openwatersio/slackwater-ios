@@ -248,16 +248,18 @@ struct ChsCurrentGateCardView: View {
         if let block = onlineStore?.block(covering: today) {
             OnlineGateCardView(gate: gate, window: block, km: km)
         } else {
+            let previous = onlineStore?.blocks.last
             let fetchState = service.onlineState(gate.id)
             let position = service.onlinePosition(gate.id)
-            // Never fetched and fetched-but-run-out are different states and
-            // print different strings (#93):
-            // `onlineGateStatus` only null-checks `blocks.last` — nil is the
-            // former (.notDownloaded), non-nil is the latter (.expired); it
-            // doesn't read the block's own covered-to date.
+            // The list distinguishes never fetched from expired (#93), while
+            // the shared detail status remains `.offline` so it cannot offer
+            // a download action without a connection.
+            let status = onlineGateStatus(previous, online: net.online,
+                                          state: fetchState, position: position)
+            let listStatus = status == .offline
+                ? (previous == nil ? CardStatus.notDownloaded : .expired) : status
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                           status: onlineGateStatus(onlineStore?.blocks.last, online: net.online,
-                                                    state: fetchState, position: position),
+                           status: listStatus,
                            detail: onlineCardDownloadLabel(state: fetchState, position: position))
         }
     }
@@ -530,7 +532,7 @@ func onlineGateStatus(_ window: ChsOnlineWindow?, online: Bool,
     if case .failed = state { return .failed }
     // Offline first: with no signal, neither tapping nor waiting fetches
     // anything, so "get online" is the only true thing to say.
-    guard online else { return window == nil ? .notDownloaded : .expired }
+    guard online else { return .offline }
     switch state {
     case .fetching: return .downloading
     case .deferred: return .retrying
