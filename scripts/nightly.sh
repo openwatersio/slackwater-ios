@@ -93,7 +93,6 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 ./scripts/testflight.sh
-node scripts/asc.mjs notes "$NEXT_BUILD" "$NOTES"
 
 BUILD_ROW=$(node scripts/asc.mjs builds | grep -F -m1 "$VERSION ($NEXT_BUILD)" || true)
 if ! print -r -- "$BUILD_ROW" | grep -Eq 'VALID.*\[Nightly\]$'; then
