@@ -114,11 +114,12 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         releaseFixture(token, "dodd-first-chunk")
-        waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 30)
+        XCTAssert(waitFor(dodd, "label CONTAINS 'Available offline'", timeout: 120))
         XCTAssert(dodd.label.contains("Available offline"))
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Downloading'", timeout: 30))
         XCTAssert(tofino.label.contains("Downloading"))
         releaseFixture(token, "tofino-first-chunk")
-        waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30)
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 120))
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {

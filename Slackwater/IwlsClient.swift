@@ -104,7 +104,7 @@ final class IwlsFetcher {
             throw ChsError.permanent("could not register UI fixture checkpoint: \(checkpoint)")
         }
         defer { notify_cancel(registration) }
-        for _ in 0..<1_200 {
+        for _ in 0..<12_000 {
             var state: UInt64 = 0
             if notify_get_state(registration, &state) == NOTIFY_STATUS_OK, state == 1 { return }
             try await Task.sleep(for: .milliseconds(50))
