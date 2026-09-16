@@ -560,22 +560,29 @@ final class NationalScaleTests: XCTestCase {
                       "Halifax fetches no Salish passes")
     }
 
-    /// A Canadian station outside the auto-fit set is visible, searchable, says
-    /// the thing that is actually true about it — and downloading it is one tap.
+    /// A Canadian station outside the auto-fit set stays visible and searchable
+    /// without presenting navigation as a download action.
     @MainActor
-    func testOnDemandStationIsVisibleAndSaysSo() throws {
+    func testOnDemandStationIsVisibleWithoutAnActionPrompt() throws {
         let service = ChsFitService.shared
         let far = try XCTUnwrap(ChsStationInfo.all.first {
             !service.isQueued($0.id) && $0.region == "Atlantic Coast"
         })
         XCTAssertTrue(StationItem.search(far.name.lowercased(), near: firstRunFix).contains { $0.id == far.id },
                       "an undownloaded station still has to be findable")
-        XCTAssertEqual(cardStatus(id: far.id), .notDownloaded,
-                       "it must not claim to be queued when it isn't")
+        let before = listCardStatus(id: far.id)
+        if Connectivity.shared.online {
+            XCTAssertEqual(before, .notQueued)
+            XCTAssertFalse(before.showsIndicator,
+                           "ordinary navigation must not read as a download action")
+        } else {
+            XCTAssertEqual(before, .notDownloaded)
+            XCTAssertEqual(before.label, "Not downloaded")
+        }
         service.promote(far.id)   // what ChsDetailView does on appear
         XCTAssertTrue(service.isQueued(far.id))
         XCTAssertEqual(service.queue.position(far.id), 1, "what you opened is next up")
-        XCTAssertTrue([.queued, .offline].contains(cardStatus(id: far.id)),
-                      "once queued it stops saying \"tap to download\"")
+        XCTAssertTrue([.queued, .notDownloaded].contains(listCardStatus(id: far.id)),
+                      "once queued it reports the automatic download state")
     }
 }

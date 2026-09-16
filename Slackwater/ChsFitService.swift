@@ -416,6 +416,12 @@ final class ChsFitService: ObservableObject {
         return state
     }
 
+    func onlinePosition(_ id: String) -> Int? {
+        if onlineState(id) == .fetching { return 1 }
+        guard let index = onlinePending.firstIndex(where: { $0.id == id }) else { return nil }
+        return index + 1 + (onlineRunning ? 1 : 0)
+    }
+
     func noteOnlineFailure(_ id: String, error: String, permanent: Bool,
                            at now: Date = appNow()) {
         onlineRetryTimers[id]?.cancel()

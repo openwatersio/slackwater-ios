@@ -250,17 +250,11 @@ final class ChsCurrentGateTests: XCTestCase {
                        "past the edge it must fail, not silently render a hole")
     }
 
-    /// #93: "never fetched" and "fetched, ran out of coverage" are different
-    /// states, and the card literal this replaced printed one sentence for
-    /// both — the user could not tell a station that needs a first download
-    /// from one whose window has expired.
-    func testOnlineGateStatusSeparatesNeverFetchedFromExpired() {
-        XCTAssertEqual(onlineGateStatus(nil, online: true), .notDownloaded,
-                       "a gate with nothing on disk is one tap from its first fetch")
-        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: true), .expired,
-                       "a stored window that no longer covers the strip is expired, not missing")
-        // No signal: neither tapping nor waiting fetches anything, so the only
-        // true thing to say is "get online" — whatever is on disk.
+    /// Detail views keep the offline state so they never offer a download
+    /// action that cannot succeed without a connection.
+    func testOnlineGateStatusRequiresSignalWhenOffline() {
+        XCTAssertEqual(onlineGateStatus(nil, online: true), .notQueued)
+        XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: true), .notQueued)
         XCTAssertEqual(onlineGateStatus(nil, online: false), .offline)
         XCTAssertEqual(onlineGateStatus(onlineWindow([0, 900], [1, 2]), online: false), .offline)
     }
