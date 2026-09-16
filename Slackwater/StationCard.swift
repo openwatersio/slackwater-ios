@@ -99,8 +99,9 @@ struct ChsCardView: View {
     }
 
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
-                       status: cardStatus(id: info.id), detail: cardStatusDetail(id: info.id))
+        let status = listCardStatus(id: info.id)
+        return ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
+                              status: status, detail: cardStatusDetail(id: info.id, status: status))
     }
 }
 
@@ -164,9 +165,9 @@ struct ChsGateCardView: View {
 
     /// A derived gate waits on its reference PORT's tidal download.
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.reference),
-                       detail: cardStatusDetail(id: gate.reference))
+        let status = listCardStatus(id: gate.reference)
+        return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
+                              status: status, detail: cardStatusDetail(id: gate.reference, status: status))
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -233,8 +234,9 @@ struct ChsCurrentGateCardView: View {
     }
 
     private func pending() -> ChsPendingCard {
-        ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                       status: cardStatus(id: gate.id), detail: cardStatusDetail(id: gate.id))
+        let status = listCardStatus(id: gate.id)
+        return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
+                              status: status, detail: cardStatusDetail(id: gate.id, status: status))
     }
 
     /// The 7 online (fit-reject) gates: a covering fetched window
@@ -498,13 +500,19 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
     case .failed: return .failed
     case .ready: return .queued
     case .pending:
-        guard Connectivity.shared.online else { return .notDownloaded }
+        guard Connectivity.shared.online else { return .offline }
         if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
         return .queued
     }
 }
 
-@MainActor func cardStatusDetail(id: String) -> String? {
+@MainActor func listCardStatus(id: String) -> CardStatus {
+    let status = cardStatus(id: id)
+    return status == .offline ? .notDownloaded : status
+}
+
+@MainActor func cardStatusDetail(id: String, status: CardStatus) -> String? {
+    guard status.showsAutomaticStatus else { return nil }
     let queue = ChsFitService.shared.queue
     guard let job = queue.job(id) else { return nil }
     return cardDownloadLabel(job, position: queue.position(id))

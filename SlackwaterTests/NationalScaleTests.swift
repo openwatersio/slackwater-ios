@@ -570,7 +570,7 @@ final class NationalScaleTests: XCTestCase {
         })
         XCTAssertTrue(StationItem.search(far.name.lowercased(), near: firstRunFix).contains { $0.id == far.id },
                       "an undownloaded station still has to be findable")
-        let before = cardStatus(id: far.id)
+        let before = listCardStatus(id: far.id)
         if Connectivity.shared.online {
             XCTAssertEqual(before, .notQueued)
             XCTAssertFalse(before.showsIndicator,
@@ -582,7 +582,7 @@ final class NationalScaleTests: XCTestCase {
         service.promote(far.id)   // what ChsDetailView does on appear
         XCTAssertTrue(service.isQueued(far.id))
         XCTAssertEqual(service.queue.position(far.id), 1, "what you opened is next up")
-        XCTAssertTrue([.queued, .notDownloaded].contains(cardStatus(id: far.id)),
+        XCTAssertTrue([.queued, .notDownloaded].contains(listCardStatus(id: far.id)),
                       "once queued it reports the automatic download state")
     }
 }

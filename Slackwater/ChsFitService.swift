@@ -122,7 +122,7 @@ final class ChsFitService: ObservableObject {
     private var retryTimer: Task<Void, Never>?
     private var connectivity: AnyCancellable?
     private var dataMode: AnyCancellable?
-    @Published private var onlinePending: [ChsCurrentGateInfo] = []
+    private var onlinePending: [ChsCurrentGateInfo] = []
     private var onlinePreferred: [String] = []
     private var onlineOrigin: (lat: Double, lon: Double)?
     private var onlineRunning = false

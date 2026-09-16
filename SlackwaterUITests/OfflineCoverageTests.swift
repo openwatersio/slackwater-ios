@@ -23,10 +23,9 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // whether Victoria is in the download set at all.
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")  // Victoria
-        // The visible card is an icon and two words (#93), but the
-        // plain-language copy still has to reach VoiceOver, which is the reader
-        // with the LEAST context, not the most.
-        let copy = NSPredicate(format: "label CONTAINS 'download once, then work offline'")
+        // The visible card is an icon and two words (#93), but the action that
+        // makes progress possible still has to reach VoiceOver.
+        let copy = NSPredicate(format: "label CONTAINS 'get back online'")
 
         openSearch(app, "victoria")
         XCTAssert(app.descendants(matching: .any).matching(copy)
