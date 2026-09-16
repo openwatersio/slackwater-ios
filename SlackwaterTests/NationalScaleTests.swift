@@ -202,83 +202,92 @@ final class NationalScaleTests: XCTestCase {
                        RankedStations.near(lat: fix.lat, lon: fix.lon).ranked.first?.id)
     }
 
-    /// The map hands MapLibre one GeoJSON document; building it must not be
-    /// something the map screen notices.
-    ///
-    /// The 0.30s budget was set at the M53 milestone against 3,125 bundled
-    /// stations. World coverage (Task 5) took the heavy tide/current path to
-    /// 1.56× in station count but **2.36×** in total constituent volume
-    /// (2,776 stations × 39.72 avg constituents vs the pre-world 1,473 × 31.68
-    /// — measured by diffing `stations.json` at the commit before world
-    /// coverage landed against today's), which is the quantity `Station.init`
-    /// and `heights()` actually do work proportional to. The number moved
-    /// because the data got legitimately bigger, not because this code got
-    /// slower — no quadratic or repeated-per-station work was found in
-    /// `Station`/`tidePinRisingHybrid`/`currentPinTone`.
-    ///
-    /// What DID regress, and is now fixed separately: `MapStyler.init`
-    /// rebuilt this whole pass from scratch on every single pin focus
-    /// (`.id(mapFocusToken)` remounts `MapViewRepresentable` on every tap) —
-    /// paid again and again in one map session, not once. `PinFeaturesCache`
-    /// (`MapPinState.swift`) now caches across those remounts, invalidating on
-    /// a real `chsTones` change or a moved time bucket; this test forces a
-    /// cold build via `resetForTesting()` so it keeps measuring the one-call
-    /// cost that regressed, not a cache hit.
-    ///
-    /// Re-budgeted from 0.30s to 0.75s: measured 569.3ms cold on this
-    /// machine at 4,699 total stations (all kinds), ~32% headroom above that
-    /// — enough to absorb shared-machine variance without sitting on the
-    /// edge, tight enough that a future 2×+ regression still trips it.
-    ///
-    /// Re-budgeted again to 1.45s for #229: 1,083.7ms cold at 6,707 stations.
-    /// The 2,017 subordinate tide stations have no cheap two-sample path —
-    /// a subordinate's curve is only defined by its extremes — so each pays
-    /// the exact 13h search (~0.26ms here), about half the growth; the rest
-    /// is the catalogue simply being 43% bigger.
-    func testPinLayerBuildsInsideAFrame() {
-        PinFeaturesCache.shared.resetForTesting()
-        let build = elapsed { _ = stationShapeSource() }
-        print(String(format: "M53 pin source · %d stations: %.1f ms", StationItem.all.count, build * 1000))
-        XCTAssertLessThan(build, 1.45 * perfScale)
+    /// The map builds for the CAMERA, not for the planet. A viewport's worth
+    /// of pins is what a pan or a zoom pays for, and decimation caps that by
+    /// SCREEN AREA — so this budget has to hold at a harbour and over a
+    /// continent alike, which is the property that replaced the old
+    /// world-build budget (1.45s for all 6,707 stations, every time the
+    /// camera so much as blinked).
+    func testPinSourceBuildsForTheCameraNotTheWorld() {
+        let harbour = PinBox(south: 32.70, west: -80.05, north: 32.87, east: -79.83)
+        let coast = PinBox(south: 25, west: -95, north: 45, east: -66)
+        for (name, box, zoom) in [("harbour", harbour, 11.5), ("continent", coast, 4.2)] {
+            var items: [StationItem] = []
+            let visible = elapsed { items = visibleStations(in: box, zoom: zoom) }
+            let build = elapsed { _ = pinFeatures(for: items, zoom: zoom) }
+            print(String(format: "map %@ · z%.1f · %d of %d stations: scan %.1f ms, state %.1f ms",
+                         name, zoom, items.count, StationItem.all.count,
+                         visible * 1000, build * 1000))
+            XCTAssertLessThan(visible + build, 0.25 * perfScale,
+                              "\(name) rebuild must land well inside a camera move")
+        }
     }
 
-    /// The regression this exists for: a stale CHS tone surviving after a fit
-    /// lands would be a worse bug than the rebuild cost `PinFeaturesCache`
-    /// exists to avoid. Proves invalidation, not just caching — a test that
-    /// only checked "the second call is fast" would pass just as happily on
-    /// a cache that never updates.
-    func testPinFeaturesCacheInvalidatesOnRealChsToneChange() throws {
-        PinFeaturesCache.shared.resetForTesting()
-        let chsPort = try XCTUnwrap(StationItem.all.first { $0.pinKind == "chs" })
+    /// `covers` decides whether a camera move can reuse the set already
+    /// built, so a false yes is a screen of missing pins. The dateline is
+    /// where it gets hard: a box's two endpoints can both sit inside another
+    /// while the arc between them runs the long way around and leaves it.
+    func testCoverageIsMeasuredAsAnArcNotTwoEndpoints() {
+        let lat = (south: 0.0, north: 10.0)
+        func box(_ west: Double, _ east: Double) -> PinBox {
+            PinBox(south: lat.south, west: west, north: lat.north, east: east)
+        }
+        // The trap: both 100 and -100 are inside [-170, 170], but the arc
+        // between them crosses the antimeridian, which is not.
+        XCTAssertFalse(box(-170, 170).covers(box(100, -100)),
+                       "a wrapped box is not covered just because its ends are inside")
+        // A wrapped box does cover a narrower wrapped box inside it.
+        XCTAssertTrue(box(170, -170).covers(box(175, -175)))
+        XCTAssertFalse(box(175, -175).covers(box(170, -170)), "and not the other way")
+        // The ordinary case still works, in both directions.
+        XCTAssertTrue(box(-10, 10).covers(box(-5, 5)))
+        XCTAssertFalse(box(-5, 5).covers(box(-10, 10)))
+        // A padded box that swallowed the globe covers anything, wrapped or not.
+        XCTAssertTrue(box(-180, 180).covers(box(100, -100)))
+        // Latitude is still a plain containment test.
+        XCTAssertFalse(box(-10, 10).covers(PinBox(south: -5, west: -5, north: 5, east: 5)))
+    }
 
+    /// Decimation's whole point: the work is bounded by what a screen can
+    /// show. Zooming out must not multiply the pins — a continent gets the
+    /// same handful of cells a harbour does, filled with its best-ranked
+    /// stations.
+    func testDecimationBoundsThePinCountAtEveryZoom() {
+        let coast = PinBox(south: 25, west: -95, north: 45, east: -66)
+        var counts: [Int] = []
+        for zoom in [3.0, 5.0, 7.0] {
+            let count = visibleStations(in: coast, zoom: zoom).count
+            XCTAssertLessThan(count, 900, "z\(zoom) put \(count) pins on one screen")
+            counts.append(count)
+        }
+        // Wider zooms cover the same water with fewer, larger cells, so they
+        // can only ever keep fewer stations.
+        XCTAssertEqual(counts, counts.sorted(), "zooming out must not add pins: \(counts)")
+        // A harbour at detail zoom keeps nearly everything: the cells are
+        // smaller than the gaps between stations.
+        let harbour = PinBox(south: 32.70, west: -80.05, north: 32.87, east: -79.83)
+        let dense = visibleStations(in: harbour, zoom: 12.5)
+        let inBox = StationItem.all.filter { harbour.contains(lat: $0.latitude, lon: $0.longitude) }
+        XCTAssertGreaterThan(Double(dense.count), Double(inBox.count) * 0.8,
+                             "detail zoom should thin almost nothing")
+    }
+
+    /// A CHS station takes its state from what the offline sync has already
+    /// stored, and only for pins the camera is actually looking at.
+    func testChsStatesResolveOnlyForTheVisibleSet() throws {
+        let chsPort = try XCTUnwrap(StationItem.all.first { $0.pinKind == "chs" })
         func stateFor(_ geojson: [String: Any], id: String) -> String? {
             let features = geojson["features"] as? [[String: Any]] ?? []
             let props = features.first { ($0["properties"] as? [String: Any])?["id"] as? String == id }
             return (props?["properties"] as? [String: Any])?["state"] as? String
         }
-
-        // Cold: nothing synced, this CHS station reads "unknown".
-        let cold = PinFeaturesCache.shared.snapshot()
+        // Nothing synced: the pin draws neutral rather than guessing.
+        let cold = pinFeatures(for: [chsPort], zoom: 11.5)
         XCTAssertEqual(stateFor(cold, id: chsPort.id), "unknown")
-
-        // A same-value push (no real sync progress) must be a no-op — the
-        // object identity check below only means something if this doesn't
-        // also happen to rebuild.
-        let stillEmpty = PinFeaturesCache.shared.update(tones: [:])
-        XCTAssertEqual(stateFor(stillEmpty, id: chsPort.id), "unknown")
-
-        // A real tone lands for exactly this station: the cache must
-        // invalidate and the NEXT read must reflect it — not the stale
-        // "unknown" from the cold build.
-        let synced = PinFeaturesCache.shared.update(tones: [chsPort.id: "flood"])
-        XCTAssertEqual(stateFor(synced, id: chsPort.id), "flood",
-                       "a real CHS tone must invalidate the cache, not be served stale")
-
-        // And a subsequent plain snapshot() (what a remounted MapStyler asks
-        // for) must see the same resolved tone, not fall back to blank.
-        let afterRemount = PinFeaturesCache.shared.snapshot()
-        XCTAssertEqual(stateFor(afterRemount, id: chsPort.id), "flood",
-                       "a remount must reuse the last-known real tone, not flash back to unknown")
+        // A resolved state reaches the feature it belongs to.
+        let synced = pinFeatures(for: [chsPort], zoom: 11.5,
+                                 chsStates: [chsPort.id: PinState(state: "flood")])
+        XCTAssertEqual(stateFor(synced, id: chsPort.id), "flood")
     }
 
     /// Task 5 fix round 1 shrank the pin's direction search to a 1h window
@@ -359,37 +368,32 @@ final class NationalScaleTests: XCTestCase {
                           "near-turn straddle lag should stay a rare, bounded timing artifact")
     }
 
-    /// Clustering is what makes 3,125 pins a map rather than a smear — and the
-    /// zoom it stops at is what keeps the discovery view tappable.
-    func testStationSourceClustersOnlyBelowTheDiscoveryZoom() throws {
-        // The clustering ceiling and the opening camera are separate constants
-        // whose relationship is the invariant: the discovery camera must open
-        // on tappable stations, not clusters.
-        XCTAssertLessThan(Double(CLUSTER_MAX_ZOOM), defaultDiscoveryZoom)
-    }
-
     /// The runtime pin layers (offline-chart-packs spec §1/§5: the basemap is
     /// a style URL the app does not own; pins go in through the runtime API).
-    /// Both tap layers must exclude clusters, or every cluster draws twice —
-    /// and the tap handler hit-tests these exact identifiers.
+    /// The tap handler hit-tests these exact identifiers.
     func testRuntimePinLayersCarryTheTapContract() throws {
         let layers = stationPinLayers(source: stationShapeSource())
         let byId = Dictionary(uniqueKeysWithValues: layers.map { ($0.identifier, $0) })
-        for id in ["station-clusters", "station-cluster-count", "station-pins-current",
+        for id in ["station-pins-dot-plate", "station-pins-dot",
+                   "station-pins-current-plate", "station-pins-current",
                    "station-pins-tide-plate", "station-pins-tide", "station-labels"] {
             XCTAssertNotNil(byId[id], "\(id) missing from the runtime pin layers")
         }
-        XCTAssertNotNil((byId["station-pins-current"] as? MLNVectorStyleLayer)?.predicate,
-                        "the current-pin layer must exclude clusters, or every cluster draws twice")
-        XCTAssertNotNil((byId["station-pins-tide"] as? MLNVectorStyleLayer)?.predicate,
-                        "the tide-pin layer must exclude clusters, or every cluster draws twice")
+        // One band at every zoom: density is settled in the data now
+        // (`visibleStations`), so no pin layer may gate itself by zoom — a
+        // floor here would leave the wide zooms pinless.
+        for id in ["station-pins-dot", "station-pins-current", "station-pins-tide"] {
+            // Unset reads back as -infinity, not 0; either is "no floor".
+            XCTAssertLessThanOrEqual(byId[id]?.minimumZoomLevel ?? .nan, 0,
+                                     "\(id) must draw at every zoom")
+        }
         // The labels ride the basemap's own fontstack, so offline packs cache
         // its glyph ranges as part of the style's needs. A stack of our own
         // here would be blank offline.
         // The getter normalizes the constant to an aggregate expression, so
         // assert on the stack's presence rather than expression equality.
         let labels = try XCTUnwrap(byId["station-labels"] as? MLNSymbolStyleLayer)
-        XCTAssertTrue(String(describing: labels.textFontNames).contains("noto_sans_bold"),
+        XCTAssertTrue(String(describing: labels.textFontNames).contains("Noto Sans Regular"),
                       "station labels must use the basemap style's own fontstack")
     }
 

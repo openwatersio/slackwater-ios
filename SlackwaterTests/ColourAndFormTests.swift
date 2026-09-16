@@ -116,13 +116,14 @@ final class ColourAndFormTests: XCTestCase {
         try scan("Slackwater/CurveDrawing.swift", from: "enum CurveDrawing {", to: { $0 == "}" }, atLeast: 40)
     }
 
-    /// A high is one ink and a low is the other, on all three surfaces a tide
-    /// detail stacks: the chart's turn dots, the schedule row's pill, and the
-    /// lead's glyph. They sit within a screen of each other, so a row whose
-    /// pill disagreed with the dot it scrubs to would read as two events.
-    /// Source text rather than rendered colour — the failure mode is a
-    /// surface reaching for `SN.rising`/`SN.flood` (the direction axis) or a
-    /// literal, not a token resolving wrong.
+    /// A high is one ink and a low is the other, on every surface that names
+    /// a tide's trend: the chart's turn dots, the schedule row's pill, the
+    /// lead's glyph, the station card's arrow, and the map's gauge fill. They
+    /// sit within a screen of each other, so a row whose pill disagreed with
+    /// the dot it scrubs to would read as two events. Mostly source text
+    /// rather than rendered colour — the failure mode is a surface reaching
+    /// for `SN.rising`/`SN.flood` (the direction axis) or a literal, not a
+    /// token resolving wrong.
     func testTurnInksAgreeAcrossChartPillAndLead() throws {
         let strip = try repoSource("Slackwater/TimelineStrip.swift")
         let lines = strip.components(separatedBy: .newlines)
@@ -144,6 +145,27 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertTrue(try repoSource("Slackwater/TideDetailView.swift")
                         .contains("(up ? SN.graphHigh : SN.graphLow)"),
                       "the tide lead's glyph must draw the same two inks")
+
+        // The station card's conditions arrow, the same pair one screen back.
+        XCTAssertTrue(try repoSource("Slackwater/StationCardFace.swift")
+                        .contains("state.rising ? SN.graphHigh : SN.graphLow"),
+                      "the card's tide arrow must draw the same two inks")
+
+        // And the map's tide gauge, the fourth surface — a rising gauge that
+        // wore the flood blue would say "flood current" on a chart where the
+        // current pins beside it mean exactly that.
+        XCTAssertEqual(mapPinHex("rising"), mapHex(SN.graphHighHex, darkenedBy: PIN_STATE_DARKEN),
+                       "the map's rising gauge must draw the chart's high ink")
+        XCTAssertEqual(mapPinHex("falling"), mapHex(SN.graphLowHex, darkenedBy: PIN_STATE_DARKEN),
+                       "the map's falling gauge must draw the chart's low ink")
+    }
+
+    /// The tone `PIN_STATE_COLOUR`'s match assigns to one named state.
+    private func mapPinHex(_ state: String) -> String? {
+        guard let match = PIN_STATE_COLOUR[2] as? [Any] else { return nil }
+        return stride(from: 2, to: match.count - 1, by: 2)
+            .first { match[$0] as? String == state }
+            .flatMap { match[$0 + 1] as? String }
     }
 
     /// Green means slack and only slack. A ramp that passes through green puts
@@ -297,11 +319,13 @@ final class ColourAndFormTests: XCTestCase {
     /// hand-maintained nothing tied them to `Palette.swift`: retarget `SN.flood`
     /// and the map kept the old blue — two blues both meaning flood, and not
     /// one failing test. They are derived from the token hexes now; this
-    /// asserts the wiring, i.e. that `rising` reaches flood and not ebb.
+    /// asserts the wiring, and in particular that a tide's `rising` reaches
+    /// the curve's high ink while a current's `flood` reaches the direction
+    /// axis. The two are not the same claim and must not share a colour.
     func testMapPinHexesTrackTheTokens() throws {
         let expected: [String: UInt32] = [
-            "rising": SN.floodHex, "flood": SN.floodHex,
-            "falling": SN.ebbHex, "ebb": SN.ebbHex,
+            "rising": SN.graphHighHex, "falling": SN.graphLowHex,
+            "flood": SN.floodHex, "ebb": SN.ebbHex,
             "slack": SN.goHex,
         ]
         // #13: the expression is now to-color(state, match(...)) — a state
@@ -338,12 +362,12 @@ final class ColourAndFormTests: XCTestCase {
     /// strip's green column uses.
     func testCurrentPinColourIsRampOutsideWindowGoInside() {
         let still = record(speedKn: 0)
-        XCTAssertEqual(currentPinColour(still, at: refTime),
+        XCTAssertEqual(currentPinState(still, at: refTime, speedUnit: "kn").state,
                        mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN), "slack pin must be go")
         let fast = record(speedKn: 3.0)
-        XCTAssertEqual(currentPinColour(fast, at: refTime),
-                       pinRampHex(forSpeedKn: 3.0), "moving pin must be the darkened ramp")
-        XCTAssertNotEqual(currentPinColour(fast, at: refTime),
+        XCTAssertEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
+                       pinRampHex(forSpeedKn: 3.0), "moving pin must be the ramp")
+        XCTAssertNotEqual(currentPinState(fast, at: refTime, speedUnit: "kn").state,
                           mapHex(SN.goHex, darkenedBy: PIN_STATE_DARKEN),
                           "a moving pin must never read go")
     }
@@ -404,22 +428,15 @@ final class ColourAndFormTests: XCTestCase {
         return (max(x, y) + 0.05) / (min(x, y) + 0.05)
     }
 
-    /// The pale water's price, and the reason every pin carries an ink outline.
-    ///
-    /// On the old navy water a pin's FILL cleared WCAG's 3:1 for a non-text
-    /// mark by itself in every state. On `#e9f7ff` three of the four states
-    /// fail it outright — flood 2.65, ebb 1.97, slack 2.11 — so the contrast
-    /// moved to the boundary, which is a thing a bounded mark is allowed to do.
-    /// That makes the outline load-bearing rather than decorative: delete it,
-    /// or let the water drift lighter, and the map silently drops under the
-    /// floor in exactly the states it most needs to be read in.
-    ///
-    /// Asserts on the outline, NOT on the fills — the fills legitimately fail
-    /// now, and a test that demanded otherwise would be demanding the palette
-    /// go back to navy. The water tone is the style's only constant ground
-    /// (satellite imagery underneath is arbitrary), so it is the one floor a
-    /// test can hold.
-    func testEveryPinOutlineClearsTheContrastFloorOnTheWaterTone() throws {
+    /// The dark water's contract: the FILLS carry WCAG's 3:1 for a non-text
+    /// mark on the water tone, because the rim around every pin is a shadow
+    /// in the basemap's own halo navy — a shadow on a dark ground cannot be
+    /// the legibility guarantee, so the fills must be. Every named state and
+    /// the whole speed ramp are swept; the neutral steel is exempt on
+    /// purpose (2.6:1 — an unknown pin reading quieter than a stated one is
+    /// the design, not a regression). The water tone is the style's only
+    /// constant ground, so it is the one floor a test can hold.
+    func testEveryPinFillClearsTheContrastFloorOnTheWaterTone() throws {
         let source = try repoSource("Slackwater/MapStyleBuilder.swift")
         func literal(_ name: String) throws -> String {
             // Two-hash delimiters: the pattern contains "# (the opening quote
@@ -429,32 +446,50 @@ final class ColourAndFormTests: XCTestCase {
                 "\(name) must stay a plain hex literal this test can read")
             return String(source[match].suffix(8).prefix(7))
         }
-        let ink = try literal("CHART_INK")
         let water = try literal("WATER_TONE")
-        XCTAssertGreaterThanOrEqual(
-            contrast(ink, water), 3.0,
-            "the pin outline is under 3:1 on the water tone — every pin state relies on it")
-        // Both kinds must actually draw that outline, and the square's comes
-        // from a backing plate because MapLibre Native renders no icon-halo on
-        // its template image. One kind outlined and the other not is how this
-        // regressed the first time.
+        // The named states, straight out of the live match expression.
+        let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
+        var i = 2   // past "match" and ["get", "state"]
+        while i + 1 < stateMatch.count {
+            let state = try XCTUnwrap(stateMatch[i] as? String)
+            let fill = try XCTUnwrap(stateMatch[i + 1] as? String)
+            XCTAssertGreaterThanOrEqual(contrast(fill, water), 3.0,
+                                        "the \(state) fill is under 3:1 on the water tone")
+            i += 2
+        }
+        // The ramp, over every speed a moving pin can render.
+        var kn = slackThresholdKn + 0.01
+        while kn <= 17 {
+            XCTAssertGreaterThanOrEqual(contrast(pinRampHex(forSpeedKn: kn), water), 3.0,
+                                        "the ramp at \(kn) kn is under 3:1 on the water tone")
+            kn += 0.25
+        }
+        // The shadow rim still has to be drawn — the dot as a stroke, each
+        // glyph via its backing plate, because MapLibre Native renders no
+        // icon-halo on template images. One form rimmed and the others not
+        // is how the outline era regressed the first time.
         XCTAssertTrue(source.contains("hexColor(CHART_INK)"),
-                      "the ink expression must derive from CHART_INK, never a hand-copied colour")
-        XCTAssertNotNil(source.range(of: #"circleStrokeColor = ink"#),
-                        "the circle pin lost its ink stroke")
-        XCTAssertNotNil(source.range(of: #"tidePinPlate\.iconColor = ink"#, options: .regularExpression),
-                        "the tide square lost its ink backing plate")
-        XCTAssertTrue(source.contains("pin-square-plate"),
-                      "the backing-plate image must be registered, or the plate layer draws nothing")
+                      "the rim expression must derive from CHART_INK, never a hand-copied colour")
+        for plate in ["pin-dot-plate", "pin-gauge-plate", "pin-arrow-plate"] {
+            XCTAssertTrue(source.contains(plate),
+                          "\(plate) must back its glyph, or the plate layer draws nothing")
+        }
+        XCTAssertNotNil(source.range(of: #"colour: ink"#),
+                        "the glyph plates lost their shadow colour")
     }
 
-    /// The state palette's integrity: the two direction ends, slack and the
-    /// neutral must stay four tellable-apart fills. Walks the actual match
-    /// expression rather than a list of expected colours, so a new state
-    /// cannot ship unexamined. Contrast against a constant ground is not
-    /// assertable here — satellite imagery is arbitrary, so the ink outline
-    /// is the legibility guarantee, asserted above.
-    func testPinStatePaletteStaysFourDistinctFills() throws {
+    /// The state palette's integrity: the tide's two trend inks, the
+    /// current's two direction ends, slack and the neutral must stay six
+    /// tellable-apart fills. Walks the actual match expression rather than a
+    /// list of expected colours, so a new state cannot ship unexamined.
+    ///
+    /// Six, not four, because a rising tide and a flood current are separate
+    /// claims that used to share the blue. The closest pair the six contain
+    /// is the falling-tide amber against the ebb amber, measured at ΔE 20 —
+    /// wider than the flood blue against the neutral steel, which is 17 and
+    /// has always shipped. (The fills' contrast floor on the water tone is
+    /// asserted above.)
+    func testPinStatePaletteStaysDistinctFills() throws {
         let stateMatch = try XCTUnwrap(PIN_STATE_COLOUR[2] as? [Any])
         var fills: [String: String] = ["unknown": try XCTUnwrap(stateMatch.last as? String)]
         var i = 2   // past "match" and ["get", "state"]
@@ -463,7 +498,7 @@ final class ColourAndFormTests: XCTestCase {
                 try XCTUnwrap(stateMatch[i + 1] as? String)
             i += 2
         }
-        XCTAssertEqual(Set(fills.values).count, 4,
-                       "the pin palette must keep four distinct fills: \(fills)")
+        XCTAssertEqual(Set(fills.values).count, 6,
+                       "the pin palette must keep six distinct fills: \(fills)")
     }
 }
