@@ -136,7 +136,6 @@ pr-create
 full-test
 merge
 upload:
-notes:39
 release:nightly-1.13.0-39
 EOF
 diff -u "$STATE/want-events" "$STATE/events"
