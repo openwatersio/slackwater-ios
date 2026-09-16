@@ -141,8 +141,8 @@ struct StationCard<Trailing: View>: View {
                 // where any builder's last sample lands.
                 if let graph {
                     graph.padding(.top, 54).padding(.horizontal, -3)
-                } else if placeholder, let status {
-                    StationCardPlaceholder(animated: status == .downloading)
+                } else if placeholder {
+                    StationCardPlaceholder()
                         .padding(.top, 54).padding(.horizontal, -3)
                 }
             }
@@ -152,25 +152,10 @@ struct StationCard<Trailing: View>: View {
     }
 }
 
-/// A data-free echo of the card curve and its time axis. Only an active
-/// download moves; queued and on-demand rows stay flat.
+/// A data-free echo of the card curve and its time axis.
 private struct StationCardPlaceholder: View {
-    let animated: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        if animated && !reduceMotion {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                let phase = timeline.date.timeIntervalSinceReferenceDate
-                    .truncatingRemainder(dividingBy: 1.4) / 1.4
-                marks.foregroundStyle(LinearGradient(
-                    colors: [SN.foam.opacity(0.12), SN.foam.opacity(0.34), SN.foam.opacity(0.12)],
-                    startPoint: UnitPoint(x: phase - 0.45, y: 0.5),
-                    endPoint: UnitPoint(x: phase + 0.45, y: 0.5)))
-            }
-        } else {
-            marks.foregroundStyle(SN.foam.opacity(0.2))
-        }
+        marks.foregroundStyle(SN.foam.opacity(0.2))
     }
 
     private var marks: some View {
