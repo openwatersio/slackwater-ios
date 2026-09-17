@@ -89,7 +89,10 @@ struct ReportProblemMenu: View {
         } label: {
             Image(systemName: "exclamationmark.bubble")
                 .font(.caption2)
-                .foregroundStyle(SN.foam.opacity(0.4))
+                // Sun, not amber: amber is the warning language this app keeps
+                // scarce, and an invitation to tell us something is wrong is
+                // not itself a warning. The same yellow the favourite star uses.
+                .foregroundStyle(SN.sun.opacity(0.8))
                 // Chrome in a fixed hit target: 44pt of touch around a caption
                 // glyph, without the frame growing with Dynamic Type into the
                 // centred label beside it.
