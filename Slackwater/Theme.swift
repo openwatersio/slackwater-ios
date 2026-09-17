@@ -742,8 +742,11 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibility)
-            value()
-                .foregroundStyle(valueColor)
+            ZStack(alignment: .leading) {
+                Text("0").font(ReadoutType.hero).hidden()
+                value()
+            }
+            .foregroundStyle(valueColor)
             Text(caption)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(captionColor)
