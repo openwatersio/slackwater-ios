@@ -378,3 +378,107 @@ test("a subordinate's bounds are its reference's, reduced by its own offsets", (
   assert.ok(checked.ratio > 1000, `only ${checked.ratio} ratio subordinates checked`);
   assert.ok(checked.fixed > 100, `only ${checked.fixed} fixed subordinates checked`);
 });
+
+// -- Resources/unavailable-stations.json (issue #401) ------------------------
+//
+// Same posture as the file above: assert on the artefact, because it is what
+// ships. The first test is the legal one and the reason this file exists at
+// all — everything else here is quality.
+
+const unavailable = JSON.parse(
+  readFileSync(join(here, "..", "Slackwater", "Resources", "unavailable-stations.json"), "utf8"));
+
+// An ALLOWLIST, mirroring the generator's own UNAVAILABLE_KEYS. This test was
+// a four-name denylist, which is exactly the weakness the generator's guard
+// was changed away from: a denylist has to predict what a future edit leaks,
+// and it already missed `latDatum`/`hatDatum` once. The point of asserting on
+// the artefact is to be independent of the generator, so it has to be at
+// least as strict.
+const IDENTITY_KEYS = ["id", "name", "region", "latitude", "longitude", "license", "source"];
+test("no unavailable station carries anything but identity", () => {
+  const leaked = unavailable
+    .map((s) => [s.id, Object.keys(s).filter((k) => !IDENTITY_KEYS.includes(k))])
+    .filter(([, extra]) => extra.length);
+  assert.deepEqual(leaked, []);
+});
+
+test("every unavailable station is one upstream states we may not use", () => {
+  const rights = new Map(allStations.map((s) => [s.id, s.license?.commercial_use]));
+  const wrong = unavailable.filter((s) => rights.get(s.id) !== false);
+  assert.deepEqual(wrong.map((s) => s.id), []);
+});
+
+// The two fields the app PRINTS, joined back to upstream. Without this the
+// pair could be hardcoded, or read off the wrong upstream key, and every other
+// test here would stay green while the provenance line on the detail page
+// credited the wrong publisher under the wrong licence.
+test("the licence and publisher shown for a station are upstream's own", () => {
+  const raw = new Map(allStations.map((s) => [s.id, s]));
+  const wrong = unavailable.filter((s) => {
+    const up = raw.get(s.id);
+    return !up || up.license?.type !== s.license || (up.source?.name ?? "") !== s.source;
+  });
+  assert.deepEqual(wrong.map((s) => s.id), []);
+});
+
+// A regression guard on the `/ioc_` drop, not a judgement about naming: it
+// restates the generator's filter on purpose, because the property it protects
+// ("every name is a place") is not machine-checkable. A tombstone that cannot
+// name its place is worse than none — the card title and the map label are the
+// name, and "Ista" answers nothing. See openwatersio/station-metadata#45.
+test("the IOC-code rows stay dropped", () => {
+  assert.deepEqual(unavailable.filter((s) => s.id.includes("/ioc_")).map((s) => s.id), []);
+});
+
+// The two files answer opposite questions, so an id in both would be the app
+// telling a user a station is shipped and withheld at the same time.
+test("no station is both shipped and unavailable", () => {
+  const shipped = new Set(stations.map((s) => s.id));
+  assert.deepEqual(unavailable.filter((s) => shipped.has(s.id)).map((s) => s.id), []);
+});
+
+// The whole selection rule: a tombstone is only worth a pin where there is
+// nothing else to show. One within reach of a shipped station is noise on a
+// map that already answers that water.
+test("every unavailable station is a real gap in coverage", () => {
+  const chsStations = JSON.parse(
+    readFileSync(join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
+  const shown = [...stations, ...chsStations];
+  const tooClose = unavailable.filter((s) => shown.some((k) => km(s, k) <= 50));
+  assert.deepEqual(tooClose.map((s) => s.id), []);
+});
+
+// The card renders all four as text ("Gijon", "Asturias — predictions we
+// can't publish", "TICON-4 publishes it under cc-by-nc-4.0"); an empty one
+// would render a dangling sentence.
+test("every unavailable station can fill its card", () => {
+  const blank = unavailable.filter((s) =>
+    !s.id || !s.name || !s.region || !s.license || !s.source ||
+    !Number.isFinite(s.latitude) || !Number.isFinite(s.longitude));
+  assert.deepEqual(blank.map((s) => s.id ?? "(no id)"), []);
+});
+
+// The regression this gate exists for: upstream lists the Fuerteventura gauge
+// twice, 1.103 km apart, which cleared a 1 km radius and shipped two rings and
+// two identical cards a few hundred metres apart.
+test("no two unavailable stations name the same place", () => {
+  const dupes = [];
+  for (let i = 0; i < unavailable.length; i++) {
+    for (let j = i + 1; j < unavailable.length; j++) {
+      if (unavailable[i].name === unavailable[j].name &&
+          km(unavailable[i], unavailable[j]) < SAME_PLACE_KM) {
+        dupes.push(`${unavailable[i].id} / ${unavailable[j].id}`);
+      }
+    }
+  }
+  assert.deepEqual(dupes, []);
+});
+
+// Issue #401's own example, and the one station a reader can check by hand:
+// the nearest thing Slackwater may ship to Gijon is Santander, 154 km east.
+test("Gijon is tombstoned", () => {
+  const gijon = unavailable.find((s) => s.name === "Gijon");
+  assert.ok(gijon, "Gijon is missing from unavailable-stations.json");
+  assert.equal(gijon.region, "Asturias");
+  assert.equal(gijon.license, "cc-by-nc-4.0");
+});

@@ -103,6 +103,79 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         }
     }
 
+    /// Issue #401: an unavailable station's ring explains itself instead of
+    /// leaving the map blank. Gijon, because it is the issue's own example and
+    /// because nothing Slackwater may ship is within 154 km of it — so at this
+    /// camera the ring is the only pin on screen and the centre tap can only
+    /// have hit it.
+    ///
+    /// Zoom 11, not `locateZoom`: the ring's layer is gated at
+    /// `NAME_MIN_ZOOM`, and a test sitting exactly on a minimum-zoom boundary
+    /// is a test that fails the day someone nudges the constant.
+    func testM4UnavailableStationExplainsItself() throws {
+        // Inline, not `launch(...)`: that helper waits for the station list,
+        // and `-openMap` opens the map instead.
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-seedGate", "-openMap", "-locDenied",
+                                             "-mapCenter", "43.558,-5.698", "-mapZoom", "11"])
+        app.launch()
+        let map = app.otherElements["map-canvas"].firstMatch
+        XCTAssert(map.appears(within: 15))
+        sleep(5)  // tiles + the camera settling, as testM4MapPinToDetail does
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        let card = app.descendants(matching: .any)["unavailable-station-card"].firstMatch
+        XCTAssert(card.appears(within: 5), "the ring tap raised no explanation")
+        XCTAssert(app.staticTexts["Gijon"].firstMatch.exists, "the card does not name the station")
+        // The card says two things and no more — the licence argument lives on
+        // the detail page, not on the map.
+        XCTAssert(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "not yet available")).firstMatch.exists,
+            "the card does not say the station is unavailable")
+        XCTAssertFalse(app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "cc-by-nc")).firstMatch.exists,
+            "licence jargon must not reach the map card")
+        // And it is NOT a station card: there is nothing to scrub.
+        XCTAssertFalse(app.descendants(matching: .any)["map-preview-card"].firstMatch.exists,
+                       "an unavailable station must not raise a station preview")
+        save(app, "m4-unavailable-station.png")
+
+        // The card's one link opens the page that explains it.
+        app.staticTexts["We need your help"].firstMatch.tap()
+        let detail = app.descendants(matching: .any)["unavailable-detail"].firstMatch
+        XCTAssert(detail.appears(within: 5), "the card's link opened no detail page")
+        XCTAssert(app.descendants(matching: .any)["unavailable-support-ask"]
+                    .firstMatch.exists, "the detail page makes no ask")
+        // The ask has to be actionable: one inline contact link, not prose
+        // inviting the reader to find an address themselves.
+        XCTAssert(app.descendants(matching: .any)["unavailable-contact"]
+                    .firstMatch.exists, "the ask offers no way to get in touch")
+        // The Nearby section is the way out. Rows carry a combined label
+        // ("Santander, Cantabria · Tide · NOAA, 83 nm"), so match a prefix the
+        // way testNearbyFiltersOpensAStationAndOpensTheMap does — Santander is
+        // the nearest station Slackwater may ship to Gijon, 154 km east.
+        let nearby = app.descendants(matching: .any)["nearby"].firstMatch
+        XCTAssert(nearby.appears(within: 10), "no Nearby section on the detail page")
+        let rows = nearby.descendants(matching: .any).matching(identifier: "nearby-station")
+        XCTAssert(rows.firstMatch.appears(within: 10), "Nearby lists no stations")
+        let labels = rows.allElementsBoundByIndex.map(\.label)
+        XCTAssert(labels.contains { $0.hasPrefix("Santander") },
+                  "Nearby does not offer the nearest shippable station, got "
+                  + labels.joined(separator: " | "))
+        // Starring an unavailable station would persist an id nothing resolves.
+        XCTAssertFalse(app.buttons["Add favorite"].firstMatch.exists,
+                       "an unavailable station must not be favoritable")
+        // One back button. DetailHeader brings its own, so a detail that
+        // forgets `.toolbar(.hidden, for: .navigationBar)` renders the
+        // system's above it — two chevrons, which no other assertion here can
+        // see.
+        XCTAssertEqual(app.navigationBars.count, 0,
+                       "the detail page did not hide the system navigation bar")
+        XCTAssertEqual(app.buttons.matching(identifier: "detail-back").count, 1,
+                       "the detail page shows more than one back button")
+        save(app, "m4-unavailable-detail.png")
+    }
+
     // A gate detail shows no tide — the port's numbers live on the port's own
     // detail, one tap through the quiet link.
     func testM4TideAtPortLink() throws {

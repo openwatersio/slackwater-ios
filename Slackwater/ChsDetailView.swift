@@ -255,6 +255,12 @@ struct ChsAmberCard: View {
     /// button uses, so a user who simply never opted in isn't nagged in the
     /// colour reserved for something being wrong. `status` still wins when set.
     var accent = SN.amber
+    /// What VoiceOver calls the icon when no `status` supplies one. Defaults
+    /// to the shape's own meaning; the unavailable-station card (issue #401)
+    /// passes its own, because "Warning" on a card whose text says it is not
+    /// a warning is the screen reader telling a different story than the
+    /// screen.
+    var iconLabel = "Warning"
     var status: CardStatus? = nil
     let onAction: () -> Void
 
@@ -273,7 +279,7 @@ struct ChsAmberCard: View {
                     .frame(width: iconTileSize, height: iconTileSize)
                     .background((status?.tint ?? accent).opacity(0.16),
                                 in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .accessibilityLabel(status?.accessibilityLabel ?? "Warning")
+                    .accessibilityLabel(status?.accessibilityLabel ?? iconLabel)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(.title3.weight(.semibold))

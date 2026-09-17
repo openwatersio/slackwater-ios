@@ -46,6 +46,41 @@ struct StationTombstone: Decodable, Identifiable, Hashable, StationIdentity {
         Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 }
 
+/// Identity for a station that exists, that we know about, and that we may
+/// never ship (unavailable-stations.json, issue #401) — the opposite fact from
+/// `StationTombstone` above, which is a station that shipped and stopped.
+///
+/// The map's problem is the hole, not the licence: near Gijon the app draws
+/// empty water and the honest reading of that is "broken", when the truth is
+/// that the nearest predictions are non-commercial and we have no right to
+/// serve them. These rows put a pin back at the right place so the map can say
+/// so in the one spot where the question gets asked.
+///
+/// Written by `gen-tides.mjs` as the complement of its own commercial-use
+/// filter — never hand-maintained, and never carrying a constituent, which
+/// that generator asserts on the way out.
+///
+/// ponytail: bundle-only, so it is NOT in `CatalogSnapshot.resources`. Add it
+/// there when this list needs to change without an app update.
+struct UnavailableStation: Decodable, Identifiable, Hashable, StationIdentity {
+    let id: String
+    let name: String
+    let region: String
+    let latitude: Double
+    let longitude: Double
+    /// Why this one is blocked: the upstream licence id ("cc-by-nc-4.0") and
+    /// the publisher it came from ("TICON-4").
+    let license: String
+    let source: String
+    /// StationIdentity's search hook. Same posture as the tombstone above:
+    /// generated identity carries no aliases.
+    var aliases: [String] { [] }
+
+    static let all: [UnavailableStation] = bundled("unavailable-stations")
+    static let byId: [String: UnavailableStation] =
+        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+}
+
 /// A harmonic model fitted on this device from IWLS predictions (`wlp` for a
 /// tide port, `wcsp1`/`wcdp1` for a current gate) — the only CHS-derived
 /// artifact, and it never leaves the device. One shape for both series; the

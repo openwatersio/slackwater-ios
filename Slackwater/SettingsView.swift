@@ -107,6 +107,16 @@ struct SettingsView: View {
                     section("Data & attribution") {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
                         Text("Additional stations: TICON-4 harmonic constants, SEANOE — used under CC BY 4.0 (seanoe.org/data/00980/109129).")
+                        // Issue #401. The same deposit also holds a
+                        // cc-by-nc-4.0 half (GESLA upstream restricts
+                        // commercial use) whose CONSTANTS can never ship —
+                        // and the map now names 139 of those stations, so
+                        // the credits screen has to account for what it is
+                        // showing. Identity only: a name, a region and a
+                        // position we display to explain an absence, which
+                        // is not a use of the predictions the licence
+                        // covers. The attribution is owed either way.
+                        Text("Stations marked \"not yet available\" are named from the same deposit's non-commercial (CC BY-NC 4.0) records — identity only, to explain why no predictions are shown. Their harmonic constants are not bundled and are never served.")
                         Text("Map tiles by OpenFreeMap (openfreemap.org), © OpenMapTiles, data © OpenStreetMap contributors, cached on this device for offline use.")
                         Text("Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada.")
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")

@@ -5,6 +5,28 @@ import SwiftUI
 
 // MARK: - Station list
 
+/// What the map's pin-tap preview panel is showing: a station's own card, or
+/// the explanation for one we know about and may never serve (issue #401).
+///
+/// An enum rather than a sixth `StationItem` case. `StationItem` is what this
+/// app means by "a station you can open" — it is what favorites, offline
+/// downloads, search ranking, the widget picker and every detail view are
+/// typed on — and these are exactly the stations you cannot. The compiler
+/// keeps them apart here; a new case would have made every one of those
+/// switches carry an arm for a station with nothing to show.
+enum MapPreview: Equatable {
+    case station(StationItem)
+    case unavailable(UnavailableStation)
+
+    /// What the map needs: mark this pin, pan it clear of the panel.
+    var selection: MapSelection {
+        switch self {
+        case .station(let s): MapSelection(s)
+        case .unavailable(let s): MapSelection(s)
+        }
+    }
+}
+
 struct StationListView: View {
     @State private var path = NavigationPath()
     @State private var query = ""
@@ -38,7 +60,11 @@ struct StationListView: View {
     /// The pin-tap preview: the tapped station's card over the map, one tap
     /// from its full detail. Tapping open water (or swiping the card down)
     /// dismisses it.
-    @State private var mapPreview: StationItem?
+    ///
+    /// One state, not one per kind: the panel shows exactly one thing, and
+    /// two optionals that must never both be set is a bug waiting for the
+    /// tap that sets the second without clearing the first.
+    @State private var mapPreview: MapPreview?
     @Environment(\.openURL) private var openURL
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     /// Read for the map's identity, not for this view's own text: the pins'
@@ -265,6 +291,7 @@ struct StationListView: View {
             .navigationDestination(for: NoaaRoute.self) { noaaDetail($0) }
             .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
             .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
+            .navigationDestination(for: UnavailableStation.self) { UnavailableDetailView(station: $0).id($0.id) }
             .toolbar(.hidden, for: .navigationBar)
         }
     }
@@ -303,6 +330,7 @@ struct StationListView: View {
                 .navigationDestination(for: NoaaRoute.self) { noaaDetail($0) }
                 .navigationDestination(for: DerivedGateRecord.self) { DerivedGateDetailView(record: $0).id($0.gate.id) }
                 .navigationDestination(for: ChsRoute.self) { ChsDetailView(route: $0).id($0.stationID) }
+            .navigationDestination(for: UnavailableStation.self) { UnavailableDetailView(station: $0).id($0.id) }
                 .toolbar(.hidden, for: .navigationBar)
             }
             // A regular-width launch opens on the first row rather than the
@@ -411,8 +439,11 @@ struct StationListView: View {
                     // Match the list's first-run ranking area.
                     ?? CLLocationCoordinate2D(latitude: firstRunFix.lat, longitude: firstRunFix.lon),
                 zoom: mapFocus?.zoom ?? (locateFocus ? locateZoom : discoveryZoom),
-                selected: mapPreview,
-                onSelect: { item in withAnimation(.snappy) { mapPreview = item } },
+                selected: mapPreview?.selection,
+                onSelect: { item in withAnimation(.snappy) { mapPreview = .station(item) } },
+                onSelectUnavailable: { station in
+                    withAnimation(.snappy) { mapPreview = .unavailable(station) }
+                },
                 onDeselect: { withAnimation(.snappy) { mapPreview = nil } }
             )
             // Units belong in the identity for the same reason the slack
@@ -451,42 +482,105 @@ struct StationListView: View {
             // second pin tap updates the same card view and its `@State`
             // graph never re-resolves — the new station wears the old one's
             // curve.
-            if let item = mapPreview {
-                previewPanel(item)
+            if let preview = mapPreview {
+                previewPanel(preview)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .background(SN.canvas.ignoresSafeArea())
     }
 
-    /// The preview panel: drag handle over the station's ordinary card on a
-    /// canvas slab. Swipe down (or tap open water) dismisses; tapping the
-    /// card opens the detail.
+    /// The preview panel: what the tapped pin has to say, over the map.
+    /// Swipe down (or tap open water) dismisses. A station's card opens its
+    /// detail on a second tap; an unavailable station's explanation has
+    /// nothing to open, which is the whole point of it.
     /// The card itself over the map — no slab, no grabber. `StationCard`
     /// already brings its own rounded chrome and shadow, so wrapping it in a
     /// second container just drew a box around a box. The canvas backing is
     /// still needed: the card's own fill is 5% white, made for the list's
     /// dark ground, and over imagery it would be a ghost.
-    private func previewPanel(_ item: StationItem) -> some View {
-        cardFace(item, eager: true)
-            .id(item.id)
-            .frame(minHeight: 168)   // a fresh card is short until its curve resolves
-            .background(SN.canvas, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                mapPreview = nil
-                if regular { showMap = false }  // the detail pane shows the pick
-                open(item)
+    @ViewBuilder private func previewPanel(_ preview: MapPreview) -> some View {
+        Group {
+            switch preview {
+            case .station(let item):
+                cardFace(item, eager: true)
+                    .frame(minHeight: 168)   // a fresh card is short until its curve resolves
+                    .background(SN.canvas, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        mapPreview = nil
+                        if regular { showMap = false }  // the detail pane shows the pick
+                        open(item)
+                    }
+                    .accessibilityIdentifier("map-preview-card")
+                    .accessibilityAddTraits(.isButton)
+            // No tap-to-open: there is nothing to open, which is the point.
+            case .unavailable(let station):
+                unavailableCard(station)
+                    // The whole card opens the page, not just the trailing
+                    // link — the station card beside it is tappable across its
+                    // whole surface, and a card that looks the same but only
+                    // answers on one word is a card people think is dead.
+                    .contentShape(Rectangle())
+                    .onTapGesture { openUnavailable(station) }
+                    // ChsAmberCard bakes a 16pt horizontal inset for the
+                    // list, where it is one row among many. Here it IS the
+                    // panel, so the inset is cancelled and `previewPanel`'s
+                    // own 12 applies — the same gutter the station card gets.
+                    // ponytail: negative padding rather than an inset
+                    // parameter on a component with four other callers.
+                    .padding(.horizontal, -16)
+                    // Its fill is `accent.opacity(0.1)`, made for the list's
+                    // dark ground. Over imagery that is a ghost, so the slab
+                    // the station card gets is needed here too.
+                    .background(SN.canvas, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .shadow(color: SN.shadow.opacity(0.4), radius: 14, y: 8)
             }
-            .accessibilityIdentifier("map-preview-card")
-            .accessibilityAddTraits(.isButton)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 12)
-            .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
-                guard drag.translation.height > 40 else { return }
-                withAnimation(.snappy) { mapPreview = nil }
-            })
+        }
+        .id(preview.selection.id)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .gesture(DragGesture(minimumDistance: 20).onEnded { drag in
+            guard drag.translation.height > 40 else { return }
+            withAnimation(.snappy) { mapPreview = nil }
+        })
+    }
+
+    /// The ring's card: almost wordless on purpose (issue #401). Someone who
+    /// tapped a ring in a harbour is asking "is this app broken", and that
+    /// answer is three words; the licence argument, the ask and the nearest
+    /// alternatives are all a tap away in `UnavailableDetailView`.
+    ///
+    /// NO REGION on the headline, which is why the second line is a bare
+    /// status. `region` is the country for 9 of the 139 rows — Alboran and
+    /// Valencia are filed under "Spain", F3platform under "Netherlands" — so
+    /// "Netherlands — not yet available" is a card claiming a whole country
+    /// is unavailable while the app ships 137 Dutch stations. The place is
+    /// already on screen under the card; the detail page's header carries it
+    /// in the one spot where it reads as context rather than as the subject.
+    ///
+    /// Steel, not amber: amber is this app's word for "these numbers aren't
+    /// what you think", and there are no numbers here. It is the same
+    /// `PIN_NEUTRAL` the ring on the map is drawn in — one meaning, one value.
+    private func unavailableCard(_ station: UnavailableStation) -> some View {
+        ChsAmberCard(title: station.name,
+                     headline: "Not yet available.",
+                     action: "We need your help",
+                     identifier: "unavailable-station-card",
+                     icon: "lock",
+                     accent: SN.steel,
+                     iconLabel: "Unavailable") {
+            openUnavailable(station)
+        }
+    }
+
+    /// Push an unavailable station's page. One definition, two callers (the
+    /// card's link and the card itself), so the two cannot drift.
+    private func openUnavailable(_ station: UnavailableStation) {
+        mapPreview = nil
+        if regular { showMap = false }  // the detail pane shows the pick
+        path.append(station)
     }
 
     /// The app's URL scheme (project.yml CFBundleURLTypes). Widgets emit

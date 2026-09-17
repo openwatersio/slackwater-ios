@@ -78,4 +78,59 @@ final class ReportProblemTests: XCTestCase {
         XCTAssertEqual(reportMoment(Date(timeIntervalSince1970: 1_789_605_360), tz),
                        "Sep 16, 2026 · 5:36pm PDT")
     }
+
+    // -- the unavailable-station report (issue #401) --------------------------
+
+    /// The regression this guards: `reportBody` resolved its name through
+    /// `StationItem.byId` alone, which misses an unavailable id by
+    /// construction, so the mail named the raw upstream id instead of the port.
+    func testUnavailableReportNamesTheStation() throws {
+        let gijon = try XCTUnwrap(UnavailableStation.all.first { $0.name == "Gijon" })
+        let body = reportBody(kind: .unavailable, stationID: gijon.id,
+                              scrubTime: nil, now: now, tz: tz)
+        XCTAssertTrue(body.contains("Station: Gijon (\(gijon.id))"), body)
+    }
+
+    /// There are no predictions here, so there is no moment to report — and a
+    /// mail that prints one invites the reader to look at a curve that does
+    /// not exist.
+    func testUnavailableReportCarriesNoMoment() throws {
+        let gijon = try XCTUnwrap(UnavailableStation.all.first { $0.name == "Gijon" })
+        let body = reportBody(kind: .unavailable, stationID: gijon.id,
+                              scrubTime: nil, now: now, tz: tz)
+        XCTAssertFalse(body.contains("Moment:"), body)
+        XCTAssertFalse(body.contains(reportMoment(now, tz)), body)
+        // The three water kinds still carry theirs.
+        for kind in [ReportKind.location, .metadata, .height] {
+            let other = reportBody(kind: kind, stationID: station, scrubTime: nil, now: now, tz: tz)
+            XCTAssertTrue(other.contains("Moment:"), "\(kind) lost its moment")
+        }
+    }
+
+    /// The prompt asks for what this page actually needs. Asking someone
+    /// standing at an unserved harbour "what was the water doing" gets a
+    /// confused answer or none.
+    func testUnavailablePromptAsksForAContactNotAReading() {
+        XCTAssertTrue(ReportKind.unavailable.prompt.contains("licensed"),
+                      ReportKind.unavailable.prompt)
+        XCTAssertFalse(ReportKind.unavailable.prompt.contains("water was doing"),
+                       ReportKind.unavailable.prompt)
+    }
+
+    /// The footer menu sits on stations that work, where "I can help with an
+    /// unavailable station" is nonsense beside "Tide height looks wrong".
+    func testTheFooterMenuDoesNotOfferTheUnavailableKind() {
+        XCTAssertFalse(ReportKind.menuCases.contains(.unavailable))
+        XCTAssertEqual(ReportKind.menuCases.count, ReportKind.allCases.count - 1)
+    }
+
+    /// A station with no published slug mints no link, so the mail must still
+    /// be well-formed without one.
+    func testUnavailableReportMintsAMailto() throws {
+        let gijon = try XCTUnwrap(UnavailableStation.all.first { $0.name == "Gijon" })
+        let url = try XCTUnwrap(reportMailURL(kind: .unavailable, stationID: gijon.id,
+                                              scrubTime: nil, now: now, tz: tz))
+        XCTAssertTrue(url.absoluteString.hasPrefix("mailto:\(supportEmail)?"), url.absoluteString)
+        XCTAssertFalse(url.absoluteString.contains("Link: "), url.absoluteString)
+    }
 }

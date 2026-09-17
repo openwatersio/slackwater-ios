@@ -31,6 +31,13 @@ struct DetailHeader: View {
     /// The station's own zone, so a shared instant reads as the same absolute
     /// moment wherever the receiver is.
     var tz: TimeZone = .current
+    /// False on an unavailable station's page (issue #401). Starring one would
+    /// persist an id that `StationItem.byId` and `StationTombstone.byId` both
+    /// miss, and the list renders that as the generic "Station removed" card —
+    /// a favorite the user cannot explain and a widget that shows nothing.
+    /// Share and distance need no flag: both already resolve through the
+    /// catalog and come back empty for a station that is not in it.
+    var favoritable = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openMapFocused) private var openMapFocused
     @ObservedObject private var favorites = FavoritesStore.shared
@@ -75,16 +82,18 @@ struct DetailHeader: View {
                         .accessibilityLabel("Share")
                         .accessibilityIdentifier("detail-share")
                     }
-                    let fav = favorites.contains(favoriteId)
-                    Button { favorites.toggle(favoriteId) } label: {
-                        Image(systemName: fav ? "star.fill" : "star")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(fav ? SN.sun : .white)
-                            .frame(width: 44, height: 44)
-                            .glassEffect(.regular.interactive(), in: Circle())
+                    if favoritable {
+                        let fav = favorites.contains(favoriteId)
+                        Button { favorites.toggle(favoriteId) } label: {
+                            Image(systemName: fav ? "star.fill" : "star")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(fav ? SN.sun : .white)
+                                .frame(width: 44, height: 44)
+                                .glassEffect(.regular.interactive(), in: Circle())
+                        }
+                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                        .accessibilityIdentifier("detail-favorite")
                     }
-                    .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
-                    .accessibilityIdentifier("detail-favorite")
                 }
             }
 
@@ -115,7 +124,13 @@ struct DetailHeader: View {
                 if let item = StationItem.byId[favoriteId] { openMapFocused(item, stationZoom) }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isButton)
+            // Gated on the same lookup the tap is gated on, as
+            // `MoonDetailSheet`'s jump rows and `Theme`'s cards already do.
+            // On an unavailable station's page (issue #401) `favoriteId` is an
+            // id the catalog misses by construction, so the tap is a
+            // permanent no-op — and announcing "button" for it tells VoiceOver
+            // a different story than the screen.
+            .accessibilityAddTraits(StationItem.byId[favoriteId] != nil ? .isButton : [])
             .accessibilityIdentifier("detail-title")
         }
         .padding(.horizontal, 16)

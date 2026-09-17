@@ -11,8 +11,33 @@ enum ReportKind: String, CaseIterable, Identifiable {
     case location = "Station is in the wrong place"
     case metadata = "Station name or details are wrong"
     case height = "Tide height looks wrong"
+    /// An unavailable station's page (issue #401), where the app has no
+    /// predictions and is asking for a contact or a licence instead.
+    case unavailable = "I can help with an unavailable station"
 
     var id: String { rawValue }
+
+    /// What the detail footer's menu offers. NOT `allCases`: `.unavailable`
+    /// belongs to a station that has no footer, and offering it beside "Tide
+    /// height looks wrong" on a station that works is nonsense.
+    static var menuCases: [ReportKind] { allCases.filter { $0 != .unavailable } }
+
+    /// The line the mail opens with. The three water cases ask what someone
+    /// saw; the unavailable one has nothing to see, so asking would get a
+    /// confused answer or none.
+    var prompt: String {
+        switch self {
+        case .unavailable:
+            "(Tell us what you know — who runs this gauge, a contact there, or "
+                + "anything about how its data is licensed.)"
+        case .location, .metadata, .height:
+            "(Tell us what you saw — what the water was doing, and when.)"
+        }
+    }
+
+    /// A station with no predictions has no moment to report, and a mail that
+    /// prints one invites a reader to go look at a curve that does not exist.
+    var carriesMoment: Bool { self != .unavailable }
 }
 
 /// The same "1.13.0 (39)" pair Settings shows, so a report and a screenshot of
@@ -36,15 +61,22 @@ func reportMoment(_ date: Date, _ tz: TimeZone) -> String {
 /// curve the reporter was looking at, with none of it to keep in sync here.
 func reportBody(kind: ReportKind, stationID: String, scrubTime: Date?,
                 now: Date = Date(), tz: TimeZone) -> String {
-    let name = StationItem.byId[stationID]?.name ?? stationID
+    // `UnavailableStation` second: an unavailable station's id is one
+    // `StationItem.byId` misses by construction, and without this the mail
+    // reads "Station: ticon/gijontg-gij-esp-cmems" instead of naming Gijon.
+    let name = StationItem.byId[stationID]?.name
+        ?? UnavailableStation.byId[stationID]?.name
+        ?? stationID
     var lines = [
-        "(Tell us what you saw — what the water was doing, and when.)",
+        kind.prompt,
         "",
         "",
         "— details —",
         "Station: \(name) (\(stationID))",
-        "Moment: \(reportMoment(scrubTime ?? now, tz))",
     ]
+    if kind.carriesMoment {
+        lines.append("Moment: \(reportMoment(scrubTime ?? now, tz))")
+    }
     // The share button's own link, so the two never disagree about which
     // moment they mean. Nil for a station with no published slug.
     if let link = detailShareURL(stationID: stationID, scrubTime: scrubTime, now: now, tz: tz) {
@@ -71,6 +103,26 @@ func reportMailURL(kind: ReportKind, stationID: String, scrubTime: Date?,
     return URL(string: "mailto:\(supportEmail)?subject=\(subject)&body=\(encoded)")
 }
 
+/// Open the mail composer, or fall back to the clipboard on a device with no
+/// mail account. Shared so the footer menu and the unavailable station's page
+/// cannot drift on the encoding or on what the fallback copies.
+@MainActor
+func sendReport(_ kind: ReportKind, stationID: String, scrubTime: Date? = nil,
+                tz: TimeZone = .current, openURL: OpenURLAction,
+                onCopied: @escaping () -> Void) {
+    guard let url = reportMailURL(kind: kind, stationID: stationID,
+                                  scrubTime: scrubTime, tz: tz) else { return }
+    openURL(url) { opened in
+        // A device with no mail account opens nothing and says nothing; the
+        // clipboard is the difference between a lost report and a paste into
+        // whatever they do use.
+        guard !opened else { return }
+        UIPasteboard.general.string = kind.rawValue + "\n\n"
+            + reportBody(kind: kind, stationID: stationID, scrubTime: scrubTime, tz: tz)
+        onCopied()
+    }
+}
+
 /// Below the fold and icon-quiet on purpose: a wrong tide is rare, and this
 /// sits in the provenance footer next to the not-for-navigation line rather
 /// than competing with the readings.
@@ -83,8 +135,11 @@ struct ReportProblemMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(ReportKind.allCases) { kind in
-                Button(kind.rawValue) { send(kind) }
+            ForEach(ReportKind.menuCases) { kind in
+                Button(kind.rawValue) {
+                    sendReport(kind, stationID: stationID, scrubTime: scrubTime,
+                               tz: tz, openURL: openURL) { copied = true }
+                }
             }
         } label: {
             Image(systemName: "exclamationmark.bubble")
@@ -108,17 +163,4 @@ struct ReportProblemMenu: View {
         }
     }
 
-    private func send(_ kind: ReportKind) {
-        guard let url = reportMailURL(kind: kind, stationID: stationID,
-                                      scrubTime: scrubTime, tz: tz) else { return }
-        openURL(url) { opened in
-            // A device with no mail account opens nothing and says nothing;
-            // the clipboard is the difference between a lost report and a
-            // paste into whatever they do use.
-            guard !opened else { return }
-            UIPasteboard.general.string = kind.rawValue + "\n\n"
-                + reportBody(kind: kind, stationID: stationID, scrubTime: scrubTime, tz: tz)
-            copied = true
-        }
-    }
 }

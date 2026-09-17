@@ -157,6 +157,98 @@ func stationShapeSource() -> MLNShapeSource {
     MLNShapeSource(identifier: "stations", shape: nil, options: nil)
 }
 
+/// The unavailable-station source (issue #401), FULL at style load and never
+/// refilled. Its own source rather than rows in `stations` because none of
+/// what that one does applies: these pins carry no reading to recompute on
+/// the clock, no state to re-tone, and nothing the camera can thin — 139
+/// points worldwide is fewer than one busy estuary, so the decimation that
+/// exists to stop the app predicting the planet has nothing to save here.
+func unavailableShapeSource() -> MLNShapeSource {
+    let points: [MLNPointFeature] = UnavailableStation.all.map {
+        let point = MLNPointFeature()
+        point.coordinate = CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+        point.attributes = ["id": $0.id, "name": $0.name]
+        return point
+    }
+    return MLNShapeSource(identifier: "unavailable", features: points, options: nil)
+}
+
+/// The unavailable pin: plate, empty ring, and its name — the three layers
+/// every other pin form here gets, because it has to read like one.
+///
+/// A RING, and the hollowness is the whole message — every other pin in this
+/// app is a filled form carrying a reading, so "the station's outline with
+/// nothing in it" says what a greyed-out copy of a real pin could not. Steel,
+/// the same `PIN_NEUTRAL` the unknown state already means.
+///
+/// The PLATE is not decoration. fiord draws its piers as dashed lines in very
+/// nearly this tone and weight, so an unplated steel ring reads as harbour
+/// linework rather than as a pin — and the one place this pin has to work is
+/// the place where there is nothing else on the map to compete with it. Full
+/// opacity, ink plate, name: the same treatment a station that CAN answer
+/// gets, because the point is that someone sees it.
+///
+/// `NAME_MIN_ZOOM` is the one restraint kept. At discovery zoom the map is
+/// answering "where is there water worth tides", and a ring that opens an
+/// apology is a worse answer than the honest gap. It appears once someone has
+/// zoomed into one place and is asking about THAT water — which is the moment
+/// #401 is about, and the zoom at which real stations get their names too.
+func unavailablePinLayers(source: MLNShapeSource) -> [MLNStyleLayer] {
+    func e(_ json: Any) -> NSExpression { NSExpression(mglJSONObject: json) }
+    let scale = e(["interpolate", ["exponential", 1.7], ["zoom"],
+                   PIN_SHRINK_FROM, PIN_ZOOM_SHRINK, PIN_GROWTH_TO, PIN_ZOOM_GROWTH])
+
+    func ring(_ id: String, image: String, colour: NSExpression) -> MLNSymbolStyleLayer {
+        let layer = MLNSymbolStyleLayer(identifier: id, source: source)
+        layer.iconImageName = NSExpression(forConstantValue: image)
+        layer.iconScale = scale
+        layer.iconColor = colour
+        // The near band's exact contract (see `glyph` below): allow-overlap
+        // TRUE so a glyph is never hidden, ignore-placement FALSE so it
+        // still REGISTERS its space against the text placed later.
+        //
+        // TRUE is load-bearing, not copied. The plate and the glyph sit at
+        // one coordinate, so under allow-overlap FALSE they collide with
+        // EACH OTHER and whichever places second is dropped — a ring with no
+        // rim, or a rim with no ring. Nothing is lost by letting them
+        // overlap: UNAVAILABLE_GAP_KM guarantees no ring is within 50 km of
+        // a station that has an answer, so a ring can never take a real
+        // pin's place at any zoom where both are drawn.
+        layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: false)
+        layer.minimumZoomLevel = Float(NAME_MIN_ZOOM)
+        return layer
+    }
+    // Plate under glyph, the order and the ink every other pin form uses.
+    // NOT in the tap layers — `handleTap` hit-tests the glyph, and a plate
+    // that answered too would return the same feature twice.
+    let plate = ring("station-pins-unavailable-plate", image: "pin-hollow-plate",
+                     colour: NSExpression(forConstantValue: hexColor(CHART_INK)))
+    let glyph = ring("station-pins-unavailable", image: "pin-hollow",
+                     colour: NSExpression(forConstantValue: hexColor(PIN_NEUTRAL)))
+
+    // The name, in the basemap's own label treatment — same paint, same halo
+    // and the same offset ramp `station-labels` uses, so a tombstoned station
+    // is captioned exactly like a real one. Without it the ring is an
+    // unlabelled circle, which answers "something is here" but not "a station
+    // is here, and it is Gijon".
+    let label = MLNSymbolStyleLayer(identifier: "station-labels-unavailable", source: source)
+    label.text = e(["get", "name"])
+    label.textFontNames = NSExpression(forConstantValue: LABEL_FONT)
+    label.textFontSize = e(["interpolate", ["linear"], ["zoom"],
+                            READING_MIN_ZOOM, 11, PIN_GROWTH_TO, 13])
+    label.textColor = NSExpression(forConstantValue: hexColor(LABEL_TEXT))
+    label.textHaloColor = NSExpression(forConstantValue: hexColor(LABEL_HALO))
+    label.textHaloWidth = NSExpression(forConstantValue: 1)
+    label.textOffset = e(["interpolate", ["linear"], ["zoom"],
+                          READING_MIN_ZOOM, ["literal", [0, 1]],
+                          PIN_GROWTH_TO, ["literal", [0, 2.4]]])
+    label.textAnchor = NSExpression(forConstantValue: "top")
+    label.textPadding = NSExpression(forConstantValue: 4)
+    label.minimumZoomLevel = Float(NAME_MIN_ZOOM)
+    return [plate, glyph, label]
+}
+
 /// The pin layers, bottom to top. Expressions come from the same JSON specs
 /// the web uses, converted via `mglJSONObject` so the two renderers cannot
 /// drift on paint.

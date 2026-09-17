@@ -133,6 +133,18 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         return pinGlyphImage(path, bounds: CGSize(width: d, height: d), inflate: inflate)
     }
 
+    /// The unavailable-station glyph (issue #401): the dot's own circle,
+    /// STROKED instead of filled, so the two forms are the same silhouette
+    /// and the only difference is that this one is empty. Inset by half the
+    /// line width — a stroke centres on its path, and without the inset the
+    /// outer half falls off the canvas.
+    private func hollowDotPinImage(inflate: CGFloat = 0) -> UIImage {
+        let d = CGFloat(PIN_RADIUS) * 2, w = CGFloat(PIN_HALO)
+        let path = UIBezierPath(ovalIn: CGRect(x: w / 2, y: w / 2, width: d - w, height: d - w))
+        return strokedGlyphImage(path, bounds: CGSize(width: d, height: d),
+                                 lineWidth: w, inflate: inflate)
+    }
+
     /// The tide gauge glyph: a slim barrel with a trend caret — above the
     /// bar pointing up when rising, below it pointing down when falling
     /// (the Navionics tide-bar idiom), gapped off the barrel so it reads as
@@ -256,6 +268,8 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // re-registers here or a style swap loses it.
         style.setImage(dotPinImage(), forName: "pin-dot")
         style.setImage(dotPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-dot-plate")
+        style.setImage(hollowDotPinImage(), forName: "pin-hollow")
+        style.setImage(hollowDotPinImage(inflate: CGFloat(PIN_HALO)), forName: "pin-hollow-plate")
         // The gauge's rim is its own constant (`gaugeRim`): the barrel is a
         // filled slab already, and the dot's and arrow's full rim reads fat
         // on one.
@@ -275,6 +289,12 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         // land on top of it.
         fill?.attach(to: style, map: mapView)
         if style.source(withIdentifier: "stations") == nil {
+            // Unavailable first, so every pin that HAS an answer draws over
+            // it — the ring is the bottom of the pin stack by construction,
+            // not by a sort key that a later layer could outrank.
+            let unavailable = unavailableShapeSource()
+            style.addSource(unavailable)
+            for layer in unavailablePinLayers(source: unavailable) { style.addLayer(layer) }
             let source = stationShapeSource()
             style.addSource(source)
             for layer in stationPinLayers(source: source) { style.addLayer(layer) }
@@ -402,6 +422,32 @@ private func centeredBounds(around center: CLLocationCoordinate2D,
 
 // MARK: - The map view
 
+/// What the preview panel is showing, as much of it as the map needs: mark
+/// that pin, and pan it clear of the panel. Not a `StationItem` — an
+/// unavailable station's ring gets the same camera treatment and is not one.
+struct MapSelection: Equatable {
+    let id: String
+    let latitude: Double
+    let longitude: Double
+
+    /// A station the map is pointing at — the preview panel's pick, and the
+    /// station a detail page's Nearby map is about.
+    init(_ item: StationItem) {
+        self.init(id: item.id, latitude: item.latitude, longitude: item.longitude)
+    }
+
+    /// One we may never serve (issue #401). Same camera, no halo.
+    init(_ station: UnavailableStation) {
+        self.init(id: station.id, latitude: station.latitude, longitude: station.longitude)
+    }
+
+    private init(id: String, latitude: Double, longitude: Double) {
+        self.id = id
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
 struct MapViewRepresentable: UIViewRepresentable {
     /// Where the discovery map opens. A real fix when there is one — a user in
     /// Boston must not open the map on the Salish Sea (M53) — and the Salish
@@ -418,9 +464,17 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// A tap on no pin, handed the zoom on screen.
     var onMiss: ((Double) -> Void)? = nil
     /// The previewed station: its pin wears the `station-selected` halo and
-    /// the camera centers it in the strip the panel leaves visible.
-    var selected: StationItem?
+    /// the camera centers it in the strip the panel leaves visible. An
+    /// unavailable station gets the camera but no halo — `selected` is a
+    /// property of the station source, and its ring is in another one.
+    var selected: MapSelection?
     let onSelect: (StationItem) -> Void
+    /// A tap on an unavailable station's ring (issue #401) — the panel shows
+    /// the explanation card instead of a station card. Its own callback, not
+    /// a case added to `StationItem`: that enum is what the whole app treats
+    /// as "a station you can open", and these are precisely the ones you
+    /// cannot.
+    var onSelectUnavailable: (UnavailableStation) -> Void = { _ in }
     /// Set, the map draws no station layers and reports where each `framing`
     /// coordinate lands in its bounds, for an overlay to draw as pins.
     var onProject: (([CGPoint]) -> Void)? = nil
@@ -429,7 +483,8 @@ struct MapViewRepresentable: UIViewRepresentable {
     var onDeselect: () -> Void = {}
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onSelect: onSelect, onMiss: onMiss, onDeselect: onDeselect)
+        Coordinator(onSelect: onSelect, onSelectUnavailable: onSelectUnavailable,
+                    onMiss: onMiss, onDeselect: onDeselect)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
@@ -474,14 +529,17 @@ struct MapViewRepresentable: UIViewRepresentable {
 
     final class Coordinator: NSObject {
         let onSelect: (StationItem) -> Void
+        let onSelectUnavailable: (UnavailableStation) -> Void
         let onMiss: ((Double) -> Void)?
         let onDeselect: () -> Void
         private weak var map: MLNMapView?
         private var styler: MapStyler?
 
-        init(onSelect: @escaping (StationItem) -> Void, onMiss: ((Double) -> Void)?,
-             onDeselect: @escaping () -> Void) {
+        init(onSelect: @escaping (StationItem) -> Void,
+             onSelectUnavailable: @escaping (UnavailableStation) -> Void,
+             onMiss: ((Double) -> Void)?, onDeselect: @escaping () -> Void) {
             self.onSelect = onSelect
+            self.onSelectUnavailable = onSelectUnavailable
             self.onMiss = onMiss
             self.onDeselect = onDeselect
         }
@@ -504,7 +562,7 @@ struct MapViewRepresentable: UIViewRepresentable {
         /// the panel is swiped away without the map hearing about it.
         private var selectedId: String?
         private var framed = false
-        func apply(selection item: StationItem?) {
+        func apply(selection item: MapSelection?) {
             guard item?.id != selectedId, let map else { return }
             selectedId = item?.id
             styler?.select(item?.id)
@@ -535,6 +593,13 @@ struct MapViewRepresentable: UIViewRepresentable {
                                  "station-pins-dot"])?.attribute(forKey: "id") as? String,
                let item = StationItem.byId[id] {
                 onSelect(item)
+                return
+            }
+            // Only once no real pin answered: a ring never wins a tap from a
+            // station that has predictions, even where they overlap.
+            if let id = nearest(["station-pins-unavailable"])?.attribute(forKey: "id") as? String,
+               let station = UnavailableStation.byId[id] {
+                onSelectUnavailable(station)
                 return
             }
             onDeselect()

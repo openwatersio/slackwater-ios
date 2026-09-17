@@ -508,8 +508,18 @@ enum StationItem: Identifiable, Hashable {
     /// A detail's Nearby rows: the stations closest to `item`, itself excluded,
     /// narrowed to one series when there is one.
     static func nearby(_ item: StationItem, series: StationSeries?, count: Int = 6) -> [StationItem] {
-        let candidates = all.filter { $0.id != item.id && (series == nil || $0.series == series) }
-        return Array(rankedByDistance(candidates, lat: item.latitude, lon: item.longitude).prefix(count))
+        nearby(lat: item.latitude, lon: item.longitude,
+               excluding: item.id, series: series, count: count)
+    }
+
+    /// The same rows around a bare position — an unavailable station's page
+    /// (issue #401), which has a location and a name but is deliberately not
+    /// a `StationItem`. `excluding` is an id that may match nothing, which is
+    /// the unavailable case: there is no row of its own to leave out.
+    static func nearby(lat: Double, lon: Double, excluding id: String,
+                       series: StationSeries?, count: Int = 6) -> [StationItem] {
+        let candidates = all.filter { $0.id != id && (series == nil || $0.series == series) }
+        return Array(rankedByDistance(candidates, lat: lat, lon: lon).prefix(count))
     }
 
     /// The My Location cards: the nearest station, plus the nearest of the
