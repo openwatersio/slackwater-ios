@@ -17,6 +17,9 @@ import SwiftUI
 /// `DetailHeader` and `NearbySection`, and nothing else.
 struct UnavailableDetailView: View {
     let station: UnavailableStation
+    @Environment(\.openURL) private var openURL
+    /// No mail account on the device — the report went to the clipboard.
+    @State private var copied = false
 
     var body: some View {
         GeometryReader { geo in
@@ -95,16 +98,18 @@ struct UnavailableDetailView: View {
     /// worth more to us right now than a subscription — we do not yet know
     /// which stations money can even fix (#428).
     ///
-    /// ponytail: PROSE ONLY, no button yet. The inline "Contact us" this wants
-    /// belongs on the shared support helpers in #422 (`supportEmail`,
-    /// `reportMailURL`, and the clipboard fallback for a device with no mail
-    /// account) — re-implementing a mailto here would duplicate the
-    /// `&=?+` encoding gotcha that file already documents. Wire it when #422
-    /// lands; note `reportBody` resolves its station name through
-    /// `StationItem.byId`, which misses an unavailable id, so it needs a
-    /// fallback to `UnavailableStation.byId` at the same time.
+    /// ONE link, inline, under the text. It reuses the support helpers rather
+    /// than building a second mailto: `reportMailURL` strips `&`, `=`, `?` and
+    /// `+` from its encoding so a station named "Wreck & Ruin" does not
+    /// truncate the body at the ampersand, and `sendReport` carries the
+    /// clipboard fallback for a device with no mail account. Both are one
+    /// call away; neither is worth reimplementing here.
+    ///
+    /// ponytail: no Premium CTA. `PremiumStore` still has nothing on sale, and
+    /// #428 has to settle whether money is even the answer for a given station
+    /// before this page asks for any.
     private var supportAsk: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("We need your help")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(SN.leaf)
@@ -115,9 +120,35 @@ struct UnavailableDetailView: View {
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.75))
                 .fixedSize(horizontal: false, vertical: true)
+
+            // Not `BranchLink`: its branch glyph means "go to a related
+            // station", and this goes to Mail. Same leaf, same weight, same
+            // chevron as every other link in the app.
+            Button {
+                sendReport(.unavailable, stationID: station.id,
+                           openURL: openURL) { copied = true }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "envelope")
+                        .font(.caption2.weight(.semibold))
+                    Text("Contact us")
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(SN.leaf)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("unavailable-contact")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("unavailable-support-ask")
+        .alert("No mail app", isPresented: $copied) {
+            Button("OK") {}
+        } message: {
+            Text("Your message was copied. Send it to \(supportEmail).")
+        }
     }
 
     /// Who this station's identity came from and under what terms — the

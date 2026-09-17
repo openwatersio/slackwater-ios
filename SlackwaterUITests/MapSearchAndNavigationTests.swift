@@ -146,6 +146,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(detail.appears(within: 5), "the card's link opened no detail page")
         XCTAssert(app.descendants(matching: .any)["unavailable-support-ask"]
                     .firstMatch.exists, "the detail page makes no ask")
+        // The ask has to be actionable: one inline contact link, not prose
+        // inviting the reader to find an address themselves.
+        XCTAssert(app.descendants(matching: .any)["unavailable-contact"]
+                    .firstMatch.exists, "the ask offers no way to get in touch")
         // The Nearby section is the way out. Rows carry a combined label
         // ("Santander, Cantabria · Tide · NOAA, 83 nm"), so match a prefix the
         // way testNearbyFiltersOpensAStationAndOpensTheMap does — Santander is
