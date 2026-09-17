@@ -215,7 +215,7 @@ struct TideDetailView: View {
     // from, keep the honesty clause that the numbers are device-computed. The
     // full clause-10 licence statement carries its weight in Settings.
     private var footer: some View {
-        DetailFooter {
+        DetailFooter(stationID: record.id, scrubTime: scrubTime, tz: tz) {
             if record.isChs {
                 Text("\(record.chartDatum) datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))

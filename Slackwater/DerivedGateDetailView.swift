@@ -160,7 +160,7 @@ struct DerivedGateDetailView: View {
     // The provenance footer (web App.tsx derived footer, in the app's CHS
     // register): derived on this device, no CHS current prediction exists.
     private var footer: some View {
-        DetailFooter {
+        DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
             Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
