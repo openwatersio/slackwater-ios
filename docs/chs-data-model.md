@@ -67,6 +67,14 @@ So, structurally:
   `Resources/chs-tombstones.json` is the same posture for stations that have
   since left the bundle: identity we authored, for a favorite that persists a
   bare id and would otherwise have nothing left to name it (issue #91).
+  `Resources/unavailable-stations.json` is the posture for the third case —
+  stations that never entered the bundle and never can, because upstream
+  states their predictions are non-commercial (issue #401). Written by
+  `gen-tides.mjs` as the complement of the commercial-use filter below, and
+  limited to the 139 that are more than 50 km from anything we do ship: where
+  the app has an answer, the fact that a licensed station also sits there is
+  not the user's problem. The map draws them as empty rings, which open an
+  explanation rather than a forecast.
 - **Models are fitted per user, on that user's device**, from predictions that
   user fetched. A fitted `ChsModel` is written to Application Support and never
   re-served — `ChsStation.swift` says it in code: *"fetched by this user, kept
@@ -99,10 +107,17 @@ terms are worse than "no" — silence is not permission.
 
 - **NOAA** — public domain. 1,429 tide stations and 842 current stations ship
   with full constituents, offline from first launch.
-- **TICON-4** — the CC BY 4.0 half ships (the non-commercial half can never);
-  49 bundled stations cover Canadian water CHS does not gauge. Attribution is in
-  Settings. **This is the precedent for bundling third-party harmonic constants**
-  — see `tools/gen-tides.mjs`.
+- **TICON-4** — the CC BY 4.0 half ships; 49 bundled stations cover Canadian
+  water CHS does not gauge. Attribution is in Settings. **This is the precedent
+  for bundling third-party harmonic constants** — see `tools/gen-tides.mjs`.
+
+  The non-commercial half's CONSTANTS can never ship, and none do. Its
+  IDENTITY does, for 139 of those stations: name, region and position, with no
+  harmonic data, so the map can explain an absence instead of leaving a hole
+  (issue #401, `unavailable-stations.json`). Displaying a name to say "there
+  is a station here we may not serve" is not a use of the predictions the
+  licence restricts — but it is an attribution obligation, paid in Settings
+  beside the CC BY 4.0 line.
 
 ---
 
@@ -292,6 +307,7 @@ The practical list. Each of these has cost someone time.
 |---|---|
 | CHS station identity (1,058) | `Slackwater/Resources/chs-stations.json` |
 | Identity for stations that have LEFT the bundle (28) | `Slackwater/Resources/chs-tombstones.json` |
+| Identity for stations that may NEVER ship (139) | `Slackwater/Resources/unavailable-stations.json` |
 | CHS current gates (22: 13 fitted, 9 online) | `Slackwater/Resources/chs-current-gates.json` |
 | Derived gates (1) | `Slackwater/Resources/chs-gates.json` |
 | NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |

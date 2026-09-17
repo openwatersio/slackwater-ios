@@ -132,7 +132,7 @@ jobs:
         run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs && node gen-station-index.mjs
 
       - name: Committed bundles match their generators
-        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json Slackwater/Resources/unavailable-stations.json
 
       - name: Bundle invariants
         working-directory: tools

@@ -164,7 +164,27 @@ const DUPLICATE_KM = 1.0;
  */
 const CHS_COVERAGE_KM = 10;
 
+/**
+ * How far a non-commercial station has to be from everything we DO ship
+ * before it is worth a tombstone (issue #401).
+ *
+ * The map's problem is a HOLE, not a licence: a user near Gijon sees empty
+ * water and reads it as the app being broken, when the nearest thing we may
+ * ship is Santander, 154 km away. A non-commercial station with a bundled
+ * station 5 km off is not that problem — the water is already answered, and a
+ * pin saying "there is also a station here you can't have" would be noise.
+ *
+ * 50 km is the distance at which the substitute stops being a substitute:
+ * beyond it the tide is a different tide, not the same one read from the next
+ * pier. Measured at this pin: 160 of the 674 non-commercial rows qualify,
+ * 139 after the self-dedupe and the IOC-code drop below — Spain, Greece, Turkiye, Denmark and the
+ * Baltic, which is exactly where TICON's GESLA half is dense and ours is
+ * empty.
+ */
+const UNAVAILABLE_GAP_KM = 50;
+
 const out = join(here, "..", "Slackwater", "Resources", "stations.json");
+const unavailableOut = join(here, "..", "Slackwater", "Resources", "unavailable-stations.json");
 const chs = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
 const resolve = placesResolver();
@@ -558,6 +578,113 @@ if (contested.length) {
     contested.slice(0, 5).map((s) => s.name).join(", "));
 }
 
+/**
+ * Resources/unavailable-stations.json — identity for stations that exist,
+ * that we know about, and that we may never ship (issue #401).
+ *
+ * This is the complement of `shippable` above, which is the point: the app
+ * does not maintain a hand-written list of what it is missing, it emits the
+ * other side of a filter it already runs. `chs-tombstones.json` is the same
+ * posture for a DIFFERENT fact — a station that HAS shipped and stopped —
+ * and the two never overlap: a CHS port left the bundle, these never entered
+ * it.
+ *
+ * `commercial_use === false`, not `!== true`. The shipping gate above uses
+ * `=== true` because silence is not permission; here the question is the
+ * opposite one — "did upstream state that we may not" — and only an explicit
+ * false answers it. That also keeps the one malformed row (`baltic-sea.geo`,
+ * whose `license` is a bare CC-BY string) out: it is an upstream data bug on
+ * a permissive licence, not a station anyone is withholding.
+ *
+ * IDENTITY ONLY, and asserted below. The whole reason these stations are
+ * here is that we have no right to their predictions, so the file that names
+ * them is the last place that may carry a constituent.
+ */
+const shippedPoints = [...stations, ...chs];
+const unavailableCandidates = allStations
+  .filter((s) => s.license?.commercial_use === false)
+  .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
+  .filter((s) => s.type === "reference")
+  // Rows upstream files under an IOC station CODE rather than a place name:
+  // "Ista" for Istanbul, "Trab" for Trabzon, "Csta" for Constanta — 13 of
+  // them, every one carrying the `ioc_` id prefix, which is the
+  // machine-readable tell. A tombstone's whole job is to say "a station
+  // exists HERE and it is called X", and it fails at that if X is a
+  // four-letter code, so these are dropped rather than renamed in the app:
+  // guessing a gauge's name from its region is how you end up with two
+  // "Istanbul" rings 40 km apart. The honest fix is upstream:
+  // openwatersio/station-metadata#45 names all thirteen, and they return on
+  // the pin bump that follows it.
+  // ponytail: an upstream symptom; delete this filter when #45 lands.
+  .filter((s) => !s.id.includes("/ioc_"))
+  .filter((s) => shippedPoints.every((k) => km(s, k) > UNAVAILABLE_GAP_KM))
+  // Named by the same resolver the shipped stations use, so the card reads
+  // like every other station card rather than like a raw database row
+  // ("Gijon · Asturias", not "gijontg-gij-esp-cmems").
+  .map((s) => {
+    const { id, name, region, latitude, longitude } = buildStation(s);
+    return {
+      id, name, region, latitude, longitude,
+      // Why this one is blocked — the card's provenance line, and the record
+      // behind issue #401's first checkbox. Today every row is the same
+      // answer (TICON-4's GESLA half, cc-by-nc-4.0); it is stored per row so
+      // a second blocked source arriving upstream needs no schema change.
+      license: s.license.type,
+      source: s.source?.name ?? "",
+    };
+  })
+  .sort(byNameThenId);
+// One tombstone per place, on BOTH the rules the shipping pipeline uses: the
+// 1 km radius, and the name-gated SAME_PLACE_KM for the pairs a 1 km radius
+// cannot see. Upstream lists the Fuerteventura gauge twice, 1.103 km apart —
+// past DUPLICATE_KM by 103 m — and on the radius alone that shipped two
+// rings, two "Fuerteventura" labels and two byte-identical cards a few
+// hundred metres apart, which is exactly the duplicated-pin look this
+// feature exists to stop the map having.
+//
+// Deliberately NOT deduped at UNAVAILABLE_GAP_KM: at 50 km the survivor is
+// whichever row sorts first, which drops Gijon for Aviles 25 km west — a
+// smaller port, and the one issue #401 is actually about. Two DIFFERENTLY
+// NAMED neighbouring ports are two ports, and the ring layer places under
+// collision (iconAllowsOverlap false), so a crowd thins itself on screen
+// instead of needing to be thinned here.
+const unavailable = [];
+for (const s of unavailableCandidates) {
+  const duplicate = unavailable.some((k) =>
+    km(s, k) <= DUPLICATE_KM || (k.name === s.name && km(s, k) < SAME_PLACE_KM));
+  if (!duplicate) unavailable.push(s);
+}
+/**
+ * The legal guard, same posture as the commercial-use assertion above: this
+ * file's entire purpose is stations we may not serve, so anything that
+ * describes the WATER rather than the PLACE reaching it is the one failure
+ * that matters.
+ *
+ * An ALLOWLIST, not a denylist of `constituents`/`offsets`. A denylist has to
+ * predict what a future edit might leak, and it guessed wrong twice already:
+ * `buildStation` also emits `chartDatum`, `datumOffset`, `latDatum` and
+ * `hatDatum`, none of which a three-name denylist mentioned, and `latDatum`
+ * /`hatDatum` are astronomical tide bounds — prediction, not identity. Here a
+ * new key has to be added to this list deliberately, and the failure mode of
+ * forgetting is a red build rather than a licence breach.
+ */
+const UNAVAILABLE_KEYS = ["id", "name", "region", "latitude", "longitude", "license", "source"];
+for (const s of unavailable) {
+  const extra = Object.keys(s).filter((k) => !UNAVAILABLE_KEYS.includes(k));
+  if (extra.length) {
+    throw new Error(`${s.id} carries ${extra.join(", ")} into unavailable-stations.json`);
+  }
+}
+if (unavailable.some((s) => ids.has(s.id))) {
+  throw new Error("a station is both shipped and unavailable");
+}
+// Gijon (issue #401's own example) is asserted in gen-tides.test.mjs, NOT
+// here. A throw at this point aborts before `writeBundle(out, stations)` and
+// takes the whole data chain down with it, so an upstream rename — or the app
+// finally gaining real coverage there — would block regenerating every other
+// artifact. A red test says the same thing and blocks nothing.
+const unavailableSize = writeBundle(unavailableOut, unavailable);
+
 const size = writeBundle(out, stations);
 const towns = stations.filter((s) => derivedTownIds.has(s.id)).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
@@ -569,3 +696,6 @@ console.log(
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
   `${dropped} duplicates dropped; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);
+console.log(
+  `${unavailable.length} unavailable stations, ${unavailableSize} ` +
+  `(non-commercial, no bundled station within ${UNAVAILABLE_GAP_KM} km)`);
