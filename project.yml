@@ -117,6 +117,12 @@ targets:
       - path: Slackwater/Resources/chs-gates.json
       - path: Slackwater/Resources/chs-current-gates.json
       - path: Slackwater/Resources/chs-tombstones.json
+      # 20 KB, and no widget reads it today. It is here because ChsStation.swift
+      # (compiled into this appex below) declares `bundled("unavailable-stations")`,
+      # and `bundled` is a preconditionFailure on a missing file — the first
+      # widget to touch `UnavailableStation.all` would crash the appex, not
+      # degrade. The list's sync rule above is what prevents that.
+      - path: Slackwater/Resources/unavailable-stations.json
       - Slackwater/AppGroup.swift
       - Slackwater/Units.swift
       - Slackwater/Palette.swift
