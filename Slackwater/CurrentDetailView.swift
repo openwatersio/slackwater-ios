@@ -193,7 +193,7 @@ struct CurrentDetailView: View {
     }
 
     private var footer: some View {
-        DetailFooter {
+        DetailFooter(stationID: record.itemId, scrubTime: scrubTime, tz: tz) {
             if let gate = provisionalGate {
                 Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded — still refining")
                     .font(.caption2).foregroundStyle(SN.amber.opacity(0.7))

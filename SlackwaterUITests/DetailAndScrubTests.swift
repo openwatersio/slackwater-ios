@@ -808,4 +808,24 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             app.terminate()
         }
     }
+
+    /// The report menu sits below the fold in the provenance footer, where no
+    /// unit test can reach it. Tapping an item hands off to Mail, so this stops
+    /// at the open menu: what it guards is that the three subjects a support
+    /// mail can carry are all still offered.
+    func testReportAProblemOffersItsThreeSubjects() throws {
+        let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        openFridayHarbor(app)
+        let report = app.descendants(matching: .any)["detail-report"].firstMatch
+        scrollTo(report, in: app)
+        save(app, "report-footer.png")
+        report.tap()
+        for subject in ["Station is in the wrong place",
+                        "Station name or details are wrong",
+                        "Tide height looks wrong"] {
+            XCTAssert(app.descendants(matching: .any)[subject].firstMatch.appears(within: 5),
+                      "the report menu is missing: \(subject)")
+        }
+        save(app, "report-menu.png")
+    }
 }

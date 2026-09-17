@@ -252,7 +252,7 @@ struct OnlineGateDetailView: View {
     }
 
     private func provenance(_ window: ChsOnlineWindow) -> some View {
-        DetailFooter {
+        DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
             Text("CHS-published predictions · fetched \(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz)) — not computed on this device")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
