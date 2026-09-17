@@ -15,7 +15,7 @@ settings:
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
     MARKETING_VERSION: 1.13.0
-    CURRENT_PROJECT_VERSION: 40
+    CURRENT_PROJECT_VERSION: 41
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
