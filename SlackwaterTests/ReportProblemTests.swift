@@ -12,7 +12,7 @@ final class ReportProblemTests: XCTestCase {
     func testBodyCarriesStationAndMoment() {
         let body = reportBody(kind: .height, stationID: station, scrubTime: nil, now: now, tz: tz)
         XCTAssertTrue(body.contains(station), body)
-        XCTAssertTrue(body.contains(reportMomentLabel(now)), body)
+        XCTAssertTrue(body.contains(reportMoment(now, tz)), body)
         XCTAssertTrue(body.contains("App: "), body)
     }
 
@@ -20,8 +20,8 @@ final class ReportProblemTests: XCTestCase {
     func testScrubbedMomentWins() {
         let scrub = now.addingTimeInterval(36 * 3_600)
         let body = reportBody(kind: .height, stationID: station, scrubTime: scrub, now: now, tz: tz)
-        XCTAssertTrue(body.contains(reportMomentLabel(scrub)), body)
-        XCTAssertFalse(body.contains(reportMomentLabel(now)), body)
+        XCTAssertTrue(body.contains(reportMoment(scrub, tz)), body)
+        XCTAssertFalse(body.contains(reportMoment(now, tz)), body)
     }
 
     /// The link is the share button's, so the report reproduces the exact view.
@@ -66,16 +66,16 @@ final class ReportProblemTests: XCTestCase {
         XCTAssertEqual(queryValue("body", in: url), raw)
     }
 
-    private func reportMomentLabel(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd HH:mm zzz"
-        f.timeZone = tz
-        return f.string(from: date)
-    }
-
     private func queryValue(_ name: String, in url: URL) -> String? {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first { $0.name == name }?.value
+    }
+
+    /// The app has one clock, so the mail prints the same 12-hour time the
+    /// detail does — a 24-hour moment line here would be a second one
+    /// (`TimelineTests.testNoSourceFileSpellsATwentyFourHourPattern`).
+    func testMomentPrintsTheAppsClockWithYearAndZone() {
+        XCTAssertEqual(reportMoment(Date(timeIntervalSince1970: 1_789_605_360), tz),
+                       "Sep 16, 2026 · 5:36pm PDT")
     }
 }

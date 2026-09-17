@@ -23,19 +23,19 @@ var appVersionLabel: String {
     return "\(v) (\(b))"
 }
 
-private let reportMomentFormatter: DateFormatter = {
-    let f = DateFormatter()
-    f.locale = Locale(identifier: "en_US_POSIX")
-    f.dateFormat = "yyyy-MM-dd HH:mm zzz"
-    return f
-}()
+/// "Sep 16, 2026 · 5:36pm PDT" — the app's own clock (`chartTime`), carrying
+/// the year and zone that a mail opened weeks later somewhere else still needs.
+func reportMoment(_ date: Date, _ tz: TimeZone) -> String {
+    let day = formatter("MMM d, yyyy", tz).string(from: date)
+    let zone = formatter("zzz", tz).string(from: date)
+    return "\(day) · \(chartTime(date, tz)) \(zone)"
+}
 
 /// ponytail: the predicted height is deliberately absent. Station plus moment
 /// IS the prediction — whoever reads the mail opens the link and sees the exact
 /// curve the reporter was looking at, with none of it to keep in sync here.
 func reportBody(kind: ReportKind, stationID: String, scrubTime: Date?,
                 now: Date = Date(), tz: TimeZone) -> String {
-    reportMomentFormatter.timeZone = tz
     let name = StationItem.byId[stationID]?.name ?? stationID
     var lines = [
         "(Tell us what you saw — what the water was doing, and when.)",
@@ -43,7 +43,7 @@ func reportBody(kind: ReportKind, stationID: String, scrubTime: Date?,
         "",
         "— details —",
         "Station: \(name) (\(stationID))",
-        "Moment: \(reportMomentFormatter.string(from: scrubTime ?? now))",
+        "Moment: \(reportMoment(scrubTime ?? now, tz))",
     ]
     // The share button's own link, so the two never disagree about which
     // moment they mean. Nil for a station with no published slug.
