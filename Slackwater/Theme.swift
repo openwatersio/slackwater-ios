@@ -742,14 +742,17 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibility)
-            value()
-                .foregroundStyle(valueColor)
+            ZStack(alignment: .leading) {
+                Text("0").font(ReadoutType.hero).hidden()
+                value()
+            }
+            .foregroundStyle(valueColor)
             Text(caption)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(captionColor)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(SN.cardFill)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
