@@ -47,9 +47,19 @@ struct UnavailableDetailView: View {
         .accessibilityIdentifier("unavailable-detail")
     }
 
-    /// The fact, the ask, and then the reason — in that order on purpose. A
-    /// page that opens with the licence argument is a page defending itself;
-    /// one that opens with "not yet" is answering the question that was asked.
+    /// The fact, then the ask. In that order on purpose: a page that opens
+    /// with an explanation is a page defending itself; one that opens with
+    /// "not yet" is answering the question that was actually asked.
+    ///
+    /// NO REASON GIVEN, deliberately. An earlier draft explained the
+    /// non-commercial licence and said buying it was the whole cost. We do not
+    /// know that. The licence is real, but what it would take to serve this
+    /// station is not: it might be a licence with a price, it might be a
+    /// contact at the authority that runs the gauge, and #428 found that most
+    /// of these records reach us through a chain whose upstream may permit
+    /// commercial use already — in which case nothing needs buying at all.
+    /// Stating a cause we have not established is how a page meant to stop
+    /// people assuming a bug starts making a different wrong claim.
     private var explanation: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label("Not yet available", systemImage: "lock")
@@ -63,20 +73,6 @@ struct UnavailableDetailView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             supportAsk
-
-            // The detail, after the ask — "some of the text you have as the
-            // extra". No publisher name and no licence id in the body: those
-            // are true, and they are also the two things a boater standing in
-            // Gijon has no use for. They sit in `provenance` below instead.
-            Text("Why: this station's predictions are published under a licence "
-                 + "that allows non-commercial use only, so an app that charges "
-                 + "for anything has no right to serve them. It isn't a bug and "
-                 + "it isn't a gap in the data — what's missing is permission, "
-                 + "and getting it means paying for a commercial licence.")
-                .font(.footnote)
-                .lineSpacing(3)
-                .foregroundStyle(SN.foam.opacity(0.62))
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -94,30 +90,27 @@ struct UnavailableDetailView: View {
         .accessibilityIdentifier("unavailable-explanation")
     }
 
-    /// The ask.
+    /// The ask, which is for information rather than for money. Whoever is
+    /// standing at this harbour may well know who runs the gauge, and that is
+    /// worth more to us right now than a subscription — we do not yet know
+    /// which stations money can even fix (#428).
     ///
-    /// "Chasing down", not "buys", and "getting it means paying" rather than
-    /// "the rights are for sale". Upstream's own note says the GESLA provider
-    /// RESTRICTS commercial use; nothing on record says it sells commercial
-    /// terms at any price. Issue #401 frames the blocker as the cost of the
-    /// rights, which is the working assumption — but the shipped sentence
-    /// promises an effort, not an outcome, because that is the part we can
-    /// stand behind. Firm this up once a provider has actually quoted.
-    ///
-    /// ponytail: PROSE ONLY while there is no SKU — `PremiumStore`
-    /// has nothing on sale (PremiumView still renders "Premium isn't on sale
-    /// yet"), and a button that opens a sheet which cannot sell anything is a
-    /// second dead end one screen after the first. When #155's yearly plan is
-    /// live this is where its buy button goes, under this same heading; the
-    /// paragraph below it already says what the money is for.
+    /// ponytail: PROSE ONLY, no button yet. The inline "Contact us" this wants
+    /// belongs on the shared support helpers in #422 (`supportEmail`,
+    /// `reportMailURL`, and the clipboard fallback for a device with no mail
+    /// account) — re-implementing a mailto here would duplicate the
+    /// `&=?+` encoding gotcha that file already documents. Wire it when #422
+    /// lands; note `reportBody` resolves its station name through
+    /// `StationItem.byId`, which misses an unavailable id, so it needs a
+    /// fallback to `UnavailableStation.byId` at the same time.
     private var supportAsk: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("We need your help")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(SN.leaf)
-            Text("Commercial licences cost money, and Slackwater is paid for by "
-                 + "the people who use it. A plan that funds them is coming — "
-                 + "chasing down stations like this one is what it pays for.")
+            Text("We don't yet know what it would take to add this one. If you "
+                 + "know a contact for this station, or anything about how its "
+                 + "data is licensed, please get in touch.")
                 .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.75))
@@ -139,9 +132,14 @@ struct UnavailableDetailView: View {
     /// contradicting itself. What is true is narrower: we took the NAME from
     /// that source, and that source's record for THIS station is the
     /// non-commercial one.
+    ///
+    /// It states the licence and stops. No "non-commercial use only" gloss:
+    /// that reads as the reason this station is missing, and the body above
+    /// deliberately does not claim to know the reason. This is where the name
+    /// came from, nothing more.
     private var provenance: some View {
-        Text("Named from \(station.source) (SEANOE), whose record for this station "
-             + "is licensed \(station.license) — non-commercial use only.")
+        Text("Named from \(station.source) (SEANOE), whose record for this "
+             + "station is licensed \(station.license).")
             .font(.caption2)
             .foregroundStyle(SN.foam.opacity(0.45))
             .multilineTextAlignment(.center)
