@@ -56,6 +56,13 @@ jobs:
 
       - run: brew install xcodegen
 
+      # Same MapLibre download cache as ci.yml, shared with its keys.
+      - uses: actions/cache@v6
+        with:
+          path: build/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
+
       # Wakes CoreSimulator on a fresh runner; see the same step in ci.yml.
       - run: xcrun simctl list > /dev/null
 

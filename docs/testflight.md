@@ -7,7 +7,7 @@ Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly wor
 | Piece | Where | Notes |
 |---|---|---|
 | ASC API key | `testflight` environment secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` (the `.p8` contents) | Signs `asc.mjs` requests and authenticates the upload. App Store Connect → Users and Access → Integrations → Team Keys, role App Manager |
-| Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains |
+| Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains. The `apple-app-site-association` file slackwater.xyz serves for `applinks:` must list `Z59BQLF5VQ.io.openwaters.slackwater` |
 | Bundle ID (appex) | `io.openwaters.slackwater.widgets` | Capabilities: App Groups. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
 | App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Not in the ASC API** — `/v1/appGroups` is a 404. Create it in Xcode or the developer.apple.com UI |
 | In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |

@@ -181,6 +181,13 @@ if (cmd === 'create-cert') {
   // needs no profile secrets and a re-mint needs no secret update.
   const dir = `${process.env.HOME}/Library/Developer/Xcode/UserData/Provisioning Profiles`;
   fs.mkdirSync(dir, { recursive: true });
+  // PROVISIONING_PROFILE_SPECIFIER matches by name, so an older same-named
+  // profile left on a local Mac (another team's, or a pre-capability mint)
+  // makes the pick nondeterministic. The plist sits in the CMS envelope as text.
+  const nameOf = (f) => fs.readFileSync(`${dir}/${f}`, 'latin1').match(/<key>Name<\/key>\s*<string>([^<]*)<\/string>/)?.[1];
+  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.mobileprovision'))) {
+    if (args.includes(nameOf(f))) fs.rmSync(`${dir}/${f}`);
+  }
   for (const name of args) {
     const r = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(name)}&filter[profileState]=ACTIVE`);
     if (r.data.length !== 1) throw new Error(`expected one active profile named "${name}", found ${r.data.length}`);
