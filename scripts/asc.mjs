@@ -181,6 +181,14 @@ if (cmd === 'create-cert') {
   // needs no profile secrets and a re-mint needs no secret update.
   const dir = `${process.env.HOME}/Library/Developer/Xcode/UserData/Provisioning Profiles`;
   fs.mkdirSync(dir, { recursive: true });
+  // Download everything before touching the directory, so a failed request
+  // leaves the installed profiles as they were.
+  const profiles = [];
+  for (const name of args) {
+    const r = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(name)}&filter[profileState]=ACTIVE`);
+    if (r.data.length !== 1) throw new Error(`expected one active profile named "${name}", found ${r.data.length}`);
+    profiles.push({ name, ...r.data[0].attributes });
+  }
   // PROVISIONING_PROFILE_SPECIFIER matches by name, so an older same-named
   // profile left on a local Mac (another team's, or a pre-capability mint)
   // makes the pick nondeterministic. The plist sits in the CMS envelope as text.
@@ -188,10 +196,7 @@ if (cmd === 'create-cert') {
   for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.mobileprovision'))) {
     if (args.includes(nameOf(f))) fs.rmSync(`${dir}/${f}`);
   }
-  for (const name of args) {
-    const r = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(name)}&filter[profileState]=ACTIVE`);
-    if (r.data.length !== 1) throw new Error(`expected one active profile named "${name}", found ${r.data.length}`);
-    const { uuid, profileContent } = r.data[0].attributes;
+  for (const { name, uuid, profileContent } of profiles) {
     fs.writeFileSync(`${dir}/${uuid}.mobileprovision`, Buffer.from(profileContent, 'base64'));
     console.log(`profile "${name}" -> ${uuid}`);
   }
