@@ -20,11 +20,15 @@ VERSION=$(awk '$1 == "MARKETING_VERSION:" { print $2; exit }' project.yml)
 CURRENT_BUILD=$(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml)
 ASC_BUILDS=$(node scripts/asc.mjs builds)
 ASC_ROW=${ASC_BUILDS%%$'\n'*}
-if [[ -z $VERSION || $CURRENT_BUILD != <-> || ! $ASC_ROW =~ '\(([0-9]+)\)' ]]; then
+# An app with no uploads yet lists no builds; count from project.yml alone.
+ASC_BUILD=0
+if [[ -n $ASC_ROW ]]; then
+  [[ $ASC_ROW =~ '\(([0-9]+)\)' ]] && ASC_BUILD=$match[1] || ASC_BUILD=
+fi
+if [[ -z $VERSION || $CURRENT_BUILD != <-> || $ASC_BUILD != <-> ]]; then
   echo "Could not determine the current version/build from project.yml and App Store Connect." >&2
   exit 1
 fi
-ASC_BUILD=$match[1]
 NEXT_BUILD=$(( CURRENT_BUILD > ASC_BUILD ? CURRENT_BUILD + 1 : ASC_BUILD + 1 ))
 BRANCH=automation/nightly-$NEXT_BUILD
 

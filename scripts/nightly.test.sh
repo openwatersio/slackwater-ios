@@ -61,7 +61,7 @@ if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
   build=$(< "$NIGHTLY_STATE/asc-build")
   groups='[Nightly]'
   [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Friends & Family]'
-  print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
+  [[ -z $build ]] || print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
 elif [[ "$1 $2" == 'scripts/asc.mjs notes' ]]; then
   print "notes:$3" >> "$NIGHTLY_STATE/events"
 else
@@ -127,7 +127,8 @@ export NIGHTLY_STATE=$STATE
 export NIGHTLY_REPO=$REPO
 export NIGHTLY_ORIGIN=$ORIGIN
 export GITHUB_REPOSITORY=openwatersio/slackwater-ios
-print 38 > "$STATE/asc-build"
+# The first run sees a new app with no uploads yet.
+: > "$STATE/asc-build"
 
 (cd "$REPO" && zsh scripts/nightly.sh)
 

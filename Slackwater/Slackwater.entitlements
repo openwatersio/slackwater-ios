@@ -6,7 +6,7 @@
 	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.openwaters.slackwater</string>
+		<string>group.io.openwaters.slackwater</string>
 	</array>
 	<!-- Universal links. The matching apple-app-site-association is served by
 	     the slackwater.xyz Worker; neither half does anything without the
