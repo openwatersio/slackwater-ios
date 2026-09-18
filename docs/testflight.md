@@ -1,37 +1,72 @@
 # TestFlight — headless signing & upload
 
-Set up 2026-07-30 under Bryan's Apple account (Team `R3H8DPTV9C`). Run `scripts/testflight.sh`
-to archive + upload; everything below is the one-time state it relies on, and how to rebuild it.
+Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) bumps the build number, runs the full suite, and calls `scripts/testflight.sh` on a GitHub-hosted macOS runner. Everything below is the one-time state that relies on, and how to rebuild it.
 
 ## The pieces
 
 | Piece | Where | Notes |
 |---|---|---|
-| ASC API key | `~/.appstoreconnect/private_keys/AuthKey_VM6W5HP585.p8` (Key ID `VM6W5HP585`, Issuer `69a6de81-5896-47e3-e053-5b8c7c11a4d1`, role App Manager) | Signs API requests + authenticates the upload. Re-mint at App Store Connect → Users and Access → Integrations |
-| Bundle ID (app) | `io.openwaters.slackwater` (ASC id `D696FS7JD3`) | Registered in ASC (one-time, 2026-07) |
-| Bundle ID (appex) | `io.openwaters.slackwater.widgets` (ASC id `BC99FA5V78`) | Registered 2026-08-23 for the widget extension. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
-| App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Created in the developer.apple.com UI — `/v1/appGroups` is a 404, App Groups are not in the ASC API at all** |
-| Distribution identity | `slackwater-ci.keychain-db` — "Apple Distribution: Bryan Clark (R3H8DPTV9C)", expires 2027-07-30 (cert `D5456R8W23`) | Key generated locally (openssl CSR → `asc.mjs create-cert`); keychain password in `~/.appstoreconnect/ci-keychain-pass` |
-| Provisioning profiles | "Slackwater App Store" (`JZRK3RW824`) **and** "Slackwater Widgets App Store" (`8395577WG2`), both re-minted 2026-08-23 and installed in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` under their UUID filename | `asc.mjs create-profile <bundleIdentifier> D5456R8W23 <out> [profileName]` — the name defaults to "Slackwater App Store", so the appex **must** pass its own or it deletes the app's profile and mints a duplicate wearing the app's name. **Both are needed**, and both must post-date the App Groups capability: a profile minted before a capability was added carries an empty `application-groups` array and the archive fails with entitlement errors. The predecessor `LF393ZYMCC` (2026-07-30) was replaced because it predated widgets |
+| ASC API key | `testflight` environment secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` (the `.p8` contents) | Signs `asc.mjs` requests and authenticates the upload. App Store Connect → Users and Access → Integrations → Team Keys, role App Manager |
+| Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains |
+| Bundle ID (appex) | `io.openwaters.slackwater.widgets` | Capabilities: App Groups. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
+| App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Not in the ASC API** — `/v1/appGroups` is a 404. Create it in Xcode or the developer.apple.com UI |
+| In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |
+| Distribution identity | `testflight` environment secrets `SIGNING_P12` (base64 `.p12`) and `SIGNING_P12_PASSWORD` | "Apple Distribution" certificate, minted through `asc.mjs create-cert`. `testflight.sh` imports it into a throwaway keychain per run |
+| Provisioning profiles | "Slackwater App Store" and "Slackwater Widgets App Store" | `testflight.sh` downloads both by name (`asc.mjs install-profiles`), so a re-mint needs no secret change. Both must post-date every capability on their bundle ID |
 | Signing config | `project.yml`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
 
-## Why the dedicated keychain (the gotcha that cost the afternoon)
+## One-time setup
 
-Non-GUI sessions (agents, launchd, ssh) see the **login keychain as locked** — codesign fails
-with `errSecInternalComponent`, `-allowProvisioningUpdates` cloud signing dies with "User
-interaction is not allowed", and `set-key-partition-list` on the login keychain doesn't help
-because the lock, not the ACL, is the blocker. The fix is the CI-standard one: a dedicated
-keychain whose password lives on disk, unlocked by the script per run, holding a distribution
-identity minted through the ASC API (no Xcode sign-in anywhere). Cloud-managed signing is never
-used; certificate renewal (2027-07) = new CSR → `asc.mjs create-cert` → import → new profile.
+Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY`). `op run` works well for keeping them in 1Password.
+
+1. **App IDs, capabilities, and the App Group.** Open `Slackwater.xcodeproj` signed into the team and build the Debug scheme to a device. Automatic signing registers both bundle IDs, enables the capabilities in the entitlements files, and creates the App Group. Confirm on developer.apple.com → Identifiers that both IDs list the capabilities in the table above.
+2. **App record.** App Store Connect → Apps → New App, bundle ID `io.openwaters.slackwater`. Records can't be created through the public API.
+3. **In-app purchases.** Create the subscription group, the yearly subscription, and the lifetime purchase with the product IDs above. Reference names match `Slackwater.storekit`: group "Slackwater Premium", "Premium Yearly", "Premium Lifetime". Check `inAppPurchasesV2` and `subscriptionGroups` on the app before release notes mention a purchase.
+4. **Distribution certificate.**
+
+   ```sh
+   openssl req -new -newkey rsa:2048 -nodes -keyout dist.key -subj "/CN=Slackwater Distribution" -out dist.csr
+   node scripts/asc.mjs create-cert dist.csr dist.cer          # prints the certificate id
+   openssl x509 -inform der -in dist.cer -out dist.pem
+   openssl pkcs12 -export -inkey dist.key -in dist.pem -out dist.p12   # add -legacy with OpenSSL 3
+   ```
+
+   The `-legacy` flag matters: `security import` can't read OpenSSL 3's default `.p12` encryption. macOS's own `/usr/bin/openssl` (LibreSSL) writes the old format already.
+5. **Profiles**, after step 1 so they carry every capability:
+
+   ```sh
+   node scripts/asc.mjs create-profile io.openwaters.slackwater <certId> app.mobileprovision
+   node scripts/asc.mjs create-profile io.openwaters.slackwater.widgets <certId> widgets.mobileprovision "Slackwater Widgets App Store"
+   ```
+
+6. **Secrets**, in a `testflight` environment that only `main` can deploy to, so a workflow edited on another branch can't read them:
+
+   ```sh
+   gh api -X PUT repos/openwatersio/slackwater-ios/environments/testflight \
+     -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api -X POST repos/openwatersio/slackwater-ios/environments/testflight/deployment-branch-policies -f name=main
+   gh secret set -e testflight ASC_KEY_ID; gh secret set -e testflight ASC_ISSUER_ID
+   gh secret set -e testflight ASC_KEY < AuthKey_XXXXXXXXXX.p8
+   base64 -i dist.p12 | gh secret set -e testflight SIGNING_P12
+   gh secret set -e testflight SIGNING_P12_PASSWORD
+   ```
+
+   Keep `dist.key`/`dist.p12` in 1Password and delete the local copies.
+7. **Tester groups.** Create an internal "Nightly" group with access to all builds, and the external groups with public links (see Tester groups).
+
+To release by hand from a Mac, export the same five variables and run `scripts/testflight.sh`.
+
+## Why a throwaway keychain
+
+Non-GUI sessions (agents, launchd, ssh, CI) see the **login keychain as locked**: codesign fails with `errSecInternalComponent`, `-allowProvisioningUpdates` cloud signing dies with "User interaction is not allowed", and `set-key-partition-list` on the login keychain doesn't help, because the lock, not the ACL, is the blocker. `testflight.sh` creates a keychain with a random password, imports the identity, adds it to the search list, and removes it on exit. Holding one identity also keeps "Apple Distribution" unambiguous; a login keychain with two same-named identities picks one arbitrarily. Cloud-managed signing is never used. Certificate renewal = steps 4–6 again.
 
 ## Tester groups
 
 | Group | Kind | Gets builds | Link |
 |---|---|---|---|
 | Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
-| Friends & Family | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | https://testflight.apple.com/join/HK7mHF19 |
-| OSS and Externals | external, public link | same — and this is the link `slackwater.xyz` publishes as its download button (`src/routes/index.tsx`), so a release that skips it leaves the public page on the previous build | https://testflight.apple.com/join/FCSS4w8s |
+| Friends & Family | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | _not yet created_ |
+| OSS and Externals | external, public link | same — and this is the link `slackwater.xyz` publishes as its download button (`src/routes/index.tsx`), so a release that skips it leaves the public page on the previous build. Update that button when the link changes | _not yet created_ |
 
 The public link is written down here because it exists nowhere else in the repo — App Store
 Connect mints it and `asc.mjs` never reads it back. Re-read it any time with
@@ -90,38 +125,22 @@ above is what caught it.
 `com.apple.developer.ubiquity-kvstore-identifier`.** Same drill, with one
 difference: iCloud *does* have an API where App Groups does not. `POST
 /v1/bundleIdCapabilities` with `capabilityType: ICLOUD` and `ICLOUD_VERSION:
-XCODE_6` against bundle id `D696FS7JD3` returns 201. Key-value storage needs no
+XCODE_6` against the app's bundle id returns 201. Key-value storage needs no
 iCloud *container*, so there is nothing to create and nothing to assign, and only
 the app target is affected — the appex reads favourites out of the App Group,
-never out of KVS. Done 2026-08-23: the app bundle id now reads `IN_APP_PURCHASE,
-APP_GROUPS, ICLOUD`, and "Slackwater App Store" was re-minted (`CN6WHP3433`,
-UUID `5c858630-7d48-4bea-a803-8bf938b4ec43`) so it carries
-`com.apple.developer.ubiquity-kvstore-identifier => R3H8DPTV9C.*`. The widgets
-profile is untouched; the appex gained no entitlement. Proven rather than
-assumed this time: `xcodebuild archive` succeeded on the new profile and the
-signed app carries `com.apple.developer.ubiquity-kvstore-identifier =>
-R3H8DPTV9C.io.openwaters.slackwater` (`codesign -d --entitlements`). That is
-the check the merge gate cannot do for you.
+never out of KVS. After re-minting, confirm the signed app carries
+`com.apple.developer.ubiquity-kvstore-identifier => Z59BQLF5VQ.io.openwaters.slackwater`
+(`codesign -d --entitlements`). That is the check the merge gate cannot do for you.
 
 **Delete the old file when you re-mint, or the name stops identifying a profile.**
-Two profiles named "Slackwater App Store" were installed side by side until this
-one — `ab3c7463…` (carrying the App Group) and `fb99187e…` (the 2026-07-30
-predecessor, which did not). `PROVISIONING_PROFILE_SPECIFIER` matches on *name*,
-so with a duplicate installed which one an archive picks is not something this
-repo controls, and the failure looks like a missing entitlement rather than a
-stale file. Both are backed up in `~/.naturali/profile-backups/2026-08-23/`. The
-`security cms -D` loop above prints one line per installed profile; a repeated
-name in that output is the bug.
+This matters on a Mac that archives locally; a hosted runner starts empty.
+`PROVISIONING_PROFILE_SPECIFIER` matches on *name*, so with two same-named
+profiles installed, which one an archive picks is not something this repo
+controls, and the failure looks like a missing entitlement rather than a stale
+file. The `security cms -D` loop above prints one line per installed profile; a
+repeated name in that output is the bug.
 
 ## Cadence
-
-Build 35 adds Associated Domains for `applinks:slackwater.xyz`. The app's
-distribution profile was refreshed on 2026-09-05: `LNV5YA445J`, UUID
-`d167dc60-6125-4498-9022-5ab20b16bbf1`. Its decoded entitlements include
-`com.apple.developer.associated-domains => *`, the existing App Group, and
-iCloud key-value storage. The old `5c858630…` profile was moved out of the
-installed profiles directory to `/private/tmp/slackwater-build35-previous-profile.mobileprovision`
-to prevent duplicate-name selection. The widgets profile is unchanged.
 
 Per-release procedure lives in the `releasing-to-testflight` skill
 (`.claude/skills/`) — bump, test, PR, upload, verify. What follows is the state

@@ -37,9 +37,9 @@ jobs:
     needs: authorize
     # Server-evaluated before runner assignment, including single-job reruns.
     if: github.triggering_actor == 'clarkbw' || github.triggering_actor == 'bkeepers'
-    runs-on:
-      group: slackwater-nightly
-      labels: [self-hosted, macOS, ARM64]
+    runs-on: macos-latest
+    # Signing secrets live in this environment, which only main can deploy to.
+    environment: testflight
     timeout-minutes: 180
     permissions:
       contents: write
@@ -50,6 +50,15 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+
+      - run: brew install xcodegen
+
+      # Wakes CoreSimulator on a fresh runner; see the same step in ci.yml.
+      - run: xcrun simctl list > /dev/null
+
       - name: Configure the release commit
         run: |
           git config user.name 'github-actions[bot]'
@@ -58,4 +67,12 @@ jobs:
       - name: Release changed main to Nightly
         env:
           GH_TOKEN: ${{ github.token }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+          SIGNING_P12: ${{ secrets.SIGNING_P12 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+          # Hosted-runner test settings; see the App tests job in ci.yml.
+          SLACKWATER_WORKERS: 1
+          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
         run: zsh scripts/nightly.sh

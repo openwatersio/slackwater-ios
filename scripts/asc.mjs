@@ -2,9 +2,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 
-const KEY_ID = 'VM6W5HP585';
-const ISSUER = '69a6de81-5896-47e3-e053-5b8c7c11a4d1';
-const P8 = `${process.env.HOME}/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8`;
+// Credentials come from the environment: repo secrets in the Nightly
+// workflow, `op run` or an exported shell locally. See docs/testflight.md.
+const env = (name) => process.env[name] || (() => { throw new Error(`${name} is not set`); })();
+const KEY_ID = env('ASC_KEY_ID');
+const ISSUER = env('ASC_ISSUER_ID');
+const P8 = env('ASC_KEY');
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 
@@ -13,7 +16,7 @@ function jwt() {
   const now = Math.floor(Date.now() / 1000);
   const payload = { iss: ISSUER, iat: now, exp: now + 900, aud: 'appstoreconnect-v1' };
   const signingInput = `${b64u(JSON.stringify(header))}.${b64u(JSON.stringify(payload))}`;
-  const key = crypto.createPrivateKey(fs.readFileSync(P8));
+  const key = crypto.createPrivateKey(P8);
   // ieee-p1363 gives the raw r||s signature JWT ES256 requires (not DER)
   const sig = crypto.sign('sha256', Buffer.from(signingInput), { key, dsaEncoding: 'ieee-p1363' });
   return `${signingInput}.${b64u(sig)}`;
@@ -31,6 +34,17 @@ async function api(method, path, body) {
   return json;
 }
 
+// The team holds other apps, and /v1/builds and /v1/betaGroups are team-wide:
+// unfiltered, Slackwater would read, annotate, and promote their builds.
+let appIdCache;
+async function appId() {
+  if (appIdCache) return appIdCache;
+  const r = await api('GET', '/v1/apps?filter[bundleId]=io.openwaters.slackwater');
+  const app = r.data.find((a) => a.attributes.bundleId === 'io.openwaters.slackwater');
+  if (!app) throw new Error('no App Store Connect app for io.openwaters.slackwater');
+  return (appIdCache = app.id);
+}
+
 // A build is not addable — or annotatable — until processing finishes, and
 // processing outlives the upload by 5-15 min. A named build is not even LISTED
 // for the first few minutes, which is a wait too: throwing there is what made
@@ -39,7 +53,7 @@ async function api(method, path, body) {
 async function waitForBuild(version) {
   let build;
   for (let i = 0; i < 60; i++) {
-    const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate');
+    const r = await api('GET', `/v1/builds?filter[app]=${await appId()}&limit=10&sort=-uploadedDate`);
     build = version ? r.data.find((b) => b.attributes.version === version) : r.data[0];
     if (!build && !version) throw new Error('no builds on App Store Connect');
     if (!build) {
@@ -67,7 +81,7 @@ if (cmd === 'create-cert') {
 } else if (cmd === 'builds') {
   // What TestFlight actually holds, which is the only place the version story
   // can be checked: project.yml states an intent, this is the outcome.
-  const r = await api('GET', '/v1/builds?limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups');
+  const r = await api('GET', `/v1/builds?filter[app]=${await appId()}&limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups`);
   const inc = (id) => r.included?.find((i) => i.id === id);
   for (const b of r.data) {
     const v = inc(b.relationships?.preReleaseVersion?.data?.id)?.attributes?.version ?? '?';
@@ -89,7 +103,7 @@ if (cmd === 'create-cert') {
   // Discovering them beats a hardcoded list precisely because that is the
   // failure mode: a new group needs no code change to get releases.
   const named = args[1];
-  const groups = await api('GET', '/v1/betaGroups?limit=20');
+  const groups = await api('GET', `/v1/betaGroups?filter[app]=${await appId()}&limit=20`);
   let targets;
   if (named) {
     const g = groups.data.find((x) => x.attributes.name === named);
@@ -162,6 +176,18 @@ if (cmd === 'create-cert') {
   });
   fs.writeFileSync(outPath, Buffer.from(r.data.attributes.profileContent, 'base64'));
   console.log('profile:', r.data.id, r.data.attributes.uuid, '->', outPath);
+} else if (cmd === 'install-profiles') {
+  // Download named profiles into Xcode's profile directory, so a fresh runner
+  // needs no profile secrets and a re-mint needs no secret update.
+  const dir = `${process.env.HOME}/Library/Developer/Xcode/UserData/Provisioning Profiles`;
+  fs.mkdirSync(dir, { recursive: true });
+  for (const name of args) {
+    const r = await api('GET', `/v1/profiles?filter[name]=${encodeURIComponent(name)}&filter[profileState]=ACTIVE`);
+    if (r.data.length !== 1) throw new Error(`expected one active profile named "${name}", found ${r.data.length}`);
+    const { uuid, profileContent } = r.data[0].attributes;
+    fs.writeFileSync(`${dir}/${uuid}.mobileprovision`, Buffer.from(profileContent, 'base64'));
+    console.log(`profile "${name}" -> ${uuid}`);
+  }
 } else {
-  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName — default: all external groups] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName]');
+  console.log('usage: asc.mjs builds | promote [buildNumber] [groupName — default: all external groups] | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName] | install-profiles <name>...');
 }

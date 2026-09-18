@@ -1,9 +1,9 @@
 #!/bin/zsh
 # Archive, export, and upload Slackwater to TestFlight — fully headless.
-# Prereqs (one-time, already done 2026-07-30 — see docs/testflight.md):
-#   ~/.appstoreconnect/private_keys/AuthKey_VM6W5HP585.p8   (ASC API key, App Manager)
-#   ~/Library/Keychains/slackwater-ci.keychain-db           (Apple Distribution identity)
-#   "Slackwater App Store" provisioning profile installed   (scripts/asc.mjs create-profile)
+# Credentials come from the environment (repo secrets in the Nightly
+# workflow; see docs/testflight.md for the one-time setup and local runs):
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY    App Store Connect API key (.p8 contents)
+#   SIGNING_P12, SIGNING_P12_PASSWORD     Apple Distribution identity, base64 .p12
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,16 +22,33 @@ cd "$(dirname "$0")/.."
 EXTERNAL=no
 case "${1:-}" in --external|--family) EXTERNAL=yes ;; esac
 
-KEY_ID=VM6W5HP585
-ISSUER=69a6de81-5896-47e3-e053-5b8c7c11a4d1
-KC=~/Library/Keychains/slackwater-ci.keychain-db
-# The identity is pinned by SHA-1 in project.yml (Release CODE_SIGN_IDENTITY)
-# and in signingCertificate below: the login keychain holds a second
-# same-named "Apple Distribution" identity, and the bare name resolves
-# ambiguously (cost the build-10 upload). NOT a CLI override — that would
-# leak onto SPM package targets, which must stay unsigned.
+: "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY:?}" "${SIGNING_P12:?}" "${SIGNING_P12_PASSWORD:?}"
+mkdir -p build
+TMP=$(mktemp -d)
+P8=$TMP/AuthKey_$ASC_KEY_ID.p8
+print -r -- "$ASC_KEY" > $P8
 
-security unlock-keychain -p "$(cat ~/.appstoreconnect/ci-keychain-pass)" $KC
+# A throwaway keychain holding only the distribution identity. Non-GUI
+# sessions see the login keychain as locked, and a keychain with one identity
+# makes "Apple Distribution" unambiguous.
+KC=$TMP/signing.keychain-db
+KC_PASS=$(uuidgen)
+OLD_KCS=("${(@f)$(security list-keychains -d user | tr -d ' "')}")
+cleanup() {
+  security list-keychains -d user -s "${OLD_KCS[@]}"
+  security delete-keychain $KC 2>/dev/null || true
+  rm -rf $TMP
+}
+trap cleanup EXIT
+security create-keychain -p "$KC_PASS" $KC
+security set-keychain-settings -lut 21600 $KC
+security unlock-keychain -p "$KC_PASS" $KC
+print -r -- "$SIGNING_P12" | base64 --decode > $TMP/signing.p12
+security import $TMP/signing.p12 -k $KC -P "$SIGNING_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" $KC > /dev/null
+security list-keychains -d user -s $KC "${OLD_KCS[@]}"
+
+node scripts/asc.mjs install-profiles "Slackwater App Store" "Slackwater Widgets App Store"
 
 xcodegen generate
 # -clonedSourcePackagesDirPath: repo-local SPM cache so CLI builds never share
@@ -57,8 +74,8 @@ cat > build/exportUpload.plist <<'EOF'
        already uploaded or the upload is rejected as a duplicate. -->
   <key>manageAppVersionAndBuildNumber</key><false/>
   <key>signingStyle</key><string>manual</string>
-  <key>teamID</key><string>R3H8DPTV9C</string>
-  <key>signingCertificate</key><string>02FBDB9A5D2DB409A4331349069A8C8B09D73069</string>
+  <key>teamID</key><string>Z59BQLF5VQ</string>
+  <key>signingCertificate</key><string>Apple Distribution</string>
   <!-- Every signed bundle in the archive needs an entry, the appex included:
        an app's profile does not cover its extensions, and a missing entry
        fails the export AFTER a successful archive. -->
@@ -74,8 +91,8 @@ EOF
 xcodebuild -exportArchive -archivePath build/Slackwater.xcarchive \
   -exportOptionsPlist build/exportUpload.plist -exportPath build/upload \
   -allowProvisioningUpdates \
-  -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8 \
-  -authenticationKeyID $KEY_ID -authenticationKeyIssuerID $ISSUER
+  -authenticationKeyPath $P8 \
+  -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID
 
 echo "Uploaded. Build appears in App Store Connect → TestFlight in ~5–15 min (processing)."
 
