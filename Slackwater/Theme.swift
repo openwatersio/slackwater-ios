@@ -1085,6 +1085,10 @@ struct WeekPickerSheet: View {
     let onPick: (Date) -> Void
 
     @State private var draft = Date()
+    /// The calendar's measured height plus the navigation bar, which becomes
+    /// the sheet's one detent. `.medium` clipped the lower weeks on iPad, and
+    /// a tap where they should be landed outside the sheet and dismissed it.
+    @State private var height: CGFloat = 480
     @Environment(\.dismiss) private var dismiss
 
     /// The one calendar this sheet uses, for both the grid and the commit.
@@ -1115,8 +1119,12 @@ struct WeekPickerSheet: View {
                     // case, and so is a UTC test runner.
                     .environment(\.timeZone, tz)
                     .environment(\.calendar, calendar)
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) {
+                        $0.size.height + $0.safeAreaInsets.top
+                    } action: { height = $0 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
             .background(CanvasBackground())
             .navigationTitle("Choose a date")
             .navigationBarTitleDisplayMode(.inline)
@@ -1135,7 +1143,7 @@ struct WeekPickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.height(height)])
         .onAppear {
             draft = anchor
             // Fire the speculative fetch as the sheet appears, not when a date
