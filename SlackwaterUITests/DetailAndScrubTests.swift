@@ -243,6 +243,34 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "a tap on the Nearby map did not open the full map")
     }
 
+    /// The picker sheet fits a six-week month. At the `.medium` detent the iPad
+    /// sheet clipped the calendar's lower rows, and a tap on one landed outside
+    /// the sheet and closed it without picking. August 2026 starts on a
+    /// Saturday, so its 31st is on the sixth row.
+    func testPickerReachesTheSixthWeek() throws {
+        let app = XCUIApplication()
+        app.launchArguments = testArguments(["-seedGate"])
+        app.launch()
+        XCTAssert(stationList(app).appears(within: 10))
+
+        openFridayHarbor(app)
+        let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
+        XCTAssert(bar.appears(within: 10), "no range bar above the schedule")
+        let before = bar.label
+        bar.tap()
+        XCTAssert(app.descendants(matching: .any)["week-picker"].firstMatch.appears(within: 5))
+
+        // The fixture clock opens the picker on September 2026.
+        stepMonth(app, "Previous Month")
+        save(app, "week-picker-six-weeks.png")
+        tapDay(app.collectionViews.buttons.matching(
+            NSPredicate(format: "label == %@", "Monday, August 31")).firstMatch)
+        let show = app.descendants(matching: .any)["week-picker-done"].firstMatch
+        XCTAssert(show.appears(within: 5), "a tap on the sixth week closed the picker")
+        show.tap()
+        XCTAssert(waitFor(bar, "label != '\(before)'"), "picking August 31 did not move the window")
+    }
+
     /// The range bar heads the schedule card on every scrubable detail and says
     /// what span the list below it covers; tapping it opens the picker, and
     /// picking a date moves the window with the bar following.
