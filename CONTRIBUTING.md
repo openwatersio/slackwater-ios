@@ -102,13 +102,15 @@ Non-visual changes do not need screenshots.
 
 ## CI
 
-Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
+Five jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
 
 | Job             | Where         | What it does                                                  |
 | --------------- | ------------- | ------------------------------------------------------------- |
 | What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
 | Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
-| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator for PRs; `--full` on iPhone and iPad for pushes to `main` |
+| TestFlight intake | GitHub-hosted | Tests and type-checks the TestFlight feedback service (`services/testflight-feedback`) |
+| Build for testing | GitHub-hosted | Builds the app and its test bundles once and uploads them |
+| App tests       | GitHub-hosted | Runs `scripts/test.sh` against that upload in five shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 
