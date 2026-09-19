@@ -102,13 +102,14 @@ Non-visual changes do not need screenshots.
 
 ## CI
 
-Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
+Four jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
 
 | Job             | Where         | What it does                                                  |
 | --------------- | ------------- | ------------------------------------------------------------- |
 | What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
 | Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
-| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator for PRs; `--full` on iPhone and iPad for pushes to `main` |
+| Build for testing | GitHub-hosted | Builds the app and tests once for every shard below |
+| App tests       | GitHub-hosted | `scripts/test.sh` against that build in five shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 

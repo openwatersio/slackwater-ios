@@ -155,45 +155,14 @@ jobs:
       - run: npm run check
         working-directory: services/testflight-feedback
 
-  app:
-    name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
+  # Builds once for every test shard below. The shards spent about half of
+  # each job rebuilding the same app (a 521 s build behind ~500 s of tests),
+  # and on a free org's five macOS slots that doubled the wall clock.
+  build:
+    name: Build for testing
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
-    # Four shards, because one lane was 42 minutes and feedback that slow is
-    # feedback nobody waits for. Measured on run 34318099667: 2053 s of tests
-    # behind a 521 s build, so the build — repeated per shard, in parallel and
-    # free on a public repo — is the floor and four shards sit just above it.
-    #
-    # Balanced on the RUNNER's numbers, which are not this Mac's: OfflineCoverage
-    # is 563 s here and DetailAndScrub 447 s, while on the Studio that order is
-    # reversed. Rebalance from a `test-evidence` bundle, never from a local run.
-    #
-    #   offline  563 s   map  538 s   detail  447 s   rest  ~471 s
-    #
-    # Expect ~18 minutes, set by the longest shard plus the build.
-    strategy:
-      # A failing shard must not cancel its siblings. The whole point is to see
-      # every failure in one run rather than the first one and then wait again.
-      fail-fast: false
-      matrix:
-        # Pull requests get the fast iPhone run. A push to main runs --full on
-        # both devices instead: Nightly releases whatever main holds without
-        # re-running the suite, so this is where the iPad leg and the national
-        # sweep report.
-        device: ${{ fromJSON(github.event_name == 'push' && '["iPhone 17", "iPad Pro 11-inch (M5)"]' || '["iPhone 17"]') }}
-        shard:
-          - name: offline
-            only: SlackwaterUITests/OfflineCoverageTests
-          - name: map
-            only: SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests
-          - name: detail
-            only: SlackwaterUITests/DetailAndScrubTests
-          # The catch-all names no tests — it SKIPS the other three. A class
-          # added tomorrow therefore runs here, instead of running nowhere and
-          # looking green. Never convert this one to `only`.
-          - name: rest
-            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/MapSearchAndNavigationTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/DetailAndScrubTests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -215,12 +184,79 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.os }}-
 
-      # Validates the recorded fixture, runs xcodegen, then the offline fast
-      # suite on the image's stock iPhone simulator. The iPad leg and exhaustive
-      # data test use `scripts/test.sh --full`; live IWLS compatibility uses the
-      # explicit `scripts/test.sh --live` smoke. SLACKWATER_SIMS must name ONE
-      # device — it overrides the script's fast/full device list outright.
-      #
+      # The IWLS fixture is compiled into the unit-test bundle, so it is staged
+      # here, before the build, and the shards never need it.
+      - name: Build
+        run: |
+          node scripts/iwls-fixtures.mjs prepare
+          xcodegen generate
+          xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater \
+            -testPlan Slackwater -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
+            -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
+            | tail -40
+          # tar, not a bare artifact upload: that drops the executable bits
+          # and symlinks the app and the test runner need.
+          tar -C build/DerivedData/Build -czf build/products.tgz Products
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build-products
+          path: build/products.tgz
+          retention-days: 1
+
+  app:
+    name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
+    needs: build
+    runs-on: macos-latest
+    # Five shards per device: a PR's five iPhone jobs fill the org's five macOS
+    # slots in one wave, and a push to main's ten fill them in two.
+    #
+    # Balanced on hosted-runner numbers (iPhone, seconds), never a local run's:
+    #
+    #   offline     OfflineCoverage                          ~480
+    #   list        ListAndFavorites + DeepLink              ~500
+    #   transition  OfflineTransition + 4 Detail tests       ~525
+    #   detail      the rest of DetailAndScrub               ~490
+    #   rest        Map, the unit tests, anything new        ~460
+    #
+    # Rebalance from a result bundle (test-evidence-*), and when a test moves,
+    # move it in both its `only` and the catch-all's `skip`.
+    strategy:
+      # A failing shard must not cancel its siblings. The whole point is to see
+      # every failure in one run rather than the first one and then wait again.
+      fail-fast: false
+      matrix:
+        # Pull requests get the fast iPhone run. A push to main runs --full on
+        # both devices instead: Nightly releases whatever main holds without
+        # re-running the suite, so this is where the iPad leg and the national
+        # sweep report.
+        device: ${{ fromJSON(github.event_name == 'push' && '["iPhone 17", "iPad Pro 11-inch (M5)"]' || '["iPhone 17"]') }}
+        shard:
+          - name: offline
+            only: SlackwaterUITests/OfflineCoverageTests
+          - name: list
+            only: SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests
+          - name: transition
+            only: SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon
+          - name: detail
+            only: SlackwaterUITests/DetailAndScrubTests
+            skip: SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon
+          # The catch-all names no tests — it SKIPS the others. A class added
+          # tomorrow therefore runs here, instead of running nowhere and
+          # looking green. Never convert this one to `only`.
+          - name: rest
+            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: build-products
+
+      - run: |
+          mkdir -p build/DerivedData/Build
+          tar -C build/DerivedData/Build -xzf products.tgz
+
       # CoreSimulator comes up cold on a fresh runner, and `xcodebuild` does not
       # wake it: it reports an EMPTY device list — placeholder destinations
       # only — and exits 70 on "Unable to find a device matching iPhone 17".
@@ -238,17 +274,21 @@ jobs:
       # symptom and leaves a version to maintain forever.
       - run: xcrun simctl list > /dev/null
 
+      # SLACKWATER_SIMS must name ONE device — it overrides the script's
+      # fast/full device list outright.
       # SLACKWATER_WORKERS is a memory budget: a booted simulator clone costs
       # ~2.2 GB and hosted arm runners have ~7 GB RAM, so one worker. If the
       # image's default Xcode ever drifts from what the project needs, pin
-      # DEVELOPER_DIR here.
+      # DEVELOPER_DIR here and in the build job.
       # SLACKWATER_PERF_SCALE widens two things calibrated on the Mac Studio:
       # the unit tests' wall-clock budgets, and every wait in the UI target
       # (ScreenshotTestCase's `uiWaitScale`). The first hosted run measured
       # 1.9–2.5× slower; 4× absorbs pool variance while a real 2×+ regression
       # on top of that still trips. Without it on the waits, three runs of
       # identical code failed three different UI tests — see #331.
-      - run: ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }}
+      - run: |
+          SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \
+            ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }}
         env:
           SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1

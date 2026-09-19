@@ -105,6 +105,13 @@ assert_has "name=Mine"
 assert_lacks "simctl erase"
 assert_lacks "simctl create"
 
+# A prebuilt run tests the given products and never rebuilds or regenerates.
+SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode
+assert_has "xcodebuild test-without-building -xctestrun products/Plan.xctestrun"
+assert_lacks "xcodegen"
+assert_lacks "iwls-fixtures.mjs prepare"
+assert_lacks "-derivedDataPath"
+
 # CI's shard variables reach xcodebuild; a shard that ran nothing fails.
 SLACKWATER_ONLY='A/B,C/D' SLACKWATER_SKIP='E/F' run_mode
 assert_has "-only-testing:A/B -only-testing:C/D -skip-testing:E/F"
