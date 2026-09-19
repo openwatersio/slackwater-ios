@@ -43,8 +43,9 @@ rejected upload.** Nothing renumbers it for you.
 3. Write `docs/release-notes/<MARKETING_VERSION>.md` — what testers see as
    "What to Test". `testflight.sh` posts it to the build it just uploaded; with
    no such file it says so and the build ships with none.
-4. `./scripts/test.sh --full` — the offline suite on both reference simulators,
-   including the exhaustive data check. Run `./scripts/test.sh --live` separately
+4. The offline `--full` suite on both reference simulators, including the
+   exhaustive data check. CI runs it on every push to `main`; check that run is
+   green for the commit you release, or run `./scripts/test.sh --full` locally. Run `./scripts/test.sh --live` separately
    when the release needs a real-IWLS compatibility check. A re-upload that
    changes nothing but the version numbers can reuse the previous release's run;
    say so in the PR, and check `git diff` really is version-only.

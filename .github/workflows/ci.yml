@@ -156,7 +156,7 @@ jobs:
         working-directory: services/testflight-feedback
 
   app:
-    name: App tests · ${{ matrix.shard.name }}
+    name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
@@ -177,6 +177,11 @@ jobs:
       # every failure in one run rather than the first one and then wait again.
       fail-fast: false
       matrix:
+        # Pull requests get the fast iPhone run. A push to main runs --full on
+        # both devices instead: Nightly releases whatever main holds without
+        # re-running the suite, so this is where the iPad leg and the national
+        # sweep report.
+        device: ${{ fromJSON(github.event_name == 'push' && '["iPhone 17", "iPad Pro 11-inch (M5)"]' || '["iPhone 17"]') }}
         shard:
           - name: offline
             only: SlackwaterUITests/OfflineCoverageTests
@@ -243,9 +248,9 @@ jobs:
       # 1.9–2.5× slower; 4× absorbs pool variance while a real 2×+ regression
       # on top of that still trips. Without it on the waits, three runs of
       # identical code failed three different UI tests — see #331.
-      - run: ./scripts/test.sh
+      - run: ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }}
         env:
-          SLACKWATER_SIMS: iPhone 17
+          SLACKWATER_SIMS: ${{ matrix.device }}
           SLACKWATER_WORKERS: 1
           TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
           SLACKWATER_ONLY: ${{ matrix.shard.only }}
@@ -256,7 +261,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-evidence-${{ matrix.shard.name }}
+          name: test-evidence-${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && '-ipad' || '' }}
           path: |
             /tmp/slackwater-shots
             build/*.xcresult

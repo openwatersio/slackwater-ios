@@ -108,7 +108,7 @@ Three jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in 
 | --------------- | ------------- | ------------------------------------------------------------- |
 | What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
 | Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
-| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator                     |
+| App tests       | GitHub-hosted | `scripts/test.sh` on the iPhone simulator for PRs; `--full` on iPhone and iPad for pushes to `main` |
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 

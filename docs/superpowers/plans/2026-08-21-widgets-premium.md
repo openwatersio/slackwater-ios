@@ -594,7 +594,7 @@ struct WidgetSnapshot: Equatable {
         PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.widgets
         CODE_SIGN_ENTITLEMENTS: SlackwaterWidgets/SlackwaterWidgets.entitlements
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: R3H8DPTV9C
+        DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
 ```

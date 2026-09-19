@@ -1,13 +1,13 @@
 # TestFlight — headless signing & upload
 
-Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) bumps the build number, runs the full suite, and calls `scripts/testflight.sh` on a GitHub-hosted macOS runner. Everything below is the one-time state that relies on, and how to rebuild it.
+Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) runs `scripts/nightly.sh` on a GitHub-hosted macOS runner: it numbers the build one past the highest on App Store Connect (or `CURRENT_PROJECT_VERSION`, if that is higher), archives and uploads it with `scripts/testflight.sh`, and tags the commit `nightly-<version>-<build>`. It commits nothing and runs no tests; CI runs `--full` on both simulators for every push to `main`. Everything below is the one-time state that relies on, and how to rebuild it.
 
 ## The pieces
 
 | Piece | Where | Notes |
 |---|---|---|
 | ASC API key | `testflight` environment secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` (the `.p8` contents) | Signs `asc.mjs` requests and authenticates the upload. App Store Connect → Users and Access → Integrations → Team Keys, role App Manager |
-| Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains |
+| Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains. The `apple-app-site-association` file slackwater.xyz serves for `applinks:` must list `Z59BQLF5VQ.io.openwaters.slackwater` |
 | Bundle ID (appex) | `io.openwaters.slackwater.widgets` | Capabilities: App Groups. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
 | App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Not in the ASC API** — `/v1/appGroups` is a 404. Create it in Xcode or the developer.apple.com UI |
 | In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |
@@ -227,7 +227,7 @@ Two smaller pieces of the same story:
 
 The old timings mixed routine behavior coverage with live downloads and do not
 describe these modes. Record observed timings after the migrated suite runs.
-Run fast while iterating and offline `--full` before `scripts/testflight.sh`.
+Run fast while iterating. Before `scripts/testflight.sh`, check that CI's push run for the commit is green; it is the `--full` suite on both simulators.
 Run `--live` separately when real-service compatibility needs checking; green
 offline runs intentionally make no claim about current IWLS availability.
 
