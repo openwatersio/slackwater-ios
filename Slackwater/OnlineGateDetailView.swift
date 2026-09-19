@@ -177,6 +177,7 @@ struct OnlineGateDetailView: View {
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
             }
+            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - Fetch

@@ -112,6 +112,7 @@ struct DerivedGateDetailView: View {
                     store?.setAnchor(anchor)
                 }
             }
+            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - The lead reading, fixed over the centerline

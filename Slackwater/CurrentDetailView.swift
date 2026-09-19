@@ -181,6 +181,7 @@ struct CurrentDetailView: View {
                 if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
             }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
+            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - Colour

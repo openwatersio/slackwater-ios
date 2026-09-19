@@ -144,6 +144,29 @@ func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
     abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
 }
 
+extension View {
+    /// A detail outlives a trip to the background, so `live` must move on reopen:
+    /// a strip parked on now follows it, one parked elsewhere keeps its moment.
+    func followsNowOnResume(scrubTime: Date, live: Binding<Date>,
+                            returnToNow: @escaping () -> Void) -> some View {
+        modifier(FollowNowOnResume(scrubTime: scrubTime, live: live, returnToNow: returnToNow))
+    }
+}
+
+private struct FollowNowOnResume: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+    let scrubTime: Date
+    @Binding var live: Date
+    let returnToNow: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            if scrubbedAway(scrubTime, from: live) { live = appNow() } else { returnToNow() }
+        }
+    }
+}
+
 /// The times the axis row has room to print, earliest first. Two events close
 /// together — a low an hour after a shallow high — would print on top of each
 /// other, so a time within `minGap` of the last one kept is dropped; the
