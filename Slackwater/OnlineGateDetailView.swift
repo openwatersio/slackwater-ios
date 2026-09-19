@@ -106,7 +106,8 @@ struct OnlineGateDetailView: View {
                                                      now: live, floodDeg: window.floodDirection,
                                                      ebbDeg: window.ebbDirection,
                                                      sky: sky,
-                                                     scrubTime: $scrubTime, onReturn: returnToNow)
+                                                     scrubTime: $scrubTime, onReturn: returnToNow,
+                                                     onResumeScrubbedAway: { live = appNow() })
                                 }
                             },
                             links: { tl, jump in
@@ -177,7 +178,6 @@ struct OnlineGateDetailView: View {
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
             }
-            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - Fetch

@@ -116,6 +116,7 @@ struct CurrentDetailView: View {
                                                  floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
                                                  sky: sky,
                                                  scrubTime: $scrubTime, onReturn: returnToNow,
+                                                 onResumeScrubbedAway: { live = appNow() },
                                                  scale: store?.scale,
                                                  scrollGate: store?.gate,
                                                  onViewportWidth: { viewportPts = $0 })
@@ -181,7 +182,6 @@ struct CurrentDetailView: View {
                 if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
             }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
-            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - Colour

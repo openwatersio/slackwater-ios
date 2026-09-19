@@ -56,6 +56,7 @@ struct DerivedGateDetailView: View {
                                                    now: live, chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
+                                                   onResumeScrubbedAway: { live = appNow() },
                                                    commentary: next.map {
                                                        commentaryText($0.text, at: $0.time, from: scrubTime, now: live)
                                                    },
@@ -112,7 +113,6 @@ struct DerivedGateDetailView: View {
                     store?.setAnchor(anchor)
                 }
             }
-            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - The lead reading, fixed over the centerline

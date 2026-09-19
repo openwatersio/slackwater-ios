@@ -102,6 +102,7 @@ struct TideDetailView: View {
                                                    chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
+                                                   onResumeScrubbedAway: { live = appNow() },
                                                    commentary: commentary,
                                                    commentaryTint: commentaryTint,
                                                    onCommentary: scrubToCommentary,
@@ -163,7 +164,6 @@ struct TideDetailView: View {
                     store?.setAnchor(anchor)
                 }
             }
-            .followsNowOnResume(scrubTime: scrubTime, live: $live, returnToNow: returnToNow)
     }
 
     // MARK: - The lead reading, fixed over the centerline

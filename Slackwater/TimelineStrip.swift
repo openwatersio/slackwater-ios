@@ -144,29 +144,6 @@ func scrubbedAway(_ scrubTime: Date, from live: Date) -> Bool {
     abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds
 }
 
-extension View {
-    /// A detail outlives a trip to the background, so `live` must move on reopen:
-    /// a strip parked on now follows it, one parked elsewhere keeps its moment.
-    func followsNowOnResume(scrubTime: Date, live: Binding<Date>,
-                            returnToNow: @escaping () -> Void) -> some View {
-        modifier(FollowNowOnResume(scrubTime: scrubTime, live: live, returnToNow: returnToNow))
-    }
-}
-
-private struct FollowNowOnResume: ViewModifier {
-    @Environment(\.scenePhase) private var scenePhase
-    let scrubTime: Date
-    @Binding var live: Date
-    let returnToNow: () -> Void
-
-    func body(content: Content) -> some View {
-        content.onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            if scrubbedAway(scrubTime, from: live) { live = appNow() } else { returnToNow() }
-        }
-    }
-}
-
 /// The times the axis row has room to print, earliest first. Two events close
 /// together — a low an hour after a shallow high — would print on top of each
 /// other, so a time within `minGap` of the last one kept is dropped; the
@@ -1130,8 +1107,8 @@ struct TimelineScrubber: UIViewRepresentable {
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
-    /// Bumped by a pill tap. A tap must win over whatever the strip is doing,
-    /// so this bypasses the settle guard below.
+    /// Bumped by a pill tap or a reopen on now. A tap must win over whatever
+    /// the strip is doing, so this bypasses the settle guard below.
     var jumpToken = 0
     /// The store's is-it-safe-to-move-the-left-edge signal (`ScrollGate`).
     /// Nil on a fixed window (the online gate), where nothing slides.
@@ -1620,6 +1597,8 @@ struct TimelineScrubStrip: View {
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
     var onReturn: (() -> Void)? = nil
+    /// Reopened while scrubbed away: the caller moves `now`, the scrub stays put.
+    var onResumeScrubbedAway: () -> Void = {}
     /// The next significant event from the scrub, and the scrub to it.
     var commentary: String? = nil
     /// The commentary's ink when it is a warning rather than a next event.
@@ -1630,6 +1609,7 @@ struct TimelineScrubStrip: View {
     var scrollGate: ScrollGate? = nil
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
+    @Environment(\.scenePhase) private var scenePhase
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -1653,6 +1633,16 @@ struct TimelineScrubStrip: View {
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("timeline-strip")
+            // The page outlives a trip to the background, so `now` is stale on reopen.
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                if scrubbedAway(scrubTime, from: now) {
+                    onResumeScrubbedAway()
+                } else {
+                    jumpToken += 1
+                    onReturn?()
+                }
+            }
     }
 
     /// The row of glass pills between the lead and the plot: the commentary
