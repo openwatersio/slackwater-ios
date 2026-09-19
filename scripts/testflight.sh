@@ -55,9 +55,12 @@ xcodegen generate
 # ~/Library/Caches/org.swift.swiftpm with the Xcode GUI — two resolvers racing
 # on the MapLibre binary artifact corrupts the shared cache ("already exists
 # in file system", 2026-07-31). Agent-run builds should pass the same flag.
+# BUILD_NUMBER overrides project.yml's CURRENT_PROJECT_VERSION for every
+# target, the widget included (nightly.sh numbers builds from ASC this way).
 xcodebuild archive -project Slackwater.xcodeproj -scheme Slackwater \
   -destination 'generic/platform=iOS' -archivePath build/Slackwater.xcarchive \
-  -clonedSourcePackagesDirPath build/SourcePackages
+  -clonedSourcePackagesDirPath build/SourcePackages \
+  ${BUILD_NUMBER:+CURRENT_PROJECT_VERSION=$BUILD_NUMBER}
 
 cat > build/exportUpload.plist <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>

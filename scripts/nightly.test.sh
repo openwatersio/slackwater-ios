@@ -31,26 +31,17 @@ print 'changed' >> "$REPO/app.txt"
 git -C "$REPO" commit -qam 'Feature after release'
 git -C "$REPO" remote add origin "$ORIGIN"
 git -C "$REPO" push -q -u origin main --tags
-git --git-dir="$ORIGIN" symbolic-ref HEAD refs/heads/main
 
+# Nightly leaves the suite to CI; any call here is a regression.
 cat > "$REPO/scripts/test.sh" <<'EOF'
 #!/bin/zsh
-print 'full-test' >> "$NIGHTLY_STATE/events"
-[[ "${1:-}" == --full ]]
-if [[ "${NIGHTLY_DRIFT:-}" == yes ]]; then
-  drift_repo=$(mktemp -d "$NIGHTLY_STATE/drift.XXXXXX")
-  git clone -q "$NIGHTLY_ORIGIN" "$drift_repo"
-  git -C "$drift_repo" config user.name 'Nightly Test'
-  git -C "$drift_repo" config user.email nightly@example.test
-  print 'drift' >> "$drift_repo/app.txt"
-  git -C "$drift_repo" commit -qam 'Main moved during validation'
-  git -C "$drift_repo" push -q origin main
-fi
+print 'test-called' >> "$NIGHTLY_STATE/events"
+exit 1
 EOF
 cat > "$REPO/scripts/testflight.sh" <<'EOF'
 #!/bin/zsh
-print "upload:$*" >> "$NIGHTLY_STATE/events"
-awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml > "$NIGHTLY_STATE/asc-build"
+print "upload:$BUILD_NUMBER" >> "$NIGHTLY_STATE/events"
+print "$BUILD_NUMBER" > "$NIGHTLY_STATE/asc-build"
 EOF
 chmod +x "$REPO/scripts/test.sh" "$REPO/scripts/testflight.sh"
 
@@ -62,8 +53,6 @@ if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
   groups='[Nightly]'
   [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Friends & Family]'
   [[ -z $build ]] || print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
-elif [[ "$1 $2" == 'scripts/asc.mjs notes' ]]; then
-  print "notes:$3" >> "$NIGHTLY_STATE/events"
 else
   print -u2 "unexpected node call: $*"
   exit 1
@@ -73,107 +62,50 @@ EOF
 cat > "$FAKEBIN/gh" <<'EOF'
 #!/bin/zsh
 set -euo pipefail
-case "$1 $2" in
-  'pr list')
-    ;;
-  'pr create')
-    print 'pr-create' >> "$NIGHTLY_STATE/events"
-    print 'https://github.test/openwatersio/slackwater-ios/pull/1'
-    ;;
-  'pr merge')
-    print 'merge' >> "$NIGHTLY_STATE/events"
-    branch=$(git -C "$NIGHTLY_REPO" branch --show-current)
-    merge_repo=$(mktemp -d "$NIGHTLY_STATE/merge.XXXXXX")
-    git clone -q "$NIGHTLY_ORIGIN" "$merge_repo"
-    git -C "$merge_repo" config user.name 'Nightly Test'
-    git -C "$merge_repo" config user.email nightly@example.test
-    git -C "$merge_repo" merge -q --squash "origin/$branch"
-    git -C "$merge_repo" commit -qm 'Nightly release PR'
-    git -C "$merge_repo" push -q origin main
-    git -C "$merge_repo" rev-parse HEAD > "$NIGHTLY_STATE/merge-sha"
-    git -C "$merge_repo" push -q origin --delete "$branch"
-    ;;
-  'pr close')
-    print 'pr-close' >> "$NIGHTLY_STATE/events"
-    branch=$(git -C "$NIGHTLY_REPO" branch --show-current)
-    git --git-dir="$NIGHTLY_ORIGIN" branch -D "$branch" >/dev/null 2>&1 || true
-    ;;
-  'pr view')
-    < "$NIGHTLY_STATE/merge-sha"
-    ;;
-  'release create')
-    tag=$3
-    target=''
-    shift 3
-    while (( $# )); do
-      if [[ "$1" == --target ]]; then target=$2; break; fi
-      shift
-    done
-    [[ -n "$target" ]]
-    git -C "$NIGHTLY_REPO" tag "$tag" "$target"
-    git -C "$NIGHTLY_REPO" push -q origin "$tag"
-    print "release:$tag" >> "$NIGHTLY_STATE/events"
-    ;;
-  *)
-    print -u2 "unexpected gh call: $*"
-    exit 1
-    ;;
-esac
+[[ "$1 $2" == 'release create' ]] || { print -u2 "unexpected gh call: $*"; exit 1; }
+tag=$3
+shift 3
+while [[ "$1" != --target ]]; do shift; done
+git -C "$NIGHTLY_REPO" tag "$tag" "$2"
+git -C "$NIGHTLY_REPO" push -q origin "$tag"
+print "release:$tag" >> "$NIGHTLY_STATE/events"
 EOF
 chmod +x "$FAKEBIN/node" "$FAKEBIN/gh"
 
 export PATH="$FAKEBIN:$PATH"
 export NIGHTLY_STATE=$STATE
 export NIGHTLY_REPO=$REPO
-export NIGHTLY_ORIGIN=$ORIGIN
-export GITHUB_REPOSITORY=openwatersio/slackwater-ios
-# The first run sees a new app with no uploads yet.
+fail() { print -u2 "check failed: $1"; exit 1; }
+nightly() { (cd "$REPO" && zsh scripts/nightly.sh) }
+new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
+
+# A new app with no uploads yet numbers from project.yml, commits nothing, and
+# tags the commit it built.
 : > "$STATE/asc-build"
-
-(cd "$REPO" && zsh scripts/nightly.sh)
-
-cat > "$STATE/want-events" <<'EOF'
-pr-create
-full-test
-merge
-upload:
-release:nightly-1.13.0-39
-EOF
-diff -u "$STATE/want-events" "$STATE/events"
-git -C "$REPO" show origin/main:project.yml | grep -q 'CURRENT_PROJECT_VERSION: 39'
+head=$(git -C "$REPO" rev-parse HEAD)
+nightly
+diff -u <(printf 'upload:39\nrelease:nightly-1.13.0-39\n') "$STATE/events"
+[[ $(git -C "$REPO" rev-parse HEAD) == $head ]]
+[[ $(git -C "$REPO" rev-parse 'nightly-1.13.0-39^{commit}') == $head ]]
+git -C "$REPO" diff --quiet
 grep -q 'Feature after release' "$REPO/build/nightly-notes.md"
 
+# Nothing new since the tag: no upload.
 before=$(wc -l < "$STATE/events")
-(cd "$REPO" && zsh scripts/nightly.sh)
-after=$(wc -l < "$STATE/events")
-[[ "$before" == "$after" ]]
+nightly
+[[ $(wc -l < "$STATE/events") == $before ]]
 
-change_repo=$(mktemp -d "$STATE/change.XXXXXX")
-git clone -q "$ORIGIN" "$change_repo"
-git -C "$change_repo" config user.name 'Nightly Test'
-git -C "$change_repo" config user.email nightly@example.test
-print 'another change' >> "$change_repo/app.txt"
-git -C "$change_repo" commit -qam 'Another feature'
-git -C "$change_repo" push -q origin main
-git -C "$REPO" fetch -q origin main
-git -C "$REPO" checkout -q --detach origin/main
+# ASC is ahead of project.yml now, so it sets the number.
+new_commit 'Another feature'
+nightly
+tail -2 "$STATE/events" | diff -u - <(printf 'upload:40\nrelease:nightly-1.13.0-40\n')
+grep -q 'Another feature' "$REPO/build/nightly-notes.md"
+! grep -q 'Feature after release' "$REPO/build/nightly-notes.md" || fail 'notes repeat commits from before the last tag'
 
-export NIGHTLY_DRIFT=yes
-! (cd "$REPO" && zsh scripts/nightly.sh)
-unset NIGHTLY_DRIFT
-tail -3 "$STATE/events" | diff -u - <(printf 'pr-create\nfull-test\npr-close\n')
-[[ $(< "$STATE/asc-build") == 39 ]]
+# A build that reaches an external group is not tagged.
+new_commit 'Third feature'
+! NIGHTLY_WRONG_GROUP=yes nightly || fail 'a build in an external group passed'
+! grep -q 'release:nightly-1.13.0-41' "$STATE/events" || fail 'a build in an external group was tagged'
 
-git -C "$REPO" fetch -q origin main
-git -C "$REPO" checkout -q --detach origin/main
-export NIGHTLY_WRONG_GROUP=yes
-! (cd "$REPO" && zsh scripts/nightly.sh)
-unset NIGHTLY_WRONG_GROUP
-! grep -q 'release:nightly-1.13.0-40' "$STATE/events"
-
-before=$(wc -l < "$STATE/events")
-! (cd "$REPO" && zsh scripts/nightly.sh)
-after=$(wc -l < "$STATE/events")
-[[ "$before" == "$after" ]]
-
+! grep -q 'test-called' "$STATE/events" || fail 'nightly ran the test suite'
 print 'nightly release checks passed'

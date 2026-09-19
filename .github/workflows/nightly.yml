@@ -40,10 +40,9 @@ jobs:
     runs-on: macos-latest
     # Signing secrets live in this environment, which only main can deploy to.
     environment: testflight
-    timeout-minutes: 180
+    timeout-minutes: 60
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -63,14 +62,6 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
           restore-keys: spm-${{ runner.os }}-
 
-      # Wakes CoreSimulator on a fresh runner; see the same step in ci.yml.
-      - run: xcrun simctl list > /dev/null
-
-      - name: Configure the release commit
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-
       - name: Release changed main to Nightly
         env:
           GH_TOKEN: ${{ github.token }}
@@ -79,7 +70,19 @@ jobs:
           ASC_KEY: ${{ secrets.ASC_KEY }}
           SIGNING_P12: ${{ secrets.SIGNING_P12 }}
           SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
-          # Hosted-runner test settings; see the App tests job in ci.yml.
-          SLACKWATER_WORKERS: 1
-          TEST_RUNNER_SLACKWATER_PERF_SCALE: "4"
+          # xcodebuild -exportArchive writes its .xcdistributionlogs here.
+          TMPDIR: ${{ runner.temp }}
         run: zsh scripts/nightly.sh
+
+      # Archive and export failures print a summary to the job log; the
+      # detail is in these files.
+      - name: Upload release logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-logs
+          path: |
+            ${{ runner.temp }}/*.xcdistributionlogs
+            build/Slackwater.xcarchive/Info.plist
+            build/exportUpload.plist
+          if-no-files-found: ignore

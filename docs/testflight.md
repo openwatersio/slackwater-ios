@@ -1,6 +1,6 @@
 # TestFlight — headless signing & upload
 
-Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) bumps the build number, runs the full suite, and calls `scripts/testflight.sh` on a GitHub-hosted macOS runner. Everything below is the one-time state that relies on, and how to rebuild it.
+Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly workflow (`.github/workflows/nightly.yml`) runs `scripts/nightly.sh` on a GitHub-hosted macOS runner: it numbers the build one past the highest on App Store Connect (or `CURRENT_PROJECT_VERSION`, if that is higher), archives and uploads it with `scripts/testflight.sh`, and tags the commit `nightly-<version>-<build>`. It commits nothing and runs no tests; CI runs `--full` on both simulators for every push to `main`. Everything below is the one-time state that relies on, and how to rebuild it.
 
 ## The pieces
 
@@ -227,7 +227,7 @@ Two smaller pieces of the same story:
 
 The old timings mixed routine behavior coverage with live downloads and do not
 describe these modes. Record observed timings after the migrated suite runs.
-Run fast while iterating and offline `--full` before `scripts/testflight.sh`.
+Run fast while iterating. Before `scripts/testflight.sh`, check that CI's push run for the commit is green; it is the `--full` suite on both simulators.
 Run `--live` separately when real-service compatibility needs checking; green
 offline runs intentionally make no claim about current IWLS availability.
 
