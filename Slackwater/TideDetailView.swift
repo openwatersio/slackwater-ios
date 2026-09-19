@@ -102,6 +102,7 @@ struct TideDetailView: View {
                                                    chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
+                                                   onResumeScrubbedAway: { live = appNow() },
                                                    commentary: commentary,
                                                    commentaryTint: commentaryTint,
                                                    onCommentary: scrubToCommentary,
