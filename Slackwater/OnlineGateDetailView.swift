@@ -106,7 +106,8 @@ struct OnlineGateDetailView: View {
                                                      now: live, floodDeg: window.floodDirection,
                                                      ebbDeg: window.ebbDirection,
                                                      sky: sky,
-                                                     scrubTime: $scrubTime, onReturn: returnToNow)
+                                                     scrubTime: $scrubTime, onReturn: returnToNow,
+                                                     onResumeScrubbedAway: { live = appNow() })
                                 }
                             },
                             links: { tl, jump in

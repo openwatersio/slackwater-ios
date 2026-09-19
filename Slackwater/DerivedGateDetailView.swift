@@ -56,6 +56,7 @@ struct DerivedGateDetailView: View {
                                                    now: live, chromeInk: sky.ink,
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
+                                                   onResumeScrubbedAway: { live = appNow() },
                                                    commentary: next.map {
                                                        commentaryText($0.text, at: $0.time, from: scrubTime, now: live)
                                                    },

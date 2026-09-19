@@ -128,6 +128,7 @@ struct CurrentScrubCard: View {
     let sky: SkyState
     @Binding var scrubTime: Date
     let onReturn: () -> Void
+    let onResumeScrubbedAway: () -> Void
     /// Infinite-strip plumbing, nil on a fixed window (the online gate):
     /// governed y-scale, the store's scroll gate, viewport report.
     var scale: TimelineScale? = nil
@@ -144,6 +145,7 @@ struct CurrentScrubCard: View {
                            chromeInk: sky.ink,
                            floodDeg: floodDeg, ebbDeg: ebbDeg,
                            scrubTime: $scrubTime, onReturn: onReturn,
+                           onResumeScrubbedAway: onResumeScrubbedAway,
                            commentary: lead.commentary,
                            onCommentary: { if let next { scrubTime = next.time } },
                            scrollGate: scrollGate,
