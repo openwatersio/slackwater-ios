@@ -188,6 +188,9 @@ jobs:
       # here, before the build, and the shards never need it.
       - name: Build
         run: |
+          # `bash -e` without pipefail: the pipe into tail would report tail's
+          # status, and a failed build would upload a partial archive.
+          set -o pipefail
           node scripts/iwls-fixtures.mjs prepare
           xcodegen generate
           xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater \
