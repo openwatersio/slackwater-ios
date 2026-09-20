@@ -74,6 +74,13 @@ struct DownloadCohort {
         return true
     }
 
+    /// A station the queue has no job for cannot be downloading, so it counts
+    /// as done: cohorts are list ids (NOAA + CHS), the queue is CHS-only.
+    func isDone(_ id: String, in queue: ChsQueue) -> Bool {
+        guard let status = queue.status(id) else { return true }
+        return status == .ready || status == .failed
+    }
+
     /// Every captured station has finished, one way or the other — or the
     /// download queue never had a job for it. A cohort is built from the
     /// station list's ids, which include NOAA stations; `ChsQueue` only ever
@@ -84,10 +91,7 @@ struct DownloadCohort {
     /// "downloading" for a station that cannot finish is a lie.
     func settled(in queue: ChsQueue) -> Bool {
         guard !ids.isEmpty else { return false }
-        return ids.allSatisfy { id in
-            guard let status = queue.status(id) else { return true }
-            return status == .ready || status == .failed
-        }
+        return ids.allSatisfy { isDone($0, in: queue) }
     }
 }
 
@@ -107,17 +111,21 @@ func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadT
     guard !cohort.ids.isEmpty else { return .absent }
     guard cohort.settled(in: queue) else {
         // An id the queue has never heard of counts as done, same as
-        // `settled` above: no job means nothing is downloading, so it can't
-        // be holding the cohort back. Without this, an unknown id is
-        // settled-but-not-done and `done` never reaches `total`.
-        let done = cohort.ids.count { id in
-            guard let status = queue.status(id) else { return true }
-            return status == .ready || status == .failed
-        }
+        // `settled` above (`isDone`): no job means nothing is downloading,
+        // so it can't be holding the cohort back. Without this, an unknown
+        // id is settled-but-not-done and `done` never reaches `total`.
+        let done = cohort.ids.count { cohort.isDone($0, in: queue) }
         return .working(done: done, total: cohort.ids.count)
     }
     // The question belongs to the automatic tier. Once a wider one is running
     // the manager owns the conversation.
     guard tier == .inView, !declined, remaining > 0 else { return .absent }
     return .asking(count: remaining)
+}
+
+// TEMPORARY STUB (Task 4) — Task 6 adds the real Slackwater/BackgroundDownloads.swift
+// and MUST DELETE this enum when it does. Leaving both in place is a build
+// failure: two types named `BackgroundDownloads`.
+enum BackgroundDownloads {
+    static func submitIfPossible(queue: ChsQueue) {}
 }

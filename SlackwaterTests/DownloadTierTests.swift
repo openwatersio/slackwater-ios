@@ -161,4 +161,45 @@ final class DownloadTierTests: XCTestCase {
                        .absent,
                        "the question belongs to the in-view tier only")
     }
+
+    func testWorkingCountsUndownloadableStationsAsAlreadyDone() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["chs-a", "noaa-b"], heroID: "chs-a")
+        let queue = ChsQueue([job("chs-a", 48.43, -123.37)])
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 5),
+                       .working(done: 1, total: 2),
+                       "the NOAA station has no job, so it is done, not pending")
+    }
+
+    @MainActor
+    func testAutoFitSetStopsAtTheActiveTier() {
+        let cohort: Set<String> = []
+        let inView = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon,
+                                              tier: .inView, cohort: cohort)
+        XCTAssertTrue(inView.isEmpty,
+                      "with nothing captured the automatic tier downloads nothing")
+
+        let nearby = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon,
+                                              tier: .nearby, cohort: cohort)
+        let everything = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon,
+                                                  tier: .everything, cohort: cohort)
+        XCTAssertGreaterThan(nearby.count, 0)
+        XCTAssertGreaterThan(everything.count, nearby.count,
+                             "the widest tier has no ceiling")
+        XCTAssertTrue(nearby.allSatisfy {
+            distanceKm($0.latitude, $0.longitude, victoria.lat, victoria.lon)
+                <= DownloadTier.nearbyRadiusKm
+        })
+    }
+
+    @MainActor
+    func testTheCohortIsDownloadedAtTheAutomaticTier() {
+        let all = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon,
+                                           tier: .everything, cohort: [])
+        guard let first = all.first else { return XCTFail("no CHS candidates bundled") }
+        let inView = ChsFitService.autoFitSet(lat: victoria.lat, lon: victoria.lon,
+                                              tier: .inView, cohort: [first.id])
+        XCTAssertEqual(inView.map(\.id), [first.id])
+    }
 }
