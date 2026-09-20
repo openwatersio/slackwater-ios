@@ -60,8 +60,29 @@ teaches the gesture and the payoff in the same motion. Then it glides again to
 the moon.
 
 Both targets are inside `Timeline.snapJumpHours` (`7 * 24` hours,
-`TimelineStrip.swift:121`), so `jump(to:)` rides the animated magnet the whole
-way rather than snapping.
+`TimelineStrip.swift:121`), so the travel qualifies for the animated magnet
+ride rather than the instant landing.
+
+**Getting the ride requires one line that does not exist yet.** The animated
+branch in `updateUIView` fires only when `jumpToken` changes
+(`TimelineStrip.swift:1216`), and `jumpToken` is `@State` private to
+`TimelineScrubStrip` (`TimelineStrip.swift:1613`), bumped only by a scene-phase
+return, the commentary pill and the Now pill. The scaffold's `jump(to:)` sets
+`scrubTime` alone, so it falls through to the instant branch at
+`TimelineStrip.swift:1245` — which is why a shared link lands without a glide
+today.
+
+The strip therefore gains one more `.onChange` beside the scene-phase one it
+already has, watching `TourCoach.glideToken` and bumping `jumpToken` when it
+moves. `TourCoach` is an `@Observable` singleton and the strip reads it
+directly, exactly as the scaffold already reads `LinkedInstant.shared.pending`
+(`Theme.swift:954`). No parameter is added, so none of the four detail views
+that construct a `TimelineScrubStrip` are touched.
+
+The scaffold exposes `glide(to:)` — `jump(to:)` plus a `glideToken` bump — and
+the tour calls only that. Whether the two arrive in the same SwiftUI update
+pass is the one genuine implementation risk in this design, so it is the first
+task in the plan and it carries a test that fails if the strip teleports.
 
 ### Finding the two moments costs nothing
 
@@ -258,7 +279,8 @@ station pick reads the ranking the list has already computed.
 New: `TourCoach.swift`.
 
 Edited: `Theme.swift` (the scaffold's overlay, the anchors, `ScrollViewReader`,
-the `tile-moon` identifier), `DetailHeader.swift` and `TimelineStrip.swift`
-(one anchor each), `StationListView.swift` (the location-path open),
+`glide(to:)`, the `tile-moon` identifier), `DetailHeader.swift` (one anchor),
+`TimelineStrip.swift` (one anchor and the `glideToken` observer),
+`StationListView.swift` (the location-path open),
 `SettingsView.swift` (the replay row), `TestSeeds.swift` (the launch hooks),
 and their tests.
