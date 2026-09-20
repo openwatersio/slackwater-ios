@@ -6,6 +6,7 @@
 // a parameter on `TimelineScrubStrip` fans out to four detail views.
 import CoreLocation
 import SwiftUI
+import UIKit
 
 let seenTourKey = "slackwater.seenTour"
 
@@ -27,6 +28,10 @@ let seenTourKey = "slackwater.seenTour"
     /// First launch has armed the tour but no detail has claimed it yet.
     private(set) var armed = false
     private var skySteps = true
+
+    /// Sky steps drop under VoiceOver too: the strip is an adjustable
+    /// element there, and "swipe the curve" is the wrong advice.
+    private var skipsSky: Bool { !skySteps || UIAccessibility.isVoiceOverRunning }
 
     /// Called once on launch. A tour that has already been seen does not arm.
     func arm() {
@@ -69,7 +74,7 @@ let seenTourKey = "slackwater.seenTour"
 
     private func next(after step: Step) -> Step? {
         Step.allCases
-            .filter { skySteps || ($0 != .stars && $0 != .moon) }
+            .filter { !skipsSky || ($0 != .stars && $0 != .moon) }
             .first { $0.rawValue > step.rawValue }
     }
 }
