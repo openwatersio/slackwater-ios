@@ -1643,6 +1643,14 @@ struct TimelineScrubStrip: View {
                     onReturn?()
                 }
             }
+            // The first-run tour's scrub demo. The animated magnet ride is
+            // reachable only through `jumpToken`, which is this view's own
+            // @State — so the tour asks for it through the observable rather
+            // than through a parameter, which would fan out to all four
+            // detail views (CLAUDE.md).
+            .onChange(of: TourCoach.shared.glideToken) { _, _ in
+                jumpToken += 1
+            }
     }
 
     /// The row of glass pills between the lead and the plot: the commentary

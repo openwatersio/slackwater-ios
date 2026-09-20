@@ -1021,6 +1021,16 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         }
     }
 
+    /// `jump(to:)` with the animated ride the tour's demo depends on. The
+    /// token bump comes FIRST so the strip's `jumpToken` is already different
+    /// by the time `scrubTime`'s change reaches `updateUIView` — reversed,
+    /// the offset write can land in the pass before the token and the strip
+    /// teleports.
+    private func glide(to t: Date) {
+        TourCoach.shared.requestGlide()
+        jump(to: t)
+    }
+
     private func scrubCard(_ tl: TimelineData) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             // Full bleed, no chrome: the curve is the hero and the page is its
