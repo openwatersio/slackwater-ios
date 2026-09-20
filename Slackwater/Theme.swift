@@ -1825,12 +1825,14 @@ final class FavoritesStore: ObservableObject {
 /// stores are untouched; exclusion is render-time only, so a station reappears
 /// when it stops being the hero / a favorite / nearby.
 struct ListGroups {
+    let heroIds: [String]
     let favorites: [String]
     let nearMe: [String]
     let recents: [String]
 
     init(heroIds: [String], favoriteIds: [String], recentIds: [String],
          rankedIds: [String], nearCount: Int) {
+        self.heroIds = heroIds
         favorites = favoriteIds.filter { !heroIds.contains($0) }
         var shown = Set(favorites)
         shown.formUnion(heroIds)

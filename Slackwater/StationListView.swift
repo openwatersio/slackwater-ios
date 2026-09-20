@@ -78,6 +78,7 @@ struct StationListView: View {
     @ObservedObject private var recents = RecentsStore.shared
     @ObservedObject private var favorites = FavoritesStore.shared
     @ObservedObject private var chosen = ChosenStationsStore.shared
+    @ObservedObject private var chs = ChsFitService.shared
     // Size class, not device, picks the layout (web styles.css breakpoints):
     // regular = the ≥62rem persistent-sidebar grid; compact = the phone stack.
     // iPad Slide Over / narrow Split View is compact and gets the phone layout.
@@ -691,6 +692,25 @@ struct StationListView: View {
                                 rankedIds: nearIds,
                                 // With hero cards the nearest is already on screen — 4 more; without, 5.
                                 nearCount: fix == nil ? 5 : 4)
+
+        // The automatic tier is what the list is rendering, and `ListGroups`
+        // has just computed exactly that. Unfiltered on purpose: filtering to
+        // Currents says what the user wants to LOOK at, not what to fetch.
+        let cohortIds = groups.heroIds + groups.nearMe
+        // Deferred a run loop turn: capturing here directly would mutate
+        // `ChsFitService`'s `@Published` state while this view's body is
+        // still being evaluated.
+        let _ = DispatchQueue.main.async {
+            ChsFitService.shared.captureCohort(ids: cohortIds, heroID: groups.heroIds.first)
+        }
+
+        DownloadStrip(
+            state: downloadStripState(cohort: chs.cohort, queue: chs.queue,
+                                      tier: chs.tier, declined: chs.declinedNearby,
+                                      remaining: chs.remainingBeyondCohort),
+            onOpen: { showDownloads = true },
+            onAccept: { ChsFitService.shared.accept(.nearby) },
+            onDecline: { ChsFitService.shared.declineNearby() })
 
         // My Location slot: the hero tile, its locating state, the amber
         // denied card, or — past the gate, with the choice never made — the ask
