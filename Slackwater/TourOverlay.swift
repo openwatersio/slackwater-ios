@@ -47,12 +47,14 @@ struct TourMarkLayer: View {
     let onNext: () -> Void
     let onSkip: () -> Void
 
-    @State private var coach = TourCoach.shared
-
     var body: some View {
-        if let step = coach.step, let anchor = anchors[step] {
+        // `.stars` and `.moon` both point at the strip; only the copy and
+        // the glide target differ, so `.moon` falls back to the `.stars`
+        // anchor rather than publishing a second one.
+        if let step = TourCoach.shared.step,
+           let anchor = anchors[step] ?? (step == .moon ? anchors[.stars] : nil) {
             let rect = proxy[anchor]
-            let below = rect.midY < proxy.size.height / 2
+            let capsuleBelow = rect.midY < proxy.size.height / 2
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(SN.leaf, lineWidth: 2)
@@ -63,7 +65,7 @@ struct TourMarkLayer: View {
                 capsule(step: step)
                     .frame(maxWidth: 320)
                     .position(x: proxy.size.width / 2,
-                              y: below ? rect.maxY + 56 : max(rect.minY - 56, 60))
+                              y: capsuleBelow ? rect.maxY + 56 : max(rect.minY - 56, 60))
             }
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.2), value: step)

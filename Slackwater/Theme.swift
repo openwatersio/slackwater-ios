@@ -949,16 +949,17 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             }
             .ignoresSafeArea(edges: .top)
             .overlayPreferenceValue(TourAnchorKey.self) { anchors in
-                // `.stars` and `.moon` both point at the strip; only the copy
-                // and the glide target differ.
-                let resolved = TourCoach.shared.step == .moon
-                    ? anchors.merging([.moon: anchors[.stars]].compactMapValues { $0 }) { _, n in n }
-                    : anchors
-                TourMarkLayer(anchors: resolved, proxy: geo,
-                              stationName: name, arrived: tourArrived,
-                              onNext: tourNext, onSkip: { TourCoach.shared.finish() })
-                    .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
-                    .allowsHitTesting(TourCoach.shared.station == favoriteId)
+                // A dedicated GeometryReader, not the outer `geo`: `geo` sits
+                // inside the safe area, but this ScrollView ignores the top
+                // safe area, so anchors must resolve in the overlay's own
+                // space to land on the real screen position.
+                GeometryReader { overlayGeo in
+                    TourMarkLayer(anchors: anchors, proxy: overlayGeo,
+                                  stationName: name, arrived: tourArrived,
+                                  onNext: tourNext, onSkip: { TourCoach.shared.finish() })
+                        .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
+                        .allowsHitTesting(TourCoach.shared.station == favoriteId)
+                }
             }
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
