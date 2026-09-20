@@ -6,7 +6,10 @@
 // instead of explaining three download systems.
 import Foundation
 
-enum DownloadTier {
+/// `String`-backed so the accepted tier can be persisted verbatim
+/// (`AppGroup.downloadTierKey`) — the widest tier is a preference, and a
+/// preference that forgets itself on a cold launch is not one.
+enum DownloadTier: String {
     /// Exactly the stations the list is rendering. Downloads with no prompt.
     case inView
     /// Everything inside `nearbyRadiusKm`. Needs a yes — and that yes is what
@@ -52,8 +55,9 @@ enum DownloadTier {
 struct DownloadCohort {
     private(set) var ids: Set<String> = []
     /// The nearest station's id. Its identity changing is what "a new place"
-    /// means — not the fix moving, which happens constantly.
-    private(set) var heroID: String?
+    /// means — not the fix moving, which happens constantly. Nothing outside
+    /// this file reads it; `capture` is the only way in or out.
+    private var heroID: String?
 
     /// Take a cohort if this is a new place. Returns true when it did, which
     /// is the caller's signal that the question may be asked again.

@@ -128,6 +128,17 @@ final class ChsFitService: ObservableObject {
 
     /// How far out the queue is currently allowed to walk, and the stations
     /// the list was rendering when the question was last framed.
+    ///
+    /// The tier PERSISTS (`AppGroup.downloadTierKey`, written in `accept`,
+    /// restored in `init`). The spec calls the widest one "a preference, not a
+    /// job", and a switch labelled "keep downloading" that reverts to off on
+    /// every cold launch cannot keep that word. It is also what makes an
+    /// accepted tier resume: `init` re-seeds jobs only for stations already on
+    /// disk, so without the restored ceiling a station queued at `.nearby` and
+    /// interrupted would simply never be re-adopted.
+    ///
+    /// `declinedNearby` deliberately does NOT persist — "Not now" holds for
+    /// the session, and the manager is the way back in (spec §Asking once).
     @Published private(set) var tier: DownloadTier = .inView
     @Published private(set) var cohort = DownloadCohort()
     /// "Not now" holds for the session. The manager is the way back in.
@@ -235,6 +246,11 @@ final class ChsFitService: ObservableObject {
 
     private init() {
         ChsModelStore.resetIfRequested()
+        // Before anything adopts: `adopt` reads `tier` to decide what the
+        // queue may take, and the first call can arrive from the list's
+        // `.task` a moment after this returns.
+        tier = AppGroup.defaults.string(forKey: AppGroup.downloadTierKey)
+            .flatMap(DownloadTier.init(rawValue:)) ?? .inView
         // One directory read, not 1,097 stat calls: which stations already
         // have a model on disk decides both what renders fitted and what stays
         // in the download set after the auto-fit rule stops choosing it.
@@ -335,8 +351,20 @@ final class ChsFitService: ObservableObject {
                                    tier: tier, cohort: cohort.ids) { queue.add(job) }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
-        remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon, tier: .nearby, cohort: cohort.ids)
-            .count { !cohort.ids.contains($0.id) }
+        // What accepting would actually GAIN, not what geography holds.
+        // `autoFitSet` is pure distance and never consults the queue, so from
+        // the second launch onward every already-fitted station still counted
+        // — the strip offered "Download 14 more nearby?" for fourteen stations
+        // sitting on disk, and Yes was a dead tap (`add` is a no-op for a
+        // known id, so `pump()` found nothing to do). `.ready` is the only
+        // status that means "you already have this": a `.pending`, `.failed`
+        // or backing-off job is still work the tier would carry out.
+        // `constrained:` matches `adopt`'s own call above — in Low Data Mode
+        // the offer must not be larger than accepting it would queue.
+        remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon,
+                                                constrained: Connectivity.shared.constrained,
+                                                tier: .nearby, cohort: cohort.ids)
+            .count { !cohort.ids.contains($0.id) && queue.status($0.id) != .ready }
     }
 
     /// The list hands over what it is rendering. Captured once per place; a
@@ -377,6 +405,7 @@ final class ChsFitService: ObservableObject {
         guard newTier != tier else { return }
         let widened = Self.widens(from: tier, to: newTier)
         tier = newTier
+        AppGroup.defaults.set(newTier.rawValue, forKey: AppGroup.downloadTierKey)
         if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
         pump()
         if widened { BackgroundDownloads.submitIfPossible(queue: queue) }
@@ -965,6 +994,10 @@ extension ChsModelStore {
     /// silently be a resume.
     static func resetIfRequested() {
         guard CommandLine.arguments.contains("-chsResetModels") else { return }
+        // The accepted tier is persisted now, and a simulator keeps App Group
+        // defaults across an uninstall — without this a run that flipped the
+        // switch on would leave every later run downloading the 150 km set.
+        AppGroup.defaults.removeObject(forKey: AppGroup.downloadTierKey)
         try? FileManager.default.removeItem(at: dir)
         try? FileManager.default.removeItem(at: ChsChunkStore.dir)
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
