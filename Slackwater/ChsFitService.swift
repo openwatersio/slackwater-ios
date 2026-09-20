@@ -2,7 +2,6 @@
 // asked, the download queue that runs it, and the fetch → fit → stored model
 // run itself. No region UX — the stations near a fix auto-fit in the
 // background; each one lands as its fit completes.
-import CoreLocation
 import Combine
 import Foundation
 

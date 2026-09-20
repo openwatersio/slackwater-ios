@@ -3,6 +3,7 @@
 // shared container (CHS fitted models). One-time migration from the
 // pre-widget standard-defaults/App-Support locations.
 import Foundation
+import os
 
 enum AppGroup {
     static let id = "group.io.openwaters.slackwater"
@@ -19,6 +20,10 @@ enum AppGroup {
             #if DEBUG
             assertionFailure("App Group suite unavailable — widget will not see shared state")
             #endif
+            // Release has no other symptom: the app works and the widget silently
+            // shows nobody's favorites. A fault is what a sysdiagnose can find.
+            Logger(subsystem: "io.openwaters.slackwater", category: "AppGroup")
+                .fault("App Group suite unavailable — falling back to standard defaults")
             return .standard
         }
         return d

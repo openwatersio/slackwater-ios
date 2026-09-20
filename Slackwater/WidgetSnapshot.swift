@@ -72,6 +72,9 @@ struct WidgetSnapshot: Equatable {
         switch station {
         case .tide(let s, _, let name):
             let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
+            // 97 samples on a 24-hour day, 93 or 101 across a DST transition —
+            // the engine buckets to the step, and the span is 23/25 hours. Grid
+            // density only: every fraction below divides by the real dayLength.
             let heights = s.heights(from: dayStart, to: dayEnd, step: 900).map(\.height)
             let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
             let extremes = s.extremes(from: now, to: now.addingTimeInterval(172_800))
@@ -100,6 +103,8 @@ struct WidgetSnapshot: Equatable {
 
         case .current(let s, _, let name):
             let name = [stationNamePrefix, name].compactMap { $0 }.joined(separator: " · ")
+            // Same DST step bucketing as the tide branch: 93/101 samples instead
+            // of 97, grid density only.
             let pts = s.speeds(from: dayStart, to: dayEnd, step: 900)
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             let ev = s.events(from: now, to: now.addingTimeInterval(172_800))

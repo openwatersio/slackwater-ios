@@ -68,9 +68,17 @@ struct PremiumView: View {
                                 .font(.footnote)
                                 .foregroundStyle(SN.foam.opacity(0.7))
                         }
-                        Button("Restore purchase") { Task { await store.restore() } }
-                            .font(.footnote)
-                            .disabled(purchasing)
+                        Button("Restore purchase") {
+                            // Shares `purchasing` with the buy buttons: AppStore.sync()
+                            // raises a system prompt, and two are worse than one.
+                            purchasing = true
+                            Task {
+                                defer { purchasing = false }
+                                await store.restore()
+                            }
+                        }
+                        .font(.footnote)
+                        .disabled(purchasing)
                     }
                 }
                 .padding(20)

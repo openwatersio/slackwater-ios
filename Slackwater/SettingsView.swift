@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var chs = ChsFitService.shared
+    @ObservedObject private var premium = PremiumStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
     @State private var showWidgets = false
@@ -76,7 +77,7 @@ struct SettingsView: View {
                     section("Slackwater Premium") {
                         Button { showPremium = true } label: {
                             HStack {
-                                Text(PremiumStore.shared.isPremium
+                                Text(premium.isPremium
                                      ? "Premium — thank you for supporting the app"
                                      : "Support the app — lock screen widgets and more")
                                 Spacer()
