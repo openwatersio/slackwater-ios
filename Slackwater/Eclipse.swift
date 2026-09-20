@@ -1,6 +1,5 @@
-// Slackwater — GPL v3. Lunar eclipses for the strip, the schedule and the
-// Moon sheet. The astronomy is Almanac's; everything here is windowing and
-// presentation.
+// Slackwater — GPL v3. Eclipses for the strip, the schedule and the Moon
+// sheet. The astronomy is Almanac's; everything here is presentation.
 import Almanac
 import Foundation
 
@@ -85,6 +84,21 @@ struct WindowEclipse: Identifiable {
     }
 }
 
+struct WindowSolarEclipse: Identifiable {
+    let eclipse: SolarEclipse
+
+    var id: Date { eclipse.peak }
+    var kind: SolarEclipseKind { eclipse.kind }
+    var obscuration: Double { eclipse.obscuration }
+    var peak: Date { eclipse.peak }
+    var start: Date { eclipse.c1 }
+    var contacts: [Date] {
+        [eclipse.c1, eclipse.c2, eclipse.peak, eclipse.c3, eclipse.c4].compactMap { $0 }
+    }
+
+    func underway(at t: Date) -> Bool { t >= eclipse.c1 && t <= eclipse.c4 }
+}
+
 /// Every eclipse in `from..<to` that this observer can see any contact of.
 ///
 /// The search itself is Almanac's `lunarEclipses(from:to:)` (0.2.0, from
@@ -127,6 +141,21 @@ func nextVisibleEclipse(after at: Date, observer: Observer) -> WindowEclipse? {
         if let found = visible(e, observer: observer) { return found }
     }
     return nil
+}
+
+// Almanac's solar searches already discard events entirely below the horizon.
+func visibleSolarEclipses(from: Date, to: Date, observer: Observer) -> [WindowSolarEclipse] {
+    ((try? solarEclipses(from: from, to: to, observer: observer)) ?? []).map {
+        WindowSolarEclipse(eclipse: $0)
+    }
+}
+
+func previousVisibleSolarEclipse(before at: Date, observer: Observer) -> WindowSolarEclipse? {
+    (try? previousSolarEclipse(before: at, observer: observer)).map(WindowSolarEclipse.init)
+}
+
+func nextVisibleSolarEclipse(after at: Date, observer: Observer) -> WindowSolarEclipse? {
+    (try? nextSolarEclipse(after: at, observer: observer)).map(WindowSolarEclipse.init)
 }
 
 private func visible(_ e: LunarEclipse, observer: Observer) -> WindowEclipse? {

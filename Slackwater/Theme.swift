@@ -436,6 +436,8 @@ func eclipseTileText(_ kind: LunarEclipseKind) -> String {
     }
 }
 
+func solarEclipseTileText(_: SolarEclipseKind) -> String { "Solar Eclipse" }
+
 /// The one-line gloss under the phase name in the Moon sheet. "Penumbral" is a
 /// term of art and reads as one; "gibbous" and "first quarter" are terms of art
 /// that do NOT, which is worse — the sheet prints them as if everyone knows.
@@ -457,6 +459,7 @@ func moonPhaseBlurb(_ name: String) -> String {
     case "Penumbral Eclipse": "In Earth's faint outer shadow — a dimming, not a bite."
     case "Partial Eclipse": "Part of the moon crossing Earth's dark inner shadow."
     case "Total Eclipse": "Fully inside Earth's shadow, reddened by Earth's sunsets."
+    case "Solar Eclipse": "The new moon crossing the sun as seen from here."
     default: ""
     }
 }
@@ -527,6 +530,26 @@ struct MoonGlyph: View {
             }
         }
         .frame(width: 2 * r, height: 2 * r)
+        .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+struct SolarEclipseGlyph: View {
+    let obscuration: Double
+    var size: CGFloat = 20
+
+    var body: some View {
+        let r = size / 2 - 1
+        ZStack {
+            Circle().fill(SN.sun)
+            // ponytail: equal-disc overlap; carry apparent radii if this mark becomes quantitative.
+            Circle().fill(Color(hex: 0x04060F))
+                .offset(x: moonUmbraShift(coverage: obscuration, radius: r))
+        }
+        .frame(width: 2 * r, height: 2 * r)
+        .clipShape(Circle())
         .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.75))
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -703,6 +726,8 @@ struct SummaryTiles: View {
     /// The eclipse underway at `at`, from the timeline: it renames the value
     /// line and shadows the glyph.
     var eclipse: WindowEclipse? = nil
+    var solarEclipse: WindowSolarEclipse? = nil
+    var solarObscuration: Double = 0
     /// Handed down from the scaffold. Without it — and without a position —
     /// the tile stays inert, which is what the tests and previews get.
     var onJump: ((Date) -> Void)? = nil
@@ -720,6 +745,8 @@ struct SummaryTiles: View {
         guard let onJump, let latitude, let longitude else { return nil }
         let tz = tz
         return { AnyView(MoonDetailSheet(at: at, eclipse: eclipse,
+                                         solarEclipse: solarEclipse,
+                                         solarObscuration: solarObscuration,
                                          latitude: latitude, longitude: longitude,
                                          tz: tz, onJump: onJump)) }
     }
@@ -743,13 +770,18 @@ struct SummaryTiles: View {
                     phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
                     ?? "\(Int((moon.fraction * 100).rounded()))% lit",
                             accessibility: "Moon", detail: sheet) {
-                    MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
-                              umbra: eclipse?.shadow(at: at) ?? 0,
-                              wash: eclipse?.wash(at: at) ?? 0)
+                    if solarEclipse != nil {
+                        SolarEclipseGlyph(obscuration: solarObscuration, size: 14)
+                    } else {
+                        MoonGlyph(fraction: moon.fraction, waxing: moon.waxing, size: 14,
+                                  umbra: eclipse?.shadow(at: at) ?? 0,
+                                  wash: eclipse?.wash(at: at) ?? 0)
+                    }
                 } value: {
                     // Words, not a number: "Waning Crescent" has to fit on one
                     // line where "7.6 ft" does, so it sits well below the hero.
-                    Text(eclipse.map { eclipseTileText($0.kind) }
+                    Text(solarEclipse.map { solarEclipseTileText($0.kind) }
+                            ?? eclipse.map { eclipseTileText($0.kind) }
                             ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
