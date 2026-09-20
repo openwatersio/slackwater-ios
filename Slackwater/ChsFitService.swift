@@ -358,13 +358,42 @@ final class ChsFitService: ObservableObject {
         pump()
     }
 
-    /// The user accepted a wider tier. This is the tap that lets the work
-    /// continue in the background.
+    /// The user accepted a tier. This is the tap that lets the work continue
+    /// in the background — but only when it actually needs to.
+    ///
+    /// Every caller routes through here: the strip's own accept, the
+    /// manager's "Download more" button, and the manager's tier `Toggle`,
+    /// which fires on both directions of a flip (including down from
+    /// `.everything` to `.nearby`) and can re-fire the same value on a
+    /// redraw. A same-value tap is a true no-op — nothing changed, so
+    /// nothing runs, not even `pump()`. A narrowing tap still needs
+    /// `pump()` (the queue's own walk reacts to `tier` changing) but not a
+    /// new background submission — `BGTaskScheduler` grants a background
+    /// task per *submission*, not per accepted tier, and its pending-request
+    /// ceiling is small. A narrowing flip has strictly less work than the
+    /// task already covers, so submitting on it burns through that ceiling
+    /// for no benefit.
     func accept(_ newTier: DownloadTier) {
+        guard newTier != tier else { return }
+        let widened = Self.widens(from: tier, to: newTier)
         tier = newTier
         if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
         pump()
-        BackgroundDownloads.submitIfPossible(queue: queue)
+        if widened { BackgroundDownloads.submitIfPossible(queue: queue) }
+    }
+
+    /// `.inView` < `.nearby` < `.everything` — the only ordering that
+    /// exists for tiers, since the queue walk only ever grows outward
+    /// (`DownloadTier.admits`). Kept local rather than a `Comparable`
+    /// conformance on `DownloadTier` itself: `accept` is the only place
+    /// that needs to compare two tiers.
+    private static func widens(from old: DownloadTier, to new: DownloadTier) -> Bool {
+        switch (old, new) {
+        case (.inView, .nearby), (.inView, .everything), (.nearby, .everything):
+            return true
+        default:
+            return false
+        }
     }
 
     func declineNearby() { declinedNearby = true }
