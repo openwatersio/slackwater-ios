@@ -711,7 +711,7 @@ final class ChsFitService: ObservableObject {
     /// flood axis, fitted with the same JSCore path as the tides. Most gates
     /// need 210 d — Rayleigh separation of K1/P1, which drive PNW diurnal
     /// inequality, needs ≥183 d — but four meet the full bar at 60 d and are
-    /// final on their first fit (spikes/chs-currents-fit/README.md).
+    /// final on their first fit (docs/validation/chs-currents.md).
     ///
     /// Chunks are fetched NEWEST FIRST, so the trailing 60 days land first and
     /// a 210-day gate can publish its fast answer at ~45 s and keep going. The

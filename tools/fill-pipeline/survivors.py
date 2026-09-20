@@ -26,9 +26,9 @@ Pipeline (task-4-brief.md):
                         BOTH axes -> data/survivors.json + data/SURVIVORS.md.
 
 Single-implementation rule: §4a grading (station_verdicts/grade_elements)
-is imported from spikes/sscofs-field/certify.py, never forked. The numpy
+is imported from tools/sscofs-validation/certify.py, never forked. The numpy
 prefilter (design_matrix/fit_elements) is imported from
-spikes/sscofs-field/prune_proof.py for the same reason; only the corpus
+tools/sscofs-validation/prune_proof.py for the same reason; only the corpus
 loader is adapted (prune_proof loads every column, this loads a column
 subset -- see load_corpus_columns).
 """
@@ -43,8 +43,8 @@ import time
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SPIKE_DIR = os.path.join(HERE, "../../spikes/sscofs-field")
-sys.path.insert(0, SPIKE_DIR)  # single-implementation rule (see module docstring)
+VALIDATION_DIR = os.path.join(HERE, "../sscofs-validation")
+sys.path.insert(0, VALIDATION_DIR)  # single-implementation rule (see module docstring)
 from certify import grade_elements, station_verdicts  # noqa: E402
 from prune_proof import BASIS_NAMES, basis_speeds, fit_elements  # noqa: E402
 

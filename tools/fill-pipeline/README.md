@@ -2,10 +2,7 @@
 
 Produces `Slackwater/Resources/fill-salish.bin` + `.json` — the committed data
 bundle behind `FillField` (`Slackwater/FillField.swift`), the speed-only
-current-fill backdrop. Design: `docs/superpowers/specs/2026-08-20-fill-phase-b-design.md`
-(authority chain: `docs/superpowers/specs/2026-08-20-current-field-composite-design.md`
-§1/§2/§4a/§10 + the owner ruling there — speed fill only, no green, timing
-stays with gates/patches).
+current-fill backdrop. Its speed-only certification contract is documented in [the CHS data model](../../docs/chs-data-model.md#6-current-fields-and-their-limits) and [the validation harness](../sscofs-validation/README.md). The ramp never contains green; timing authority stays with validated stations.
 
 Everything below runs from `tools/fill-pipeline/` unless stated otherwise.
 All intermediate output lives under `data/` (gitignored) — only the final
@@ -62,7 +59,7 @@ doesn't need to be — one API sweep, a few minutes.
 and writes `data/index.json` (station↔element pairs) plus per-pair sample
 files (`data/samples/<slug>-e<elem>.json`) and truth-event files
 (`data/events/<slug>-events.json`). Imports `to_sample`/`project_signed_kn`
-from the spike rather than reimplementing them — one epoch-ms sample rule,
+from `../sscofs-validation/` — one epoch-ms sample rule,
 one flood-axis projection rule in the repo. **Resumable** (re-run skips
 pairs already indexed — confirmed live: a second run prints `(resumed)` on
 the first two lines and adds nothing new). Per-station fetch failures
@@ -102,12 +99,12 @@ Must pass before step 6 runs at all.
 
 The core of the pipeline. Four stages, single process:
 
-1. **Certify** (§4a, imported unchanged from `spikes/sscofs-field/certify.py`
+1. **Certify** (§4a, imported unchanged from `tools/sscofs-validation/certify.py`
    — one implementation of the grading rule, never forked): grades all
    311,447 mesh elements at D = 2/3/5 km from `data/verdicts` +
    `data/index.json` + `data/stations.json`. D = 3000 m is the shipped set.
 2. **Numpy prefilter** (`design_matrix`/`fit_elements` imported unchanged
-   from `spikes/sscofs-field/prune_proof.py`; only the corpus loader is
+   from `tools/sscofs-validation/prune_proof.py`; only the corpus loader is
    forked, to slice to certified columns per-day instead of after
    concatenating the full 311,447-column corpus): shortlist = certified ∧
    prefilter-R² ≥ 0.7 both axes. Loose on purpose — a cheap triage, not the
@@ -220,11 +217,13 @@ Two rules this pipeline exists to honor, not to re-litigate:
 
 - **§4a grading** (`station_verdicts`/`grade_elements`) and the **numpy
   prefilter** (`design_matrix`/`fit_elements`) are imported from
-  `spikes/sscofs-field/certify.py` / `prune_proof.py`, never forked.
+  `tools/sscofs-validation/certify.py` / `prune_proof.py`, never forked.
 - **The shipping fitter is the committed JS artifacts** run in node
   (`fit_batch.mjs` loading `Slackwater/Resources/chs-bundle.js` +
-  `chs-glue.js`), the same precedent as `spikes/chs-currents-fit/node-control.mjs`.
+  `chs-glue.js`), the same precedent as `tools/fill-pipeline/parity_check.sh`.
 
 `region_mesh.py`/`fetch_region.py`/`stations.py`/`make_matrix.py` legitimately
-fork their spike counterparts (region bbox and output paths differ) — each
+adapt the box-validation tools (region bbox and output paths differ) — each
 carries a provenance comment saying so in its header.
+
+Numbered design-section citations in scripts and generated reports refer to the [reviewed field design](https://github.com/openwatersio/slackwater-ios/blob/47e9c59971924dfa0a637ac3df395704a88f6b52/docs/superpowers/specs/2026-08-20-current-field-composite-design.md). The maintained speed-certification rules are in the validation harness README linked above.

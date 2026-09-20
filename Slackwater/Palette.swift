@@ -1,7 +1,4 @@
-// Slackwater — GPL v3. Design tokens from the prototype design system
-// (prototype/_ds/_ds_bundle.css): sn- palette, Fraunces/Geist/Geist Mono type
-// roles, and the web app's unit formatting. The per-station gradient trios
-// this once carried are gone (M53 layout A) — cards take a flat SN.cardFill.
+// Slackwater — GPL v3. Shared palette, typography, chart geometry, and unit formatting.
 import SwiftUI
 
 extension Color {

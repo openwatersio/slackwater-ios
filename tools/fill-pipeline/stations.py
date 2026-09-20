@@ -1,17 +1,8 @@
 #!/usr/bin/env -S uv run --script --with requests
-"""Build the truth-station table for the region: CHS gates (IWLS metadata axis)
-+ NOAA type-H current stations (currents_predictions metadata axis).
+"""Discover CHS and NOAA truth stations throughout the Salish render region.
 
-Forked from spikes/sscofs-field/truth_stations.py (state provenance: that spike
-ran to completion against real CHS/NOAA APIs, see spikes/sscofs-field/README.md)
-per fill-phase-b-design.md §1 / task-2-brief.md: BOX widens from the spike's
-box to the render region. Legitimate fork, not an import -- the §4a-grading
-no-fork rule (spikes/sscofs-field/certify.py) applies only to certification,
-not to this station-discovery parameterization. Same schema, same dedup/assert
-discipline, region-wide instead of box-scoped -- this pulls in every CHS gate
-in the region (Seymour Narrows, Gillard Passage, Race Passage, etc.) beyond
-the spike's original Gulf Islands box.
-"""
+Uses the discovery method in tools/sscofs-validation/truth_stations.py with the
+region bbox. Writes data/stations.json; see README.md for scoring and provenance."""
 import json, os, requests, time
 
 BOX = (-125.5, 47.0, -122.0, 50.6)  # lonW, latS, lonE, latN (spec §1 region)

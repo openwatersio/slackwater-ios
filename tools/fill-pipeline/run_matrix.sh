@@ -3,10 +3,8 @@
 # data/index.json. Resumable: data/verdicts/<label>.done marks a pair already
 # run, so a killed/retried run only redoes what's left.
 #
-# Forked from spikes/sscofs-field/run_matrix.sh per fill-phase-b-design.md §1 /
-# task-2-brief.md: index/verdicts paths point at tools/fill-pipeline/data/
-# instead of the spike's box-scoped dirs. Same resumability + stale-report
-# pattern (rm -f before each run) carried over unchanged.
+# Region-wide counterpart of tools/sscofs-validation/run_matrix.sh.
+# Inputs and verdicts live in data/; see README.md.
 #
 # MATRIX_INDEX overrides the index file for a filtered/subset run without
 # touching this script; the committed default is the full index.

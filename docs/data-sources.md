@@ -1,7 +1,6 @@
 # Tidal currents outside North America — what can actually ship
 
-Research 2026-08-16. Companion to `docs/superpowers/specs/2026-08-16-global-coverage-design.md`,
-which deliberately excludes currents.
+Source review: August 16, 2026. This reference records dataset constraints and unresolved licensing questions for coverage work. Recheck the linked terms before adopting a source; the app's shipped credits live in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
 
 ## Verdict
 
@@ -10,7 +9,7 @@ will do it.** The architecture that works is the one Slackwater already has — 
 harmonic prediction at surveyed current stations with published slack/max offsets — extended
 country by country. Not spatial interpolation of a global grid.
 
-Three findings invert what we assumed:
+The source-specific findings are:
 
 1. **Germany gives away the best tidal-stream atlas in Europe**, commercial use explicitly
    permitted, €0.
@@ -199,27 +198,6 @@ For **streams** in NL there is a licence conversation with a working precedent (
 data is non-commercial by default, but *"soms is een licentie gratis"*, and Stroomatlas Noordzee
 already ships all 91 charts under Koninklijke Marine licence). In NO, IE and DK there is simply
 no stream product — Kartverket's own page on Saltstraumen admits no reliable measurements exist.
-
-## Recommended sequence
-
-1. **Germany first.** Finished, static, free, commercially licensed, machine-readable. It proves
-   the non-NOAA current path end to end against a dataset with no licence risk at all.
-2. **France currents** next — same shape, one clarifying email first.
-3. **UK via CMEMS/UKMCAS** — real work (fit constituents from a year of `ubar`/`vbar`), free, and
-   we own the output. Good for approaches, honest about not resolving the famous gates.
-4. **UKHO** in parallel, because the answer takes ~20 working days and the price is the single
-   largest unknown in this document.
-
-## Outbound needed — all require Bryan's review before sending
-
-- `LicensingTeam@ukho.gov.uk` — REF061a tidal stream data + atlases, commercial mobile app,
-  offline bundling. **The only way to learn the price.**
-- `diffusion-commercial@shom.fr` — resolve the Licence Ouverte 2.0 declaration against the
-  contradicting "licence commerciale" widget string on the currents pages.
-- `aviso@altimetry.fr` — written confirmation that FES2014 currents are commercially licensable
-  as Adapted Material under Issue 20. **The product pages still carry the superseded Issue-19
-  "scientific purposes only" wording**, so the contradiction is live.
-- Met Office UKMCAS — whether the order form adds terms beyond OGL v3.
 
 ## Sources
 

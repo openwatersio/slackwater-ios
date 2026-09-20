@@ -7,8 +7,8 @@
 # existence marker — a chs-bundle.js/chs-glue.js edit after the fact must
 # re-fail the gate) is what fit_batch.mjs checks for.
 #
-# NOT literal byte-identity. spikes/chs-currents-fit/README.md's own M47
-# finding #4 measured amplitude diffs up to ~9e-16 between node and JSCore on
+# NOT literal byte-identity. The recorded CHS current validation
+# measured amplitude diffs up to ~9e-16 between node and JSCore on
 # identical samples ("machine epsilon (FP reassociation between engines) ...
 # physically nil") — re-checking empirically against these cached fits
 # reproduces the same order of noise (worst measured here: ~6e-13), not
@@ -20,10 +20,10 @@
 #
 # Usage: parity_check.sh [samples-file] [fit-file]
 #   Defaults to the first cached pair under /tmp/fit-validation/reports/ (the
-#   sscofs-field spike matrix's *-210d-samples.json / *-fit.json). If that
-#   directory has nothing, regenerate one pair via the spike's own matrix
+#   SSCOFS validation matrix's *-210d-samples.json / *-fit.json). If that
+#   directory has nothing, regenerate one pair via the validation matrix
 #   runner on a single row:
-#     cd ../../spikes/sscofs-field && \
+#     cd ../../tools/sscofs-validation && \
 #       MATRIX_INDEX=<(jq -c '.[0:1]' samples/index.json) ./run_matrix.sh
 #   then re-run this script.
 set -euo pipefail
@@ -35,7 +35,7 @@ candidates=("$REPORTS"/*-210d-samples.json)
 SAMPLES="${1:-${candidates[0]:-}}"
 if [ -z "${SAMPLES:-}" ]; then
   echo "parity_check.sh: no cached FitValidation samples found under $REPORTS" >&2
-  echo "  regenerate one pair: cd ../../spikes/sscofs-field && MATRIX_INDEX=<(jq -c '.[0:1]' samples/index.json) ./run_matrix.sh" >&2
+  echo "  regenerate one pair: cd ../../tools/sscofs-validation && MATRIX_INDEX=<(jq -c '.[0:1]' samples/index.json) ./run_matrix.sh" >&2
   exit 1
 fi
 FIT="${2:-${SAMPLES/-samples.json/-fit.json}}"

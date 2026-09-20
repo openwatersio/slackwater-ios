@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. FillField provider tests (fill-phase-b-design.md §4,
+// Slackwater — GPL v3. FillField provider tests (tools/fill-pipeline/README.md,
 // task-6-brief.md). The `fill-fixture.bin`/`.json` pair in Fixtures/ was
 // generated with `tools/fill-pipeline/pack.py` against a synthetic 3-element
 // survivors+mesh input (not hand-typed bytes) — the same tool that will

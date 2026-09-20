@@ -1,15 +1,8 @@
 #!/usr/bin/env -S uv run --script --with h5py,fsspec,aiohttp,numpy,requests
-"""Subset SSCOFS element centroids + triangle vertices to the region bbox.
-Downloads one fields file header remotely (ranged reads) -- no full download.
+"""Subset the SSCOFS mesh to the Salish render region.
 
-Forked from spikes/sscofs-field/mesh_subset.py (state provenance: that spike
-ran to completion against real SSCOFS data, see spikes/sscofs-field/README.md)
-per fill-phase-b-design.md §1 / task-1-brief.md: bbox widens the spike's box
-to the render region, and elements now carry triangle vertices (node lon/lat
-via `nv` connectivity) for cell rendering. Legitimate fork, not an import --
-the §4a-grading no-fork rule (spikes/sscofs-field/certify.py) applies only to
-certification, not to this mesh/fetch parameterization.
-"""
+Uses the box-validation connectivity checks from tools/sscofs-validation/mesh_subset.py.
+Writes data/mesh.json; the bbox and output contract are documented in README.md."""
 import json, os, sys, datetime as dt
 import numpy as np, h5py, fsspec
 

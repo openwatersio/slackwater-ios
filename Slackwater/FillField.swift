@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. FillField provider (fill-phase-b-design.md §4): loads
+// Slackwater — GPL v3. FillField provider (tools/fill-pipeline/README.md): loads
 // the committed fill bundle (tools/fill-pipeline/pack.py, format_version 1)
 // and evaluates each element's u/v at a given instant via Neaps's own
 // constituent machinery — the astronomical arguments (V0+u, nodal f) are

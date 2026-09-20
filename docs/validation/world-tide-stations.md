@@ -1,10 +1,6 @@
 # World tide stations — datum validation (2026-08-16)
 
-This is the follow-on to `spikes/chs-currents-fit/README.md`'s method for the tide side
-of world coverage: Task 6 of the world-tide-stations plan took Slackwater from 1,473
-US+Canada tide stations to 2,765 worldwide by adding TICON reference stations outside
-NOAA/CHS. This pass validates that expansion against each station's own publishing
-authority before shipping it under a trusted name.
+This record validates the datum and amplitude gate for worldwide tide coverage against each station's publishing authority. The measurements use the August 16, 2026 dataset snapshot; current station counts and admission decisions live in the generated bundle and its generators. Current-gate timing has separate [validation criteria](chs-currents.md).
 
 ## The question
 
@@ -162,8 +158,8 @@ double high water port — the Solent's geometry produces a secondary high water
 shallow-water M4/M6 overtide interaction, a nonlinear effect a station's harmonic
 constituent set can carry but which stresses the mean-of-extremes comparison this check
 makes. The world-coverage design spec named double high water ports as the likeliest UK
-failure mode *before* this check was run against real data (`docs/superpowers/specs/2026-08-16-global-coverage-design.md`,
-per the plan this task closes out). The check then caught exactly that station. A gate
+failure mode *before* this check was run against real data (the [coverage design in Git history](https://github.com/openwatersio/slackwater-ios/blob/47e9c59971924dfa0a637ac3df395704a88f6b52/docs/superpowers/specs/2026-08-16-global-coverage-design.md),
+§3). The check then caught exactly that station. A gate
 that fails the case its own design doc predicted, on real data, is doing its job rather
 than passing by construction.
 
@@ -245,13 +241,13 @@ that a UK harmonic prediction puts high water at the right minute.
 
 Timing validation needs an independent reference — real observed or independently
 predicted event times to check the model's predictions against, the same way
-`spikes/chs-currents-fit/README.md` scores CHS current-gate fits against CHS's own
+`docs/validation/chs-currents.md` scores CHS current-gate fits against CHS's own
 held-out published events. No such reference is usable for UK tides in an offline app:
 every candidate is licence-restricted. The ADMIRALTY Tidal API's terms cap end-user
 caching at 24 hours (`developer.admiralty.co.uk/TandC` §5.7), which rules out storing
 anything from it on-device; EasyTide's terms separately forbid "systematically
 downloading and storing" its content. Full survey in
-`docs/research/european-currents-licensing-2026-08-16.md`. Until a licence-clean timing
+`docs/data-sources.md`. Until a licence-clean timing
 reference exists, UK (and other non-NOAA/CHS) tide timing ships on the same footing as
 its datum and amplitude validation here — checked against the station's own publishing
 authority's *levels*, unchecked against any independent source for *when* those levels

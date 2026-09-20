@@ -1,9 +1,6 @@
-// Slackwater — GPL v3. Current detail on the iOS scrub model (prototype
-// TidesApp.dc.html): one continuous multi-day strip pans under a fixed
-// centerline, current only — a paired reference port's tide no longer rides
-// the same track (split-scrubbers spec §1). The port stays reachable one tap
-// away via TideAtPortLink, in the scrub card. No day pager; the schedule is a
-// rolling multi-day list, rows scrub cross-day.
+// Slackwater — GPL v3. Current detail: a continuous current-only strip
+// beneath a fixed centerline, with a rolling schedule and paired tide link.
+// Product contract: docs/scrubber.md.
 import SwiftUI
 import Neaps
 

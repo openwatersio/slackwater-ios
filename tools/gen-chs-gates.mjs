@@ -53,7 +53,7 @@ console.log(`${gates.length} derived gate(s): ${gates.map((g) => g.name).join(",
 
 // ---------------------------------------------------------------------------
 // Validated CHS current gates (M47). Only gates that PASSED the fit-validation
-// bar ship (spikes/chs-currents-fit/README.md — 210 d fit vs CHS's own
+// bar ship (docs/validation/chs-currents.md — 210 d fit vs CHS's own
 // published wcp1-events, held out +28..+35 d: slack median ≤15 / worst ≤30
 // min, extrema median ≤20 min, peak-speed median ≤0.5 kn, no reversed axis).
 // A failed gate is ABSENT, not broken-looking. Numbers recorded 2026-07-31.

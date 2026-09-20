@@ -1,7 +1,7 @@
 # Current charts — spec
 
 How to draw a tidal current. Normative: this is the target, whatever any given
-codebase currently does.
+codebase currently does. The [scrubber specification](scrubber.md) defines the current detail presentation and its known implementation gaps; it takes precedence for detail marks and motion.
 
 Covers the signed-velocity curve and its annotations, including derived and
 online gates. §15 covers the low-resolution surfaces — the list card and the
@@ -236,7 +236,7 @@ justification.
 **Draw the instant only when there is no window to draw**, as a hairline:
 
 - a pass so fast the window is shorter than the sample step (§8.3)
-- a derived gate, which knows slack timing and nothing else (§9)
+- a measured-current series with no measurable sub-threshold interval (derived-gate presentation is specified in §9)
 
 A zero-width window must never look like a window; a hairline is the honest
 form. And where a run exists, the run is the mark — the crossing is already
@@ -517,16 +517,11 @@ a lag, often from cruising consensus rather than a published current prediction
 
 On a derived gate:
 
-- The curve is **schematic**: a ±1 shape meaning "flood, then ebb", drawn in a
-  **neutral** colour with the ramp **off**. Running a ±1 shape through a speed
-  scale renders a one-knot gate — a number nobody measured. Colour is state, and
-  the state of this curve's magnitude is *unknown*; the neutral fill is the
-  honest encoding.
+- The curve is a schematic ±1 phase shape. The detail uses blue fill fading to clear at zero and a blue curve, with the speed ramp off. Its height never states a measured speed.
 - **No speed labels, no threshold lines, no window.** A window is defined in
   knots; without knots there is no window, and drawing one would invent the
   number by implication.
-- **Slack instants draw as hairlines** — the one case where the instant is the
-  mark, because it is all that is known (§5.3).
+- Known slack instants draw as green dots on the detail strip, with their times on the axis. There is no dashed zero reference line or duration claim; see [scrubber §13.3](scrubber.md#133-schematic-derived-current).
 - **No set arrow.** The gate knows timing and nothing about set; inventing a
   bearing is the schematic-curve mistake in glyph form. Fall back to a mark that
   claims only phase.

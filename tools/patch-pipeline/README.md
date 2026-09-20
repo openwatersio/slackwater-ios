@@ -2,7 +2,7 @@
 
 Produces `passes/<slug>.json` — refined thalweg, perpendicular cross-sections,
 A(x) at MWL, and continuity scales A(anchor)/A(x) — for a hand-authored
-`inputs/<slug>.json` plus bathymetry tiles. Design: grown-patches spec §2.
+`inputs/<slug>.json` plus bathymetry tiles. The [certification record](passes/CERTIFICATION.md) defines the acceptance bars and retained geometry.
 
 Everything below runs from `tools/patch-pipeline/`. `data/` (tile cache) is
 gitignored; only `inputs/*.json` and `passes/*.json` are committed.
@@ -114,3 +114,5 @@ geometry code did.
 ```sh
 uv run --with pytest,numpy,rasterio pytest -q test_sections.py test_sensitivity.py test_certify.py test_pack.py
 ```
+
+Numbered design-section citations in certification records refer to the [reviewed patch design](https://github.com/openwatersio/slackwater-ios/blob/47e9c59971924dfa0a637ac3df395704a88f6b52/docs/superpowers/specs/2026-08-21-grown-patches-design.md). The committed pass geometry and certification record determine what ships.
