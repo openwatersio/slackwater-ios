@@ -589,6 +589,10 @@ final class ChsFitService: ObservableObject {
         prefetchOnlineGates(Array(onlineDesired.values))
     }
 
+    /// A background entry into the existing run loop, without `retryNow()`'s
+    /// online-state reset.
+    func resumeForBackground() { pump() }
+
     private func pump() {
         guard !running, !networkKillSwitch, Connectivity.shared.online else { return }
         guard queue.nextPending() != nil else { return scheduleRetryPump() }

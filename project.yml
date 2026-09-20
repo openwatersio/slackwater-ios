@@ -108,6 +108,16 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: io.openwaters.slackwater
             CFBundleURLSchemes: [slackwater]
+        # A continued-processing task is what the "Yes" tap buys. Both keys are
+        # required: the mode alone does not let registration succeed, and the
+        # identifier list alone does not grant runtime.
+        UIBackgroundModes: [processing]
+        # Derived, never written out. A literal that drifts from the bundle id
+        # fails registration SILENTLY, and this app has been renamed once.
+        # A handler is registered against a CONCRETE id matching this pattern,
+        # never against the pattern itself.
+        BGTaskSchedulerPermittedIdentifiers:
+          - $(PRODUCT_BUNDLE_IDENTIFIER).downloads.*
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater
