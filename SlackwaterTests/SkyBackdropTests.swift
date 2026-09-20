@@ -5,6 +5,32 @@ import XCTest
 @testable import Slackwater
 
 final class SkyBackdropTests: XCTestCase {
+    func testSolarEclipseDrawsTheMoonOverTheSunAndDarkensTheSky() throws {
+        // 2017-08-21 from Victoria BC: about nine tenths of the sun covered at 17:21 UTC.
+        let peak = try XCTUnwrap(ISO8601DateFormatter().date(from: "2017-08-21T17:21:00Z"))
+        let sky = SkyState(time: peak, latitude: 48.4284, longitude: -123.3656)
+        let sunAlt = try XCTUnwrap(sky.sun?.altDeg)
+        XCTAssertGreaterThan(sky.obscuration, 0.85)
+        XCTAssertLessThan(sky.obscuration, 0.95)
+        XCTAssertGreaterThan(sunAlt, 30)
+        // The sky darkens with the covered fraction; a partial keeps daylight's paint family.
+        XCTAssertLessThan(sky.litAltitude, sunAlt)
+        XCTAssertGreaterThan(sky.litAltitude, -9)
+        XCTAssertNotEqual(sky.paint, skyPaint(sunAltitude: sunAlt))
+        // An hour later the discs are apart again and nothing is darkened.
+        let after = SkyState(time: peak.addingTimeInterval(2 * 3600), latitude: 48.4284, longitude: -123.3656)
+        XCTAssertEqual(after.obscuration, 0)
+        XCTAssertEqual(after.litAltitude, try XCTUnwrap(after.sun?.altDeg))
+        // The glare fade is overridden while the moon is in front of the sun.
+        XCTAssertEqual(moonGlareOpacity(distance: 0, obscuration: 0.01), 1)
+        XCTAssertEqual(moonGlareOpacity(distance: 0, obscuration: 0), 0)
+        // Totality reaches nautical twilight; a half-covered sun barely moves; below it, nothing moves.
+        XCTAssertEqual(eclipsedSunAltitude(40, obscuration: 1), -9)
+        XCTAssertGreaterThan(eclipsedSunAltitude(40, obscuration: 0.5), 36)
+        XCTAssertEqual(eclipsedSunAltitude(-12, obscuration: 1), -12)
+        XCTAssertEqual(eclipsedSunAltitude(40, obscuration: 0), 40)
+    }
+
     func testMoonShadingStaysContinuousAcrossMidnightSunWrap() throws {
         let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-02T07:44:00Z"))
         var previous = SkyState(time: start, latitude: 48.424, longitude: -123.371)
