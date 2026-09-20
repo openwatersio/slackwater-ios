@@ -6,7 +6,7 @@
 // instead of explaining three download systems.
 import Foundation
 
-enum DownloadTier: String, CaseIterable {
+enum DownloadTier {
     /// Exactly the stations the list is rendering. Downloads with no prompt.
     case inView
     /// Everything inside `nearbyRadiusKm`. Needs a yes — and that yes is what
@@ -38,6 +38,41 @@ enum DownloadTier: String, CaseIterable {
         case .everything:
             return distanceKm(job.latitude, job.longitude, origin.lat, origin.lon)
                 <= ChsFitService.autoFitRadiusKm
+        }
+    }
+}
+
+/// The stations the list was rendering when the question was framed.
+///
+/// Captured ONCE per place, because three separate things re-order the list
+/// underneath it: `prioritize()` runs on every location update, so fix jitter
+/// re-ranks constantly; iCloud delivers favorites after launch; and the series
+/// filter chips change what Near Me renders. A set that cannot change cannot
+/// flap, so the prompt needs no debounce, timer or suppression window.
+struct DownloadCohort {
+    private(set) var ids: Set<String> = []
+    /// The nearest station's id. Its identity changing is what "a new place"
+    /// means — not the fix moving, which happens constantly.
+    private(set) var heroID: String?
+
+    /// Take a cohort if this is a new place. Returns true when it did, which
+    /// is the caller's signal that the question may be asked again.
+    mutating func capture(ids newIDs: [String], heroID newHero: String?) -> Bool {
+        guard !newIDs.isEmpty else { return false }
+        guard self.ids.isEmpty || newHero != heroID else { return false }
+        self.ids = Set(newIDs)
+        self.heroID = newHero
+        return true
+    }
+
+    /// Every captured station has finished, one way or the other. `.failed`
+    /// counts: another attempt gets the same answer, and holding the user at
+    /// "downloading" for a station that cannot finish is a lie.
+    func settled(in queue: ChsQueue) -> Bool {
+        guard !ids.isEmpty else { return false }
+        return ids.allSatisfy { id in
+            guard let status = queue.status(id) else { return false }
+            return status == .ready || status == .failed
         }
     }
 }

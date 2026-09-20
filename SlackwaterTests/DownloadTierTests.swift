@@ -41,4 +41,57 @@ final class DownloadTierTests: XCTestCase {
     func testNearbyRadiusIsTwentyFive() {
         XCTAssertEqual(DownloadTier.nearbyRadiusKm, 25)
     }
+
+    func testCohortIsCapturedOnceAndIgnoresLaterReRanking() {
+        var cohort = DownloadCohort()
+        XCTAssertTrue(cohort.capture(ids: ["a", "b"], heroID: "a"))
+        XCTAssertEqual(cohort.ids, ["a", "b"])
+
+        // A fix moves a few metres: same place, list re-ranks, cohort holds.
+        XCTAssertFalse(cohort.capture(ids: ["b", "a", "c"], heroID: "a"))
+        XCTAssertEqual(cohort.ids, ["a", "b"],
+                       "fix jitter must not grow the automatic tier")
+    }
+
+    func testCohortIsRecapturedWhenThePlaceChanges() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["a", "b"], heroID: "a")
+        XCTAssertTrue(cohort.capture(ids: ["x", "y"], heroID: "x"),
+                      "a new nearest station is a new place and a new question")
+        XCTAssertEqual(cohort.ids, ["x", "y"])
+    }
+
+    func testCohortIsSettledOnlyWhenEveryMemberIsDone() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["a", "b"], heroID: "a")
+
+        var queue = ChsQueue([job("a", 48.43, -123.37), job("b", 48.44, -123.38)])
+        XCTAssertFalse(cohort.settled(in: queue))
+
+        queue.set("a", .ready)
+        XCTAssertFalse(cohort.settled(in: queue))
+
+        // Failed counts as done: another attempt gets the same answer, and the
+        // user should not be held at "downloading" by a station that cannot.
+        queue.set("b", .failed)
+        XCTAssertTrue(cohort.settled(in: queue))
+    }
+
+    func testJobsAddedAfterCaptureDoNotUnsettleTheCohort() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["a"], heroID: "a")
+        var queue = ChsQueue([job("a", 48.43, -123.37)])
+        queue.set("a", .ready)
+        XCTAssertTrue(cohort.settled(in: queue))
+
+        queue.add(job("later", 49.0, -123.0))
+        XCTAssertTrue(cohort.settled(in: queue),
+                      "accepting a wider tier must not re-open the question")
+    }
+
+    func testAnEmptyCohortIsNotSettled() {
+        let cohort = DownloadCohort()
+        XCTAssertFalse(cohort.settled(in: ChsQueue()),
+                       "nothing captured yet is not the same as finished")
+    }
 }
