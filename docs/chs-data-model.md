@@ -35,7 +35,7 @@ Both halves of that sentence constrain more work than people expect.
 Stations are resolved **by position, never by name** — nearest IWLS station
 serving the required series within 3 km of the registry position
 (`ChsFitService.swift`, and see the resolve rule in
-`spikes/chs-currents-fit/README.md`).
+`docs/validation/chs-currents.md`).
 
 All of these are point series at a gauge. None is a field.
 
@@ -158,7 +158,7 @@ ever. Lag offsets cannot produce a velocity.
 The M47 pass scored each candidate gate's **fitted** slacks against CHS's own
 published `wcp1-events`, held out 28–35 days into the future, on the app's exact
 shipping path. The bar was set before scoring
-(`spikes/chs-currents-fit/README.md`):
+(`docs/validation/chs-currents.md`):
 
 | Quantity | Bar |
 |---|---|
@@ -171,9 +171,7 @@ shipping path. The bar was set before scoring
 Slack is the safety quantity — a gate is transited *at slack* — so it gets the
 tightest numbers.
 
-**Gates that failed are not bundled at all: absent, not broken-looking.** That is
-the house rule for Canadian coverage generally — coverage stops where we can
-still tell when the numbers are wrong.
+A failed fit never ships as a fitted prediction. An online gate can retain its identity and display official CHS samples, with fetched-coverage checks and provenance. A derived gate has its separate timing-only model.
 
 The consequence for any future data source: a shipped gate's numbers have been
 measured against CHS's published truth. An unvalidated source that disagrees with
@@ -181,95 +179,18 @@ one does not get to quietly win.
 
 ---
 
-## 6. Why there is no current field, and why interpolation is not a substitute
+## 6. Current fields and their limits
 
-Recurring question, settled on #57, recorded here so it stays settled.
+IWLS publishes predictions at stations, not a gridded velocity field. Interpolating between stations would paint calm water through unmodeled passes and spread narrow-channel currents across unrelated open water. The map must leave unsupported water without a current claim.
 
-Products like PredictWind render a **gridded hydrodynamic model** — velocity at
-every point of water. Nothing in the CHS/IWLS pipeline provides that; it serves
-predictions at gauges. Our map has points.
+The app's current-field data has two sources:
 
-The tempting middle path is interpolating a field between our stations. It is
-wrong, and wrong asymmetrically:
+- The [fill pipeline](../tools/fill-pipeline/README.md) fits SSCOFS surface u/v independently and ships only certified speed-fill elements. A station passes when its best scoreable element has median peak-speed error ≤ 0.5 kn. Extrema below 0.75 kn are unscoreable. An element's nearest scoreable station must pass and lie within 3 km; a nearer failed station masks it. Record sensitivity at 2, 3, and 5 km. Final fits require R² ≥ 0.8 on both axes. The shipping JavaScript fitter decides survival; NumPy fits are prefilters and sizing estimates.
+- The [patch pipeline](../tools/patch-pipeline/README.md) uses bathymetric cross-sections and a validated station to bound a local speed-and-direction field. Its committed [certification record](../tools/patch-pipeline/passes/CERTIFICATION.md) records retained geometry and rejected passes. Patch magnitude is depth-averaged and subject to the documented placement, datum, and phase limitations.
 
-- Tidal currents are set by **local constriction geometry**. Race Passage runs
-  hard because of one specific narrows; a couple of kilometres away in the strait
-  it does not.
-- Interpolating would paint fast water across open water where there is none —
-  embarrassing.
-- And it would paint **calm water through every pass we have no gate for** —
-  which tells someone an unmodelled pass is safe. That is the dangerous
-  direction, and it is the same guess the app already refuses to make at Sechelt.
+Both provide speed context. Slack timing and transitability belong to the station prediction and its validated windows. The field ramp contains no green. Missing or rejected elements remain absent, never calm, and interpolation must not paint across certification boundaries. Keep raw-source and derived-bundle provenance with the generated resources; a model refit is a release decision.
 
-### The gridded-model option: closed for WebTide-era meshes (#99), reopened for SSCOFS (2026-08-20)
-
-The obvious next thought is a different **data product** — one storing harmonic
-constants per mesh node, which the engine could evaluate offline the way it
-already evaluates TICON constants. #99 went looking and, among the
-datasets it measured, found none viable — **resolution, failing in the dangerous
-direction.** (The 2026-08-20 re-measurement below narrows that verdict to
-WebTide-era meshes and sub-mesh throats.)
-
-The mechanism was fine. WebTide really does store per-node velocity harmonics;
-the NE Pacific mesh `ne_pac4` is 51,330 nodes and **12.6 MB**, smaller than the
-sprites. It fails on everything after that:
-
-| Measured | Value |
-|---|---|
-| `ne_pac4` node spacing, Active Pass | **492 m** (pass is ~500 m wide) |
-| `ne_pac4` node spacing, Dodd Narrows | **493 m** (throat is ~60–80 m) |
-| Dodd Narrows, sampled at the charted throat | **2.62 kn** |
-| Dodd Narrows, CHS Tide & Current Tables Vol 5 | **9.5 kn** |
-| Our own peak-speed bar (§5) | ≤ 0.5 kn median error |
-
-The most defensible sampling method gives the worst answer, and the error is
-**4–14× the bar we already enforce** — at a gate that currently *passes* at
-0.16 kn peak-speed error and ships offline. Three of four passes returned
-"outside mesh" entirely, because CHS coordinates rounded to whole arc-minutes
-are coarser than the mesh's wet/dry structure.
-
-Two more, independent of resolution: `ne_pac4` carries 8 astronomical
-constituents and **no M4/M6 overtides** — precisely the shallow-water harmonics
-that create narrow-pass flood/ebb asymmetry, where our fitter uses a
-23-constituent basis. And it truncates at **49.686 °N**, leaving 6 of our 11
-validated gates outside it — Seymour Narrows, our best-validated gate, by 74 km.
-
-Licence closes what resolution leaves: WebTide's data carries no licence at all
-and its software is non-commercial; TPXO and FES2022 are non-commercial; ADCIRC
-publishes no terms, which §3 says is worse than "no". The pattern is that the
-licences permitting commercial bundling are attached to the datasets that cannot
-resolve.
-
-**The finding, as corrected 2026-08-20:** the ~500 m convergence was a property of
-`ne_pac4`'s era, not of gridded models. NOAA's operational SSCOFS mesh, measured
-with the same method ([#99 comment](https://github.com/openwatersio/slackwater-ios/issues/99#issuecomment-5358204673)),
-validates at 0.86–1.00 of published peak speeds at Active Pass, Seymour Narrows,
-Deception Pass and Tacoma Narrows, covers the Canadian Strait of Georgia to 51 °N,
-and is public domain. What survives of the original finding — permanently — is the
-**sub-mesh throat failure**: Dodd Narrows (60–80 m against ~500 m elements) reads
-0.24× in SSCOFS exactly as it failed in WebTide. Sub-mesh throats are a station
-problem; the rest of the water is not.
-
-The standing ruling is therefore the **composite** (spec:
-`docs/superpowers/specs/2026-08-20-current-field-composite-design.md`): a
-harmonic backdrop fitted by us from SSCOFS output, rendered only in regions
-certified against the station truth set; bounded fields grown from validated
-gates inside sub-mesh passes; visible no-data everywhere else. Interpolating
-between stations remains ruled out; an uncertified model field remains ruled
-out; absence still renders as neutral, never calm.
-
-The SSCOFS backdrop itself was spike-tested 2026-08-20 and failed certification —
-slack timing missed the bar at every station in the box (see
-`spikes/sscofs-field/README.md`) — so the standing ruling ships grown patches only
-("Plan B"). The speed-only fill question the spike raised was subsequently ruled
-by the owner: **approved** — fill ships where speed certifies, the ramp never
-contains green, and timing/transitability authority stays with gates and patches
-(see the spec's status block for the full ruling).
-
-Coverage work still routes to more validated gates (#9) — every new gate also
-certifies backdrop and seeds a grown patch.
-
----
+The [SSCOFS validation harness](../tools/sscofs-validation/README.md) records why speed certification is distinct from timing certification: none of the 53 scoreable stations in its 60-day box experiment passed all five current-fit bars. A fine-looking mesh is not proof of slack accuracy. Dodd Narrows is a negative control: a throat about 60–80 m wide is below the resolving scale of roughly 500 m elements. A model field cannot overrule a validated gate there.
 
 ## 7. Consequences that keep catching people
 
@@ -313,5 +234,5 @@ The practical list. Each of these has cost someone time.
 | NOAA tide stations (1,429) | `Slackwater/Resources/stations.json` |
 | NOAA current stations (842) | `Slackwater/Resources/currents.json` |
 | Regeneration | `cd tools && npm install && npm run build:data` |
-| Fit validation history | `spikes/chs-currents-fit/README.md` |
+| Fit validation criteria and evidence | `docs/validation/chs-currents.md` |
 | Peak-magnitude distributions | `tools/ramp-domain.mjs` |

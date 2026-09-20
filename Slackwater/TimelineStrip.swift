@@ -1,12 +1,6 @@
-// Slackwater — GPL v3. The continuous pan-under-centerline scrubber, the iOS
-// model from prototype/TidesApp.dc.html (DCLogic innerChart / chartEl /
-// onTideScroll / magnet / tableEl). The reading line is FIXED at the viewport
-// center; dragging pans a fixed multi-day timeline strip (-48h on the current
-// week only, always +180h, 18pt per hour) underneath it, so nights bleed across
-// day boundaries. Native UIScrollView supplies the momentum; a "magnet" pass
-// after the scroll settles snaps a nearby stop (tide turn, slack/max, sun
-// event) under the centerline when it's within 46pt. One implementation for
-// the tide-only and current-only details.
+// Slackwater — GPL v3. Continuous timeline beneath a fixed centerline.
+// Native scrolling, tap selection, and magnetic settling at 18 points/hour.
+// Product contract: docs/scrubber.md. Chunked data and scale: TimelineChunks.swift.
 import Almanac
 import Synchronization
 import SwiftUI

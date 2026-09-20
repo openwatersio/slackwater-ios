@@ -1,24 +1,15 @@
 #!/usr/bin/env -S uv run --script --with numpy,requests
-"""Project region-mesh element u/v onto each truth station's flood axis;
-export fitTides samples + held-out truth events.
+"""Project region-mesh u/v onto each truth station's flood axis and export
+fitTides samples and held-out events to data/index.json, data/samples/, and data/events/.
 
-Forked from spikes/sscofs-field/make_samples.py (state provenance: that spike
-ran to completion against real SSCOFS data, see spikes/sscofs-field/README.md)
-per fill-phase-b-design.md §1 / task-2-brief.md: paths point at
-tools/fill-pipeline/data/ (region mesh + 190-day corpus + region stations)
-instead of the spike's box-scoped dirs, and the index/events layout is
-data/index.json + data/samples/ + data/events/ per the task interface.
-`to_sample`/`project_signed_kn` are imported from the spike rather than
-reimplemented, so there is exactly one epoch-ms / projection rule in the repo.
-Legitimate fork, not an import for the rest -- the §4a-grading no-fork rule
-(spikes/sscofs-field/certify.py) applies only to certification.
-"""
+The shared projection and epoch-ms sample rules live in tools/sscofs-validation/make_samples.py.
+See README.md for corpus and station inputs."""
 import glob, json, os, sys, datetime as dt
 import numpy as np, requests
 
 # One epoch-ms sample rule and one flood-axis-projection rule, period --
 # import rather than reimplement (chs-glue.js:4 contract: {t: epoch-ms, v: signed knots}).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "spikes", "sscofs-field"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "sscofs-validation"))
 from make_samples import to_sample, project_signed_kn  # noqa: E402
 
 IWLS = "https://api-iwls.dfo-mpo.gc.ca/api/v1"

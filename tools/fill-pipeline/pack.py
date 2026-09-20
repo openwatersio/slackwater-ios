@@ -2,7 +2,7 @@
 """Slackwater fill-pipeline — bundle pack tool (format v1). Packs
 data/survivors.json (Task 4's output; join key `i` = full-mesh element
 index) + data/mesh.json into Slackwater/Resources/fill-<region>.bin +
-sidecar JSON header, per fill-phase-b-design.md §3 / task-5-brief.md.
+sidecar JSON header. The format and reproduction steps are documented in README.md.
 
 Binary layout, little-endian, elements concatenated (no per-file header --
 the offsets table lives in the sidecar JSON, which is read once at bundle
@@ -24,7 +24,7 @@ axis-X max amplitude, 0.005 kn). u and v get separate kept lists in the
 shipped format, so there is no reason to couple them at pack time.
 
 This deliberately differs from composite-design.md §10's bundle-sizing
-estimate (spikes/sscofs-field/prune_proof.py:energy_floor_keep), which
+estimate (tools/sscofs-validation/prune_proof.py:energy_floor_keep), which
 keeps a constituent for BOTH axes if EITHER axis clears -- a sizing-time
 simplification (one shared kept-set is cheaper to reason about when
 estimating a byte budget), not the shipped rule. Pruning independently
@@ -39,7 +39,7 @@ import struct
 from datetime import datetime, timezone
 
 # 23-name shipping basis, canonical order pinned to the constituent id
-# table below. Sourced verbatim from spikes/sscofs-field/prune_proof.py:34-35
+# table below. Sourced verbatim from tools/sscofs-validation/prune_proof.py:34-35
 # (BASIS_NAMES) -- that script already proved all 23 resolve against
 # Slackwater/Resources/chs-bundle.js's own embedded defineConstituent(...)
 # records (node vm, no fallback to a second-sourced hand-typed table).
@@ -185,7 +185,7 @@ def build_header(*, mesh, mesh_path, stations_path, corpus_dir, survivors,
         "generated": generated,
         "element_count": len(offsets) - 1,
         "constituents": {str(i): name for i, name in enumerate(BASIS_NAMES)},
-        "constituent_basis_source": "spikes/sscofs-field/prune_proof.py:34-35",
+        "constituent_basis_source": "tools/sscofs-validation/prune_proof.py:34-35",
         "bin_sha256": sha256_bytes(bin_bytes),
         "offsets": offsets,
     }

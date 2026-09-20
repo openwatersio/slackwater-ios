@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Slackwater — GPL v3. Fill-pipeline batch fitter: the app's own committed
 // chs-bundle.js + chs-glue.js, run in a node vm context (precedent:
-// spikes/chs-currents-fit/node-control.mjs — same artifacts, same fitTides()
+// tools/fill-pipeline/parity_check.sh — same artifacts, same fitTides()
 // call). Pure stdin->stdout JSONL filter; no npz reading, no resumability —
 // that's the Python driver's job (T4's survivors.py streams samples in and
 // skips elems already present in its output).

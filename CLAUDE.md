@@ -2,11 +2,11 @@
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first for policy and basics: branching, PRs, review, CI, and how to run the tests.
 
-## Plans and specs are intent, not source
+## Keep only lasting documentation
 
-The Swift in `docs/superpowers/` plans and specs has never been compiled. Treat it as a statement of what to build, not known-good code — verify its code and factual claims against the repo before following them, and say so when a brief is wrong.
+Follow CONTRIBUTING.md's documentation policy. Use ignored `.superpowers/` for plans, task briefs, and spike output, including when a workflow suggests `docs/superpowers/`. Keep proposed work in its issue or PR; a merged proposal is not evidence that the behavior ships. Promote lasting decisions into the relevant living document and reusable experiment code into `tools/` with checks. Do not commit completed implementation diaries or obsolete prototypes.
 
-Before enforcing a "rule", find it in this repo's tests or code. Sibling repos (`slackwater-web` especially) have different conventions, and plans sometimes import them.
+Verify claims against this repo's tests and code. Sibling repos can have different conventions. The detail scrubber's maintained contract is [docs/scrubber.md](docs/scrubber.md).
 
 ## Generated data is a chain
 
@@ -14,9 +14,9 @@ The JSON files in `Slackwater/Resources/` are committed generated artifacts (see
 
 A stale `@neaps/tide-database` pin is a slug hazard. A bump can swap stations in the bundle (one multi-week bump traded `noaa/8723887` for `noaa/8655875`), and `tools/gen-slugs.mjs` fails outright on a station with no published slug. Fix it upstream: run station-metadata's `slugs` command, release, then bump the pin here. Bumped often, each swap is a one-station fix.
 
-## The window: `anchor` drives geometry, `today` drives language
+## The window: `anchor` drives the schedule, `today` drives language
 
-`anchor` — the local midnight the window hangs from — drives `start`, `end`, `days`, `scheduleRange`, `visibleDays`. `today` — the real local midnight — drives only Today/Tomorrow labels, the now-marker, and return-to-now. Never geometry. `Timeline.window(anchor:)` (`Slackwater/TimelineStrip.swift:131`) is the **only** definition of the window; do not re-derive it. The width is a constant 228h with an unconditional 48h back-pad, for every anchor.
+`anchor` is the station-local midnight of the schedule week. `today` drives Today/Tomorrow labels; `now` drives the reference dot and return-to-now. Tide, harmonic-current, and derived-gate details use `TimelineWindowStore`'s seven-calendar-day chunks for continuous scrolling. Their loaded span is independent of the schedule anchor. The online-current detail remains bounded by `Timeline.window(anchor:)`: 228 elapsed hours with an unconditional 48-hour back-pad. That function also defines when the continuous details re-anchor their schedule after a settled scrub. Do not re-derive either window.
 
 ## A scrubber change has four consumers
 

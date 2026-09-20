@@ -116,6 +116,14 @@ Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no loc
 
 `gen-chs-stations.mjs` stays out of CI because it is the only generator that needs the network; its artifact is trusted as committed.
 
+## Documentation
+
+Keep documentation that has an ongoing reader: product contracts, architecture constraints, operating procedures, release notes, and validation evidence. Describe the current behavior and update the existing document when it changes. [docs/README.md](docs/README.md) is the index.
+
+Put implementation plans, task checklists, session reports, and spike scratch in ignored `.superpowers/` or `/tmp`. Use issues and PRs for proposed work and review history. Before removing a completed experiment, move any lasting constraints or measurements into the appropriate living document. Code imported by a maintained pipeline belongs under `tools/`, with its reproduction instructions and checks. Generated data provenance and release records remain durable evidence.
+
+A scrubber behavior change updates [docs/scrubber.md](docs/scrubber.md) in the same PR and reviews all four detail consumers.
+
 ## AI agents
 
 Agents work here under the same policy as everyone else, with one addition: an agent never merges its own PR. Docs-only work gets a PR like anything else — the `What changed` job keeps it off the macOS lane, and a docs PR that books one is a bug in that job, not a reason to skip review. `CLAUDE.md` at the repo root carries the rest — the constraints that aren't discoverable from the code itself.

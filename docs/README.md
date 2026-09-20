@@ -1,23 +1,38 @@
-# Docs
+# Documentation
 
-Two kinds of documents live here, split by shelf life:
+Documentation here describes the current product, maintained operating procedures, and evidence needed to trust its predictions. Update the relevant document with the implementation. Completed plans, session reports, screenshots used only for review, and superseded prototypes belong in Git history or pull requests.
 
-**Living docs** (root) — kept current; when reality changes, these change:
+## Product and data contracts
 
-| Doc | What |
+| Document | Purpose |
 |---|---|
-| [`chs-data-model.md`](chs-data-model.md) | What Canada gives us and what it doesn't — IWLS series, the licensing posture that shapes the architecture, the four tiers of current coverage, what "validated" means, why there is no current field. Standalone: read it before scoping anything touching Canadian coverage |
-| [`appstore-metadata.md`](appstore-metadata.md) | The App Store listing — name, subtitle, keywords, description, privacy answers, accessibility labels — and the rules each field is written against. A PR that changes coverage, a network host or an accessibility gap changes this too |
+| [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
+| [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
+| [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |
+| [App Store metadata](appstore-metadata.md) | Listing copy, privacy answers, and accessibility declarations |
+| [Licensing](licensing.md) | App licensing and the contributor agreement |
 
-**Research snapshots** ([`research/`](research/)) — dated, point-in-time; superseded by newer
-snapshots rather than edited:
+## Operating procedures and evidence
 
-| Doc | What |
+| Document | Purpose |
 |---|---|
-| [`design-readiness-2026-07-22.md`](research/design-readiness-2026-07-22.md) | Pre-build design review — verdict: ready; loose ends listed blocking → parked |
-| [`european-currents-licensing-2026-08-16.md`](research/european-currents-licensing-2026-08-16.md) | Whether European current data can be bundled or fetched, authority by authority |
+| [TestFlight](testflight.md) | Release setup and signing |
+| [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`; retained release history |
+| [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
+| [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
+| [Generated resources](../Slackwater/Resources/README.md) | Bundle inputs, generation order, and provenance |
+| [Fill pipeline](../tools/fill-pipeline/README.md) | SSCOFS speed-fill certification, fitting, and packing |
+| [SSCOFS validation](../tools/sscofs-validation/README.md) | Reusable validation tools imported by the fill pipeline |
+| [Patch pipeline](../tools/patch-pipeline/README.md) | Bathymetry, bounded current patches, and certification evidence |
+| [Feedback intake](../services/testflight-feedback/README.md) | Private TestFlight feedback setup, storage, and recovery |
 
-Strategy, market and competitor research, the comparison-page plan and the product landscape are private and live in the [Open Waters planning repo](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Technical reasoning needed to work on this app lives here; read [the CHS data model](chs-data-model.md#3-the-licence-architecture--the-load-bearing-section) before changing how Canadian data is stored, bundled or served.
+## Project structure
+
+`Slackwater/` contains the app, `SlackwaterWidgets/` the extension, and `SlackwaterTests/` and `SlackwaterUITests/` their checks. `project.yml` defines the generated Xcode project. `scripts/` holds build, test, and release entry points; `tools/` holds data generators and maintained validation pipelines. Service-specific code and docs live together under `services/`.
+
+Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and [CLAUDE.md](../CLAUDE.md) for agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
+
+Strategy, market research, and future product planning live in the private [planning repository](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Reviewed proposals remain available in their PRs: [download tiers #453](https://github.com/openwatersio/slackwater-ios/pull/453), [catalog delivery #297](https://github.com/openwatersio/slackwater-ios/pull/297), and [alerts #371](https://github.com/openwatersio/slackwater-ios/pull/371). A merged design proposal alone does not mean its behavior ships.
 
 ## Archived source citations
 
@@ -28,4 +43,4 @@ Bare `chs-online-design` citations in `Slackwater/ChsStation.swift`, `tools/gen-
 | `chs-online-design` §2 | [Archived CHS online design](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#2-the-licence-architecture) | The per-user fetch and local-storage rationale |
 | `chs-online-design` §6a | [Archived current-station selection rule](https://github.com/sailingnaturali/slackwater/blob/51648731c02addef265f4839c9632145be962ad0/docs/superpowers/specs/2026-07-21-chs-online-design.md#6a-currents-the-rule-already-in-the-data) | Which current stations belong in the registry; this section does not specify a maxima-timing tolerance |
 
-The fit spike's numerical acceptance criteria are in its own [threshold table](../spikes/chs-currents-fit/README.md#the-bar-set-before-scoring).
+The current-fit acceptance criteria and measurements are in [CHS current validation](validation/chs-currents.md).

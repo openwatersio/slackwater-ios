@@ -22,8 +22,8 @@ jq -c '.[]' "$INDEX" | while read -r row; do
   report="${REPORTS}/${label}-210d-report.json"
   rm -f "$report"
   (cd ../../tools/FitValidation && swift run -c release fit-validation \
-    --samples "../../spikes/sscofs-field/$(jq -r .samples <<<"$row")" \
-    --events  "../../spikes/sscofs-field/$(jq -r .events  <<<"$row")" \
+    --samples "../../tools/sscofs-validation/$(jq -r .samples <<<"$row")" \
+    --events  "../../tools/sscofs-validation/$(jq -r .events  <<<"$row")" \
     --flood "$(jq -r .flood <<<"$row")" --ebb "$(jq -r .ebb <<<"$row")" \
     --label "$label") 2>&1 | tee "results/${label}.log" || true
   # The tool's own 210d report (the window its exit code reflects) is the

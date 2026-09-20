@@ -1,15 +1,9 @@
 #!/usr/bin/env -S uv run --script --with h5py,fsspec,aiohttp,numpy
-"""Fetch DAYS days of hourly surface u/v for the region mesh's elements.
-Resumable: skips existing day shards.
+"""Fetch hourly SSCOFS surface u/v for the region mesh into data/corpus/.
 
-Forked from spikes/sscofs-field/fetch_corpus.py (state provenance: that spike
-ran to completion against real SSCOFS data, see spikes/sscofs-field/README.md)
-per fill-phase-b-design.md §1 / task-1-brief.md: element index comes from the
-region mesh (data/mesh.json, region N) instead of the spike's box, and DAYS is
-a required argument for the 190-day production run. Legitimate fork, not an
-import -- the §4a-grading no-fork rule (spikes/sscofs-field/certify.py) does
-not apply to this mesh/fetch parameterization.
-"""
+Uses the ranged-read approach in tools/sscofs-validation/fetch_corpus.py.
+The region's element indices come from data/mesh.json. Pass the number of days
+on the command line; the production corpus uses 190 days. See README.md."""
 import json, os, sys, datetime as dt, concurrent.futures as cf
 import numpy as np, h5py, fsspec
 

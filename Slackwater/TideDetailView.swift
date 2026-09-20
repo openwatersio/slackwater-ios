@@ -1,10 +1,6 @@
-// Slackwater — GPL v3. Tide detail on the iOS scrub model (prototype
-// TidesApp.dc.html, not the web's): a FIXED reading line at the center of the
-// strip, the continuous multi-day curve panning underneath it. No day pager —
-// free panning plus return-to-now. The schedule below is a
-// rolling list over `Timeline.scheduleRange` — the week hanging off the
-// anchor, and the strip is `Timeline.window` over the same anchor — with day
-// headers; rows scrub, cross-day.
+// Slackwater — GPL v3. Tide detail: a continuous strip beneath a fixed
+// centerline and a rolling schedule anchored to the selected local week.
+// Product contract: docs/scrubber.md.
 import SwiftUI
 import Neaps
 

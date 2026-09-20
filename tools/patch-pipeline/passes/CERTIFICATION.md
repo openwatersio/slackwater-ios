@@ -14,7 +14,7 @@ cut to nothing by the second (Deception).
 | dodd-narrows | `[18, 18]` (flare only; sensitivity never runs) | 0 | **no** | anchor instability 19.7–20.5 % across all three sensitivity variants, blows the 10 % bar |
 | porlier-pass | `[20, 25]` (flare only; sensitivity never runs) | 0 | **no** | anchor instability 12.7 % on the `datum=CD` axis (blows the 10 % bar) + springs plausibility +46 % over published |
 
-Three of five ship. The §6a RUN method-certification record for the two US
+Two of five ship. The §6a RUN method-certification record for the two US
 passes (Tacoma, Deception) is immediately below; the §6b BC record (Seymour,
 Dodd, Porlier, including the Dodd/Porlier failures in detail) follows it
 further down this file.
@@ -316,8 +316,8 @@ it is noted here because a reader comparing 960 m to a chart will otherwise assu
 - Tile windows, the archive's sha256s, the datum finding and the OGL – Canada licence note
   are in `data/tiles/<slug>/MANIFEST.json` (gitignored, like all tiles).
 - Review plots (§6b.4 owner bounds review):
-  `docs/superpowers/specs/grown-patches-plots/plot-tacoma-narrows.png`,
-  `docs/superpowers/specs/grown-patches-plots/plot-deception-pass.png`,
-  `docs/superpowers/specs/grown-patches-plots/plot-seymour-narrows.png`,
-  `docs/superpowers/specs/grown-patches-plots/plot-dodd-narrows-throat.png`,
-  `docs/superpowers/specs/grown-patches-plots/plot-porlier-pass.png`.
+  [plot-tacoma-narrows.png](plots/plot-tacoma-narrows.png),
+  [plot-deception-pass.png](plots/plot-deception-pass.png),
+  [plot-seymour-narrows.png](plots/plot-seymour-narrows.png),
+  [plot-dodd-narrows-throat.png](plots/plot-dodd-narrows-throat.png),
+  [plot-porlier-pass.png](plots/plot-porlier-pass.png).
