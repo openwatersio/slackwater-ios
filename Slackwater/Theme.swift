@@ -974,6 +974,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // open station re-pushes the same value, so nothing else re-appears.
             .onAppear(perform: applyLinkedInstant)
             .onChange(of: LinkedInstant.shared.pending) { _, _ in applyLinkedInstant() }
+            // A waiting page or an unavailable station has no curve, no sky,
+            // no moon tile and no scrubber — nothing to teach — so the tour
+            // stays armed and fires on the next detail that does.
+            .onChange(of: timeline?.revision, initial: true) { _, _ in
+                guard let days = timeline?.days else { return }
+                TourCoach.shared.begin(
+                    on: favoriteId,
+                    skySteps: tourStarsTime(days: days, after: appNow()) != nil)
+            }
+            .onDisappear {
+                if TourCoach.shared.station == favoriteId { TourCoach.shared.finish() }
+            }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
                     // Park the centerline on the picked week when it isn't already

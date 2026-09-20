@@ -223,6 +223,11 @@ struct StationListView: View {
         // Search covers everything — list, map, and (regular) the detail pane.
         .overlay { if searching { searchOverlay } }
         .onAppear {
+            // Captured before the branches below consume and clear both —
+            // a search bypass or a deep link must win the tour push, since
+            // that user asked for something specific.
+            let hadSearchHandoff = gateSearchHandoff
+            let hadDeepLink = pendingDeepLink != nil
             loc.refreshIfAuthorized()
             if gateSearchHandoff {
                 gateSearchHandoff = false
@@ -231,6 +236,14 @@ struct StationListView: View {
             if let url = pendingDeepLink {
                 pendingDeepLink = nil
                 handleDeepLink(url)
+            }
+            // First run on the location path: the gate has resolved (a fix or
+            // a denial) and nothing else has claimed the tour, so bring the
+            // user to a detail that can teach. A bundled station needs no
+            // download, so this works offline and with location denied.
+            if TourCoach.shared.armed, !hadSearchHandoff, !hadDeepLink,
+               let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] {
+                open(item)
             }
         }
         // First connected launch: the auto-fit set around where this list is
