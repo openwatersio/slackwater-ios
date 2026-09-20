@@ -9,7 +9,6 @@ Documentation here describes the current product, maintained operating procedure
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
 | [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |
-| [Data sources](data-sources.md) | Source licensing research and unresolved questions to recheck before expanding coverage |
 | [App Store metadata](appstore-metadata.md) | Listing copy, privacy answers, and accessibility declarations |
 | [Licensing](licensing.md) | App licensing and the contributor agreement |
 

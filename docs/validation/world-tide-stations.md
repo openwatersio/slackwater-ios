@@ -247,7 +247,7 @@ every candidate is licence-restricted. The ADMIRALTY Tidal API's terms cap end-u
 caching at 24 hours (`developer.admiralty.co.uk/TandC` §5.7), which rules out storing
 anything from it on-device; EasyTide's terms separately forbid "systematically
 downloading and storing" its content. Full survey in
-`docs/data-sources.md`. Until a licence-clean timing
+[tide-database issue #148](https://github.com/openwatersio/tide-database/issues/148). Until a licence-clean timing
 reference exists, UK (and other non-NOAA/CHS) tide timing ships on the same footing as
 its datum and amplitude validation here — checked against the station's own publishing
 authority's *levels*, unchecked against any independent source for *when* those levels
