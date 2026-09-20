@@ -53,12 +53,25 @@ func moonGlowRadius(fraction: Double) -> CGFloat { 12 + CGFloat(fraction) * 20 }
 /// bodies are symbols many times their true size, so near every new moon the
 /// two would otherwise overlap like an eclipse. `distance` is between their
 /// projected centres; the moon is gone by the time the discs would touch and
-/// clear once it is past the sun's glow. A real solar eclipse fades too —
-/// gate on an Almanac separation once it has one.
-func moonGlareOpacity(distance: CGFloat) -> Double {
+/// clear once it is past the sun's glow. During a real solar eclipse
+/// (`obscuration` > 0, Almanac's covered fraction of the sun's disc) the fade
+/// is exactly wrong: the moon is in front of the sun, so it stays at full
+/// opacity and draws over it.
+func moonGlareOpacity(distance: CGFloat, obscuration: Double = 0) -> Double {
+    guard obscuration <= 0 else { return 1 }
     let touching = sunDiscRadius + moonGlyphSize / 2
     let clear = sunGlowRadius + moonGlyphSize / 2
     return max(0, min(1, Double((distance - touching) / (clear - touching))))
+}
+/// The sun altitude the sky is painted for: the true one, pulled down toward
+/// nautical twilight by a solar eclipse's covered fraction. Daylight barely
+/// dims until the last tenth of the disc goes, so the pull is quartic — a
+/// half-covered sun is still day; totality is a 360° sunset. Every consumer of
+/// the paint (gradient, ink, stars) keys off this, so they darken together.
+func eclipsedSunAltitude(_ altitude: Double, obscuration: Double) -> Double {
+    let totality = -9.0
+    guard altitude > totality, obscuration > 0 else { return altitude }
+    return altitude + (totality - altitude) * pow(min(obscuration, 1), 4)
 }
 func starOpacity(sunAltitude: Double) -> Double {
     max(0, min(0.7, (-sunAltitude - 6) / 12 * 0.7))
@@ -166,6 +179,11 @@ struct SkyState {
     /// position lookups below — the same reason the horizon spans read their
     /// rise and set times from `days` rather than searching for them.
     let eclipse: WindowEclipse?
+    /// Fraction of the sun's disc the moon covers right now, 0 outside a solar
+    /// eclipse. Almanac's `solarObscuration` is a position lookup, not a
+    /// search, so it is cheap enough for every scrub frame. Geometric only: a
+    /// covered sun below the horizon is clipped like any other.
+    let obscuration: Double
 
     /// `days` is the strip's own day chrome. Both bodies' horizon spans take
     /// their rise and set times from there rather than searching here: this
@@ -191,6 +209,7 @@ struct SkyState {
         } ?? []
         moon = observer.flatMap { try? moonAltAz(time, observer: $0) }
         illumination = try? moonIllumination(time)
+        obscuration = observer.flatMap { try? solarObscuration(at: time, observer: $0) } ?? 0
         sunSpan = observer.flatMap { obs in
             Self.span(rises: days.compactMap(\.sunrise), sets: days.compactMap(\.sunset),
                       at: time) { try sunAltAz($0, observer: obs) }
@@ -225,11 +244,13 @@ struct SkyState {
         return atan2(-vertical, horizontal)
     }
 
-    var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
-    var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
-    var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
+    /// The altitude the sky is lit for — the sun's, darkened by any eclipse.
+    var litAltitude: Double { eclipsedSunAltitude(sun?.altDeg ?? -18, obscuration: obscuration) }
+    var paint: SkyPaint { skyPaint(sunAltitude: litAltitude) }
+    var opacity: Double { skyOpacity(sunAltitude: litAltitude) }
+    var ink: Color { skyUsesDarkInk(sunAltitude: litAltitude) ? SN.navyDeep : .white }
     /// The ground the chrome's coloured inks are lifted against.
-    var chromeGround: UInt32 { skyChromeGround(sunAltitude: sun?.altDeg ?? -18) }
+    var chromeGround: UInt32 { skyChromeGround(sunAltitude: litAltitude) }
 }
 
 struct SkyBackdrop: View {
@@ -251,8 +272,8 @@ struct SkyBackdrop: View {
                                        .init(color: Color(hex: paint.bottom), location: 1)],
                                startPoint: .top, endPoint: .bottom)
                     .opacity(sky.opacity)
-                if let altitude = sky.sun?.altDeg {
-                    let opacity = starOpacity(sunAltitude: altitude)
+                if sky.sun != nil {
+                    let opacity = starOpacity(sunAltitude: sky.litAltitude)
                     TimelineView(.animation(minimumInterval: 0.125,
                                             paused: opacity == 0 || reduceMotion)) { timeline in
                         let seconds = timeline.date.timeIntervalSinceReferenceDate
@@ -292,11 +313,31 @@ struct SkyBackdrop: View {
                 }
                 if let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
-                    let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
-                                         latitude: sky.latitude, span: sky.moonSpan,
-                                         pad: moonGlyphSize / 2, size: size)
+                    let truePoint = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
+                                             latitude: sky.latitude, span: sky.moonSpan,
+                                             pad: moonGlyphSize / 2, size: size)
+                    // The symbols are many times the true half-degree, so the
+                    // real separation is under a point and any partial would
+                    // read as total. In an eclipse the moon sits off the sun by
+                    // the covered fraction instead: touching at first contact,
+                    // concentric at totality, along its true bearing.
+                    let point = sunPoint.map { sun -> CGPoint in
+                        guard sky.obscuration > 0 else { return truePoint }
+                        let dx = truePoint.x - sun.x, dy = truePoint.y - sun.y, len = hypot(dx, dy)
+                        let d = (sunDiscRadius + moonGlyphSize / 2) * (1 - sky.obscuration)
+                        return len > 0 ? CGPoint(x: sun.x + dx / len * d, y: sun.y + dy / len * d)
+                                       : CGPoint(x: sun.x + d, y: sun.y)
+                    } ?? truePoint
                     let toSun = sky.moonLightAngle
-                    let glare = sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity
+                    let glare = moonGlareOpacity(
+                        distance: sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity,
+                        obscuration: sky.obscuration)
+                    // A new moon's glyph is mostly clear; in front of the sun it
+                    // needs a body. The silhouette is the night sky's own black.
+                    if sky.obscuration > 0 {
+                        Circle().fill(Color(hex: 0x04060F))
+                            .frame(width: moonGlyphSize - 2, height: moonGlyphSize - 2).position(point)
+                    }
                     // An eclipsed moon dims and warms, and the sky goes quiet
                     // with it: two changes to the one gradient, not a second
                     // element on top of it. The umbra is copper, not black.
@@ -317,14 +358,14 @@ struct SkyBackdrop: View {
                             ], center: .center, startRadius: 0, endRadius: glowRadius))
                         .frame(width: glowRadius * 2, height: glowRadius * 2)
                         .position(x: point.x + 4 * cos(toSun), y: point.y + 4 * sin(toSun))
-                        .opacity(moonGlareOpacity(distance: glare))
+                        .opacity(glare)
                     // `waxing: true` lights the +x limb; the rotation aims it.
                     // Keep the umbra screen-stable; its physical entry direction is #304-adjacent work.
                     MoonGlyph(fraction: illumination.fraction, waxing: true, size: moonGlyphSize,
                               umbra: sky.shadow, wash: sky.wash, shadowTilt: .radians(-toSun))
                         .rotationEffect(.radians(toSun))
                         .position(point)
-                        .opacity(moonGlareOpacity(distance: glare))
+                        .opacity(glare)
                 }
             }
         }
