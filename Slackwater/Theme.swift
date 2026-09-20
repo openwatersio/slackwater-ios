@@ -624,6 +624,7 @@ struct LeadCard<Eyebrow: View>: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
+        .tourAnchor(.read)
     }
 }
 
@@ -753,6 +754,8 @@ struct SummaryTiles: View {
                             ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
+                .accessibilityIdentifier("tile-moon")
+                .tourAnchor(.moonCard)
             }
         }
         .task(id: dayLocal(at, tz)) {
@@ -866,6 +869,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// generic signature.
     var topBackdrop: AnyView? = nil
     @State private var topHeight: CGFloat = 0
+    /// The tour's glide has settled, which swaps the stars copy from the
+    /// instruction to the payoff.
+    @State private var tourArrived = false
     @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -942,6 +948,18 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .overlayPreferenceValue(TourAnchorKey.self) { anchors in
+                // `.stars` and `.moon` both point at the strip; only the copy
+                // and the glide target differ.
+                let resolved = TourCoach.shared.step == .moon
+                    ? anchors.merging([.moon: anchors[.stars]].compactMapValues { $0 }) { _, n in n }
+                    : anchors
+                TourMarkLayer(anchors: resolved, proxy: geo,
+                              stationName: name, arrived: tourArrived,
+                              onNext: tourNext, onSkip: { TourCoach.shared.finish() })
+                    .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
+                    .allowsHitTesting(TourCoach.shared.station == favoriteId)
+            }
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
@@ -1029,6 +1047,26 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     private func glide(to t: Date) {
         TourCoach.shared.requestGlide()
         jump(to: t)
+    }
+
+    /// Advance the tour, gliding first where the next mark needs the strip
+    /// somewhere else. The glide targets are read off the timeline the page is
+    /// already drawing — no almanac search (see `tourStarsTime`).
+    private func tourNext() {
+        tourArrived = false
+        TourCoach.shared.advance()
+        guard let step = TourCoach.shared.step, let days = timeline?.days else { return }
+        let target: Date? = switch step {
+        case .stars: tourStarsTime(days: days, after: appNow())
+        case .moon: tourMoonTime(days: days, after: appNow())
+        default: nil
+        }
+        guard let target else { return }
+        glide(to: target)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            tourArrived = true
+        }
     }
 
     private func scrubCard(_ tl: TimelineData) -> some View {

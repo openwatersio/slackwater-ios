@@ -1633,6 +1633,7 @@ struct TimelineScrubStrip: View {
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("timeline-strip")
+            .tourAnchor(.stars)
             // The page outlives a trip to the background, so `now` is stale on reopen.
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
