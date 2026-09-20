@@ -19,13 +19,18 @@ extension View {
 
 /// What each mark says. The copy is deliberately about what the thing IS, not
 /// about the app: the backdrop being the real sky is the fact nobody guesses.
-func tourCopy(_ step: TourCoach.Step, station: String, arrived: Bool) -> String {
+func tourCopy(_ step: TourCoach.Step, stationName: String, arrived: Bool) -> String {
     switch step {
     case .read:
-        return "The reading is whatever sits on the centre line."
+        // True on all four detail views, including a derived gate, whose
+        // `LeadCard` has no numeric value at all (shape/speed only) — this
+        // says what the line marks, not what value it holds.
+        return "The center line marks the moment shown below."
     case .stars:
         return arrived
-            ? "Those are the actual stars over \(station) right now."
+            // The glide already moved the strip to sunset + 1h, so by the
+            // time this shows the moment on screen is tonight, not now.
+            ? "Those are the actual stars over \(stationName) tonight."
             : "Swipe the curve to move through time."
     case .moon:
         return "And that is the real moon, at tonight's phase."
@@ -51,6 +56,15 @@ struct TourMarkLayer: View {
         // `.stars` and `.moon` both point at the strip; only the copy and
         // the glide target differ, so `.moon` falls back to the `.stars`
         // anchor rather than publishing a second one.
+        //
+        // A step with no anchor at all draws nothing here — no capsule, so
+        // no Skip, which would strand the tour (`seenTour` never written).
+        // That is only safe because no reachable case currently drops an
+        // anchor: `.read`/`.stars` require a timeline, which `begin` already
+        // requires; all four detail views pass a moon tile, so `tile-moon`
+        // (the `.moonCard` anchor) always exists; `.star` is only absent on
+        // a non-scaffold view, which never runs the tour. A future change
+        // that removes an anchor conditionally must keep that true.
         if let step = TourCoach.shared.step,
            let anchor = anchors[step] ?? (step == .moon ? anchors[.stars] : nil) {
             let rect = proxy[anchor]
@@ -81,7 +95,7 @@ struct TourMarkLayer: View {
                     Image(systemName: "hand.draw.fill")
                         .symbolEffect(.wiggle.left)
                 }
-                Text(tourCopy(step, station: stationName, arrived: arrived))
+                Text(tourCopy(step, stationName: stationName, arrived: arrived))
                     .font(.callout)
                     .foregroundStyle(SN.paper)
                     .multilineTextAlignment(.leading)

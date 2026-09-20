@@ -981,7 +981,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 guard let days = timeline?.days else { return }
                 TourCoach.shared.begin(
                     on: favoriteId,
-                    skySteps: tourStarsTime(days: days, after: appNow()) != nil)
+                    starsAvailable: tourStarsTime(days: days, after: appNow()) != nil,
+                    moonAvailable: tourMoonTime(days: days, after: appNow()) != nil)
             }
             .onDisappear {
                 if TourCoach.shared.station == favoriteId { TourCoach.shared.finish() }
@@ -1031,8 +1032,12 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // are never off-screen when their mark appears.
             .onChange(of: TourCoach.shared.step) { _, step in
                 guard let step, TourCoach.shared.station == favoriteId else { return }
+                // `.moon` has no `.id` of its own — it reuses `.stars`'
+                // anchor (TourMarkLayer) — so scroll to `.stars`' id for it
+                // too. Smaller than publishing a second id for the same spot.
+                let scrollID = step == .moon ? .stars : step
                 withAnimation(.easeInOut(duration: 0.25)) {
-                    scrollProxy.scrollTo(step, anchor: .center)
+                    scrollProxy.scrollTo(scrollID, anchor: .center)
                 }
             }
             }

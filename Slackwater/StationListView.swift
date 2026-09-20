@@ -54,6 +54,12 @@ struct StationListView: View {
     /// The locate FAB was tapped with no fix to center on yet — the first fix
     /// that lands recenters the map, exactly once.
     @State private var pendingLocate = false
+    /// One shot per launch: without it, popping back to the list before the
+    /// pushed detail's first timeline build (the only thing that clears
+    /// `TourCoach.shared.armed`) leaves `armed` set, so `.onAppear` would
+    /// re-open the same tour station forever. Settings' replay bypasses this
+    /// latch entirely — it opens the station directly, not through here.
+    @State private var hasOpenedTourStation = false
     /// One-shot like `mapFocus`: the locate remount lands at `locateZoom`
     /// instead of the discovery camera; cleared by the same `.onAppear`.
     @State private var locateFocus = false
@@ -195,7 +201,9 @@ struct StationListView: View {
         // fine — but SettingsView itself is this `.sheet`'s ROOT content, so
         // without this it's SettingsView's environment that's broken, not
         // OfflineManagerList's. Same boundary as the comment below.
-        .sheet(isPresented: $showSettings) { SettingsView().environment(\.openChsRoute, openChsRoute) }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, openChsRoute)
+        }
         // Re-forwarded explicitly, not just inherited: `.sheet` content sits in
         // a separate presentation hierarchy that only crosses SYSTEM
         // environment keys (like `\.dismiss`) automatically — a custom key set
@@ -241,8 +249,9 @@ struct StationListView: View {
             // a denial) and nothing else has claimed the tour, so bring the
             // user to a detail that can teach. A bundled station needs no
             // download, so this works offline and with location denied.
-            if TourCoach.shared.armed, !hadSearchHandoff, !hadDeepLink,
+            if TourCoach.shared.armed, !hasOpenedTourStation, !hadSearchHandoff, !hadDeepLink,
                let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] {
+                hasOpenedTourStation = true
                 open(item)
             }
         }
@@ -586,6 +595,18 @@ struct StationListView: View {
                      iconLabel: "Unavailable") {
             openUnavailable(station)
         }
+    }
+
+    /// Settings' "Show the tour again". A sheet dismissal does not re-fire
+    /// this view's `.onAppear` (unlike a pop from a pushed detail), so the
+    /// existing armed-tour `.onAppear` path can never claim this — open the
+    /// station directly instead. `open` pushes it, and the pushed detail's
+    /// own `begin()` fires once its timeline builds, the same as any other
+    /// first-run open.
+    private func replayTour() {
+        TourCoach.shared.replay()
+        guard let item = StationItem.byId[tourStationID(near: loc.location?.coordinate)] else { return }
+        open(item)
     }
 
     /// Push an unavailable station's page. One definition, two callers (the

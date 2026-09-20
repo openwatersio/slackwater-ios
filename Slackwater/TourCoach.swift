@@ -11,8 +11,9 @@ import UIKit
 let seenTourKey = "slackwater.seenTour"
 
 @Observable final class TourCoach {
-    /// In order. `stars` and `moon` are dropped when the window holds no night
-    /// (see `skySteps`), so never advance by `rawValue` — use `next(after:)`.
+    /// In order. `stars` and `moon` each drop independently when their own
+    /// target time is unavailable (see `starsAvailable` / `moonAvailable`),
+    /// so never advance by `rawValue` — use `next(after:)`.
     enum Step: Int, CaseIterable { case read, stars, moon, moonCard, star }
 
     static let shared = TourCoach()
@@ -27,11 +28,17 @@ let seenTourKey = "slackwater.seenTour"
 
     /// First launch has armed the tour but no detail has claimed it yet.
     private(set) var armed = false
-    private var skySteps = true
+    /// `.stars` and `.moon` are independent: `tourStarsTime` and
+    /// `tourMoonTime` can each resolve to nil on their own (a moon only ever
+    /// up in daylight, say), so one flag per step — never a single
+    /// `skySteps` — or the surviving step can assert something false.
+    private var starsAvailable = true
+    private var moonAvailable = true
 
     /// Sky steps drop under VoiceOver too: the strip is an adjustable
     /// element there, and "swipe the curve" is the wrong advice.
-    private var skipsSky: Bool { !skySteps || UIAccessibility.isVoiceOverRunning }
+    private var skipsStars: Bool { !starsAvailable || UIAccessibility.isVoiceOverRunning }
+    private var skipsMoon: Bool { !moonAvailable || UIAccessibility.isVoiceOverRunning }
 
     /// Called once on launch. A tour that has already been seen does not arm.
     func arm() {
@@ -39,18 +46,26 @@ let seenTourKey = "slackwater.seenTour"
     }
 
     /// A detail with a real timeline claims the armed tour.
-    func begin(on station: String, skySteps: Bool) {
+    func begin(on station: String, starsAvailable: Bool, moonAvailable: Bool) {
         guard armed else { return }
         armed = false
         self.station = station
-        self.skySteps = skySteps
+        self.starsAvailable = starsAvailable
+        self.moonAvailable = moonAvailable
         step = .read
     }
 
     /// Settings' "How to read a station" — the seen flag does not gate this.
-    func replay(on station: String, skySteps: Bool) {
+    /// Only arms: this sheet is presented from the station LIST, not the
+    /// detail, so there is no timeline here to derive `starsAvailable` /
+    /// `moonAvailable` from. Leaving any in-progress step/station behind
+    /// (rather than calling `begin` here) means a half-finished tour cannot
+    /// linger once the caller opens the real station and `begin` fires there
+    /// with the real, freshly-derived flags.
+    func replay() {
+        step = nil
+        station = nil
         armed = true
-        begin(on: station, skySteps: skySteps)
     }
 
     func advance() {
@@ -74,7 +89,7 @@ let seenTourKey = "slackwater.seenTour"
 
     private func next(after step: Step) -> Step? {
         Step.allCases
-            .filter { !skipsSky || ($0 != .stars && $0 != .moon) }
+            .filter { !($0 == .stars && skipsStars) && !($0 == .moon && skipsMoon) }
             .first { $0.rawValue > step.rawValue }
     }
 }
