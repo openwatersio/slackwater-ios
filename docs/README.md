@@ -7,6 +7,7 @@ Two kinds of documents live here, split by shelf life:
 | Doc | What |
 |---|---|
 | [`chs-data-model.md`](chs-data-model.md) | What Canada gives us and what it doesn't — IWLS series, the licensing posture that shapes the architecture, the four tiers of current coverage, what "validated" means, why there is no current field. Standalone: read it before scoping anything touching Canadian coverage |
+| [`appstore-metadata.md`](appstore-metadata.md) | The App Store listing — name, subtitle, keywords, description, privacy answers, accessibility labels — and the rules each field is written against. A PR that changes coverage, a network host or an accessibility gap changes this too |
 
 **Research snapshots** ([`research/`](research/)) — dated, point-in-time; superseded by newer
 snapshots rather than edited:
@@ -16,7 +17,7 @@ snapshots rather than edited:
 | [`design-readiness-2026-07-22.md`](research/design-readiness-2026-07-22.md) | Pre-build design review — verdict: ready; loose ends listed blocking → parked |
 | [`european-currents-licensing-2026-08-16.md`](research/european-currents-licensing-2026-08-16.md) | Whether European current data can be bundled or fetched, authority by authority |
 
-Strategy, market and competitor research, the App Store listing text, the comparison-page plan and the product landscape are private and live in the [Open Waters planning repo](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Technical reasoning needed to work on this app lives here; read [the CHS data model](chs-data-model.md#3-the-licence-architecture--the-load-bearing-section) before changing how Canadian data is stored, bundled or served.
+Strategy, market and competitor research, the comparison-page plan and the product landscape are private and live in the [Open Waters planning repo](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Technical reasoning needed to work on this app lives here; read [the CHS data model](chs-data-model.md#3-the-licence-architecture--the-load-bearing-section) before changing how Canadian data is stored, bundled or served.
 
 ## Archived source citations
 
