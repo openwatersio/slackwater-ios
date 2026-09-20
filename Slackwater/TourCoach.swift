@@ -104,7 +104,10 @@ func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
     }
     let moonUp: [(Date, Date)] = days.compactMap { d in
         guard let rise = d.moonrise else { return nil }
-        // A lunar day is 24h50m, so the set can belong to the next entry.
+        // ponytail: a moonset without an in-window moonrise is dropped here. This is safe:
+        // such a span already up when the window opened has a midpoint at least three days
+        // before `now` (window spans offsets −3…8), and the `midpoint > now` filter discards it
+        // anyway. Revisit only if the tour is run on a detail whose anchor is not today.
         guard let set = days.compactMap(\.moonset).sorted().first(where: { $0 > rise })
         else { return nil }
         return (rise, set)

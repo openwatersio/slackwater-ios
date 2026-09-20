@@ -57,4 +57,14 @@ final class TourTargetTests: XCTestCase {
         let days = [day(0, sunrise: 6, sunset: nil, moonrise: 8, moonset: 16)]
         XCTAssertNil(tourMoonTime(days: days, after: h(12)))
     }
+
+    func testMoonTimeReturnsTheEarlierOfTwoOverlaps() {
+        // Two valid dark-moon overlaps in the window, both after now.
+        // day 0: dark 18→30, moon up 8→22 ⇒ overlap 18→22, midpoint 20.
+        // day 1: dark 44→54, moon up 32→50 ⇒ overlap 44→50, midpoint 47.
+        let days = [day(0, sunrise: 6, sunset: 18, moonrise: 8, moonset: 22),
+                    day(1, sunrise: 30, sunset: 44, moonrise: 32, moonset: 50),
+                    day(2, sunrise: 54, sunset: 68, moonrise: 70, moonset: 78)]
+        XCTAssertEqual(tourMoonTime(days: days, after: h(12)), h(20))
+    }
 }
