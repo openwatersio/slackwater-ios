@@ -14,8 +14,9 @@ final class PremiumTests: XCTestCase {
     }
 
     /// T6: `.unverified` must surface as a real, human-readable error rather
-    /// than silently doing nothing (the old behaviour — `purchase` only ever
-    /// acted on `.verified` and swallowed everything else, including this).
+    /// than silently doing nothing. Message only — StoreKitTest signs its
+    /// transactions with a local certificate the app trusts, so a test session
+    /// has no way to hand `purchase(_:)` an unverified result to act on.
     func testUnverifiedErrorHasAMessage() {
         XCTAssertEqual(PremiumError.unverified.errorDescription,
                        "Purchase couldn't be verified — try again.")
