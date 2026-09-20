@@ -74,8 +74,13 @@ cd "$(dirname "$0")/.."
 export TEST_RUNNER_M1_SHOT_DIR="${SHOT_DIR:-/tmp/slackwater-shots}"
 mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 
-[[ $MODE == live ]] || node scripts/iwls-fixtures.mjs prepare
-xcodegen generate
+# SLACKWATER_XCTESTRUN names a .xctestrun from an earlier build-for-testing
+# (CI builds once and shards the tests across jobs). The fixture is compiled
+# into the unit-test bundle, so that build already staged it.
+if [[ -z "${SLACKWATER_XCTESTRUN:-}" ]]; then
+  [[ $MODE == live ]] || node scripts/iwls-fixtures.mjs prepare
+  xcodegen generate
+fi
 
 # SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
 # ONE device so the fast lane stays iPhone-only (see .github/workflows/ci.yml).
@@ -197,13 +202,16 @@ for i in {1..$#sims}; do
   # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit
   # on 16 GB; set SLACKWATER_WORKERS to the machine's budget (CI sets 1 — a
   # hosted arm runner has ~7 GB).
-  xcodebuild test -project Slackwater.xcodeproj -scheme Slackwater \
-    -derivedDataPath build/DerivedData \
-    -testPlan Slackwater -destination "$dests[$i]" \
+  if [[ -n "${SLACKWATER_XCTESTRUN:-}" ]]; then
+    action=(test-without-building -xctestrun "$SLACKWATER_XCTESTRUN")
+  else
+    action=(test -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater
+            -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
+  fi
+  xcodebuild "${action[@]}" -destination "$dests[$i]" \
     -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
     -collect-test-diagnostics "$diagnostics" \
     "${selection[@]}" \
-    -clonedSourcePackagesDirPath build/SourcePackages \
     -resultBundlePath "$bundle" \
     | tail -40
   # A shard that runs NOTHING exits 0 and reports green — which is the failure
