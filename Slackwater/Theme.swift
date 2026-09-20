@@ -624,6 +624,8 @@ struct LeadCard<Eyebrow: View>: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
+        .tourAnchor(.read)
+        .id(TourCoach.Step.read)
     }
 }
 
@@ -753,6 +755,9 @@ struct SummaryTiles: View {
                             ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
+                .accessibilityIdentifier("tile-moon")
+                .tourAnchor(.moonCard)
+                .id(TourCoach.Step.moonCard)
             }
         }
         .task(id: dayLocal(at, tz)) {
@@ -866,6 +871,9 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// generic signature.
     var topBackdrop: AnyView? = nil
     @State private var topHeight: CGFloat = 0
+    /// The tour's glide has settled, which swaps the stars copy from the
+    /// instruction to the payoff.
+    @State private var tourArrived = false
     @State private var showPicker = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
@@ -885,6 +893,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         // ignores it), so the proxy reads the real top inset for DetailHeader —
         // per device and per iPad split-view pane, live across rotation.
         GeometryReader { geo in
+            ScrollViewReader { scrollProxy in
             ScrollView {
                 ZStack(alignment: .top) {
                     if let topBackdrop, let timeline {
@@ -942,6 +951,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .overlayPreferenceValue(TourAnchorKey.self) { anchors in
+                // A dedicated GeometryReader, not the outer `geo`: `geo` sits
+                // inside the safe area, but this ScrollView ignores the top
+                // safe area, so anchors must resolve in the overlay's own
+                // space to land on the real screen position.
+                GeometryReader { overlayGeo in
+                    TourMarkLayer(anchors: anchors, proxy: overlayGeo,
+                                  stationName: name, arrived: tourArrived,
+                                  onNext: tourNext, onSkip: { TourCoach.shared.finish() })
+                        .opacity(TourCoach.shared.station == favoriteId ? 1 : 0)
+                        .allowsHitTesting(TourCoach.shared.station == favoriteId)
+                }
+            }
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
@@ -952,6 +974,19 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // open station re-pushes the same value, so nothing else re-appears.
             .onAppear(perform: applyLinkedInstant)
             .onChange(of: LinkedInstant.shared.pending) { _, _ in applyLinkedInstant() }
+            // A waiting page or an unavailable station has no curve, no sky,
+            // no moon tile and no scrubber — nothing to teach — so the tour
+            // stays armed and fires on the next detail that does.
+            .onChange(of: timeline?.revision, initial: true) { _, _ in
+                guard let days = timeline?.days else { return }
+                TourCoach.shared.begin(
+                    on: favoriteId,
+                    starsAvailable: tourStarsTime(days: days, after: appNow()) != nil,
+                    moonAvailable: tourMoonTime(days: days, after: appNow()) != nil)
+            }
+            .onDisappear {
+                if TourCoach.shared.station == favoriteId { TourCoach.shared.finish() }
+            }
             .sheet(isPresented: $showPicker) {
                 WeekPickerSheet(anchor: $anchor, tz: tz, onOpen: onPickerOpen, onPick: { picked in
                     // Park the centerline on the picked week when it isn't already
@@ -984,6 +1019,27 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     }
                     onPicked(picked)
                 })
+            }
+            // The user's own swipe is as good as Next, which is the whole
+            // point of a demo you can interrupt. The tour's own glide writes
+            // scrubTime too, so only a change AFTER the glide settled counts.
+            .onChange(of: scrubTime) { _, _ in
+                guard TourCoach.shared.step == .stars, tourArrived else { return }
+                tourNext()
+            }
+            // Each mark's target scrolls to centre before the capsule shows,
+            // so the star (in the header) and the moon tile (below the strip)
+            // are never off-screen when their mark appears.
+            .onChange(of: TourCoach.shared.step) { _, step in
+                guard let step, TourCoach.shared.station == favoriteId else { return }
+                // `.moon` has no `.id` of its own — it reuses `.stars`'
+                // anchor (TourMarkLayer) — so scroll to `.stars`' id for it
+                // too. Smaller than publishing a second id for the same spot.
+                let scrollID = step == .moon ? .stars : step
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    scrollProxy.scrollTo(scrollID, anchor: .center)
+                }
+            }
             }
         }
     }
@@ -1018,6 +1074,36 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // anyway: a placed anchor is how the caller knows a moment is
             // here, and opens its first build on `scrubTime` rather than now.
             anchor = todayLocal(tz)
+        }
+    }
+
+    /// `jump(to:)` with the animated ride the tour's demo depends on. The
+    /// token bump comes FIRST so the strip's `jumpToken` is already different
+    /// by the time `scrubTime`'s change reaches `updateUIView` — reversed,
+    /// the offset write can land in the pass before the token and the strip
+    /// teleports.
+    private func glide(to t: Date) {
+        TourCoach.shared.requestGlide()
+        jump(to: t)
+    }
+
+    /// Advance the tour, gliding first where the next mark needs the strip
+    /// somewhere else. The glide targets are read off the timeline the page is
+    /// already drawing — no almanac search (see `tourStarsTime`).
+    private func tourNext() {
+        tourArrived = false
+        TourCoach.shared.advance()
+        guard let step = TourCoach.shared.step, let days = timeline?.days else { return }
+        let target: Date? = switch step {
+        case .stars: tourStarsTime(days: days, after: appNow())
+        case .moon: tourMoonTime(days: days, after: appNow())
+        default: nil
+        }
+        guard let target else { return }
+        glide(to: target)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            tourArrived = true
         }
     }
 

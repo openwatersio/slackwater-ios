@@ -1627,6 +1627,8 @@ struct TimelineScrubStrip: View {
             .overlay(alignment: .top) { chromeRow }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("timeline-strip")
+            .tourAnchor(.stars)
+            .id(TourCoach.Step.stars)
             // The page outlives a trip to the background, so `now` is stale on reopen.
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
@@ -1636,6 +1638,14 @@ struct TimelineScrubStrip: View {
                     jumpToken += 1
                     onReturn?()
                 }
+            }
+            // The first-run tour's scrub demo. The animated magnet ride is
+            // reachable only through `jumpToken`, which is this view's own
+            // @State — so the tour asks for it through the observable rather
+            // than through a parameter, which would fan out to all four
+            // detail views (CLAUDE.md).
+            .onChange(of: TourCoach.shared.glideToken) { _, _ in
+                jumpToken += 1
             }
     }
 

@@ -4,6 +4,9 @@
 import SwiftUI
 
 struct SettingsView: View {
+    /// Opens the tour's station directly — see `StationListView.replayTour`
+    /// for why this cannot just arm-and-dismiss.
+    let onReplayTour: () -> Void
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
@@ -72,6 +75,20 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
+                    }
+
+                    section("How to read a station") {
+                        Button {
+                            dismiss()
+                            onReplayTour()
+                        } label: {
+                            HStack {
+                                Text("Show the tour again")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .accessibilityIdentifier("settings-replay-tour")
                     }
 
                     section("Slackwater Premium") {

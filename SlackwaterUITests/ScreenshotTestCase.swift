@@ -33,8 +33,10 @@ class ScreenshotTestCase: XCTestCase {
         // -resetSeriesFilter / -resetChosenStations: the Tides/Currents pick and
         // chooser picks persist, and one test's pick would otherwise change
         // the next test's lists.
+        // -seedTour: arm() now fires on every launch, so without this every
+        // detail-opening test would grow an unexpected coach mark.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
-                             "-currentFillOff", "-chartPacksOff",
+                             "-currentFillOff", "-chartPacksOff", "-seedTour",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")

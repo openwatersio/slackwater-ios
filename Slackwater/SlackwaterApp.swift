@@ -21,6 +21,9 @@ struct SlackwaterApp: App {
         #if DEBUG
         applySeedHooksIfRequested()
         #endif
+        // Must come after the seed hooks above: `-resetTour`/`-seedTour`
+        // write `seenTourKey`, and `arm()` reads it.
+        TourCoach.shared.arm()
     }
 
     var body: some Scene {
