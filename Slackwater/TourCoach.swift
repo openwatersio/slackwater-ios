@@ -53,8 +53,11 @@ let seenTourKey = "slackwater.seenTour"
     }
 
     /// Skip, or leaving the detail. One way: the seen flag is written here and
-    /// nowhere else, and there is no resume-later state by design.
+    /// nowhere else, and there is no resume-later state by design. A guard
+    /// ensures this runs only when a tour is actually showing (step != nil);
+    /// a stray call when no tour is running would suppress it forever.
     func finish() {
+        guard step != nil else { return }
         step = nil
         station = nil
         armed = false

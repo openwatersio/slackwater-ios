@@ -64,4 +64,13 @@ final class TourCoachTests: XCTestCase {
         c.requestGlide()
         XCTAssertEqual(c.glideToken, before + 2)
     }
+
+    func testFinishGuardPreventsStrayCall() {
+        let c = TourCoach.shared
+        c.arm()
+        c.finish()
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: seenTourKey), "finish when no tour is running does not write the seen flag")
+        c.arm()
+        XCTAssertTrue(c.armed, "after a guarded finish, arm still works")
+    }
 }
