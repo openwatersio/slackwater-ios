@@ -100,6 +100,12 @@ struct TourMarkLayer: View {
         }
         .padding(14)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        // .contain (not the default .combine) keeps this container itself
+        // addressable as "tour-mark" while letting the Skip/Next buttons
+        // keep their own identifiers — see TimelineStrip.swift's
+        // "timeline-strip" for the same shape. Without it, an identifier on
+        // a container overrides its descendants' in SwiftUI.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("tour-mark")
     }
 }
