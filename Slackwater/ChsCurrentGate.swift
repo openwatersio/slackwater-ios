@@ -12,7 +12,7 @@
 // axis arrives from IWLS station metadata at fit time. Nothing CHS-published
 // ships in the app — same licensing posture as the tide ports (chs-online §2).
 import Foundation
-import TideEngine
+import Neaps
 
 /// Bundled identity for one validated CHS current gate.
 struct ChsCurrentGateInfo: Decodable, Identifiable, Hashable, StationIdentity {

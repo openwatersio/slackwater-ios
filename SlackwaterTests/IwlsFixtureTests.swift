@@ -1,5 +1,5 @@
 import XCTest
-import TideEngine
+import Neaps
 @testable import Slackwater
 
 final class IwlsFixtureTests: XCTestCase {

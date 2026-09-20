@@ -20,9 +20,9 @@ packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
     from: 0.4.1
-  TideEngine:
-    url: https://github.com/openwatersio/slackwater-engine
-    from: 0.7.0
+  Neaps:
+    url: https://github.com/openwatersio/neaps
+    from: 1.0.0
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
@@ -34,8 +34,8 @@ targets:
     dependencies:
       - package: Almanac
         product: Almanac
-      - package: TideEngine
-        product: TideEngine
+      - package: Neaps
+        product: Neaps
       - package: MapLibre
         product: MapLibre
       - target: SlackwaterWidgets
@@ -149,8 +149,8 @@ targets:
       - Slackwater/ChsGate.swift
       - Slackwater/ChsCurrentGate.swift
     dependencies:
-      - package: TideEngine
-        product: TideEngine
+      - package: Neaps
+        product: Neaps
     info:
       path: SlackwaterWidgets/Info.plist
       properties:

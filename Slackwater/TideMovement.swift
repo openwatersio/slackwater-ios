@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Shared tide-movement classification for the detail
 // scrubber and widget extension.
 import Foundation
-import TideEngine
+import Neaps
 
 let tideMovementRampAnchorsMHr: [Double] = [0.6, 1.0, 1.5, 1.8]
 

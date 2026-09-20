@@ -11,7 +11,7 @@
 import XCTest
 import SwiftUI
 @testable import Slackwater
-import TideEngine
+import Neaps
 
 final class RenderedStripTests: XCTestCase {
 
@@ -135,7 +135,7 @@ final class RenderedStripTests: XCTestCase {
     /// Malibu Rapids over a synthetic Point Atkinson fit: a reference port's
     /// model is fitted on-device and no unit test can fit one, so the port is
     /// built here the way the other derived-gate tests build theirs. Any
-    /// plausible harmonic shape gives TideEngine real highs and lows to lag
+    /// plausible harmonic shape gives Neaps real highs and lows to lag
     /// into slacks, which is all a gate reads from its reference.
     ///
     /// Measured at 1× on the 396pt canvas: 0.090 against a no-track floor of

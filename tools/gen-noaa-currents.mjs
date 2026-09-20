@@ -11,7 +11,7 @@
  * load-bearing:
  *   1. Harmonic and subordinate stations (#268). A subordinate has no
  *      constituents: it ships with `reference` and NOAA's six offsets, in the
- *      engine's own field names, for slackwater-engine's SubordinateStation —
+ *      engine's own field names, for Neaps's SubordinateStation —
  *      and only if its reference ships too (the 147 whose reference is a
  *      non-primary bin are #269).
  *   2. Primary bin only (id without "@") — one station, one prediction — except

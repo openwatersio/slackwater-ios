@@ -7,7 +7,7 @@
 // `_read_bundle`).
 import CoreLocation
 import XCTest
-import TideEngine
+import Neaps
 @testable import Slackwater
 
 final class FillFieldTests: XCTestCase {
@@ -107,7 +107,7 @@ final class FillFieldTests: XCTestCase {
     //     byte offsets, or id→name mapping disagree with that reader, this
     //     test compares against the WRONG station and fails.
     //  2. Those amplitude/phase values are then fed straight into
-    //     TideEngine's own `CurrentStation.speeds(from:to:step:)` — the exact
+    //     Neaps's own `CurrentStation.speeds(from:to:step:)` — the exact
     //     call FillField makes internally, and the exact call every other
     //     station in this app makes (CurrentStation.swift's `cardState`) —
     //     bypassing FillField's element/axis decoding entirely. A bug in
@@ -117,7 +117,7 @@ final class FillFieldTests: XCTestCase {
     //     assembled independently, not by calling `field.cells` a second time.
     //
     // Astronomical arguments (V0+u, nodal f) are never computed in this test
-    // or in FillField — both paths hand raw constituents to TideEngine and
+    // or in FillField — both paths hand raw constituents to Neaps and
     // let it own the astronomy, per the task's authority constraint.
     func testSyntheticGoldenTwoInstants() throws {
         let field = try loadFixture()
@@ -160,7 +160,7 @@ final class FillFieldTests: XCTestCase {
             // expression above (which is a verbatim copy of production's, so a
             // wrong-but-consistent formula passes it). The payload's
             // (speed, bearing) must decompose back to the same (u, v)
-            // TideEngine produced: east = speed*sin(bearing),
+            // Neaps produced: east = speed*sin(bearing),
             // north = speed*cos(bearing), bearing measured from true north.
             // An axis swap, a radians/degrees slip, or atan2(v, u) survives
             // both equalities above and fails here.
@@ -187,7 +187,7 @@ final class FillFieldTests: XCTestCase {
     //
     // This is a REGRESSION pin, not an independent derivation (unlike
     // testSyntheticGoldenTwoInstants's synthetic golden, which is built from
-    // constituents fed straight into TideEngine by a path that never calls
+    // constituents fed straight into Neaps by a path that never calls
     // FillField). There is no third-party published speed for this element to
     // check against -- it's a SSCOFS-fitted grid cell, not a named station --
     // so the expected value below was captured from FillField's own first run
