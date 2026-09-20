@@ -74,6 +74,22 @@ struct SettingsView: View {
                         }
                     }
 
+                    section("How to read a station") {
+                        Button {
+                            TourCoach.shared.replay(
+                                on: tourStationID(near: LocationService.shared.location?.coordinate),
+                                skySteps: true)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text("Show the tour again")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .accessibilityIdentifier("settings-replay-tour")
+                    }
+
                     section("Slackwater Premium") {
                         Button { showPremium = true } label: {
                             HStack {
