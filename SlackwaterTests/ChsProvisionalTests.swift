@@ -118,6 +118,24 @@ final class ChsProvisionalTests: XCTestCase {
                        "only the newest, uncached chunk may move")
     }
 
+    /// Fetched chunks are re-downloadable CHS data, so they stay out of the
+    /// user's backup — the same posture as the station-list cache. The mark is
+    /// asserted after a reset-and-recreate, because that is the path that would
+    /// silently leak it back in.
+    func testChunkStoreIsExcludedFromBackup() throws {
+        try? FileManager.default.removeItem(at: ChsChunkStore.dir)
+        defer { ChsChunkStore.purge("backup-station") }
+
+        let start = Date(timeIntervalSince1970: 1_784_000_000)
+        ChsChunkStore.save([ChsSample(t: start.timeIntervalSince1970 * 1000, v: 1)],
+                           "backup-station", "wlp",
+                           ChsChunk(start: start, end: start.addingTimeInterval(7 * 86_400)))
+
+        let values = try ChsChunkStore.dir.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(values.isExcludedFromBackup, true,
+                       "re-downloadable CHS chunks must not enter a device backup")
+    }
+
     /// Cached current data may be denser; the fit must keep a uniform time grid.
     func testCachedChunksResumeWithoutRefetching() async throws {
         let start = Date(timeIntervalSince1970: 1_784_000_000)

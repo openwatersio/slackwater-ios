@@ -48,6 +48,15 @@ enum ChsChunkStore {
 
     static func save(_ samples: [ChsSample], _ stationID: String, _ code: String, _ chunk: ChsChunk) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Re-downloadable by definition, so it has no business in a device
+        // backup (iOS Data Storage Guidelines) — the same mark the station-list
+        // cache beside it carries. Set on every save rather than at creation
+        // because the directory is removed outright by a reset and recreated
+        // by the next fetch, and an unmarked recreation is the case that leaks.
+        var marked = dir
+        var exclude = URLResourceValues()
+        exclude.isExcludedFromBackup = true
+        try? marked.setResourceValues(exclude)
         try? JSONEncoder().encode(samples).write(to: url(stationID, code, chunk), options: .atomic)
     }
 
@@ -295,7 +304,7 @@ final class IwlsFetcher {
             try? data.write(to: cache, options: .atomic)
             // Re-downloadable by definition, so it has no business in a device
             // backup (iOS Data Storage Guidelines). The chunk store beside it
-            // needs no such mark — it is purged as each fit lands.
+            // carries the same mark, set as it writes.
             var written = cache
             var exclude = URLResourceValues()
             exclude.isExcludedFromBackup = true
