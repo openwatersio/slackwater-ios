@@ -94,4 +94,24 @@ final class DownloadTierTests: XCTestCase {
         XCTAssertFalse(cohort.settled(in: ChsQueue()),
                        "nothing captured yet is not the same as finished")
     }
+
+    func testCohortSettlesEvenWhenSomeStationsAreNotDownloadable() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["chs-a", "noaa-b"], heroID: "chs-a")
+        var queue = ChsQueue([job("chs-a", 48.43, -123.37)])
+        XCTAssertFalse(cohort.settled(in: queue))
+        queue.set("chs-a", .ready)
+        XCTAssertTrue(cohort.settled(in: queue),
+                      "a NOAA station has no CHS job and can never be downloading")
+    }
+
+    func testCohortWithNoHeroRecapturesWhenTheListChanges() {
+        var cohort = DownloadCohort()
+        XCTAssertTrue(cohort.capture(ids: ["a", "b"], heroID: nil))
+        XCTAssertFalse(cohort.capture(ids: ["b", "a"], heroID: nil),
+                       "the same set in a different order is not a change")
+        XCTAssertTrue(cohort.capture(ids: ["c", "d"], heroID: nil),
+                      "with no hero, a genuinely different list is a new cohort")
+        XCTAssertEqual(cohort.ids, ["c", "d"])
+    }
 }
