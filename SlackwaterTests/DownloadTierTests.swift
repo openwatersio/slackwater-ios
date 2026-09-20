@@ -114,4 +114,51 @@ final class DownloadTierTests: XCTestCase {
                       "with no hero, a genuinely different list is a new cohort")
         XCTAssertEqual(cohort.ids, ["c", "d"])
     }
+
+    private func settledQueue() -> (DownloadCohort, ChsQueue) {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["a"], heroID: "a")
+        var queue = ChsQueue([job("a", 48.43, -123.37)])
+        queue.set("a", .ready)
+        return (cohort, queue)
+    }
+
+    func testStripWorksWhileTheCohortIsDownloading() {
+        var cohort = DownloadCohort()
+        _ = cohort.capture(ids: ["a", "b"], heroID: "a")
+        var queue = ChsQueue([job("a", 48.43, -123.37), job("b", 48.44, -123.38)])
+        queue.set("a", .ready)
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .working(done: 1, total: 2))
+    }
+
+    func testStripAsksOnceTheCohortIsSettled() {
+        let (cohort, queue) = settledQueue()
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .asking(count: 14))
+    }
+
+    func testStripIsAbsentWhenDeclined() {
+        let (cohort, queue) = settledQueue()
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: true, remaining: 14),
+                       .absent)
+    }
+
+    func testStripIsAbsentWithNothingLeftToOffer() {
+        let (cohort, queue) = settledQueue()
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 0),
+                       .absent)
+    }
+
+    func testStripDoesNotAskAgainOnceAWiderTierIsAccepted() {
+        let (cohort, queue) = settledQueue()
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .nearby,
+                                          declined: false, remaining: 14),
+                       .absent,
+                       "the question belongs to the in-view tier only")
+    }
 }

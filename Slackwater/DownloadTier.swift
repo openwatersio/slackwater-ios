@@ -90,3 +90,34 @@ struct DownloadCohort {
         }
     }
 }
+
+/// What the strip at the top of the station list is saying, if anything.
+enum DownloadStripState: Equatable {
+    case absent
+    case working(done: Int, total: Int)
+    /// `count` is the offer. A count and never a duration: locking the device
+    /// stops the work, so any promise of a finish would be false in a pocket.
+    case asking(count: Int)
+}
+
+/// Pure mapping from download state to what the list shows. Free function
+/// rather than a view model so it can be tested without a view or a service.
+func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadTier,
+                        declined: Bool, remaining: Int) -> DownloadStripState {
+    guard !cohort.ids.isEmpty else { return .absent }
+    guard cohort.settled(in: queue) else {
+        // An id the queue has never heard of counts as done, same as
+        // `settled` above: no job means nothing is downloading, so it can't
+        // be holding the cohort back. Without this, an unknown id is
+        // settled-but-not-done and `done` never reaches `total`.
+        let done = cohort.ids.count { id in
+            guard let status = queue.status(id) else { return true }
+            return status == .ready || status == .failed
+        }
+        return .working(done: done, total: cohort.ids.count)
+    }
+    // The question belongs to the automatic tier. Once a wider one is running
+    // the manager owns the conversation.
+    guard tier == .inView, !declined, remaining > 0 else { return .absent }
+    return .asking(count: remaining)
+}
