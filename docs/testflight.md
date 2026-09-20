@@ -52,7 +52,7 @@ Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `A
    ```
 
    Keep `dist.key`/`dist.p12` in 1Password and delete the local copies.
-7. **Tester groups.** Create an internal "Nightly" group with access to all builds, and the external groups with public links (see Tester groups).
+7. **Tester groups.** Create an internal "Nightly" group with access to all builds, and the external "Beta" group with a public link (see Tester groups).
 
 To release by hand from a Mac, export the same five variables and run `scripts/testflight.sh`.
 
@@ -65,13 +65,17 @@ Non-GUI sessions (agents, launchd, ssh, CI) see the **login keychain as locked**
 | Group | Kind | Gets builds | Link |
 |---|---|---|---|
 | Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
-| Friends & Family | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | _not yet created_ |
-| OSS and Externals | external, public link | same — and this is the link `slackwater.xyz` publishes as its download button (`src/routes/index.tsx`), so a release that skips it leaves the public page on the previous build. Update that button when the link changes | _not yet created_ |
+| Beta | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | <https://testflight.apple.com/join/5gwh791N> |
 
-The public link is written down here because it exists nowhere else in the repo — App Store
-Connect mints it and `asc.mjs` never reads it back. Re-read it any time with
-`GET /v1/betaGroups` → the group's `attributes.publicLink` (`publicLinkEnabled` is the
-on/off switch, `publicLinkLimit` the tester cap, currently unset).
+Beta is the only external group. `slackwater.xyz` publishes its link as the download button
+(`src/lib/links.ts`, shared by the homepage and every station page), so a release that skips
+the promotion leaves the public page on the previous build. Update that file when the link
+changes.
+
+The link is written down here because it exists nowhere else in the repo — App Store Connect
+mints it and `asc.mjs` never reads it back. Re-read it any time with `GET /v1/betaGroups` →
+the group's `attributes.publicLink` (`publicLinkEnabled` is the on/off switch,
+`publicLinkLimit` the tester cap).
 
 Before handing the link to anyone, check what they'd actually install: `node scripts/asc.mjs
 builds` shows group membership, but membership is not availability — an external build sits

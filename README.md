@@ -13,7 +13,7 @@ before you leave the dock.
 Slackwater is free and currently available as a public beta for iOS 26 and
 later.
 
-**[Get Slackwater on TestFlight](https://testflight.apple.com/join/FCSS4w8s)**
+**[Get Slackwater on TestFlight](https://testflight.apple.com/join/5gwh791N)**
 
 See screenshots, explore stations and learn how the predictions work at
 **[slackwater.xyz](https://slackwater.xyz)**.

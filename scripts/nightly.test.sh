@@ -51,7 +51,7 @@ set -eu
 if [[ "$1 $2" == 'scripts/asc.mjs builds' ]]; then
   build=$(< "$NIGHTLY_STATE/asc-build")
   groups='[Nightly]'
-  [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Friends & Family]'
+  [[ "${NIGHTLY_WRONG_GROUP:-}" == yes ]] && groups='[Nightly, Beta]'
   [[ -z $build ]] || print "1.13.0 ($build)  VALID  2026-09-15T09:00:00Z  $groups"
 else
   print -u2 "unexpected node call: $*"
