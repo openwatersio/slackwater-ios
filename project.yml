@@ -19,7 +19,7 @@ settings:
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
-    from: 0.4.1
+    from: 0.4.2
   Neaps:
     url: https://github.com/openwatersio/neaps
     from: 1.0.0
