@@ -1,0 +1,43 @@
+// Slackwater — GPL v3. How far out the download queue walks.
+//
+// The queue is ONE list, sorted nearest-first (ChsQueue.reorder). A tier is
+// not a separate queue or a separate set of stations — it is where that one
+// walk stops. That is what lets the manager ask "how far out should I go?"
+// instead of explaining three download systems.
+import Foundation
+
+enum DownloadTier: String, CaseIterable {
+    /// Exactly the stations the list is rendering. Downloads with no prompt.
+    case inView
+    /// Everything inside `nearbyRadiusKm`. Needs a yes — and that yes is what
+    /// iOS requires before any of this can continue in the background.
+    case nearby
+    /// Everything inside `ChsFitService.autoFitRadiusKm` — the same ceiling
+    /// today's unconstrained auto-fit already uses. It is the widest tier,
+    /// not an unlimited one: lifting the radius itself is a separate change.
+    case everything
+
+    /// Sized to be ACCEPTED rather than to maximise coverage. That tap is the
+    /// only thing that unlocks background execution, so its acceptance rate is
+    /// the whole mechanism; a tier that reads as 45 minutes gets declined.
+    static let nearbyRadiusKm = 25.0
+
+    /// Does this tier take that station into the download set?
+    ///
+    /// The cohort is admitted at every tier, never only at `.inView`: a station
+    /// on screen is already being looked at, and a tier ceiling must never
+    /// evict something the user can see.
+    func admits(_ job: ChsJob, from origin: (lat: Double, lon: Double),
+                cohort: Set<String>) -> Bool {
+        if cohort.contains(job.id) { return true }
+        switch self {
+        case .inView: return false
+        case .nearby:
+            return distanceKm(job.latitude, job.longitude, origin.lat, origin.lon)
+                <= Self.nearbyRadiusKm
+        case .everything:
+            return distanceKm(job.latitude, job.longitude, origin.lat, origin.lon)
+                <= ChsFitService.autoFitRadiusKm
+        }
+    }
+}
