@@ -207,6 +207,47 @@ final class ColourAndFormTests: XCTestCase {
         }
     }
 
+    /// The commentary pill and the lead's glyph float on the SKY, not on the
+    /// dark water the ramp's lift was calibrated against. At sunrise the
+    /// backdrop behind them is a tan, where the red end of the ramp measured
+    /// 2.1:1 — feedback #14, "the text for falling is unreadable against the
+    /// sunrise". The lift answers the ground now: whatever clears the
+    /// small-text floor on it, or white where nothing does (a daylight sky is
+    /// past what any tint can hold — white itself is only 3.8:1 there).
+    func testRateWarningInkAnswersTheSkyItSitsOn() {
+        for tenths in stride(from: -180, through: 100, by: 5) {
+            let ground = skyChromeGround(sunAltitude: Double(tenths) / 10)
+            for i in 0...20 {
+                let t = Double(i) / 20
+                let ink = SN.speedLabelColour(t, over: ground)
+                XCTAssertTrue(contrast(hexString(ink), String(format: "%06X", ground)) >= 4.5
+                                || rgb(ink) == rgb(.white),
+                              "rate ink at t=\(t) is unreadable on sky ground \(String(format: "%06X", ground))")
+            }
+        }
+    }
+
+    /// And the night sky — the ground it was drawn for — still gets the tint
+    /// it was drawn with: a quarter of the way to white. Compared as the
+    /// 8-bit colour that renders, which is what the lift settles on.
+    func testRateWarningInkIsUnchangedOnTheNightSky() {
+        let c = SN.speedRGB(1)
+        let quarter = String(format: "%02X%02X%02X",
+                             Int((c.r + (255 - c.r) * 0.25).rounded()),
+                             Int((c.g + (255 - c.g) * 0.25).rounded()),
+                             Int((c.b + (255 - c.b) * 0.25).rounded()))
+        XCTAssertEqual(hexString(SN.speedLabelColour(1, over: skyChromeGround(sunAltitude: -18))),
+                       quarter, "the ramp's red end over a dark sky")
+    }
+
+    /// A Color as "RRGGBB", for the contrast helpers below.
+    private func hexString(_ color: Color) -> String {
+        let c = rgb(color)
+        return String(format: "%02X%02X%02X",
+                      Int((c[0] * 255).rounded()), Int((c[1] * 255).rounded()),
+                      Int((c[2] * 255).rounded()))
+    }
+
     /// The ramp at `t` as a hex string, for the luminance/contrast helpers.
     private func rampHex(_ t: Double) -> String {
         let c = SN.speedRGB(t)

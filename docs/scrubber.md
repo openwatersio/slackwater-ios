@@ -458,7 +458,10 @@ Rising 0.60 m/hr
 Falling 5.2 ft/hr
 ```
 
-Tint this text with a lightened form of the rate-ramp colour. Activating it moves
+Tint this text — and the lead glyph above it — with a lightened form of the
+rate-ramp colour, lightened as far as the sky behind the pill demands: the ramp's
+red end is unreadable against a sunrise, and where no tint clears that ground the
+ink is the chrome's own white. Activating it moves
 to the closest fastest-rate point in the same rising/falling run, unless already
 within one second of that point; from there it advances to the next extreme.
 

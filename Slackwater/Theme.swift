@@ -33,6 +33,16 @@ func skyPaint(sunAltitude: Double) -> SkyPaint {
 
 // The muted daylight paint never gets bright enough for navy at the lead's position.
 func skyUsesDarkInk(sunAltitude _: Double) -> Bool { false }
+
+/// What the chrome floats on: the gradient's lit band composited over the
+/// canvas at `skyOpacity`. That band is the brightest ground any pill or lead
+/// glyph can land on, so an ink checked against it is legible everywhere in
+/// the frame — and it is a sunrise's tan, not the canvas's near-black, which
+/// is what the ramp's inks used to assume.
+func skyChromeGround(sunAltitude: Double) -> UInt32 {
+    mixedHex(SN.canvasHex, skyPaint(sunAltitude: sunAltitude).bottom,
+             skyOpacity(sunAltitude: sunAltitude))
+}
 /// The bodies' sizes, in points. Symbols, many times the true half-degree.
 /// The moon's glare fade keys off the sun's glow.
 let sunDiscRadius: CGFloat = 8
@@ -218,6 +228,8 @@ struct SkyState {
     var paint: SkyPaint { skyPaint(sunAltitude: sun?.altDeg ?? -18) }
     var opacity: Double { skyOpacity(sunAltitude: sun?.altDeg ?? -18) }
     var ink: Color { skyUsesDarkInk(sunAltitude: sun?.altDeg ?? -18) ? SN.navyDeep : .white }
+    /// The ground the chrome's coloured inks are lifted against.
+    var chromeGround: UInt32 { skyChromeGround(sunAltitude: sun?.altDeg ?? -18) }
 }
 
 struct SkyBackdrop: View {
