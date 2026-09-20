@@ -4,6 +4,7 @@
 // App-level state read directly by the views that need it, the way
 // `LinkedInstant` is (GateView.swift) — deliberately NOT a parameter, because
 // a parameter on `TimelineScrubStrip` fans out to four detail views.
+import CoreLocation
 import SwiftUI
 
 let seenTourKey = "slackwater.seenTour"
@@ -121,4 +122,31 @@ func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
     }
     .sorted()
     .first { $0 > now }
+}
+
+// MARK: - Which station the tour teaches on
+
+/// Friday Harbor — the station the gate already showed as its example
+/// (GateView.swift), so the card someone just looked at is the one they now
+/// learn to read.
+let tourFallbackStationID = "noaa/9449880"
+
+/// Past this there is no "local water" claim worth making, and the fallback
+/// is more honest than a station on another coast.
+private let tourStationRangeKm = 150.0
+
+/// The nearest bundled tide station to the fix, else Friday Harbor.
+///
+/// Reads `StationIndex.bundled`, the identity-only index — never
+/// `StationItem.all`, whose decode is the launch cost #317 is about. Bundled
+/// stations need no download, which is what lets the tour run with no network
+/// and no location at all.
+func tourStationID(near fix: CLLocationCoordinate2D?) -> String {
+    guard let fix else { return tourFallbackStationID }
+    let here = CLLocation(latitude: fix.latitude, longitude: fix.longitude)
+    let nearest = StationIndex.bundled.tides
+        .map { ($0.id, CLLocation(latitude: $0.latitude, longitude: $0.longitude).distance(from: here)) }
+        .min { $0.1 < $1.1 }
+    guard let nearest, nearest.1 <= tourStationRangeKm * 1000 else { return tourFallbackStationID }
+    return nearest.0
 }
