@@ -310,8 +310,11 @@ struct OfflineManagerList: View {
     /// number on the list's strip is an invitation to sit and wait.
     @ViewBuilder private var tierSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("In view").font(.headline)
-            Text("The stations on your list download on their own.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("In view").font(.headline)
+                Text("The stations on your list download on their own.")
+            }
+            .accessibilityIdentifier("download-tier-in-view")
 
             if service.tier == .inView {
                 Button("Download \(service.remainingBeyondCohort) more within 25 km") {
@@ -319,6 +322,7 @@ struct OfflineManagerList: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(service.remainingBeyondCohort == 0)
+                .accessibilityIdentifier("download-tier-nearby-accept")
             } else {
                 Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
             }
@@ -327,15 +331,28 @@ struct OfflineManagerList: View {
                 get: { service.tier == .everything },
                 set: { on in service.accept(on ? .everything : .nearby) })) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Keep downloading Canadian stations")
+                        // 150 km, not "Canadian stations" unqualified — this
+                        // stops at ChsFitService.autoFitRadiusKm same as the
+                        // unconstrained auto-fit; lifting that radius is a
+                        // separate change (DownloadTier.everything).
+                        Text("Keep downloading Canadian stations within 150 km")
                         // No estimate and no percentage: 1,073 stations is
                         // hours of requests and has no finish line to show.
-                        Text("Whenever Slackwater is open. \(service.queue.ready) so far.")
+                        // The queue only ever grows (M53) — off stops MORE
+                        // stations from being added, not what is already
+                        // in flight, and the copy says so rather than
+                        // implying a pause that doesn't happen.
+                        Text("Adds more whenever Slackwater is open. Turning this off doesn't stop what's already downloading. \(service.queue.ready) so far.")
                             .font(.footnote)
                     }
                 }
+                .accessibilityIdentifier("download-tier-everything-toggle")
         }
-        .padding(.horizontal, 26)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
     }
 
     // MARK: Summary

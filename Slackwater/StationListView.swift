@@ -682,26 +682,43 @@ struct StationListView: View {
         let nearIds = seriesFilter.map { series in
             places.shownIds.filter { StationItem.byId[$0]?.series == series }
         } ?? places.shownIds
-        let groups = ListGroups(heroIds: heroItems.map(\.id),
-                                favoriteIds: favorites.ids.filter { $0 != linkedRemovedStationID },
+        let heroIds = heroItems.map(\.id)
+        let favoriteIds = favorites.ids.filter { $0 != linkedRemovedStationID }
+        // With hero cards the nearest is already on screen — 4 more; without, 5.
+        let nearCount = fix == nil ? 5 : 4
+        let groups = ListGroups(heroIds: heroIds,
+                                favoriteIds: favoriteIds,
                                 // Uncollapsed on purpose: a station opened via the chooser is an explicit
                                 // pick, same principle StationGroups grants Favorites — collapsing it
                                 // would let Recents silently show and reopen the nearest namesake
                                 // instead. Near Me stays collapsed: distance ranking is not user choice.
                                 recentIds: recents.ids,
                                 rankedIds: nearIds,
-                                // With hero cards the nearest is already on screen — 4 more; without, 5.
-                                nearCount: fix == nil ? 5 : 4)
+                                nearCount: nearCount)
 
         // The automatic tier is what the list is rendering, and `ListGroups`
-        // has just computed exactly that. Unfiltered on purpose: filtering to
-        // Currents says what the user wants to LOOK at, not what to fetch.
-        let cohortIds = groups.heroIds + groups.nearMe
+        // has just computed exactly that — except for the filter, which the
+        // cohort must ignore (spec §What "in view" means). Filtering to
+        // Currents says what the user wants to LOOK at, not what to fetch, so
+        // the cohort takes the SAME nearCount prefix off the unfiltered
+        // ranking. `seriesFilter` is `@AppStorage`, so a filtered cohort also
+        // persists: a chip left on would make every later launch download
+        // currents only. Worse, with no hero (`fix == nil`) `capture` keys
+        // novelty on the id set, so a chip tap would re-capture and reset
+        // `declinedNearby` — a filter undoing a "Not now", which is exactly
+        // the flap the latch exists to prevent. Unfiltered, the chips cannot
+        // reach it. Second pass only when a chip is on: with no filter
+        // `nearIds` IS `places.shownIds` and `groups` is already the answer.
+        let cohortGroups = seriesFilter == nil ? groups
+            : ListGroups(heroIds: heroIds, favoriteIds: favoriteIds,
+                         recentIds: recents.ids, rankedIds: places.shownIds,
+                         nearCount: nearCount)
+        let cohortIds = cohortGroups.heroIds + cohortGroups.nearMe
         // Deferred a run loop turn: capturing here directly would mutate
         // `ChsFitService`'s `@Published` state while this view's body is
         // still being evaluated.
         let _ = DispatchQueue.main.async {
-            ChsFitService.shared.captureCohort(ids: cohortIds, heroID: groups.heroIds.first)
+            ChsFitService.shared.captureCohort(ids: cohortIds, heroID: cohortGroups.heroIds.first)
         }
 
         DownloadStrip(

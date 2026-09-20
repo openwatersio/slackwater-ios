@@ -24,8 +24,8 @@ enum BackgroundDownloads {
 
     /// The wildcard, matching `BGTaskSchedulerPermittedIdentifiers`. Built from
     /// the bundle id so the two cannot drift; a stale literal fails
-    /// registration silently.
-    static var pattern: String { (Bundle.main.bundleIdentifier ?? "") + ".downloads.*" }
+    /// registration silently. Nothing outside this file reads it.
+    private static var pattern: String { (Bundle.main.bundleIdentifier ?? "") + ".downloads.*" }
 
     /// Register a fresh concrete identifier and submit it. Continued-processing
     /// registrations are exempt from the register-before-launch rule, so this
@@ -140,13 +140,32 @@ enum BackgroundDownloads {
                 // itself runs on whatever queue BGTaskScheduler's handler
                 // uses, and `ChsFitService.shared` is @MainActor-isolated.
                 let service = ChsFitService.shared
-                let total = service.queue.total
-                task.progress.totalUnitCount = Int64(total)
                 service.resumeForBackground()
+                // Per REQUEST, not per station: a 210-day current gate is ~150
+                // requests behind one station-level tick, which freezes the bar
+                // for ~2.5 minutes on an API that kills tasks showing no
+                // progress first. `ChsJob.total`/`done` already track chunks
+                // within a job (set by `fit`/`fitCurrent`); `requestCount` is
+                // the same figure for a job that hasn't started one yet, so it
+                // stands in as that job's planned share before `total` is set.
                 while !Task.isCancelled, service.queue.active {
-                    task.progress.completedUnitCount = Int64(service.queue.ready)
+                    let jobs = service.queue.jobs
+                    let planned = jobs.reduce(0.0) { $0 + $1.requestCount }
+                    let done = jobs.reduce(0.0) { sum, job in
+                        sum + (job.status == .ready ? job.requestCount : Double(job.done))
+                    }
+                    task.progress.totalUnitCount = Int64(planned.rounded())
+                    task.progress.completedUnitCount = Int64(done.rounded())
+                    // A rate-limit backoff waits at least 60 s (`ChsQueue.backoff`),
+                    // which would otherwise read as a second stall with no
+                    // explanation.
+                    let waiting = jobs.contains {
+                        $0.status == .pending && ($0.retryAfter ?? .distantPast) > appNow()
+                    }
                     task.updateTitle("Downloading tide stations",
-                                     subtitle: "\(service.queue.ready) of \(total)")
+                                     subtitle: waiting
+                                        ? "Waiting for a rate limit to clear…"
+                                        : "\(Int(done.rounded())) of \(Int(planned.rounded())) requests")
                     try? await Task.sleep(for: .seconds(2))
                 }
                 task.setTaskCompleted(success: !Task.isCancelled)
