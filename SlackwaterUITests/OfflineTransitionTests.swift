@@ -141,7 +141,13 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         // and promotion, not tier gating, so pull the whole fixture set in.
         let everythingToggle = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
         XCTAssert(everythingToggle.appears(within: 5))
-        everythingToggle.tap()
+        // Aim at the trailing edge, not the centre. SwiftUI publishes the whole
+        // Toggle row — its two-line explanation included — as one Switch element
+        // (338×98 pt here), so `tap()`'s centre point lands on the copy about
+        // 120 pt left of the control. A switch's label is not a tap target on
+        // iOS, so that tap is delivered and does nothing: the tier stayed
+        // `.inView` and Race Passage and Porlier Pass never joined the queue.
+        everythingToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
