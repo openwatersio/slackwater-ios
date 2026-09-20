@@ -123,9 +123,8 @@ func sendReport(_ kind: ReportKind, stationID: String, scrubTime: Date? = nil,
     }
 }
 
-/// Below the fold and icon-quiet on purpose: a wrong tide is rare, and this
-/// sits in the provenance footer next to the not-for-navigation line rather
-/// than competing with the readings.
+/// Below the fold and quiet on purpose: a wrong tide is rare, and this sits in
+/// the provenance footer rather than competing with the readings.
 struct ReportProblemMenu: View {
     let stationID: String
     var scrubTime: Date? = nil
@@ -142,19 +141,20 @@ struct ReportProblemMenu: View {
                 }
             }
         } label: {
-            Image(systemName: "exclamationmark.bubble")
-                .font(.caption2)
-                // Sun, not amber: amber is the warning language this app keeps
-                // scarce, and an invitation to tell us something is wrong is
-                // not itself a warning. The same yellow the favourite star uses.
-                .foregroundStyle(SN.sun.opacity(0.8))
-                // Chrome in a fixed hit target: 44pt of touch around a caption
-                // glyph, without the frame growing with Dynamic Type into the
-                // centred label beside it.
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+            HStack(spacing: 4) {
+                Text("Concerns or Feedback")
+                    .foregroundStyle(SN.foam.opacity(0.4))
+                Image(systemName: "exclamationmark.bubble")
+                    // Sun, not amber: amber is the warning language this app keeps
+                    // scarce, and an invitation to tell us something is wrong is
+                    // not itself a warning. The same yellow the favourite star uses.
+                    .foregroundStyle(SN.sun.opacity(0.8))
+            }
+            .font(.caption2)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
-        .accessibilityLabel("Report a problem")
+        .accessibilityLabel("Concerns or Feedback")
         .accessibilityIdentifier("detail-report")
         .alert("No mail app", isPresented: $copied) {
             Button("OK") {}

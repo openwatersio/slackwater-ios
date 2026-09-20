@@ -1208,7 +1208,7 @@ struct WeekPickerSheet: View {
 }
 
 /// The provenance footer: the not-for-navigation label over the caller's
-/// caption line(s), with the report menu hung off the label's trailing edge.
+/// caption line(s), followed by the report menu on its own line.
 struct DetailFooter<Note: View>: View {
     /// The station a report is about — the same id the header favourites.
     let stationID: String
@@ -1221,13 +1221,9 @@ struct DetailFooter<Note: View>: View {
         VStack(spacing: 6) {
             MonoLabel(text: "Predictions — not for navigation",
                       color: SN.foam.opacity(0.4), tracking: 1.4)
-                // An overlay, not an HStack: the label stays centred on the
-                // row and the menu hangs past it into the margin.
                 .frame(maxWidth: .infinity)
-                .overlay(alignment: .trailing) {
-                    ReportProblemMenu(stationID: stationID, scrubTime: scrubTime, tz: tz)
-                }
             note()
+            ReportProblemMenu(stationID: stationID, scrubTime: scrubTime, tz: tz)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
