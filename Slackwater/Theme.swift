@@ -313,9 +313,21 @@ struct SkyBackdrop: View {
                 }
                 if let moon = sky.moon, let illumination = sky.illumination {
                     let glowRadius = moonGlowRadius(fraction: illumination.fraction)
-                    let point = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
-                                         latitude: sky.latitude, span: sky.moonSpan,
-                                         pad: moonGlyphSize / 2, size: size)
+                    let truePoint = skyPoint(azimuth: moon.azDeg, altitude: moon.altDeg,
+                                             latitude: sky.latitude, span: sky.moonSpan,
+                                             pad: moonGlyphSize / 2, size: size)
+                    // The symbols are many times the true half-degree, so the
+                    // real separation is under a point and any partial would
+                    // read as total. In an eclipse the moon sits off the sun by
+                    // the covered fraction instead: touching at first contact,
+                    // concentric at totality, along its true bearing.
+                    let point = sunPoint.map { sun -> CGPoint in
+                        guard sky.obscuration > 0 else { return truePoint }
+                        let dx = truePoint.x - sun.x, dy = truePoint.y - sun.y, len = hypot(dx, dy)
+                        let d = (sunDiscRadius + moonGlyphSize / 2) * (1 - sky.obscuration)
+                        return len > 0 ? CGPoint(x: sun.x + dx / len * d, y: sun.y + dy / len * d)
+                                       : CGPoint(x: sun.x + d, y: sun.y)
+                    } ?? truePoint
                     let toSun = sky.moonLightAngle
                     let glare = moonGlareOpacity(
                         distance: sunPoint.map { hypot($0.x - point.x, $0.y - point.y) } ?? .infinity,
