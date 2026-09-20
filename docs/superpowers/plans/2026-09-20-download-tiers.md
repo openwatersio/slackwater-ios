@@ -6,7 +6,7 @@
 
 **Architecture:** The download queue is already one distance-sorted list (`ChsQueue`, ordered by `reorder()`). Tiers are not new queues — they are ceilings on how far `ChsFitService.adopt` walks the candidate list when it adds jobs. A captured cohort of station ids, taken once per place from what `ListGroups` renders, defines the automatic tier and gives the prompt a completion predicate that cannot flap.
 
-**Tech Stack:** Swift 6 toolchain in Swift 5 language mode, SwiftUI, XCTest, XcodeGen (`project.yml` generates `Slackwater.xcodeproj` and `Slackwater/Info.plist`), BackgroundTasks (iOS 26).
+**Tech Stack:** Swift 6.4 toolchain (Xcode 27) compiling in **Swift 5 language mode**, SwiftUI, XCTest, XcodeGen (`project.yml` generates `Slackwater.xcodeproj` and `Slackwater/Info.plist`), BackgroundTasks (iOS 26).
 
 **Spec:** `docs/superpowers/specs/2026-09-20-download-tiers-design.md`
 
@@ -18,6 +18,7 @@
 - A `BGContinuedProcessingTask` handler is registered against a **concrete** identifier at tap time and submitted immediately. Continued-processing registrations are exempt from the register-before-launch rule. Never register against the wildcard pattern itself, and never register the same identifier twice in one session — that is a fatal exception, not an error.
 - The nearby tier radius is **25 km** (`DownloadTier.nearbyRadiusKm`).
 - No user-facing string may promise background completion. Locking the device stops a continued-processing task. Offers state a count, never a duration; durations appear only inside the downloads manager.
+- **Swift 5 language mode is a default, not a decision.** `project.yml` sets no `SWIFT_VERSION`, so XcodeGen writes `SWIFT_VERSION = 5.0` into the generated project, and that project is gitignored — the setting exists in no committed file. Concurrency violations are therefore warnings, which is what lets Task 6 capture a non-`Sendable` `BGContinuedProcessingTask` into a `Task`. Do not treat that as sanctioned: write each task as though the mode could flip, and if it ever does, the fix is to pin `SWIFT_VERSION: 5.0` in `project.yml` deliberately rather than to discover it from a wall of errors.
 - Commit messages end with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` and carry no session URL.
 - Compile-check with `lockf -t 0 /tmp/slackwater-test.lock xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater -destination 'platform=iOS Simulator,name=iPhone 17' -clonedSourcePackagesDirPath build/SourcePackages`. `lockf -t 0` fails immediately if another worktree holds the machine — wait, never force it.
 
