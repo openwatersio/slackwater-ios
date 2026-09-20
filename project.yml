@@ -16,6 +16,15 @@ settings:
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
     MARKETING_VERSION: 1.13.0
     CURRENT_PROJECT_VERSION: 42
+    # The language mode the app compiles in, stated rather than inherited.
+    # XcodeGen's default is 5.0 and the project it writes is gitignored, so
+    # without this line the mode lives in no committed file: a version bump
+    # could move it, and every concurrency warning in the app — the
+    # non-Sendable UserDefaults in StationIntent, the detached run loop in
+    # ChsFitService — would become an error at once, with nothing in git to
+    # say what changed. Pinned at the value already in use, so this changes
+    # no behaviour. Moving to 6 is a migration, not a setting.
+    SWIFT_VERSION: "5.0"
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
