@@ -126,6 +126,19 @@ final class ChsFitService: ObservableObject {
     private var onlineOrigin: (lat: Double, lon: Double)?
     private var onlineRunning = false
 
+    /// How far out the queue is currently allowed to walk, and the stations
+    /// the list was rendering when the question was last framed.
+    @Published private(set) var tier: DownloadTier = .inView
+    @Published private(set) var cohort = DownloadCohort()
+    /// "Not now" holds for the session. The manager is the way back in.
+    @Published private(set) var declinedNearby = false
+    /// How many stations the next tier would add — the offer's number. Kept
+    /// as a stored value recomputed at the end of `adopt()` and in
+    /// `captureCohort()`, not a computed property: a view observes this
+    /// through `@Published` and would otherwise re-run a haversine scan over
+    /// every candidate on each body evaluation while a download is in flight.
+    @Published private(set) var remainingBeyondCohort = 0
+
     /// The first nine jobs lead; unconstrained paths continue through every station within 150 km.
     static let autoFitPorts = 6
     static let autoFitGates = 3
@@ -149,6 +162,10 @@ final class ChsFitService: ObservableObject {
         return jobs.filter { fitOnly?.contains($0.id) ?? true }
     }()
 
+    /// `candidates`' ids, for `captureCohort`'s filter: the station list mixes
+    /// NOAA and CHS stations, but only a CHS id ever gets a `ChsQueue` job.
+    private static let candidateIDs: Set<String> = Set(candidates.map(\.id))
+
     /// Online gates use the same radius and Low Data Mode brake as fitted jobs.
     static func autoPrefetchGates(lat: Double, lon: Double,
                                   constrained: Bool = false) -> [ChsCurrentGateInfo] {
@@ -162,9 +179,18 @@ final class ChsFitService: ObservableObject {
         return constrained ? Array(gates.prefix(autoFitGates)) : gates
     }
 
-    /// The stations a fix downloads on its own: the nearest ports and the
-    /// nearest gates, out of those inside `autoFitRadiusKm`.
-    static func autoFitSet(lat: Double, lon: Double, constrained: Bool = false) -> [ChsJob] {
+    /// The stations a fix downloads: those the active tier admits, nearest
+    /// first. The cohort is always admitted — a station on screen is being
+    /// looked at, and a ceiling must never evict it.
+    ///
+    /// `tier` defaults to `.everything` (bounded at `autoFitRadiusKm`), NOT
+    /// `.inView`: every caller that does not pass a tier explicitly —
+    /// `adopt` is the only one that does — is preserving today's
+    /// unconstrained auto-fit behaviour, and `.inView` with an empty cohort
+    /// downloads nothing.
+    static func autoFitSet(lat: Double, lon: Double, constrained: Bool = false,
+                           tier: DownloadTier = .everything,
+                           cohort: Set<String> = []) -> [ChsJob] {
         func byDistance(_ jobs: [ChsJob]) -> [ChsJob] {
             jobs.sorted {
                 let a = distanceKm($0.latitude, $0.longitude, lat, lon)
@@ -172,11 +198,11 @@ final class ChsFitService: ObservableObject {
                 return a == b ? $0.id < $1.id : a < b
             }
         }
-        let near = candidates.filter {
-            distanceKm($0.latitude, $0.longitude, lat, lon) <= autoFitRadiusKm
+        let admitted = candidates.filter {
+            tier.admits($0, from: (lat, lon), cohort: cohort)
         }
-        let ports = byDistance(near.filter { !$0.isCurrent })
-        let gates = byDistance(near.filter { $0.isCurrent })
+        let ports = byDistance(admitted.filter { !$0.isCurrent })
+        let gates = byDistance(admitted.filter { $0.isCurrent })
         let budgeted = Array(ports.prefix(autoFitPorts)) + Array(gates.prefix(autoFitGates))
         guard !constrained else { return budgeted }
         return budgeted + Array(gates.dropFirst(autoFitGates)) + Array(ports.dropFirst(autoFitPorts))
@@ -305,10 +331,43 @@ final class ChsFitService: ObservableObject {
     /// ports, and never drops what Victoria already paid for.
     private func adopt(lat: Double, lon: Double) {
         for job in Self.autoFitSet(lat: lat, lon: lon,
-                                   constrained: Connectivity.shared.constrained) { queue.add(job) }
+                                   constrained: Connectivity.shared.constrained,
+                                   tier: tier, cohort: cohort.ids) { queue.add(job) }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
+        remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon, tier: .nearby, cohort: cohort.ids)
+            .count { !cohort.ids.contains($0.id) }
     }
+
+    /// The list hands over what it is rendering. Captured once per place; a
+    /// capture that takes re-opens the question.
+    ///
+    /// Filtered to CHS candidates first: the list mixes NOAA and CHS
+    /// stations, but only a CHS id ever gets a `ChsQueue` job, so an
+    /// unfiltered cohort would count stations that were never going to
+    /// download in the strip's "done of total".
+    func captureCohort(ids: [String], heroID: String?) {
+        let chsIDs = ids.filter { Self.candidateIDs.contains($0) }
+        guard cohort.capture(ids: chsIDs, heroID: heroID) else { return }
+        declinedNearby = false
+        if let origin = onlineOrigin {
+            adopt(lat: origin.lat, lon: origin.lon)
+        } else {
+            remainingBeyondCohort = 0
+        }
+        pump()
+    }
+
+    /// The user accepted a wider tier. This is the tap that lets the work
+    /// continue in the background.
+    func accept(_ newTier: DownloadTier) {
+        tier = newTier
+        if let origin = onlineOrigin { adopt(lat: origin.lat, lon: origin.lon) }
+        pump()
+        BackgroundDownloads.submitIfPossible(queue: queue)
+    }
+
+    func declineNearby() { declinedNearby = true }
 
     /// Re-assert the UI-test hooks over jobs added by a later location fix.
     private func markFailOnly() {
