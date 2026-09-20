@@ -57,21 +57,35 @@ struct DownloadCohort {
 
     /// Take a cohort if this is a new place. Returns true when it did, which
     /// is the caller's signal that the question may be asked again.
+    ///
+    /// With a hero, only the hero's identity marks a new place — that is the
+    /// anti-flap rule and it does not change when a hero is present. Without
+    /// one (location denied, no fix yet), there is no identity to key off,
+    /// so a genuine change to the id set is what counts instead; the same
+    /// set in a different order is not a change.
     mutating func capture(ids newIDs: [String], heroID newHero: String?) -> Bool {
         guard !newIDs.isEmpty else { return false }
-        guard self.ids.isEmpty || newHero != heroID else { return false }
+        let isNewPlace = ids.isEmpty
+            || newHero != heroID
+            || (newHero == nil && Set(newIDs) != ids)
+        guard isNewPlace else { return false }
         self.ids = Set(newIDs)
         self.heroID = newHero
         return true
     }
 
-    /// Every captured station has finished, one way or the other. `.failed`
-    /// counts: another attempt gets the same answer, and holding the user at
+    /// Every captured station has finished, one way or the other — or the
+    /// download queue never had a job for it. A cohort is built from the
+    /// station list's ids, which include NOAA stations; `ChsQueue` only ever
+    /// holds CHS jobs, so an id the queue doesn't know needs no download and
+    /// cannot be "still downloading" — treating it as unsettled would leave
+    /// any cohort with a NOAA station stuck forever. `.failed` counts too:
+    /// another attempt gets the same answer, and holding the user at
     /// "downloading" for a station that cannot finish is a lie.
     func settled(in queue: ChsQueue) -> Bool {
         guard !ids.isEmpty else { return false }
         return ids.allSatisfy { id in
-            guard let status = queue.status(id) else { return false }
+            guard let status = queue.status(id) else { return true }
             return status == .ready || status == .failed
         }
     }
