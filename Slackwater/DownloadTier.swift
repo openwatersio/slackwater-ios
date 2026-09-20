@@ -122,10 +122,3 @@ func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadT
     guard tier == .inView, !declined, remaining > 0 else { return .absent }
     return .asking(count: remaining)
 }
-
-// TEMPORARY STUB (Task 4) — Task 6 adds the real Slackwater/BackgroundDownloads.swift
-// and MUST DELETE this enum when it does. Leaving both in place is a build
-// failure: two types named `BackgroundDownloads`.
-enum BackgroundDownloads {
-    static func submitIfPossible(queue: ChsQueue) {}
-}
