@@ -294,6 +294,7 @@ struct OfflineManagerList: View {
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
+                tierSection
                 summary
                 chartsCard
                 ForEach(downloads) { download in
@@ -308,6 +309,41 @@ struct OfflineManagerList: View {
         }
         .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
+    }
+
+    // MARK: Tiers
+
+    /// The tiers, and the only place a duration is allowed to appear: someone
+    /// who opened the manager came looking for the number, whereas the same
+    /// number on the list's strip is an invitation to sit and wait.
+    @ViewBuilder private var tierSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("In view").font(.headline)
+            Text("The stations on your list download on their own.")
+
+            if service.tier == .inView {
+                Button("Download \(service.remainingBeyondCohort) more within 25 km") {
+                    service.accept(.nearby)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(service.remainingBeyondCohort == 0)
+            } else {
+                Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
+            }
+
+            Toggle(isOn: Binding(
+                get: { service.tier == .everything },
+                set: { on in service.accept(on ? .everything : .nearby) })) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Keep downloading Canadian stations")
+                        // No estimate and no percentage: 1,073 stations is
+                        // hours of requests and has no finish line to show.
+                        Text("Whenever Slackwater is open. \(service.queue.ready) so far.")
+                            .font(.footnote)
+                    }
+                }
+        }
+        .padding(.horizontal, 26)
     }
 
     // MARK: Summary
@@ -438,7 +474,7 @@ struct OfflineManagerList: View {
             return [String(localized: "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.", comment: "Offline-download summary while offline."), onDemandLine]
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        let base = String(localized: "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.", comment: "Offline-download progress summary. The value is an approximate duration.")
+        let base = String(localized: "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice.", comment: "Offline-download progress summary.")
         return [base, onDemandLine].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
@@ -446,11 +482,6 @@ struct OfflineManagerList: View {
         let rest = service.notQueued
         guard rest > 0 else { return "" }
         return String(localized: "\(rest) more Canadian stations are searchable everywhere — open one and it downloads.", comment: "Offline-download catalog note. The integer is a station count; vary by plural.")
-    }
-
-    private var remainingSeconds: Double {
-        queue.jobs.filter { $0.status == .pending || $0.status == .downloading }
-            .reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
     }
 
     private var allGates: [ChsJob] { service.gatesToDownload }
