@@ -72,3 +72,50 @@ let seenTourKey = "slackwater.seenTour"
             .first { $0.rawValue > step.rawValue }
     }
 }
+
+// MARK: - Where the demo scrubs to
+
+/// An hour past the next sunset: late enough that the backdrop is actually
+/// dark and the stars are worth pointing at.
+private let darkMargin: TimeInterval = 3600
+
+/// The moment the tour glides to for its stars beat, or nil above the Arctic
+/// Circle in summer, where the window holds no sunset at all.
+///
+/// Read off `TimelineDay`, never searched for: `SkyState` documents why a rise
+/// or set search does not belong on this page (Theme.swift), and the timeline
+/// build has already paid for these.
+func tourStarsTime(days: [TimelineDay], after now: Date) -> Date? {
+    days.compactMap(\.sunset)
+        .sorted()
+        .first { $0.addingTimeInterval(darkMargin) > now }
+        .map { $0.addingTimeInterval(darkMargin) }
+}
+
+/// The midpoint of the first span where the moon is up AND the sun is down —
+/// the only kind of moment where "that is the real moon" is worth showing.
+/// Nil when no such span falls in the window.
+func tourMoonTime(days: [TimelineDay], after now: Date) -> Date? {
+    let sunsets = days.compactMap(\.sunset).sorted()
+    let sunrises = days.compactMap(\.sunrise).sorted()
+    // A dark span runs from a sunset to the next sunrise after it.
+    let dark: [(Date, Date)] = sunsets.compactMap { set in
+        sunrises.first { $0 > set }.map { (set, $0) }
+    }
+    let moonUp: [(Date, Date)] = days.compactMap { d in
+        guard let rise = d.moonrise else { return nil }
+        // A lunar day is 24h50m, so the set can belong to the next entry.
+        guard let set = days.compactMap(\.moonset).sorted().first(where: { $0 > rise })
+        else { return nil }
+        return (rise, set)
+    }
+    return dark.flatMap { d in
+        moonUp.compactMap { m -> Date? in
+            let lo = max(d.0, m.0), hi = min(d.1, m.1)
+            guard lo < hi else { return nil }
+            return lo.addingTimeInterval(hi.timeIntervalSince(lo) / 2)
+        }
+    }
+    .sorted()
+    .first { $0 > now }
+}
