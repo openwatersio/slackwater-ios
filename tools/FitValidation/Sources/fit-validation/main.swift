@@ -1,12 +1,19 @@
 // Slackwater — GPL v3. M3 exit check A: fitted predictions vs live IWLS over a
-// held-out window, the M0 spike's methodology (60 d @ 15 min fit; 7-day
-// validation window 4 weeks after fit end; RMSE on the 15-min grid vs wlp;
-// extreme timing vs wlp-hilo, classified against neighbours, matched by kind
-// within 180 min). Fit runs in JSCore via the app's committed chs-bundle.js +
-// chs-glue.js; prediction runs in Neaps — exactly the shipping path.
+// held-out window, the M0 spike's methodology (15-min fit; 7-day validation
+// window 4 weeks after fit end; RMSE on the 15-min grid vs wlp; extreme timing
+// vs wlp-hilo, classified against a neighbour, matched by kind within 180 min).
+// Fit runs in JSCore via the app's committed chs-bundle.js + chs-glue.js;
+// prediction runs in Neaps — exactly the shipping path.
 //
 //   swift run fit-validation <name> <lat> <lon> [cacheDir]            # tide (wlp)
 //   swift run fit-validation --current <name> <lat> <lon> [cacheDir]  # current gate (wcsp1)
+//
+// Tide mode fits 60 d by default. `--days 28,35,42,60` sweeps several windows
+// instead: one fetch covers the longest, every shorter window is its trailing
+// slice, and each is scored against the same held-out data. The bar the tide
+// numbers are read against is spikes/chs-tide-window/README.md — held-out error
+// is the only instrument that sees a short-window failure, because the in-sample
+// rms does not move while it happens.
 //
 // Current mode (M47): fetch wcsp1 (speed) + wcdp1 (direction) for 210 d ending
 // today 00Z, project onto the CHS flood axis (speed·cos(dir−floodDirection) —
@@ -23,14 +30,35 @@ import Neaps
 
 let isCurrentMode = CommandLine.arguments.contains("--current")
 let isFileMode = CommandLine.arguments.contains("--samples")
-let args = CommandLine.arguments.filter { $0 != "--current" }
-
 // File-input mode (Task 5): --samples/--events/--flood/--ebb/--label replace
 // IWLS discovery+fetch entirely; see runFileMode() below.
 func flagValue(_ flag: String) -> String? {
     guard let i = CommandLine.arguments.firstIndex(of: flag), i + 1 < CommandLine.arguments.count else { return nil }
     return CommandLine.arguments[i + 1]
 }
+
+/// Positional args only: every flag, and the value following a valued flag, is
+/// dropped so `<name> <lat> <lon> [cacheDir]` keeps its indices whatever flags
+/// are passed. Without this, a trailing `--days 35` reads as the cacheDir.
+let valuedFlags: Set<String> = ["--days", "--samples", "--events", "--flood", "--ebb", "--label"]
+let args: [String] = {
+    var out: [String] = []
+    var skip = false
+    for a in CommandLine.arguments {
+        if skip { skip = false; continue }
+        if valuedFlags.contains(a) { skip = true; continue }
+        if a.hasPrefix("--") { continue }
+        out.append(a)
+    }
+    return out
+}()
+
+/// Tide-mode fit windows, in days. One `wlp` fetch covers the longest; every
+/// shorter window is its trailing slice, so the sweep costs no extra requests
+/// (the shape `--current` mode already uses for its 210/60 pair).
+let fitWindows: [Double] = (flagValue("--days") ?? "60")
+    .split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+    .sorted()
 
 let lat: Double
 let lon: Double
@@ -39,7 +67,7 @@ if isFileMode {
     lon = 0
 } else {
     guard args.count >= 4, let l = Double(args[2]), let o = Double(args[3]) else {
-        print("usage: fit-validation [--current] <name> <lat> <lon> [cacheDir]")
+        print("usage: fit-validation [--current] [--days 28,35,42,60] <name> <lat> <lon> [cacheDir]")
         print("       fit-validation --samples <file> --events <file> --flood <deg> --ebb <deg> --label <slug>")
         exit(2)
     }
@@ -111,11 +139,12 @@ if !isFileMode {
     print("resolved: \(name) -> \(station.officialName) (\(station.id)), \(String(format: "%.2f", distance)) km")
 }
 
-// --- windows: fit 60 d ending today 00Z; validate +28 d .. +35 d ---
+// --- windows: fit the longest requested window ending today 00Z; validate +28 d .. +35 d ---
 struct IwlsSample: Decodable { let eventDate: String; let value: Double }
 let dayS = 86_400.0
 let today = floor(Date().timeIntervalSince1970 / dayS) * dayS
-let fitStart = Date(timeIntervalSince1970: today - 60 * dayS)
+let longestWindow = fitWindows.max() ?? 60
+let fitStart = Date(timeIntervalSince1970: today - longestWindow * dayS)
 let fitEnd = Date(timeIntervalSince1970: today)
 let valStart = Date(timeIntervalSince1970: today + 28 * dayS)
 let valEnd = Date(timeIntervalSince1970: today + 35 * dayS)
@@ -412,9 +441,9 @@ if isCurrentMode {
 let fitSamples = quarter(try fetchSeries("wlp", fitStart, fitEnd))
 let valSamples = quarter(try fetchSeries("wlp", valStart, valEnd))
 let hilo = try fetchSeries("wlp-hilo", valStart, valEnd)
-print("fit: \(fitSamples.count) pts (60 d @ 15 min), val: \(valSamples.count) pts, hilo: \(hilo.count) events")
+print("fit: \(fitSamples.count) pts (\(Int(longestWindow)) d @ 15 min), val: \(valSamples.count) pts, hilo: \(hilo.count) events")
 
-// --- fit with the app's exact JS artifacts ---
+// --- the app's exact JS artifacts, loaded once and reused for every window ---
 let ctx = JSContext()!
 var jsError: String?
 ctx.exceptionHandler = { _, exc in jsError = exc?.toString() }
@@ -423,70 +452,151 @@ for file in ["chs-bundle.js", "chs-glue.js"] {
     ctx.evaluateScript(try String(contentsOf: resources.appendingPathComponent(file), encoding: .utf8))
     if let e = jsError { fatalError("\(file): \(e)") }
 }
-let samplesJson = "[" + fitSamples.map { "{\"t\":\($0.t),\"v\":\($0.v)}" }.joined(separator: ",") + "]"
-let t0 = DispatchTime.now()
-guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [samplesJson]), jsError == nil else {
-    fatalError("fitTides threw: \(jsError ?? "?")")
-}
-let wallMs = Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds) / 1e6
+
 struct Fit: Decodable {
     struct Con: Decodable { let name: String; let amplitude: Double; let phase: Double }
     let fitMs: Double, offset: Double, rms: Double
     let constituents: [Con], unseparable: [String]
 }
-let fit = try JSONDecoder().decode(Fit.self, from: Data(out.toString()!.utf8))
-print("fit: \(fit.constituents.count) constituents, rms \(String(format: "%.1f", fit.rms * 100)) cm, " +
-      "offset \(String(format: "%.3f", fit.offset)) m, \(Int(fit.fitMs)) ms JS (\(Int(wallMs)) ms wall), " +
-      "unseparable: \(fit.unseparable.joined(separator: ", "))")
 
-// --- predict with Neaps (the app's shipping path) and score ---
-let engine = Station(constituents: fit.constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
-                     offset: fit.offset)
-let predicted = engine.heights(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970),
-                               to: valEnd, step: 900)
-var predByMs: [Double: Double] = [:]
-for p in predicted { predByMs[p.time.timeIntervalSince1970 * 1000] = p.height }
-var n = 0, sq = 0.0, maxAbs = 0.0
-for s in valSamples {
-    guard let pred = predByMs[s.t] else { continue }
-    let e = (pred - s.v) * 100
-    n += 1; sq += e * e; maxAbs = max(maxAbs, abs(e))
-}
-let rmse = (sq / Double(n)).squareRoot()
+/// The bar, set before scoring — spikes/chs-tide-window/README.md.
+///
+/// Height is not slack: nobody transits a port *at* high water the way a gate
+/// is transited at slack, so timing uses the engine's established maxima bar
+/// rather than the tighter numbers currents earned. Each HEIGHT clause carries
+/// a relative alternative because 10 cm is a fifth of the range at a small
+/// Salish port and a rounding error at Saint John; the looser applies.
+let TIMING_MEDIAN_MAX = 20.0, TIMING_WORST_MAX = 40.0
+let HEIGHT_ABS_CM = 10.0, HEIGHT_REL = 0.02
+let EXTREME_MATCH_MIN = 180.0
+/// Relative clause: a short window ships as FINAL, so it must not be a quiet
+/// downgrade of a number already shipping at 60 days.
+let RMSE_RATIO_MAX = 1.25, TIMING_DRIFT_MAX = 5.0
 
-// Extreme timing vs wlp-hilo (no high/low qualifier — classify vs neighbours).
-let extremes = engine.extremes(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970 - dayS),
-                               to: valEnd.addingTimeInterval(dayS))
-var timings: [Double] = [], heightErrs: [Double] = []
-var matched = 0
-for i in hilo.indices {
-    let prev = i > 0 ? hilo[i - 1].v : -.infinity
-    let next = i < hilo.count - 1 ? hilo[i + 1].v : -.infinity
-    let isHigh = hilo[i].v > prev || hilo[i].v > next
-    var best: (dt: Double, h: Double)?
-    for e in extremes where (e.kind == .high) == isHigh {
-        let dt = abs(e.time.timeIntervalSince1970 * 1000 - hilo[i].t) / 60_000
-        if best == nil || dt < best!.dt { best = (dt, e.height) }
-    }
-    if let b = best, b.dt < 180 {
-        matched += 1
-        timings.append(b.dt)
-        heightErrs.append(abs(b.h - hilo[i].v) * 100)
+// Range is the observed peak-to-trough of wlp over the held-out window, per
+// station — the denominator both height clauses scale against.
+let rangeCm = ((valSamples.map { $0.v }.max() ?? 0) - (valSamples.map { $0.v }.min() ?? 0)) * 100
+let heightBar = max(HEIGHT_ABS_CM, rangeCm * HEIGHT_REL)
+print(String(format: "range %.0f cm over the held-out window -> height bar %.1f cm", rangeCm, heightBar))
+
+struct WindowResult {
+    let days: Double, rmse: Double, maxAbs: Double
+    let timingMedian: Double?, timingWorst: Double?, heightMedian: Double?
+    let matched: Int, total: Int, constituents: Int, fitRmsCm: Double
+    let unseparable: [String]
+    var absolutePass: Bool {
+        matched == total
+            && rmse <= heightBar
+            && (timingMedian ?? .infinity) <= TIMING_MEDIAN_MAX
+            && (timingWorst ?? .infinity) <= TIMING_WORST_MAX
+            && (heightMedian ?? .infinity) <= heightBar
     }
 }
-timings.sort()
-print(String(format: """
-    == %@ vs live IWLS, held-out %@ .. %@ ==
-    RMSE          %.2f cm   (n=%d)
-    max abs       %.1f cm
-    extremes      %d/%d matched, timing median %.0f min / max %.0f min, mean height err %.1f cm
-    """, name, iso.string(from: valStart), iso.string(from: valEnd),
-    rmse, n, maxAbs, matched, hilo.count,
-    timings.isEmpty ? -1 : timings[timings.count / 2], timings.last ?? -1,
-    heightErrs.isEmpty ? -1 : heightErrs.reduce(0, +) / Double(heightErrs.count)))
 
-// Tolerance: the spike's Victoria benchmark was 6.44 cm RMSE / 11 min median.
-// Gate at RMSE <= 10 cm and median extreme timing <= 20 min.
-let pass = rmse <= 10 && !timings.isEmpty && timings[timings.count / 2] <= 20
-print(pass ? "PASS" : "FAIL")
-exit(pass ? 0 : 1)
+let reportsDir = cacheDir.appendingPathComponent("reports")
+try FileManager.default.createDirectory(at: reportsDir, withIntermediateDirectories: true)
+let slug = name.lowercased().replacingOccurrences(of: " ", with: "-")
+
+var results: [WindowResult] = []
+for days in fitWindows {
+    // Trailing slice of the one fetched series — no window refetches anything.
+    let cut = (today - days * dayS) * 1000
+    let windowSamples = fitSamples.filter { $0.t >= cut }
+    let samplesJson = "[" + windowSamples.map { "{\"t\":\($0.t),\"v\":\($0.v)}" }.joined(separator: ",") + "]"
+    jsError = nil
+    guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [samplesJson]), jsError == nil else {
+        fatalError("fitTides threw at \(Int(days)) d: \(jsError ?? "?")")
+    }
+    let fit = try JSONDecoder().decode(Fit.self, from: Data(out.toString()!.utf8))
+
+    // --- predict with Neaps (the app's shipping path) and score ---
+    let engine = Station(constituents: fit.constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
+                         offset: fit.offset)
+    let predicted = engine.heights(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970),
+                                   to: valEnd, step: 900)
+    var predByMs: [Double: Double] = [:]
+    for p in predicted { predByMs[p.time.timeIntervalSince1970 * 1000] = p.height }
+    var n = 0, sq = 0.0, maxAbs = 0.0
+    for s in valSamples {
+        guard let pred = predByMs[s.t] else { continue }
+        let e = (pred - s.v) * 100
+        n += 1; sq += e * e; maxAbs = max(maxAbs, abs(e))
+    }
+    let rmse = (sq / Double(n)).squareRoot()
+
+    // Extreme timing vs wlp-hilo (no high/low qualifier — classify vs neighbours).
+    let extremes = engine.extremes(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970 - dayS),
+                                   to: valEnd.addingTimeInterval(dayS))
+    var timings: [Double] = [], heightErrs: [Double] = []
+    var matched = 0
+    for i in hilo.indices {
+        // wlp-hilo carries no high/low qualifier, so classify against a
+        // neighbour — either one will do, since extremes alternate. Defaulting
+        // a MISSING neighbour to -infinity (the earlier form) made `v > prev ||
+        // v > next` vacuously true at both ends, so the first and last event
+        // were always called high; a low at either end then matched a distant
+        // high and scored unmatched, at every window and every station.
+        guard hilo.count > 1 else { break }
+        let isHigh = i > 0 ? hilo[i].v > hilo[i - 1].v : hilo[i].v > hilo[i + 1].v
+        var best: (dt: Double, h: Double)?
+        for e in extremes where (e.kind == .high) == isHigh {
+            let dt = abs(e.time.timeIntervalSince1970 * 1000 - hilo[i].t) / 60_000
+            if best == nil || dt < best!.dt { best = (dt, e.height) }
+        }
+        if let b = best, b.dt < EXTREME_MATCH_MIN {
+            matched += 1
+            timings.append(b.dt)
+            heightErrs.append(abs(b.h - hilo[i].v) * 100)
+        }
+    }
+
+    let r = WindowResult(days: days, rmse: rmse, maxAbs: maxAbs,
+                         timingMedian: med(timings), timingWorst: timings.max(),
+                         heightMedian: med(heightErrs),
+                         matched: matched, total: hilo.count,
+                         constituents: fit.constituents.count, fitRmsCm: fit.rms * 100,
+                         unseparable: fit.unseparable)
+    results.append(r)
+
+    let fmt = { (x: Double?) in x.map { String(format: "%.1f", $0) } ?? "-" }
+    print("""
+    == \(name) [\(Int(days)) d] \(windowSamples.count) pts, fit rms \(String(format: "%.1f", r.fitRmsCm)) cm, \(fit.constituents.count) constituents
+       RMSE     \(String(format: "%.2f", rmse)) cm  (n=\(n), max abs \(String(format: "%.1f", maxAbs)) cm)
+       timing   median \(fmt(r.timingMedian)) / worst \(fmt(r.timingWorst)) min  (\(matched)/\(hilo.count) matched)
+       height   median \(fmt(r.heightMedian)) cm
+       unseparable [\(fit.unseparable.joined(separator: " "))]
+       \(r.absolutePass ? "PASS" : "FAIL") (absolute bar)
+    """)
+
+    let report: [String: Any] = [
+        "station": name, "windowDays": days, "iwlsId": station.id, "iwlsName": station.officialName,
+        "resolvedKm": distance, "samples": windowSamples.count,
+        "fitRmsCm": r.fitRmsCm, "constituents": fit.constituents.count,
+        "unseparable": fit.unseparable,
+        "valStart": iso.string(from: valStart), "valEnd": iso.string(from: valEnd),
+        "rangeCm": rangeCm, "heightBarCm": heightBar,
+        "rmseCm": rmse, "maxAbsCm": maxAbs,
+        "timingMedianMin": r.timingMedian ?? -1, "timingWorstMin": r.timingWorst ?? -1,
+        "heightMedianCm": r.heightMedian ?? -1,
+        "matched": matched, "hiloTotal": hilo.count,
+        "absolutePass": r.absolutePass,
+    ]
+    try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+        .write(to: reportsDir.appendingPathComponent("\(slug)-tide-\(Int(days))d-report.json"))
+}
+
+// --- the relative clause: is a short window as good as the one shipping? ---
+if let reference = results.first(where: { $0.days == 60 }) ?? results.last, results.count > 1 {
+    print("\n-- vs the \(Int(reference.days)) d window (relative clause) --")
+    for r in results where r.days != reference.days {
+        let ratio = r.rmse / reference.rmse
+        let drift = (r.timingMedian ?? .infinity) - (reference.timingMedian ?? 0)
+        let ok = ratio <= RMSE_RATIO_MAX && drift <= TIMING_DRIFT_MAX
+        print(String(format: "   %3d d: RMSE x%.2f, timing %+.1f min  %@",
+                     Int(r.days), ratio, drift, ok ? "PASS" : "FAIL"))
+    }
+}
+
+let longest = results.last
+print(longest?.absolutePass == true ? "PASS" : "FAIL")
+exit(longest?.absolutePass == true ? 0 : 1)
