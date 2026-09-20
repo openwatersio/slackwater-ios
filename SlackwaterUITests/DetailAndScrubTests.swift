@@ -846,6 +846,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         openFridayHarbor(app)
         let report = app.descendants(matching: .any)["detail-report"].firstMatch
         scrollTo(report, in: app)
+        XCTAssertEqual(report.label, "Concerns or Feedback")
         save(app, "report-footer.png")
         report.tap()
         for subject in ["Station is in the wrong place",
