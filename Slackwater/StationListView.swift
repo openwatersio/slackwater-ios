@@ -620,8 +620,9 @@ struct StationListView: View {
     }
 
     /// Show a station picked anywhere (row tap in regular, map pin tap in
-    /// both). Resets the path first: in the split layout this replaces the
-    /// shown detail; in the stack the path is empty here anyway.
+    /// both). Replaces the path rather than appending to it: in the split
+    /// layout that swaps the shown detail; in the stack the path is empty
+    /// here anyway.
     ///
     /// `at` is the moment a shared link carried; the pushed detail scrubs to
     /// it (ScrubDetailScaffold). Nil — every other caller — means "now".
@@ -633,17 +634,23 @@ struct StationListView: View {
         // detail — drop it. On iPhone the push dismisses it anyway.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                         to: nil, from: nil, for: nil)
-        path = NavigationPath()
+        // Built whole, then assigned once. Callers mutate other state in the
+        // same gesture (the map preview sets `mapPreview` and `showMap`), and a
+        // reset-then-append coalesced into one update can leave the stack
+        // holding the empty path: the preview dismissed with nothing pushed
+        // (#448).
+        var next = NavigationPath()
         switch item {
-        case .tide(let s): path.append(NoaaRoute.tide(s))
-        case .current(let s): path.append(NoaaRoute.current(s))
+        case .tide(let s): next.append(NoaaRoute.tide(s))
+        case .current(let s): next.append(NoaaRoute.current(s))
         // Every CHS station routes the same way, fitted or not: ChsDetailView
         // shows the real detail when the model is there and the ⚠️ download
         // explanation when it isn't. A tap is never a dead tap.
-        case .chs(let info): path.append(ChsRoute.port(info))
-        case .chsGate(let gate): path.append(ChsRoute.derivedGate(gate))
-        case .chsCurrent(let gate): path.append(ChsRoute.currentGate(gate))
+        case .chs(let info): next.append(ChsRoute.port(info))
+        case .chsGate(let gate): next.append(ChsRoute.derivedGate(gate))
+        case .chsCurrent(let gate): next.append(ChsRoute.currentGate(gate))
         }
+        path = next
     }
 
     // The stations: My Location → Favorites → Near Me → Recents —
