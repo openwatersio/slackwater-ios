@@ -122,7 +122,7 @@ struct SettingsView: View {
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")
                         Text("Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included.")
                         Text("Station names & pairings: @openwaters/station-metadata (MIT).")
-                        Text("Prediction engine: slackwater-engine, a port of Neaps (MIT).")
+                        Text("Prediction engine: Neaps (MIT).")
                     }
 
                     section("Privacy") {

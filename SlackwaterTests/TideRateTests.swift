@@ -3,7 +3,7 @@
 // evaluations, not neighbouring 600 s strip samples (TideStation.swift:48
 // records why sample differencing near a turn picks up numerical noise).
 import XCTest
-import TideEngine
+import Neaps
 @testable import Slackwater
 
 final class TideRateTests: XCTestCase {

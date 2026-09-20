@@ -24,7 +24,7 @@
 // partial/flagged state.
 import CoreLocation
 import Foundation
-import TideEngine
+import Neaps
 
 /// One channel-2 oriented flow sample: a cell's centroid + the SIGNED
 /// (not `abs`) anchor speed scaled to that cell, plus the cell's physical

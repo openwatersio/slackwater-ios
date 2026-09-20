@@ -31,7 +31,7 @@
  * and all still load-bearing:
  *
  *   - reference and subordinate stations. A subordinate is offsets against a
- *     reference (slackwater-engine's SubordinateTideStation does the
+ *     reference (Neaps's SubordinateTideStation does the
  *     reduction); it ships with `reference` and `offsets` and NO constituents
  *     — see isSubordinate below for why — and only if its reference ships too.
  *   - at least one non-zero constituent, or there is nothing to predict.

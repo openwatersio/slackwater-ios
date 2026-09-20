@@ -1,5 +1,5 @@
 import XCTest
-import TideEngine
+import Neaps
 @testable import Slackwater
 
 /// Subordinate current stations (#268): a bundled record with `reference` and

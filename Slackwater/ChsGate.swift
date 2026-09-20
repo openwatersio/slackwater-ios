@@ -4,10 +4,10 @@
 // port's high/low water plus a fixed lag — cruising-community consensus, not a
 // CHS current prediction — so slack TIMES and a flood/ebb PHASE are honest,
 // but never a speed. Mirrors slackwater-web chsStations.ts (derived) +
-// chs/current.ts (deriveCurrentState); the math lives in TideEngine's
+// chs/current.ts (deriveCurrentState); the math lives in Neaps's
 // DerivedSlackStation, kept in step with the web.
 import Foundation
-import TideEngine
+import Neaps
 
 /// Bundled identity for one derived gate. `reference` is a bundled CHS tide
 /// port (chs-stations.json) whose on-device fitted model supplies the

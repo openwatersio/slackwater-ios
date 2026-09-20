@@ -5,7 +5,7 @@
 // reduce from).
 import CoreLocation
 import Foundation
-import TideEngine
+import Neaps
 
 /// Below this magnitude the water reads "Slack", not a direction (web chs/current.ts SLACK_KN).
 let slackKn = 0.15

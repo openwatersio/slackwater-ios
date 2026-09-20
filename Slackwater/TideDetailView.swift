@@ -6,7 +6,7 @@
 // anchor, and the strip is `Timeline.window` over the same anchor — with day
 // headers; rows scrub, cross-day.
 import SwiftUI
-import TideEngine
+import Neaps
 
 struct TideDetailView: View {
     let record: TideStationRecord

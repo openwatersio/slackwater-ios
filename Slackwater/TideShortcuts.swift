@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Offline, voice-first answers for the selected local tide station.
 import AppIntents
 import Foundation
-import TideEngine
+import Neaps
 
 enum TideShortcutKind {
     case high, low

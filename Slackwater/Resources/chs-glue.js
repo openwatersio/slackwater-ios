@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. JSCore glue for the on-device CHS fit (M0 spike's
-// glue.js, trimmed to fit-only: prediction runs natively in TideEngine).
+// glue.js, trimmed to fit-only: prediction runs natively in Neaps).
 // Expects the chs-bundle.js IIFE global. No fetch, no console use — samples
 // arrive as a JSON string of {t: epoch-ms, v: metres} from Swift.
 function fitTides(samplesJson) {

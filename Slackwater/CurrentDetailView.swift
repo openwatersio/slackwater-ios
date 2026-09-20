@@ -5,7 +5,7 @@
 // away via TideAtPortLink, in the scrub card. No day pager; the schedule is a
 // rolling multi-day list, rows scrub cross-day.
 import SwiftUI
-import TideEngine
+import Neaps
 
 /// One schedule for every real-velocity current strip (harmonic or fetched
 /// official samples): slack rows bare, max rows with speed + set bearing.

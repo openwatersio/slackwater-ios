@@ -4,11 +4,11 @@ Slackwater is © Open Water Software, LLC and licensed under [GPL-3.0](LICENSE.m
 
 ## Code
 
-- [slackwater-engine](https://github.com/openwatersio/slackwater-engine) — the harmonic prediction engine, a Swift port of [Neaps](https://github.com/neaps/neaps). MIT.
+- [Neaps](https://github.com/openwatersio/neaps) — the harmonic prediction engine. MIT.
 - [MapLibre Native](https://github.com/maplibre/maplibre-native) — map rendering. BSD-2-Clause.
 - [Almanac](https://github.com/openwatersio/almanac) — sun and moon calculations. MIT, with algorithms translated from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, © Don Cross).
 - [@openwaters/station-metadata](https://github.com/openwatersio/station-metadata) — station names, regions, aliases, and tide/current pairings, consumed at build time by the data generators in `tools/`. MIT.
-- [@neaps/tide-database](https://github.com/neaps/tide-database) and [@neaps/tide-predictor](https://github.com/neaps/neaps) — build-time inputs for the bundled tide stations. MIT.
+- [@neaps/tide-database](https://github.com/openwatersio/tide-database) and [@neaps/tide-predictor](https://github.com/openwatersio/neaps) — build-time inputs for the bundled tide stations. MIT.
 
 ## Data
 

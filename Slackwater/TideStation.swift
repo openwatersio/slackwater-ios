@@ -2,7 +2,7 @@
 // same file slackwater-web ships, enriched with resolved names/regions/aliases
 // from @openwaters/station-metadata so both apps say the same thing).
 import Foundation
-import TideEngine
+import Neaps
 
 struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     let id: String

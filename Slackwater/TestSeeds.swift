@@ -65,7 +65,7 @@ func applySeedHooksIfRequested() {
 /// one bundled CHS tide port, stored as if fitted on this device — the
 /// reference-port fit a derived gate's slacks derive from, with no network
 /// (issue #38). Amplitudes/offset are Point-Atkinson-ish metres; any
-/// plausible shape gives TideEngine real highs and lows to lag into slacks.
+/// plausible shape gives Neaps real highs and lows to lag into slacks.
 /// Wipes the model store AND the chunk store first, so the seed is the WHOLE
 /// state `ChsFitService.init` finds — determinism without `-chsResetModels`,
 /// which this hook must never be combined with (see the init comment). The
