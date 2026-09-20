@@ -89,19 +89,18 @@ if (cmd === 'create-cert') {
     console.log(`${v} (${b.attributes.version})  ${b.attributes.processingState}  ${b.attributes.uploadedDate}  [${groups.join(', ')}]`);
   }
 } else if (cmd === 'promote') {
-  // Put a build in front of the external testers. Two steps, because
-  // "Friends & Family" is an EXTERNAL group behind a public link: adding the
-  // build to the group is not enough, Apple has to beta-review it first. The
-  // internal "Nightly" group needs none of this — it has hasAccessToAllBuilds
-  // and every upload lands there on its own, which is why this command exists
-  // only for the external side.
-  // With no group named, promote to EVERY external group. Naming one group was
-  // the old default ('Friends & Family'), and it silently shipped an asymmetry:
-  // build 27 reached three groups, build 28 reached two, because a second
-  // external group ("OSS and Externals" — the one the slackwater.xyz landing
-  // page links) had been added and nothing in the release path knew about it.
-  // Discovering them beats a hardcoded list precisely because that is the
-  // failure mode: a new group needs no code change to get releases.
+  // Put a build in front of the external testers. Two steps, because an
+  // external group sits behind a public link: adding the build to the group is
+  // not enough, Apple has to beta-review it first. The internal "Nightly" group
+  // needs none of this — it has hasAccessToAllBuilds and every upload lands
+  // there on its own, which is why this command exists only for the external
+  // side.
+  // With no group named, promote to EVERY external group. Naming one was the
+  // old default, and it silently shipped an asymmetry: build 27 reached three
+  // groups, build 28 reached two, because a second external group had been
+  // added and nothing in the release path knew about it. Discovering them beats
+  // a hardcoded list precisely because that is the failure mode: a new group
+  // needs no code change to get releases.
   const named = args[1];
   const groups = await api('GET', `/v1/betaGroups?filter[app]=${await appId()}&limit=20`);
   let targets;

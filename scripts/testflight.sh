@@ -13,11 +13,10 @@ cd "$(dirname "$0")/.."
 # not another nightly. The internal Nightly group needs no flag; it takes every
 # upload on its own.
 #
-# It was --family, and that named ONE group. A second external group ("OSS and
-# Externals", the one slackwater.xyz links as its download button) was added
+# It was --family, and that named ONE group. A second external group was added
 # later and nothing here knew: build 27 reached three groups, build 28 reached
 # two, and the public link kept serving the older release. asc.mjs now
-# discovers the external groups instead of naming one, so adding a third needs
+# discovers the external groups instead of naming one, so adding another needs
 # no change here. --family still works and means the same thing.
 EXTERNAL=no
 case "${1:-}" in --external|--family) EXTERNAL=yes ;; esac
