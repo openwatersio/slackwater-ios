@@ -49,9 +49,11 @@ struct TideDetailView: View {
     private var fastTide: Bool { abs(scrubRate) >= tideMovementRampAnchorsMHr[0] }
     /// The rate ramp's colour when the rate is out of the ordinary (#95: at
     /// Friday Harbor 0.8 ft/hr is nothing, at Ile Haute 8 ft/hr is the
-    /// warning), else nil and the direction colour stands.
-    private var rateWarningColor: Color? {
-        fastTide ? SN.speedColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
+    /// warning), else nil and the direction colour stands. The lead's glyph
+    /// and the pill under it wear the one ink, lifted for the sky both float
+    /// on — the ramp's red end is unreadable against a sunrise otherwise.
+    private func rateWarning(over ground: UInt32) -> Color? {
+        fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate)), over: ground) : nil
     }
     /// The stop the pill names and its tap walks to: the next turn, or the
     /// sun's next rise or set when that comes first.
@@ -64,9 +66,6 @@ struct TideDetailView: View {
     private var commentary: String? {
         if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
         return nextStop.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: live) }
-    }
-    private var commentaryTint: Color? {
-        fastTide ? SN.speedLabelColour(Timeline.rampT(forTideRateMHr: abs(scrubRate))) : nil
     }
     /// A fast tide's tap goes to this run's fastest point — the flow arrow the
     /// magnet already snaps to — so the pill then reads the peak rate. From
@@ -104,11 +103,11 @@ struct TideDetailView: View {
                                                    onReturn: returnToNow,
                                                    onResumeScrubbedAway: { live = appNow() },
                                                    commentary: commentary,
-                                                   commentaryTint: commentaryTint,
+                                                   commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
                                                    scrollGate: store?.gate,
                                                    onViewportWidth: { viewportPts = $0 })
-                                    .overlay(alignment: .top) { lead(ink: sky.ink) }
+                                    .overlay(alignment: .top) { lead(sky: sky) }
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
@@ -181,7 +180,8 @@ struct TideDetailView: View {
                 prev.kind == .low ? "low to high" : "high to low")
     }
 
-    private func lead(ink: Color) -> some View {
+    private func lead(sky: SkyState) -> some View {
+        let ink = sky.ink
         let turn = atTurn
         let up = turn.map { $0.kind == .high } ?? rising
         let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
@@ -197,7 +197,7 @@ struct TideDetailView: View {
             // (#95), which outranks direction.
             Image(systemName: turn.map { $0.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line" }
                               ?? (rising ? "arrow.up.right" : "arrow.down.right"))
-                .foregroundStyle(rateWarningColor ?? (up ? SN.graphHigh : SN.graphLow))
+                .foregroundStyle(rateWarning(over: sky.chromeGround) ?? (up ? SN.graphHigh : SN.graphLow))
         }
     }
 

@@ -26,7 +26,8 @@ extension Color {
 
 enum SN {
     static let navyDeep = Color(hex: 0x00183C)
-    static let canvas = Color(hex: 0x05122A)  // duplicated in LaunchBackground.colorset — the launch screen renders before code
+    static let canvasHex: UInt32 = 0x05122A  // duplicated in LaunchBackground.colorset — the launch screen renders before code
+    static let canvas = Color(hex: canvasHex)
     static let canvasGlow = Color(hex: 0x0A2140)  // radial glow at top of a screen
     static let leaf = Color(hex: 0x88B868)
     static let steelHex: UInt32 = 0x5888A8
@@ -88,15 +89,30 @@ enum SN {
         (2.0 / 3.0, 0xE8763C), (1.0, 0xC93A32),
     ]
 
+    /// An sRGB hex as 0...255 channels.
+    static func channels(_ hex: UInt32) -> (r: Double, g: Double, b: Double) {
+        (Double((hex >> 16) & 0xFF), Double((hex >> 8) & 0xFF), Double(hex & 0xFF))
+    }
+
+    /// WCAG relative luminance of 0...255 sRGB channels.
+    static func luminance(_ c: (r: Double, g: Double, b: Double)) -> Double {
+        let lin = { (v: Double) -> Double in
+            let s = v / 255
+            return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+
+    static func contrast(_ a: Double, _ b: Double) -> Double {
+        (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
     /// The ramp sampled at `t`, clamped to 0...1. Piecewise-linear in sRGB:
     /// the stops sit close enough together that a perceptual space buys
     /// nothing a reader could see.
     static func speedRGB(_ t: Double) -> (r: Double, g: Double, b: Double) {
         let t = min(max(t, 0), 1)
         let stops = speedRampStops
-        let channels = { (hex: UInt32) -> (Double, Double, Double) in
-            (Double((hex >> 16) & 0xFF), Double((hex >> 8) & 0xFF), Double(hex & 0xFF))
-        }
         for i in 0..<(stops.count - 1) {
             let a = stops[i], b = stops[i + 1]
             guard t >= a.t, t <= b.t else { continue }
@@ -114,14 +130,32 @@ enum SN {
         return Color(red: c.r / 255, green: c.g / 255, blue: c.b / 255)
     }
 
-    /// The ramp as text on the dark ground: lifted a quarter toward white so
-    /// the red end clears the small-text contrast floor the yellow end
-    /// already does.
-    static func speedLabelColour(_ t: Double) -> Color {
+    /// Small semibold text's floor. The chrome over a daylight sky cannot
+    /// reach it — white itself measures 3.8:1 there — so this is the target
+    /// the lift below aims at, not a guarantee it can always keep.
+    static let smallTextContrast = 4.5
+
+    /// The ramp as text over `ground` — the sky the chrome floats on, not the
+    /// canvas. Lifted toward white until it clears `smallTextContrast`: a
+    /// quarter of the way is enough on the dark water (what this was
+    /// calibrated to), and a sunrise puts a tan behind the pill where the red
+    /// end measured 2.1:1. Where no tint clears the ground it lands on white,
+    /// which is the answer `skyUsesDarkInk` already gives the chrome beside it.
+    static func speedLabelColour(_ t: Double, over ground: UInt32) -> Color {
         let c = speedRGB(t)
-        return Color(red: (c.r + (255 - c.r) * 0.25) / 255,
-                     green: (c.g + (255 - c.g) * 0.25) / 255,
-                     blue: (c.b + (255 - c.b) * 0.25) / 255)
+        let groundL = luminance(channels(ground))
+        // Rounded to the 8-bit channel that actually renders: measuring the
+        // unrounded value lands a step short of the floor at some grounds.
+        func lifted(_ f: Double) -> (r: Double, g: Double, b: Double) {
+            ((c.r + (255 - c.r) * f).rounded(), (c.g + (255 - c.g) * f).rounded(),
+             (c.b + (255 - c.b) * f).rounded())
+        }
+        // ponytail: a 5% scan, not a solve — the gamma curve has no closed
+        // form worth the algebra, and the step is finer than the eye.
+        let f = stride(from: 0.25, to: 1.0, by: 0.05)
+            .first { contrast(luminance(lifted($0)), groundL) >= smallTextContrast } ?? 1
+        let out = lifted(f)
+        return Color(red: out.r / 255, green: out.g / 255, blue: out.b / 255)
     }
 
     /// Ink for a label drawn ON the ramp fill — whichever of white or `canvas`
@@ -130,12 +164,7 @@ enum SN {
     /// stays auto-fitted, so a quiet station puts a label deep inside a dark
     /// fill just as a violent one puts one inside a bright fill.
     static func speedInk(_ t: Double) -> Color {
-        let c = speedRGB(t)
-        let lin = { (v: Double) -> Double in
-            let s = v / 255
-            return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
-        }
-        let l = 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+        let l = luminance(speedRGB(t))
         // `canvas` is 0x05122A — relative luminance 0.00632, so 0.05632 is its
         // contrast denominator. The crossover lands at t ≈ 0.90, where both
         // inks measure ≈4.3:1; that is the ramp's worst point and it clears
