@@ -1634,6 +1634,7 @@ struct TimelineScrubStrip: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("timeline-strip")
             .tourAnchor(.stars)
+            .id(TourCoach.Step.stars)
             // The page outlives a trip to the background, so `now` is stale on reopen.
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }

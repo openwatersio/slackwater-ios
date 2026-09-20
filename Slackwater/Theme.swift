@@ -625,6 +625,7 @@ struct LeadCard<Eyebrow: View>: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
         .tourAnchor(.read)
+        .id(TourCoach.Step.read)
     }
 }
 
@@ -756,6 +757,7 @@ struct SummaryTiles: View {
                 }
                 .accessibilityIdentifier("tile-moon")
                 .tourAnchor(.moonCard)
+                .id(TourCoach.Step.moonCard)
             }
         }
         .task(id: dayLocal(at, tz)) {
@@ -891,6 +893,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
         // ignores it), so the proxy reads the real top inset for DetailHeader —
         // per device and per iPad split-view pane, live across rotation.
         GeometryReader { geo in
+            ScrollViewReader { scrollProxy in
             ScrollView {
                 ZStack(alignment: .top) {
                     if let topBackdrop, let timeline {
@@ -1003,6 +1006,23 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
                     }
                     onPicked(picked)
                 })
+            }
+            // The user's own swipe is as good as Next, which is the whole
+            // point of a demo you can interrupt. The tour's own glide writes
+            // scrubTime too, so only a change AFTER the glide settled counts.
+            .onChange(of: scrubTime) { _, _ in
+                guard TourCoach.shared.step == .stars, tourArrived else { return }
+                tourNext()
+            }
+            // Each mark's target scrolls to centre before the capsule shows,
+            // so the star (in the header) and the moon tile (below the strip)
+            // are never off-screen when their mark appears.
+            .onChange(of: TourCoach.shared.step) { _, step in
+                guard let step, TourCoach.shared.station == favoriteId else { return }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    scrollProxy.scrollTo(step, anchor: .center)
+                }
+            }
             }
         }
     }

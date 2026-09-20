@@ -94,6 +94,7 @@ struct DetailHeader: View {
                         .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
                         .accessibilityIdentifier("detail-favorite")
                         .tourAnchor(.star)
+                        .id(TourCoach.Step.star)
                     }
                 }
             }
