@@ -27,6 +27,8 @@ struct MoonFacts {
     /// each rather than three of whatever comes next: the three kinds are the
     /// thing worth learning, and a list of three penumbrals teaches none of it.
     let upcoming: [WindowEclipse]
+    let lastSolar: WindowSolarEclipse?
+    let nextSolar: WindowSolarEclipse?
 }
 
 /// Almanac has no apsis search; the Moon tile runs these samples off the scrub path.
@@ -119,7 +121,9 @@ func moonFacts(at: Date, observer: Observer, tz: TimeZone) -> MoonFacts? {
         closest: apsides.perigee,
         farthest: apsides.apogee,
         last: previousVisibleEclipse(before: at, observer: observer),
-        upcoming: firstOfKind.values.sorted { $0.peak < $1.peak })
+        upcoming: firstOfKind.values.sorted { $0.peak < $1.peak },
+        lastSolar: previousVisibleSolarEclipse(before: at, observer: observer),
+        nextSolar: nextVisibleSolarEclipse(after: at, observer: observer))
 }
 
 /// The moment the moon stands highest in the dark night nearest `instant`; the
@@ -149,6 +153,8 @@ func phaseNight(_ instant: Date, observer: Observer) -> Date {
 struct MoonDetailSheet: View {
     let at: Date
     var eclipse: WindowEclipse? = nil
+    var solarEclipse: WindowSolarEclipse? = nil
+    var solarObscuration: Double = 0
     let latitude: Double
     let longitude: Double
     /// Passed, not read from the environment: `.sheet` content does not
@@ -181,19 +187,26 @@ struct MoonDetailSheet: View {
                         }
                         distance(facts)
                         group {
-                            eclipseRow("LAST ECLIPSE", facts.last,
+                            eclipseRow("LAST LUNAR ECLIPSE", facts.last,
                                        id: "moon-last-eclipse", color: SN.umbraLabel)
+                            divider
+                            solarEclipseRow("LAST SOLAR ECLIPSE", facts.lastSolar,
+                                            id: "moon-last-solar-eclipse")
                         }
                         if !facts.upcoming.isEmpty {
                             group {
                                 ForEach(Array(facts.upcoming.enumerated()), id: \.element.id) {
                                     index, e in
                                     if index > 0 { divider }
-                                    eclipseRow(index == 0 ? "NEXT ECLIPSE" : "THEN", e,
+                                    eclipseRow(index == 0 ? "NEXT LUNAR ECLIPSE" : "THEN", e,
                                                id: "moon-next-eclipse-\(e.kind.rawValue)",
                                                color: SN.umbraLabel)
                                 }
                             }
+                        }
+                        group {
+                            solarEclipseRow("NEXT SOLAR ECLIPSE", facts.nextSolar,
+                                            id: "moon-next-solar-eclipse")
                         }
                     } else {
                         ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
@@ -229,7 +242,8 @@ struct MoonDetailSheet: View {
 
     private func head(_ facts: MoonFacts) -> some View {
         let phase = moonPhaseName(phase: facts.illumination.phase)
-        let title = eclipse.map { eclipseTileText($0.kind) } ?? phase
+        let title = solarEclipse.map { solarEclipseTileText($0.kind) }
+            ?? eclipse.map { eclipseTileText($0.kind) } ?? phase
         let tideLabel = moonTideLabel(phase: facts.illumination.phase, at: at,
                                        perigee: facts.closest, apogee: facts.farthest)
         let tideText = moonTideExplanation(phase: facts.illumination.phase, at: at,
@@ -239,9 +253,13 @@ struct MoonDetailSheet: View {
         // lines and pushes the head taller than the card below it.
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 14) {
-                MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
-                          size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
-                          wash: eclipse?.wash(at: at) ?? 0)
+                if solarEclipse != nil {
+                    SolarEclipseGlyph(obscuration: solarObscuration, size: 54)
+                } else {
+                    MoonGlyph(fraction: facts.illumination.fraction, waxing: facts.illumination.waxing,
+                              size: 54, umbra: eclipse?.shadow(at: at) ?? 0,
+                              wash: eclipse?.wash(at: at) ?? 0)
+                }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(ReadoutType.tileText)
@@ -413,6 +431,37 @@ struct MoonDetailSheet: View {
             // Nil reads "none visible from here" rather than vanishing: a
             // missing row would say the app forgot to look, and "none from
             // here" is the actual answer for an observer the shadow misses.
+            cell(label, value: "none visible from here", jumpTo: nil, id: id) {
+                Color.clear.frame(width: 78, height: 44)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func solarEclipseRow(_ label: String, _ e: WindowSolarEclipse?, id: String) -> some View {
+        if let e {
+            HStack(spacing: 12) {
+                SolarEclipseGlyph(obscuration: e.obscuration, size: 34)
+                    .frame(width: 78, height: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    MonoLabel(text: label, color: SN.sun)
+                    Text("\(e.kind.rawValue.capitalized) Solar Eclipse")
+                        .font(ReadoutType.tileText).foregroundStyle(.white)
+                    Text(when(e.peak)).font(.caption.monospacedDigit())
+                        .foregroundStyle(SN.foam.opacity(0.55))
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .onTapGesture { onJump(e.start); dismiss() }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier(id)
+        } else {
             cell(label, value: "none visible from here", jumpTo: nil, id: id) {
                 Color.clear.frame(width: 78, height: 44)
             }

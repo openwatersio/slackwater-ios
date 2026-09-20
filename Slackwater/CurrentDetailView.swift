@@ -123,6 +123,8 @@ struct CurrentDetailView: View {
                                     SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination,
                                                  at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
+                                                 solarObscuration: sky.obscuration,
                                                  onJump: jump,
                                                  latitude: record.latitude, longitude: record.longitude)
                                     StationLinksRow(stationId: record.itemId) {

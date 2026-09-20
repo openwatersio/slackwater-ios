@@ -119,6 +119,8 @@ struct OnlineGateDetailView: View {
                                     SummaryTiles(primary: window.flatMap { lead(tl, $0).nextMax },
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
+                                                 solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
+                                                 solarObscuration: sky.obscuration,
                                                  onJump: jump,
                                                  latitude: gate.latitude, longitude: gate.longitude)
                                     StationLinksRow(stationId: gate.id) {

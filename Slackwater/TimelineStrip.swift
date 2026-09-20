@@ -204,6 +204,8 @@ struct TimelineData {
     /// read by the dome's moon, the schedule row and the strip's mark.
     var eclipses: [WindowEclipse] = []
 
+    var solarEclipses: [WindowSolarEclipse] = []
+
     /// The workable sub-threshold window around each slack, computed ONCE here
     /// off the same `currentPoints` the strip draws (gutter spec §3). The green
     /// band on the strip and the duration in the readout are therefore the same
@@ -398,6 +400,13 @@ struct TimelineData {
         return visibleEclipses(from: start, to: end, observer: observer)
     }
 
+    private static func windowSolarEclipses(lat: Double, lon: Double,
+                                            start: Date, end: Date) -> [WindowSolarEclipse] {
+        guard let observer = try? Observer(latitudeDeg: lat, longitudeDeg: lon)
+        else { return [] }
+        return visibleSolarEclipses(from: start, to: end, observer: observer)
+    }
+
     /// A derived gate's strip is single-track: the schematic ±1 half-sine with
     /// slack events only. The port is the SOURCE of the slack times (engineGate
     /// reads it), never a drawn track (split-scrubbers spec §3).
@@ -437,8 +446,10 @@ struct TimelineData {
         let sunTimes = chrome.days.filter { $0.offset <= 7 }
             .flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
+        let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(currentEvents.map(\.time) + sunTimes
                               + eclipses.flatMap(\.contacts)
+                              + solarEclipses.flatMap(\.contacts)
                               + windows.flatMap { [$0.start, $0.end] }))
             .filter { $0 >= start && $0 <= end }.sorted()
 
@@ -446,7 +457,7 @@ struct TimelineData {
                             start: start, end: end, days: chrome.days,
                             tidePoints: [], tideRates: [], tideExtremes: [],
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, eclipses: eclipses,
+                            snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
                             slackWindows: windows, slackThreshold: threshold)
     }
 
@@ -508,16 +519,19 @@ struct TimelineData {
         // rate-coloured line, and the readout's rate warning fires exactly
         // there.
         let eclipses = windowEclipses(lat: lat, lon: lon, start: start, end: end)
+        let solarEclipses = windowSolarEclipses(lat: lat, lon: lon, start: start, end: end)
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
                               + currentEvents.map(\.time) + sunTimes
                               + eclipses.flatMap(\.contacts)
+                              + solarEclipses.flatMap(\.contacts)
                               + windows.flatMap { [$0.start, $0.end] }))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: chrome.anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, eclipses: eclipses, slackWindows: windows,
+                            snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
+                            slackWindows: windows,
                             slackThreshold: threshold,
                             speedsAreSchematic: gate != nil)
     }
@@ -820,9 +834,10 @@ struct TimelineCanvas: View {
     /// schedule row below, and the readout as you scrub. #304 is where a
     /// better answer goes; this one is deliberately quiet rather than wrong.
     private func drawEclipses(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
-        for e in data.eclipses where data.contains(e.peak) && e.peak >= t0 && e.peak <= t1 {
+        let peaks = data.eclipses.map(\.peak) + data.solarEclipses.map(\.peak)
+        for peak in peaks where data.contains(peak) && peak >= t0 && peak <= t1 {
             ctx.draw(Text("🌘").font(.system(size: 6.5)),
-                     at: CGPoint(x: data.x(e.peak), y: geo.sunY), anchor: .center)
+                     at: CGPoint(x: data.x(peak), y: geo.sunY), anchor: .center)
         }
     }
 
@@ -1753,9 +1768,13 @@ struct ScheduleEntry: Identifiable {
 /// detail views: an eclipse is the sky's event, not the station's, so all four
 /// kinds of detail get the same row from the one place.
 func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
-    tl.eclipses
+    let lunar = tl.eclipses
         .filter { tl.scheduleRange.contains($0.start) }
         .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
+    let solar = tl.solarEclipses
+        .filter { tl.scheduleRange.contains($0.start) }
+        .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
+    return lunar + solar
 }
 
 /// Day-grouped events list over `Timeline.scheduleRange` — the week hanging off

@@ -40,6 +40,12 @@ final class EclipseTests: XCTestCase {
         return (tl, try XCTUnwrap(tl.eclipses.first))
     }
 
+    private func solarEclipseTimeline() throws -> (TimelineData, WindowSolarEclipse) {
+        let at = anchor("2017-08-21T12:00:00Z", friday.tz)
+        let tl = TimelineData.build(tide: friday, current: nil, now: at, anchor: at)
+        return (tl, try XCTUnwrap(tl.solarEclipses.first))
+    }
+
     // MARK: - The window search
 
     func testTheWindowFindsThe2026PartialAndDescribesIt() throws {
@@ -61,6 +67,38 @@ final class EclipseTests: XCTestCase {
                                   to: utc("2026-08-31T00:00:00Z"),
                                   observer: Self.perth)
         XCTAssertTrue(found.isEmpty, "Perth is in daylight for the whole event")
+    }
+
+    func testTheSolarWindowDescribesThe2017VictoriaEclipse() throws {
+        let found = visibleSolarEclipses(from: utc("2017-08-20T00:00:00Z"),
+                                         to: utc("2017-08-23T00:00:00Z"),
+                                         observer: Self.victoria)
+        XCTAssertEqual(found.count, 1)
+        let e = try XCTUnwrap(found.first)
+        XCTAssertEqual(e.kind, .partial)
+        XCTAssertEqual(e.start, e.eclipse.c1)
+        XCTAssertEqual(e.contacts, [e.eclipse.c1, e.peak, e.eclipse.c4])
+        XCTAssertEqual(e.contacts, e.contacts.sorted())
+        XCTAssertGreaterThan(e.obscuration, 0.85)
+        XCTAssertLessThan(e.obscuration, 0.95)
+        XCTAssertTrue(e.underway(at: e.peak))
+        XCTAssertFalse(e.underway(at: e.eclipse.c4.addingTimeInterval(60)))
+    }
+
+    func testTheSolarWindowCarriesAllContactsForTotality() throws {
+        let dallas = try Observer(latitudeDeg: 32.7767, longitudeDeg: -96.7970)
+        let e = try XCTUnwrap(visibleSolarEclipses(from: utc("2024-04-07T00:00:00Z"),
+                                                  to: utc("2024-04-09T00:00:00Z"),
+                                                  observer: dallas).first)
+        XCTAssertEqual(e.kind, .total)
+        XCTAssertEqual(e.contacts,
+                       [e.eclipse.c1, e.eclipse.c2!, e.peak, e.eclipse.c3!, e.eclipse.c4])
+    }
+
+    func testASolarEclipseBelowTheHorizonIsDropped() {
+        XCTAssertTrue(visibleSolarEclipses(from: utc("2017-08-20T00:00:00Z"),
+                                           to: utc("2017-08-23T00:00:00Z"),
+                                           observer: Self.perth).isEmpty)
     }
 
     func testShadowIsZeroOutsideAndPeaksAtTheUmbralMagnitude() throws {
@@ -156,6 +194,41 @@ final class EclipseTests: XCTestCase {
                           "the wash must read lighter than the umbra")
     }
 
+    @MainActor
+    func testTheSolarEclipseGlyphShowsTheCoveredFraction() throws {
+        func shot(_ obscuration: Double) throws -> UIImage {
+            let renderer = ImageRenderer(content:
+                SolarEclipseGlyph(obscuration: obscuration, size: 44)
+                    .frame(width: 60, height: 60)
+                    .background(SN.canvas))
+            renderer.scale = 2
+            return try XCTUnwrap(renderer.uiImage)
+        }
+
+        XCTAssertGreaterThan(differingFraction(try shot(0.2), try shot(0.9)), 0.05)
+    }
+
+    @MainActor
+    func testTheSolarEclipseChangesTheMoonSummaryTile() throws {
+        let e = try XCTUnwrap(visibleSolarEclipses(from: utc("2017-08-20T00:00:00Z"),
+                                                  to: utc("2017-08-23T00:00:00Z"),
+                                                  observer: Self.victoria).first)
+        let moon = try moonIllumination(e.peak)
+
+        func shot(_ solar: WindowSolarEclipse?) throws -> UIImage {
+            let renderer = ImageRenderer(content:
+                SummaryTiles(moon: moon, at: e.peak,
+                             solarEclipse: solar,
+                             solarObscuration: solar?.obscuration ?? 0)
+                    .frame(width: 200)
+                    .background(SN.canvas))
+            renderer.scale = 2
+            return try XCTUnwrap(renderer.uiImage)
+        }
+
+        XCTAssertGreaterThan(differingFraction(try shot(nil), try shot(e)), 0.01)
+    }
+
     // MARK: - The Moon sheet
 
     func testMoonApsidesAreNearbyLocalDistanceExtremes() throws {
@@ -179,6 +252,10 @@ final class EclipseTests: XCTestCase {
         XCTAssertEqual(eclipseTileText(.total), "Total Eclipse")
         XCTAssertEqual(eclipseTileText(.partial), "Partial Eclipse")
         XCTAssertEqual(eclipseTileText(.penumbral), "Penumbral Eclipse")
+        for kind in [SolarEclipseKind.partial, .annular, .total] {
+            XCTAssertEqual(solarEclipseTileText(kind), "Solar Eclipse")
+        }
+        XCTAssertFalse(moonPhaseBlurb("Solar Eclipse").isEmpty)
     }
 
     func testMoonFactsFindAnEclipseOnEitherSideOfTheNight() throws {
@@ -199,6 +276,18 @@ final class EclipseTests: XCTestCase {
         XCTAssertNotNil(facts.farthest)
         XCTAssertGreaterThan(facts.distanceKm, 350_000)
         XCTAssertLessThan(facts.distanceKm, 410_000)
+    }
+
+    func testMoonFactsFindASolarEclipseOnEitherSide() throws {
+        let at = utc("2026-09-07T12:00:00Z")
+        let facts = try XCTUnwrap(moonFacts(at: at, observer: Self.victoria,
+                                            tz: TimeZone(identifier: "America/Vancouver")!))
+        let last = try XCTUnwrap(facts.lastSolar)
+        let next = try XCTUnwrap(facts.nextSolar)
+        XCTAssertLessThan(last.peak, at)
+        XCTAssertGreaterThan(next.peak, at)
+        XCTAssertGreaterThan(last.obscuration, 0)
+        XCTAssertGreaterThan(next.obscuration, 0)
     }
 
     /// The sheet teaches the three kinds apart, so it lists one of each rather
@@ -313,6 +402,13 @@ final class EclipseTests: XCTestCase {
         XCTAssertTrue(eclipseEntries(tl).isEmpty)
     }
 
+    func testTheSolarEclipseMergesIntoTheSchedule() throws {
+        let (tl, e) = try solarEclipseTimeline()
+        let row = try XCTUnwrap(eclipseEntries(tl).first { $0.time == e.start })
+        XCTAssertEqual(row.pill, .eclipse)
+        XCTAssertEqual(row.value, chartTime(e.peak, tl.tz))
+    }
+
     @MainActor
     func testTheEclipsePillDoesNotMakeItsScheduleRowTaller() {
         let time = Date(timeIntervalSinceReferenceDate: 0)
@@ -353,6 +449,18 @@ final class EclipseTests: XCTestCase {
         XCTAssertGreaterThan(changed, 0, "no eclipse mark on the strip")
     }
 
+    @MainActor
+    func testTheStripMarksTheSolarEclipse() throws {
+        let (tl, _) = try solarEclipseTimeline()
+        var stripped = tl
+        stripped.solarEclipses = []
+
+        let marked = try XCTUnwrap(stripImage(tl))
+        let plain = try XCTUnwrap(stripImage(stripped))
+        XCTAssertGreaterThan(differingFraction(marked, plain), 0,
+                             "no solar eclipse mark on the strip")
+    }
+
     // MARK: - On the dome
 
     func testTheSkyStateCarriesOnlyTheEclipseUnderwayAtItsTime() throws {
@@ -384,6 +492,28 @@ final class EclipseTests: XCTestCase {
         XCTAssertEqual(e.kind, .partial)
         for c in e.contacts where tl.contains(c) {
             XCTAssertTrue(tl.snapTimes.contains(c), "contact \(c) is not magnetic")
+        }
+    }
+
+    func testTheTimelineCarriesTheSolarEclipseAndSnapsToEveryContact() throws {
+        let (tl, e) = try solarEclipseTimeline()
+        XCTAssertEqual(e.kind, .partial)
+        for c in e.contacts where tl.contains(c) {
+            XCTAssertTrue(tl.snapTimes.contains(c), "solar contact \(c) is not magnetic")
+        }
+    }
+
+    func testTheChunkedTimelineCarriesTheSolarEclipseAndSnapsToEveryContact() throws {
+        let start = anchor("2017-08-21T12:00:00Z", friday.tz)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = friday.tz
+        let end = try XCTUnwrap(cal.date(byAdding: .day, value: 7, to: start))
+        let source = TimelineSource.tide(friday)
+        let chunk = TimelineChunk.build(source, index: 0, start: start, end: end)
+        let tl = TimelineData.merged([chunk], source: source, anchor: start, today: start)
+        let e = try XCTUnwrap(tl.solarEclipses.first)
+        for contact in e.contacts {
+            XCTAssertTrue(tl.snapTimes.contains(contact), "solar contact \(contact) is not magnetic")
         }
     }
 
@@ -423,5 +553,13 @@ final class EclipseTests: XCTestCase {
         // 7 ms Almanac 0.2 takes locally, and scales for hosted runners.
         XCTAssertLessThan(withEclipse, 0.05 * perfScale)
         XCTAssertLessThan(without, 0.05 * perfScale)
+
+        var solar: [WindowSolarEclipse] = []
+        let solarWeek = elapsed {
+            solar = visibleSolarEclipses(from: utc("2017-08-20T00:00:00Z"),
+                                         to: utc("2017-08-23T00:00:00Z"), observer: observer)
+        }
+        XCTAssertEqual(solar.count, 1)
+        XCTAssertLessThan(solarWeek, 0.05 * perfScale)
     }
 }

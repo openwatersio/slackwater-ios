@@ -84,6 +84,7 @@ struct TimelineChunk {
     let currentEvents: [CurrentEvent]
     let slackWindows: [(slack: Date, start: Date, end: Date)]
     let eclipses: [WindowEclipse]
+    let solarEclipses: [WindowSolarEclipse]
 
     /// A derived gate's schematic shape needs the slack before and after every
     /// sample, and slacks run ~6h apart — a wider net than the event pad.
@@ -156,11 +157,13 @@ struct TimelineChunk {
 
         let eclipses = (observer.map { visibleEclipses(from: start, to: end, observer: $0) } ?? [])
             .filter { inSpan($0.peak) }
+        let solarEclipses = (observer.map { visibleSolarEclipses(from: start, to: end, observer: $0) } ?? [])
+            .filter { inSpan($0.peak) }
 
         return TimelineChunk(index: index, start: start, end: end, days: days,
                              tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                              currentPoints: currentPoints, currentEvents: currentEvents,
-                             slackWindows: windows, eclipses: eclipses)
+                             slackWindows: windows, eclipses: eclipses, solarEclipses: solarEclipses)
     }
 }
 
@@ -219,19 +222,24 @@ extension TimelineData {
         }.map(\.element)
         var eclipseSeen = Set<Date>()
         let eclipses = chunks.flatMap(\.eclipses).filter { eclipseSeen.insert($0.peak).inserted }
+        var solarEclipseSeen = Set<Date>()
+        let solarEclipses = chunks.flatMap(\.solarEclipses)
+            .filter { solarEclipseSeen.insert($0.peak).inserted }
 
         // The magnet's stops, assembled the way both monolithic builders do it.
         let sunTimes = days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
         let snaps = Array(Set(tideExtremes.map(\.time) + tideFlowArrows(tideRates).map(\.time)
                               + currentEvents.map(\.time) + sunTimes
                               + eclipses.flatMap(\.contacts)
+                              + solarEclipses.flatMap(\.contacts)
                               + windows.flatMap { [$0.start, $0.end] }))
             .filter { $0 >= start && $0 <= end }.sorted()
 
         return TimelineData(tz: tz, anchor: anchor, today: today, start: start, end: end, days: days,
                             tidePoints: tidePoints, tideRates: tideRates, tideExtremes: tideExtremes,
                             currentPoints: currentPoints, currentEvents: currentEvents,
-                            snapTimes: snaps, eclipses: eclipses, slackWindows: windows,
+                            snapTimes: snaps, eclipses: eclipses, solarEclipses: solarEclipses,
+                            slackWindows: windows,
                             slackThreshold: source.threshold,
                             speedsAreSchematic: source.isSchematic)
     }
