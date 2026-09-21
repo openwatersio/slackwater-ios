@@ -128,6 +128,8 @@ Full text:
 
 Re-answer this section whenever a new host appears in the app. `grep -rhoE "https://[a-z0-9.-]+" --include="*.swift" Slackwater/` lists every one.
 
+- **Privacy manifests.** `Slackwater/PrivacyInfo.xcprivacy` and `SlackwaterWidgets/PrivacyInfo.xcprivacy` declare no tracking, no collected data, and the required-reason APIs each target uses: `UserDefaults` (`CA92.1`, and `1C8F.1` for the App Group) and file modification dates (`C617.1`). Both targets compile `ChsCurrentGate.swift`, which reads a file's modification date, so the two files are identical. Re-check them when a target starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api); App Store Connect reports a gap by email (ITMS-91053), not in the upload log.
+
 ## Accessibility Nutrition Labels
 
 Claim only what the app does today. These labels appear on the product page and a wrong one is a support burden and a trust cost, not a marketing win — an omitted label costs nothing but the label itself.
