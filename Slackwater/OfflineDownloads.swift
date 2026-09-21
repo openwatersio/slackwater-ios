@@ -321,6 +321,9 @@ struct OfflineManagerList: View {
                     service.accept(.nearby)
                 }
                 .buttonStyle(.borderedProminent)
+                // Same reason as the list strip's Yes: untinted, this fills
+                // with the system accent and is the only blue on the screen.
+                .tint(SN.leaf)
                 .disabled(service.remainingBeyondCohort == 0)
                 .accessibilityIdentifier("download-tier-nearby-accept")
             } else {
