@@ -39,7 +39,13 @@ struct DownloadStrip: View {
                 Text("Download \(count) more nearby?")
                 Spacer(minLength: 8)
                 Button("Not now", action: onDecline).buttonStyle(.plain)
-                Button("Yes", action: onAccept).buttonStyle(.borderedProminent)
+                // Tinted, because `.borderedProminent` otherwise fills with the
+                // system accent — the only blue on a screen built from navy and
+                // leaf, which reads as an alert dropped into the app rather
+                // than part of it.
+                Button("Yes", action: onAccept)
+                    .buttonStyle(.borderedProminent)
+                    .tint(SN.leaf)
             }
             .foregroundStyle(SN.leaf)
             .padding(.horizontal, 26)
