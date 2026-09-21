@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. Premium lock-screen widgets (spec §4). Without the
 // entitlement they render the quiet locked state — wave glyph + "Premium",
-// no data, no urgency. Tapping any of them opens the in-app Widgets page.
+// no data, no urgency. Tapping a locked one opens the in-app Widgets page;
+// an unlocked one opens its station (`accessoryDeepLink`).
 import SwiftUI
 import WidgetKit
 
@@ -10,7 +11,6 @@ private struct Locked: View {
             Image(systemName: "water.waves")
             Text("Premium").font(.caption2)
         }
-        .widgetURL(URL(string: "slackwater://premium"))
     }
 }
 
@@ -18,15 +18,18 @@ struct SlackInlineWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "SlackInline", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
-            if !entry.premium { Locked() }
-            else if let s = entry.snapshot, let next = s.next {
-                // e.g. "Slack 14:32 · Race Passage" — label carries a
-                // formatted height/speed on a max event, so it gets the same
-                // .monospacedDigit() as the clock half.
-                (Text(next.label + " ").monospacedDigit()
-                    + Text(next.time, style: .time) + Text(" · " + s.stationName))
-                    .environment(\.timeZone, s.tz)
-            } else { Text("Open Slackwater") }
+            Group {
+                if !entry.premium { Locked() }
+                else if let s = entry.snapshot, let next = s.next {
+                    // e.g. "Slack 14:32 · Race Passage" — label carries a
+                    // formatted height/speed on a max event, so it gets the same
+                    // .monospacedDigit() as the clock half.
+                    (Text(next.label + " ").monospacedDigit()
+                        + Text(next.time, style: .time) + Text(" · " + s.stationName))
+                        .environment(\.timeZone, s.tz)
+                } else { Text("Open Slackwater") }
+            }
+            .widgetURL(accessoryDeepLink(entry))
         }
         .configurationDisplayName("Next Slack")
         .description("The next event, above the clock.")
@@ -50,6 +53,7 @@ struct SlackCircularWidget: Widget {
                     }
                 } else { Image(systemName: "water.waves") }
             }
+            .widgetURL(accessoryDeepLink(entry))
         }
         .configurationDisplayName("Next Event")
         .description("Next slack or turn at a glance.")
@@ -61,24 +65,27 @@ struct SlackRectangularWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "SlackRectangular", intent: StationConfigIntent.self,
                                provider: StationProvider()) { entry in
-            if !entry.premium { Locked() }
-            else if let s = entry.snapshot, let next = s.next {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(s.stationName).font(.caption2).lineLimit(1)
-                    HStack(spacing: 4) {
-                        Image(systemName: next.symbol)
-                        Text(next.time, style: .time).fontWeight(.semibold)
-                            .environment(\.timeZone, s.tz)
-                        Text(next.label).monospacedDigit().lineLimit(1)
+            Group {
+                if !entry.premium { Locked() }
+                else if let s = entry.snapshot, let next = s.next {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(s.stationName).font(.caption2).lineLimit(1)
+                        HStack(spacing: 4) {
+                            Image(systemName: next.symbol)
+                            Text(next.time, style: .time).fontWeight(.semibold)
+                                .environment(\.timeZone, s.tz)
+                            Text(next.label).monospacedDigit().lineLimit(1)
+                        }
+                        .font(.caption)
+                        if let w = s.window {
+                            (Text("window ") + Text(w.start, style: .time) + Text("–") + Text(w.end, style: .time))
+                                .font(.caption2).foregroundStyle(.secondary)
+                                .environment(\.timeZone, s.tz)
+                        }
                     }
-                    .font(.caption)
-                    if let w = s.window {
-                        (Text("window ") + Text(w.start, style: .time) + Text("–") + Text(w.end, style: .time))
-                            .font(.caption2).foregroundStyle(.secondary)
-                            .environment(\.timeZone, s.tz)
-                    }
-                }
-            } else { Text("Open Slackwater") }
+                } else { Text("Open Slackwater") }
+            }
+            .widgetURL(accessoryDeepLink(entry))
         }
         .configurationDisplayName("Slack Window")
         .description("Next event plus the workable window.")

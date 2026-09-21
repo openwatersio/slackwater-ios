@@ -52,4 +52,16 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(deepLink(entry),
                        URL(string: "slackwater://station/current%3Anoaa%2FCHB9904"))
     }
+
+    /// #213: an unlocked lock-screen widget opens its station; a locked one
+    /// opens the Widgets page even though its entry still names a station.
+    func testAccessoryWidgetLinksToStationOnlyWhenUnlocked() {
+        func entry(premium: Bool) -> SlackwaterEntry {
+            SlackwaterEntry(date: .distantPast, snapshot: nil, card: nil,
+                            premium: premium, stationID: "noaa/9454616")
+        }
+        XCTAssertEqual(accessoryDeepLink(entry(premium: true)),
+                       URL(string: "slackwater://station/noaa%2F9454616"))
+        XCTAssertEqual(accessoryDeepLink(entry(premium: false)), URL(string: "slackwater://premium"))
+    }
 }
