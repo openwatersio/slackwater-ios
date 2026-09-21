@@ -95,6 +95,13 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssert(XCTWaiter().wait(for: [focused], timeout: scaled(10)) == .completed,
                   "search field did not take keyboard focus")
         field.typeText(text)
+        // A loaded runner drops keystrokes while typeText reports success
+        // ("malibu" landed as "m" on the iPad lane), so retype what is missing.
+        for _ in 0..<2 where !waitFor(field, "value == '\(text)'", timeout: 2) {
+            let typed = field.value as? String ?? ""
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
+                                  count: typed.count) + text)
+        }
     }
 
     /// Open the Downloads sheet from the list footer, retapping like
