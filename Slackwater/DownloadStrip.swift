@@ -43,9 +43,15 @@ struct DownloadStrip: View {
                 // system accent — the only blue on a screen built from navy and
                 // leaf, which reads as an alert dropped into the app rather
                 // than part of it.
+                //
+                // The label needs its own colour: this row sets
+                // `.foregroundStyle(SN.leaf)` below, and a prominent button's
+                // label inherits it, so tinting the FILL leaf as well renders
+                // leaf on leaf and the word disappears entirely.
                 Button("Yes", action: onAccept)
                     .buttonStyle(.borderedProminent)
                     .tint(SN.leaf)
+                    .foregroundStyle(SN.canvas)
             }
             .foregroundStyle(SN.leaf)
             .padding(.horizontal, 26)

@@ -323,7 +323,11 @@ struct OfflineManagerList: View {
                 .buttonStyle(.borderedProminent)
                 // Same reason as the list strip's Yes: untinted, this fills
                 // with the system accent and is the only blue on the screen.
+                // The explicit label colour matters for the same reason too —
+                // a prominent button's label inherits the surrounding
+                // foreground, so a leaf fill under a leaf label vanishes.
                 .tint(SN.leaf)
+                .foregroundStyle(SN.canvas)
                 .disabled(service.remainingBeyondCohort == 0)
                 .accessibilityIdentifier("download-tier-nearby-accept")
             } else {
