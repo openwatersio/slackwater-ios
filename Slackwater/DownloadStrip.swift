@@ -36,22 +36,37 @@ struct DownloadStrip: View {
             HStack(spacing: 12) {
                 // A count, never a duration: locking the phone stops the work,
                 // so a time here would be a promise the app cannot keep.
-                Text("Download \(count) more nearby?")
+                Text("Download \(count) more?")
                 Spacer(minLength: 8)
-                Button("Not now", action: onDecline).buttonStyle(.plain)
+                // Marks, not words: the question is already the sentence, and
+                // two more words beside it made the row wrap to a second line.
+                // Each carries its own label, because a glyph alone tells
+                // VoiceOver nothing about what it accepts.
+                Button(action: onDecline) {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Not now")
+                .accessibilityIdentifier("download-strip-decline")
                 // Tinted, because `.borderedProminent` otherwise fills with the
                 // system accent — the only blue on a screen built from navy and
                 // leaf, which reads as an alert dropped into the app rather
                 // than part of it.
                 //
-                // The label needs its own colour: this row sets
+                // The mark needs its own colour: this row sets
                 // `.foregroundStyle(SN.leaf)` below, and a prominent button's
                 // label inherits it, so tinting the FILL leaf as well renders
-                // leaf on leaf and the word disappears entirely.
-                Button("Yes", action: onAccept)
-                    .buttonStyle(.borderedProminent)
-                    .tint(SN.leaf)
-                    .foregroundStyle(SN.canvas)
+                // leaf on leaf and the glyph disappears entirely.
+                Button(action: onAccept) {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(SN.leaf)
+                .foregroundStyle(SN.canvas)
+                .accessibilityLabel("Download \(count) more")
+                .accessibilityIdentifier("download-strip-accept")
             }
             .foregroundStyle(SN.leaf)
             .padding(.horizontal, 26)
