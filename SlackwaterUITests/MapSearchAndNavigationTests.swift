@@ -53,7 +53,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         XCTAssert(field.appears(within: 5), "gate bypass did not open search")
         XCTAssert(waitFor(field, "hasKeyboardFocus == true"),
                   "the gate's search field did not take keyboard focus")
-        field.typeText("friday")  // works only if the field auto-focused
+        type("friday", into: field)  // works only if the field auto-focused
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.appears(within: 5))
         closeSearch(app)
 
@@ -505,7 +505,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                   "results are not ranked by distance from the fix")
 
         // Narrowing removes the truncation notice — the list is complete again.
-        app.textFields.firstMatch.typeText(" townsend")
+        type(" townsend", into: app.textFields.firstMatch, expecting: "port townsend")
         _ = app.descendants(matching: .any)["search-truncated"].firstMatch
             .disappears(within: 10)
         XCTAssertFalse(app.descendants(matching: .any)["search-truncated"].firstMatch.exists,
