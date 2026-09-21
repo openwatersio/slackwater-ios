@@ -156,15 +156,19 @@ enum BackgroundDownloads {
                     }
                     task.progress.totalUnitCount = Int64(planned.rounded())
                     task.progress.completedUnitCount = Int64(done.rounded())
-                    // A rate-limit backoff waits at least 60 s (`ChsQueue.backoff`),
-                    // which would otherwise read as a second stall with no
-                    // explanation.
-                    let waiting = jobs.contains {
-                        $0.status == .pending && ($0.retryAfter ?? .distantPast) > appNow()
-                    }
+                    // A deferred job is sitting out `ChsQueue.backoff`, which
+                    // reads as a stall with no explanation — up to 15 minutes,
+                    // on an API that kills tasks showing no progress first.
+                    //
+                    // The copy names no cause, because this cannot tell which.
+                    // `deferRetry` fires for every transient failure — offline,
+                    // 5xx, station list unavailable — and the rate limit it was
+                    // written for is the one case it does NOT catch: IWLS's 429
+                    // wait happens inside `IwlsClient.get`, with the job still
+                    // `.downloading`. "Waiting to retry" is true of all of them.
                     task.updateTitle("Downloading tide stations",
-                                     subtitle: waiting
-                                        ? "Waiting for a rate limit to clear…"
+                                     subtitle: service.queue.deferred() > 0
+                                        ? "Waiting to retry…"
                                         : "\(Int(done.rounded())) of \(Int(planned.rounded())) requests")
                     try? await Task.sleep(for: .seconds(2))
                 }
