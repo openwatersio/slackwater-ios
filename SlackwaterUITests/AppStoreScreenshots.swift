@@ -142,9 +142,7 @@ final class AppStoreScreenshots: ShotWalk {
         app = launchShots(["-openMap", "-mapCenter", mapCenter,
                            "-mapZoom", String(format: "%.3f", zoom)])
         XCTAssert(app.otherElements["map-canvas"].firstMatch.appears(within: 10))
-        XCTAssert(waitFor(app.staticTexts["map-settles"].firstMatch, "label != '0'"),
-                  "map never settled")
-        sleep(5)  // tiles never reach the accessibility tree
+        sleep(5)  // nothing the map draws reaches the accessibility tree
         save(app, "05-map.png")
     }
 

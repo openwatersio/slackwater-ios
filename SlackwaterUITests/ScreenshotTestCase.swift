@@ -591,10 +591,17 @@ class ScreenshotTestCase: XCTestCase {
 /// SLACKWATER_SHOTS so a routine suite run skips them.
 class ShotWalk: ScreenshotTestCase {
     /// The day every detail is scrubbed on: a full moon (2026-09-26), so the
-    /// night sky has a moon in it and the spring range is at its widest. The
-    /// app clock is shifted there (`-nowOffsetDays`) so the schedule still
-    /// says Today.
+    /// night sky has a moon in it and the spring range is at its widest.
     let day = DateComponents(year: 2026, month: 9, day: 26)
+    /// The instant the app clock is pinned to: 9:41am Pacific on `day`, the
+    /// time the status-bar override shows. An absolute `-nowEpoch`, never a
+    /// `-nowOffsetDays` shift off the host clock — the shift is `N * 86_400`
+    /// applied to whatever time the run happens to start, so the readings a
+    /// frame takes at `now` (every card in the nearby list) come out
+    /// different on every run, and a run across a DST boundary lands on a
+    /// different wall clock as well. The schedule still says Today: `today`
+    /// reads the app clock like everything else.
+    let shotEpoch = "1790440860"
     /// Friday Harbor — the located list is shot from here: all-NOAA
     /// neighbours, so every Near Me reading lands without a fit.
     let fix = ["-fixLat", "48.545", "-fixLon", "-123.013"]
@@ -611,13 +618,9 @@ class ShotWalk: ScreenshotTestCase {
     }
 
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .current
-        let target = cal.date(from: day)!
-        let offset = cal.dateComponents([.day], from: cal.startOfDay(for: .now), to: target).day!
-        var args = ["-seedGate", "-resetRecents", "-noCloudSync", "-mapSettleSignal",
+        var args = ["-seedGate", "-resetRecents", "-noCloudSync",
                     "-seedFavorites", seededFavorites,
-                    "-nowOffsetDays", String(offset)] + fix + extra
+                    "-nowEpoch", shotEpoch] + fix + extra
         if let time {
             args += ["-scrubInstant", String(format: "%04d-%02d-%02dT%@:00%@",
                                              day.year!, day.month!, day.day!, time, shotZone)]

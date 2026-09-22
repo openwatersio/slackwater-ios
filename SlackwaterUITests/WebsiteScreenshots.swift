@@ -23,12 +23,13 @@ final class WebsiteScreenshots: ShotWalk {
         _ = settled { app.staticTexts.count }
         save(app, "search.png")
 
-        // Map: opened on the fix. Tiles never reach the accessibility tree,
-        // so the settle signal is followed by a plain wait for them to draw.
+        // Map: opened on the fix, then a plain wait for the tiles. Nothing
+        // the map draws reaches the accessibility tree, so there is no
+        // element to wait on — and a predicate aimed at one that does not
+        // exist reads its empty label and passes at t=0, which is a wait that
+        // never waits.
         app = launchShots(["-openMap"])
         XCTAssert(app.otherElements["map-canvas"].firstMatch.appears(within: 10))
-        XCTAssert(waitFor(app.staticTexts["map-settles"].firstMatch, "label != '0'"),
-                  "map never settled")
         sleep(5)
         save(app, "map.png")
 
