@@ -25,6 +25,9 @@ console.log("bundled current stations", i.currents.length, bySource(i.currents))
 console.log("Canadian tide stations", require("./Slackwater/Resources/chs-stations.json").length);
 console.log("Canadian current passes", require("./Slackwater/Resources/chs-current-gates.json").length);
 console.log("listed but blank", require("./Slackwater/Resources/unavailable-stations.json").length);
+// country isnt in the committed data, but every TICON id embeds an ISO 3166-1 alpha-3 code
+const ticonCountries = new Set(i.tides.filter((s) => s.id.startsWith("ticon/")).map((s) => s.id.match(/-([a-z]{3})-[a-z0-9_]+$/)[1]));
+console.log("countries and territories", ticonCountries.size);
 '
 ```
 
