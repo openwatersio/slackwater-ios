@@ -6,9 +6,8 @@ One file per version, named for its `MARKETING_VERSION`. `scripts/testflight.sh`
 
 1. The version line, which gains its build number when a build is picked.
 2. A blank line.
-3. One sentence naming what the version is about.
-4. Highlight bullets, each opening with `·`.
-5. A closing paragraph starting `Worth testing:`.
+3. What the version is about — one sentence and highlight bullets opening with `·` for an update, an introduction for a first release.
+4. A closing paragraph starting `Worth testing:`.
 
 ## The App Store takes the highlights only
 
@@ -20,4 +19,4 @@ sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 
 So `Worth testing:` starts its own line and stays last, and anything a beta tester needs but an App Store reader does not belongs inside it — build numbers, simulator caveats, what to watch for in a specific lane.
 
-The first App Store version introduces the app rather than listing changes, and its copy lives in [App Store metadata](../appstore-metadata.md) instead.
+[App Store metadata](../appstore-metadata.md) names this file as the source of its What's New rather than holding a second copy, so the listing and the build's notes cannot drift apart.

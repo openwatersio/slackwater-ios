@@ -118,18 +118,13 @@ Full text:
 
 ## What's New (4,000 chars max)
 
-The first version has nothing to compare itself to, so this field introduces the app rather than listing changes:
+This field is the version's release notes without the beta testing instructions, so the two can never disagree:
 
-> Slackwater's first release. Tides for thousands of stations worldwide are
-> already on your phone — no signal, no server, nothing to load. Currents for
-> the United States and Canada get a curve for the whole day, with slack, max
-> flood and max ebb marked, so you can see when a pass goes slack and how hard
-> it is running in between. Every station sits on a map that keeps the
-> coastline you have already looked at. Free, no account, no ads.
+```sh
+sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
+```
 
-Every version after this one takes its highlights from that version's release
-notes; [`release-notes/README.md`](release-notes/README.md) has the command that
-extracts them without the TestFlight testing instructions.
+[`release-notes/README.md`](release-notes/README.md) documents the format. 1.14.0 introduces the app rather than listing changes, because a first version has nothing to compare itself to; every version after it leads with what changed.
 
 ## Privacy (App Store Connect "App Privacy" answers)
 
