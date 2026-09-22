@@ -161,7 +161,6 @@ struct SettingsView: View {
             #endif
             .sheet(isPresented: $showWidgets) { WidgetsGalleryView() }
         }
-        .preferredColorScheme(.dark)
     }
 
     private var slackWindowSpeedBinding: Binding<Double> {

@@ -63,6 +63,15 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         ITSAppUsesNonExemptEncryption: false
+        # SwiftUI's `.preferredColorScheme(.dark)` (RootView, SlackwaterApp.swift)
+        # only reaches the app's own view hierarchy. This plist key sets the
+        # app's trait collection at the OS level, so in-process system UI the
+        # app presents (share sheet, keyboard, action sheets) follows it
+        # without needing a SwiftUI modifier on every sheet. CLLocationManager's
+        # authorization alert is a separate case: it always renders using the
+        # device's own appearance, checked on the simulator with this key set,
+        # and no app-level setting reaches it.
+        UIUserInterfaceStyle: Dark
         # Without this the plist ships XcodeGen's literal default of "1" and the
         # build number that reaches TestFlight is whatever `exportArchive`
         # assigns (see scripts/testflight.sh) — a plain upload counter, not this
