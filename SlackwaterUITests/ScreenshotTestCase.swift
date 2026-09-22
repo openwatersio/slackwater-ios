@@ -94,7 +94,23 @@ class ScreenshotTestCase: XCTestCase {
             predicate: NSPredicate(format: "hasKeyboardFocus == true"), object: field)
         XCTAssert(XCTWaiter().wait(for: [focused], timeout: scaled(10)) == .completed,
                   "search field did not take keyboard focus")
+        type(text, into: field)
+    }
+
+    /// `typeText`, checked. A loaded runner drops keystrokes while typeText
+    /// reports success ("malibu" landed as "m" on the iPad lane), so retype
+    /// the whole `expected` value until the field holds it.
+    func type(_ text: String, into field: XCUIElement, expecting expected: String? = nil) {
+        let expected = expected ?? text
+        let holds = NSPredicate(format: "value == %@", expected).predicateFormat
         field.typeText(text)
+        for _ in 0..<2 where !waitFor(field, holds, timeout: 2) {
+            let typed = field.value as? String ?? ""
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
+                                  count: typed.count) + expected)
+        }
+        XCTAssert(waitFor(field, holds, timeout: 2),
+                  "the field holds \"\(field.value as? String ?? "")\", not \"\(expected)\"")
     }
 
     /// Open the Downloads sheet from the list footer, retapping like
