@@ -1,52 +1,14 @@
 // Slackwater — GPL v3. The website's screenshot walk: what it saves becomes
-// slackwater.xyz/public/shots (and the App Store sets). A generator, not a
-// guard — it skips itself unless SLACKWATER_SHOTS reaches the runner, which
-// scripts/screenshots.sh arranges along with a 9:41 status bar.
+// slackwater.xyz/public/shots. A generator, not a guard — it skips itself
+// unless SLACKWATER_SHOTS reaches the runner, which scripts/screenshots.sh
+// arranges along with a 9:41 status bar. The day, the location fix and the
+// favorites it shoots in are `ShotWalk`'s; the App Store sets shoot in the
+// same world (AppStoreScreenshots.swift).
 import XCTest
 
-final class WebsiteScreenshots: ScreenshotTestCase {
-    /// The day every detail is scrubbed on: a full moon (2026-09-26), so the
-    /// night sky has a moon in it. The app clock is shifted there
-    /// (`-nowOffsetDays`) so the schedule still says Today.
-    private let day = DateComponents(year: 2026, month: 9, day: 26)
-    /// Friday Harbor — the located list is shot from here: all-NOAA
-    /// neighbours, so every Near Me reading lands without a fit.
-    private let fix = ["-fixLat", "48.545", "-fixLon", "-123.013"]
-
-    private func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .current
-        let target = cal.date(from: day)!
-        let offset = cal.dateComponents([.day], from: cal.startOfDay(for: .now), to: target).day!
-        var args = ["-seedGate", "-resetRecents", "-noCloudSync", "-mapSettleSignal",
-                    "-seedFavorites", "noaa/9444900,current:noaa/PUG1701",
-                    "-nowOffsetDays", String(offset)] + fix + extra
-        if let time {
-            args += ["-scrubInstant", String(format: "%04d-%02d-%02dT%@:00-07:00",
-                                             day.year!, day.month!, day.day!, time)]
-        }
-        let app = XCUIApplication()
-        app.launchArguments = args
-        app.launch()
-        // -openMap replaces the list with the map.
-        let first = extra.contains("-openMap")
-            ? app.otherElements["map-canvas"].firstMatch : stationList(app)
-        XCTAssert(first.appears(within: 20), "app did not reach its first screen")
-        return app
-    }
-
-    /// The scrubbed detail has parked on `clock` and its lead has stopped
-    /// rewriting itself.
-    private func settleScrub(_ app: XCUIApplication, at clock: String) {
-        XCTAssert(leadReading(app).appears(within: 10), "no lead reading")
-        XCTAssert(waitFor(leadReading(app), "label CONTAINS '\(clock)'"),
-                  "detail did not scrub to \(clock): \(leadReading(app).label)")
-        _ = settled { leadReading(app).label }
-    }
-
+final class WebsiteScreenshots: ShotWalk {
     func testWebsiteShots() throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_SHOTS"] == nil,
-                      "generator — run scripts/screenshots.sh")
+        try skipUnlessShooting()
 
         // List: My Location → Favorites → Near Me, every reading landed.
         var app = launchShots()
