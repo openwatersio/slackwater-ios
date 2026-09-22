@@ -40,9 +40,11 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertNotNil(StationItem.byId[stationID(from: url)])
     }
 
-    /// M2: no resolvable station — the gallery/explainer, not a dead
-    /// `slackwater://station` with nothing after it.
-    func testNoStationIDFallsBackToPremium() {
+    /// M2: no resolvable station never mints a dead `slackwater://station`
+    /// with nothing after it. Where it falls back to instead is what
+    /// PREMIUM_ENABLED decides, so this asserts against the build it runs in;
+    /// the other branch is covered by the Release compile.
+    func testNoStationIDMintsNoStationLink() {
         #if PREMIUM_ENABLED
         XCTAssertEqual(deepLink(forStationID: nil), URL(string: "slackwater://premium"))
         #else
