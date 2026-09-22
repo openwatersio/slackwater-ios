@@ -6,13 +6,13 @@ The listing Slackwater submits, and the rules any edit to it is written against.
 
 Tides are worldwide. Currents are the United States and Canada. Any copy that describes the app as North American is wrong; any copy that implies currents are worldwide is also wrong, and it is the more expensive mistake.
 
-| What ships | Count | Where it comes from |
-|---|---|---|
-| Bundled tide stations | 4,782 | 3,262 NOAA, 1,520 TICON across 105 countries and territories |
-| Bundled current stations | 2,534 | NOAA |
-| Canadian tide stations | 1,060 | CHS, fetched once per station, then offline for good |
-| Canadian current passes | 22 | CHS, same fetch-once model |
-| Listed but blank | 139 | Stations we cannot publish numbers for |
+| What ships               | Count | Where it comes from                                          |
+| ------------------------ | ----- | ------------------------------------------------------------ |
+| Bundled tide stations    | 4,782 | 3,262 NOAA, 1,520 TICON across 105 countries and territories |
+| Bundled current stations | 2,534 | NOAA                                                         |
+| Canadian tide stations   | 1,060 | CHS, fetched once per station, then offline for good         |
+| Canadian current passes  | 22    | CHS, same fetch-once model                                   |
+| Listed but blank         | 139   | Stations we cannot publish numbers for                       |
 
 Refresh the counts before submitting, and any time coverage changes:
 
@@ -24,9 +24,9 @@ Round down in copy. "More than 4,700" survives a catalog change; "4,782" needs a
 
 ## Name & subtitle
 
-| Field | Value | Limit |
-|---|---|---|
-| **Name** | `Slackwater — Tides & Currents` | 30 (29 used) |
+| Field        | Value                           | Limit        |
+| ------------ | ------------------------------- | ------------ |
+| **Name**     | `Slackwater — Tides & Currents` | 30 (29 used) |
 | **Subtitle** | `Offline worldwide predictions` | 30 (29 used) |
 
 The name already indexes "tides" and "currents", so the subtitle spends all 30 characters on words the name does not have: the differentiator, the coverage, and a third indexable noun. Never name a region here — currents will outgrow one before the listing is next reviewed.
@@ -57,7 +57,7 @@ Weather is where tide apps live — Tide Guide and Tides Near Me both sit there,
 
 ## Promotional text (170 chars max, editable without review)
 
-> Tide and current predictions worldwide, offline on your phone. Works on the water, on the beach, in the anchorage — no bars and nothing to load. Free, no account.
+> Tide and current predictions worldwide, offline on your phone. Works on the water, an the beach, in the anchorage — no bars and nothing to load. Free, no account.
 
 (162 characters.)
 
@@ -65,7 +65,7 @@ This field sits directly above the description and is the one piece of copy that
 
 ## Description
 
-**Angle: problem first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the problem and the solution. Everything establishing *why the numbers are trustworthy* — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
+**Angle: problem first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the problem and the solution. Everything establishing _why the numbers are trustworthy_ — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
 
 Two rules that are easy to break by accident:
 
@@ -75,7 +75,7 @@ Two rules that are easy to break by accident:
 Full text:
 
 > Every tide app works fine at home. Slackwater works offline, where you need
-> it — on the water, on the beach, in the anchorage — no bars and nothing to
+> it — on the water, an the beach, in the anchorage — no bars and nothing to
 > load. Thousands of stations worldwide, already on your phone.
 >
 > No spinner. No "no internet connection". No waiting on a server that isn't
@@ -146,16 +146,16 @@ Claim only what the app does today. These labels appear on the product page and 
 
 Verify each answer against Apple's current published criteria before submitting; the summary below is what the code supports, not a reading of the criteria.
 
-| Label | Answer today | Evidence |
-|---|---|---|
-| Dark Interface | Yes | The app is dark-only (`preferredColorScheme(.dark)` app-wide). |
-| Captions, Audio Descriptions | Not applicable | No audio or video. |
-| Larger Text | Not yet | Chrome scales and `SlackwaterTests/TypeScaleTests.swift` guards it, but chart labels are drawn in `Canvas` at fixed sizes, and the lead sits in fixed 160-point geometry. |
-| VoiceOver | Not yet | Labels, traits and values cover cards, lists, headers and downloads. The graph canvas is not an adjustable control and the scroll view announces a bare clock time. |
-| Reduced Motion | Not yet | Honoured for the sky's stars; pill settle fading still runs under the setting. |
-| Sufficient Contrast | Unverified | `ColourAndFormTests` asserts contrast on the speed ramp and pin fills only, not on body text. |
-| Differentiate Without Color | Unverified | Direction is a signed diverging axis with arrow glyphs, and tests forbid speaking direction in colour alone — but no test covers every state. |
-| Voice Control | Unverified | Rides on the same labels as VoiceOver; never tested. |
+| Label                        | Answer today   | Evidence                                                                                                                                                                  |
+| ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dark Interface               | Yes            | The app is dark-only (`preferredColorScheme(.dark)` app-wide).                                                                                                            |
+| Captions, Audio Descriptions | Not applicable | No audio or video.                                                                                                                                                        |
+| Larger Text                  | Not yet        | Chrome scales and `SlackwaterTests/TypeScaleTests.swift` guards it, but chart labels are drawn in `Canvas` at fixed sizes, and the lead sits in fixed 160-point geometry. |
+| VoiceOver                    | Not yet        | Labels, traits and values cover cards, lists, headers and downloads. The graph canvas is not an adjustable control and the scroll view announces a bare clock time.       |
+| Reduced Motion               | Not yet        | Honoured for the sky's stars; pill settle fading still runs under the setting.                                                                                            |
+| Sufficient Contrast          | Unverified     | `ColourAndFormTests` asserts contrast on the speed ramp and pin fills only, not on body text.                                                                             |
+| Differentiate Without Color  | Unverified     | Direction is a signed diverging axis with arrow glyphs, and tests forbid speaking direction in colour alone — but no test covers every state.                             |
+| Voice Control                | Unverified     | Rides on the same labels as VoiceOver; never tested.                                                                                                                      |
 
 [`scrubber.md`](scrubber.md) § 18 is the authoritative list of the gaps behind the "not yet" rows, including the pill capsules that do not yet offer a 44-by-44 target. Close those before flipping a row to yes, and re-run this table whenever they land — the labels are editable without a full review, so shipping honest labels now and upgrading them later costs nothing.
 
