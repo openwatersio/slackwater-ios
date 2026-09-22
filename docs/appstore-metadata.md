@@ -17,7 +17,18 @@ Tides are worldwide. Currents are the United States and Canada. Any copy that de
 Refresh the counts before submitting, and any time coverage changes:
 
 ```
-node -e 'const i=require("./Slackwater/Resources/station-index.json");console.log(i.tides.length,i.currents.length)'
+node -e '
+const bySource = (arr) => arr.reduce((c, s) => (c[s.id.split("/")[0]] = (c[s.id.split("/")[0]] || 0) + 1, c), {});
+const i = require("./Slackwater/Resources/station-index.json");
+console.log("bundled tide stations", i.tides.length, bySource(i.tides));
+console.log("bundled current stations", i.currents.length, bySource(i.currents));
+console.log("Canadian tide stations", require("./Slackwater/Resources/chs-stations.json").length);
+console.log("Canadian current passes", require("./Slackwater/Resources/chs-current-gates.json").length);
+console.log("listed but blank", require("./Slackwater/Resources/unavailable-stations.json").length);
+// country isnt in the committed data, but every TICON id embeds an ISO 3166-1 alpha-3 code
+const ticonCountries = new Set(i.tides.filter((s) => s.id.startsWith("ticon/")).map((s) => s.id.match(/-([a-z]{3})-[a-z0-9_]+$/)[1]));
+console.log("countries and territories", ticonCountries.size);
+'
 ```
 
 Round down in copy. "More than 4,700" survives a catalog change; "4,782" needs an App Store review to correct.
