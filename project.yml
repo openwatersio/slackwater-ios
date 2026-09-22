@@ -25,6 +25,12 @@ settings:
     # say what changed. Pinned at the value already in use, so this changes
     # no behaviour. Moving to 6 is a migration, not a setting.
     SWIFT_VERSION: "5.0"
+  configs:
+    # Premium (the lock-screen widgets, its sheet, and slackwater://premium) is
+    # Debug-only until it ships (#463). Add PREMIUM_ENABLED to Release to ship
+    # it. DEBUG is restated because this key replaces XcodeGen's preset.
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG PREMIUM_ENABLED"
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac

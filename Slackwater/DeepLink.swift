@@ -22,14 +22,23 @@ struct SlackwaterEntry: TimelineEntry {
 let idPathCharacters = CharacterSet(charactersIn:
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
-/// The widget's `slackwater://station/<id>` deep link for one station id, or
-/// the Widgets gallery/explainer when there's no id to resolve (M2) — station
-/// ids contain ":" and "/" (e.g. "current:noaa/jx0701"), so both get
+/// The widget's `slackwater://station/<id>` deep link for one station id —
+/// station ids contain ":" and "/" (e.g. "current:noaa/jx0701"), so both get
 /// percent-encoded; the receiving `.onOpenURL` reads the id back decoded via
 /// `url.pathComponents`.
+///
+/// With no id to resolve (M2) a PREMIUM_ENABLED build opens the Widgets
+/// gallery/explainer. Without Premium that route does not exist, so the widget
+/// gets no URL and a tap opens the app wherever it was.
 func deepLink(forStationID id: String?) -> URL? {
     guard let id, let encoded = id.addingPercentEncoding(withAllowedCharacters: idPathCharacters)
-    else { return URL(string: "slackwater://premium") }
+    else {
+        #if PREMIUM_ENABLED
+        return URL(string: "slackwater://premium")
+        #else
+        return nil  // no gallery route without Premium; the tap just opens the app
+        #endif
+    }
     return URL(string: "slackwater://station/\(encoded)")
 }
 

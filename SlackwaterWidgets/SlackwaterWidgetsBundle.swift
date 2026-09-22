@@ -55,8 +55,10 @@ struct SlackwaterWidgetsBundle: WidgetBundle {
     var body: some Widget {
         NextEventWidget()
         DayCurveWidget()
+        #if PREMIUM_ENABLED
         SlackInlineWidget()
         SlackCircularWidget()
         SlackRectangularWidget()
+        #endif
     }
 }
