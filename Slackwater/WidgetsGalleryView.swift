@@ -4,8 +4,10 @@
 import SwiftUI
 
 struct WidgetsGalleryView: View {
+    #if PREMIUM_ENABLED
     @ObservedObject private var store = PremiumStore.shared
     @State private var showPremium = false
+    #endif
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -18,6 +20,7 @@ struct WidgetsGalleryView: View {
                                   "Now, which way it's going, and the next turn."),
                                  ("Today's Curve", "waveform.path.ecg",
                                   "Today's curve with the next event.")])
+                    #if PREMIUM_ENABLED
                     group("Lock screen — Premium",
                           note: "Long-press your lock screen → Customize → add Slackwater above or below the clock.",
                           rows: [("Next Slack (inline)", "lock.iphone",
@@ -34,6 +37,7 @@ struct WidgetsGalleryView: View {
                         .buttonStyle(.bordered)
                         .tint(SN.leaf)
                     }
+                    #endif
                 }
                 .padding(20)
                 .padding(.bottom, 30)
@@ -48,7 +52,9 @@ struct WidgetsGalleryView: View {
                         .foregroundStyle(SN.leaf)
                 }
             }
+            #if PREMIUM_ENABLED
             .sheet(isPresented: $showPremium) { PremiumView() }
+            #endif
         }
         .preferredColorScheme(.dark)
     }

@@ -43,7 +43,11 @@ final class DeepLinkTests: XCTestCase {
     /// M2: no resolvable station — the gallery/explainer, not a dead
     /// `slackwater://station` with nothing after it.
     func testNoStationIDFallsBackToPremium() {
+        #if PREMIUM_ENABLED
         XCTAssertEqual(deepLink(forStationID: nil), URL(string: "slackwater://premium"))
+        #else
+        XCTAssertNil(deepLink(forStationID: nil))
+        #endif
     }
 
     func testConfiguredWidgetEntryDeepLinksToItsStation() {

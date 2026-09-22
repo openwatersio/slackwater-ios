@@ -29,7 +29,13 @@ let idPathCharacters = CharacterSet(charactersIn:
 /// `url.pathComponents`.
 func deepLink(forStationID id: String?) -> URL? {
     guard let id, let encoded = id.addingPercentEncoding(withAllowedCharacters: idPathCharacters)
-    else { return URL(string: "slackwater://premium") }
+    else {
+        #if PREMIUM_ENABLED
+        return URL(string: "slackwater://premium")
+        #else
+        return nil  // no gallery route without Premium; the tap just opens the app
+        #endif
+    }
     return URL(string: "slackwater://station/\(encoded)")
 }
 

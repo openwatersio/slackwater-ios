@@ -599,7 +599,9 @@ struct StationListView: View {
         }
         guard url.scheme == "slackwater" else { return }
         switch url.host {
+        #if PREMIUM_ENABLED
         case "premium": showWidgetsGallery = true
+        #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
             let id = stationID(from: url)

@@ -9,9 +9,11 @@ struct SettingsView: View {
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var chs = ChsFitService.shared
+    #if PREMIUM_ENABLED
     @ObservedObject private var premium = PremiumStore.shared
-    @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
+    #endif
+    @Environment(\.dismiss) private var dismiss
     @State private var showWidgets = false
 
     private var version: String {
@@ -74,6 +76,7 @@ struct SettingsView: View {
                         }
                     }
 
+                    #if PREMIUM_ENABLED
                     section("Slackwater Premium") {
                         Button { showPremium = true } label: {
                             HStack {
@@ -86,16 +89,13 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
-                        Button { showWidgets = true } label: {
-                            HStack {
-                                Text("Widgets — add them to your home and lock screen")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold))
-                            }
-                            .foregroundStyle(SN.leaf)
-                        }
+                        widgetsButton("Widgets — add them to your home and lock screen")
                     }
+                    #else
+                    section("Widgets") {
+                        widgetsButton("Widgets — add them to your home screen")
+                    }
+                    #endif
 
                     section("About these predictions") {
                         Text("Slackwater computes harmonic tide and current predictions on this device. Predictions are not observations — actual conditions vary with weather, river flow and local effects.")
@@ -156,7 +156,9 @@ struct SettingsView: View {
                         .foregroundStyle(SN.leaf)
                 }
             }
+            #if PREMIUM_ENABLED
             .sheet(isPresented: $showPremium) { PremiumView() }
+            #endif
             .sheet(isPresented: $showWidgets) { WidgetsGalleryView() }
         }
         .preferredColorScheme(.dark)
@@ -165,6 +167,18 @@ struct SettingsView: View {
     private var slackWindowSpeedBinding: Binding<Double> {
         Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
                 set: { slackWindowSpeed = normalizedSlackThresholdKn($0) })
+    }
+
+    private func widgetsButton(_ title: String) -> some View {
+        Button { showWidgets = true } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(SN.leaf)
+        }
     }
 
     @ViewBuilder private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {
