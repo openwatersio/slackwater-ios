@@ -159,7 +159,7 @@ Verify each answer against Apple's current published criteria before submitting;
 
 | Label                        | Answer today   | Evidence                                                                                                                                                                  |
 | ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dark Interface               | Yes            | The app is dark-only (`preferredColorScheme(.dark)` app-wide).                                                                                                            |
+| Dark Interface               | Yes            | The app is dark-only (`UIUserInterfaceStyle: Dark` in `project.yml`).                                                                                                     |
 | Captions, Audio Descriptions | Not applicable | No audio or video.                                                                                                                                                        |
 | Larger Text                  | Not yet        | Chrome scales and `SlackwaterTests/TypeScaleTests.swift` guards it, but chart labels are drawn in `Canvas` at fixed sizes, and the lead sits in fixed 160-point geometry. |
 | VoiceOver                    | Not yet        | Labels, traits and values cover cards, lists, headers and downloads. The graph canvas is not an adjustable control and the scroll view announces a bare clock time.       |

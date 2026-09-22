@@ -56,7 +56,6 @@ struct WidgetsGalleryView: View {
             .sheet(isPresented: $showPremium) { PremiumView() }
             #endif
         }
-        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder private func group(_ title: String, note: String,
