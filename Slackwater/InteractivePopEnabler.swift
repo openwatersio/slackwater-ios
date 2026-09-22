@@ -38,6 +38,15 @@ struct InteractivePopEnabler: UIViewControllerRepresentable {
             pop.delegate = popDelegate
             pop.isEnabled = true
         }
+        // The recognizer holds `popDelegate` weakly, so once this detail is popped
+        // nothing refuses a swipe on the root. Disable it there. Not in
+        // viewWillDisappear: that fires as an interactive pop begins, and disabling
+        // the recognizer then would cancel the swipe.
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            guard let nav = popDelegate.nav, nav.viewControllers.count <= 1 else { return }
+            nav.interactivePopGestureRecognizer?.isEnabled = false
+        }
     }
 
     func makeUIViewController(context: Context) -> Host { Host() }
