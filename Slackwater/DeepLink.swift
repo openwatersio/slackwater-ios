@@ -35,6 +35,13 @@ func deepLink(forStationID id: String?) -> URL? {
 
 func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
 
+/// A lock-screen widget's link: its station once unlocked, the Widgets page
+/// while locked. The provider resolves `stationID` either way, so the locked
+/// case can't lean on `deepLink(_:)`'s nil fallback.
+func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {
+    entry.premium ? deepLink(entry) : deepLink(forStationID: nil)
+}
+
 /// The station id back out of a `slackwater://station/<id>` URL — the inverse
 /// of `deepLink(forStationID:)`, and the only safe read of it. The id IS the
 /// whole path and nearly every id carries a "/" ("noaa/9449880"), so take the
