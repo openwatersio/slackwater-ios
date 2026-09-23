@@ -31,7 +31,9 @@ export function loadListing(file = new URL('../docs/appstore-listing.json', impo
 // line and the blank line after it (docs/release-notes/README.md).
 export function whatsNew(notes, version) {
   const lines = notes.split('\n');
-  if (!lines[0].startsWith(version) || lines[1] !== '') throw new Error(`release notes for ${version} must open with the version line and a blank line`);
+  // Exactly the version, or the version and its build: "1.14.0 (45)" but never "1.14.01".
+  const head = lines[0] === version || lines[0].startsWith(`${version} `);
+  if (!head || lines[1] !== '') throw new Error(`release notes for ${version} must open with the version line and a blank line`);
   const end = lines.findIndex((line) => line.startsWith('Worth testing:'));
   // Without the marker the beta instructions would publish too.
   if (end < 0) throw new Error(`release notes for ${version} have no "Worth testing:" line`);
