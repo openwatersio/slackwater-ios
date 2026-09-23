@@ -23,6 +23,14 @@ class ScreenshotTestCase: XCTestCase {
     static let fixtureDate = Date(timeIntervalSince1970: TimeInterval(fixtureNow)!)
     private var fixtureNotifyTokens: [String: Int32] = [:]
 
+    /// One miss is the whole report. Left to continue, a test that lost one
+    /// race walks on into four more waits, each scaled 4× on CI, and buries
+    /// the first cause under a ten-minute cascade (#474).
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+    }
+
     override func tearDown() {
         for token in fixtureNotifyTokens.values { notify_cancel(token) }
         fixtureNotifyTokens.removeAll()
@@ -98,19 +106,43 @@ class ScreenshotTestCase: XCTestCase {
     }
 
     /// `typeText`, checked. A loaded runner drops keystrokes while typeText
-    /// reports success ("malibu" landed as "m" on the iPad lane), so retype
-    /// the whole `expected` value until the field holds it.
+    /// reports success ("malibu" landed as "m", "deception" as "dec"), and a
+    /// whole-string retype drops them the same way. So the retype clears the
+    /// field and goes one character at a time, confirming each before the
+    /// next. The assertion judges and reports one settled read; a re-read
+    /// after the deadline prints `holds "Friday", not "Friday"` (#474).
     func type(_ text: String, into field: XCUIElement, expecting expected: String? = nil) {
         let expected = expected ?? text
-        let holds = NSPredicate(format: "value == %@", expected).predicateFormat
         field.typeText(text)
-        for _ in 0..<2 where !waitFor(field, holds, timeout: 2) {
-            let typed = field.value as? String ?? ""
+        var observed = valueLanded(in: field, expecting: expected)
+        for _ in 0..<2 where observed != expected {
+            // Over-delete: `observed` may itself be mid-landing, and deleting
+            // past empty costs nothing.
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
-                                  count: typed.count) + expected)
+                                  count: observed.count + expected.count))
+            var prefix = ""
+            for ch in expected {
+                prefix.append(ch)
+                field.typeText(String(ch))
+                if !waitFor(field, holdsValue(prefix), timeout: 2) { break }
+            }
+            observed = valueLanded(in: field, expecting: expected)
         }
-        XCTAssert(waitFor(field, holds, timeout: 2),
-                  "the field holds \"\(field.value as? String ?? "")\", not \"\(expected)\"")
+        XCTAssertEqual(observed, expected, "the search field never took the query")
+    }
+
+    private func holdsValue(_ value: String) -> String {
+        NSPredicate(format: "value == %@", value).predicateFormat
+    }
+
+    /// Wait for `field` to hold `expected`, a second per character, then hand
+    /// back a settled read either way so the caller judges and reports the
+    /// same string. An empty field reads as its placeholder.
+    private func valueLanded(in field: XCUIElement, expecting expected: String) -> String {
+        if waitFor(field, holdsValue(expected), timeout: max(2, Double(expected.count))) {
+            return expected
+        }
+        return settled { field.value as? String ?? "" }
     }
 
     /// Open the Downloads sheet from the list footer, retapping like

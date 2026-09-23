@@ -34,6 +34,7 @@ struct StationListView: View {
     @State private var showDownloads = false
     @State private var showWidgetsGallery = false
     @State private var searching = false
+    @State private var results: [StationItem] = []
     /// Tides/Currents narrowing, nil = everything. One persisted value for
     /// Near Me, search and every detail's Nearby, so a pick carries between
     /// them; `SeriesFilterChips` writes it.
@@ -1002,7 +1003,34 @@ struct StationListView: View {
 
     private func openSearch() {
         query = ""       // a new search never inherits the last query
+        results = []
         searching = true
+    }
+
+    /// Everything the ranking reads, as one `.task(id:)` key.
+    private struct SearchInput: Equatable {
+        var query: String
+        var series: StationSeries?
+        var lat: Double
+        var lon: Double
+    }
+
+    private var searchInput: SearchInput {
+        SearchInput(query: query, series: seriesFilter, lat: anchor.lat, lon: anchor.lon)
+    }
+
+    /// Ranking the catalog costs about a frame on a slow machine (40 ms on a
+    /// hosted CI runner), so done in the body on every keystroke it stalls the
+    /// main thread mid-burst and the next keystroke is dropped (#474). Coalesce
+    /// the burst and rank off the main actor; an empty query ranks at once so
+    /// opening search shows the nearest stations without a pause.
+    private func rankResults(_ input: SearchInput) async {
+        if !input.query.isEmpty {
+            guard (try? await Task.sleep(for: .milliseconds(120))) != nil else { return }
+        }
+        results = await Task.detached(priority: .userInitiated) {
+            StationItem.search(input.query, near: (input.lat, input.lon), series: input.series)
+        }.value
     }
 
     private var searchOverlay: some View {
@@ -1013,7 +1041,6 @@ struct StationListView: View {
         ZStack(alignment: .bottom) {
             CanvasBackground()
             ScrollView {
-                    let results = StationItem.search(query, near: anchor, series: seriesFilter)
                     VStack(spacing: 12) {
                         // Nationally a two-letter query matches a thousand
                         // stations. Showing the nearest 60 is the useful
@@ -1076,6 +1103,7 @@ struct StationListView: View {
             .onTapGesture { searchFocused = true }
         }
         .onAppear { searchFocused = true }  // keyboard up immediately
+        .task(id: searchInput) { await rankResults(searchInput) }
     }
 
     /// The station's ordinary card, by kind — what a search result and the
