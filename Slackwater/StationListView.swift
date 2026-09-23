@@ -1028,9 +1028,15 @@ struct StationListView: View {
         if !input.query.isEmpty {
             guard (try? await Task.sleep(for: .milliseconds(120))) != nil else { return }
         }
-        results = await Task.detached(priority: .userInitiated) {
+        let ranked = await Task.detached(priority: .userInitiated) {
             StationItem.search(input.query, near: (input.lat, input.lon), series: input.series)
         }.value
+        // A later keystroke cancels this task but cannot stop the ranking
+        // already running. A one-letter query matches thousands of stations
+        // and sorts slower than the full word, so it returns second and would
+        // overwrite the answer (CI showed "d" results under "deception").
+        guard !Task.isCancelled else { return }
+        results = ranked
     }
 
     private var searchOverlay: some View {
