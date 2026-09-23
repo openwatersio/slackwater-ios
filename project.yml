@@ -14,7 +14,7 @@ settings:
     # app ships — a per-target pair here silently drifts the two Info.plists
     # apart (the appex shipped 1.0/1 otherwise; see the app target's own
     # CFBundleVersion/CFBundleShortVersionString comment below for the history).
-    MARKETING_VERSION: 1.13.0
+    MARKETING_VERSION: 1.14.0
     CURRENT_PROJECT_VERSION: 42
     # The language mode the app compiles in, stated rather than inherited.
     # XcodeGen's default is 5.0 and the project it writes is gitignored, so
