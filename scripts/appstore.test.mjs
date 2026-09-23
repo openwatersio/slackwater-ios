@@ -51,7 +51,9 @@ test('the listing loader rejects copy over Apple’s limits', () => {
 test('What’s New is the notes between the version line and Worth testing', () => {
   const notes = '1.15.0 (60)\n\nFaster maps.\n\n· One\n· Two\n\nWorth testing: the map.\n';
   assert.equal(whatsNew(notes, '1.15.0'), 'Faster maps.\n\n· One\n· Two');
+  assert.equal(whatsNew('1.15.0\n\nFaster maps.\n\nWorth testing: x', '1.15.0'), 'Faster maps.');
   assert.throws(() => whatsNew('Faster maps.\n\nWorth testing: x', '1.15.0'), /version line/);
+  assert.throws(() => whatsNew('1.15.01 (60)\n\nFaster maps.\n\nWorth testing: x', '1.15.0'), /version line/);
   assert.throws(() => whatsNew('1.15.0\n\nFaster maps.\n', '1.15.0'), /no "Worth testing:"/);
   assert.throws(() => whatsNew('1.15.0\n\nWorth testing: x', '1.15.0'), /nothing above/);
 });
