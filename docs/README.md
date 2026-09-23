@@ -9,7 +9,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
 | [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |
-| [App Store metadata](appstore-metadata.md) | Listing copy, privacy answers, and accessibility declarations |
+| [App Store metadata](appstore-metadata.md) | Rules for the listing copy in [`appstore-listing.json`](appstore-listing.json), privacy answers, and accessibility declarations |
 | [Licensing](licensing.md) | App licensing and the contributor agreement |
 
 ## Operating procedures and evidence
@@ -17,6 +17,7 @@ Documentation here describes the current product, maintained operating procedure
 | Document | Purpose |
 |---|---|
 | [TestFlight](testflight.md) | Release setup and signing |
+| [App Store releases](appstore.md) | Pushing the listing, submitting for review, and releasing with `scripts/asc.mjs` |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
