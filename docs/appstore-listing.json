@@ -1,0 +1,70 @@
+{
+  "locale": "en-US",
+  "app": {
+    "contentRightsDeclaration": "USES_THIRD_PARTY_CONTENT"
+  },
+  "appInfo": {
+    "primaryCategory": "WEATHER",
+    "secondaryCategory": "NAVIGATION"
+  },
+  "appInfoLocalization": {
+    "name": "Slackwater — Tides & Currents",
+    "subtitle": "Offline worldwide predictions",
+    "privacyPolicyUrl": "https://slackwater.xyz/privacy/"
+  },
+  "version": {
+    "copyright": "2026 Open Water Software, LLC"
+  },
+  "versionLocalization": {
+    "promotionalText": "Tide and current predictions worldwide, offline on your phone. Works on the water, on the beach, in the anchorage — no bars and nothing to load. Free, no account.",
+    "description": [
+      "Every tide app works fine at home. Slackwater works offline, where you need it — on the water, on the beach, in the anchorage — no bars and nothing to load. Thousands of stations worldwide, already on your phone.",
+      "",
+      "No spinner. No \"no internet connection\". No waiting on a server that isn't coming. You open it, and the answer is there.",
+      "",
+      "And it does the part most tide apps skip. Heights are the easy half. The harder question is the current: when does the pass go slack? How hard is it running at max? Can you get through before it turns?",
+      "",
+      "WORKS WHERE THERE IS NO SIGNAL",
+      "The predictions are computed on your phone, not fetched. Down a dead-end road, out at the point, in an anchorage, or with the boat's electronics down — you get the same answer you would have got at the dock.",
+      "",
+      "CURRENTS, NOT JUST TIDES",
+      "A curve for the whole day, with slack, max flood and max ebb marked. Drag your thumb across it to read any moment. Every current station shows the tide at its reference port on the same screen.",
+      "",
+      "A MAP THAT WORKS OFFLINE TOO",
+      "Every station on a map. The coastline you have already looked at stays on your phone and draws again with zero bars.",
+      "",
+      "FREE, NO ACCOUNT, NO ADS",
+      "The offline core is free and stays free.",
+      "",
+      "WHERE THE NUMBERS COME FROM",
+      "Tides for more than 4,700 stations across a hundred countries are built in with nothing to download, each one from the national authority that publishes it and checked against that authority's own tide datums before it ships. Currents cover the United States and Canada: every NOAA current station, plus Canadian passes from the Salish Sea to Haida Gwaii and Cape Breton. Canadian stations build their own model from the Canadian Hydrographic Service's published predictions, then work offline for good. A few stations are listed but blank — where we cannot publish numbers we trust, we say so instead of guessing.",
+      "",
+      "Predictions are not observations — conditions vary with weather and river flow. Not for navigation."
+    ],
+    "keywords": "chart,table,slack,ebb,flood,marine,kayak,paddle,fishing,sailing,noaa,chs,harbor,harbour,salish sea",
+    "supportUrl": "https://slackwater.xyz/support/",
+    "marketingUrl": "https://slackwater.xyz"
+  },
+  "reviewDetail": {
+    "contactFirstName": "Brandon",
+    "contactLastName": "Keepers",
+    "contactEmail": "slackwater@openwaters.io",
+    "demoAccountRequired": false,
+    "notes": [
+      "All predictions are computed on-device from public harmonic data. The app is explicitly marked \"not for navigation\" in-app (every detail footer, the map, and Settings). Location permission is optional and used only to sort the station list; deny it and search/browse works identically.",
+      "",
+      "No account is needed. Canadian stations download their data from the Canadian Hydrographic Service once, the first time each one is opened, and then work offline."
+    ]
+  },
+  "accessibility": {
+    "supportsAudioDescriptions": false,
+    "supportsCaptions": false,
+    "supportsDarkInterface": true,
+    "supportsDifferentiateWithoutColorAlone": false,
+    "supportsLargerText": false,
+    "supportsReducedMotion": false,
+    "supportsSufficientContrast": false,
+    "supportsVoiceControl": false,
+    "supportsVoiceover": false
+  }
+}

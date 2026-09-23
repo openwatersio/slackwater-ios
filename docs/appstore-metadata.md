@@ -1,6 +1,6 @@
 # App Store metadata
 
-The listing Slackwater submits, and the rules any edit to it is written against. Nothing here has been submitted — App Store Connect still holds placeholder values.
+The rules the App Store listing is written against. The values themselves live in [`appstore-listing.json`](appstore-listing.json), which `scripts/asc.mjs` pushes to App Store Connect ([App Store releases](appstore.md)); the field names below are its keys. `scripts/appstore.mjs` refuses any value over Apple's limit before a request goes out.
 
 ## Coverage, as every field below states it
 
@@ -35,20 +35,13 @@ Round down in copy. "More than 4,700" survives a catalog change; "4,782" needs a
 
 ## Name & subtitle
 
-| Field        | Value                           | Limit        |
-| ------------ | ------------------------------- | ------------ |
-| **Name**     | `Slackwater — Tides & Currents` | 30 (29 used) |
-| **Subtitle** | `Offline worldwide predictions` | 30 (29 used) |
+`appInfoLocalization.name` and `appInfoLocalization.subtitle`, 30 characters each.
 
 The name already indexes "tides" and "currents", so the subtitle spends all 30 characters on words the name does not have: the differentiator, the coverage, and a third indexable noun. Never name a region here — currents will outgrow one before the listing is next reviewed.
 
-## Keywords (≤100 chars, name/subtitle words omitted)
+## Keywords
 
-```
-chart,table,slack,ebb,flood,marine,kayak,paddle,fishing,sailing,noaa,chs,harbor,harbour,salish sea
-```
-
-(98 characters.)
+`versionLocalization.keywords`: comma-separated, 100 bytes, name and subtitle words omitted.
 
 The rules this set follows, for whoever edits it next:
 
@@ -62,19 +55,19 @@ Deliberately out: `gulf islands`, `juan de fuca`, `puget sound`, `knot`, `boatin
 
 ## Category
 
-**Primary: Weather. Secondary: Navigation.**
+**Primary: Weather. Secondary: Navigation.** (`appInfo.primaryCategory` and `appInfo.secondaryCategory`, as App Store Connect category IDs.)
 
 Weather is where tide apps live — Tide Guide and Tides Near Me both sit there, so it is where tide-app browsers and chart rankings are. Navigation carries an implication the app disclaims on every screen ("not for navigation"), so it stays secondary: the discovery surface without a primary shelf that contradicts the disclaimer.
 
-## Promotional text (170 chars max, editable without review)
+## Promotional text
 
-> Tide and current predictions worldwide, offline on your phone. Works on the water, an the beach, in the anchorage — no bars and nothing to load. Free, no account.
-
-(162 characters.)
+`versionLocalization.promotionalText`, 170 characters, editable without review.
 
 This field sits directly above the description and is the one piece of copy that can change without a review — use it for anything time-sensitive. Keep it problem-first like the description rather than leading with a station count, or the two read as a spec sheet twice over.
 
 ## Description
+
+`versionLocalization.description`, 4,000 characters. In the JSON it is an array of lines: each paragraph is one line, an empty string separates paragraphs, and a section heading sits on the line directly above its paragraph.
 
 **Angle: problem first.** The App Store truncates after roughly three lines before "…more", so those lines are all most people ever read. They carry the problem and the solution. Everything establishing _why the numbers are trustworthy_ — sources, validation, counts — sits near the end, where it reassures the people who scroll rather than gatekeeping the people who don't.
 
@@ -83,59 +76,15 @@ Two rules that are easy to break by accident:
 - **Placement beats phrasing inside the first 200 characters.** "Offline" earns its spot in the second sentence because that is character 52, inside the collapsed view. A better sentence past the fold is worse than a plain one above it.
 - **Currents are named as North American every time coverage is claimed.** The provenance block is the only place the limit appears, so it cannot be trimmed for length.
 
-Full text:
+## What's New
 
-> Every tide app works fine at home. Slackwater works offline, where you need
-> it — on the water, an the beach, in the anchorage — no bars and nothing to
-> load. Thousands of stations worldwide, already on your phone.
->
-> No spinner. No "no internet connection". No waiting on a server that isn't
-> coming. You open it, and the answer is there.
->
-> And it does the part most tide apps skip. Heights are the easy half. The
-> harder question is the current: when does the pass go slack? How hard is it
-> running at max? Can you get through before it turns?
->
-> WORKS WHERE THERE IS NO SIGNAL
-> The predictions are computed on your phone, not fetched. Down a dead-end
-> road, out at the point, in an anchorage, or with the boat's electronics
-> down — you get the same answer you would have got at the dock.
->
-> CURRENTS, NOT JUST TIDES
-> A curve for the whole day, with slack, max flood and max ebb marked. Drag
-> your thumb across it to read any moment. Every current station shows the
-> tide at its reference port on the same screen.
->
-> A MAP THAT WORKS OFFLINE TOO
-> Every station on a map. The coastline you have already looked at stays on
-> your phone and draws again with zero bars.
->
-> FREE, NO ACCOUNT, NO ADS
-> The offline core is free and stays free.
->
-> WHERE THE NUMBERS COME FROM
-> Tides for more than 4,700 stations across a hundred countries are built in
-> with nothing to download, each one from the national authority that
-> publishes it and checked against that authority's own tide datums before it
-> ships. Currents cover the United States and Canada: every NOAA current
-> station, plus Canadian passes from the Salish Sea to Haida Gwaii and Cape
-> Breton. Canadian stations build their own model from the Canadian
-> Hydrographic Service's published predictions, then work offline for good. A
-> few stations are listed but blank — where we cannot publish numbers we
-> trust, we say so instead of guessing.
->
-> Predictions are not observations — conditions vary with weather and river
-> flow. Not for navigation.
-
-## What's New (4,000 chars max)
-
-This field is the version's release notes without the beta testing instructions, so the two can never disagree:
+This field is the version's release notes without the beta testing instructions, so the two can never disagree. `asc.mjs localization` extracts it the same way as this line:
 
 ```sh
 sed -e '1,2d' -e '/^Worth testing:/,$d' docs/release-notes/1.14.0.md
 ```
 
-[`release-notes/README.md`](release-notes/README.md) documents the format. 1.14.0 introduces the app rather than listing changes, because a first version has nothing to compare itself to; every version after it leads with what changed.
+[`release-notes/README.md`](release-notes/README.md) documents the format. An app's first version has no What's New field, so 1.14.0's introduction reaches TestFlight and the GitHub release only. Every version after it leads with what changed.
 
 ## Privacy (App Store Connect "App Privacy" answers)
 
@@ -153,7 +102,7 @@ Re-answer this section whenever a new host appears in the app. `grep -rhoE "http
 
 ## Accessibility Nutrition Labels
 
-Claim only what the app does today. These labels appear on the product page and a wrong one is a support burden and a trust cost, not a marketing win — an omitted label costs nothing but the label itself.
+`accessibility` in the listing file holds one flag per label, true only for the rows answered yes below; `asc.mjs accessibility --yes` publishes them for iPhone and iPad. Claim only what the app does today. These labels appear on the product page and a wrong one is a support burden and a trust cost, not a marketing win — an omitted label costs nothing but the label itself.
 
 Verify each answer against Apple's current published criteria before submitting; the summary below is what the code supports, not a reading of the criteria.
 
@@ -170,16 +119,13 @@ Verify each answer against Apple's current published criteria before submitting;
 
 Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) § 18 lists the scrubber's own remaining deviations. `AccessibilityAuditTests` runs the platform audit over the station list and both detail kinds on every CI run, so a regression in a claimed row fails the build. Re-check this table whenever one of those issues lands — the labels are editable without a full review, so shipping honest labels now and upgrading them later costs nothing.
 
-## Review notes (for the App Review box)
+## Review notes
 
-> All predictions are computed on-device from public harmonic data. The app is
-> explicitly marked "not for navigation" in-app (every detail footer, the map,
-> and Settings). Location permission is optional and used only to sort the
-> station list; deny it and search/browse works identically. No account needed.
+`reviewDetail` in the listing file: the contact and the notes App Review reads. The notes say that predictions are computed on-device, that the app is marked not for navigation, that location is optional, that no account is needed, and that Canadian stations download their data once for offline use. The contact phone number stays out of the repo (`ASC_REVIEW_PHONE`, see [App Store releases](appstore.md)).
 
 ## Before submission
 
-- [ ] Screenshots uploaded. Apple takes 1–10 per device size and scales the 6.9" set down for smaller iPhones, so two sets cover a universal app: 6.9" iPhone (1320×2868) and 13" iPad (2064×2752). `SlackwaterUITests/AppStoreScreenshots.swift` shoots both from a pinned clock, location fix and favorites, so a re-run reproduces them:
+- [ ] Screenshots shot on the current UI. Apple takes 1–10 per device size and scales the 6.9" set down for smaller iPhones, so two sets cover a universal app: 6.9" iPhone (1320×2868) and 13" iPad (2064×2752). `SlackwaterUITests/AppStoreScreenshots.swift` shoots both from a pinned clock, location fix and favorites, so a re-run reproduces them, and `asc.mjs screenshots` uploads them:
 
   ```
   WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 ./scripts/screenshots.sh
@@ -189,6 +135,5 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
 - [ ] Station counts re-derived and rounded down.
-- [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.
 - [ ] Accessibility Nutrition Labels answered against Apple's current criteria, claiming only the rows that are yes.
