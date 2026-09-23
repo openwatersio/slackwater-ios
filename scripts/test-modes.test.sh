@@ -65,7 +65,7 @@ assert_has "xcrun simctl erase SIM-Slackwater_iPhone_17"
 assert_has "id=SIM-Slackwater_iPhone_17"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
-assert_has "-collect-test-diagnostics never"
+assert_has "-collect-test-diagnostics on-failure"
 assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
@@ -85,7 +85,7 @@ assert_lacks "live=1"
 run_mode --unit
 assert_count '^xcodebuild ' 1
 assert_has "-only-testing:SlackwaterTests"
-assert_has "-collect-test-diagnostics never"
+assert_has "-collect-test-diagnostics on-failure"
 assert_lacks "NationalScaleTests"
 
 run_mode --live

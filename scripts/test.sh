@@ -160,8 +160,9 @@ case $MODE in
   unit) selection=(-only-testing:SlackwaterTests) ;;
   live) selection=(-only-testing:SlackwaterUITests/LiveFetchTests) ;;
 esac
+# A PR failure with no recording is a blind re-run (#474); the cost is paid
+# only by a failing test.
 diagnostics=on-failure
-[[ $MODE == fast || $MODE == unit ]] && diagnostics=never
 
 # One shard's share of the suite, comma-separated. CI's matrix sets exactly one
 # of these per shard (.github/workflows/ci.yml); a local run sets neither and
