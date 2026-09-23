@@ -1,10 +1,6 @@
 name: CI
 
-# ADVISORY, not blocking. openwatersio is a free org and this repo is private,
-# so GitHub offers neither branch protection nor rulesets here — nothing can
-# reject a push to main server-side. CI reports; the policy it backs is in
-# CONTRIBUTING.md and holds by agreement. If the org ever moves to Team, turn
-# these jobs into required checks and the policy stops being voluntary.
+# Required checks is the protected-branch gate and accepts the app lane's docs-only skip.
 
 on:
   pull_request:
@@ -24,7 +20,7 @@ jobs:
   # This is a JOB-level gate, not `on: paths-ignore`, for two reasons: the free
   # Ubuntu lane below should still run, and a workflow that never starts leaves
   # a required check pending forever, whereas a job skipped by `if:` satisfies
-  # it. (CI is advisory today — see the header — but this keeps the door open.)
+  # it. The Required checks gate below absorbs that skipped job.
   #
   # Fail-safe by construction: it skips only when EVERY changed path is docs or
   # a top-level .md. A new directory nobody thought about runs the suite.
@@ -309,3 +305,26 @@ jobs:
             /tmp/slackwater-shots
             build/*.xcresult
           if-no-files-found: ignore
+
+  required:
+    name: Required checks
+    if: always()
+    needs: [changes, data, feedback, build, app]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          DATA: ${{ needs.data.result }}
+          FEEDBACK: ${{ needs.feedback.result }}
+          APP_NEEDED: ${{ needs.changes.outputs.app }}
+          BUILD: ${{ needs.build.result }}
+          APP: ${{ needs.app.result }}
+        run: |
+          test "$CHANGES" = success
+          test "$DATA" = success
+          test "$FEEDBACK" = success
+          if [ "$APP_NEEDED" = true ]; then
+            test "$BUILD" = success
+            test "$APP" = success
+          fi
