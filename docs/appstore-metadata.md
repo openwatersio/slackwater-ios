@@ -179,7 +179,15 @@ Verify each answer against Apple's current published criteria before submitting;
 
 ## Before submission
 
-- [ ] Screenshots (6.9" and 6.5" sets), produced from the UI-test screenshot walk once copy is settled.
+- [ ] Screenshots uploaded. Apple takes 1–10 per device size and scales the 6.9" set down for smaller iPhones, so two sets cover a universal app: 6.9" iPhone (1320×2868) and 13" iPad (2064×2752). `SlackwaterUITests/AppStoreScreenshots.swift` shoots both from a pinned clock, location fix and favorites, so a re-run reproduces them:
+
+  ```
+  WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/iphone-6.9 ./scripts/screenshots.sh
+  WALK=AppStoreScreenshots SHOT_DIR=/tmp/slackwater-appstore/ipad-13 \
+    SLACKWATER_SIM='iPad Pro 13-inch (M5)' ./scripts/screenshots.sh
+  ```
+
+  Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
 - [ ] Station counts re-derived and rounded down.
 - [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.

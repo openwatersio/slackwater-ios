@@ -585,6 +585,73 @@ class ScreenshotTestCase: XCTestCase {
     }
 }
 
+/// The pinned world both screenshot walks shoot in — one day, one location
+/// fix, one set of favorites — so a re-run writes the same frames. Carries no
+/// tests of its own; the walks below it are the generators, each gated on
+/// SLACKWATER_SHOTS so a routine suite run skips them.
+class ShotWalk: ScreenshotTestCase {
+    /// The day every detail is scrubbed on: a full moon (2026-09-26), so the
+    /// night sky has a moon in it and the spring range is at its widest.
+    let day = DateComponents(year: 2026, month: 9, day: 26)
+    /// The instant the app clock is pinned to: 9:41am Pacific on `day`, the
+    /// time the status-bar override shows. An absolute `-nowEpoch`, never a
+    /// `-nowOffsetDays` shift off the host clock — the shift is `N * 86_400`
+    /// applied to whatever time the run happens to start, so the readings a
+    /// frame takes at `now` (every card in the nearby list) come out
+    /// different on every run, and a run across a DST boundary lands on a
+    /// different wall clock as well. The schedule still says Today: `today`
+    /// reads the app clock like everything else.
+    let shotEpoch = "1790440860"
+    /// Friday Harbor — the located list is shot from here: all-NOAA
+    /// neighbours, so every Near Me reading lands without a fit.
+    let fix = ["-fixLat", "48.545", "-fixLon", "-123.013"]
+    /// Pacific Daylight Time, which every station these walks open keeps.
+    let shotZone = "-07:00"
+    /// Port Townsend and Deception Pass, starred so the list has a Favorites
+    /// group between My Location and Near Me. A walk with less room on screen
+    /// overrides it.
+    var seededFavorites = "noaa/9444900,current:noaa/PUG1701"
+
+    func skipUnlessShooting() throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SLACKWATER_SHOTS"] == nil,
+                      "generator — run scripts/screenshots.sh")
+    }
+
+    func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
+        var args = ["-seedGate", "-resetRecents", "-noCloudSync",
+                    "-seedFavorites", seededFavorites,
+                    "-nowEpoch", shotEpoch] + fix + extra
+        if let time {
+            args += ["-scrubInstant", String(format: "%04d-%02d-%02dT%@:00%@",
+                                             day.year!, day.month!, day.day!, time, shotZone)]
+        }
+        let app = XCUIApplication()
+        app.launchArguments = args
+        app.launch()
+        // -openMap replaces the list with the map.
+        let first = extra.contains("-openMap")
+            ? app.otherElements["map-canvas"].firstMatch : stationList(app)
+        XCTAssert(first.appears(within: 20), "app did not reach its first screen")
+        // The list existing is not the list being ready: every nearby reading
+        // lands on its own and reflows the rows behind it, and on a 13-inch
+        // iPad that goes on for tens of seconds after `station-list` appears.
+        // A tap taken during it is silently dropped — three FAB taps in a row
+        // opened nothing there — so wait for the readings to stop arriving
+        // before handing the app back.
+        if !extra.contains("-openMap") { _ = settled { app.staticTexts.count } }
+        return app
+    }
+
+    /// The scrubbed detail has parked on `clock` and its lead has stopped
+    /// rewriting itself.
+    func settleScrub(_ app: XCUIApplication, at clock: String) {
+        XCTAssert(leadReading(app).appears(within: 10), "no lead reading")
+        XCTAssert(waitFor(leadReading(app), "label CONTAINS '\(clock)'"),
+                  "detail did not scrub to \(clock): \(leadReading(app).label)")
+        _ = settled { leadReading(app).label }
+    }
+}
+
 /// How much slower this machine is than the one the waits were written on.
 ///
 /// Every timeout in this target was picked on the Mac Studio. A hosted CI
