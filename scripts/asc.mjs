@@ -238,7 +238,7 @@ async function pushScreenshots(loc, dir) {
     // Upload order is not a documented guarantee of display order; this is.
     await api('PATCH', `/v1/appScreenshotSets/${s.id}/relationships/appScreenshots`,
       { data: ids.map((id) => ({ type: 'appScreenshots', id })) });
-    if (!DRY_RUN) await waitForScreenshots(s.id);
+    if (!DRY_RUN) await waitForScreenshots(s.id, ids.length);
     console.log(`${set.type}: ${set.files.map((f) => f.name).join(', ')}`);
   }
 }
@@ -264,17 +264,18 @@ async function uploadScreenshot(setId, f) {
 }
 
 // App Store Connect checks an image after the commit; a wrong one turns FAILED
-// here instead of at submission.
-async function waitForScreenshots(setId) {
+// here instead of at submission. The set must hold exactly the uploads, since
+// an empty list would otherwise pass as all COMPLETE.
+async function waitForScreenshots(setId, count) {
   for (let i = 0; i < 60; i++) {
     const shots = (await api('GET', `/v1/appScreenshotSets/${setId}/appScreenshots?limit=50`)).data;
     const state = (s) => s.attributes.assetDeliveryState?.state;
     const failed = shots.filter((s) => state(s) === 'FAILED');
     if (failed.length) fail(failed.map((s) => `${s.attributes.fileName}: ${JSON.stringify(s.attributes.assetDeliveryState.errors)}`).join('\n'));
-    if (shots.every((s) => state(s) === 'COMPLETE')) return;
+    if (shots.length === count && shots.every((s) => state(s) === 'COMPLETE')) return;
     await sleep(5_000);
   }
-  fail('screenshots still processing after 5 min');
+  fail(`screenshot set ${setId} did not reach ${count} COMPLETE screenshots in 5 min`);
 }
 
 // Only the version goes in the submission. One already holding anything else,
