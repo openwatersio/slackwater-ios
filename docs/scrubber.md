@@ -343,19 +343,17 @@ under 60 minutes: 28m
 60 minutes or more: 3h 28m
 ```
 
-When the selected time is within one horizontal logical unit of now—200 seconds at the reference scale—the phrase is reader-relative:
+The visual label uses the same selected-time-relative order at now and while planning away from now. It contains no sentence glue:
 
 ```text
-High in 28m
-Slack in 1h 12m
+High ↑ 28m
+Low ↓ 3h 28m
+Slack 1h 12m
 ```
 
-When farther away, it is selected-time-relative:
+The up/down marks above represent SF Symbols, not translated glyphs. Only tide extrema receive them: `High` uses `arrow.up`, `Low` uses `arrow.down`, and the symbol inherits the text colour. Current, slack, sunrise, sunset, and fast-tide commentary have no tide arrow.
 
-```text
-High 3h 28m later
-Max ebb 42m later
-```
+The accessible button label preserves the complete relationship and uses localized full-duration units, for example `High tide in 28 minutes` or `Max ebb in 42 minutes`. The decorative tide arrow is hidden from accessibility.
 
 All four consumers compare the next water stop with sunrise and sunset and name whichever occurs first. Candidates must be more than one second after the selection, so landing on a stop advances the pill. Missing polar sun events contribute no candidate. The label and tap destination must name the same stop. The fast-tide rate warning below takes precedence over this chronological choice. Commentary is absent when there is no applicable later target.
 
@@ -616,7 +614,7 @@ Expose one adjustable timeline control with:
 
 The five-minute accessibility step is independent of device pixels and remains usable at every viewport width. Every adjustment updates the same `selectedTime` as touch input.
 
-Expose commentary and Now as ordinary buttons with labels that include their visible text. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller.
+Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now includes its visible text. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller.
 
 The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops. Include the civil date and station time zone in spoken output when crossing midnight; a bare `4:22pm` is ambiguous in a multi-day timeline.
 

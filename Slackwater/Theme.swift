@@ -655,25 +655,49 @@ func leadState(_ text: String, ink: Color = SN.foam) -> Text {
     Text(text).fontWeight(.medium).foregroundStyle(ink.opacity(0.85))
 }
 
-/// "Low tide in 28m" while the reading is now; "Low tide 3h 28m later" once
-/// the scrub has left it — "in" counts from the reader, "later" from wherever
-/// on the strip they are looking.
-func commentaryText(_ event: String, at time: Date, from scrub: Date, now: Date) -> String {
-    let gap = countdown(from: scrub, to: time)
-    return scrubbedAway(scrub, from: now) ? "\(event) \(gap) later" : "\(event) in \(gap)"
+struct CommentaryStop: Equatable {
+    let time: Date
+    let label: String
+    var spokenLabel: String? = nil
+    var systemImage: String? = nil
+}
+
+struct CommentaryContent: Equatable {
+    let label: String
+    var duration: String? = nil
+    var systemImage: String? = nil
+    let accessibilityLabel: String
+}
+
+func commentaryContent(_ stop: CommentaryStop, from scrub: Date,
+                       locale: Locale = .autoupdatingCurrent) -> CommentaryContent {
+    let formatter = DateComponentsFormatter()
+    formatter.allowedUnits = [.hour, .minute]
+    formatter.unitsStyle = .full
+    formatter.maximumUnitCount = 2
+    formatter.zeroFormattingBehavior = .dropAll
+    var calendar = Calendar.autoupdatingCurrent
+    calendar.locale = locale
+    formatter.calendar = calendar
+
+    let duration = countdown(from: scrub, to: stop.time)
+    let spokenDuration = formatter.string(from: max(0, stop.time.timeIntervalSince(scrub))) ?? duration
+    return CommentaryContent(label: stop.label, duration: duration,
+                             systemImage: stop.systemImage,
+                             accessibilityLabel: "\(stop.spokenLabel ?? stop.label) in \(spokenDuration)")
 }
 
 /// The stop the commentary names and its tap walks to: the water's next stop,
 /// or the sun's next rise or set when that comes first. Dark is an event a
 /// reader plans around the same way they plan around a slack.
-func nextCommentaryStop(_ water: (time: Date, text: String)?,
+func nextCommentaryStop(_ water: CommentaryStop?,
                         sun days: [TimelineDay],
-                        after scrub: Date) -> (time: Date, text: String)? {
+                        after scrub: Date) -> CommentaryStop? {
     // Strictly after the scrub, so landing on a stop advances to the next.
     let cutoff = scrub.addingTimeInterval(1)
     let sun = days
         .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
-        .compactMap { time, word in time.map { (time: $0, text: word) } }
+        .compactMap { time, word in time.map { CommentaryStop(time: $0, label: word) } }
     return (sun + [water].compactMap { $0 })
         .filter { $0.time > cutoff }
         .min { $0.time < $1.time }
@@ -682,7 +706,7 @@ func nextCommentaryStop(_ water: (time: Date, text: String)?,
 /// What comes next, centred on the reading line in the strip's chrome row.
 /// Tapping scrubs to it. The strip owns the settle fade for both chrome pills.
 struct Commentary: View {
-    let text: String?
+    let content: CommentaryContent?
     /// Set when the text is a warning about the scrub instant — a fast tide —
     /// rather than the next event; the ramp's colour, so the pill explains
     /// the line under it.
@@ -692,18 +716,28 @@ struct Commentary: View {
 
     var body: some View {
         Group {
-            if let text {
+            if let content {
                 // Glass, not a fill: it floats over the curve and its labels,
                 // and has to stay legible over both. The button style owns the
                 // glass — interactive glass on the label competes with the
                 // button for the tap and drops every other one.
                 Button(action: onTap) {
-                    Text(text)
-                        .font(.caption.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(tint ?? ink)
+                    HStack(spacing: 4) {
+                        Text(content.label)
+                        if let systemImage = content.systemImage {
+                            Image(systemName: systemImage)
+                                .accessibilityHidden(true)
+                        }
+                        if let duration = content.duration {
+                            Text(duration)
+                        }
+                    }
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(tint ?? ink)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.capsule)
+                .accessibilityLabel(content.accessibilityLabel)
                 .accessibilityIdentifier("commentary")
             }
         }
