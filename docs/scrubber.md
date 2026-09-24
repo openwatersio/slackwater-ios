@@ -682,7 +682,7 @@ These scenarios define the minimum behavior shared by all platforms.
 8. **Already parked:** Resting within 0.5 unit of a target starts no redundant animation.
 9. **Commentary during fling:** Activating commentary stops the fling and lands on the named target; no later momentum frame overwrites the request.
 10. **Now during settle:** Activating Now cancels a magnetic animation, refreshes now, lands home, and removes the Now pill.
-11. **Reduce Motion:** Opening, commentary, and Now land directly with no travel or opacity animation.
+11. **Reduce Motion:** Opening, commentary, Now, and a drag-end magnetic settle land directly with no travel, and the pill row appears without an opacity animation.
 
 ### Geometry and time
 
@@ -728,11 +728,9 @@ These are implementation gaps, not behavior to copy to another platform:
 - The graph canvas is not itself an adjustable accessibility control. The iOS app currently relies on its lead, direct buttons, scroll-view clock value, and the separate event list as the accessible path.
 - The scroll view's exposed value is only the selected clock, not a full dated state/value announcement.
 - Visible pill capsules are about 30 points tall and do not yet provide an explicit 44-by-44 semantic target.
-- Pill settle fading currently runs under Reduce Motion.
 - The lead's 44-point value sits inside fixed 160-point geometry rather than growing the geometry with accessible text sizes.
 - Long commentary can compete with the Now pill at large text sizes.
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
-- Drag-end magnetic settling does not check Reduce Motion even though opening, taps, external jumps, and vertical rescaling do.
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 

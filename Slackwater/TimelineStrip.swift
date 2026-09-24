@@ -1585,10 +1585,17 @@ struct TimelineScrubber: UIViewRepresentable {
             let center = sv.contentOffset.x + sv.bounds.width / 2
             guard let best = nearest(parent.data.snapTimes, toX: center),
                   best.dx < Timeline.magnetPts, best.dx > 0.5 else { return }
+            let desired = CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0)
+            // Reduce Motion: park on the stop directly, the same landing a
+            // tap or a pill gets.
+            if UIAccessibility.isReduceMotionEnabled {
+                sv.contentOffset = desired
+                parent.scrubTime = best.time
+                return
+            }
             magneting = true
             magnetTarget = best.time
-            sv.setContentOffset(CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0),
-                                animated: true)
+            sv.setContentOffset(desired, animated: true)
         }
     }
 }
@@ -1619,6 +1626,7 @@ struct TimelineScrubStrip: View {
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -1677,7 +1685,7 @@ struct TimelineScrubStrip: View {
         }
         .opacity(settled ? 1 : 0)
         .allowsHitTesting(settled)
-        .animation(.easeInOut(duration: 0.2), value: settled)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
         .task(id: scrubTime) {
             // Rest = no scrub change for this long. A cancelled sleep is a
             // scrub still in motion, not a rest.
@@ -1718,7 +1726,7 @@ struct TimelineScrubStrip: View {
                     .frame(width: 1, height: geo.bodyBottom - geo.padTop)
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
                     .opacity(settled && commentary != nil ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.2), value: settled)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas

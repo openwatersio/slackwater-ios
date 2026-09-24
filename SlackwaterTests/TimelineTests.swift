@@ -512,6 +512,38 @@ final class TimelineTests: XCTestCase {
                       "and the ordinary path animates the travel")
     }
 
+    /// A drag-end magnetic settle rides the standard scroll animation, except
+    /// under Reduce Motion, where it parks on the target directly (scenario
+    /// 11). The same source-scan shape as the jump tripwire above, for the
+    /// same reason: `magnet` needs a live `UIScrollView` and `UIAccessibility`.
+    func testDragEndMagnetHonoursReduceMotion() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = source.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func magnet(_ sv: UIScrollView)") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("animated: true") })
+        else { return XCTFail("the magnet was not found — this tripwire needs retargeting") }
+        let magnet = lines[start...end].joined(separator: "\n")
+        XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
+                      "the drag-end magnet must ask about Reduce Motion before animating")
+        XCTAssertTrue(magnet.contains("parent.scrubTime = best.time"),
+                      "the direct landing parks scrubTime on the target itself")
+    }
+
+    /// The chrome pills fade in once the scrub rests; under Reduce Motion the
+    /// opacity flips with no animation (§ 15). SwiftUI's environment cannot be
+    /// injected into a view body from this target, so a source scan guards
+    /// every `settled` animation reading the environment flag.
+    func testPillSettleFadeHonoursReduceMotion() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let fades = source.components(separatedBy: .newlines)
+            .filter { $0.contains(".animation(") && $0.contains("value: settled") }
+        XCTAssertFalse(fades.isEmpty, "the settle fade was not found — this tripwire needs retargeting")
+        for line in fades {
+            XCTAssertTrue(line.contains("reduceMotion ? nil :"),
+                          "a settle fade must not animate under Reduce Motion:\n\(line)")
+        }
+    }
+
     /// #280: rotation keeps `contentOffset.x` while the viewport width
     /// changes, so the time under the centerline (`offset + width / 2`)
     /// drifts by half the width change and the curve disagrees with the
