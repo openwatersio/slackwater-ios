@@ -142,11 +142,21 @@ final class StationLinkTests: XCTestCase {
         XCTAssertEqual(item("https://slackwater.xyz/currents/alcatraz-island")?.id, "current:noaa/SFB1204")
     }
 
-    /// A slug this build doesn't know — an older build, a tombstoned station,
+    /// A slug this build doesn't know — a newer build's, a tombstoned station,
     /// a typo — opens nothing. It must never open something else.
     func testUnknownSlugResolvesToNothing() {
         XCTAssertNil(item("https://slackwater.xyz/tides/atlantis"))
         XCTAssertNil(item("https://slackwater.xyz/currents/friday-harbor"))
+    }
+
+    /// A slug an older build minted keeps opening the water it did then. The
+    /// database renamed Sawyer Key's two stations for the channel side each
+    /// sits on; a message from before that still carries `sawyer-key`, and
+    /// `former` in the table is what turns it into the same station.
+    func testFormerSlugResolvesToTheSameStation() {
+        XCTAssertEqual(item("https://slackwater.xyz/tides/sawyer-key")?.id, "noaa/8724369")
+        XCTAssertEqual(item("https://slackwater.xyz/tides/sawyer-key-inside-cudjoe-channel")?.id, "noaa/8724369")
+        XCTAssertEqual(item("https://slackwater.xyz/currents/agate-passage")?.id, "current:noaa/PUG1501")
     }
 
     // MARK: - Minting the link (the share button's half, UI pending #187)

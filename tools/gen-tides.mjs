@@ -274,7 +274,10 @@ const upstreamRegion = (s) => {
  * free. cc-by-4.0 obliges ATTRIBUTION, which the app pays in its credits
  * screen — see ATTRIBUTION below.
  */
-const shippable = allStations.filter((s) => s.license?.commercial_use === true);
+// The database carries current stations in the same list since it unified
+// the two; this generator is the tide half, and a subordinate current keeps
+// its offsets under `current`, not where a tide's are.
+const shippable = allStations.filter((s) => (s.kind ?? "tide") === "tide" && s.license?.commercial_use === true);
 
 /**
  * One pin per place. NOAA wins ties outright: public domain, curated names,
