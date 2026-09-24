@@ -27,7 +27,7 @@ final class StationCardLoadingTests: XCTestCase {
 
     @MainActor
     func testAutomaticQueueStatesShowTheirProgress() {
-        XCTAssertGreaterThan(statusSize(.downloading, detail: "19 of 31 to go").width, 80)
+        XCTAssertGreaterThan(statusSize(.downloading, detail: "12 of 31 downloaded").width, 80)
         XCTAssertGreaterThan(statusSize(.queued, detail: "4th in line").width, 60)
     }
 
@@ -35,7 +35,7 @@ final class StationCardLoadingTests: XCTestCase {
         var downloading = job(status: .downloading)
         downloading.done = 12
         downloading.total = 31
-        XCTAssertEqual(cardDownloadLabel(downloading, position: 1, at: t0), "19 of 31 to go")
+        XCTAssertEqual(cardDownloadLabel(downloading, position: 1, at: t0), "12 of 31 downloaded")
 
         XCTAssertEqual(cardDownloadLabel(job(), position: 4, at: t0), "4th in line")
         XCTAssertEqual(cardDownloadLabel(job(), position: 1, at: t0), "Next")
