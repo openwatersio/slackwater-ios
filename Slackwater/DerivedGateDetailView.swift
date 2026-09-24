@@ -57,6 +57,7 @@ struct DerivedGateDetailView: View {
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    onResumeScrubbedAway: { live = appNow() },
+                                                   spokenLead: phase.word,
                                                    commentary: next.map {
                                                        commentaryContent($0, from: scrubTime)
                                                    },

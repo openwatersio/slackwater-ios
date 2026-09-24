@@ -126,6 +126,15 @@ final class DetailLeadTests: XCTestCase {
         XCTAssertEqual(next.label, text, message, line: line)
     }
 
+    /// The strip's spoken value is the lead in words: the state, then the
+    /// magnitude with its unit written out (§ 15), never "kn".
+    func testSpokenLeadNamesStateAndUnitInFull() {
+        XCTAssertEqual(lead(scrub: at(0)).spoken, "Max flood 1.0 knots")
+        XCTAssertEqual(lead(scrub: at(3600)).spoken, "Slack 1.0 knots")
+        XCTAssertEqual(spokenUnit("km/h"), "kilometres per hour")
+        XCTAssertEqual(spokenUnit("ft"), "feet")
+    }
+
     /// Every kind of stop the commentary can walk to, in the order the day
     /// presents them. A window contributes TWO stops — its opening is the
     /// slack, its closing is the run that begins — and the window's own slack

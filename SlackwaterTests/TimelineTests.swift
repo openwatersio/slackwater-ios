@@ -525,8 +525,8 @@ final class TimelineTests: XCTestCase {
         let magnet = lines[start...end].joined(separator: "\n")
         XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
-        XCTAssertTrue(magnet.contains("parent.scrubTime = best.time"),
-                      "the direct landing parks scrubTime on the target itself")
+        XCTAssertTrue(magnet.contains("park(sv, at: best.time)"),
+                      "the direct landing parks on the target itself")
     }
 
     /// The chrome pills fade in once the scrub rests; under Reduce Motion the
@@ -580,6 +580,56 @@ final class TimelineTests: XCTestCase {
             XCTAssertEqual(scrub, parked, "re-anchoring must not rewrite scrubTime from layout")
             XCTAssertTrue(co.didInitialCenter, "a resize must not restart the opening centre")
         }
+    }
+
+    /// The strip is one adjustable VoiceOver control (spec § 15): a swipe up
+    /// or down moves five minutes, the custom actions jump to the next or
+    /// previous magnetic target, and the value speaks a dated station-local
+    /// time rather than a bare clock. The same real `UIScrollView` as above.
+    func testStripIsAnAdjustableControlSteppingFiveMinutes() throws {
+        let now = Date()
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
+        let geo = TimelineGeo(data: data)
+        let parked = now.addingTimeInterval(-6 * 3600)
+        var scrub = parked
+        let scrubber = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: { scrub = $0 }),
+                                        spokenLead: "Rising 2.3 feet")
+        let co = TimelineScrubber.Coordinator(scrubber)
+        let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        sv.delegate = co
+        sv.onLayout = { [weak sv] in if let sv { co.layoutDidRun(sv) } }
+        sv.layoutIfNeeded()
+        func centre() -> Date { data.time(atX: sv.contentOffset.x + sv.bounds.width / 2) }
+
+        XCTAssertTrue(sv.isAccessibilityElement)
+        XCTAssertTrue(sv.accessibilityTraits.contains(.adjustable))
+        XCTAssertEqual(sv.accessibilityLabel, "Tide timeline")
+        // The spoken time is the pixel-rounded centre, not the exact scrub.
+        XCTAssertEqual(sv.accessibilityValue, "Rising 2.3 feet, " + spokenWhen(centre(), data.tz))
+
+        sv.accessibilityIncrement()
+        XCTAssertEqual(scrub.timeIntervalSince(parked), 300, accuracy: 1)
+        XCTAssertEqual(centre().timeIntervalSince(scrub), 0, accuracy: 60, "the curve follows the step")
+        sv.accessibilityDecrement()
+        XCTAssertEqual(scrub.timeIntervalSince(parked), 0, accuracy: 1)
+
+        let actions = try XCTUnwrap(sv.accessibilityCustomActions)
+        XCTAssertEqual(actions.map(\.name), ["Next event", "Previous event"])
+        let next = try XCTUnwrap(data.snapTimes.first { $0 > parked.addingTimeInterval(1) })
+        XCTAssertTrue(actions[0].actionHandler?(actions[0]) ?? false)
+        XCTAssertEqual(scrub, next, "the next-event action parks exactly on the target")
+        XCTAssertTrue(actions[1].actionHandler?(actions[1]) ?? false)
+        XCTAssertLessThan(scrub, next, "and the previous-event action walks back off it")
+    }
+
+    /// "September 20, 4:22pm PDT": the spoken date keeps the station's zone
+    /// and never abbreviates the month into something VoiceOver mispronounces.
+    func testSpokenWhenIsDatedAndZoned() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        let t = formatter("yyyy-MM-dd HH:mm", tz).date(from: "2026-09-20 16:22")!
+        XCTAssertEqual(spokenWhen(t, tz), "September 20, 4:22pm PDT")
     }
 
     /// The axis row's crowding rule, on its own. Two times a label's width

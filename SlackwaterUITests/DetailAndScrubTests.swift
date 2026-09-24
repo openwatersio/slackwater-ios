@@ -503,10 +503,11 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         }
     }
 
-    /// The time under the strip's centerline ("1:42pm"), from the scroll
-    /// view's accessibility value.
+    /// The time under the strip's centerline ("1:42pm"), out of the scroll
+    /// view's spoken value ("Rising 2.3 feet, September 20, 1:42pm PDT").
     private func stripCentre(_ app: XCUIApplication) -> String {
-        app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
+        let value = app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
+        return value.range(of: #"\d{1,2}:\d{2}[ap]m"#, options: .regularExpression).map { String(value[$0]) } ?? value
     }
 
     /// Minutes between two "h:mma" clocks, the short way round midnight.

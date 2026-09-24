@@ -737,6 +737,10 @@ struct Commentary: View {
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.capsule)
+                // The visible capsule stays compact; the semantic target is
+                // the platform's 44 points (spec § 15).
+                .frame(height: Timeline.pillTarget)
+                .accessibilityElement(children: .combine)
                 .accessibilityLabel(content.accessibilityLabel)
                 .accessibilityIdentifier("commentary")
             }

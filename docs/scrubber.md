@@ -703,7 +703,7 @@ These scenarios define the minimum behavior shared by all platforms.
 
 ### Accessibility
 
-23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value.
+23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value; the next- and previous-event actions park exactly on a magnetic target.
 24. **Direct controls:** Commentary and Now meet semantic target sizes and expose their visible meaning without requiring the canvas labels.
 25. **No-colour reading:** High/low, current direction, slack, magnitude, and schematic unknown remain distinguishable in greyscale.
 
@@ -725,9 +725,6 @@ These scenarios define the minimum behavior shared by all platforms.
 
 These are implementation gaps, not behavior to copy to another platform:
 
-- The graph canvas is not itself an adjustable accessibility control. The iOS app currently relies on its lead, direct buttons, scroll-view clock value, and the separate event list as the accessible path.
-- The scroll view's exposed value is only the selected clock, not a full dated state/value announcement.
-- Visible pill capsules are about 30 points tall and do not yet provide an explicit 44-by-44 semantic target.
 - The lead's 44-point value sits inside fixed 160-point geometry rather than growing the geometry with accessible text sizes.
 - Long commentary can compete with the Now pill at large text sizes.
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.

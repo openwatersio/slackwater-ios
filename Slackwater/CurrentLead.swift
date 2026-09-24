@@ -91,6 +91,11 @@ struct CurrentLead: View {
         return phase.word
     }
 
+    /// The lead in words, for the strip's spoken value.
+    var spoken: String {
+        "\(state) \(tilde)\(formatSpeed(abs(signed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))"
+    }
+
     var body: some View {
         let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(isSlack ? .slack : phase)
         LeadCard(value: Text("\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))").font(ReadoutType.lead.monospacedDigit())
@@ -146,6 +151,7 @@ struct CurrentScrubCard: View {
                            floodDeg: floodDeg, ebbDeg: ebbDeg,
                            scrubTime: $scrubTime, onReturn: onReturn,
                            onResumeScrubbedAway: onResumeScrubbedAway,
+                           spokenLead: lead.spoken,
                            commentary: lead.commentary,
                            onCommentary: { if let next { scrubTime = next.time } },
                            scrollGate: scrollGate,
