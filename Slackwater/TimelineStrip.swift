@@ -1589,6 +1589,7 @@ struct TimelineScrubber: UIViewRepresentable {
             // Reduce Motion: park on the stop directly, the same landing a
             // tap or a pill gets.
             if UIAccessibility.isReduceMotionEnabled {
+                cancelMagnet()
                 sv.contentOffset = desired
                 parent.scrubTime = best.time
                 return
