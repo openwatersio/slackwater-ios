@@ -36,8 +36,12 @@ const out = join(res, "slugs.json");
 const previous = (() => {
   try {
     return JSON.parse(readFileSync(out, "utf8"));
-  } catch {
-    return { tide: {}, current: {} };
+  } catch (error) {
+    // Only a missing table is a first run. A table that exists but cannot
+    // be read or parsed must stop the build: rewriting it from nothing would
+    // drop every former slug that lives only here.
+    if (error.code === "ENOENT") return { tide: {}, current: {} };
+    throw error;
   }
 })();
 // A reference-only bin (#269) is not a station and is never linked.
@@ -84,11 +88,29 @@ function narrow(kind, files) {
     throw new Error(`${missing.length} bundled ${kind} station(s) have no published route: ${missing.slice(0, 5).join(", ")}`);
   }
   if (reserved) console.log(`${kind}: ${reserved} CHS stations on a reserved slug the database does not route yet`);
-  // A former slug that is now some station's live slug would send an old link
-  // to the wrong water; the database forbids that, and this refuses to ship it.
+  // History only for stations still in the bundle: the app cannot open an id
+  // it does not carry, and the database's own former paths bring the entry
+  // back if the station returns.
+  for (const [old, id] of Object.entries(former)) if (!table[id]) delete former[old];
+  // A former slug that is some station's live slug would send an old link to
+  // the wrong water. Against the bundle that is an error outright. Against the
+  // whole database it is an error only when the live owner is bundled — the
+  // resolver tries live before former, so a bundled owner wins and the history
+  // entry is a lie. An unbundled owner is reported and kept: `ogdensburg` is
+  // the NOAA twin's slug in the database and the MEDS copy's here, the same
+  // gauge a kilometre apart (tide-database#168), and without the entry a link
+  // to the copy this app carries would open nothing.
   const live = new Set(Object.values(table));
   const clash = Object.keys(former).filter((old) => live.has(old));
   if (clash.length) throw new Error(`${kind}: former slug(s) also live: ${clash.slice(0, 5).join(", ")}`);
+  const elsewhere = [];
+  for (const route of stationRoutes(kind)) {
+    if (!(route.slug in former)) continue;
+    if (route.stationIds.some((id) => table[id]))
+      throw new Error(`${kind}: former slug ${route.slug} is live for bundled ${route.stationIds.join(",")}`);
+    elsewhere.push(`${route.slug} (${route.stationIds.join(",")})`);
+  }
+  if (elsewhere.length) console.log(`${kind}: ${elsewhere.length} former slug(s) live for an unbundled station: ${elsewhere.join("; ")}`);
   return { table, former: Object.fromEntries(Object.entries(former).sort()) };
 }
 

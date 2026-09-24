@@ -47,6 +47,14 @@ test("a former slug names a bundled station, and never a slug that is live", () 
   }
 });
 
+test("history is kept only for stations still bundled", () => {
+  // A former entry for an id the app no longer carries can never resolve;
+  // the database's former paths bring it back if the station returns.
+  for (const kind of ["tide", "current"]) {
+    for (const [old, id] of Object.entries(slugs.former[kind])) assert.ok(slugs[kind][id], `${kind} former ${old} -> ${id} left the bundle`);
+  }
+});
+
 test("the slugs this table published before are still reachable", () => {
   // Sawyer Key's two stations were `sawyer-key` and `sawyer-key-fl` before the
   // database named the water. Both must still open the station they did.
