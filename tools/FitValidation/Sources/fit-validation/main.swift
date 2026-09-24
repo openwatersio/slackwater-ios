@@ -3,7 +3,7 @@
 // window 4 weeks after fit end; RMSE on the 15-min grid vs wlp; extreme timing
 // vs wlp-hilo, classified against a neighbour, matched by kind within 180 min).
 // Fit runs in JSCore via the app's committed chs-bundle.js + chs-glue.js;
-// prediction runs in Neaps — exactly the shipping path.
+// prediction runs in SlackwaterKit — exactly the shipping path.
 //
 //   swift run fit-validation <name> <lat> <lon> [cacheDir]            # tide (wlp)
 //   swift run fit-validation --current <name> <lat> <lon> [cacheDir]  # current gate (wcsp1)
@@ -19,14 +19,14 @@
 // today 00Z, project onto the CHS flood axis (speed·cos(dir−floodDirection) —
 // the chs-constituents pipeline's own projection), fit BOTH the full 210 d and
 // the trailing 60 d in JSCore, predict the held-out window (+28..+35 d) with
-// Neaps's CurrentStation (the shipping synthesis), and score slack/extremum
+// SlackwaterKit's CurrentStation (the shipping synthesis), and score slack/extremum
 // timing + peak speed against CHS's own published wcp1-events.
 //
 // Fetched IWLS data is cached under cacheDir (default /tmp/fit-validation) and
 // deliberately never written into the repo — it is CHS data, the user's own.
 import Foundation
 import JavaScriptCore
-import Neaps
+import SlackwaterKit
 
 let isCurrentMode = CommandLine.arguments.contains("--current")
 let isFileMode = CommandLine.arguments.contains("--samples")
@@ -509,7 +509,7 @@ for days in fitWindows {
     }
     let fit = try JSONDecoder().decode(Fit.self, from: Data(out.toString()!.utf8))
 
-    // --- predict with Neaps (the app's shipping path) and score ---
+    // --- predict with SlackwaterKit (the app's shipping path) and score ---
     let engine = Station(constituents: fit.constituents.map { HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase) },
                          offset: fit.offset)
     let predicted = engine.heights(from: Date(timeIntervalSince1970: valStart.timeIntervalSince1970),

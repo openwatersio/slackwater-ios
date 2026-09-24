@@ -5,7 +5,7 @@
  * signal and no account, so the only question that decides what ships is
  * whether a station's licence lets it.
  *
- * LICENCE (M53, widened since). @neaps/tide-database is a WORLD database: at
+ * LICENCE (M53, widened since). @slackwater/database is a WORLD database: at
  * 0.8.20260722, 8,291 stations, of which 4,838 come from TICON-4/UHSLC. The
  * generator used to gate on `license.type === "public domain" AND source.name
  * === NOAA`, a proxy for "can we ship this" written before the database
@@ -31,7 +31,7 @@
  * and all still load-bearing:
  *
  *   - reference and subordinate stations. A subordinate is offsets against a
- *     reference (Neaps's SubordinateTideStation does the
+ *     reference (SlackwaterKit's SubordinateTideStation does the
  *     reduction); it ships with `reference` and `offsets` and NO constituents
  *     — see isSubordinate below for why — and only if its reference ships too.
  *   - at least one non-zero constituent, or there is nothing to predict.
@@ -78,7 +78,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations } from "@neaps/tide-database";
+import { allStations } from "@slackwater/database";
 import {
   here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
@@ -393,7 +393,7 @@ const isSubordinate = (s) => s.type === "subordinate";
 // TideExtreme.height.
 //
 // Absent for any station whose constituents cannot honestly bound an envelope:
-// @neaps/tide-database omits LAT/HAT where Sa and Ssa are both zero, since a
+// @slackwater/database omits LAT/HAT where Sa and Ssa are both zero, since a
 // seasonless set returns a narrowed envelope rather than an extreme. The keys
 // are then omitted entirely rather than set to 0 — for the ~2,000 stations
 // whose chart datum IS LAT the correct value is exactly 0.000, and absent must

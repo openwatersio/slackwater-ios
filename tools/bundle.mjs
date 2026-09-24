@@ -82,7 +82,7 @@ export function writeBundle(path, data) {
   return `${(json.length / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** The @neaps/tide-database `source.name` NOAA CO-OPS rows carry — mirrors the
+/** The @slackwater/database `source.name` NOAA CO-OPS rows carry — mirrors the
  *  same-named constant in gen-tides.mjs, which also uses it outside network
  *  classification (licence sort, CHS cede rule) so isn't itself moved here. */
 const NOAA = "US National Oceanic and Atmospheric Administration";

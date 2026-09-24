@@ -1,5 +1,5 @@
 import XCTest
-import Neaps
+import SlackwaterKit
 @testable import Slackwater
 
 /// Issue #59: "Flooding"/"Ebbing" mean nothing to non-sailors, so no surface

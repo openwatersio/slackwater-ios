@@ -5,7 +5,7 @@
 // must hold inside its deadband and move outside it.
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class TimelineChunkTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!

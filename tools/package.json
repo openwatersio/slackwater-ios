@@ -6,9 +6,9 @@
     "@openwaters/station-metadata": "^5.3.2"
   },
   "devDependencies": {
-    "@neaps/tide-database": "^0.9.20260907",
     "@neaps/tide-database-routes": "npm:@neaps/tide-database@^0.10.20260924",
-    "@neaps/tide-predictor": "^0.11.0",
+    "@slackwater/database": "^1.0.0-beta.0",
+    "@slackwater/engine": "^1.0.0-beta.0",
     "tz-lookup": "^6.1.25"
   },
   "scripts": {

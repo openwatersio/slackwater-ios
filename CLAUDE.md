@@ -12,7 +12,7 @@ Verify claims against this repo's tests and code. Sibling repos can have differe
 
 The JSON files in `Slackwater/Resources/` are committed generated artifacts (see `Slackwater/Resources/README.md`). The generators depend on each other's committed output: CHS stations → tides → NOAA currents → CHS gates. Any change to one means `cd tools && npm run build:data` and committing every changed artifact together. CI regenerates and `git diff --exit-code`s `stations.json` and `currents.json`, but nothing checks what the diff _means_ — a tide station leaving `stations.json` silently unpairs current stations whose `tideReference` pointed at it. Read the regenerated diff before assuming it is noise.
 
-A stale `@neaps/tide-database` pin is a slug hazard. A bump can swap stations in the bundle (one multi-week bump traded `noaa/8723887` for `noaa/8655875`), and `tools/gen-slugs.mjs` fails outright on a station with no published slug. Fix it upstream: run station-metadata's `slugs` command, release, then bump the pin here. Bumped often, each swap is a one-station fix.
+A stale `@slackwater/database` pin is a slug hazard. A bump can swap stations in the bundle (one multi-week bump traded `noaa/8723887` for `noaa/8655875`), and `tools/gen-slugs.mjs` fails outright on a station with no published slug. Fix it upstream: run station-metadata's `slugs` command, release, then bump the pin here. Bumped often, each swap is a one-station fix.
 
 ## The window: `anchor` drives the schedule, `today` drives language
 
@@ -28,7 +28,7 @@ Anything meaning _a day_ goes through `Calendar` with its `timeZone` set. `addin
 
 ## Yearly tidal claims need an annual constituent
 
-Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@neaps/tide-database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `chs-glue.js`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
+Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@slackwater/database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `chs-glue.js`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
 
 A subordinate's reduced LAT/HAT is the floor of a prediction, not a datum. It belongs in `latDatum`/`hatDatum`, never in `datums`, where tide-database's datum-ordering gate rejects it.
 

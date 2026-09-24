@@ -1,5 +1,5 @@
 import XCTest
-import Neaps
+import SlackwaterKit
 @testable import Slackwater
 
 /// Subordinate tide stations (#229): a bundled record with `reference` and

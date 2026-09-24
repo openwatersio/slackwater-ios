@@ -3,7 +3,7 @@
 // reference port's HW/LW plus the fixed lags (web chs/current.ts parity).
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class DerivedGateTests: XCTestCase {
     let malibu = ChsGateInfo.all.first { $0.id == "chs-malibu-rapids" }

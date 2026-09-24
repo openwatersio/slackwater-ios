@@ -49,7 +49,7 @@ enum SN {
     /// same hex so retargeting a token keeps its label in lockstep.
     static let floodLabel = Color.hex(floodHex, lightenedBy: 0.6)
     static let ebbLabel = Color.hex(ebbHex, lightenedBy: 0.6)
-    /// The station-card curve's palette (Neaps dark mode, packages/react
+    /// The station-card curve's palette (Slackwater dark mode, packages/react
     /// styles.css) — full saturation for the card's hero element, unlike
     /// flood/floodLabel, which are muted to sit inside the timeline strip.
     /// high/low double as the TIDE TREND pair: a rising tide is not a flood

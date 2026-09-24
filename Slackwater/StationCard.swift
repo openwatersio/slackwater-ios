@@ -1,5 +1,5 @@
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -> String {
     switch job.status {

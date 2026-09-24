@@ -3,7 +3,7 @@
 // speed as the hero, the set arrow and phase word above it, the time below,
 // and the next significant stop the commentary pill walks to.
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 struct CurrentLead: View {
     let timeline: TimelineData

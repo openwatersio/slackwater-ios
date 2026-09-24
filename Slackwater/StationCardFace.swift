@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. The station card shell and its trailing reading
 // block, shared by the list and the home-screen widget.
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 /// The one card shell. Every variant renders through it, so the chrome and
 /// the ViewThatFits shed step have a single place to live and cannot drift.

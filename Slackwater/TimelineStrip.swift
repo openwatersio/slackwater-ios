@@ -5,7 +5,7 @@ import Almanac
 import Synchronization
 import SwiftUI
 import UIKit
-import Neaps
+import SlackwaterKit
 
 /// Hands out `TimelineData.revision`. Atomic because a timeline is built on
 /// whatever thread asked for it — chunk builds run off the main actor.

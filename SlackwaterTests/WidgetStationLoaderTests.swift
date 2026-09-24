@@ -3,7 +3,7 @@
 // store, nil when unfitted.
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class WidgetStationLoaderTests: XCTestCase {
     private var storageRoots: [URL] = []

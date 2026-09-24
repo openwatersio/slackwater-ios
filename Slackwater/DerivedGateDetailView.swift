@@ -3,7 +3,7 @@
 // the reference port's tide. A derived gate has honest slack times and phase,
 // but no speed prediction.
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 struct DerivedGateDetailView: View {
     let record: DerivedGateRecord

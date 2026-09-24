@@ -42,7 +42,7 @@ or visit [Slackwater support](https://slackwater.xyz/support/).
 
 ## Related projects
 
-- [Neaps](https://github.com/openwatersio/neaps) — the
+- [Slackwater engine](https://github.com/openwatersio/slackwater) — the
   Swift harmonic prediction engine used by the app
 - [Open Waters](https://openwaters.io) — the organization behind Slackwater
 

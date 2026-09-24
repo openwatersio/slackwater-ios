@@ -34,7 +34,7 @@ Harness: `tools/FitValidation`, the same tool and the same committed `chs-bundle
 1. **Resolve by position, never by name** — nearest IWLS station serving `wlp` within 3 km of the registry position.
 2. **Fetch `wlp` once per station**, 60 days ending today 00Z, decimated to the 15-minute grid the app fits on. Each shorter window is the trailing slice of that one series, so the sweep costs no extra IWLS requests — the shape `--current` mode already uses for its 210/60 pair.
 3. **Fit each window in JavaScriptCore** with the app's own artifacts.
-4. **Predict with Neaps `Station`** — the shipping synthesis.
+4. **Predict with SlackwaterKit `Station`** — the shipping synthesis.
 5. **Score against CHS's own published `wlp` and `wlp-hilo`**, held out +28..+35 days into the future: RMSE on the 15-minute grid, and extreme timing and height against `wlp-hilo`, classified high/low against neighbours and matched by kind within 180 minutes.
 
 Ports are spread deliberately, because whatever does vary with window length will not vary uniformly: dense Salish inlets, open Atlantic coast, the Fundy extreme range, the St Lawrence river and estuary where shallow-water overtides dominate, and a sparse sub-Arctic site.

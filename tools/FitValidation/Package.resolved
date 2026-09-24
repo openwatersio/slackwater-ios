@@ -5,8 +5,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/openwatersio/neaps",
       "state" : {
-        "revision" : "e75f6b6457fa21cb56e164f655493ea029572c34",
-        "version" : "1.0.0"
+        "revision" : "6d84b3f2ffbf13b1a080779a2e6c10c59b17f5d9"
       }
     }
   ],

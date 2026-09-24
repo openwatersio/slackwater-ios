@@ -11,7 +11,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations } from "@neaps/tide-database";
+import { allStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
   placesResolver, undangle,
