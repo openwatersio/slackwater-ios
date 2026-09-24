@@ -1,5 +1,5 @@
-// Slackwater — GPL v3. The detail hero's two pieces of language: the
-// commentary pill's sentence, and the stops a current lead walks it to.
+// Slackwater — GPL v3. The detail hero's compact commentary content and the
+// stops a current lead walks it to.
 //
 // Both are plain values on `CurrentLead`, not rendered output, which is the
 // only reason a unit test can reach them at all — this target renders no text
@@ -24,33 +24,52 @@ final class DetailLeadTests: XCTestCase {
 
     // MARK: - Commentary
 
-    /// "in" counts from the reader, "later" from wherever on the strip they
-    /// are looking — the whole difference between the two sentences.
-    func testCommentaryCountsFromTheReaderUntilTheScrubLeavesNow() {
-        let now = t0
-        XCTAssertEqual(commentaryText("High", at: at(28 * 60), from: now, now: now),
-                       "High in 28m", "parked on now, the countdown is the reader's")
+    /// Catches sentence glue in visual copy, incomplete spoken units, and missing or swapped tide arrows.
+    func testCommentaryContentKeepsVisualCopyCompactAndSpeaksTheRelationship() {
+        let locale = Locale(identifier: "en_US")
+        let high = CommentaryStop(
+            time: at(28 * 60),
+            label: "High",
+            spokenLabel: "High tide",
+            systemImage: "arrow.up"
+        )
+        let low = CommentaryStop(
+            time: at((3 * 60 + 28) * 60),
+            label: "Low",
+            spokenLabel: "Low tide",
+            systemImage: "arrow.down"
+        )
+        let current = CommentaryStop(
+            time: at(90 * 60),
+            label: "Max flood"
+        )
 
-        // An hour off now is unambiguously scrubbed away: the threshold is one
-        // point of strip, five minutes.
-        let scrub = at(3600)
-        XCTAssertTrue(scrubbedAway(scrub, from: now), "the fixture must actually be scrubbed away")
-        XCTAssertEqual(commentaryText("High", at: scrub.addingTimeInterval(3 * 3600 + 28 * 60),
-                                      from: scrub, now: now),
-                       "High 3h 28m later", "scrubbed away, the countdown is the strip's")
-    }
-
-    /// One sentence for both kinds of stop. A tide's "High" and a current's
-    /// "Max flood" differ in the event word and in nothing else — the phrasing
-    /// is the shared function's, so the two details cannot drift apart.
-    func testTideAndCurrentStopsShareOneSentence() {
-        let now = t0, target = at(90 * 60)
-        let tide = commentaryText("High", at: target, from: now, now: now)
-        let current = commentaryText("Max flood", at: target, from: now, now: now)
-        XCTAssertEqual(tide, "High in 1h 30m")
-        XCTAssertEqual(current, "Max flood in 1h 30m")
-        XCTAssertEqual(tide.dropFirst("High".count), current.dropFirst("Max flood".count),
-                       "only the event word may differ between a tide and a current stop")
+        XCTAssertEqual(
+            commentaryContent(high, from: t0, locale: locale),
+            CommentaryContent(
+                label: "High",
+                duration: "28m",
+                systemImage: "arrow.up",
+                accessibilityLabel: "High tide in 28 minutes"
+            )
+        )
+        XCTAssertEqual(
+            commentaryContent(low, from: t0, locale: locale),
+            CommentaryContent(
+                label: "Low",
+                duration: "3h 28m",
+                systemImage: "arrow.down",
+                accessibilityLabel: "Low tide in 3 hours, 28 minutes"
+            )
+        )
+        XCTAssertEqual(
+            commentaryContent(current, from: t0, locale: locale),
+            CommentaryContent(
+                label: "Max flood",
+                duration: "1h 30m",
+                accessibilityLabel: "Max flood in 1 hour, 30 minutes"
+            )
+        )
     }
 
     // MARK: - The stops a current lead walks
@@ -104,7 +123,7 @@ final class DetailLeadTests: XCTestCase {
             return XCTFail("no stop after the scrub — \(message)", line: line)
         }
         XCTAssertEqual(next.time, time, message, line: line)
-        XCTAssertEqual(next.text, text, message, line: line)
+        XCTAssertEqual(next.label, text, message, line: line)
     }
 
     /// Every kind of stop the commentary can walk to, in the order the day
@@ -152,19 +171,26 @@ final class DetailLeadTests: XCTestCase {
     func testProvisionalMarksTheTileAndTheCommentary() throws {
         let provisional = lead(scrub: at(-100), provisional: true)
         XCTAssertEqual(try XCTUnwrap(provisional.nextMax).value, "~2.4\u{00a0}kn")
-        XCTAssertEqual(provisional.commentary, "~Max flood in 1m")
+        XCTAssertEqual(
+            provisional.commentary,
+            CommentaryContent(
+                label: "~Max flood",
+                duration: "1m",
+                accessibilityLabel: "~Max flood in 1 minute"
+            )
+        )
     }
 
     /// Dark is a stop like any other: whichever comes first — the water's turn
     /// or the sun's — is what every detail's pill names and its tap walks to.
     func testTheSunIsAStopWhenItComesFirst() {
         let day = sunsetDay
-        let high = (time: at(3600), text: "High")
-        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: t0)?.text, "Sunset",
+        let high = CommentaryStop(time: at(3600), label: "High")
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: t0)?.label, "Sunset",
                        "sunset at 12:33 beats the 1:00 high")
-        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(2000))?.text, "High",
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(2000))?.label, "High",
                        "past sunset, the water's turn is next again")
-        XCTAssertEqual(nextCommentaryStop(nil, sun: [day], after: t0)?.text, "Sunset",
+        XCTAssertEqual(nextCommentaryStop(nil, sun: [day], after: t0)?.label, "Sunset",
                        "the sun still stands when the water has no stop at all")
         XCTAssertNil(nextCommentaryStop(nil, sun: [day], after: at(3600)),
                      "nothing left in the day, nothing for the pill to say")
@@ -173,7 +199,7 @@ final class DetailLeadTests: XCTestCase {
         // that hands over the stop it is parked on still walks forward.
         XCTAssertNil(nextCommentaryStop(high, sun: [day], after: at(3600)),
                      "the stop under the scrub is not a stop ahead of it")
-        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(1990))?.text, "Sunset",
+        XCTAssertEqual(nextCommentaryStop(high, sun: [day], after: at(1990))?.label, "Sunset",
                        "ten seconds out, the sun is still ahead")
     }
 
@@ -182,11 +208,24 @@ final class DetailLeadTests: XCTestCase {
     func testACurrentLeadWalksToTheSunUntilded() {
         let sun = lead(scrub: at(10), provisional: true, days: [sunsetDay])
         XCTAssertEqual(sun.nextSignificant?.time, at(2000), "sunset beats the window's opening")
-        XCTAssertEqual(sun.commentary, "Sunset in 33m")
+        XCTAssertEqual(
+            sun.commentary,
+            CommentaryContent(
+                label: "Sunset",
+                duration: "33m",
+                accessibilityLabel: "Sunset in 33 minutes"
+            )
+        )
 
-        // Past it, the water is back — and marked, because its speeds are.
-        XCTAssertEqual(lead(scrub: at(2010), provisional: true, days: [sunsetDay]).commentary,
-                       "~Slack 16m later")
+        // The tilde belongs to the provisional water event, not the exact sun clock.
+        XCTAssertEqual(
+            lead(scrub: at(2010), provisional: true, days: [sunsetDay]).commentary,
+            CommentaryContent(
+                label: "~Slack",
+                duration: "16m",
+                accessibilityLabel: "~Slack in 16 minutes"
+            )
+        )
     }
 
     /// The pill explains the yellow line: the rate, direction first, in the

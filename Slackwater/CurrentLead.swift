@@ -29,7 +29,7 @@ struct CurrentLead: View {
     /// The stops the commentary walks: a window opening, its closing (the
     /// run that begins), each max, a bare slack where no window exists, and
     /// the sun's next rise or set when it beats all of them.
-    var nextSignificant: (time: Date, text: String)? {
+    var nextSignificant: CommentaryStop? {
         var stops: [(time: Date, text: String)] = []
         // The windows' own slacks, gathered once: the event loop below asks
         // this of every slack event, and the linear scan it replaces made
@@ -58,12 +58,12 @@ struct CurrentLead: View {
         // so it goes on here rather than in `commentary`.
         let water = stops.filter { $0.time > scrubTime.addingTimeInterval(1) }
             .min { $0.time < $1.time }
-            .map { (time: $0.time, text: "\(tilde)\($0.text)") }
+            .map { CommentaryStop(time: $0.time, label: "\(tilde)\($0.text)") }
         return nextCommentaryStop(water, sun: timeline.days, after: scrubTime)
     }
 
-    var commentary: String? {
-        nextSignificant.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: now) }
+    var commentary: CommentaryContent? {
+        nextSignificant.map { commentaryContent($0, from: scrubTime) }
     }
 
     /// The summary tile's number: the maximum the water is heading for. A

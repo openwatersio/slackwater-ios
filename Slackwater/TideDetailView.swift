@@ -53,15 +53,23 @@ struct TideDetailView: View {
     }
     /// The stop the pill names and its tap walks to: the next turn, or the
     /// sun's next rise or set when that comes first.
-    private var nextStop: (time: Date, text: String)? {
-        nextCommentaryStop(nextExtreme.map { (time: $0.time, text: $0.kind == .high ? "High" : "Low") },
+    private var nextStop: CommentaryStop? {
+        nextCommentaryStop(nextExtreme.map {
+            let high = $0.kind == .high
+            return CommentaryStop(time: $0.time,
+                                  label: high ? "High" : "Low",
+                                  spokenLabel: high ? "High tide" : "Low tide",
+                                  systemImage: high ? "arrow.up" : "arrow.down")
+        },
                            sun: timeline?.days ?? [], after: scrubTime)
     }
     /// What the pill says: the rate while the tide is fast — it explains the
     /// yellow line under it — else the next stop.
-    private var commentary: String? {
-        if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) { return fast }
-        return nextStop.map { commentaryText($0.text, at: $0.time, from: scrubTime, now: live) }
+    private var commentary: CommentaryContent? {
+        if let fast = tideRateCommentary(rate: scrubRate, imperial: imperial) {
+            return CommentaryContent(label: fast, accessibilityLabel: fast)
+        }
+        return nextStop.map { commentaryContent($0, from: scrubTime) }
     }
     /// A fast tide's tap goes to this run's fastest point — the flow arrow the
     /// magnet already snaps to — so the pill then reads the peak rate. From

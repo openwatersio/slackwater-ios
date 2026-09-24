@@ -30,8 +30,8 @@ struct DerivedGateDetailView: View {
     private var nextSlack: DerivedSlackEvent? { slacks.first { $0.time > scrubTime } }
     /// The stop the pill names and its tap walks to: the next slack, or the
     /// sun's next rise or set when that comes first.
-    private var nextStop: (time: Date, text: String)? {
-        nextCommentaryStop(nextSlack.map { (time: $0.time, text: "Slack") },
+    private var nextStop: CommentaryStop? {
+        nextCommentaryStop(nextSlack.map { CommentaryStop(time: $0.time, label: "Slack") },
                            sun: timeline?.days ?? [], after: scrubTime)
     }
 
@@ -58,7 +58,7 @@ struct DerivedGateDetailView: View {
                                                    onReturn: returnToNow,
                                                    onResumeScrubbedAway: { live = appNow() },
                                                    commentary: next.map {
-                                                       commentaryText($0.text, at: $0.time, from: scrubTime, now: live)
+                                                       commentaryContent($0, from: scrubTime)
                                                    },
                                                    onCommentary: { if let next { scrubTime = next.time } },
                                                    scrollGate: store?.gate,

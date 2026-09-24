@@ -1609,7 +1609,7 @@ struct TimelineScrubStrip: View {
     /// Reopened while scrubbed away: the caller moves `now`, the scrub stays put.
     var onResumeScrubbedAway: () -> Void = {}
     /// The next significant event from the scrub, and the scrub to it.
-    var commentary: String? = nil
+    var commentary: CommentaryContent? = nil
     /// The commentary's ink when it is a warning rather than a next event.
     var commentaryTint: Color? = nil
     var onCommentary: () -> Void = {}
@@ -1662,7 +1662,7 @@ struct TimelineScrubStrip: View {
         let past = scrubTime < now
         let showNow = onReturn != nil && scrubbedAway(scrubTime, from: now)
         return ZStack {
-            Commentary(text: commentary, tint: commentaryTint,
+            Commentary(content: commentary, tint: commentaryTint,
                        ink: chromeInk) {
                 jumpToken += 1
                 onCommentary()
