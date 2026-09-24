@@ -4,7 +4,7 @@ import Neaps
 func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -> String {
     switch job.status {
     case .downloading:
-        return job.total > 0 ? "\(max(job.total - job.done, 0)) of \(job.total) to go" : "Downloading"
+        return job.total > 0 ? "\(min(job.done, job.total)) of \(job.total) downloaded" : "Downloading"
     case .pending:
         if let due = job.retryAfter {
             guard due > now else { return "Retrying" }
