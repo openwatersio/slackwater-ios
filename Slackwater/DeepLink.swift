@@ -153,12 +153,21 @@ func stationLink(from url: URL) -> StationLink? {
 private struct SlugTable: Decodable {
     let tide: [String: String]
     let current: [String: String]
+    /// Every slug a bundled station used to answer to, already inverted:
+    /// former slug → catalog id. A link shared by an older build lands on
+    /// the same water it did then. Optional so a table without one decodes.
+    let former: Former?
+
+    struct Former: Decodable {
+        let tide: [String: String]
+        let current: [String: String]
+    }
 
     static let shared: SlugTable = {
         guard let url = Bundle.main.url(forResource: "slugs", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let table = try? JSONDecoder().decode(SlugTable.self, from: data)
-        else { return SlugTable(tide: [:], current: [:]) }
+        else { return SlugTable(tide: [:], current: [:], former: nil) }
         return table
     }()
 
@@ -172,15 +181,19 @@ private struct SlugTable: Decodable {
 }
 
 /// The bundled station a shared link names, or nil when this build has none
-/// under that slug — an older build, or a station that has since left the
-/// bundle. Never a different station: a slug is allocated once and never
-/// reused, so a miss is a dead link and not the wrong water.
+/// under that slug — a newer build's slug, or a station that has since left
+/// the bundle. Never a different station: the database allocates a slug once
+/// and never reuses it, and when it does move one the old slug is kept in
+/// `former` pointing at the same id — so a miss is a dead link and not the
+/// wrong water, and a link from an older build is not a miss at all.
 func stationItem(for link: StationLink) -> StationItem? {
     switch link.kind {
     case .tides:
-        return SlugTable.tideIDs[link.slug].flatMap { StationItem.byId[$0] }
+        let id = SlugTable.tideIDs[link.slug] ?? SlugTable.shared.former?.tide[link.slug]
+        return id.flatMap { StationItem.byId[$0] }
     case .currents:
-        guard let id = SlugTable.currentIDs[link.slug] else { return nil }
+        guard let id = SlugTable.currentIDs[link.slug] ?? SlugTable.shared.former?.current[link.slug]
+        else { return nil }
         // A NOAA current keys the list with the `current:` prefix; a CHS gate
         // keys it bare (CurrentStationRecord.itemId). Try the prefix first —
         // a bare `noaa/…` is only ever a tide.

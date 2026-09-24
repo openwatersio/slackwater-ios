@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "@neaps/tide-database": "^0.9.20260907",
+    "@neaps/tide-database-routes": "npm:@neaps/tide-database@^0.10.20260924",
     "@neaps/tide-predictor": "^0.11.0",
     "tz-lookup": "^6.1.25"
   },
