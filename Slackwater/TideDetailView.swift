@@ -200,8 +200,8 @@ struct TideDetailView: View {
         let turn = atTurn
         let up = turn.map { $0.kind == .high } ?? rising
         let state = leadState
-        return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
-                            + Text(" \(unit)").font(ReadoutType.leadUnit),
+        return LeadCard(value: formatHeight(scrubHeight, imperial: imperial),
+                        unit: unit,
                         time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {

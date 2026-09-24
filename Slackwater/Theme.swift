@@ -611,8 +611,9 @@ func weekRangeLabel(anchor: Date, today: Date, tz: TimeZone) -> String {
 /// the far corner, the number, a caption. The glyph colours itself; the value
 /// takes `valueColor` — white, or amber for a provisional reading.
 enum ReadoutType {
-    /// The page's one reading: what sits under the centerline.
-    static let lead: Font = .system(size: 44, weight: .medium, design: .rounded)
+    /// The page's one reading: what sits under the centerline. 44 at the
+    /// default text size; `LeadCard` scales it with the large title.
+    static func lead(_ size: CGFloat) -> Font { .system(size: size, weight: .medium, design: .rounded) }
     static let leadUnit: Font = .title2.weight(.light)
     /// A tile's value.
     static let hero: Font = .system(.title2, design: .rounded).weight(.medium)
@@ -629,17 +630,23 @@ enum ReadoutType {
 /// the eyebrow over the time, with the big line left out rather than filled
 /// with a placeholder number.
 struct LeadCard<Eyebrow: View>: View {
-    var value: Text? = nil
+    var value: String? = nil
+    var unit: String? = nil
     let time: String
     var valueColor: Color = .white
     var timeColor: Color = SN.foam.opacity(0.55)
     @ViewBuilder var eyebrow: () -> Eyebrow
+    @ScaledMetric(relativeTo: .largeTitle) private var leadSize: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 4) {
             HStack(spacing: 6) { eyebrow() }
                 .font(.footnote.weight(.semibold))
-            value?.foregroundStyle(valueColor)
+            if let value {
+                (Text(value).font(ReadoutType.lead(leadSize).monospacedDigit())
+                    + Text(unit.map { " \($0)" } ?? "").font(ReadoutType.leadUnit))
+                    .foregroundStyle(valueColor)
+            }
             Text(time)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(timeColor)

@@ -632,6 +632,21 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(spokenWhen(t, tz), "September 20, 4:22pm PDT")
     }
 
+    /// The pad over the plot grows with the lead's text size (spec § 15), and
+    /// everything under it — plot, chrome rows, the strip's height — moves
+    /// down by the same amount rather than being overprinted.
+    func testALargerPadMovesThePlotDownIntact() {
+        let data = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
+        let base = TimelineGeo(data: data, padTop: 160)
+        let large = TimelineGeo(data: data, padTop: 200)
+        XCTAssertEqual(base.tideTop, 170)
+        XCTAssertEqual(large.tideTop, 210)
+        XCTAssertEqual(large.tideBottom - large.tideTop, base.tideBottom - base.tideTop, "the plot box keeps its size")
+        XCTAssertEqual(large.chromeY, 164)
+        XCTAssertEqual(large.height - base.height, 40)
+        XCTAssertGreaterThanOrEqual(TimelineGeo.scaledPadTop, 160, "the pad never shrinks below the reference")
+    }
+
     /// The axis row's crowding rule, on its own. Two times a label's width
     /// apart both print; closer than that, the LATER one is dropped — the
     /// schedule below still lists it. Order-independent, because the callers

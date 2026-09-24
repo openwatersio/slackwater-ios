@@ -150,7 +150,7 @@ These are the current iOS logical-unit values. Preserve them on phone-sized surf
 | Token | Value | Purpose |
 |---|---:|---|
 | `pointsPerHour` | 18 | Horizontal time scale |
-| `topPad` | 160 | Clear scene for lead and pills |
+| `topPad` | 160 | Clear scene for lead and pills; scales with the platform's large-title text size, and every row below moves with it |
 | `pillTop` | 124 | Top of the pill row (`topPad - 36`) |
 | `plotTop` | 170 | Top of tide/current plot |
 | `plotBottom` | 320 | Bottom of tide/current plot |
@@ -166,11 +166,11 @@ Reference typography:
 
 | Content | iOS reference |
 |---|---|
-| Lead value | 44, medium, rounded, tabular digits |
+| Lead value | 44, medium, rounded, tabular digits, scaled with the large title |
 | Lead unit | title level 2, light |
 | Lead state | footnote, semibold |
 | Lead time | caption, tabular digits |
-| Pill text | caption, semibold, tabular digits |
+| Pill text | caption, semibold, tabular digits, capped at the first accessibility size |
 | Turn/peak value | 18, semibold, tabular digits |
 | Event time | 12, medium, tabular digits |
 | Day name | 13, semibold |
@@ -706,27 +706,26 @@ These scenarios define the minimum behavior shared by all platforms.
 23. **Adjustable value:** A non-touch increment changes selected time by five minutes and announces a dated, station-local lead value; the next- and previous-event actions park exactly on a magnetic target.
 24. **Direct controls:** Commentary and Now meet semantic target sizes and expose their visible meaning without requiring the canvas labels.
 25. **No-colour reading:** High/low, current direction, slack, magnitude, and schematic unknown remain distinguishable in greyscale.
+26. **Larger text:** At the largest accessibility size the lead value and its pad grow together, the plot and chrome rows move down without overprinting, and commentary and Now share one row.
 
 ### Continuous browsing and host integration
 
-26. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
-27. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
-28. **Plot tap:** A tap selects its moment or a magnetic target within 46 units and lands on a reachable center time.
-29. **Date or sun tap:** A date tap stops motion and opens the picker; a sun tap centers that event.
-30. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
-31. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
-32. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it.
-33. **Far destination:** A shared link or picked week opens at its requested instant with data on both sides. A Now jump over seven days lands without travel and restores the current schedule.
-34. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
-35. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
-36. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible. Greater obscuration darkens the backdrop without adding solar contact stops to the strip.
+27. **Chunk seam:** Browse several weeks in both directions, including a DST transition. No sample gap, duplicated event, broken night band, or selected-time jump appears. Left-edge changes wait for motion to stop.
+28. **Scale:** A new visible peak can expand the plot with a 300 ms glide; ordinary chunk churn leaves it stable. Curve and riding dot share each frame's scale, and Reduce Motion adopts directly.
+29. **Plot tap:** A tap selects its moment or a magnetic target within 46 units and lands on a reachable center time.
+30. **Date or sun tap:** A date tap stops motion and opens the picker; a sun tap centers that event.
+31. **Sun commentary:** Sunrise or sunset wins over a later water event, has no provisional tilde, and advances after landing. Fast tide retains its rate warning.
+32. **Dated lead:** Crossing midnight changes the displayed local date. A one-digit hour occupies the same clock width as a two-digit hour.
+33. **Foreground return:** A home selection follows refreshed now; a selection away from the old now stays where the person left it.
+34. **Far destination:** A shared link or picked week opens at its requested instant with data on both sides. A Now jump over seven days lands without travel and restores the current schedule.
+35. **Model replacement:** A refined CHS model or changed slack threshold refreshes the graph and readout while preserving the selected instant.
+36. **Slack caps:** Green runs replace the underlying stroke, including in the past, and only their ends have separation gaps. Fill and sky remain intact.
+37. **Solar eclipse:** At a locally visible partial eclipse, the sun has a bite and the moon remains visible. Greater obscuration darkens the backdrop without adding solar contact stops to the strip.
 
 ## 18. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy to another platform:
 
-- The lead's 44-point value sits inside fixed 160-point geometry rather than growing the geometry with accessible text sizes.
-- Long commentary can compete with the Now pill at large text sizes.
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.

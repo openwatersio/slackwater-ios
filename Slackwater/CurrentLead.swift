@@ -98,8 +98,8 @@ struct CurrentLead: View {
 
     var body: some View {
         let phaseColor = provisional ? SN.amber : CurrentDetailView.phaseColor(isSlack ? .slack : phase)
-        LeadCard(value: Text("\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))").font(ReadoutType.lead.monospacedDigit())
-                    + Text(" \(speedUnitLabel(speedUnit))").font(ReadoutType.leadUnit),
+        LeadCard(value: "\(tilde)\(formatSpeed(abs(signed), unit: speedUnit))",
+                 unit: speedUnitLabel(speedUnit),
                  time: leadWhen(scrubTime, tz),
                  valueColor: readingColor,
                  timeColor: ink) {

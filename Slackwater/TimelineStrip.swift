@@ -541,8 +541,8 @@ struct TimelineData {
 
 // MARK: - Vertical geometry (prototype geo())
 
-/// Every number in here is a literal point, and that is why the chart's own
-/// labels are the one place in this branch that keeps a fixed `.system(size:)`
+/// Every number below the pad is a literal point, and that is why the chart's
+/// own labels are the one place in this branch that keeps a fixed `.system(size:)`
 /// — text scaled inside fixed-point geometry degrades by OVERPRINTING the
 /// chart, not by wrapping (measured at AX5). Making the labels scale means
 /// making this geometry scale with them — a real chart-layout change, not a
@@ -568,8 +568,15 @@ struct TimelineGeo {
 
     /// The lead reading and, under it, the row of glass pills sit over this
     /// zone at the top of the strip, with the sky behind them and nothing
-    /// floating over the curve.
-    let padTop: CGFloat = 160
+    /// floating over the curve. It grows with the lead's text size (spec
+    /// § 15): the plot below moves down intact rather than being overprinted.
+    let padTop: CGFloat
+    static let basePadTop: CGFloat = 160
+    /// The pad at the current Dynamic Type size, scaled as the lead's own
+    /// large-title-relative value is.
+    static var scaledPadTop: CGFloat {
+        UIFontMetrics(forTextStyle: .largeTitle).scaledValue(for: basePadTop)
+    }
     /// The pill row's top. The pills are caption-height glass, about 30pt,
     /// so the row ends 6pt above the pad and never reaches the plot. The
     /// commentary is centred on the reading line; return-to-now sits at the
@@ -578,30 +585,34 @@ struct TimelineGeo {
     /// The plot box. 10 past the pad clears a turn dot's halo. Below it come
     /// the time row, then the day row (day label and sun times) — the card
     /// graph's order, chrome under the curve rather than over it.
-    private static let plotTop: CGFloat = 170
-    private static let plotBottom: CGFloat = 320
     /// How far the plot box runs below the sky's horizon (`bodyTop`). The
     /// sky backdrop extends this far past its horizon, under the water.
-    static let plotDepth = plotBottom - plotTop
+    static let plotDepth: CGFloat = 150
+    /// The plot box: 10 past the pad clears a turn dot's halo.
+    private static func plotBox(padTop: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        (padTop + 10, padTop + 10 + plotDepth)
+    }
 
     /// `scale` nil derives the y-mapping from everything in `data` — correct
     /// for a fixed window, and what every test renders. The infinite strip
     /// passes the store's governed scale instead: its data span slides under
     /// the viewport, and a scale derived from it would re-stretch the curve
     /// on every chunk swap.
-    init(data: TimelineData, scale: TimelineScale? = nil) {
+    init(data: TimelineData, scale: TimelineScale? = nil, padTop: CGFloat = Self.scaledPadTop) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
+        self.padTop = padTop
+        let (plotTop, plotBottom) = Self.plotBox(padTop: padTop)
         // ONE track box, whichever track fills it. The switch resolves a
         // hypothetical both-tracks input tide-first instead of drawing two
         // curves through each other.
         switch (hasTide, hasCurrent) {
         case (true, _):
-            tideTop = Self.plotTop; tideBottom = Self.plotBottom
+            tideTop = plotTop; tideBottom = plotBottom
             curTop = 0; curBottom = 0
         default:
             tideTop = 0; tideBottom = 0
-            curTop = Self.plotTop; curBottom = Self.plotBottom
+            curTop = plotTop; curBottom = plotBottom
         }
         // Both edges resolve tide-first, like the switch above: a both-tracks
         // input that took its top from the tide box and its bottom from the
@@ -1739,6 +1750,9 @@ struct TimelineScrubStrip: View {
                 }
             }
         }
+        // Capped so a long commentary and the Now pill share one row at
+        // accessibility sizes; the lead above carries the full-size reading.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .opacity(settled ? 1 : 0)
         .allowsHitTesting(settled)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
