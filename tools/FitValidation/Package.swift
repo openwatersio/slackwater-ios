@@ -1,6 +1,6 @@
 // swift-tools-version: 5.9
-// M3 exit-check harness: fit a CHS station with the app's exact JS artifacts
-// (Resources/chs-bundle.js + chs-glue.js in JavaScriptCore), predict the
+// Reference harness: fit a CHS station with the frozen JS artifacts
+// (tools/chs-reference in JavaScriptCore), predict the
 // held-out validation window with SlackwaterKit (the app's shipping predictor),
 // and score against live IWLS — the M0 spike's methodology, on the M3 path.
 import PackageDescription

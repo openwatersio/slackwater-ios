@@ -83,7 +83,7 @@ missing `.done` markers.
 ### 5. Node fitter parity gate — `./parity_check.sh [samples.json]`
 
 One-time (or one-per-artifact-change) proof that the node shipping fitter
-(`fit_batch.mjs`, running the committed `Slackwater/Resources/chs-bundle.js`
+(`fit_batch.mjs`, running the committed `tools/chs-reference/chs-bundle.js`
 + `chs-glue.js` in a node `vm`) reproduces a cached FitValidation fit within
 `1e-9` absolute tolerance (~3 orders of magnitude above measured
 node-vs-JSCore floating-point noise, ~8 below anything a downstream R²/floor
@@ -219,7 +219,7 @@ Two rules this pipeline exists to honor, not to re-litigate:
   prefilter** (`design_matrix`/`fit_elements`) are imported from
   `tools/sscofs-validation/certify.py` / `prune_proof.py`, never forked.
 - **The shipping fitter is the committed JS artifacts** run in node
-  (`fit_batch.mjs` loading `Slackwater/Resources/chs-bundle.js` +
+  (`fit_batch.mjs` loading `tools/chs-reference/chs-bundle.js` +
   `chs-glue.js`), the same precedent as `tools/fill-pipeline/parity_check.sh`.
 
 `region_mesh.py`/`fetch_region.py`/`stations.py`/`make_matrix.py` legitimately

@@ -10,7 +10,7 @@
 // out: {"elem": <i>, "axis": "u"|"v", "constituents": [{name,amplitude,phase}...],
 //       "offset": <n>, "rms": <n>, "unseparable": [<"NAME1/NAME2">...]}
 //
-// R²: chs-glue's fitTides() (Slackwater/Resources/chs-glue.js) does not
+// R²: chs-glue's fitTides() (tools/chs-reference/chs-glue.js) does not
 // expose a prediction function — only the fit's own residual rms, not a
 // per-sample R². This filter cannot compute R² itself, so no "r2" key ships
 // from here; the Python driver computes it exactly from this rms alone
@@ -42,7 +42,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const RESOURCES = path.join(HERE, "../../Slackwater/Resources");
+const RESOURCES = path.join(HERE, "../chs-reference");
 const GUARD = path.join(HERE, "data/.parity-ok");
 
 function loadArtifact(name) {

@@ -42,6 +42,30 @@ final class IwlsFixtureTests: XCTestCase {
         try IwlsFetcher.decode(JSONEncoder().encode(try XCTUnwrap(station.series[code], "\(station.key): missing \(code)")))
     }
 
+    private func assertGolden(_ fit: ChsFitResult, _ key: String,
+                              file: StaticString = #filePath, line: UInt = #line) throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "chs-fit-golden", withExtension: "json"))
+        let golden = try JSONDecoder().decode([String: ChsFitResult].self, from: Data(contentsOf: url))
+        let expected = try XCTUnwrap(golden[key])
+        XCTAssertEqual(fit.offset, expected.offset, accuracy: 1e-7, file: file, line: line)
+        XCTAssertEqual(fit.rms, expected.rms, accuracy: 1e-7, file: file, line: line)
+        XCTAssertEqual(fit.constituents.map(\.name), expected.constituents.map(\.name), file: file, line: line)
+        for (actual, want) in zip(fit.constituents, expected.constituents) {
+            XCTAssertEqual(actual.amplitude, want.amplitude, accuracy: 1e-6, file: file, line: line)
+            let delta = abs(actual.phase - want.phase).truncatingRemainder(dividingBy: 360)
+            XCTAssertLessThan(min(delta, 360 - delta), 1e-3, file: file, line: line)
+        }
+    }
+
+    func testInvalidFitIsPermanent() async {
+        do {
+            _ = try await ChsFitter().fit(samples: [])
+            XCTFail("empty samples must fail")
+        } catch {
+            XCTAssertTrue(ChsError.isPermanent(error))
+        }
+    }
+
     func testDecoderRejectsMalformedJSONAndDropsBadDatesAndDuplicateTimestamps() throws {
         XCTAssertThrowsError(try IwlsFetcher.decode(Data("{}".utf8)))
         let data = Data("""
@@ -121,6 +145,7 @@ final class IwlsFixtureTests: XCTestCase {
         let all = try samples(victoria, "wlp").filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
         let split = all.count * 5 / 6
         let fit = try await ChsFitter().fit(samples: Array(all[..<split]))
+        try assertGolden(fit, "victoria")
         XCTAssertGreaterThanOrEqual(fit.constituents.count, 20)
         XCTAssertLessThan(fit.rms, 0.15)
 
@@ -153,6 +178,8 @@ final class IwlsFixtureTests: XCTestCase {
         let provisionalStart = holdoutStart - 60 * 86_400_000
         let provisional = try await ChsFitter().fit(samples: training.filter { $0.t >= provisionalStart })
         let full = try await ChsFitter().fit(samples: training)
+        try assertGolden(provisional, "dodd60")
+        try assertGolden(full, "doddFull")
         XCTAssertGreaterThanOrEqual(provisional.constituents.count, 20)
         XCTAssertGreaterThanOrEqual(full.constituents.count, 20)
 

@@ -41,7 +41,7 @@ from datetime import datetime, timezone
 # 23-name shipping basis, canonical order pinned to the constituent id
 # table below. Sourced verbatim from tools/sscofs-validation/prune_proof.py:34-35
 # (BASIS_NAMES) -- that script already proved all 23 resolve against
-# Slackwater/Resources/chs-bundle.js's own embedded defineConstituent(...)
+# tools/chs-reference/chs-bundle.js's own embedded defineConstituent(...)
 # records (node vm, no fallback to a second-sourced hand-typed table).
 # Reused rather than re-derived so there is exactly one basis-order list in
 # the repo.

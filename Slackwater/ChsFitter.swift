@@ -1,13 +1,6 @@
-// Slackwater — GPL v3. The JSCore fitter: chs-bundle.js + chs-glue.js run in
-// JavaScriptCore to turn decimated samples into harmonic constituents.
-//
-// Constraints this bridge is built to:
-//   - JSContext.exceptionHandler is set (JS errors are silent without it)
-//   - nothing fetches inside JSCore — samples cross as JSON strings on an
-//     epoch-ms bridge, fetched on the Swift side
-//   - BASIS + SA/SSA constituent list (in chs-glue.js)
+// Slackwater — GPL v3. Native fitting for tides and projected currents.
 import Foundation
-import JavaScriptCore
+import Neaps
 
 struct ChsFitResult: Decodable {
     let fitMs: Double
@@ -16,37 +9,30 @@ struct ChsFitResult: Decodable {
     let constituents: [Con]
 }
 
-/// Runs chs-bundle.js + chs-glue.js in JavaScriptCore, off the main thread.
-/// One context, reused across stations within a fit run.
-final class ChsFitter {
-    private var context: JSContext?
-    private var jsError: String?
-
-    private func makeContext() throws -> JSContext {
-        if let context { return context }
-        let ctx = JSContext()!
-        ctx.exceptionHandler = { [weak self] _, exc in self?.jsError = exc?.toString() }
-        // JSCore has no console; shim it so a stray log can't crash the fit.
-        ctx.evaluateScript("var console = {log:function(){},warn:function(){},error:function(){},info:function(){},debug:function(){}};")
-        for name in ["chs-bundle", "chs-glue"] {
-            guard let url = Bundle.main.url(forResource: name, withExtension: "js") else {
-                throw ChsError.permanent("\(name).js missing from bundle")
-            }
-            ctx.evaluateScript(try String(contentsOf: url, encoding: .utf8))
-            if let e = jsError { throw ChsError.permanent("\(name).js: \(e)") }
-        }
-        context = ctx
-        return ctx
-    }
+struct ChsFitter {
+    // SA/SSA absorb Z0 in a 60-day fit and worsen held-out heights.
+    // Preserve the validated basis for both provisional and full fits.
+    static let basis = [
+        "M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1",
+        "M4", "MS4", "MN4", "2N2", "MU2", "NU2", "L2", "T2",
+        "J1", "MM", "MSF", "MF", "M6", "S4", "M3",
+    ]
 
     func fit(samples: [ChsSample]) async throws -> ChsFitResult {
-        let json = String(data: try JSONEncoder().encode(samples), encoding: .utf8)!
-        let ctx = try makeContext()
-        jsError = nil
-        guard let out = ctx.objectForKeyedSubscript("fitTides")?.call(withArguments: [json]),
-              jsError == nil, let str = out.toString() else {
-            throw ChsError.permanent(jsError ?? "fitTides returned nothing")
+        let start = ContinuousClock.now
+        do {
+            let result = try Neaps.fit(samples: samples.map {
+                HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
+            }, constituents: Self.basis)
+            let elapsed = start.duration(to: .now).components
+            return ChsFitResult(
+                fitMs: Double(elapsed.seconds) * 1000 + Double(elapsed.attoseconds) / 1e15,
+                offset: result.offset, rms: result.rms,
+                constituents: result.constituents.map {
+                    Con(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
+                })
+        } catch {
+            throw ChsError.permanent("Harmonic fit failed: \(error)")
         }
-        return try JSONDecoder().decode(ChsFitResult.self, from: Data(str.utf8))
     }
 }

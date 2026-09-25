@@ -117,7 +117,7 @@ def load_corpus_columns(corpus_dir, columns):
 
 def stage2_prefilter(data_dir, certified_positions):
     t, u_kn, v_kn = load_corpus_columns(os.path.join(data_dir, "corpus"), certified_positions)
-    speeds = basis_speeds(os.path.join(HERE, "..", "..", "Slackwater", "Resources", "chs-bundle.js"))
+    speeds = basis_speeds(os.path.join(HERE, "..", "chs-reference", "chs-bundle.js"))
     speed_list = [speeds[n] for n in BASIS_NAMES]
     _, r2_u = fit_elements(t, u_kn, speed_list)
     _, r2_v = fit_elements(t, v_kn, speed_list)
