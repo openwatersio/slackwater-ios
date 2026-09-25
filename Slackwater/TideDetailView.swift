@@ -106,6 +106,7 @@ struct TideDetailView: View {
                                                    scrubTime: $scrubTime,
                                                    onReturn: returnToNow,
                                                    onResumeScrubbedAway: { live = appNow() },
+                                                   spokenLead: spokenLead,
                                                    commentary: commentary,
                                                    commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
@@ -186,13 +187,21 @@ struct TideDetailView: View {
                 prev.kind == .low ? "low to high" : "high to low")
     }
 
+    private var leadState: String {
+        atTurn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
+    }
+    /// The lead in words, for the strip's spoken value.
+    private var spokenLead: String {
+        "\(leadState) \(formatHeight(scrubHeight, imperial: imperial)) \(spokenUnit(unit))"
+    }
+
     private func lead(sky: SkyState) -> some View {
         let ink = sky.ink
         let turn = atTurn
         let up = turn.map { $0.kind == .high } ?? rising
-        let state = turn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
-        return LeadCard(value: Text(formatHeight(scrubHeight, imperial: imperial)).font(ReadoutType.lead.monospacedDigit())
-                            + Text(" \(unit)").font(ReadoutType.leadUnit),
+        let state = leadState
+        return LeadCard(value: formatHeight(scrubHeight, imperial: imperial),
+                        unit: unit,
                         time: leadWhen(scrubTime, tz),
                         valueColor: ink,
                         timeColor: ink) {

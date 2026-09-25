@@ -139,9 +139,19 @@ extension TypeScaleTests {
             // consumed by `StationDetailRow`'s value `Text`, which carries the
             // mono trait for its whole column (Theme.swift).
             "CurrentStation.swift:detailsMeanFlow",
+            // The lead's value: formatted where it is known and consumed by
+            // `LeadCard`'s one value Text, which carries the mono trait and
+            // the Dynamic-Type-scaled size (Theme.swift).
+            "TideDetailView.swift:lead",
+            "CurrentLead.swift:body",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
-        let knownNonVisual: Set<String> = ["TideShortcuts.swift:spoken"]
+        let knownNonVisual: Set<String> = [
+            "TideShortcuts.swift:spoken",
+            // The strip's VoiceOver value: the lead in words.
+            "TideDetailView.swift:spokenLead",
+            "CurrentLead.swift:spoken",
+        ]
         // Nor is anything in this file: its readings are GeoJSON properties
         // that MapLibre rasterizes from the basemap style's own fontstack,
         // and no SwiftUI view reads them. Whole-file rather than per-symbol

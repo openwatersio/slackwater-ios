@@ -512,6 +512,38 @@ final class TimelineTests: XCTestCase {
                       "and the ordinary path animates the travel")
     }
 
+    /// A drag-end magnetic settle rides the standard scroll animation, except
+    /// under Reduce Motion, where it parks on the target directly (scenario
+    /// 11). The same source-scan shape as the jump tripwire above, for the
+    /// same reason: `magnet` needs a live `UIScrollView` and `UIAccessibility`.
+    func testDragEndMagnetHonoursReduceMotion() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = source.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func magnet(_ sv: UIScrollView)") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0.contains("animated: true") })
+        else { return XCTFail("the magnet was not found — this tripwire needs retargeting") }
+        let magnet = lines[start...end].joined(separator: "\n")
+        XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
+                      "the drag-end magnet must ask about Reduce Motion before animating")
+        XCTAssertTrue(magnet.contains("park(sv, at: best.time)"),
+                      "the direct landing parks on the target itself")
+    }
+
+    /// The chrome pills fade in once the scrub rests; under Reduce Motion the
+    /// opacity flips with no animation (§ 15). SwiftUI's environment cannot be
+    /// injected into a view body from this target, so a source scan guards
+    /// every `settled` animation reading the environment flag.
+    func testPillSettleFadeHonoursReduceMotion() throws {
+        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let fades = source.components(separatedBy: .newlines)
+            .filter { $0.contains(".animation(") && $0.contains("value: settled") }
+        XCTAssertFalse(fades.isEmpty, "the settle fade was not found — this tripwire needs retargeting")
+        for line in fades {
+            XCTAssertTrue(line.contains("reduceMotion ? nil :"),
+                          "a settle fade must not animate under Reduce Motion:\n\(line)")
+        }
+    }
+
     /// #280: rotation keeps `contentOffset.x` while the viewport width
     /// changes, so the time under the centerline (`offset + width / 2`)
     /// drifts by half the width change and the curve disagrees with the
@@ -548,6 +580,71 @@ final class TimelineTests: XCTestCase {
             XCTAssertEqual(scrub, parked, "re-anchoring must not rewrite scrubTime from layout")
             XCTAssertTrue(co.didInitialCenter, "a resize must not restart the opening centre")
         }
+    }
+
+    /// The strip is one adjustable VoiceOver control (spec § 15): a swipe up
+    /// or down moves five minutes, the custom actions jump to the next or
+    /// previous magnetic target, and the value speaks a dated station-local
+    /// time rather than a bare clock. The same real `UIScrollView` as above.
+    func testStripIsAnAdjustableControlSteppingFiveMinutes() throws {
+        let now = Date()
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: todayLocal(friday.tz))
+        let geo = TimelineGeo(data: data)
+        let parked = now.addingTimeInterval(-6 * 3600)
+        var scrub = parked
+        let scrubber = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: { scrub = $0 }),
+                                        spokenLead: "Rising 2.3 feet")
+        let co = TimelineScrubber.Coordinator(scrubber)
+        let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+        sv.delegate = co
+        sv.onLayout = { [weak sv] in if let sv { co.layoutDidRun(sv) } }
+        sv.layoutIfNeeded()
+        func centre() -> Date { data.time(atX: sv.contentOffset.x + sv.bounds.width / 2) }
+
+        XCTAssertTrue(sv.isAccessibilityElement)
+        XCTAssertTrue(sv.accessibilityTraits.contains(.adjustable))
+        XCTAssertEqual(sv.accessibilityLabel, "Tide timeline")
+        // The spoken time is the pixel-rounded centre, not the exact scrub.
+        XCTAssertEqual(sv.accessibilityValue, "Rising 2.3 feet, " + spokenWhen(centre(), data.tz))
+
+        sv.accessibilityIncrement()
+        XCTAssertEqual(scrub.timeIntervalSince(parked), 300, accuracy: 1)
+        XCTAssertEqual(centre().timeIntervalSince(scrub), 0, accuracy: 60, "the curve follows the step")
+        sv.accessibilityDecrement()
+        XCTAssertEqual(scrub.timeIntervalSince(parked), 0, accuracy: 1)
+
+        let actions = try XCTUnwrap(sv.accessibilityCustomActions)
+        XCTAssertEqual(actions.map(\.name), ["Next event", "Previous event"])
+        let next = try XCTUnwrap(data.snapTimes.first { $0 > parked.addingTimeInterval(1) })
+        XCTAssertTrue(actions[0].actionHandler?(actions[0]) ?? false)
+        XCTAssertEqual(scrub, next, "the next-event action parks exactly on the target")
+        XCTAssertTrue(actions[1].actionHandler?(actions[1]) ?? false)
+        XCTAssertLessThan(scrub, next, "and the previous-event action walks back off it")
+    }
+
+    /// "September 20, 4:22pm PDT": the spoken date keeps the station's zone
+    /// and never abbreviates the month into something VoiceOver mispronounces.
+    func testSpokenWhenIsDatedAndZoned() {
+        let tz = TimeZone(identifier: "America/Vancouver")!
+        let t = formatter("yyyy-MM-dd HH:mm", tz).date(from: "2026-09-20 16:22")!
+        XCTAssertEqual(spokenWhen(t, tz), "September 20, 4:22pm PDT")
+    }
+
+    /// The pad over the plot grows with the lead's text size (spec § 15), and
+    /// everything under it — plot, chrome rows, the strip's height — moves
+    /// down by the same amount rather than being overprinted.
+    func testALargerPadMovesThePlotDownIntact() {
+        let data = TimelineData.build(tide: friday, current: nil, now: Date(), anchor: todayLocal(friday.tz))
+        let base = TimelineGeo(data: data, padTop: 160)
+        let large = TimelineGeo(data: data, padTop: 200)
+        XCTAssertEqual(base.tideTop, 170)
+        XCTAssertEqual(large.tideTop, 210)
+        XCTAssertEqual(large.tideBottom - large.tideTop, base.tideBottom - base.tideTop, "the plot box keeps its size")
+        XCTAssertEqual(large.chromeY, 164)
+        XCTAssertEqual(large.height - base.height, 40)
+        XCTAssertGreaterThanOrEqual(TimelineGeo.scaledPadTop, 160, "the pad never shrinks below the reference")
     }
 
     /// The axis row's crowding rule, on its own. Two times a label's width

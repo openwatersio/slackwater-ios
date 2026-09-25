@@ -304,6 +304,14 @@ func chartTime(_ date: Date, _ tz: TimeZone) -> String {
     formatter("h:mma", tz).string(from: date).lowercased()
 }
 
+/// "September 20, 4:22pm PDT" — the strip's spoken when. The full month and
+/// the station's zone, because a bare clock is ambiguous across a multi-day
+/// timeline read from somewhere else.
+func spokenWhen(_ date: Date, _ tz: TimeZone) -> String {
+    "\(formatter("MMMM d", tz).string(from: date)), \(chartTime(date, tz)) \(tz.abbreviation(for: date) ?? "")"
+        .trimmingCharacters(in: .whitespaces)
+}
+
 /// "Wed" — the strip's non-relative day label.
 func shortWeekday(_ date: Date, _ tz: TimeZone) -> String {
     formatter("EEE", tz).string(from: date)

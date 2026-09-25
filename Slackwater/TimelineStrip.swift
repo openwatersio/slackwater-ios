@@ -37,6 +37,8 @@ enum Timeline {
     static let centerPad = 12.0
     static let forwardHours = scheduleHours + centerPad   // 180
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
+    static let accessibilityStep: TimeInterval = 300    // one VoiceOver increment
+    static let pillTarget: CGFloat = 44    // a pill's semantic hit target; the capsule is ~30
     /// The one-shot loading affordance: show two hours of tide/current and sky
     /// motion, then settle on the live reading before the page feels delayed.
     static let introDuration: TimeInterval = 0.65
@@ -539,8 +541,8 @@ struct TimelineData {
 
 // MARK: - Vertical geometry (prototype geo())
 
-/// Every number in here is a literal point, and that is why the chart's own
-/// labels are the one place in this branch that keeps a fixed `.system(size:)`
+/// Every number below the pad is a literal point, and that is why the chart's
+/// own labels are the one place in this branch that keeps a fixed `.system(size:)`
 /// — text scaled inside fixed-point geometry degrades by OVERPRINTING the
 /// chart, not by wrapping (measured at AX5). Making the labels scale means
 /// making this geometry scale with them — a real chart-layout change, not a
@@ -566,8 +568,15 @@ struct TimelineGeo {
 
     /// The lead reading and, under it, the row of glass pills sit over this
     /// zone at the top of the strip, with the sky behind them and nothing
-    /// floating over the curve.
-    let padTop: CGFloat = 160
+    /// floating over the curve. It grows with the lead's text size (spec
+    /// § 15): the plot below moves down intact rather than being overprinted.
+    let padTop: CGFloat
+    static let basePadTop: CGFloat = 160
+    /// The pad at the current Dynamic Type size, scaled as the lead's own
+    /// large-title-relative value is.
+    static var scaledPadTop: CGFloat {
+        UIFontMetrics(forTextStyle: .largeTitle).scaledValue(for: basePadTop)
+    }
     /// The pill row's top. The pills are caption-height glass, about 30pt,
     /// so the row ends 6pt above the pad and never reaches the plot. The
     /// commentary is centred on the reading line; return-to-now sits at the
@@ -576,30 +585,34 @@ struct TimelineGeo {
     /// The plot box. 10 past the pad clears a turn dot's halo. Below it come
     /// the time row, then the day row (day label and sun times) — the card
     /// graph's order, chrome under the curve rather than over it.
-    private static let plotTop: CGFloat = 170
-    private static let plotBottom: CGFloat = 320
     /// How far the plot box runs below the sky's horizon (`bodyTop`). The
     /// sky backdrop extends this far past its horizon, under the water.
-    static let plotDepth = plotBottom - plotTop
+    static let plotDepth: CGFloat = 150
+    /// The plot box: 10 past the pad clears a turn dot's halo.
+    private static func plotBox(padTop: CGFloat) -> (top: CGFloat, bottom: CGFloat) {
+        (padTop + 10, padTop + 10 + plotDepth)
+    }
 
     /// `scale` nil derives the y-mapping from everything in `data` — correct
     /// for a fixed window, and what every test renders. The infinite strip
     /// passes the store's governed scale instead: its data span slides under
     /// the viewport, and a scale derived from it would re-stretch the curve
     /// on every chunk swap.
-    init(data: TimelineData, scale: TimelineScale? = nil) {
+    init(data: TimelineData, scale: TimelineScale? = nil, padTop: CGFloat = Self.scaledPadTop) {
         hasTide = data.hasTide
         hasCurrent = data.hasCurrent
+        self.padTop = padTop
+        let (plotTop, plotBottom) = Self.plotBox(padTop: padTop)
         // ONE track box, whichever track fills it. The switch resolves a
         // hypothetical both-tracks input tide-first instead of drawing two
         // curves through each other.
         switch (hasTide, hasCurrent) {
         case (true, _):
-            tideTop = Self.plotTop; tideBottom = Self.plotBottom
+            tideTop = plotTop; tideBottom = plotBottom
             curTop = 0; curBottom = 0
         default:
             tideTop = 0; tideBottom = 0
-            curTop = Self.plotTop; curBottom = Self.plotBottom
+            curTop = plotTop; curBottom = plotBottom
         }
         // Both edges resolve tide-first, like the switch above: a both-tracks
         // input that took its top from the tide box and its bottom from the
@@ -1116,6 +1129,8 @@ struct TimelineScrubber: UIViewRepresentable {
     var floodDeg: Double? = nil
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
+    /// The lead in words — "Rising 2.3 feet" — for the strip's spoken value.
+    var spokenLead = ""
     /// Bumped by a pill tap or a reopen on now. A tap must win over whatever
     /// the strip is doing, so this bypasses the settle guard below.
     var jumpToken = 0
@@ -1147,10 +1162,21 @@ struct TimelineScrubber: UIViewRepresentable {
     /// time instead — the first moment the real width exists.
     final class ScrubScrollView: UIScrollView {
         var onLayout: (() -> Void)?
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            isAccessibilityElement = true
+            accessibilityTraits = .adjustable
+        }
+        required init?(coder: NSCoder) { fatalError("not from a nib") }
         override func layoutSubviews() {
             super.layoutSubviews()
             onLayout?()
         }
+        /// The strip is one adjustable VoiceOver control (spec § 15): the
+        /// canvas's labels are decoration, not focus stops.
+        private var scrubber: Coordinator? { delegate as? Coordinator }
+        override func accessibilityIncrement() { scrubber?.step(self, by: Timeline.accessibilityStep) }
+        override func accessibilityDecrement() { scrubber?.step(self, by: -Timeline.accessibilityStep) }
     }
 
     func makeUIView(context: Context) -> UIScrollView {
@@ -1185,6 +1211,7 @@ struct TimelineScrubber: UIViewRepresentable {
         // final position.
         co.refreshCanvas(sv)
         guard sv.bounds.width > 0 else { return }
+        co.publishCenter(sv)
         // The window's width is a constant 228h for every anchor (the 48h
         // back-pad is unconditional, #67 item 1) — an anchor pick alone can no
         // longer change `totalWidth`. The guard below still earns its keep for
@@ -1391,7 +1418,47 @@ struct TimelineScrubber: UIViewRepresentable {
         func publishCenter(_ sv: UIScrollView) {
             guard sv.bounds.width > 0 else { return }
             let t = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
-            sv.accessibilityValue = chartTime(t, parent.data.tz)
+            sv.accessibilityLabel = parent.geo.hasTide ? "Tide timeline" : "Current timeline"
+            sv.accessibilityValue = [parent.spokenLead, spokenWhen(t, parent.data.tz)]
+                .filter { !$0.isEmpty }.joined(separator: ", ")
+            sv.accessibilityCustomActions = [
+                UIAccessibilityCustomAction(name: "Next event") { [weak self, weak sv] _ in
+                    guard let self, let sv else { return false }
+                    let after = self.parent.scrubTime.addingTimeInterval(1)
+                    return self.jump(sv, to: self.parent.data.snapTimes.first { $0 > after })
+                },
+                UIAccessibilityCustomAction(name: "Previous event") { [weak self, weak sv] _ in
+                    guard let self, let sv else { return false }
+                    let before = self.parent.scrubTime.addingTimeInterval(-1)
+                    return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
+                },
+            ]
+        }
+
+        /// A VoiceOver increment: five minutes, landed directly.
+        func step(_ sv: UIScrollView, by seconds: TimeInterval) {
+            stopIntro()
+            park(sv, at: parent.scrubTime.addingTimeInterval(seconds))
+        }
+        private func jump(_ sv: UIScrollView, to target: Date?) -> Bool {
+            guard let target else { return false }
+            stopIntro()
+            park(sv, at: target)
+            return true
+        }
+
+        /// Land on a moment with no travel: the Reduce Motion path, and the
+        /// accessibility one. Clamped, then read back, so a moment past the
+        /// window's edge parks where the offset can actually reach (see
+        /// `handleTap`).
+        func park(_ sv: UIScrollView, at target: Date) {
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            let reachable = abs(parent.data.x(target) - sv.bounds.width / 2 - desired) < 0.5
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            cancelMagnet()
+            sv.contentOffset = CGPoint(x: desired, y: 0)
+            parent.scrubTime = reachable ? target : parent.data.time(atX: desired + sv.bounds.width / 2)
         }
 
         /// One-shot initial centering, at the first layout with a real width
@@ -1523,9 +1590,7 @@ struct TimelineScrubber: UIViewRepresentable {
             // same landing a tapped pill gets (updateUIView's jump branch).
             sv.setContentOffset(sv.contentOffset, animated: false)
             if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
-                cancelMagnet()
-                sv.contentOffset = CGPoint(x: desired, y: 0)
-                parent.scrubTime = landing
+                park(sv, at: landing)
             } else {
                 magneting = true
                 // `nudging` for the same reason the opening slide sets it: the
@@ -1585,10 +1650,16 @@ struct TimelineScrubber: UIViewRepresentable {
             let center = sv.contentOffset.x + sv.bounds.width / 2
             guard let best = nearest(parent.data.snapTimes, toX: center),
                   best.dx < Timeline.magnetPts, best.dx > 0.5 else { return }
+            let desired = CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0)
+            // Reduce Motion: park on the stop directly, the same landing a
+            // tap or a pill gets.
+            if UIAccessibility.isReduceMotionEnabled {
+                park(sv, at: best.time)
+                return
+            }
             magneting = true
             magnetTarget = best.time
-            sv.setContentOffset(CGPoint(x: parent.data.x(best.time) - sv.bounds.width / 2, y: 0),
-                                animated: true)
+            sv.setContentOffset(desired, animated: true)
         }
     }
 }
@@ -1608,6 +1679,8 @@ struct TimelineScrubStrip: View {
     var onReturn: (() -> Void)? = nil
     /// Reopened while scrubbed away: the caller moves `now`, the scrub stays put.
     var onResumeScrubbedAway: () -> Void = {}
+    /// The lead in words, for the strip's spoken value (spec § 15).
+    var spokenLead = ""
     /// The next significant event from the scrub, and the scrub to it.
     var commentary: CommentaryContent? = nil
     /// The commentary's ink when it is a warning rather than a next event.
@@ -1619,6 +1692,7 @@ struct TimelineScrubStrip: View {
     var onViewportWidth: ((CGFloat) -> Void)? = nil
     @Environment(\.openWeekPicker) private var openWeekPicker
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -1626,6 +1700,7 @@ struct TimelineScrubStrip: View {
         TimelineScrubber(data: data, geo: geo, imperial: imperial, speedUnit: speedUnit,
                          now: now,
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
+                         spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
                          onPickDate: openWeekPicker)
             .frame(height: geo.height)
@@ -1675,9 +1750,12 @@ struct TimelineScrubStrip: View {
                 }
             }
         }
+        // Capped so a long commentary and the Now pill share one row at
+        // accessibility sizes; the lead above carries the full-size reading.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .opacity(settled ? 1 : 0)
         .allowsHitTesting(settled)
-        .animation(.easeInOut(duration: 0.2), value: settled)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
         .task(id: scrubTime) {
             // Rest = no scrub change for this long. A cancelled sleep is a
             // scrub still in motion, not a rest.
@@ -1685,7 +1763,9 @@ struct TimelineScrubStrip: View {
             guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
             settled = true
         }
-        .padding(.top, geo.chromeY)
+        // The pills' 44-point semantic rows are centred on the 30-point
+        // capsules the geometry places at `chromeY`.
+        .padding(.top, geo.chromeY - (Timeline.pillTarget - 30) / 2)
         .padding(.horizontal, 16)
     }
 
@@ -1701,6 +1781,8 @@ struct TimelineScrubStrip: View {
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
+        .frame(height: Timeline.pillTarget)
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("Return to now")
         .accessibilityIdentifier("detail-return-now")
     }
@@ -1718,7 +1800,7 @@ struct TimelineScrubStrip: View {
                     .frame(width: 1, height: geo.bodyBottom - geo.padTop)
                     .position(x: w / 2, y: geo.padTop + (geo.bodyBottom - geo.padTop) / 2)
                     .opacity(settled && commentary != nil ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.2), value: settled)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settled)
                 if geo.hasTide {
                     // Neutral white, like the current dot below it — a green
                     // dot coloured the mark by SERIES IDENTITY inside a canvas

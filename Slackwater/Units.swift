@@ -37,6 +37,18 @@ func speedUnitLabel(_ unit: String) -> String {
     unit == "kmh" ? "km/h" : unit == "ms" ? "m/s" : "kn"
 }
 
+/// A printed unit as VoiceOver should say it: "kn" is read as a word.
+func spokenUnit(_ label: String) -> String {
+    switch label {
+    case "kn": "knots"
+    case "km/h": "kilometres per hour"
+    case "m/s": "metres per second"
+    case "ft": "feet"
+    case "m": "metres"
+    default: label
+    }
+}
+
 // MARK: - Distance formatting (prototype NearMe.dc.html semantics)
 
 /// "1.2 nm" / "14 nm" — the prototype's fmtDist.
