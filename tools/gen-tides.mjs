@@ -287,6 +287,7 @@ const shippable = allStations.filter((s) => (s.kind ?? "tide") === "tide" && s.l
  */
 const grid = new Map();
 const cell = (la, lo) => `${Math.round(la * 20)}:${Math.round(lo * 20)}`;
+const round3 = (v) => Number(v.toFixed(3));
 // +-2 cells of 0.05deg: >= 1.4 km of longitude even at Alert (82.5N), so the
 // search window always contains everything within DUPLICATE_KM.
 const collides = (s) => {
@@ -401,7 +402,6 @@ const isSubordinate = (s) => s.type === "subordinate";
 function astronomicalBounds(s) {
   const zero = s.datums?.[s.chart_datum];
   if (zero == null || s.datums?.LAT == null || s.datums?.HAT == null) return {};
-  const round3 = (v) => Number(v.toFixed(3));
   const lat = s.datums.LAT - zero;
   const hat = s.datums.HAT - zero;
   if (!isSubordinate(s)) return { latDatum: round3(lat), hatDatum: round3(hat) };
@@ -528,13 +528,15 @@ function buildStation(s) {
         .filter((c) => c.amplitude > 0)
         .map((c) => ({ name: c.name, amplitude: c.amplitude, phase: c.phase })),
       // Minutes and metres (or a ratio), exactly as NOAA publishes them; the
-      // reference's own datumOffset is the one that applies.
+      // reference's own datumOffset is the one that applies. NOAA's values
+      // are 2dp decimals, but the database stores them float32, so round off
+      // the representation error (0.79 arrives as 0.7900000214576721).
       ...(isSubordinate(s) && {
         datumOffset: 0,
         reference: s.offsets.reference,
         offsets: {
           time: { high: s.offsets.time.high, low: s.offsets.time.low },
-          height: { type: s.offsets.height.type, high: s.offsets.height.high, low: s.offsets.height.low },
+          height: { type: s.offsets.height.type, high: round3(s.offsets.height.high), low: round3(s.offsets.height.low) },
         },
       }),
     };

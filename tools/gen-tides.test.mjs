@@ -340,7 +340,10 @@ test("a missing bound is absent, never zero", () => {
   const atZero = stations.filter((s) => s.latDatum === 0);
   assert.ok(atZero.length > 100, `expected many chart-datum-is-LAT stations, got ${atZero.length}`);
   for (const s of atZero) {
-    assert.equal(s.chartDatum, "LAT", `${s.id} sits at 0 but its chart datum is ${s.chartDatum}`);
+    // Kartverket labels its chart datum "CD"; Norway defines chart datum as
+    // LAT, so sitting exactly at 0 is that definition, not a missing bound.
+    const label = s.id.startsWith("kartverket/") ? ["LAT", "CD"] : ["LAT"];
+    assert.ok(label.includes(s.chartDatum), `${s.id} sits at 0 but its chart datum is ${s.chartDatum}`);
   }
   // Absence is a missing key, not a null.
   assert.deepEqual(
