@@ -293,7 +293,7 @@ func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
 
 func localizedFormatter(_ template: String, _ tz: TimeZone,
                         locale: Locale = .autoupdatingCurrent) -> DateFormatter {
-    let key = ("localized|" + template + "|" + tz.identifier + "|" + locale.identifier) as NSString
+    let key = "localized|\(template)|\(tz.identifier)|\(locale.identifier)" as NSString
     if let cached = formatterCache.object(forKey: key) { return cached }
     let f = DateFormatter()
     f.locale = locale

@@ -192,7 +192,7 @@ jobs:
           xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater \
             -testPlan Slackwater -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
-            | tail -200
+            | tail -40
           # tar, not a bare artifact upload: that drops the executable bits
           # and symlinks the app and the test runner need.
           tar -C build/DerivedData/Build -czf build/products.tgz Products
