@@ -9,13 +9,14 @@ let package = Package(
     name: "FitValidation",
     platforms: [.macOS(.v14)],
     dependencies: [
-        // The engine's rename branch (openwatersio/neaps#339). On flip day
-        // (neaps#338) this becomes the renamed repo URL and a `from:` version.
-        .package(url: "https://github.com/openwatersio/neaps",
-                 revision: "6d84b3f2ffbf13b1a080779a2e6c10c59b17f5d9"),
+        // Exact-commit pin: the stack is in prerelease (slackwater#338 stage
+        // 4), so no post-rename semver tag exists yet. Becomes `from:` at the
+        // deliberate 1.0.0 release.
+        .package(url: "https://github.com/openwatersio/slackwater",
+                 revision: "6021524a3f2c5f609cd41af645ebea4a0e135bf8"),
     ],
     targets: [
         .executableTarget(
             name: "fit-validation",
-            dependencies: [.product(name: "SlackwaterKit", package: "neaps")]),
+            dependencies: [.product(name: "SlackwaterKit", package: "slackwater")]),
     ])

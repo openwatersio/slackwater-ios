@@ -36,11 +36,11 @@ packages:
     url: https://github.com/openwatersio/almanac
     from: 0.4.2
   slackwater:
-    # The engine's rename branch (openwatersio/neaps#339), where the package is
-    # `slackwater` and the library product is `SlackwaterKit`. On flip day
-    # (neaps#338) this becomes the renamed repo URL and a `from:` version tag.
-    url: https://github.com/openwatersio/neaps
-    revision: 6d84b3f2ffbf13b1a080779a2e6c10c59b17f5d9
+    # Exact-commit pin: the stack is in prerelease (slackwater#338 stage 4),
+    # so the repo has no post-rename semver tag yet. Becomes a `from:` version
+    # at the deliberate 1.0.0 release.
+    url: https://github.com/openwatersio/slackwater
+    revision: 6021524a3f2c5f609cd41af645ebea4a0e135bf8
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
