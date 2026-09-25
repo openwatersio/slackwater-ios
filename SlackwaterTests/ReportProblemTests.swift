@@ -71,12 +71,12 @@ final class ReportProblemTests: XCTestCase {
             .queryItems?.first { $0.name == name }?.value
     }
 
-    /// The app has one clock, so the mail prints the same 12-hour time the
-    /// detail does — a 24-hour moment line here would be a second one
-    /// (`TimelineTests.testNoSourceFileSpellsATwentyFourHourPattern`).
-    func testMomentPrintsTheAppsClockWithYearAndZone() {
-        XCTAssertEqual(reportMoment(Date(timeIntervalSince1970: 1_789_605_360), tz),
-                       "Sep 16, 2026 · 5:36pm PDT")
+    func testMomentPrintsTheLocalizedAppClockWithYearAndZone() {
+        let moment = Date(timeIntervalSince1970: 1_789_605_360)
+        XCTAssertEqual(reportMoment(moment, tz, locale: Locale(identifier: "en_US")),
+                       "Sep 16, 2026 · 5:36\u{202F}PM PDT")
+        XCTAssertEqual(reportMoment(moment, tz, locale: Locale(identifier: "fr_FR")),
+                       "16 sept. 2026 · 17:36 UTC−7")
     }
 
     // -- the unavailable-station report (issue #401) --------------------------

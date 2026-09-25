@@ -14,9 +14,15 @@ func toFeet(_ metres: Double) -> Double { metres * 3.28084 }
 /// Strip a negative zero, which appears whenever a tide sits just below datum.
 private func unsign(_ n: Double) -> Double { abs(n) < 0.05 ? abs(n) : n }
 
-func formatHeight(_ metres: Double, imperial: Bool) -> String {
-    imperial ? String(format: "%.1f", unsign(toFeet(metres)))
-             : String(format: "%.2f", unsign(metres))
+private func decimal(_ value: Double, places: Int, locale: Locale) -> String {
+    value.formatted(.number.locale(locale).grouping(.never)
+        .rounded(rule: .toNearestOrAwayFromZero).precision(.fractionLength(places)))
+}
+
+func formatHeight(_ metres: Double, imperial: Bool,
+                  locale: Locale = .autoupdatingCurrent) -> String {
+    imperial ? decimal(unsign(toFeet(metres)), places: 1, locale: locale)
+             : decimal(unsign(metres), places: 2, locale: locale)
 }
 
 func heightUnit(imperial: Bool) -> String { imperial ? "ft" : "m" }
@@ -28,9 +34,10 @@ func toKmh(_ knots: Double) -> Double { knots * 1.852 }
 func toMs(_ knots: Double) -> Double { knots * 0.514444 }
 
 /// Web formatSpeed: convert, strip a near-zero sign, one decimal.
-func formatSpeed(_ knots: Double, unit: String) -> String {
+func formatSpeed(_ knots: Double, unit: String,
+                 locale: Locale = .autoupdatingCurrent) -> String {
     let v = unit == "kmh" ? toKmh(knots) : unit == "ms" ? toMs(knots) : knots
-    return String(format: "%.1f", abs(v) < 0.05 ? abs(v) : v)
+    return decimal(abs(v) < 0.05 ? abs(v) : v, places: 1, locale: locale)
 }
 
 func speedUnitLabel(_ unit: String) -> String {
@@ -52,7 +59,7 @@ func spokenUnit(_ label: String) -> String {
 // MARK: - Distance formatting (prototype NearMe.dc.html semantics)
 
 /// "1.2 nm" / "14 nm" — the prototype's fmtDist.
-func formatNm(_ km: Double) -> String {
+func formatNm(_ km: Double, locale: Locale = .autoupdatingCurrent) -> String {
     let nm = km / 1.852
-    return (nm < 10 ? String(format: "%.1f", nm) : "\(Int(nm.rounded()))") + " nm"
+    return decimal(nm, places: nm < 10 ? 1 : 0, locale: locale) + " nm"
 }

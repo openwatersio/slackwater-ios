@@ -437,26 +437,26 @@ class ScreenshotTestCase: XCTestCase {
                    withVelocity: .default, thenHoldForDuration: 0)
     }
 
-    /// The lead reading under the centerline — the page's one readout, and the
-    /// only element that carries the scrubbed time. `LeadCard` combines its
-    /// children, so the eyebrow, the value and the time arrive as one label and
-    /// no bare "4:22pm" static text exists to query.
+    /// The lead reading under the centerline. Its label carries the state and
+    /// reading; its value carries the complete localized clock.
     func leadReading(_ app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)["detail-reading"].firstMatch
     }
 
-    /// The time the strip's centerline is parked on ("1:42pm"), pulled out of
-    /// the lead's combined label. Never nil: a missing readout is a hard test
-    /// failure inside the query itself. One resolve on purpose — an `exists`
-    /// pre-check is a second snapshot, and callers read this mid-deceleration,
-    /// where the extra round trip lands the read after the moment the assertion
-    /// is about. The whole label is the fallback: it moves with the scrub too,
-    /// so a settle still settles.
+    /// The complete localized clock under the strip's centerline.
     func scrubClock(_ app: XCUIApplication) -> String {
-        let label = leadReading(app).label
-        guard let time = label.range(of: "\\d{1,2}:\\d{2}(am|pm)",
-                                     options: .regularExpression) else { return label }
-        return String(label[time])
+        let when = leadReading(app).value as? String ?? ""
+        return when.components(separatedBy: " · ").last ?? when
+    }
+
+    func localizedClock(_ hour24: String) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.dateFormat = "HH:mm"
+        let output = DateFormatter()
+        output.locale = .autoupdatingCurrent
+        output.setLocalizedDateFormatFromTemplate("jm")
+        return input.date(from: hour24).map { output.string(from: $0) } ?? hour24
     }
 
     /// A current detail — harmonic station or gate — has rendered: the lead
@@ -503,21 +503,25 @@ class ScreenshotTestCase: XCTestCase {
     /// row does not. It passes on iPhone, which has no sidebar, and passes in
     /// isolation on iPad, where the sidebar state differs.
     ///
-    /// Each row is ONE element, not a container: `TimelineStrip` applies
-    /// `.accessibilityElement(children: .combine)`, so a row's children are
-    /// merged into its own label and `row.staticTexts` finds nothing. Hence we
-    /// read each row's label and pull the values out of it, rather than
-    /// querying descendants — querying would return an empty set and every
-    /// caller's comparison loop would pass vacuously.
-    func scheduleRowLabels(_ app: XCUIApplication) -> [String] {
+    /// Each row is ONE element, not a container: `TimelineStrip` combines its
+    /// children, so `row.staticTexts` finds nothing.
+    func scheduleRows(_ app: XCUIApplication) -> [XCUIElement] {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH 'schedule-row-d'"))
             .allElementsBoundByIndex
-            .compactMap { $0.exists ? $0.label : nil }
+            .filter(\.exists)
+    }
+
+    func scheduleRowLabels(_ app: XCUIApplication) -> [String] {
+        scheduleRows(app).map(\.label)
+    }
+
+    func scheduleRowClocks(_ app: XCUIApplication) -> [String] {
+        scheduleRows(app).compactMap { $0.value as? String }
     }
 
     /// Every substring of the schedule rows matching `pattern`. Unanchored by
-    /// design: the row label is a combined string like "05:48 2.2 ft ↑ HIGH",
+    /// design: the row label is a combined string like "2.2 ft ↑ HIGH",
     /// so an anchored `^…$` — one value per element — matches nothing.
     func scheduleValues(_ app: XCUIApplication, _ pattern: String) -> Set<String> {
         guard let re = try? NSRegularExpression(pattern: pattern) else { return [] }
@@ -625,7 +629,7 @@ class ShotWalk: ScreenshotTestCase {
     /// The day every detail is scrubbed on: a full moon (2026-09-26), so the
     /// night sky has a moon in it and the spring range is at its widest.
     let day = DateComponents(year: 2026, month: 9, day: 26)
-    /// The instant the app clock is pinned to: 9:41am Pacific on `day`, the
+    /// The instant the app clock is pinned to: 09:41 Pacific on `day`, the
     /// time the status-bar override shows. An absolute `-nowEpoch`, never a
     /// `-nowOffsetDays` shift off the host clock — the shift is `N * 86_400`
     /// applied to whatever time the run happens to start, so the readings a
@@ -678,9 +682,9 @@ class ShotWalk: ScreenshotTestCase {
     /// rewriting itself.
     func settleScrub(_ app: XCUIApplication, at clock: String) {
         XCTAssert(leadReading(app).appears(within: 10), "no lead reading")
-        XCTAssert(waitFor(leadReading(app), "label CONTAINS '\(clock)'"),
+        XCTAssert(waitFor(leadReading(app), "value CONTAINS '\(clock)'"),
                   "detail did not scrub to \(clock): \(leadReading(app).label)")
-        _ = settled { leadReading(app).label }
+        _ = settled { scrubClock(app) }
     }
 }
 

@@ -226,8 +226,8 @@ struct MoonDetailSheet: View {
         }
     }
 
-    /// "Aug 27 · 9:12pm", and "Aug 17, 2027 · 12:13am" when the year is not
-    /// the one being scrubbed. The year is not decoration here: the next
+    /// The localized date and clock include the year when it is not the one
+    /// being scrubbed. The year is not decoration here: the next
     /// eclipse is usually months out and often the following year, and a bare
     /// "Aug 17" under a "NEXT ECLIPSE" label on September 7th reads as a date
     /// in the past. `weekRangeLabel` makes the same call for the same reason.
@@ -236,7 +236,7 @@ struct MoonDetailSheet: View {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = tz
         let sameYear = cal.component(.year, from: d) == cal.component(.year, from: at)
-        let day = sameYear ? monthDay(d, tz) : formatter("MMM d, yyyy", tz).string(from: d)
+        let day = sameYear ? monthDay(d, tz) : monthDayYear(d, tz)
         return "\(day) · \(chartTime(d, tz))"
     }
 

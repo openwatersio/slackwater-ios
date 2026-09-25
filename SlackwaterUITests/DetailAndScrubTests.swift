@@ -167,15 +167,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // clear margin at any anchor the picker can reach.
         let sun = app.descendants(matching: .any)["day-sun-d0"].firstMatch
         XCTAssert(sun.exists, "no sun times in the schedule's day column")
-        let sunrise = try XCTUnwrap(sun.label.range(of: "\\d{1,2}:\\d{2}(am|pm)",
-                                                   options: .regularExpression)
-                                        .map { String(sun.label[$0]) },
-                                    "no sunrise in '\(sun.label)'")
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.95)).tap()
         settleScrub(app)
         XCTAssertFalse(picker.exists, "a tap on the sunrise opened the picker")
-        XCTAssertEqual(scrubClock(app), sunrise,
-                       "the sunrise tap left the centerline on \(scrubClock(app)), not \(sunrise) (noon was \(noon))")
+        let sunrise = scrubClock(app)
+        XCTAssertTrue(sun.label.hasPrefix("↑\(sunrise)"),
+                      "the sunrise tap left the centerline on \(sunrise), outside '\(sun.label)' (noon was \(noon))")
         save(app, "strip-tap-sunrise.png")
     }
 
@@ -488,8 +485,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // Away from now, so nothing but the rotation moves the strip.
         scrubStrip(app)
         settleScrub(app)
-        XCTAssertLessThanOrEqual(clockGap(stripCentre(app), scrubClock(app)), 5,
-                                 "before rotating, the curve and readout already disagree")
+        XCTAssertTrue(stripCentre(app).contains(scrubClock(app)),
+                      "before rotating, the curve and readout already disagree")
 
         for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
             let before = scrubClock(app)
@@ -497,31 +494,15 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             settleLayout(strip)
             let readout = scrubClock(app), centre = stripCentre(app)
             XCTAssertEqual(readout, before, "rotation changed the readout")
-            XCTAssertLessThanOrEqual(clockGap(centre, readout), 5,
-                                     "after rotating to \(orientation.rawValue) the curve under the "
-                                     + "centerline reads \(centre) while the readout says \(readout)")
+            XCTAssertTrue(centre.contains(readout),
+                          "after rotating to \(orientation.rawValue) the curve under the "
+                          + "centerline reads \(centre) while the readout says \(readout)")
         }
     }
 
-    /// The time under the strip's centerline ("1:42pm"), out of the scroll
-    /// view's spoken value ("Rising 2.3 feet, September 20, 1:42pm PDT").
+    /// The localized reading and dated time under the strip's centerline.
     private func stripCentre(_ app: XCUIApplication) -> String {
-        let value = app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
-        return value.range(of: #"\d{1,2}:\d{2}[ap]m"#, options: .regularExpression).map { String(value[$0]) } ?? value
-    }
-
-    /// Minutes between two "h:mma" clocks, the short way round midnight.
-    private func clockGap(_ a: String, _ b: String) -> Int {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "h:mma"
-        func minutes(_ s: String) -> Int {
-            guard let d = f.date(from: s.uppercased()) else { return Int.min / 2 }
-            let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-            return c.hour! * 60 + c.minute!
-        }
-        let gap = abs(minutes(a) - minutes(b)) % 1440
-        return min(gap, 1440 - gap)
+        app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
     }
 
     /// Over a fast tide the pill explains the yellow line: the rate, in the
@@ -811,10 +792,12 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             openSearch(app, query)
             pickSearchResult(app, app.staticTexts[name].firstMatch)
             XCTAssert(leadReading(app).appears(within: 10), "no lead reading on \(name)")
-            XCTAssert(waitFor(leadReading(app), "label CONTAINS '1:00pm'"),
+            let clock = localizedClock("13:00")
+            XCTAssert(waitFor(leadReading(app), "value CONTAINS '\(clock)'"),
                       "\(name) did not land on the moment: \(leadReading(app).label)")
-            _ = settled { leadReading(app).label }
-            XCTAssertEqual(scrubClock(app), "1:00pm", "\(name)'s strip moved off the moment once it settled")
+            _ = settled { scrubClock(app) }
+            XCTAssertEqual(scrubClock(app), clock,
+                           "\(name)'s strip moved off the moment once it settled")
             let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
             XCTAssert(bar.appears(within: 10), "no range bar on \(name)")
             XCTAssert(bar.label.contains("Sep 28"), "\(name)'s window did not move to the moment's day: \(bar.label)")

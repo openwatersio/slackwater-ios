@@ -335,7 +335,7 @@ final class EclipseTests: XCTestCase {
                              "the partial was inside the window after all")
     }
 
-    /// #314: the 2026-09-26 full moon is 9:49am in Victoria. The row still prints
+    /// #314: the 2026-09-26 full moon is 09:49 in Victoria. The row still prints
     /// that instant, but scrubs to the moon at its highest in the night before.
     func testPhaseShortcutsLandWhereTheMoonIsHighestThatNight() throws {
         let facts = try XCTUnwrap(moonFacts(at: utc("2026-09-20T12:00:00Z"), observer: Self.victoria,

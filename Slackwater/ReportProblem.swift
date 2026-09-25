@@ -48,12 +48,13 @@ var appVersionLabel: String {
     return "\(v) (\(b))"
 }
 
-/// "Sep 16, 2026 · 5:36pm PDT" — the app's own clock (`chartTime`), carrying
-/// the year and zone that a mail opened weeks later somewhere else still needs.
-func reportMoment(_ date: Date, _ tz: TimeZone) -> String {
-    let day = formatter("MMM d, yyyy", tz).string(from: date)
-    let zone = formatter("zzz", tz).string(from: date)
-    return "\(day) · \(chartTime(date, tz)) \(zone)"
+/// The app's localized clock, carrying the year and zone that a mail opened
+/// weeks later somewhere else still needs.
+func reportMoment(_ date: Date, _ tz: TimeZone,
+                  locale: Locale = .autoupdatingCurrent) -> String {
+    let day = monthDayYear(date, tz, locale: locale)
+    let zone = localizedFormatter("z", tz, locale: locale).string(from: date)
+    return "\(day) · \(chartTime(date, tz, locale: locale)) \(zone)"
 }
 
 /// ponytail: the predicted height is deliberately absent. Station plus moment

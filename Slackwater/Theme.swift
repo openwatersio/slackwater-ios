@@ -559,52 +559,49 @@ struct SolarEclipseGlyph: View {
 /// "Aug 7" — the when-row's date. No weekday and no TODAY/TOMORROW: the
 /// scrubber's day headers already carry those, and repeating them here read
 /// as "SUN · SUN, AUG 9" the moment you scrubbed (design feedback 2026-08-07).
-func monthDay(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("MMM d", tz).string(from: date)
+func monthDay(_ date: Date, _ tz: TimeZone,
+              locale: Locale = .autoupdatingCurrent) -> String {
+    localizedFormatter("MMMd", tz, locale: locale).string(from: date)
 }
 
-/// "Sep 10 · 3:42pm" — the lead's when. The date is here because a strip
-/// centered on night has both flanking day headers off-screen. Date only, no
-/// weekday and no TODAY/TOMORROW, for the reason `monthDay` records.
+func monthDayYear(_ date: Date, _ tz: TimeZone,
+                  locale: Locale = .autoupdatingCurrent) -> String {
+    localizedFormatter("yMMMd", tz, locale: locale).string(from: date)
+}
+
+/// The lead's localized date and clock. The date remains visible when a strip
+/// centered on night has both flanking day headers off-screen.
 ///
 /// The line is centered under the reading, so a one-digit hour would narrow
 /// the string and shift every glyph as the scrub crosses 9:59→10:00 — many
 /// times in one pan. A figure space — digit-wide under `monospacedDigit` —
 /// stands in for the missing digit. The day's digits move too, but once per
 /// midnight rather than per pan, so they go unpadded.
-func leadWhen(_ date: Date, _ tz: TimeZone) -> String {
-    var time = chartTime(date, tz)
-    if time.prefix(while: \.isNumber).count == 1 {
-        time = "\u{2007}" + time
+func leadWhen(_ date: Date, _ tz: TimeZone,
+              locale: Locale = .autoupdatingCurrent) -> String {
+    var time = chartTime(date, tz, locale: locale)
+    if let digit = time.firstIndex(where: \.isNumber),
+       time[digit...].prefix(while: \.isNumber).count == 1 {
+        time.insert("\u{2007}", at: digit)
     }
-    return "\(monthDay(date, tz)) · \(time)"
+    return "\(monthDay(date, tz, locale: locale)) · \(time)"
 }
 
-/// The schedule's span, as the range bar prints it: `Aug 11 – 17`,
-/// `Aug 28 – Sep 3`, `Dec 29 – Jan 4, 2027`.
-///
-/// The second date is the LAST DAY SHOWN — `anchor + 6` — not the exclusive
-/// `scheduleRange` upper bound. The window is rolling rather than a calendar
-/// week, so this bar is the only thing on screen that says what span you are
-/// looking at; naming a day that is not in the list below it would be the
-/// same defect as calling a Tue→Mon window "Week of Aug 9 – 16".
-///
-/// The month repeats only when it changes. The year appears when the range
-/// crosses one or is not in today's year — a bar that printed "2026" every
-/// week would be teaching the user to stop reading it, but a picked March
-/// 2027 printed bare reads as this March (#305).
-func weekRangeLabel(anchor: Date, today: Date, tz: TimeZone) -> String {
+/// The localized range bar names the last day shown and omits the year only
+/// when both ends fall in today's year.
+func weekRangeLabel(anchor: Date, today: Date, tz: TimeZone,
+                    locale: Locale = .autoupdatingCurrent) -> String {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
     let last = cal.date(byAdding: .day, value: Int(Timeline.scheduleDays) - 1, to: anchor)!
 
-    let head = formatter("MMM d", tz).string(from: anchor)
-
-    let sameMonth = cal.isDate(anchor, equalTo: last, toGranularity: .month)
     let sameYear = cal.isDate(anchor, equalTo: last, toGranularity: .year)
         && cal.isDate(anchor, equalTo: today, toGranularity: .year)
-    let tailPattern = (sameMonth ? "d" : "MMM d") + (sameYear ? "" : ", yyyy")
-    return "\(head) – \(formatter(tailPattern, tz).string(from: last))"
+    let formatter = DateIntervalFormatter()
+    formatter.locale = locale
+    formatter.timeZone = tz
+    formatter.dateTemplate = sameYear ? "MMMd" : "yMMMd"
+    return formatter.string(from: anchor, to: last)
 }
 
 /// One Weather-style readout tile (tide + current): eyebrow with the glyph in
@@ -650,10 +647,12 @@ struct LeadCard<Eyebrow: View>: View {
             Text(time)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(timeColor)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
+        .accessibilityValue(time.replacingOccurrences(of: "\u{2007}", with: ""))
     }
 }
 

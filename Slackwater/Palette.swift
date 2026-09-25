@@ -281,7 +281,7 @@ func noonLocal(_ day: Date, _ tz: TimeZone) -> Date {
 private let formatterCache = NSCache<NSString, DateFormatter>()
 
 func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
-    let key = (pattern + tz.identifier) as NSString
+    let key = ("pattern|" + pattern + "|" + tz.identifier) as NSString
     if let cached = formatterCache.object(forKey: key) { return cached }
     let f = DateFormatter()
     f.locale = Locale(identifier: "en_US_POSIX")
@@ -291,30 +291,42 @@ func formatter(_ pattern: String, _ tz: TimeZone) -> DateFormatter {
     return f
 }
 
-/// "4:22pm" — the card/readout style. The same string `chartTime` prints:
+func localizedFormatter(_ template: String, _ tz: TimeZone,
+                        locale: Locale = .autoupdatingCurrent) -> DateFormatter {
+    let key = "localized|\(template)|\(tz.identifier)|\(locale.identifier)" as NSString
+    if let cached = formatterCache.object(forKey: key) { return cached }
+    let f = DateFormatter()
+    f.locale = locale
+    f.timeZone = tz
+    f.setLocalizedDateFormatFromTemplate(template)
+    formatterCache.setObject(f, forKey: key)
+    return f
+}
+
+/// The card/readout style. The same string `chartTime` prints:
 /// one clock across cards, readouts, charts and the schedule, so a time never
 /// changes shape between the surface you read it on and the one you tapped.
-func cardTime(_ date: Date, _ tz: TimeZone) -> String {
-    chartTime(date, tz)
+func cardTime(_ date: Date, _ tz: TimeZone,
+              locale: Locale = .autoupdatingCurrent) -> String {
+    chartTime(date, tz, locale: locale)
 }
 
-/// "4:22pm" — the app's clock. Twelve-hour, lowercase, no space and no
-/// periods: " p.m." labels were mostly meridiem and collided because of it.
-func chartTime(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("h:mma", tz).string(from: date).lowercased()
+/// The app's clock, in the reader's locale and the station's time zone.
+func chartTime(_ date: Date, _ tz: TimeZone,
+               locale: Locale = .autoupdatingCurrent) -> String {
+    localizedFormatter("jm", tz, locale: locale).string(from: date)
 }
 
-/// "September 20, 4:22pm PDT" — the strip's spoken when. The full month and
-/// the station's zone, because a bare clock is ambiguous across a multi-day
-/// timeline read from somewhere else.
-func spokenWhen(_ date: Date, _ tz: TimeZone) -> String {
-    "\(formatter("MMMM d", tz).string(from: date)), \(chartTime(date, tz)) \(tz.abbreviation(for: date) ?? "")"
-        .trimmingCharacters(in: .whitespaces)
+/// The strip's spoken date, time and station time zone.
+func spokenWhen(_ date: Date, _ tz: TimeZone,
+                locale: Locale = .autoupdatingCurrent) -> String {
+    localizedFormatter("MMMMdjmz", tz, locale: locale).string(from: date)
 }
 
-/// "Wed" — the strip's non-relative day label.
-func shortWeekday(_ date: Date, _ tz: TimeZone) -> String {
-    formatter("EEE", tz).string(from: date)
+/// The strip's localized non-relative day label.
+func shortWeekday(_ date: Date, _ tz: TimeZone,
+                  locale: Locale = .autoupdatingCurrent) -> String {
+    localizedFormatter("EEE", tz, locale: locale).string(from: date)
 }
 
 /// The web's CompassArrow: ↑ rotated to a true bearing, "sets this way".
