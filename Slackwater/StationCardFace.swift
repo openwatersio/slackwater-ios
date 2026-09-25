@@ -75,7 +75,9 @@ struct StationCard<Trailing: View>: View {
                     if extras, let km {
                         Text("•")
                             .font(.caption)
-                            .foregroundStyle(SN.foam.opacity(0.5))
+                            // 0.7, not 0.5: under a pending card's 0.82 the
+                            // separator has to keep 4.5:1 on the card fill.
+                            .foregroundStyle(SN.foam.opacity(0.7))
                         Text(formatNm(km))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(SN.foam)
@@ -287,7 +289,7 @@ struct ConditionsItem: View {
     @ViewBuilder
     private func set(deg: Double, signed: Double, tint: Color, font: Font, arrowFirst: Bool) -> some View {
         if abs(signed) < 0.05 {
-            Text("•").font(font).foregroundStyle(SN.foam.opacity(0.4))
+            Text("•").font(font).foregroundStyle(SN.foam.opacity(0.6))
                 .frame(width: 30)
         } else {
             HStack(spacing: arrowFirst ? 2 : 4) {

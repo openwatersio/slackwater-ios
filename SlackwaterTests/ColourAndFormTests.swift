@@ -542,4 +542,58 @@ final class ColourAndFormTests: XCTestCase {
         XCTAssertEqual(Set(fills.values).count, 6,
                        "the pin palette must keep six distinct fills: \(fills)")
     }
+
+    /// The lead's white value is large text, and it clears WCAG's 3:1 on the
+    /// brightest ground the sky can put under it at every sun altitude — the
+    /// same ground the rate warning's ink answers to. Caption-size chrome
+    /// over the sky (the header's region line, the lead's time) is a
+    /// different story: over the twilight-to-day band no single ink reaches
+    /// 4.5:1 (white bottoms out at 3.85:1, the navy the sky model anticipates
+    /// peaks at 4.56:1 by full day), so that is a design question, not an
+    /// opacity tweak — tracked in #438.
+    func testLeadInkClearsLargeTextContrastOnEverySky() {
+        for tenth in stride(from: -180, through: 700, by: 5) {
+            let altitude = Double(tenth) / 10
+            let ground = String(format: "%06X", skyChromeGround(sunAltitude: altitude))
+            XCTAssertGreaterThanOrEqual(contrast("FFFFFF", ground), 3,
+                                        "white over the sky at \(altitude)° reads \(contrast("FFFFFF", ground))")
+        }
+    }
+
+    /// Spec § 25, the no-colour contract, pinned to the code that carries
+    /// each state without its tint: a high and a low hang different glyphs,
+    /// a current's set is an arrow plus a compass word, slack is a word on
+    /// every lead, a maximum prints its speed, and a schematic shape prints
+    /// no speed at all. Source scans, because greyscale pixels cannot tell
+    /// a carrier from its absence; the render tests prove the ink exists,
+    /// this proves what the ink says.
+    func testEveryStateHasANonColourCarrier() throws {
+        let drawing = try repoSource("Slackwater/CurveDrawing.swift")
+        XCTAssertTrue(drawing.contains("high ? \"⤒\" : \"⤓\""),
+                      "a high and a low must hang different to-bar glyphs")
+        XCTAssertTrue(drawing.contains("flood ? \"arrow.forward\" : \"arrow.backward\""),
+                      "a derived gate's flow glyph must differ by direction")
+
+        let strip = try repoSource("Slackwater/TimelineStrip.swift")
+        let lines = strip.components(separatedBy: .newlines)
+        guard let start = lines.firstIndex(where: { $0.contains("private func drawCurrent(") }),
+              let end = lines[(start + 1)...].firstIndex(where: { $0 == "    }" })
+        else { return XCTFail("drawCurrent not found — this tripwire needs retargeting") }
+        let drawCurrent = lines[start...end].joined(separator: "\n")
+        XCTAssertTrue(drawCurrent.contains("glyph: deg(flood).map { .set(deg: $0) }"),
+                      "a current maximum hangs a set arrow")
+        XCTAssertTrue(drawCurrent.contains("value: data.speedsAreSchematic ? nil : formatSpeed("),
+                      "a measured maximum prints its speed; a schematic one prints none")
+        XCTAssertTrue(strip.contains("Text(compass16(deg))"),
+                      "the schedule names the set as a compass word beside its arrow")
+
+        let lead = try repoSource("Slackwater/CurrentLead.swift")
+        XCTAssertTrue(lead.contains("if isSlack { return \"Slack\" }"),
+                      "the measured-current lead names slack in words")
+        XCTAssertTrue(lead.contains("Text(compass16(setDegrees))"),
+                      "the measured-current lead names the set in words")
+        let derived = try repoSource("Slackwater/DerivedGateDetailView.swift")
+        XCTAssertTrue(derived.contains("leadState(word, ink: ink)"),
+                      "the derived lead names its phase in words")
+    }
 }

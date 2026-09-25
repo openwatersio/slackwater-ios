@@ -816,7 +816,11 @@ struct StationListView: View {
     /// closure-not-NavigationLink rule the detail-to-detail environment keys
     /// follow (Theme.swift), and what the search results and map pins do.
     @ViewBuilder private func activatable<V: View>(_ view: V, _ item: StationItem) -> some View {
+        // `.contain` groups the card's texts under one container while keeping
+        // each addressable. The platform audit still reports every line inside
+        // as its own small hit region; one element per card is the fix (#438).
         view.contentShape(Rectangle()).onTapGesture { open(item) }
+            .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder private func itemCard(_ item: StationItem, km: Double? = nil) -> some View {
