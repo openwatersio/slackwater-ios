@@ -249,7 +249,7 @@ rtk git commit -m "Read stable station routes from Swift"
 
 **Interfaces:**
 - Consumes: green Tasks 1-3.
-- Produces: exact `1.0.0` Swift/Node release contract consumed by Slackwater iOS.
+- Produces: exact `1.0.0-beta.0` Swift/Node release contract consumed by Slackwater iOS.
 
 - [ ] **Step 1: Verify public symbol names from a clean consumer**
 
@@ -281,4 +281,4 @@ Add the Swift API changes and exact verification counts to the existing PR body.
 
 - [ ] **Step 4: Merge and tag through the scheduled rename workflow**
 
-Confirm the published repository is `openwatersio/slackwater-database`, npm package is `@slackwater/database@1.0.0`, Swift product is `SlackwaterDatabase`, and release artifact is `slackwater-<date>.tcdb`.
+Confirm the published repository is `openwatersio/slackwater-database`, npm package is `@slackwater/database@1.0.0-beta.0`, Swift product is `SlackwaterDatabase`, and release artifact is `slackwater-<date>.tcdb`. Keep the package at this beta until the Slackwater app releases.

@@ -6,14 +6,14 @@
 
 **Architecture:** Node classifies the unified station database once and builds an app-specific `slackwater.tcdb` containing every identity and only approved prediction payloads. A focused Swift adapter maps the public `SlackwaterDatabase` API into existing app record types; the app scans identity while detail and widget paths perform binary record lookups.
 
-**Tech Stack:** Node.js 24, `@slackwater/database@1.0.0`, Swift 5, `SlackwaterDatabase`, Neaps/Slackwater engine, XCTest, XcodeGen
+**Tech Stack:** Node.js 24, `@slackwater/database@1.0.0-beta.0`, Swift 5, `SlackwaterDatabase`, Neaps/Slackwater engine, XCTest, XcodeGen
 
 **Spec:** `docs/superpowers/specs/2026-09-24-unified-tcdb-catalog-design.md`
 
 ## Global constraints
 
-- Start only after the upstream reader plan publishes the exact 1.0.0 contract.
-- Pin Swift and Node to exactly `1.0.0`; do not use a range.
+- Start only after the upstream reader plan publishes the exact `1.0.0-beta.0` contract.
+- Pin Swift and Node to exactly `1.0.0-beta.0`; do not use a range. Keep that beta pin until the Slackwater app releases.
 - Bundle every upstream identity and strip every prediction field from non-renderable records.
 - Keep CHS observations, downloaded windows, and fitted models local.
 - Preserve station IDs and the existing `current:` UI prefix.
@@ -39,7 +39,7 @@
 - Test: `SlackwaterTests/DatabaseDependencyTests.swift`
 
 **Interfaces:**
-- Consumes: `SlackwaterDatabase` and `@slackwater/database` version `1.0.0`.
+- Consumes: `SlackwaterDatabase` and `@slackwater/database` version `1.0.0-beta.0`.
 - Produces: both app targets can import `SlackwaterDatabase`; Node generators import `@slackwater/database`.
 
 - [ ] **Step 1: Add a compile-time dependency test**
@@ -63,7 +63,7 @@ Expected: FAIL because `SlackwaterDatabase` is not a target dependency.
 
 - [ ] **Step 3: Pin both package consumers**
 
-Add the Swift package with `exactVersion: 1.0.0` and add its product to both `Slackwater` and `SlackwaterWidgets`. Replace `@neaps/tide-database` and the temporary route alias with exact `@slackwater/database: "1.0.0"`.
+Add the Swift package with `exactVersion: 1.0.0-beta.0` and add its product to both `Slackwater` and `SlackwaterWidgets`. Replace `@neaps/tide-database` and the temporary route alias with exact `@slackwater/database: "1.0.0-beta.0"`.
 
 - [ ] **Step 4: Install and regenerate**
 

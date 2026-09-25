@@ -17,7 +17,7 @@ Success means:
 
 ## Upstream dependency
 
-The integration targets the first `openwatersio/slackwater-database` 1.0 release that contains the APIs requested on tide-database PR #192. `project.yml` pins the Swift package exactly, and `tools/package.json` pins `@slackwater/database` to the same release.
+The integration targets `openwatersio/slackwater-database` version `1.0.0-beta.0`, including the APIs requested on tide-database PR #192. The database packages remain at that beta until the Slackwater app releases. `project.yml` pins the Swift package exactly, and `tools/package.json` pins `@slackwater/database` to the same version.
 
 The public Swift API uses domain types instead of generated FlatBuffers accessors:
 
