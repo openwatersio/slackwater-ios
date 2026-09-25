@@ -111,24 +111,42 @@ class ScreenshotTestCase: XCTestCase {
     /// field and goes one character at a time, confirming each before the
     /// next. The assertion judges and reports one settled read; a re-read
     /// after the deadline prints `holds "Friday", not "Friday"` (#474).
+    ///
+    /// The field can also lose keyboard focus between keystrokes — seen twice
+    /// on CI, the retype stopping after "f" and after "fr" with "Neither
+    /// element nor any descendant has keyboard focus". `typeText` throws
+    /// rather than retrying, so every keystroke first makes sure the field
+    /// still has focus, tapping it back when it does not.
     func type(_ text: String, into field: XCUIElement, expecting expected: String? = nil) {
         let expected = expected ?? text
-        field.typeText(text)
+        focused(field).typeText(text)
         var observed = valueLanded(in: field, expecting: expected)
         for _ in 0..<2 where observed != expected {
             // Over-delete: `observed` may itself be mid-landing, and deleting
             // past empty costs nothing.
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
-                                  count: observed.count + expected.count))
+            focused(field).typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
+                                           count: observed.count + expected.count))
             var prefix = ""
             for ch in expected {
                 prefix.append(ch)
-                field.typeText(String(ch))
+                focused(field).typeText(String(ch))
                 if !waitFor(field, holdsValue(prefix), timeout: 2) { break }
             }
             observed = valueLanded(in: field, expecting: expected)
         }
         XCTAssertEqual(observed, expected, "the search field never took the query")
+    }
+
+    /// The field, with keyboard focus restored if it slipped. Returns the
+    /// field either way so the call reads as one step; the assertion is
+    /// what reports a field that will not take focus back.
+    @discardableResult
+    private func focused(_ field: XCUIElement) -> XCUIElement {
+        if NSPredicate(format: "hasKeyboardFocus == true").evaluate(with: field) { return field }
+        field.tap()
+        XCTAssert(waitFor(field, "hasKeyboardFocus == true", timeout: 5),
+                  "the search field lost keyboard focus and would not take it back")
+        return field
     }
 
     private func holdsValue(_ value: String) -> String {
