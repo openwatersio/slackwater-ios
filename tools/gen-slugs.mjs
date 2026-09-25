@@ -23,11 +23,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-// The route index comes from the release that publishes routes, aliased so the
-// catalog generators can stay on the release their output was built from until
-// #469 moves them: the URL a station is shared at and the record it is drawn
-// from are two decisions, and this file is only the first.
-import { stationRoutes } from "@neaps/tide-database-routes";
+import { stationRoutes } from "@neaps/tide-database";
 import { here, writeBundle } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
