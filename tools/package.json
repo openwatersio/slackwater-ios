@@ -7,8 +7,8 @@
   },
   "devDependencies": {
     "@neaps/tide-database-routes": "npm:@neaps/tide-database@^0.10.20260924",
-    "@slackwater/database": "https://pkg.pr.new/openwatersio/tide-database/@slackwater/database@431e308",
-    "@slackwater/engine": "https://pkg.pr.new/openwatersio/neaps/@slackwater/engine@6d84b3f",
+    "@slackwater/database": "^1.0.0-beta.0",
+    "@slackwater/engine": "^1.0.0-beta.0",
     "tz-lookup": "^6.1.25"
   },
   "scripts": {
