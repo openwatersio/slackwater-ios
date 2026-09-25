@@ -1782,7 +1782,9 @@ struct TimelineScrubStrip: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
         .frame(height: Timeline.pillTarget)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Activate") { jumpToken += 1; onReturn?() }
         .accessibilityLabel("Return to now")
         .accessibilityIdentifier("detail-return-now")
     }

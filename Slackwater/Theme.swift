@@ -84,7 +84,7 @@ func skyOpacity(sunAltitude: Double) -> Double {
     1 - max(0, min(1, (sunAltitude + 6) / 6)) * 0.45
 }
 
-private func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
+func mixedHex(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
     func channel(_ shift: UInt32) -> UInt32 {
         let x = Double((a >> shift) & 0xFF)
         let y = Double((b >> shift) & 0xFF)
@@ -746,7 +746,12 @@ struct Commentary: View {
                 // The visible capsule stays compact; the semantic target is
                 // the platform's 44 points (spec § 15).
                 .frame(height: Timeline.pillTarget)
-                .accessibilityElement(children: .combine)
+                // `.ignore`, not `.combine`: a combined element keeps the
+                // button's own frame, so the 44-point row would not be the
+                // target.
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction(named: "Activate", onTap)
                 .accessibilityLabel(content.accessibilityLabel)
                 .accessibilityIdentifier("commentary")
             }
@@ -1316,11 +1321,13 @@ struct StationDetails<Rows: View>: View {
     @ViewBuilder var rows: () -> Rows
 
     var body: some View {
-        DisclosureGroup("Station details") {
+        DisclosureGroup {
             VStack(alignment: .leading, spacing: 10) {
                 rows()
             }
             .padding(.top, 8)
+        } label: {
+            Text("Station details").frame(minHeight: 44)
         }
         .font(.subheadline)
         .foregroundStyle(SN.foam.opacity(0.7))
@@ -1464,7 +1471,7 @@ struct BranchLink: View {
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(SN.leaf)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
         .accessibilityElement(children: .combine)
@@ -1554,7 +1561,9 @@ struct SeriesFilterChips: View {
             .padding(.vertical, 4)
             .glassEffect(selected ? .regular.tint(SN.leaf.opacity(0.25)).interactive()
                                   : .regular.interactive(), in: Capsule())
-            .contentShape(Capsule())
+            // The capsule stays compact; the target is the 44-point row.
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
             .onTapGesture { filter = selected ? nil : series }
             .accessibilityLabel("Show \(label.lowercased())")
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
