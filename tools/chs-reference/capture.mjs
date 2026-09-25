@@ -1,5 +1,10 @@
 import fs from "node:fs";
 import vm from "node:vm";
+import { pathToFileURL } from "node:url";
+
+const fit = process.argv[2]
+  ? (await import(pathToFileURL(process.argv[2]))).fit
+  : null;
 
 const context = vm.createContext({ console });
 for (const name of ["chs-bundle.js", "chs-glue.js"]) {
@@ -48,13 +53,16 @@ const inputs = {
 };
 const golden = Object.fromEntries(
   Object.entries(inputs).map(([key, input]) => {
-    const { fitMs, ...result } = JSON.parse(
-      context.fitTides(JSON.stringify(input)),
-    );
+    const { fitMs, ...result } = fit
+      ? fit(
+          input.map(({ t, v }) => ({ time: new Date(t), value: v })),
+          context.CHSConstituents.BASIS,
+        )
+      : JSON.parse(context.fitTides(JSON.stringify(input)));
     return [key, { ...result, fitMs: 0 }];
   }),
 );
 fs.writeFileSync(
-  new URL("chs-fit-golden.json", fixtures),
+  new URL(fit ? "chs-fit-parity.json" : "chs-fit-golden.json", fixtures),
   JSON.stringify(golden, null, 2) + "\n",
 );

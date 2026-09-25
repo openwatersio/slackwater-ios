@@ -82,7 +82,7 @@ So, structurally:
 - CHS data is **not to be used for navigation**; the app says so in Settings and
   marks *"Predictions — not for navigation"* on every detail footer.
 
-`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities. `ChsFitter.basis` preserves the validated 23 constituents and excludes SA/SSA from the 60-day fit. Recorded Victoria and Dodd samples check coefficient parity against the JavaScript reference and prediction error on held-out data. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
+`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. `ChsFitter.basis` preserves the validated 23 constituents and excludes SA/SSA from the 60-day fit. Recorded Victoria and Dodd samples check coefficient parity against `@neaps/harmonics` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
 
 ### This pattern does NOT generalise — the rule, and why
 

@@ -42,11 +42,15 @@ final class IwlsFixtureTests: XCTestCase {
         try IwlsFetcher.decode(JSONEncoder().encode(try XCTUnwrap(station.series[code], "\(station.key): missing \(code)")))
     }
 
+    private func golden(_ key: String, resource: String = "chs-fit-parity") throws -> ChsFitResult {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: resource, withExtension: "json"))
+        let golden = try JSONDecoder().decode([String: ChsFitResult].self, from: Data(contentsOf: url))
+        return try XCTUnwrap(golden[key])
+    }
+
     private func assertGolden(_ fit: ChsFitResult, _ key: String,
                               file: StaticString = #filePath, line: UInt = #line) throws {
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "chs-fit-golden", withExtension: "json"))
-        let golden = try JSONDecoder().decode([String: ChsFitResult].self, from: Data(contentsOf: url))
-        let expected = try XCTUnwrap(golden[key])
+        let expected = try golden(key)
         XCTAssertEqual(fit.offset, expected.offset, accuracy: 1e-7, file: file, line: line)
         XCTAssertEqual(fit.rms, expected.rms, accuracy: 1e-7, file: file, line: line)
         XCTAssertEqual(fit.constituents.map(\.name), expected.constituents.map(\.name), file: file, line: line)
@@ -161,7 +165,21 @@ final class IwlsFixtureTests: XCTestCase {
                                 uniquingKeysWith: { first, _ in first })
         let errors = held.compactMap { sample in byTime[sample.t].map { $0 - sample.v } }
         XCTAssertGreaterThan(errors.count, 800)
-        XCTAssertLessThan((errors.reduce(0) { $0 + $1 * $1 } / Double(errors.count)).squareRoot(), 0.2)
+        let rmse = (errors.reduce(0) { $0 + $1 * $1 } / Double(errors.count)).squareRoot()
+        XCTAssertLessThan(rmse, 0.2)
+        let legacy = try golden("victoria", resource: "chs-fit-golden")
+        let legacyEngine = Station(constituents: legacy.constituents.map {
+            HarmonicConstituent(name: $0.name, amplitude: $0.amplitude, phase: $0.phase)
+        }, offset: legacy.offset)
+        let legacyPredicted = legacyEngine.heights(from: Date(timeIntervalSince1970: heldStart.t / 1000),
+                                                   to: Date(timeIntervalSince1970: heldEnd.t / 1000), step: 900)
+        let legacyByTime = Dictionary(legacyPredicted.map { ($0.time.timeIntervalSince1970 * 1000, $0.height) },
+                                      uniquingKeysWith: { first, _ in first })
+        let legacyErrors = held.compactMap { sample in legacyByTime[sample.t].map { $0 - sample.v } }
+        XCTAssertEqual(legacyErrors.count, errors.count)
+        let legacyRMSE = (legacyErrors.reduce(0) { $0 + $1 * $1 } / Double(legacyErrors.count)).squareRoot()
+        XCTAssertLessThanOrEqual(rmse, legacyRMSE + 0.001)
+        print("Victoria holdout RMSE: per-sample \(rmse), CHS \(legacyRMSE); fit \(fit.fitMs) ms")
     }
 
     func testRealFitterComparesDoddProvisionalAndFullFitsOnHoldout() async throws {
@@ -203,5 +221,10 @@ final class IwlsFixtureTests: XCTestCase {
         XCTAssertLessThan(provisionalRMSE, 0.75)
         XCTAssertLessThan(fullRMSE, 0.75)
         XCTAssertNotEqual(provisionalRMSE, fullRMSE, accuracy: 0.000_001)
+        let legacyProvisional = try holdoutRMSE(golden("dodd60", resource: "chs-fit-golden"))
+        let legacyFull = try holdoutRMSE(golden("doddFull", resource: "chs-fit-golden"))
+        XCTAssertLessThanOrEqual(provisionalRMSE, legacyProvisional + 0.001)
+        XCTAssertLessThanOrEqual(fullRMSE, legacyFull + 0.001)
+        print("Dodd holdout RMSE: per-sample \(provisionalRMSE)/\(fullRMSE), CHS \(legacyProvisional)/\(legacyFull); fit \(provisional.fitMs)/\(full.fitMs) ms")
     }
 }
