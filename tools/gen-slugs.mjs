@@ -2,7 +2,7 @@
  * Generate Resources/slugs.json — the URL slug of every bundled station, for
  * the shared link `https://slackwater.xyz/<tides|currents>/<slug>` (#187).
  *
- * The vocabulary is @neaps/tide-database's route index: one slug per station,
+ * The vocabulary is @slackwater/database's route index: one slug per station,
  * allocated once and kept, so the app and the website mint the same link for
  * the same water. The table is narrowed to the ids the five committed catalogs
  * ship, keyed exactly as they key them (bare `noaa/…` for a current — the
@@ -27,7 +27,7 @@ import { join } from "node:path";
 // catalog generators can stay on the release their output was built from until
 // #469 moves them: the URL a station is shared at and the record it is drawn
 // from are two decisions, and this file is only the first.
-import { stationRoutes } from "@neaps/tide-database-routes";
+import { stationRoutes } from "@slackwater/database";
 import { here, writeBundle } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
