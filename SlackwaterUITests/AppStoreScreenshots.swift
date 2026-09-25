@@ -65,7 +65,7 @@ final class AppStoreScreenshots: ShotWalk {
         app = launchShots(scrubTo: slack)
         openDeceptionPass(app)
         assertCurrentDetailRendered(app)
-        settleScrub(app, at: clock12(slack))
+        settleScrub(app, at: localizedClock(slack))
         XCTAssert(leadReading(app).label.localizedCaseInsensitiveContains("slack"),
                   "the currents frame is not on slack: \(leadReading(app).label)")
         save(app, "01-currents-slack.png")
@@ -87,7 +87,7 @@ final class AppStoreScreenshots: ShotWalk {
 
         app = launchShots(scrubTo: rising)
         openStation(app, search: "seattle", named: "Seattle")
-        settleScrub(app, at: clock12(rising))
+        settleScrub(app, at: localizedClock(rising))
         XCTAssert(commentaryPill(app).label.hasPrefix("Rising"),
                   "the tide frame should be mid-rise, not \(commentaryPill(app).label)")
         save(app, "02-tide-rising.png")
@@ -105,7 +105,7 @@ final class AppStoreScreenshots: ShotWalk {
         // which stop that is depends on the device's strip width.
         let app = launchShots(scrubTo: "23:30")
         openFridayHarbor(app)
-        settleScrub(app, at: "11:30pm")
+        settleScrub(app, at: localizedClock("23:30"))
         XCTAssert(app.buttons["Return to now"].appears(within: 5),
                   "the centerline is not parked off now")
         save(app, "03-scrubber.png")
@@ -163,33 +163,27 @@ final class AppStoreScreenshots: ShotWalk {
     /// arrival, so these are today's rows and no scrolling is needed to reach
     /// them: the labels are in the tree whether or not the rows are on screen.
     private func scheduleTimes(_ app: XCUIApplication, naming stop: String) -> [String] {
-        let times = scheduleRowLabels(app)
-            .filter { $0.localizedCaseInsensitiveContains(stop) }
-            .compactMap { label -> String? in
-                label.range(of: #"\d{1,2}:\d{2}(am|pm)"#, options: .regularExpression)
-                    .map { String(label[$0]).clock24 }
+        let times = scheduleRows(app)
+            .filter { $0.label.localizedCaseInsensitiveContains(stop) }
+            .compactMap { row -> String? in
+                (row.value as? String)?.clock24
             }
         XCTAssertFalse(times.isEmpty, "no \(stop) row on today's schedule")
         return times
     }
 
-    /// "13:22" → "1:22pm", the form the lead reading prints.
-    private func clock12(_ time: String) -> String {
-        let (h, m) = time.hourMinute
-        return "\(h % 12 == 0 ? 12 : h % 12):\(String(format: "%02d", m))\(h < 12 ? "am" : "pm")"
-    }
-
 }
 
 private extension String {
-    /// "1:22pm" → "13:22".
-    var clock24: String {
-        let bare = String(dropLast(2))
-        let parts = bare.split(separator: ":")
-        var hour = Int(parts[0]) ?? 0
-        if hasSuffix("pm"), hour != 12 { hour += 12 }
-        if hasSuffix("am"), hour == 12 { hour = 0 }
-        return String(format: "%02d:%@", hour, String(parts[1]))
+    /// A localized clock → "13:22".
+    var clock24: String? {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        guard let date = formatter.date(from: self) else { return nil }
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        guard let hour = parts.hour, let minute = parts.minute else { return nil }
+        return String(format: "%02d:%02d", hour, minute)
     }
 
     /// "13:22" → (13, 22).

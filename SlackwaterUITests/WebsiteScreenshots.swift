@@ -34,22 +34,22 @@ final class WebsiteScreenshots: ShotWalk {
         save(app, "map.png")
 
         // Tides: Friday Harbor at noon and at night under the full moon.
-        for (time, clock, name) in [("13:00", "1:00pm", "tides-day.png"),
-                                    ("23:30", "11:30pm", "tides-night.png")] {
+        for (time, name) in [("13:00", "tides-day.png"),
+                             ("23:30", "tides-night.png")] {
             app = launchShots(scrubTo: time)
             openFridayHarbor(app)
-            settleScrub(app, at: clock)
+            settleScrub(app, at: localizedClock(time))
             save(app, name)
         }
 
         // Currents: Deception Pass at noon and at sunrise.
-        for (time, clock, name) in [("13:00", "1:00pm", "currents-day.png"),
-                                    ("07:10", "7:10am", "currents-sunrise.png")] {
+        for (time, name) in [("13:00", "currents-day.png"),
+                             ("07:10", "currents-sunrise.png")] {
             app = launchShots(scrubTo: time)
             openSearch(app, "deception")
             pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
             assertCurrentDetailRendered(app)
-            settleScrub(app, at: clock)
+            settleScrub(app, at: localizedClock(time))
             save(app, name)
         }
     }

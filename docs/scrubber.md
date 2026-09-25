@@ -295,11 +295,11 @@ Its anatomy is:
 2. one large value and a lighter unit, when magnitude is known; and
 3. station-local selected date and clock time.
 
-The state and value form one accessible reading. The lead prints `MMM d · h:mmam/pm`, for example `Sep 20 · 4:22pm`, without a weekday or relative day word. A figure space pads a one-digit hour to keep the centered tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same twelve-hour format without the date or padding: no leading zero, lowercase `am`/`pm`, and no space or periods. Spoken time should follow platform locale while retaining the station time zone and full date context.
+The state and value form one accessible reading. The lead prints the station-local date and clock without a weekday or relative day word. Date order, month names, clock cycle, separator spacing, and meridiem follow the platform locale. A figure space pads a one-digit hour when the locale uses one, keeping the centered tabular clock stable as it crosses 9:59 to 10:00. Other graph clocks use the same localized time style without the date or padding.
 
 ### 9.1 Tide lead
 
-The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. Format feet to one decimal or metres to two decimals; strip negative zero.
+The tide value is the engine-exact height at `selectedTime`, not the graph's ten-minute interpolation. Format feet to one fractional digit or metres to two using the locale's decimal separator, and strip negative zero. The compact unit symbols remain `ft` and `m` in every locale.
 
 Within one second of an extreme, the state is `High` or `Low` and uses the corresponding to-bar glyph. Otherwise the state is `Rising` or `Falling`, inferred from the next extreme, with a diagonal arrow.
 
@@ -311,7 +311,7 @@ State colour:
 
 ### 9.2 Measured-current lead
 
-The value is the absolute speed at `selectedTime`; the phase carries its sign. Harmonic stations use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one decimal and strip negative zero.
+The value is the absolute speed at `selectedTime`; the phase carries its sign. Harmonic stations use an engine-exact value. Online sampled currents use linear interpolation through the displayed series. Format all supported speed units to one fractional digit using the locale's decimal separator, and strip negative zero. The nautical unit symbols `kn`, `km/h`, and `m/s` remain unchanged across locales.
 
 The state is:
 
@@ -342,6 +342,8 @@ Countdowns floor to whole minutes and never go below zero:
 under 60 minutes: 28m
 60 minutes or more: 3h 28m
 ```
+
+The compact `h` and `m` countdowns are fixed chart notation. VoiceOver uses localized full-duration words.
 
 The visual label uses the same selected-time-relative order at now and while planning away from now. It contains no sentence glue:
 
@@ -578,8 +580,8 @@ For every civil day touched by the window:
 
 - centre `Today`, `Tomorrow`, `Yesterday`, or the short weekday halfway between sunrise and sunset; use station-local noon when either sun event is missing;
 - place `MMM d` beneath it;
-- draw sunrise as `↑5:24am` in sunrise ink at its true x-coordinate;
-- draw sunset as `↓7:53pm` in sunset ink at its true x-coordinate; and
+- draw sunrise as `↑` plus its localized station time in sunrise ink at its true x-coordinate;
+- draw sunset as `↓` plus its localized station time in sunset ink at its true x-coordinate; and
 - place a seven-unit sun dot beneath each time.
 
 Sunrise/sunset events are computed for the station coordinate and civil-day bounds. A polar day may lack either event; omit missing marks without inventing a time.
@@ -616,7 +618,7 @@ The five-minute accessibility step is independent of device pixels and remains u
 
 Expose commentary and Now as ordinary buttons. Commentary's label must expand its compact visible copy into the complete event, relationship, and localized duration; for example, visible `High ↑ 28m` is announced as `High tide in 28 minutes`. Now includes its visible text. Their semantic hit targets must meet the platform minimum—44 by 44 points on iOS/web and 48 by 48 dp on Android—even when their visible capsule is smaller.
 
-The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops. Include the civil date and station time zone in spoken output when crossing midnight; a bare `4:22pm` is ambiguous in a multi-day timeline.
+The lead should be one combined announcement rather than separate state, value, unit, and clock focus stops. Include the civil date and station time zone in spoken output when crossing midnight; a clock time without its date is ambiguous in a multi-day timeline.
 
 Do not rely on colour alone:
 

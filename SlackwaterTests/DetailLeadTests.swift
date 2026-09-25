@@ -164,13 +164,13 @@ final class DetailLeadTests: XCTestCase {
         let flood = try XCTUnwrap(lead(scrub: at(-100)).nextMax)
         XCTAssertEqual(flood.label, "Next max")
         XCTAssertEqual(flood.value, "2.4\u{00a0}kn")
-        XCTAssertEqual(flood.caption, "Flood at 12:00pm")
+        XCTAssertEqual(flood.caption, "Flood at \(chartTime(t0, utc))")
 
         // Past the flood max, the next one is the ebb — reported unsigned,
         // because the direction is the caption's job.
         let ebb = try XCTUnwrap(lead(scrub: at(10)).nextMax)
         XCTAssertEqual(ebb.value, "1.8\u{00a0}kn")
-        XCTAssertEqual(ebb.caption, "Ebb at 1:40pm")
+        XCTAssertEqual(ebb.caption, "Ebb at \(chartTime(at(6000), utc))")
 
         XCTAssertNil(lead(scrub: at(12_700)).nextMax, "no maximum left in the window")
     }

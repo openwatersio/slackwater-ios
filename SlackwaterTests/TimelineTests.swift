@@ -427,67 +427,44 @@ final class TimelineTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(days.count, 2)
     }
 
-    /// One clock wherever a moment is printed: `cardTime` and `chartTime` are
-    /// the same string, so a time never changes shape between the row you
-    /// tapped and the strip you landed on.
-    func testOneTwelveHourClockAcrossTheApp() {
+    /// One clock wherever a moment is printed, following the reader's locale.
+    func testOneLocaleAwareClockAcrossTheApp() {
         var cal = Calendar(identifier: .gregorian)
         let utc = TimeZone(identifier: "UTC")!
+        let american = Locale(identifier: "en_US")
+        let french = Locale(identifier: "fr_FR")
+        let korean = Locale(identifier: "ko_KR")
         cal.timeZone = utc
         func at(_ h: Int, _ m: Int) -> Date {
             cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: m))!
         }
-        XCTAssertEqual(chartTime(at(7, 3), utc), "7:03am", "no pad, bare lowercase suffix")
-        XCTAssertEqual(cardTime(at(7, 3), utc), chartTime(at(7, 3), utc),
+        XCTAssertEqual(chartTime(at(7, 3), utc, locale: american), "7:03\u{202F}AM")
+        XCTAssertEqual(cardTime(at(7, 3), utc, locale: american),
+                       chartTime(at(7, 3), utc, locale: american),
                        "cards, readouts and charts print one clock")
-        XCTAssertEqual(chartTime(at(16, 22), utc), "4:22pm")
-        // The two ends of the clock, where 12-hour conversion goes wrong:
-        // midnight is 12am and noon is 12pm, never 0am/0pm and never each other.
-        XCTAssertEqual(chartTime(at(0, 36), utc), "12:36am")
-        XCTAssertEqual(chartTime(at(12, 5), utc), "12:05pm")
-        XCTAssertEqual(chartTime(at(23, 59), utc), "11:59pm")
-        // No space and no periods — " p.m." is four characters the strip can't spend.
-        XCTAssertFalse(chartTime(at(16, 22), utc).contains(" "))
-        XCTAssertFalse(chartTime(at(16, 22), utc).contains("."))
+        XCTAssertEqual(chartTime(at(16, 22), utc, locale: american), "4:22\u{202F}PM")
+        XCTAssertEqual(chartTime(at(16, 22), utc, locale: french), "16:22")
+        XCTAssertEqual(chartTime(at(16, 22), utc, locale: korean), "오후 4:22")
+        XCTAssertEqual(shortWeekday(at(16, 22), utc, locale: french), "lun.")
     }
 
-    /// The lead's when-line is centered, so every hour must occupy one
-    /// width: a figure space stands in for a one-digit hour's missing digit,
-    /// and two-digit hours get no pad.
-    func testLeadWhenPadsOneDigitHours() {
+    func testLeadWhenUsesLocalizedDateAndClockOrder() {
         var cal = Calendar(identifier: .gregorian)
         let utc = TimeZone(identifier: "UTC")!
         cal.timeZone = utc
         func at(_ h: Int) -> Date {
             cal.date(from: DateComponents(year: 2026, month: 8, day: 10, hour: h, minute: 5))!
         }
-        XCTAssertEqual(leadWhen(at(7), utc), "Aug 10 · \u{2007}7:05am")
-        XCTAssertEqual(leadWhen(at(12), utc), "Aug 10 · 12:05pm")
-        XCTAssertEqual(leadWhen(at(7), utc).count, leadWhen(at(12), utc).count,
+        let american = Locale(identifier: "en_US")
+        XCTAssertEqual(leadWhen(at(7), utc, locale: american), "Aug 10 · \u{2007}7:05\u{202F}AM")
+        XCTAssertEqual(leadWhen(at(12), utc, locale: american), "Aug 10 · 12:05\u{202F}PM")
+        XCTAssertEqual(leadWhen(at(7), utc, locale: american).count,
+                       leadWhen(at(12), utc, locale: american).count,
                        "one width for every hour — the centered line must not shift")
-    }
-
-    /// One clock means one FORMATTER: a 24-hour pattern anywhere in the app is
-    /// a second clock, and it would print beside the 12-hour one on the same
-    /// screen. Repo-wide, because the surface that reaches for its own
-    /// formatter is always the one nobody thought to check.
-    ///
-    /// An ISO 8601 date-time — the hour glued to a full date by `'T'` — is a
-    /// wire format, not a readout: nothing on screen prints it, and the share
-    /// link (DeepLink.swift) has to write the instant the web reads. Only the
-    /// bare 24-hour time is a second clock.
-    func testNoSourceFileSpellsATwentyFourHourPattern() throws {
-        var offenders: [String] = []
-        // DeepLink.swift PARSES the share link's ISO-8601 instant with these
-        // patterns and prints nothing — a wire format read, not a second clock.
-        for (name, source) in try appSources() where name != "DeepLink.swift" {
-            for (n, line) in source.components(separatedBy: .newlines).enumerated()
-            where codeOnly(line).replacingOccurrences(of: "'T'HH:mm", with: "").contains("HH:mm") {
-                offenders.append("\(name):\(n + 1)")
-            }
-        }
-        XCTAssertTrue(offenders.isEmpty,
-                      "24-hour time pattern outside chartTime:\n" + offenders.joined(separator: "\n"))
+        XCTAssertEqual(leadWhen(at(7), utc, locale: Locale(identifier: "fr_FR")),
+                       "10 août · 07:05")
+        XCTAssertTrue(leadWhen(at(7), utc, locale: Locale(identifier: "ko_KR"))
+            .contains("오전 \u{2007}7:05"))
     }
 
     /// An external scrub — a tapped commentary pill, return-to-now — rides the
@@ -624,12 +601,13 @@ final class TimelineTests: XCTestCase {
         XCTAssertLessThan(scrub, next, "and the previous-event action walks back off it")
     }
 
-    /// "September 20, 4:22pm PDT": the spoken date keeps the station's zone
-    /// and never abbreviates the month into something VoiceOver mispronounces.
-    func testSpokenWhenIsDatedAndZoned() {
+    func testSpokenWhenIsLocalizedDatedAndZoned() {
         let tz = TimeZone(identifier: "America/Vancouver")!
         let t = formatter("yyyy-MM-dd HH:mm", tz).date(from: "2026-09-20 16:22")!
-        XCTAssertEqual(spokenWhen(t, tz), "September 20, 4:22pm PDT")
+        XCTAssertEqual(spokenWhen(t, tz, locale: Locale(identifier: "en_US")),
+                       "September 20 at 4:22\u{202F}PM PDT")
+        XCTAssertEqual(spokenWhen(t, tz, locale: Locale(identifier: "fr_FR")),
+                       "20 septembre à 16:22 UTC−7")
     }
 
     /// The pad over the plot grows with the lead's text size (spec § 15), and
@@ -672,7 +650,7 @@ final class TimelineTests: XCTestCase {
     /// The magnet snaps to `snapTimes`, so a label showing anything else puts a
     /// number on screen that the scrubber will never park you at. The slack
     /// label printed its WINDOW'S OPENING EDGE for one iteration and that edge
-    /// is not a snap stop — you read "7:48pm", let go, and landed on 7:56pm
+    /// is not a snap stop — you read one time, let go, and landed eight minutes later
     /// with nothing explaining the gap.
     ///
     /// Window edges are labelled as the start/end of the usable window, so
@@ -1135,20 +1113,26 @@ final class TimelineTests: XCTestCase {
     func testWeekRangeLabel() {
         let tz = TimeZone(identifier: "America/Vancouver")!
         let today = vancouverMidnight(2026, 9, 12)
+        let american = Locale(identifier: "en_US")
         let cases: [(y: Int, m: Int, d: Int, expected: String, why: String)] = [
             // Anchor Aug 11 → groups Aug 11…Aug 17. The label names Aug 17, the
             // last day ON SCREEN, never the exclusive Aug 18 boundary.
-            (2026, 8, 11, "Aug 11 – 17", "names the last day shown"),
-            (2026, 8, 28, "Aug 28 – Sep 3", "spells the month when it changes"),
-            (2026, 12, 29, "Dec 29 – Jan 4, 2027", "shows the year when it changes"),
-            (2026, 6, 1, "Jun 1 – 7", "a range in today's year never prints a year"),
+            (2026, 8, 11, "Aug 11\u{2009}–\u{2009}17", "names the last day shown"),
+            (2026, 8, 28, "Aug 28\u{2009}–\u{2009}Sep 3", "spells the month when it changes"),
+            (2026, 12, 29, "Dec 29, 2026\u{2009}–\u{2009}Jan 4, 2027", "shows both years when they change"),
+            (2026, 6, 1, "Jun 1\u{2009}–\u{2009}7", "a range in today's year never prints a year"),
             // Out of today's year, the year is all that tells next March from this one.
-            (2027, 3, 3, "Mar 3 – 9, 2027", "a later year prints it"),
-            (2025, 3, 3, "Mar 3 – 9, 2025", "an earlier year prints it"),
+            (2027, 3, 3, "Mar 3\u{2009}–\u{2009}9, 2027", "a later year prints it"),
+            (2025, 3, 3, "Mar 3\u{2009}–\u{2009}9, 2025", "an earlier year prints it"),
         ]
         for c in cases {
-            XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d), today: today, tz: tz),
+            XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(c.y, c.m, c.d),
+                                          today: today, tz: tz, locale: american),
                            c.expected, c.why)
         }
+        XCTAssertEqual(weekRangeLabel(anchor: vancouverMidnight(2026, 8, 11),
+                                      today: today, tz: tz,
+                                      locale: Locale(identifier: "fr_FR")),
+                       "11–17 août")
     }
 }

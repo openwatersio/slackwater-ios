@@ -8,14 +8,21 @@ final class UnitsAndGroupsTests: XCTestCase {
     // MARK: - formatSpeed mirrors web units.ts (kn | kmh | ms, one decimal)
 
     func testFormatSpeedUnits() {
-        XCTAssertEqual(formatSpeed(6.0, unit: "kn"), "6.0")
-        XCTAssertEqual(formatSpeed(6.0, unit: "kmh"), "11.1")   // 6 × 1.852
-        XCTAssertEqual(formatSpeed(6.0, unit: "ms"), "3.1")     // 6 × 0.514444
+        let english = Locale(identifier: "en_US")
+        XCTAssertEqual(formatSpeed(6.0, unit: "kn", locale: english), "6.0")
+        XCTAssertEqual(formatSpeed(6.0, unit: "kmh", locale: english), "11.1")   // 6 × 1.852
+        XCTAssertEqual(formatSpeed(6.0, unit: "ms", locale: english), "3.1")     // 6 × 0.514444
         // Near-zero negatives lose their sign (web unsign), post-conversion.
-        XCTAssertEqual(formatSpeed(-0.02, unit: "kn"), "0.0")
-        XCTAssertEqual(formatSpeed(-0.02, unit: "kmh"), "0.0")
+        XCTAssertEqual(formatSpeed(-0.02, unit: "kn", locale: english), "0.0")
+        XCTAssertEqual(formatSpeed(-0.02, unit: "kmh", locale: english), "0.0")
         // An unknown value falls back to knots, like the web's default.
-        XCTAssertEqual(formatSpeed(2.5, unit: "furlongs"), "2.5")
+        XCTAssertEqual(formatSpeed(2.5, unit: "furlongs", locale: english), "2.5")
+    }
+
+    func testReadoutRoundingMatchesTheExistingHalfAwayFromZeroRule() {
+        let english = Locale(identifier: "en_US")
+        XCTAssertEqual(formatSpeed(-0.05, unit: "kn", locale: english), "-0.1")
+        XCTAssertEqual(formatNm(10.5 * 1.852, locale: english), "11 nm")
     }
 
     func testSpeedUnitLabels() {
@@ -24,12 +31,20 @@ final class UnitsAndGroupsTests: XCTestCase {
         XCTAssertEqual(speedUnitLabel("ms"), "m/s")
     }
 
+    func testReadoutNumbersUseLocaleDecimalSeparator() {
+        let french = Locale(identifier: "fr_FR")
+        XCTAssertEqual(formatHeight(1.5, imperial: false, locale: french), "1,50")
+        XCTAssertEqual(formatSpeed(6, unit: "kmh", locale: french), "11,1")
+        XCTAssertEqual(formatNm(2.2224, locale: french), "1,2 nm")
+    }
+
     /// The switch changes what a current card renders: same knots in, a
     /// different readout string per setting.
     func testSpeedUnitSwitchChangesReadout() {
         let knots = 3.4
-        let kn = "\(formatSpeed(knots, unit: "kn")) \(speedUnitLabel("kn"))"
-        let kmh = "\(formatSpeed(knots, unit: "kmh")) \(speedUnitLabel("kmh"))"
+        let english = Locale(identifier: "en_US")
+        let kn = "\(formatSpeed(knots, unit: "kn", locale: english)) \(speedUnitLabel("kn"))"
+        let kmh = "\(formatSpeed(knots, unit: "kmh", locale: english)) \(speedUnitLabel("kmh"))"
         XCTAssertEqual(kn, "3.4 kn")
         XCTAssertEqual(kmh, "6.3 km/h")
         XCTAssertNotEqual(kn, kmh)

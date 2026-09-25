@@ -1953,10 +1953,9 @@ struct MultiDaySchedule: View {
                                     Text(chartTime(e.time, tz))
                                         .font(.footnote.monospaced())
                                         .foregroundStyle(on ? .white : SN.foam.opacity(0.85))
-                                        // "7:03am" is a character shorter than
-                                        // "12:53pm": the floor keeps the values
-                                        // beside it in a column down the list.
+                                        // The floor keeps shorter localized clocks aligned in one column.
                                         .frame(minWidth: 58, alignment: .leading)
+                                        .accessibilityHidden(true)
                                     Spacer()
                                     Text(e.value ?? "—")
                                         .font(.subheadline.weight(.semibold).monospacedDigit())
@@ -1977,6 +1976,7 @@ struct MultiDaySchedule: View {
                                 .accessibilityElement(children: .combine)
                                 .accessibilityAddTraits(.isButton)
                                 .accessibilityIdentifier("schedule-row-d\(group.offset)")
+                                .accessibilityValue(chartTime(e.time, tz))
                                 if e.id != group.items.last?.id {
                                     Divider().overlay(Color.white.opacity(0.055))
                                 }

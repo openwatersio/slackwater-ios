@@ -238,7 +238,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // Boston's range is metres — the numbers are the station's own.
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty,
                        "no height readings on the Boston detail")
-        XCTAssertGreaterThanOrEqual(scheduleValues(app, "\\b\\d{1,2}:\\d{2}(?:am|pm)\\b").count, 3,
+        XCTAssertGreaterThanOrEqual(Set(scheduleRowClocks(app)).count, 3,
                                     "no schedule on the Boston detail")
         sleep(3)  // header map tiles: MLNMapView surfaces no load state to XCUITest
         save(app, "m53-us-station.png")
