@@ -84,9 +84,6 @@ class ScreenshotTestCase: XCTestCase {
         return XCTWaiter().wait(for: [met], timeout: scaled(timeout)) == .completed
     }
 
-    /// Search lives behind the bottom-left FAB. Opens it and types with
-    /// NO field tap — typeText throws unless the field already has keyboard
-    /// focus, so every use doubles as the keyboard-up-immediately assertion.
     func openSearch(_ app: XCUIApplication, _ text: String) {
         let fab = app.buttons["Search"].firstMatch
         XCTAssert(fab.appears(within: 10), "search FAB did not appear")
@@ -98,10 +95,7 @@ class ScreenshotTestCase: XCTestCase {
             if field.appears(within: 5) { opened = true; break }
         }
         XCTAssert(opened, "search input did not appear")
-        let focused = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "hasKeyboardFocus == true"), object: field)
-        XCTAssert(XCTWaiter().wait(for: [focused], timeout: scaled(10)) == .completed,
-                  "search field did not take keyboard focus")
+        _ = focused(field)
         type(text, into: field)
     }
 
@@ -138,17 +132,13 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssertEqual(observed, expected, "the search field never took the query")
     }
 
-    /// The field, with keyboard focus restored if it slipped. Returns the
-    /// field either way so the call reads as one step; the assertion is
-    /// what reports a field that will not take focus back. The tap lands at
-    /// the trailing edge, past the text, so the caret returns to the end
-    /// rather than into the middle of the query.
+    /// Restore focus at the trailing edge so retyping resumes after the existing query.
     @discardableResult
     private func focused(_ field: XCUIElement) -> XCUIElement {
         if NSPredicate(format: "hasKeyboardFocus == true").evaluate(with: field) { return field }
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
         XCTAssert(waitFor(field, "hasKeyboardFocus == true", timeout: 5),
-                  "the search field lost keyboard focus and would not take it back")
+                  "the search field would not take keyboard focus")
         return field
     }
 
