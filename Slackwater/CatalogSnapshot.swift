@@ -165,7 +165,7 @@ struct CatalogSnapshot {
     }
 
     private static func validConstituents(_ constituents: [Con]) -> Bool {
-        // This checks structure only. Before enabling remote activation, Neaps
+        // This checks structure only. Before enabling remote activation, SlackwaterKit
         // needs a public recognized-name lookup (it currently drops unknown names).
         !constituents.isEmpty && constituents.allSatisfy {
             !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

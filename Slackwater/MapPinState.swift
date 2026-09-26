@@ -3,7 +3,7 @@
 // stations inside the camera's box, thinned to one per grid cell, so the
 // app predicts water for what is on screen and nothing else.
 import Foundation
-import Neaps
+import SlackwaterKit
 
 /// The exact-search fallback's window: 13h clears a diurnal station's ~12.4h
 /// half-period, so it always finds the next turn. Only the minority of

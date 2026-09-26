@@ -2,7 +2,7 @@
 // event, current state, and today's render-ready curve. Pure function of
 // (station, now) — deterministic, offline, engine-only.
 import Foundation
-import Neaps
+import SlackwaterKit
 
 struct WidgetSnapshot: Equatable {
     enum CurveKind: Equatable { case tide, current, schematic }

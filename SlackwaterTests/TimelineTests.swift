@@ -5,7 +5,7 @@
 import SwiftUI
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
@@ -723,7 +723,7 @@ final class TimelineTests: XCTestCase {
         // Both arrays non-empty: pins that no case (true, true) exists to claim
         // it — resurrecting the deleted combined arm ahead of `case (true, _)`
         // would go uncaught otherwise. TidePoint has no public init outside
-        // Neaps, so the tide side is real data borrowed from the tide-only
+        // SlackwaterKit, so the tide side is real data borrowed from the tide-only
         // build above; only the current side is synthesized.
         let both = TimelineGeo(data: TimelineData(
             tz: tideData.tz, anchor: tideData.anchor, today: tideData.today, start: tideData.start, end: tideData.end,

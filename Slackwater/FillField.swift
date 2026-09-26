@@ -1,9 +1,9 @@
 // Slackwater — GPL v3. FillField provider (tools/fill-pipeline/README.md): loads
 // the committed fill bundle (tools/fill-pipeline/pack.py, format_version 1)
-// and evaluates each element's u/v at a given instant via Neaps's own
+// and evaluates each element's u/v at a given instant via SlackwaterKit's own
 // constituent machinery — the astronomical arguments (V0+u, nodal f) are
 // never re-derived here, only reconstructed HarmonicConstituents handed to
-// Neaps, same as every other station in this app (CurrentStation.swift's
+// SlackwaterKit, same as every other station in this app (CurrentStation.swift's
 // `engineStation`, `station.speeds(from:to:step:)`).
 //
 // Binary layout (little-endian, per element, offsets from the sidecar JSON
@@ -21,7 +21,7 @@
 // vended (nothing here re-synthesizes a masked/no-data cell).
 import CoreLocation
 import Foundation
-import Neaps
+import SlackwaterKit
 
 /// One fill cell: a triangle + the current there at the instant `cells(at:)`
 /// was asked about. Payload is deliberately just polygon+speed+bearing — the

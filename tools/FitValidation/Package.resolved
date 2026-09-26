@@ -1,12 +1,11 @@
 {
   "pins" : [
     {
-      "identity" : "neaps",
+      "identity" : "slackwater",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/openwatersio/neaps",
+      "location" : "https://github.com/openwatersio/slackwater",
       "state" : {
-        "revision" : "e75f6b6457fa21cb56e164f655493ea029572c34",
-        "version" : "1.0.0"
+        "revision" : "83e439b8c5d0997ae4b5fadef693efdf90637957"
       }
     }
   ],

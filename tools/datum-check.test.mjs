@@ -12,7 +12,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allStations } from "@neaps/tide-database";
+import { allStations } from "@slackwater/database";
 import { datumDeviation, passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
 
 const checkable = (s) =>

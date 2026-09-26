@@ -5,7 +5,7 @@
 // no fast answer here, only the real published numbers or an honest why-not).
 import SwiftUI
 import Combine
-import Neaps
+import SlackwaterKit
 
 struct OnlineGateDetailView: View {
     let gate: ChsCurrentGateInfo

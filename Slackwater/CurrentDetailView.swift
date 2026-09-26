@@ -2,7 +2,7 @@
 // beneath a fixed centerline, with a rolling schedule and paired tide link.
 // Product contract: docs/scrubber.md.
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 /// One schedule for every real-velocity current strip (harmonic or fetched
 /// official samples): slack rows bare, max rows with speed + set bearing.

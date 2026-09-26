@@ -6,7 +6,7 @@
 // and walks no accessibility tree (RenderProbes.swift).
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class DetailLeadTests: XCTestCase {
 

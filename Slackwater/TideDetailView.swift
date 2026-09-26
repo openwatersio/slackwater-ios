@@ -2,7 +2,7 @@
 // centerline and a rolling schedule anchored to the selected local week.
 // Product contract: docs/scrubber.md.
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 struct TideDetailView: View {
     let record: TideStationRecord

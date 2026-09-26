@@ -1,10 +1,10 @@
 // Slackwater — GPL v3. Validated CHS current gates (M47): bundled identity,
 // the flood-axis projection, and the fit→events math — a fitted model's
-// record drives Neaps's CurrentStation exactly like a bundled NOAA
+// record drives SlackwaterKit's CurrentStation exactly like a bundled NOAA
 // station (slacks at velocity zeros, maxima signed flood/ebb).
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class ChsCurrentGateTests: XCTestCase {
 

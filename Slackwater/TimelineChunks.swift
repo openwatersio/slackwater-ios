@@ -22,7 +22,7 @@
 import Almanac
 import Foundation
 import SwiftUI
-import Neaps
+import SlackwaterKit
 import UIKit
 
 // MARK: - What a chunk is built from

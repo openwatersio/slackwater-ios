@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. The workable sub-threshold window around a slack — shared by the timeline strip and the widget extension.
 import Foundation
-import Neaps
+import SlackwaterKit
 
 /// The boat-specific speed that defines a usable slack window. It is shared
 /// with the widget and map, and falls back safely when a stored value is bad.

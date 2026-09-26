@@ -3,7 +3,7 @@
 import XCTest
 import SwiftUI
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class WidgetSnapshotTests: XCTestCase {
     var friday: WidgetStation { WidgetStationLoader.load(id: TideStationRecord.fridayHarborID)! }

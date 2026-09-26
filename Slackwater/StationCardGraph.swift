@@ -1,5 +1,5 @@
 import SwiftUI
-import Neaps
+import SlackwaterKit
 
 /// The curve on a station card: one swing of history behind now and three
 /// ahead, tide height or signed current speed as a line, and a dot with

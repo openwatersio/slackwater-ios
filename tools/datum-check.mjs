@@ -17,7 +17,7 @@
  * the whole world bundle and it runs at build time. Cache it when a human is
  * waiting on it.
  */
-import { createTidePredictor } from "@neaps/tide-predictor";
+import { createTidePredictor } from "@slackwater/engine";
 
 /**
  * 0.30 m. Independently justified by the NOAA control alone: its noise floor

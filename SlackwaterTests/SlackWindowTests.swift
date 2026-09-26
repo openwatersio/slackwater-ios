@@ -2,7 +2,7 @@
 // interpolated sub-threshold span, clamping, and the no-window cases.
 import XCTest
 @testable import Slackwater
-import Neaps
+import SlackwaterKit
 
 final class SlackWindowTests: XCTestCase {
     /// Symmetric V through zero: -1 kn at t0, 0 at t0+600, +1 at t0+1200.

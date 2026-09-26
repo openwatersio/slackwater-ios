@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Widgets use only bundled or shared saved predictions;
 // the extension never fits stations or fetches from the network.
 import Foundation
-import Neaps
+import SlackwaterKit
 
 enum WidgetStation {
     case tide(any TidePredicting, tz: TimeZone, name: String)
