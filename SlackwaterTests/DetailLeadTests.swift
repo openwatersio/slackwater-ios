@@ -72,6 +72,36 @@ final class DetailLeadTests: XCTestCase {
         )
     }
 
+    func testEveryCommentaryEventUsesItsOwnSymbolAndFullSpokenLabel() throws {
+        let currentCases: [(scrub: Date, label: String, spoken: String, symbol: String)] = [
+            (at(-100), "Max flood", "Maximum flood current", "arrow.forward"),
+            (at(10), "Slack", "Slack current", "arrow.right.and.line.vertical.and.arrow.left"),
+            (at(3600), "Ebb", "Ebb current", "arrow.backward"),
+            (at(4300), "Max ebb", "Maximum ebb current", "arrow.backward"),
+            (at(9000), "Flood", "Flood current", "arrow.forward"),
+        ]
+
+        for expected in currentCases {
+            let stop = try XCTUnwrap(lead(scrub: expected.scrub).nextSignificant)
+            let content = commentaryContent(stop, from: expected.scrub,
+                                            locale: Locale(identifier: "en_US"))
+            XCTAssertEqual(stop.label, expected.label)
+            XCTAssertEqual(content.systemImage, expected.symbol, expected.label)
+            XCTAssertTrue(content.accessibilityLabel.hasPrefix("\(expected.spoken) in "),
+                          "\(expected.label) was spoken as '\(content.accessibilityLabel)'")
+        }
+
+        let day = TimelineDay(offset: 0, start: t0, sunrise: at(1000), sunset: at(2000),
+                              moonrise: nil, moonset: nil)
+        let sunrise = try XCTUnwrap(nextCommentaryStop(nil, sun: [day], after: t0))
+        let sunset = try XCTUnwrap(nextCommentaryStop(nil, sun: [day], after: at(1000)))
+
+        XCTAssertEqual(sunrise.systemImage, "sunrise")
+        XCTAssertEqual(sunset.systemImage, "sunset")
+        XCTAssertTrue(commentaryContent(sunrise, from: t0).accessibilityLabel.hasPrefix("Sunrise in "))
+        XCTAssertTrue(commentaryContent(sunset, from: at(1000)).accessibilityLabel.hasPrefix("Sunset in "))
+    }
+
     // MARK: - The stops a current lead walks
 
     /// A synthetic current day: a flood max, a slack with a window either side
@@ -185,7 +215,8 @@ final class DetailLeadTests: XCTestCase {
             CommentaryContent(
                 label: "~Max flood",
                 duration: "1m",
-                accessibilityLabel: "~Max flood in 1 minute"
+                systemImage: "arrow.forward",
+                accessibilityLabel: "~Maximum flood current in 1 minute"
             )
         )
     }
@@ -222,6 +253,7 @@ final class DetailLeadTests: XCTestCase {
             CommentaryContent(
                 label: "Sunset",
                 duration: "33m",
+                systemImage: "sunset",
                 accessibilityLabel: "Sunset in 33 minutes"
             )
         )
@@ -232,7 +264,8 @@ final class DetailLeadTests: XCTestCase {
             CommentaryContent(
                 label: "~Slack",
                 duration: "16m",
-                accessibilityLabel: "~Slack in 16 minutes"
+                systemImage: "arrow.right.and.line.vertical.and.arrow.left",
+                accessibilityLabel: "~Slack current in 16 minutes"
             )
         )
     }
