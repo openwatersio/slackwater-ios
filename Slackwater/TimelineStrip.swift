@@ -816,13 +816,12 @@ struct TimelineCanvas: View {
                         .foregroundStyle(SN.foam.opacity(0.48)),
                      at: CGPoint(x: labelX, y: geo.dayY + 17),
                      anchor: .center)
-            // Sun rise/set dots + "↑5:24AM" labels.
-            for (t, arrow) in [(day.sunrise, "↑"), (day.sunset, "↓")] {
+            for (t, systemImage) in [(day.sunrise, "sunrise"), (day.sunset, "sunset")] {
                 guard let t else { continue }
                 let x = data.x(t)
                 ctx.fill(Path(ellipseIn: CGRect(x: x - 3.5, y: geo.sunY - 3.5, width: 7, height: 7)),
                          with: .color(SN.sun))
-                ctx.draw(Text("\(arrow)\(cardTime(t, data.tz))")
+                ctx.draw((Text(Image(systemName: systemImage)) + Text(" \(cardTime(t, data.tz))"))
                             .font(.system(size: 11, weight: .medium).monospaced())
                             .foregroundStyle(SN.sunrise),
                          at: CGPoint(x: x, y: geo.dayY), anchor: .center)
@@ -1914,10 +1913,14 @@ struct MultiDaySchedule: View {
                             if let day = days.first(where: { $0.offset == group.offset }) {
                                 VStack(alignment: .leading, spacing: 1) {
                                     if let rise = day.sunrise {
-                                        Text("↑\(chartTime(rise, tz))").foregroundStyle(SN.sunrise)
+                                        (Text(Image(systemName: "sunrise")) + Text(" \(chartTime(rise, tz))"))
+                                            .foregroundStyle(SN.sunrise)
+                                            .accessibilityLabel("Sunrise \(chartTime(rise, tz))")
                                     }
                                     if let set = day.sunset {
-                                        Text("↓\(chartTime(set, tz))").foregroundStyle(SN.sunset)
+                                        (Text(Image(systemName: "sunset")) + Text(" \(chartTime(set, tz))"))
+                                            .foregroundStyle(SN.sunset)
+                                            .accessibilityLabel("Sunset \(chartTime(set, tz))")
                                     }
                                 }
                                 .font(.caption2.monospaced())

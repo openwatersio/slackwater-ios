@@ -171,7 +171,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         settleScrub(app)
         XCTAssertFalse(picker.exists, "a tap on the sunrise opened the picker")
         let sunrise = scrubClock(app)
-        XCTAssertTrue(sun.label.hasPrefix("↑\(sunrise)"),
+        XCTAssertTrue(sun.label.contains("Sunrise \(sunrise)"),
                       "the sunrise tap left the centerline on \(sunrise), outside '\(sun.label)' (noon was \(noon))")
         save(app, "strip-tap-sunrise.png")
     }
