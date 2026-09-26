@@ -38,9 +38,12 @@ packages:
   slackwater:
     # Exact-commit pin: the stack is in prerelease (slackwater#338 stage 4),
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
-    # at the deliberate 1.0.0 release.
+    # at the deliberate 1.0.0 release. Pinned to the rename merge, BELOW the
+    # engine's #341 (swift-harmonic-fit): with #341 the app never reaches
+    # XCUITest quiescence (UI-test wall clock 5x, snapshot timeouts). Advance
+    # the pin only after that regression is fixed upstream.
     url: https://github.com/openwatersio/slackwater
-    revision: 6021524a3f2c5f609cd41af645ebea4a0e135bf8
+    revision: 83e439b8c5d0997ae4b5fadef693efdf90637957
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
