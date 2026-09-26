@@ -54,6 +54,11 @@ enum AppGroup {
     /// chooser. The app folds it into the three nearest ids above.
     static let chosenStationsKey = "slackwater.chosenStations"
     static let premiumKey = "slackwater.premium"
+    /// How far out the CHS download queue is allowed to walk
+    /// (`DownloadTier`'s raw value). A preference, not a job: the manager's
+    /// switch has to still be on next launch, and an accepted tier has to
+    /// resume the work it started.
+    static let downloadTierKey = "slackwater.downloadTier"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
 
     private static let migratedKey = "slackwater.appgroup.migrated"

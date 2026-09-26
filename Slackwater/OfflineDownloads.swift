@@ -286,6 +286,7 @@ struct OfflineManagerList: View {
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
+                tierSection
                 summary
                 chartsCard
                 ForEach(downloads) { download in
@@ -300,6 +301,65 @@ struct OfflineManagerList: View {
         }
         .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
+    }
+
+    // MARK: Tiers
+
+    /// The tiers, and the only place a duration is allowed to appear: someone
+    /// who opened the manager came looking for the number, whereas the same
+    /// number on the list's strip is an invitation to sit and wait.
+    @ViewBuilder private var tierSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("In view").font(.headline)
+                Text("The stations on your list download on their own.")
+            }
+            .accessibilityIdentifier("download-tier-in-view")
+
+            if service.tier == .inView {
+                Button("Download \(service.remainingBeyondCohort) more within 25 km") {
+                    service.accept(.nearby)
+                }
+                .buttonStyle(.borderedProminent)
+                // Same reason as the list strip's Yes: untinted, this fills
+                // with the system accent and is the only blue on the screen.
+                // The explicit label colour matters for the same reason too —
+                // a prominent button's label inherits the surrounding
+                // foreground, so a leaf fill under a leaf label vanishes.
+                .tint(SN.leaf)
+                .foregroundStyle(SN.canvas)
+                .disabled(service.remainingBeyondCohort == 0)
+                .accessibilityIdentifier("download-tier-nearby-accept")
+            } else {
+                Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
+            }
+
+            Toggle(isOn: Binding(
+                get: { service.tier == .everything },
+                set: { on in service.accept(on ? .everything : .nearby) })) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // 150 km, not "Canadian stations" unqualified — this
+                        // stops at ChsFitService.autoFitRadiusKm same as the
+                        // unconstrained auto-fit; lifting that radius is a
+                        // separate change (DownloadTier.everything).
+                        Text("Keep downloading Canadian stations within 150 km")
+                        // No estimate and no percentage: 1,073 stations is
+                        // hours of requests and has no finish line to show.
+                        // The queue only ever grows (M53) — off stops MORE
+                        // stations from being added, not what is already
+                        // in flight, and the copy says so rather than
+                        // implying a pause that doesn't happen.
+                        Text("Adds more whenever Slackwater is open. Turning this off doesn't stop what's already downloading. \(service.queue.ready) so far.")
+                            .font(.footnote)
+                    }
+                }
+                .accessibilityIdentifier("download-tier-everything-toggle")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
     }
 
     // MARK: Summary
@@ -422,18 +482,13 @@ struct OfflineManagerList: View {
         if !net.online {
             return "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.\(onDemandLine)"
         }
-        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.\(onDemandLine)"
+        return "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice.\(onDemandLine)"
     }
 
     private var onDemandLine: String {
         let rest = service.notQueued
         guard rest > 0 else { return "" }
         return " \(rest) more Canadian stations are searchable everywhere — open one and it downloads."
-    }
-
-    private var remainingSeconds: Double {
-        queue.jobs.filter { $0.status == .pending || $0.status == .downloading }
-            .reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
     }
 
     private var allGates: [ChsJob] { service.gatesToDownload }
