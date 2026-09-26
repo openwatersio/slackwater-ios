@@ -801,7 +801,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             let bar = app.descendants(matching: .any)["week-range-bar"].firstMatch
             XCTAssert(bar.appears(within: 10), "no range bar on \(name)")
             XCTAssert(bar.label.contains("Sep 28"), "\(name)'s window did not move to the moment's day: \(bar.label)")
-            save(app, "moment-weeks-away-\(query).png")
             app.terminate()
         }
     }

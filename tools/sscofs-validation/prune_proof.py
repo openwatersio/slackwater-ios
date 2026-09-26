@@ -18,7 +18,7 @@ Consumes: corpus/*.npz, mesh/elements.json, certified/certified.json,
 samples/index.json + truth/stations.json (via certify.py's own
 station_verdicts/grade_elements -- re-imported, not re-derived, so the D=2/5
 km sensitivity sets use the exact same distance logic certified.json's D=3 km
-set came from), Slackwater/Resources/chs-bundle.js.
+set came from), tools/chs-reference/chs-bundle.js.
 
 Produces: certified/PRUNING.md.
 """
@@ -68,7 +68,7 @@ console.log(JSON.stringify(map));
 """
 
 
-def basis_speeds(bundle_path="../../Slackwater/Resources/chs-bundle.js"):
+def basis_speeds(bundle_path="../../tools/chs-reference/chs-bundle.js"):
     """Basis constituent angular speeds (deg/hour), sourced from the shipping
     bundle.
 

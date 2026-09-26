@@ -28,7 +28,7 @@ Anything meaning _a day_ goes through `Calendar` with its `timeZone` set. `addin
 
 ## Yearly tidal claims need an annual constituent
 
-Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@slackwater/database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `chs-glue.js`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
+Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station having a non-zero `SA` or `SSA`, never on whether it is CHS. The bundle encodes this already: `astronomicalBounds` in `tools/gen-tides.mjs` emits `latDatum`/`hatDatum` only where `@slackwater/database` publishes LAT/HAT, which it omits when Sa and Ssa are both zero. CHS on-device fits never have them (`tideFitDays` is 60 and separating Sa/Ssa needs 183; see `ChsFitter.basis`), and about a fifth of NOAA's harmonic references lack them too. Fortnightly and perigean claims hold everywhere.
 
 A subordinate's reduced LAT/HAT is the floor of a prediction, not a datum. It belongs in `latDatum`/`hatDatum`, never in `datums`, where tide-database's datum-ordering gate rejects it.
 
