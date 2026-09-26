@@ -1,6 +1,6 @@
 // Slackwater — GPL v3. Native fitting for tides and projected currents.
 import Foundation
-import Neaps
+import SlackwaterKit
 
 struct ChsFitResult: Decodable {
     let fitMs: Double
@@ -21,7 +21,7 @@ struct ChsFitter {
     func fit(samples: [ChsSample]) async throws -> ChsFitResult {
         let start = ContinuousClock.now
         do {
-            let result = try Neaps.fit(samples: samples.map {
+            let result = try SlackwaterKit.fit(samples: samples.map {
                 HarmonicSample(time: Date(timeIntervalSince1970: $0.t / 1000), value: $0.v)
             }, constituents: Self.basis)
             let elapsed = start.duration(to: .now).components
