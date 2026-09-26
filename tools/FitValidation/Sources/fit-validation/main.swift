@@ -2,8 +2,8 @@
 // held-out window, the M0 spike's methodology (15-min fit; 7-day validation
 // window 4 weeks after fit end; RMSE on the 15-min grid vs wlp; extreme timing
 // vs wlp-hilo, classified against a neighbour, matched by kind within 180 min).
-// Fit runs in JSCore via the app's committed chs-bundle.js + chs-glue.js;
-// prediction runs in SlackwaterKit — exactly the shipping path.
+// Fit runs in JSCore via tools/chs-reference's frozen JavaScript oracle;
+// prediction runs in SlackwaterKit. Native-fit parity and holdouts run in IwlsFixtureTests.
 //
 //   swift run fit-validation <name> <lat> <lon> [cacheDir]            # tide (wlp)
 //   swift run fit-validation --current <name> <lat> <lon> [cacheDir]  # current gate (wcsp1)
@@ -169,11 +169,11 @@ func fetchSeries(_ code: String, _ from: Date, _ to: Date) throws -> [(t: Double
 }
 let quarter = { (s: [(t: Double, v: Double)]) in s.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 } }
 
-// The app's exact JS artifacts (shared by both modes).
+// The JavaScript reference artifacts (shared by both modes).
 let resources = URL(fileURLWithPath: #filePath) // tools/FitValidation/Sources/fit-validation/main.swift
     .deletingLastPathComponent().deletingLastPathComponent()
     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    .appendingPathComponent("Slackwater/Resources")
+    .appendingPathComponent("tools/chs-reference")
 
 // MARK: - Current-gate mode (M47)
 
@@ -298,7 +298,7 @@ func runFileMode() throws -> Int32 {
         from: Data(contentsOf: URL(fileURLWithPath: samplesPath)))
     let projected: [(t: Double, v: Double)] = decoded.map { ($0.t, $0.v) }
     // chs-glue.js documents fitTides' contract as epoch-ms ("t: epoch-ms" —
-    // Slackwater/Resources/chs-glue.js:4), and every existing caller (fetchSeries,
+    // tools/chs-reference/chs-glue.js:4), and every existing caller (fetchSeries,
     // the current-mode IWLS fetch) hands ms. File-mode does NOT convert units —
     // it decodes t literally, matching what the parity check requires (replaying
     // an already-ms samples file must stay byte-identical). The trailing-60d
@@ -333,7 +333,7 @@ func runFit(name: String, flood: Double, ebb: Double,
             projected: [(t: Double, v: Double)], projected60: [(t: Double, v: Double)],
             observed: [Obs], valStart: Date, valEnd: Date,
             stationId: String, stationName: String, resolvedKm: Double) throws -> Int32 {
-    // The app's exact JS artifacts, same as the tide path.
+    // The JavaScript reference artifacts, same as the tide path.
     let ctx = JSContext()!
     var jsErr: String?
     ctx.exceptionHandler = { _, exc in jsErr = exc?.toString() }
@@ -443,7 +443,7 @@ let valSamples = quarter(try fetchSeries("wlp", valStart, valEnd))
 let hilo = try fetchSeries("wlp-hilo", valStart, valEnd)
 print("fit: \(fitSamples.count) pts (\(Int(longestWindow)) d @ 15 min), val: \(valSamples.count) pts, hilo: \(hilo.count) events")
 
-// --- the app's exact JS artifacts, loaded once and reused for every window ---
+// --- JavaScript reference artifacts, reused for every window ---
 let ctx = JSContext()!
 var jsError: String?
 ctx.exceptionHandler = { _, exc in jsError = exc?.toString() }

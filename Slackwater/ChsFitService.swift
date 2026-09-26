@@ -693,13 +693,13 @@ final class ChsFitService: ObservableObject {
         samples.sort { $0.t < $1.t }
         // IWLS advertises wlp on stations it serves no water for, and can retire
         // one after this build's bundle was minted. Say so, rather than handing
-        // the fitter nothing and reporting whatever JSCore makes of it.
+        // the fitter nothing.
         guard !samples.isEmpty else {
             throw ChsError.permanent("\(info.name): IWLS served no wlp samples over \(Int(Self.tideFitDays)) d")
         }
         let start = plan.last?.start ?? end
         let fit = try await fitter.fit(samples: samples)
-        print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms (interpreted, no JIT), rms \(String(format: "%.1f", fit.rms * 100)) cm")
+        print("CHS fit \(info.id): \(samples.count) samples, \(Int(fit.fitMs)) ms, rms \(String(format: "%.1f", fit.rms * 100)) cm")
         return ChsModel(
             stationID: info.id, iwlsID: station.id, iwlsName: station.officialName,
             fittedAt: .now, fitStartMs: start.timeIntervalSince1970 * 1000,
@@ -708,7 +708,7 @@ final class ChsFitService: ObservableObject {
     }
 
     /// wcsp1+wcdp1 over the gate's OWN validated window, projected onto the CHS
-    /// flood axis, fitted with the same JSCore path as the tides. Most gates
+    /// flood axis, fitted with the same native path as the tides. Most gates
     /// need 210 d — Rayleigh separation of K1/P1, which drive PNW diurnal
     /// inequality, needs ≥183 d — but four meet the full bar at 60 d and are
     /// final on their first fit (docs/validation/chs-currents.md).

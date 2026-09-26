@@ -82,6 +82,8 @@ So, structurally:
 - CHS data is **not to be used for navigation**; the app says so in Settings and
   marks *"Predictions — not for navigation"* on every detail footer.
 
+`ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. `ChsFitter.basis` preserves the validated 23 constituents and excludes SA/SSA from the 60-day fit. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
+
 ### This pattern does NOT generalise — the rule, and why
 
 Fetch-don't-bundle looks like a general answer to any restrictively licensed
@@ -185,7 +187,7 @@ IWLS publishes predictions at stations, not a gridded velocity field. Interpolat
 
 The app's current-field data has two sources:
 
-- The [fill pipeline](../tools/fill-pipeline/README.md) fits SSCOFS surface u/v independently and ships only certified speed-fill elements. A station passes when its best scoreable element has median peak-speed error ≤ 0.5 kn. Extrema below 0.75 kn are unscoreable. An element's nearest scoreable station must pass and lie within 3 km; a nearer failed station masks it. Record sensitivity at 2, 3, and 5 km. Final fits require R² ≥ 0.8 on both axes. The shipping JavaScript fitter decides survival; NumPy fits are prefilters and sizing estimates.
+- The [fill pipeline](../tools/fill-pipeline/README.md) fits SSCOFS surface u/v independently and ships only certified speed-fill elements. A station passes when its best scoreable element has median peak-speed error ≤ 0.5 kn. Extrema below 0.75 kn are unscoreable. An element's nearest scoreable station must pass and lie within 3 km; a nearer failed station masks it. Record sensitivity at 2, 3, and 5 km. Final fits require R² ≥ 0.8 on both axes. The JavaScript reference fitter decides survival; NumPy fits are prefilters and sizing estimates.
 - The [patch pipeline](../tools/patch-pipeline/README.md) uses bathymetric cross-sections and a validated station to bound a local speed-and-direction field. Its committed [certification record](../tools/patch-pipeline/passes/CERTIFICATION.md) records retained geometry and rejected passes. Patch magnitude is depth-averaged and subject to the documented placement, datum, and phase limitations.
 
 Both provide speed context. Slack timing and transitability belong to the station prediction and its validated windows. The field ramp contains no green. Missing or rejected elements remain absent, never calm, and interpolation must not paint across certification boundaries. Keep raw-source and derived-bundle provenance with the generated resources; a model refit is a release decision.

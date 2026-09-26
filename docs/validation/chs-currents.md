@@ -4,7 +4,7 @@ This record supports the gate admission and provisional-fit rules in [the CHS da
 
 ## Method and acceptance criteria
 
-Run `tools/FitValidation` with `--current` for a gate. It resolves the nearest IWLS station with `wcsp1` within 3 km, fetches speed and direction, and projects signed velocity onto the metadata flood axis. The committed `chs-bundle.js` and `chs-glue.js` fit the series in JavaScriptCore; the app's current engine synthesizes slacks and maxima. Score against held-out CHS `wcp1-events` 28–35 days ahead. Compare both 210-day and trailing 60-day fits from the same fetch.
+Run `tools/FitValidation` with `--current` for a gate. It resolves the nearest IWLS station with `wcsp1` within 3 km, fetches speed and direction, and projects signed velocity onto the metadata flood axis. The frozen artifacts in `tools/chs-reference` fit the series in JavaScriptCore; the app's current engine synthesizes slacks and maxima. Score against held-out CHS `wcp1-events` 28–35 days ahead. Compare both 210-day and trailing 60-day fits from the same fetch. The app fits natively through Neaps with per-sample astronomy; `IwlsFixtureTests` checks coefficient parity with `@slackwater/engine`, held-out Victoria and Dodd error limits, and no holdout RMS regression above 0.001 input units against the frozen CHS fit.
 
 | Quantity | Acceptance bar |
 |---|---|

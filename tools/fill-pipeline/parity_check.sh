@@ -87,8 +87,8 @@ const { createHash } = require("crypto");
 const { readFileSync, writeFileSync } = require("fs");
 const hash = (p) => createHash("sha256").update(readFileSync(p, "utf8")).digest("hex");
 writeFileSync("data/.parity-ok", JSON.stringify({
-  "chs-bundle.js": hash("../../Slackwater/Resources/chs-bundle.js"),
-  "chs-glue.js": hash("../../Slackwater/Resources/chs-glue.js"),
+  "chs-bundle.js": hash("../../tools/chs-reference/chs-bundle.js"),
+  "chs-glue.js": hash("../../tools/chs-reference/chs-glue.js"),
 }, null, 2) + "\n");
 '
 echo "parity_check.sh: wrote data/.parity-ok (sha256 of both artifacts)"
