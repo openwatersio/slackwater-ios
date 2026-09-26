@@ -115,7 +115,7 @@ jobs:
         working-directory: tools
 
       - name: Fixture tooling
-        run: node --test scripts/iwls-fixtures.test.mjs
+        run: node --test scripts/iwls-fixtures.test.mjs scripts/appstore.test.mjs
 
       # gen-chs-stations.mjs is the only generator that needs the network (the
       # DFO IWLS API), so it stays out of CI and its artefact is trusted as
