@@ -1622,19 +1622,23 @@ final class RecentsStore: ObservableObject {
     var lastOpened: StationItem? { items.first }
 }
 
-/// The station picked in the matching-station chooser, one per series and
-/// name. The list shows it in place of the nearest namesake (`RankedStations`),
-/// and the widget's nearest-station ids resolve to it
-/// (`LocationService.cacheNearestWidgetStation`). The App Group copy is this
-/// device's truth; iCloud carries picks between devices.
+/// The stations picked in the matching-station chooser. The list shows a pick
+/// in place of the nearest namesake (`RankedStations`), and the widget's
+/// nearest-station ids resolve to it (`LocationService.cacheNearestWidgetStation`).
+/// The App Group copy is this device's truth; iCloud carries picks between devices.
+///
+/// A pick is a station id, not a place: a place is a series and a name, and a
+/// name is the database's to change between catalog releases. Keyed by name,
+/// a pick was orphaned by every rename; as an id it survives them, and the
+/// group it answers for is found again from the id at read time.
 final class ChosenStationsStore: ObservableObject {
     static let shared = ChosenStationsStore()
     static let cloudPrefix = "slackwater.pick."
 
-    @Published private(set) var ids: [String: String]
+    @Published private(set) var ids: Set<String>
 
     private init() {
-        ids = AppGroup.defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
+        ids = Self.load(AppGroup.defaults)
         // Nil under both kinds of test, like favourites (FavoritesCloud.store).
         guard let cloud = FavoritesCloud.store else { return }
         NotificationCenter.default.addObserver(
@@ -1643,6 +1647,29 @@ final class ChosenStationsStore: ObservableObject {
         ) { [weak self] _ in MainActor.assumeIsolated { self?.adopt(cloud) } }
         cloud.synchronize()
         MainActor.assumeIsolated { self.adopt(cloud) }
+    }
+
+    /// The picks on disk. Builds before the catalog could rename a station
+    /// kept them as place key → id; the values are the ids, so that shape is
+    /// read as-is and written back as the array on the next change.
+    static func load(_ defaults: UserDefaults) -> Set<String> {
+        if let ids = defaults.stringArray(forKey: AppGroup.chosenStationsKey) { return Set(ids) }
+        let legacy = defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
+        return Set(legacy.values)
+    }
+
+    /// The pick that answers for a group of namesakes, nearest first: the
+    /// first member chosen. Two can be chosen at once only after a rename
+    /// merged two places, and the nearer is what the chooser would show anyway.
+    static func chosen(in group: [StationItem], from ids: Set<String>) -> StationItem? {
+        group.first { ids.contains($0.id) }
+    }
+
+    /// `ids` with `item` picked for its place: the other members of the place
+    /// leave, so a pick stays one per place under the names of the day.
+    static func choosing(_ item: StationItem, in ids: Set<String>) -> Set<String> {
+        let place = Set((StationItem.byPlace[item.placeKey] ?? [item]).map(\.id))
+        return ids.subtracting(place).union([item.id])
     }
 
     /// One KVS key per place, so two devices picking for the same place
@@ -1655,39 +1682,52 @@ final class ChosenStationsStore: ObservableObject {
         return cloudPrefix + String(hash, radix: 16)
     }
 
-    /// Place key → chosen id, out of `dictionaryRepresentation`. The place
-    /// comes from the id, and a pick for a station no longer bundled drops out.
-    static func picks(_ raw: [String: Any]) -> [String: String] {
-        var out: [String: String] = [:]
+    /// The picked ids, out of `dictionaryRepresentation`. The key is only a
+    /// collision slot; a pick for a station no longer bundled drops out.
+    static func picks(_ raw: [String: Any]) -> Set<String> {
+        var out = Set<String>()
         for (key, value) in raw where key.hasPrefix(cloudPrefix) {
-            guard let id = value as? String, let item = StationItem.byId[id] else { continue }
-            out[item.placeKey] = id
+            guard let id = value as? String, StationItem.byId[id] != nil else { continue }
+            out.insert(id)
         }
         return out
     }
 
     @MainActor func choose(_ item: StationItem) {
-        guard ids[item.placeKey] != item.id else { return }
-        FavoritesCloud.store?.set(item.id, forKey: Self.cloudKey(item.placeKey))
-        var next = ids
-        next[item.placeKey] = item.id
+        guard !ids.contains(item.id) else { return }
+        if let cloud = FavoritesCloud.store {
+            // A pick the cloud holds for another member of this place, under
+            // whatever name it had when it was made, would read back beside
+            // this one; it is the pick this one replaces.
+            let place = Set((StationItem.byPlace[item.placeKey] ?? []).map(\.id))
+            for (key, value) in cloud.dictionaryRepresentation
+            where key.hasPrefix(Self.cloudPrefix) && place.contains(value as? String ?? "") {
+                cloud.removeObject(forKey: key)
+            }
+            cloud.set(item.id, forKey: Self.cloudKey(item.placeKey))
+        }
+        apply(Self.choosing(item, in: ids))
+    }
+
+    /// The cloud's picks win their places. A pick only this device has, for a
+    /// place the cloud has none for, is written up — how picks made before
+    /// iCloud reach it.
+    @MainActor private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
+        let picks = Self.picks(cloud.dictionaryRepresentation)
+        let cloudPlaces = Set(picks.compactMap { StationItem.byId[$0]?.placeKey })
+        var next = picks
+        for id in ids where !picks.contains(id) {
+            guard let item = StationItem.byId[id], !cloudPlaces.contains(item.placeKey) else { continue }
+            cloud.set(id, forKey: Self.cloudKey(item.placeKey))
+            next.insert(id)
+        }
         apply(next)
     }
 
-    /// The cloud's picks win their places. A place only this device has a
-    /// pick for is written up — how picks made before iCloud reach it.
-    @MainActor private func adopt(_ cloud: NSUbiquitousKeyValueStore) {
-        let picks = Self.picks(cloud.dictionaryRepresentation)
-        for (place, id) in ids where picks[place] == nil {
-            cloud.set(id, forKey: Self.cloudKey(place))
-        }
-        apply(ids.merging(picks) { _, fromCloud in fromCloud })
-    }
-
-    @MainActor private func apply(_ next: [String: String]) {
+    @MainActor private func apply(_ next: Set<String>) {
         guard next != ids else { return }
         ids = next
-        AppGroup.defaults.set(ids, forKey: AppGroup.chosenStationsKey)
+        AppGroup.defaults.set(Array(ids).sorted(), forKey: AppGroup.chosenStationsKey)
         // Without a fix the widget ids catch up on the next one.
         let loc = LocationService.shared
         if loc.authorized, let c = loc.location?.coordinate,
@@ -1891,14 +1931,14 @@ struct StationGroups {
     let shownIds: [String]
 
     /// `ranked` is the catalog sorted nearest-first, so the first station of a
-    /// name is the nearest one — the one shown, unless `chosen` (placeKey → id,
-    /// `ChosenStationsStore`) names another station of that place.
-    init(ranked: [StationItem], chosen: [String: String] = [:]) {
+    /// name is the nearest one — the one shown, unless `chosen` (station ids,
+    /// `ChosenStationsStore`) holds another station of that place.
+    init(ranked: [StationItem], chosen: Set<String> = []) {
         var byName: [String: [StationItem]] = [:]
         for item in ranked { byName[item.placeKey, default: []].append(item) }
         self.byName = byName
         let shownForPlace = byName.mapValues { group in
-            group.first { $0.id == chosen[group[0].placeKey] }?.id ?? group[0].id
+            (ChosenStationsStore.chosen(in: group, from: chosen) ?? group[0]).id
         }
         let canonical = Dictionary(ranked.map { ($0.id, shownForPlace[$0.placeKey] ?? $0.id) },
                                    uniquingKeysWith: { first, _ in first })
@@ -1936,7 +1976,7 @@ enum RankedStations {
     private static var key = ""
     private static var ranked: [StationItem] = []
     private static var groups = StationGroups(ranked: [])
-    private static var chosen: [String: String] = [:]
+    private static var chosen: Set<String> = []
 
     /// A chooser pick regroups without re-sorting: the order depends on the fix alone.
     static func near(lat: Double, lon: Double) -> (ranked: [StationItem], groups: StationGroups) {

@@ -152,29 +152,56 @@ final class UnitsAndGroupsTests: XCTestCase {
         let ranked = StationItem.rankedByDistance(StationItem.all, lat: firstRunFix.lat, lon: firstRunFix.lon)
         let discovery = ranked.filter { $0.name == "Discovery Island" }
         let far = discovery[2]
-        let places = StationGroups(ranked: ranked, chosen: [far.placeKey: far.id])
+        let places = StationGroups(ranked: ranked, chosen: [far.id])
         XCTAssertEqual(places.shown(discovery[0].id), far.id)
         XCTAssertEqual(places.collapse(discovery.map(\.id)), [far.id])
         XCTAssert(places.shownIds.contains(far.id))
         XCTAssertFalse(places.shownIds.contains(discovery[0].id))
         XCTAssertEqual(places.matches(discovery[0]).map(\.id), discovery.map(\.id))
 
-        let stale = StationGroups(ranked: ranked, chosen: [far.placeKey: "noaa/gone"])
+        let stale = StationGroups(ranked: ranked, chosen: ["noaa/gone"])
         XCTAssertEqual(stale.shown(far.id), discovery[0].id, "a pick that left the bundle falls back to the nearest")
     }
 
     /// iCloud carries one key per place: every key fits the 64-byte limit, and
-    /// a pick reads back to its place through the id it holds.
-    func testCloudPicksFitTheKeyLimitAndReadBackByPlace() {
+    /// a pick reads back as the id it holds, whatever its key was named for.
+    func testCloudPicksFitTheKeyLimitAndReadBackById() {
         let longest = StationItem.all.map { ChosenStationsStore.cloudKey($0.placeKey).utf8.count }.max() ?? 0
         XCTAssertLessThanOrEqual(longest, 64)
         let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
         let raw: [String: Any] = [
             ChosenStationsStore.cloudKey(discovery[0].placeKey): discovery[1].id,
+            ChosenStationsStore.cloudKey("tide|A Name The Catalog No Longer Uses"): discovery[2].id,
             ChosenStationsStore.cloudPrefix + "stale": "noaa/gone",
             "slackwater.fav.x": 1.0,
         ]
-        XCTAssertEqual(ChosenStationsStore.picks(raw), [discovery[0].placeKey: discovery[1].id])
+        XCTAssertEqual(ChosenStationsStore.picks(raw), [discovery[1].id, discovery[2].id])
+    }
+
+    /// A pick is a station id. Builds before the catalog could rename a
+    /// station kept it under the station's name; those read back by their
+    /// values, so a rename in the catalog cannot orphan them.
+    func testPicksSurviveTheNameTheyWereKeyedBy() throws {
+        let d = UserDefaults(suiteName: #function)!
+        defer { d.removePersistentDomain(forName: #function) }
+        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
+        d.set(["current|Discovery Island, before its rename": discovery[1].id], forKey: AppGroup.chosenStationsKey)
+        XCTAssertEqual(ChosenStationsStore.load(d), [discovery[1].id])
+        d.set([discovery[2].id], forKey: AppGroup.chosenStationsKey)
+        XCTAssertEqual(ChosenStationsStore.load(d), [discovery[2].id])
+    }
+
+    /// Choosing a namesake replaces the pick for its place and leaves every
+    /// other place's pick alone; a group answers with its nearest chosen member.
+    func testChoosingReplacesThePlacesPickOnly() throws {
+        let discovery = StationItem.all.filter { $0.name == "Discovery Island" }
+        let sierra = try XCTUnwrap(StationItem.all.first { $0.name == "Sierra Point" })
+        let before: Set<String> = [discovery[1].id, sierra.id]
+        let after = ChosenStationsStore.choosing(discovery[2], in: before)
+        XCTAssertEqual(after, [discovery[2].id, sierra.id])
+        let ranked = StationItem.rankedByDistance(discovery, lat: firstRunFix.lat, lon: firstRunFix.lon)
+        XCTAssertEqual(ChosenStationsStore.chosen(in: ranked, from: after)?.id, discovery[2].id)
+        XCTAssertNil(ChosenStationsStore.chosen(in: ranked, from: [sierra.id]))
     }
 
     /// A chooser row names where its station sits, not just how far it is.
