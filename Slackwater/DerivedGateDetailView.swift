@@ -31,7 +31,7 @@ struct DerivedGateDetailView: View {
     /// The stop the pill names and its tap walks to: the next slack, or the
     /// sun's next rise or set when that comes first.
     private var nextStop: CommentaryStop? {
-        nextCommentaryStop(nextSlack.map { CommentaryStop(time: $0.time, label: "Slack") },
+        nextCommentaryStop(nextSlack.map { commentaryEventStop("Slack", at: $0.time) },
                            sun: timeline?.days ?? [], after: scrubTime)
     }
 

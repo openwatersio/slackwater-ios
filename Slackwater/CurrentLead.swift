@@ -58,7 +58,7 @@ struct CurrentLead: View {
         // so it goes on here rather than in `commentary`.
         let water = stops.filter { $0.time > scrubTime.addingTimeInterval(1) }
             .min { $0.time < $1.time }
-            .map { CommentaryStop(time: $0.time, label: "\(tilde)\($0.text)") }
+            .map { commentaryEventStop($0.text, at: $0.time, prefix: tilde) }
         return nextCommentaryStop(water, sun: timeline.days, after: scrubTime)
     }
 
