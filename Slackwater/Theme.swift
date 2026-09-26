@@ -675,6 +675,25 @@ struct CommentaryContent: Equatable {
     let accessibilityLabel: String
 }
 
+func commentaryEventStop(_ label: String, at time: Date,
+                         prefix: String = "") -> CommentaryStop {
+    let spoken: String
+    let systemImage: String
+    switch label {
+    case "Sunrise": (spoken, systemImage) = ("Sunrise", "sunrise")
+    case "Sunset": (spoken, systemImage) = ("Sunset", "sunset")
+    case "Slack": (spoken, systemImage) = ("Slack current", "arrow.right.and.line.vertical.and.arrow.left")
+    case "Flood": (spoken, systemImage) = ("Flood current", "arrow.forward")
+    case "Ebb": (spoken, systemImage) = ("Ebb current", "arrow.backward")
+    case "Max flood": (spoken, systemImage) = ("Maximum flood current", "arrow.forward")
+    case "Max ebb": (spoken, systemImage) = ("Maximum ebb current", "arrow.backward")
+    default: return CommentaryStop(time: time, label: prefix + label)
+    }
+    return CommentaryStop(time: time, label: prefix + label,
+                          spokenLabel: prefix + spoken,
+                          systemImage: systemImage)
+}
+
 func commentaryContent(_ stop: CommentaryStop, from scrub: Date,
                        locale: Locale = .autoupdatingCurrent) -> CommentaryContent {
     let formatter = DateComponentsFormatter()
@@ -703,7 +722,7 @@ func nextCommentaryStop(_ water: CommentaryStop?,
     let cutoff = scrub.addingTimeInterval(1)
     let sun = days
         .flatMap { [($0.sunrise, "Sunrise"), ($0.sunset, "Sunset")] }
-        .compactMap { time, word in time.map { CommentaryStop(time: $0, label: word) } }
+        .compactMap { time, word in time.map { commentaryEventStop(word, at: $0) } }
     return (sun + [water].compactMap { $0 })
         .filter { $0.time > cutoff }
         .min { $0.time < $1.time }
