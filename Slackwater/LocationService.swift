@@ -144,13 +144,13 @@ extension LocationService {
             case .current: if current == nil || km < current!.km { current = (km, item) }
             }
         }
-        let chosen = defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
+        let chosen = ChosenStationsStore.load(defaults)
         var changed = false
         for (nearest, key) in [(any, AppGroup.currentLocationStationKey),
                                (tide, AppGroup.nearestTideStationKey),
                                (current, AppGroup.nearestCurrentStationKey)] {
             guard let item = nearest?.item else { continue }
-            let id = chosen[item.placeKey].flatMap { StationItem.byId[$0]?.id } ?? item.id
+            let id = ChosenStationsStore.chosen(in: StationItem.byPlace[item.placeKey] ?? [], from: chosen)?.id ?? item.id
             guard defaults.string(forKey: key) != id else { continue }
             defaults.set(id, forKey: key)
             changed = true
