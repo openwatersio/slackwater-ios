@@ -637,11 +637,8 @@ struct StationListView: View {
         // detail — drop it. On iPhone the push dismisses it anyway.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                         to: nil, from: nil, for: nil)
-        // Built whole, then assigned once. Callers mutate other state in the
-        // same gesture (the map preview sets `mapPreview` and `showMap`), and a
-        // reset-then-append coalesced into one update can leave the stack
-        // holding the empty path: the preview dismissed with nothing pushed
-        // (#448).
+        // One mutation, not a reset followed by an append: the stack never
+        // observes an intermediate empty path.
         var next = NavigationPath()
         switch item {
         case .tide(let s): next.append(NoaaRoute.tide(s))
