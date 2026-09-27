@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { stationsById } from "@slackwater/database";
 import { here } from "./bundle.mjs";
 
 const stations = JSON.parse(
@@ -25,6 +26,45 @@ test("Point Bonita ships as a subordinate of a bundled reference", () => {
   assert.ok(bonita, "noaa/PCT0236 is not in the bundle");
   assert.equal(bonita.reference, "noaa/SFB1201");
   assert.deepEqual(OFFSETS.map((k) => bonita[k]), [-4080, -5280, -3840, -5100, 0.3, 0.5]);
+});
+
+test("Pollock Rip Channel ships NOAA's own axis, mean flow and M2", () => {
+  const pollock = stations.find((s) => s.id === "noaa/ACT1616");
+  assert.ok(pollock, "noaa/ACT1616 is not in the bundle");
+  assert.deepEqual([pollock.floodDirection, pollock.ebbDirection, pollock.meanFlow], [37, 217, 0.15]);
+  assert.deepEqual(pollock.constituents.find((k) => k.name === "M2"),
+    { name: "M2", amplitude: 1.818, phase: 322.3 });
+});
+
+// The database stores float32; the bundle ships NOAA's three decimals.
+const near = (a, b) => Math.abs(a - b) < 5e-4;
+
+test("every station carries its database record's fields, in the engine's units", () => {
+  for (const s of stations) {
+    const record = stationsById.get(s.id);
+    const c = record?.current;
+    assert.ok(c, `${s.id} is not a current station in the database`);
+    assert.ok(near(s.floodDirection, c.flood_direction), `${s.id} flood direction`);
+    assert.ok(near(s.ebbDirection, c.ebb_direction), `${s.id} ebb direction`);
+    assert.ok(near(s.meanFlow, c.mean_flow ?? 0), `${s.id} mean flow`);
+    if (s.reference) {
+      const o = c.offsets;
+      assert.equal(s.reference, o.reference);
+      // Minutes in the database; SlackwaterKit's SubordinateStation takes seconds.
+      assert.deepEqual(OFFSETS.slice(0, 4).map((k) => s[k]),
+        [o.slack_before_flood, o.slack_before_ebb, o.flood_time, o.ebb_time].map((m) => m * 60), s.id);
+      assert.ok(near(s.floodSpeedRatio, o.flood_speed_ratio), `${s.id} flood ratio`);
+      assert.ok(near(s.ebbSpeedRatio, o.ebb_speed_ratio), `${s.id} ebb ratio`);
+    } else {
+      const source = record.harmonic_constituents.filter((k) => k.amplitude > 0);
+      assert.equal(s.constituents.length, source.length, `${s.id} constituent count`);
+      for (const k of source) {
+        const shipped = s.constituents.find((x) => x.name === k.name);
+        assert.ok(shipped && near(shipped.amplitude, k.amplitude) && near(shipped.phase, k.phase),
+          `${s.id} ${k.name}`);
+      }
+    }
+  }
 });
 
 test("every subordinate's reference ships in the bundle", () => {

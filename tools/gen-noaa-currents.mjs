@@ -1,11 +1,12 @@
 /**
  * Generate Resources/currents.json — every bundled NOAA tidal-current station.
  *
- * Source: data/noaa-currents.json, the national extract vendored from
- * @openwaters/noaa-current-stations (its `currents.json`; the package ships
- * the extractor and schema on npm but not the data, so it is vendored here the
- * same way slackwater-web vendors its Salish subset — see that repo's README to
- * re-extract). NOAA CO-OPS data is public domain.
+ * Source: the NOAA current records in @slackwater/database, the same release
+ * gen-tides.mjs reads. The database's own source workspace extracts them from
+ * NOAA CO-OPS (public domain), keeps the reviewed bundle, and asserts the
+ * cross-flow bound there: every station here is modelled as one signed speed
+ * along a fixed flood axis, and a station whose perpendicular flow exceeds
+ * half its axis peak is refused at extraction, not here.
  *
  * Filters, all inherited from slackwater-web's build-currents.mjs, all still
  * load-bearing:
@@ -19,8 +20,6 @@
  *      a reference-only record: `referenceOnly: true`, harmonic shape, named
  *      for its surface station, no slug. The app never lists it.
  *   3. At least one non-zero constituent; zero-amplitude ones are dropped.
- * A fourth guard is not a filter: the extract's crossFlow census bounds how much
- * perpendicular flow this 1-D model drops. See the CROSS-FLOW note below.
  * The web's fourth filter — a Salish bounding box — is gone: national IS the
  * scope now, and the extract is US waters throughout.
  *
@@ -57,11 +56,49 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { here, placesResolver, byNameThenId, undangle, writeBundle } from "./bundle.mjs";
+import { allStations } from "@slackwater/database";
+import { here, placesResolver, byNameThenId, undangle, round3, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
-const bundle = JSON.parse(readFileSync(join(here, "..", "data", "noaa-currents.json"), "utf8"));
+const NOAA = "noaa/";
+const MINUTE = 60;
+
+/**
+ * A database record in the extract's own shape, so the filters below read as
+ * NOAA describes a station. The database splits a name into the place and
+ * the water ("Eastport" / "Friar Roads"); joined back, resolve() names it the
+ * way it names a tide station. Its offsets are minutes; the engine's
+ * SubordinateStation takes seconds.
+ */
+function fromDatabase(s) {
+  const c = s.current ?? {};
+  const o = c.offsets;
+  return {
+    id: s.id.slice(NOAA.length),
+    name: s.context && !s.context_derived ? `${s.name}, ${s.context}` : s.name,
+    type: o ? "subordinate" : "harmonic",
+    latitude: s.latitude,
+    longitude: s.longitude,
+    floodDirection: c.flood_direction == null ? null : round3(c.flood_direction),
+    ebbDirection: c.ebb_direction == null ? null : round3(c.ebb_direction),
+    offset: c.mean_flow == null ? undefined : round3(c.mean_flow),
+    constituents: (s.harmonic_constituents ?? [])
+      .map((k) => ({ name: k.name, amplitude: round3(k.amplitude), phase: round3(k.phase) })),
+    ...(o && {
+      reference: o.reference.slice(NOAA.length),
+      slackBeforeFloodOffset: o.slack_before_flood * MINUTE,
+      slackBeforeEbbOffset: o.slack_before_ebb * MINUTE,
+      floodTimeOffset: o.flood_time * MINUTE,
+      ebbTimeOffset: o.ebb_time * MINUTE,
+      floodSpeedRatio: round3(o.flood_speed_ratio),
+      ebbSpeedRatio: round3(o.ebb_speed_ratio),
+    }),
+  };
+}
+const bundle = {
+  stations: allStations.filter((s) => s.kind === "current" && s.id.startsWith(NOAA)).map(fromDatabase),
+};
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
 const resolve = placesResolver();
 
@@ -175,29 +212,6 @@ if (worstNeighbour > REGION_SANITY_KM) {
     "station — its region line would be a guess; check the extract's extent");
 }
 
-// CROSS-FLOW. Every station here is modelled as one signed speed along a fixed
-// flood axis. NOAA also publishes the flow PERPENDICULAR to that axis, which
-// runs at all times including slack, and the extract summarises it in a
-// bundle-level census (@openwaters/noaa-current-stations >= 0.4.0). None of it
-// is shipped per station — bundling the minor axis was measured and rejected in
-// #102 (worth a median 4% of peak, and a 2D magnitude never crosses zero, so
-// slack detection silently returns nothing). We re-assert the bound here so a
-// re-vendor that drifts is caught by `build:data` rather than by a reader.
-// Source of truth for the number is that package's CROSS_FLOW_RATIO_MAX;
-// duplicated rather than adding an npm dep for one constant.
-const CROSS_FLOW_RATIO_MAX = 0.5;
-const cf = bundle.crossFlow;
-if (!cf?.worstRatio) {
-  throw new Error("the vendored extract carries no crossFlow census — re-vendor from " +
-    "noaa-current-stations >= 0.4.0 (gh release download v0.4.0 --repo openwatersio/" +
-    "noaa-current-stations --pattern currents.json --output data/noaa-currents.json)");
-}
-if (cf.worstRatio.ratio > CROSS_FLOW_RATIO_MAX) {
-  throw new Error(`cross-flow ratio ${cf.worstRatio.ratio} at ${cf.worstRatio.id} exceeds ` +
-    `${CROSS_FLOW_RATIO_MAX} — the flood axis no longer describes that station, so the ` +
-    "1-D model we ship for it is suspect; refusing to ship");
-}
-
 const size = writeBundle(join(res, "currents.json"), stations);
 const subordinateCount = stations.filter((s) => s.reference).length;
 const referenceOnlyCount = stations.filter((s) => s.referenceOnly).length;
@@ -208,7 +222,3 @@ console.log(
   `${orphaned} orphaned and ${undirected} direction-less subordinates dropped), ${size}; ` +
   `${curated} curated + ${paired} proximity-paired (<= ${PAIR_KM} km); ` +
   `farthest tide gauge for a region line: ${worstNeighbour.toFixed(0)} km`);
-console.log(
-  `  cross-flow: worst ratio ${cf.worstRatio.ratio} at ${cf.worstRatio.id}, ` +
-  `worst ${cf.worstAbsolute.crossFlow} kn at ${cf.worstAbsolute.id} ` +
-  `(${cf.gte0_25kn} of ${cf.records} records >= 0.25 kn) — not shipped, measured only`);
