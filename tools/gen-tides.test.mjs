@@ -115,19 +115,16 @@ test("every station has a region line and a usable model", () => {
 test("no bundled Canadian station duplicates a CHS station", () => {
   const chs = JSON.parse(readFileSync(
     join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
-  // The province code either IS the region line or ends it — "BC" and
-  // "Sidney, BC" are both Canadian. Matching only the bare code quietly
-  // shrank this check to 25 stations the day nearest-town labels landed, which
-  // is the wrong way for a duplicate-detector to fail. Read from the shipped
-  // file rather than the generator's own bookkeeping, deliberately: that is
-  // what makes this an independent check and not a restatement.
-  const ca = stations.filter((s) =>
-    /(^|,\s)(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NT|NU)$/.test(s.region));
+  // Canadian by the database's country, not by the region line, which may name
+  // the water rather than the province, nor by the "-can-" in a TICON id, which
+  // is the operating agency's: MEDS runs Patos Island, in Washington. Read the
+  // shipped file rather than the generator's own bookkeeping, deliberately:
+  // that is what makes this an independent check and not a restatement.
   // NOAA rows are exempt: their datums are adopted, and Hyder was already
   // shipping when CHS gauges Stewart 1.3 km away.
-  const contested = ca
-    .filter((s) => s.id.startsWith("ticon/") && chs.some((c) => km(s, c) <= 10))
-    .map((s) => s.name);
+  const country = new Map(allStations.map((s) => [s.id, s.country_code]));
+  const ca = stations.filter((s) => s.id.startsWith("ticon/") && country.get(s.id) === "CA");
+  const contested = ca.filter((s) => chs.some((c) => km(s, c) <= 10)).map((s) => s.name);
   assert.deepEqual(contested, []);
   assert.ok(ca.length > 30, `only ${ca.length} Canadian gap-fills`);
 });

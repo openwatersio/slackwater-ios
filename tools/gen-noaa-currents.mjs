@@ -32,32 +32,30 @@
  *
  * PAIRING (`tideReference`) — was tools/enrich-currents.mjs, folded in here so
  * the file that writes a record also writes its pairing. Two rungs, in order:
- *   1. The registry's curated pairing, surfaced by resolve() (the v2.5.0 type
- *      contract). Today the registry pairs only CHS gates, so this is the
- *      wire-through that picks curation up the moment it lands for a NOAA gate.
+ *   1. The database's curated pairing (`current.tide_reference`). Today only
+ *      curated CHS gates carry one, so this is the wire-through that picks
+ *      curation up the moment it lands for a NOAA gate.
  *   2. Proximity fallback, bounded at the web's own "standing at the station"
  *      threshold: a bundled tide station within 2 km (slackwater-web
  *      src/tides.ts matchQuality — distance wins outright under 2 km). The
  *      current-detail spec §2 requires the association be a data-layer field,
  *      honestly nearby; recording it at build time, at a threshold the web
  *      already codified, keeps it out of UI-guess territory.
- *      ponytail: proximity fallback at 2 km; delete it when the registry
+ *      ponytail: proximity fallback at 2 km; delete it when the database
  *      curates NOAA pairings.
  *
- * NAMING is the tide generator's, verbatim: station-metadata resolve(),
- * with a DERIVED context replaced by the nearest tide station's region —
- * the bundled gazetteer is 19 Salish towns and nationally invents nonsense
- * ("Pollock Rip Channel · near Everett, WA") — and the same dangling-
- * preposition strip ("0.9 nm east of" -> "0.9 nm east"), which 199 of these
- * 842 need against the Salish bundle's 0.
+ * NAMING is the database's: its name, and its context (the provider's own
+ * qualifier, else the place it derives) with the dangling preposition
+ * stripped ("0.9 nm east of" -> "0.9 nm east"). A station with no context
+ * borrows the nearest tide station's region.
  *
  * Run: cd tools && npm install && node gen-tides.mjs && node gen-noaa-currents.mjs
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { allStations } from "@slackwater/database";
-import { here, placesResolver, byNameThenId, undangle, round3, writeBundle } from "./bundle.mjs";
+import { allStations, stationsById } from "@slackwater/database";
+import { here, byNameThenId, undangle, round3, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
@@ -66,9 +64,7 @@ const MINUTE = 60;
 
 /**
  * A database record in the extract's own shape, so the filters below read as
- * NOAA describes a station. The database splits a name into the place and
- * the water ("Eastport" / "Friar Roads"); joined back, resolve() names it the
- * way it names a tide station. Its offsets are minutes; the engine's
+ * NOAA describes a station. Its offsets are minutes; the engine's
  * SubordinateStation takes seconds.
  */
 function fromDatabase(s) {
@@ -76,7 +72,7 @@ function fromDatabase(s) {
   const o = c.offsets;
   return {
     id: s.id.slice(NOAA.length),
-    name: s.context && !s.context_derived ? `${s.name}, ${s.context}` : s.name,
+    name: s.name,
     type: o ? "subordinate" : "harmonic",
     latitude: s.latitude,
     longitude: s.longitude,
@@ -100,7 +96,6 @@ const bundle = {
   stations: allStations.filter((s) => s.kind === "current" && s.id.startsWith(NOAA)).map(fromDatabase),
 };
 const tides = JSON.parse(readFileSync(join(res, "stations.json"), "utf8"));
-const resolve = placesResolver();
 
 /** Distance wins outright under this (slackwater-web tides.ts matchQuality). */
 const PAIR_KM = 2.0;
@@ -145,23 +140,21 @@ const kept = bundle.stations
   .map((s) => {
     const id = `noaa/${s.id}`;
     const near = nearestTide(s);
-    // A bin is named for its surface station: same water, same resolved name.
-    const r = resolve({ id: `noaa/${s.id.split("@")[0]}`, name: s.name, latitude: s.latitude, longitude: s.longitude });
+    // A bin is named for its surface station: same water, same name.
+    const named = stationsById.get(`noaa/${s.id.split("@")[0]}`) ?? stationsById.get(id);
+    const context = undangle(named.context);
     // The neighbour only matters when it names the region. Three subordinates
     // (Rat Islands, Meyers Passage) sit 250-350 km from any harmonic gauge and
     // carry their own context, so their distance is nobody's business.
-    if (!undangle(r.context)) worstNeighbour = Math.max(worstNeighbour, near.d);
+    if (!context) worstNeighbour = Math.max(worstNeighbour, near.d);
     const out = {
       id,
-      name: r.name,
-      // A derived context is kept now, and outranks the borrowed one. It used
-      // to be discarded in favour of the nearest tide station's region because
-      // the gazetteer behind it was 19 Salish towns; since station-metadata
-      // 2.8.0 it is a national list capped at 40 km, which is both closer to
-      // this station than its neighbouring gauge and more specific than that
+      name: named.name,
+      // Even a derived context outranks the borrowed one: it is closer to this
+      // station than its neighbouring gauge, and more specific than that
       // gauge's own label.
-      region: undangle(r.context) || near.t.region,
-      aliases: r.aliases ?? [],
+      region: context || near.t.region,
+      aliases: named.aliases ?? [],
       latitude: s.latitude,
       longitude: s.longitude,
       timezone: tzLookup(s.latitude, s.longitude),
@@ -177,8 +170,9 @@ const kept = bundle.stations
       ...(isReferenceOnly(s) && { referenceOnly: true }),
     };
     if (!isReferenceOnly(s)) {
-      if (r.tideReference && tides.some((t) => t.id === r.tideReference)) {
-        out.tideReference = r.tideReference;
+      const pair = named.current?.tide_reference;
+      if (pair && tides.some((t) => t.id === pair)) {
+        out.tideReference = pair;
         curated += 1;
       } else if (near.d <= PAIR_KM) {
         out.tideReference = near.t.id;
