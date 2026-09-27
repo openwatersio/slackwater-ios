@@ -16,6 +16,7 @@ struct SlackwaterApp: App {
         // until the app assigns it, so the widget extension — which also
         // compiles ChsModelStore.save — never triggers its own reload.
         WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
+        _ = UnitsCloud.shared
         // Chart packs download whether or not the map is ever opened.
         DispatchQueue.main.async { ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL) }
         #if DEBUG

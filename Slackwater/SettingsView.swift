@@ -27,7 +27,8 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     section("Tide height") {
-                        Picker("Tide height units", selection: $units) {
+                        Picker("Tide height units", selection: Binding(
+                            get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })) {
                             Text("Feet").tag("imperial")
                             Text("Meters").tag("metric")
                         }
@@ -35,7 +36,8 @@ struct SettingsView: View {
                     }
 
                     section("Current speed") {
-                        Picker("Current speed units", selection: $speedUnit) {
+                        Picker("Current speed units", selection: Binding(
+                            get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })) {
                             Text("Knots").tag("kn")
                             Text("km/h").tag("kmh")
                             Text("m/s").tag("ms")
