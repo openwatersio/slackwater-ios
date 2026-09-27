@@ -68,7 +68,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["9 kn flood & ebb"].appears(within: 5),
                   "derived gate lost the magnitude context under its tiles")
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        XCTAssert(app.staticTexts["Slack"].firstMatch.appears(within: 5),
+        XCTAssert(scheduleRowLabels(app).contains(where: { $0.contains("Slack") }),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts["Shape only"].firstMatch.exists)
         XCTAssert(app.staticTexts["No speed"].firstMatch.exists,
