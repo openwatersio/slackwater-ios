@@ -8,7 +8,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { here, tombstones } from "./bundle.mjs";
+import { here, tombstones, curatedRecords } from "./bundle.mjs";
 
 const resource = (name) =>
   JSON.parse(readFileSync(join(here, "..", "Slackwater", "Resources", name), "utf8"));
@@ -50,6 +50,21 @@ test("station 00550 ships its English name only", () => {
   const sable = stations.find((s) => s.id === "chs-sable-island-sable-azle-de");
   assert.equal(sable?.name, "Sable Island");
   assert.ok(sable.aliases.includes("sable, île de"), "French half stays searchable");
+});
+
+// CI never reruns the CHS generators (one needs the network), so a database
+// release that renames a curated gate or port would otherwise ship stale.
+test("every curated CHS station ships as the database curates it", async () => {
+  const curated = Object.entries(await curatedRecords()).filter(([, e]) => e.provider === "chs");
+  const shipped = new Map([...stations, ...resource("chs-current-gates.json"), ...resource("chs-gates.json")]
+    .map((s) => [s.id, s]));
+  // Arran Rapids is excluded outright as a hazard call (gen-chs-gates.mjs).
+  assert.deepEqual(curated.filter(([id]) => !shipped.has(id)).map(([id]) => id), ["chs-arran-rapids"]);
+  for (const [id, e] of curated.filter(([id]) => shipped.has(id))) {
+    const s = shipped.get(id);
+    assert.deepEqual([s.name, s.region, s.aliases, s.latitude, s.longitude],
+      [e.name, e.context, e.aliases, ...e.position], id);
+  }
 });
 
 // Ids are what stored fitted models are keyed by, and what gen-chs-gates.mjs

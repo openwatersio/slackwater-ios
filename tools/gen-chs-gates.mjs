@@ -1,9 +1,9 @@
 /**
  * Generate Resources/chs-gates.json — the derived current gates from the
- * station-metadata registry (a pass with NO current station of its own,
+ * database's curated records (a pass with NO current station of its own,
  * where slack is the reference tide port's high/low water plus a fixed lag —
  * Malibu Rapids today; generic over every `derived` entry so a new gate is a
- * registry bump + rerun, no app edit) — and Resources/chs-current-gates.json,
+ * database release + rerun, no app edit) — and Resources/chs-current-gates.json,
  * the VALIDATED CHS current gates (M47): registry gates with a live IWLS
  * current station whose on-device fit passed the validation bar.
  *
@@ -17,11 +17,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { currentGates as selectCurrentGates } from "@openwaters/station-metadata";
-import { here, stationData } from "./bundle.mjs";
+import { here, curatedRecords } from "./bundle.mjs";
 
 const res = join(here, "..", "Slackwater", "Resources");
-const registry = stationData("registry.json");
+const registry = await curatedRecords();
 const ports = JSON.parse(readFileSync(join(res, "chs-stations.json"), "utf8"));
 
 const gates = [];
@@ -155,15 +154,9 @@ const ONLINE = new Map([
     "Slackwater's on-device model missed the timing of peak flows here by about 25 minutes in testing, so it won't guess at Masset Sound." }],
 ]);
 
-// The registry's own selector, not a filter of our own. Ours was
-// `provider === "chs" && !e.kind && !e.derived`, which read "no kind" as "is a
-// gate" — true only because the registry was gates-only before it grew the
-// field. Every gate added since carries `kind: current` explicitly, so the
-// national gates were dropped silently: no warning, just four missing passes.
-// currentGates() treats an absent kind as current, which is the actual rule.
-const gateEntries = [
-  ...selectCurrentGates({ registry: new Map(Object.entries(registry)), provider: "chs" }),
-];
+// The database gives every record an explicit kind, so a gate is a CHS current with no derived block.
+const gateEntries = Object.entries(registry)
+  .filter(([, e]) => e.provider === "chs" && e.kind === "current" && !e.derived);
 const currentGates = gateEntries
   .filter(([id]) => SHIPPED.has(id))
   .map(([id, e]) => {
