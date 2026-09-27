@@ -17,7 +17,7 @@ final class CurrentStationDetailsTests: XCTestCase {
     func testHarmonicStationHasNoOffsetTable() {
         let harmonic = record(meanFlow: 0)
         XCTAssertNil(harmonic.detailsOffsets)
-        XCTAssertEqual(harmonic.detailsPrediction, "2 harmonic constituents, computed on this device")
+        XCTAssertEqual(harmonic.detailsPrediction, "2 harmonic constituents computed on this device")
     }
 
     func testSubordinateShowsNoaaTableAsPublished() throws {
@@ -34,7 +34,8 @@ final class CurrentStationDetailsTests: XCTestCase {
         XCTAssertEqual(offsets.times,
                        "slack before flood +12 min · max flood -30 min · slack before ebb 0 min · max ebb +60 min")
         XCTAssertEqual(offsets.ratios, "flood ×0.85 · ebb ×1.20")
-        XCTAssertTrue(sub.detailsPrediction.contains("NOAA offsets"))
+        XCTAssertEqual(sub.detailsPrediction,
+                       "NOAA reference slacks and maxima, adjusted by published offsets and computed on this device")
     }
 
     func testSubordinateFooterOmitsAnIdenticalReferenceName() {

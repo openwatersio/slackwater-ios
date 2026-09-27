@@ -61,7 +61,7 @@ final class ChsQueueTests: XCTestCase {
         q.set("a", .failed)
         q.note("a", error: "IWLS serves no wlp here")
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0),
-                       "Unavailable · IWLS serves no wlp here")
+                       "Predictions unavailable")
 
         q.set("a", .ready)
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Available offline")

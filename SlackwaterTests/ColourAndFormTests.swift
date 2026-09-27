@@ -569,7 +569,7 @@ final class ColourAndFormTests: XCTestCase {
     /// this proves what the ink says.
     func testEveryStateHasANonColourCarrier() throws {
         let drawing = try repoSource("Slackwater/CurveDrawing.swift")
-        XCTAssertTrue(drawing.contains("high ? \"⤒\" : \"⤓\""),
+        XCTAssertTrue(drawing.contains("high ? \"arrow.up.to.line\" : \"arrow.down.to.line\""),
                       "a high and a low must hang different to-bar glyphs")
         XCTAssertTrue(drawing.contains("flood ? \"arrow.forward\" : \"arrow.backward\""),
                       "a derived gate's flow glyph must differ by direction")

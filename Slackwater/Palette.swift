@@ -227,7 +227,8 @@ struct MonoLabel: View {
     var color: Color = SN.leaf
     var tracking: CGFloat = 1.6
     var body: some View {
-        Text(text.uppercased())
+        Text(text)
+            .textCase(.uppercase)
             .font(.caption2.monospaced().weight(.medium))
             .tracking(tracking)
             .foregroundStyle(color)

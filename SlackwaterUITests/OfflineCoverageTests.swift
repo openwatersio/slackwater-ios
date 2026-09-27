@@ -68,7 +68,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["9 kn flood & ebb"].appears(within: 5),
                   "derived gate lost the magnitude context under its tiles")
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        XCTAssert(app.staticTexts["● SLACK"].firstMatch.appears(within: 5),
+        XCTAssert(app.staticTexts["SLACK"].firstMatch.appears(within: 5),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts["Shape only"].firstMatch.exists)
         XCTAssert(app.staticTexts["No speed"].firstMatch.exists,
@@ -76,7 +76,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Point Atkinson tides"].firstMatch.exists,
                   "the shape-only summary lost its source")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'cruising-community'")).firstMatch
+            NSPredicate(format: "label CONTAINS 'cruising rule of thumb'")).firstMatch
             .appears(within: 5),
                   "derived provenance footer missing")
 

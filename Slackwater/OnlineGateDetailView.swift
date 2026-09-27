@@ -134,7 +134,7 @@ struct OnlineGateDetailView: View {
                             },
                             bottom: {
                                 if let note = gate.magnitudeNote {
-                                    Text("Large-tide context: \(note). Not a prediction for this pass.")
+                                    Text("Large-tide context: \(note). This is not a prediction for this pass.")
                                         .font(.caption2)
                                         .foregroundStyle(SN.foam.opacity(0.7))
                                         .multilineTextAlignment(.center)
@@ -244,9 +244,9 @@ struct OnlineGateDetailView: View {
             if let port = pairedTide {
                 StationDetailRow("Reference", "\(port.name), \(Int(distanceKm(gate.latitude, gate.longitude, port.latitude, port.longitude).rounded())) km away")
             }
-            StationDetailRow("Prediction", "CHS-published predictions, fetched — never computed on this device")
+            StationDetailRow("Prediction", "CHS-published predictions downloaded for offline use; not computed on this device")
             if let note = gate.onlineNote {
-                StationDetailRow("Why not fitted", note)
+                StationDetailRow("On-device fit unavailable", note)
             }
             if let window {
                 StationDetailRow("Downloaded", "\(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz))")
@@ -256,7 +256,7 @@ struct OnlineGateDetailView: View {
 
     private func provenance(_ window: ChsOnlineWindow) -> some View {
         DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
-            Text("CHS-published predictions · fetched \(monthDay(window.fetchedAt, tz)), covers to \(monthDay(window.end, tz)) — not computed on this device")
+            Text("CHS-published predictions downloaded \(monthDay(window.fetchedAt, tz)); available through \(monthDay(window.end, tz)). Not computed on this device.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("online-provenance")

@@ -186,23 +186,23 @@ struct ChsWaitingView: View {
         }
     }
 
-    /// The one-line "what is happening". The established plain register is
-    /// kept verbatim — "Downloading Canadian tidal/current predictions…".
+    /// The one-line "what is happening", in the same plain register as the
+    /// download manager.
     private var headline: String {
         let what = referenceName.map { "\($0)'s tide predictions" } ?? "This station's predictions"
         if !net.online {
-            return "\(what) need a moment of signal — Canadian \(series) predictions download once, then work offline."
+            return "\(what) need a connection before they can download."
         }
         if status == .retrying {
-            return "\(what) didn't finish downloading. Trying again shortly."
+            return "\(what) didn't finish downloading. Slackwater will try again."
         }
         switch job?.status {
         case .failed:
-            return "\(what) didn't finish downloading."
+            return "\(what) couldn't be downloaded."
         case .downloading:
             return "Downloading Canadian \(series) predictions…"
         default:
-            return "\(what) haven't downloaded yet. Downloading Canadian \(series) predictions…"
+            return "\(what) aren't on this device yet. Downloading Canadian \(series) predictions…"
         }
     }
 
@@ -210,22 +210,22 @@ struct ChsWaitingView: View {
     /// it is once-and-for-all.
     private var expectation: String {
         guard net.online else {
-            return "Nothing downloads without a connection. Once it does, this station works offline — with no signal — for good."
+            return "Connect once to download this station for permanent offline use."
         }
         if job?.status == .failed {
-            return "Try this station again here. Once it downloads, it works offline — with no signal — for good."
+            return "Retry this station. Once downloaded, it stays available offline."
         }
         if status == .retrying {
-            return "Slackwater retries on its own, and again whenever your signal comes back. Once it downloads, this station works offline for good."
+            return "Slackwater retries automatically when a connection is available."
         }
         if let job, job.status == .downloading, job.total > 0 {
-            return "Downloading \(job.done) of \(job.total) requests. After that this station works offline for good."
+            return "\(job.done) of \(job.total) requests downloaded. This station stays available offline when finished."
         }
         let queued = service.queue.position(jobID).map { at -> String in
             at <= 1 ? "It's first in line — moved to the front because you opened it."
                     : "It's \(ordinal(at)) in line — moved up because you opened it."
         } ?? ""
-        return "\(queued) At the current speed, \(durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))). It downloads once; after that this station works offline for good."
+        return "\(queued) Estimated wait: \(durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))). The station downloads once and stays available offline."
     }
 
     private var footer: some View {
