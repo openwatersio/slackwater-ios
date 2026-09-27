@@ -412,7 +412,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["detail-header"].appears(within: 8), "the entry did not open its station")
         let chooserButton = app.buttons["matching-stations"].firstMatch
         XCTAssert(chooserButton.appears(within: 8), "no matching-station affordance on the station page")
-        XCTAssert(chooserButton.label.contains("2 other current locations"), chooserButton.label)
+        XCTAssertEqual(chooserButton.label, "Other locations (2)")
         chooserButton.tap()
 
         XCTAssert(app.descendants(matching: .any)["station-chooser"].firstMatch.appears(within: 5),
@@ -542,6 +542,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let title = app.staticTexts["North Galiano"].firstMatch
         XCTAssert(title.appears(within: 5),
                   "the removed favorite rendered no row, or rendered one it could not name")
+        XCTAssert(app.images["Station removed"].exists)
         scrollTo(title, in: app)
         save(app, "issue91-removed-favorite.png")
 
@@ -550,7 +551,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // instead of the tombstone would list a visibly different set.
         // ChsAmberCard's action is a .plain Button — the denied-card test reads
         // its twin as a staticText, so accept either element type.
-        tapAmberAction(app, "Pick a replacement")
+        tapAmberAction(app, "Choose another station")
         // `descendants(matching: .any)`, not `otherElements`: the identifier
         // sits on the sheet's root ZStack and does not reliably surface as an
         // `otherElement` (the same reason `listContainer` queries this way).
