@@ -44,7 +44,7 @@
  * questions asked.
  *
  * `country` itself is trustworthy for NOAA rows and NOT for TICON's, which is
- * why COUNTRY_FIX exists below: upstream reads a station's operating agency as
+ * why COUNTRY_FIX exists (bundle.mjs): upstream reads a station's operating agency as
  * its country, so the gauges NOAA runs abroad arrive claiming "United States".
  * With no COUNTRIES gate to drop them as a side effect, COUNTRY_FIX is what
  * lets them ship labelled honestly — Dakar as Senegal, not as a US station.
@@ -77,42 +77,12 @@ import { join } from "node:path";
 import { allStations } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
-  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
+  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
-
-/**
- * Upstream reads a station's OPERATING AGENCY as its country, so the 17 gauges
- * NOAA runs outside US waters arrive as "United States" — Dakar, Lagos, Suva,
- * Easter Island. Every one carries a `-usa-noaa` id suffix, which is the tell.
- *
- * Corrected, not deny-listed, because the correction is what is actually true
- * and it is the form the world bundle needs: these are keepers, they just have
- * to be labelled honestly — so worldwide they ship under the country this map
- * corrects them to, not as a seventh US territory.
- */
-const COUNTRY_FIX = new Map([
-  ["ticon/barbuda-9761115-usa-noaa", "Antigua and Barbuda"],
-  ["ticon/bermuda-2695540-usa-noaa", "Bermuda"],
-  ["ticon/bermuda_biological_station-2695535-usa-noaa", "Bermuda"],
-  ["ticon/chuuk-1840000-usa-noaa", "Micronesia"],
-  ["ticon/cochino_pequeno-9653601-usa-noaa", "Honduras"],
-  ["ticon/dakar-7691360-usa-noaa", "Senegal"],
-  ["ticon/diego_garcia-2431000-usa-noaa", "British Indian Ocean Territory"],
-  ["ticon/diego_ramirez_island-9952000-usa-noaa", "Chile"],
-  ["ticon/easter_island-9962420-usa-noaa", "Chile"],
-  ["ticon/esperanza-1495000-usa-noaa", "Antarctica"],
-  ["ticon/fare_ute_point-1732417-usa-noaa", "French Polynesia"],
-  ["ticon/kwajalein-1820000-usa-noaa", "Marshall Islands"],
-  ["ticon/lagos-7641400-usa-noaa", "Nigeria"],
-  ["ticon/madero-9500966-usa-noaa", "Mexico"],
-  ["ticon/settlement_point-9710441-usa-noaa", "Bahamas"],
-  ["ticon/suva-1910000-usa-noaa", "Fiji"],
-  ["ticon/valparaiso-9963950-usa-noaa", "Chile"],
-]);
 
 /**
  * Canadian rows carry GeoNames admin1 codes ("02"), not the province codes the
@@ -221,7 +191,6 @@ const untrail = (name, ...regions) => {
 /** The state/province code a region line ends in — "LaSalle, ON" -> "ON". */
 const trailingCode = (region) => region.match(/\b([A-Z]{2})$/)?.[1];
 
-const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
 const regionOf = (s) => {
   const r = (countryOf(s) === "Canada" && CA_PROVINCE[s.region]) || s.region;
   // A GeoNames code that survived the map is a cross-border mislabel — five
