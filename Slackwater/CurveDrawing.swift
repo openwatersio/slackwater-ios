@@ -229,7 +229,7 @@ enum CurveDrawing {
         let glyphAt = CGPoint(x: p.x, y: cy - toward * CurveStyle.hangGlyphGap)
         switch glyph {
         case .toBar(let high):
-            ctx.draw(Text(high ? "⤒" : "⤓")
+            ctx.draw(Text(Image(systemName: high ? "arrow.up.to.line" : "arrow.down.to.line"))
                         .font(.system(size: CurveStyle.hangGlyphFontSize, weight: .semibold))
                         .foregroundStyle(tint),
                      at: glyphAt, anchor: .center)

@@ -195,22 +195,22 @@ struct CurrentDetailView: View {
     private var footer: some View {
         DetailFooter(stationID: record.itemId, scrubTime: scrubTime, tz: tz) {
             if let gate = provisionalGate {
-                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded — still refining")
+                Text("\(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded. The on-device fit is still refining. Flood sets \(Int(record.floodDirection.rounded()))°T.")
                     .font(.caption2).foregroundStyle(SN.amber.opacity(0.7))
                     .multilineTextAlignment(.center)
             } else if record.isChs {
                 // Same register as the CHS tide footer (TideDetailView).
-                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
+                Text("Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets \(Int(record.floodDirection.rounded()))°T.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else if let ref = record.referenceRecord {
                 // A different accuracy class: NOAA's table offsets against the
                 // reference's events, with a drawn curve between them.
-                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · \(subordinateCurrentFooter(stationName: record.name, referenceName: ref.name))")
+                Text("\(subordinateCurrentFooter(stationName: record.name, referenceName: ref.name)). Flood sets \(Int(record.floodDirection.rounded()))°T.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else {
-                Text("Flood sets \(Int(record.floodDirection.rounded()))°T · NOAA harmonic current prediction · \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit))")
+                Text("NOAA harmonic current prediction. Flood sets \(Int(record.floodDirection.rounded()))°T. Speeds use \(speedUnit == "kn" ? "knots" : speedUnitLabel(speedUnit)).")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
         }
@@ -230,7 +230,7 @@ struct CurrentDetailView: View {
             // own — its record carries no meaningful mean flow to report.
             if !record.isSubordinate {
                 StationDetailRow("Mean flow", record.detailsMeanFlow(unit: speedUnit))
-                StationDetailNote("Mean flow is the net non-tidal drift the fit found under the tide — the river left over when the tide averages out.")
+                StationDetailNote("Mean flow is the net drift remaining after the tide averages out.")
             }
             if let ref = record.referenceRecord {
                 StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
@@ -245,7 +245,7 @@ struct CurrentDetailView: View {
                 // fit is 60 days of a gate whose final window is 210.
                 StationDetailRow("Fit window", "\(Int(model.fitDays ?? record.chsGate?.fitDays ?? 0)) days of CHS observations")
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Downloaded")
+                    Text("Data downloaded")
                     Spacer()
                     Text(model.fittedAt, style: .relative)
                 }

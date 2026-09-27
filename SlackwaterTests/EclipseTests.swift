@@ -255,6 +255,9 @@ final class EclipseTests: XCTestCase {
         for kind in [SolarEclipseKind.partial, .annular, .total] {
             XCTAssertEqual(solarEclipseTileText(kind), "Solar Eclipse")
         }
+        XCTAssertEqual(solarEclipseName(.partial), "Partial Solar Eclipse")
+        XCTAssertEqual(solarEclipseName(.annular), "Annular Solar Eclipse")
+        XCTAssertEqual(solarEclipseName(.total), "Total Solar Eclipse")
         XCTAssertFalse(moonPhaseBlurb("Solar Eclipse").isEmpty)
     }
 

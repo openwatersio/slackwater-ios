@@ -115,11 +115,11 @@ final class AppStoreScreenshots: ShotWalk {
 
     private func nearbyWithFavorites() {
         let app = launchShots()
-        XCTAssert(app.staticTexts["MY LOCATION"].appears(within: 10))
-        XCTAssert(app.staticTexts["FAVORITES"].appears(within: 10),
+        XCTAssert(app.staticTexts["My Location"].appears(within: 10))
+        XCTAssert(app.staticTexts["Favorites"].appears(within: 10),
                   "the seeded favorites never grouped")
-        XCTAssert(app.staticTexts["NEAR ME"].appears(within: 10))
-        settleLayout(app.staticTexts["NEAR ME"].firstMatch)
+        XCTAssert(app.staticTexts["Near Me"].appears(within: 10))
+        settleLayout(app.staticTexts["Near Me"].firstMatch)
         save(app, "04-nearby.png")
     }
 

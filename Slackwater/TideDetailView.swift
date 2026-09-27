@@ -233,20 +233,20 @@ struct TideDetailView: View {
     private var footer: some View {
         DetailFooter(stationID: record.id, scrubTime: scrubTime, tz: tz) {
             if record.isChs {
-                Text("\(record.chartDatum) datum · Downloaded from CHS (IWLS) — computed on this device, not CHS-published numbers")
+                Text("\(record.chartDatum) chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else if let ref = record.referenceRecord {
                 // A different accuracy class, and the reference can be far
                 // away (Nurse Channel sits 600 km from Settlement Point).
-                Text("\(record.chartDatum) datum · NOAA subordinate station: \(ref.name)'s tide, corrected by published offsets")
+                Text("\(record.chartDatum) chart datum. Based on \(ref.name) tides and NOAA's published offsets; computed on this device.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
             } else if record.id.hasPrefix("noaa/") {
-                Text("\(record.chartDatum) datum · NOAA harmonic prediction")
+                Text("\(record.chartDatum) chart datum. NOAA harmonic prediction.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             } else {
-                Text("\(record.chartDatum) datum · TICON-4 harmonic prediction")
+                Text("\(record.chartDatum) chart datum. TICON-4 harmonic prediction.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
             }
         }
@@ -255,19 +255,19 @@ struct TideDetailView: View {
     private var stationDetails: some View {
         StationDetails {
             StationDetailRow("Datum", record.detailsDatum)
-            StationDetailNote("Heights are measured above chart datum. A negative height means there is that much less water than the charted depth shows.")
+            StationDetailNote("Heights are measured from chart datum. A negative value predicts less water than the charted depth.")
             StationDetailRow("Station", record.id)
             StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
             StationDetailRow("Time zone", record.timezone)
             if let ref = record.referenceRecord {
                 StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
-                StationDetailRow("Prediction", "Reference highs and lows, shifted and scaled by NOAA offsets, computed on this device")
+                StationDetailRow("Prediction", "NOAA reference highs and lows, adjusted by published offsets and computed on this device")
             } else {
-                StationDetailRow("Prediction", "\(record.constituents.count) harmonic constituents, computed on this device")
+                StationDetailRow("Prediction", "\(record.constituents.count) harmonic constituents computed on this device")
             }
             if let chsFittedAt {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Downloaded")
+                    Text("Data downloaded")
                     Spacer()
                     Text(chsFittedAt, style: .relative)
                 }

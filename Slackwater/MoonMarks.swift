@@ -166,8 +166,8 @@ struct MoonOrbitMark: View {
                 .overlay(Circle().strokeBorder(SN.canvas.opacity(0.6), lineWidth: 1))
                 .position(moon)
 
-            if let perigee { vertex("CLOSEST", perigee, at: near, floor: cy + b * squash) }
-            if let apogee { vertex("FARTHEST", apogee, at: far, floor: cy + b * squash) }
+            if let perigee { vertex("Closest", perigee, at: near, floor: cy + b * squash) }
+            if let apogee { vertex("Farthest", apogee, at: far, floor: cy + b * squash) }
         }
     }
 
@@ -195,7 +195,7 @@ struct MoonOrbitMark: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(label.lowercased()) \(monthDay(date, tz))")
             .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier(label == "CLOSEST" ? "moon-perigee" : "moon-apogee")
+            .accessibilityIdentifier(label == "Closest" ? "moon-perigee" : "moon-apogee")
             .position(x: p.x, y: floor + 24)
         }
     }

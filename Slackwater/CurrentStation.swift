@@ -258,8 +258,8 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// How the prediction under this station is made, in one line.
     var detailsPrediction: String {
         isSubordinate
-            ? "Reference slacks and maxima, shifted and scaled by NOAA offsets, computed on this device"
-            : "\(constituents.count) harmonic constituents, computed on this device"
+            ? "NOAA reference slacks and maxima, adjusted by published offsets and computed on this device"
+            : "\(constituents.count) harmonic constituents computed on this device"
     }
 
     /// NOAA's subordinate table as the table itself states it — the four time

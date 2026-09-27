@@ -165,7 +165,7 @@ struct DerivedGateDetailView: View {
     // register): derived on this device, no CHS current prediction exists.
     private var footer: some View {
         DetailFooter(stationID: gate.id, scrubTime: scrubTime, tz: tz) {
-            Text("Slack times for \(gate.name) are derived on this device from \(port.name) high and low water — a cruising-community rule of thumb, not a CHS prediction. CHS publishes no current prediction for this pass.")
+            Text("Slackwater estimates \(gate.name) slack times from high and low water at \(port.name), using a cruising rule of thumb. CHS does not publish current predictions for this pass.")
                 .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                 .multilineTextAlignment(.center)
         }
@@ -181,8 +181,8 @@ struct DerivedGateDetailView: View {
             StationDetailRow("Time zone", gate.timezone)
             StationDetailRow("Reference", "\(port.name), \(Int(distanceKm(gate.latitude, gate.longitude, port.latitude, port.longitude).rounded())) km away")
             StationDetailRow("Slack lags", "\(Int(gate.hwLagMinutes.rounded())) min after \(port.name) high · \(Int(gate.lwLagMinutes.rounded())) min after low")
-            StationDetailRow("Prediction", "Slack times only, derived on this device — no speed prediction exists for this pass")
-            StationDetailNote("The curve between slacks is a schematic shape, not a measured speed. Only the times it crosses zero are a claim.")
+            StationDetailRow("Prediction", "Estimated slack times only. No speed prediction is available for this pass.")
+            StationDetailNote("The curve between slack times is a guide, not a speed measurement. Only its zero crossings represent predicted times.")
         }
     }
 

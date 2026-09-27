@@ -848,7 +848,7 @@ struct TimelineCanvas: View {
     private func drawEclipses(_ ctx: GraphicsContext, _ t0: Date, _ t1: Date) {
         let peaks = data.eclipses.map(\.peak) + data.solarEclipses.map(\.peak)
         for peak in peaks where data.contains(peak) && peak >= t0 && peak <= t1 {
-            ctx.draw(Text("🌘").font(.system(size: 6.5)),
+            ctx.draw(Text(verbatim: "🌘").font(.system(size: 6.5)),
                      at: CGPoint(x: data.x(peak), y: geo.sunY), anchor: .center)
         }
     }
@@ -1913,12 +1913,18 @@ struct MultiDaySchedule: View {
                             if let day = days.first(where: { $0.offset == group.offset }) {
                                 VStack(alignment: .leading, spacing: 1) {
                                     if let rise = day.sunrise {
-                                        (Text(Image(systemName: "sunrise")) + Text(" \(chartTime(rise, tz))"))
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "sunrise")
+                                            Text(chartTime(rise, tz))
+                                        }
                                             .foregroundStyle(SN.sunrise)
                                             .accessibilityLabel("Sunrise \(chartTime(rise, tz))")
                                     }
                                     if let set = day.sunset {
-                                        (Text(Image(systemName: "sunset")) + Text(" \(chartTime(set, tz))"))
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "sunset")
+                                            Text(chartTime(set, tz))
+                                        }
                                             .foregroundStyle(SN.sunset)
                                             .accessibilityLabel("Sunset \(chartTime(set, tz))")
                                     }
@@ -1998,20 +2004,29 @@ struct MultiDaySchedule: View {
     private func pillView(_ e: ScheduleEntry) -> some View {
         switch e.pill {
         case .high:
-            // ⤒ / ⤓, the strip's turn glyph — arrow to bar, "arrives and stops".
-            // A bare ↑ here said "rising" next to a row that means the rising is
-            // over. The two surfaces sit one above the other on every tide
-            // detail, so they have to speak the same glyph — and the same
-            // colour: teal for a high, amber for a low, the chart's turn dots.
+            // Keep the arrow outside the translated phrase. The two surfaces
+            // sit one above the other on every tide detail, so they use the
+            // same direction and the same colour: teal for a high, amber for
+            // a low, matching the chart's turn dots.
             // A row and the dot it scrubs to are one event. Flood and ebb below
             // stay on the direction axis, which is a different question.
-            Text("⤒ HIGH")
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up")
+                    .accessibilityHidden(true)
+                Text("High")
+            }
+                .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.graphHigh, in: Capsule())
         case .low:
-            Text("⤓ LOW")
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.down")
+                    .accessibilityHidden(true)
+                Text("Low")
+            }
+                .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
@@ -2024,15 +2039,24 @@ struct MultiDaySchedule: View {
                     CompassArrow(deg: deg)
                     Text(compass16(deg))
                 }
-                Text(e.pill == .flood ? "FLOOD" : "EBB")
-                    .opacity(0.7)
+                if e.pill == .flood {
+                    Text("Flood").opacity(0.7)
+                } else {
+                    Text("Ebb").opacity(0.7)
+                }
             }
+            .textCase(.uppercase)
             .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
             .foregroundStyle(SN.navyDeep)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(e.pill == .flood ? SN.rising : SN.falling, in: Capsule())
         case .slack:
-            Text("● SLACK")
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.right.and.line.vertical.and.arrow.left")
+                    .accessibilityHidden(true)
+                Text("Slack")
+            }
+                .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
@@ -2043,7 +2067,12 @@ struct MultiDaySchedule: View {
             // total, penumbral) is deliberately absent — the column caps at
             // 100pt for "WSW FLOOD" and "🌘 PENUMBRAL ECLIPSE" does not fit.
             // The kind belongs to the Moon sheet, which has room for it.
-            Text("🌘 ECLIPSE")
+            HStack(spacing: 3) {
+                Text(verbatim: "🌘")
+                    .accessibilityHidden(true)
+                Text("Eclipse")
+            }
+                .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)
                 .foregroundStyle(SN.foam)
                 .padding(.horizontal, 8).padding(.vertical, 4)

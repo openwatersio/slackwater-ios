@@ -190,9 +190,9 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
                        "the paired tide readout is retired")
         // Two calls, not one `&&`: an `&&` only fails when BOTH row kinds
         // leak, so a single stray HIGH (or LOW) row would pass silently.
-        XCTAssertFalse(app.staticTexts["⤒ HIGH"].firstMatch.exists,
+        XCTAssertFalse(scheduleRowLabels(app).contains(where: { $0.contains("High") }),
                        "port tide rows must not appear in a gate schedule")
-        XCTAssertFalse(app.staticTexts["⤓ LOW"].firstMatch.exists,
+        XCTAssertFalse(scheduleRowLabels(app).contains(where: { $0.contains("Low") }),
                        "port tide rows must not appear in a gate schedule")
         // What the gate does say is the commentary pill: the stop ahead,
         // named and walked to — a slack, a run, or the sun when it is nearer.
@@ -219,8 +219,13 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         let link = app.descendants(matching: .any).matching(identifier: "tide-at-port").firstMatch
         XCTAssert(link.appears(within: 5), "tide-at-port link missing")
         link.tap()
-        XCTAssert(app.staticTexts["⤒ HIGH"].firstMatch.appears(within: 8)
-                  || app.staticTexts["⤓ LOW"].firstMatch.appears(within: 8),
+        XCTAssert(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'schedule-row-d'"))
+            .firstMatch.appears(within: 8),
+                  "port detail shows a schedule")
+        XCTAssert(scheduleRowLabels(app).contains(where: {
+            $0.contains("High") || $0.contains("Low")
+        }),
                   "port detail shows its own tide schedule")
         XCTAssert(app.staticTexts["Deception Pass State Park"].firstMatch.exists,
                   "the link did not open the reference port's detail")
@@ -393,10 +398,10 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
 
         // Offline: the established honest register, and no bogus ETA.
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'need a moment of signal'")).firstMatch.exists,
-                  "offline warning must keep the moment-of-signal copy")
+            NSPredicate(format: "label CONTAINS 'need a connection'")).firstMatch.exists,
+                  "offline warning must explain that a connection is required")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'Nothing downloads without a connection'"))
+            NSPredicate(format: "label CONTAINS 'permanent offline use'"))
             .firstMatch.exists)
     }
 

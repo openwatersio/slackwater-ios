@@ -46,7 +46,7 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
     if provisional { return "Refining…" }
     switch job.status {
     case .ready: return "Available offline"
-    case .failed: return job.lastError.map { "Unavailable · \($0)" } ?? "Unavailable"
+    case .failed: return "Predictions unavailable"
     case .downloading:
         return job.total > 0 ? "Downloading · \(job.done) of \(job.total)" : "Downloading…"
     case .pending:
@@ -354,7 +354,7 @@ struct OfflineManagerList: View {
     private var chartsCard: some View {
         let state = charts.summary
         return VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: state.total == 0 ? "CHARTS" : "CHARTS · \(state.ready) of \(state.total) ready")
+            MonoLabel(text: state.total == 0 ? "Charts" : "Charts · \(state.ready) of \(state.total) ready")
             if state.total > 0 {
                 ProgressView(value: Double(state.ready), total: Double(max(state.total, 1)))
                     .tint(state.failed > 0 ? SN.amber : SN.leaf)
@@ -517,7 +517,7 @@ struct OfflineManagerList: View {
         case .deferred(let due):
             let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
             return "Retrying in \(minutes) min"
-        case .failed(let reason): return "Unavailable · \(reason)"
+        case .failed: return "Download failed"
         case .idle:
             if let position = service.onlinePosition(gate.id) {
                 return position <= 1 ? "Waiting · next" : "Waiting · \(ordinal(position)) in line"

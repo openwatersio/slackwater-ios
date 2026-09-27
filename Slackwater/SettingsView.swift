@@ -56,7 +56,7 @@ struct SettingsView: View {
                                 Text("kn")
                             }
                         }
-                        Text("0.1–10 kn. This changes when Slackwater marks a current as a usable slack window.")
+                        Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
                     }
 
                     // The downloads manager also lives one tap from the list,
@@ -100,16 +100,16 @@ struct SettingsView: View {
                     #endif
 
                     section("About these predictions") {
-                        Text("Slackwater computes harmonic tide and current predictions on this device. Predictions are not observations — actual conditions vary with weather, river flow and local effects.")
+                        Text("Slackwater computes harmonic tide and current predictions on this device. They are not observations; actual conditions vary with weather, river flow, and local effects.")
                         Text("Not for navigation.")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(SN.foam.opacity(0.9))
-                        Text("Canadian (CHS) stations are harmonic models fitted on this device from CHS (IWLS) predictions fetched under DFO's terms — not CHS-published numbers. CHS data is used under licence (clause 10) and is not to be used for navigation. A few Canadian waters CHS does not gauge are covered by bundled TICON-4 constants instead.")
+                        Text("Canadian (CHS) stations use harmonic models fitted on this device from CHS (IWLS) predictions under DFO's terms (clause 10). They are not CHS-published numbers and are not for navigation. A few Canadian waters without CHS gauges use bundled TICON-4 constants.")
                     }
 
                     section("Data & attribution") {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
-                        Text("Additional stations: TICON-4 harmonic constants, SEANOE — used under CC BY 4.0 (seanoe.org/data/00980/109129).")
+                        Text("Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129).")
                         // Issue #401. The same deposit also holds a
                         // cc-by-nc-4.0 half (GESLA upstream restricts
                         // commercial use) whose CONSTANTS can never ship —
@@ -119,12 +119,12 @@ struct SettingsView: View {
                         // position we display to explain an absence, which
                         // is not a use of the predictions the licence
                         // covers. The attribution is owed either way.
-                        Text("Stations marked \"not yet available\" are named from the same deposit's non-commercial (CC BY-NC 4.0) records — identity only, to explain why no predictions are shown. Their harmonic constants are not bundled and are never served.")
+                        Text("Stations marked \"Predictions unavailable\" are named from non-commercial records in the same SEANOE deposit (CC BY-NC 4.0). Slackwater does not bundle or serve their harmonic constants.")
                         Text("Map tiles by OpenFreeMap (openfreemap.org), © OpenMapTiles, data © OpenStreetMap contributors, cached on this device for offline use.")
                         Text("Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada.")
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")
                         Text("Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included.")
-                        Text("Station names & pairings: Slackwater database and @openwaters/station-metadata (MIT).")
+                        Text("Station names and pairings: Slackwater database and @openwaters/station-metadata (MIT).")
                         Text("Prediction engine: Slackwater (MIT).")
                     }
 

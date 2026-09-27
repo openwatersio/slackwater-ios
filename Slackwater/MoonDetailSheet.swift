@@ -174,23 +174,23 @@ struct MoonDetailSheet: View {
                     if let facts {
                         head(facts)
                         group {
-                            horizonCell("RISE", facts.rise, rising: true, facts, id: "moon-rise")
+                            horizonCell("Rise", facts.rise, rising: true, facts, id: "moon-rise")
                             divider
-                            horizonCell("SET", facts.set, rising: false, facts, id: "moon-set")
+                            horizonCell("Set", facts.set, rising: false, facts, id: "moon-set")
                         }
                         group {
-                            phaseCell("NEXT FULL", facts.nextFull, jumpTo: facts.fullNight,
+                            phaseCell("Next full", facts.nextFull, jumpTo: facts.fullNight,
                                       fraction: 1, id: "moon-next-full")
                             divider
-                            phaseCell("NEXT NEW", facts.nextNew, jumpTo: facts.newNight,
+                            phaseCell("Next new", facts.nextNew, jumpTo: facts.newNight,
                                       fraction: 0, id: "moon-next-new")
                         }
                         distance(facts)
                         group {
-                            eclipseRow("LAST LUNAR ECLIPSE", facts.last,
+                            eclipseRow("Last lunar eclipse", facts.last,
                                        id: "moon-last-eclipse", color: SN.umbraLabel)
                             divider
-                            solarEclipseRow("LAST SOLAR ECLIPSE", facts.lastSolar,
+                            solarEclipseRow("Last solar eclipse", facts.lastSolar,
                                             id: "moon-last-solar-eclipse")
                         }
                         if !facts.upcoming.isEmpty {
@@ -198,14 +198,14 @@ struct MoonDetailSheet: View {
                                 ForEach(Array(facts.upcoming.enumerated()), id: \.element.id) {
                                     index, e in
                                     if index > 0 { divider }
-                                    eclipseRow(index == 0 ? "NEXT LUNAR ECLIPSE" : "THEN", e,
+                                    eclipseRow(index == 0 ? "Next lunar eclipse" : "Then", e,
                                                id: "moon-next-eclipse-\(e.kind.rawValue)",
                                                color: SN.umbraLabel)
                                 }
                             }
                         }
                         group {
-                            solarEclipseRow("NEXT SOLAR ECLIPSE", facts.nextSolar,
+                            solarEclipseRow("Next solar eclipse", facts.nextSolar,
                                             id: "moon-next-solar-eclipse")
                         }
                     } else {
@@ -376,7 +376,7 @@ struct MoonDetailSheet: View {
         return group {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    MonoLabel(text: "DISTANCE FROM EARTH", color: SN.foam.opacity(0.55))
+                    MonoLabel(text: "Distance from Earth", color: SN.foam.opacity(0.55))
                     Spacer()
                     Text(verbatim: "\(km) km")
                         .font(.footnote.monospacedDigit()).foregroundStyle(.white)
@@ -428,10 +428,10 @@ struct MoonDetailSheet: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier(id)
         } else {
-            // Nil reads "none visible from here" rather than vanishing: a
+            // Nil reads "None visible from here." rather than vanishing: a
             // missing row would say the app forgot to look, and "none from
             // here" is the actual answer for an observer the shadow misses.
-            cell(label, value: "none visible from here", jumpTo: nil, id: id) {
+            cell(label, value: "None visible from here.", jumpTo: nil, id: id) {
                 Color.clear.frame(width: 78, height: 44)
             }
         }
@@ -445,7 +445,7 @@ struct MoonDetailSheet: View {
                     .frame(width: 78, height: 44)
                 VStack(alignment: .leading, spacing: 3) {
                     MonoLabel(text: label, color: SN.sun)
-                    Text("\(e.kind.rawValue.capitalized) Solar Eclipse")
+                    Text(solarEclipseName(e.kind))
                         .font(ReadoutType.tileText).foregroundStyle(.white)
                     Text(when(e.peak)).font(.caption.monospacedDigit())
                         .foregroundStyle(SN.foam.opacity(0.55))
@@ -462,7 +462,7 @@ struct MoonDetailSheet: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier(id)
         } else {
-            cell(label, value: "none visible from here", jumpTo: nil, id: id) {
+            cell(label, value: "None visible from here.", jumpTo: nil, id: id) {
                 Color.clear.frame(width: 78, height: 44)
             }
         }

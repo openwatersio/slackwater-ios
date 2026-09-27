@@ -438,6 +438,14 @@ func eclipseTileText(_ kind: LunarEclipseKind) -> String {
 
 func solarEclipseTileText(_: SolarEclipseKind) -> String { "Solar Eclipse" }
 
+func solarEclipseName(_ kind: SolarEclipseKind) -> String {
+    switch kind {
+    case .partial: "Partial Solar Eclipse"
+    case .annular: "Annular Solar Eclipse"
+    case .total: "Total Solar Eclipse"
+    }
+}
+
 /// The one-line gloss under the phase name in the Moon sheet. "Penumbral" is a
 /// term of art and reads as one; "gibbous" and "first quarter" are terms of art
 /// that do NOT, which is worse — the sheet prints them as if everyone knows.
@@ -466,19 +474,32 @@ func moonPhaseBlurb(_ name: String) -> String {
 
 /// Lunar geometry describes a tendency in tidal range, not a local height prediction.
 func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
-    let phaseTide: String? = switch moonPhaseName(phase: phase) {
-    case "New Moon", "Full Moon": "Spring tide"
-    case "First Quarter", "Last Quarter": "Neap tide"
+    enum RangeKind { case spring, neap }
+    let range: RangeKind? = switch moonPhaseName(phase: phase) {
+    case "New Moon", "Full Moon": .spring
+    case "First Quarter", "Last Quarter": .neap
     default: nil
     }
     // Coastal tides can lag the astronomical event by a day or two.
     if let perigee, abs(perigee.timeIntervalSince(at)) <= 2 * 86_400 {
-        return "Perigean \(phaseTide?.lowercased() ?? "tide")"
+        return switch range {
+        case .spring: "Perigean spring tide"
+        case .neap: "Perigean neap tide"
+        case nil: "Perigean tide"
+        }
     }
     if let apogee, abs(apogee.timeIntervalSince(at)) <= 2 * 86_400 {
-        return "Apogean \(phaseTide?.lowercased() ?? "tide")"
+        return switch range {
+        case .spring: "Apogean spring tide"
+        case .neap: "Apogean neap tide"
+        case nil: "Apogean tide"
+        }
     }
-    return phaseTide
+    return switch range {
+    case .spring: "Spring tide"
+    case .neap: "Neap tide"
+    case nil: nil
+    }
 }
 
 /// The moon glyph: the lit region over a dark disc that stays
