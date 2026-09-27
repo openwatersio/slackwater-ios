@@ -155,16 +155,10 @@ export const networkOf = (s) =>
   s.source?.name === NOAA ? "coops" : (s.id.split("-").pop() ?? "");
 
 /**
- * Everywhere station-metadata's bundled gazetteer (places.json, 9,660
- * towns) can legitimately label a station — its own countries, plus the
- * territories it also carries towns for. Matamoros, MX sits 2.8 km from
- * Brownsville, TX, inside the resolver's own 40 km derivation radius;
- * nothing this close currently reaches gen-tides.mjs's naming stage (it
- * ships as a `subordinate` row and is filtered out earlier), but the
- * resolver has no way to know that, and a future upstream row could. So
- * gen-tides.mjs trusts a DERIVED context (the resolver's `derived: true`)
- * only inside this set — everywhere else the upstream region field is used
- * instead (see upstreamRegion in gen-tides.mjs).
+ * Where gen-tides.mjs puts a derived context on the region line: the United
+ * States, Canada and the US territories. Everywhere else the upstream region
+ * field is used instead (see upstreamRegion in gen-tides.mjs), the
+ * presentation the source authority itself uses.
  *
  * Shared with gen-tides.test.mjs so the region-line tests can classify a
  * station the same way the generator does, without importing gen-tides.mjs
@@ -172,6 +166,39 @@ export const networkOf = (s) =>
  */
 export const NORTH_AMERICA = new Set(["United States", "Canada", "Puerto Rico",
   "Virgin Islands", "Guam", "Northern Mariana Islands", "American Samoa"]);
+
+/**
+ * Upstream reads a station's OPERATING AGENCY as its country, so the 17 gauges
+ * NOAA runs outside US waters arrive as "United States" — Dakar, Lagos, Suva,
+ * Easter Island. Every one carries a `-usa-noaa` id suffix, which is the tell.
+ *
+ * Corrected, not deny-listed, because the correction is what is actually true
+ * and it is the form the world bundle needs: these are keepers, they just have
+ * to be labelled honestly — so worldwide they ship under the country this map
+ * corrects them to, not as a seventh US territory.
+ */
+const COUNTRY_FIX = new Map([
+  ["ticon/barbuda-9761115-usa-noaa", "Antigua and Barbuda"],
+  ["ticon/bermuda-2695540-usa-noaa", "Bermuda"],
+  ["ticon/bermuda_biological_station-2695535-usa-noaa", "Bermuda"],
+  ["ticon/chuuk-1840000-usa-noaa", "Micronesia"],
+  ["ticon/cochino_pequeno-9653601-usa-noaa", "Honduras"],
+  ["ticon/dakar-7691360-usa-noaa", "Senegal"],
+  ["ticon/diego_garcia-2431000-usa-noaa", "British Indian Ocean Territory"],
+  ["ticon/diego_ramirez_island-9952000-usa-noaa", "Chile"],
+  ["ticon/easter_island-9962420-usa-noaa", "Chile"],
+  ["ticon/esperanza-1495000-usa-noaa", "Antarctica"],
+  ["ticon/fare_ute_point-1732417-usa-noaa", "French Polynesia"],
+  ["ticon/kwajalein-1820000-usa-noaa", "Marshall Islands"],
+  ["ticon/lagos-7641400-usa-noaa", "Nigeria"],
+  ["ticon/madero-9500966-usa-noaa", "Mexico"],
+  ["ticon/settlement_point-9710441-usa-noaa", "Bahamas"],
+  ["ticon/suva-1910000-usa-noaa", "Fiji"],
+  ["ticon/valparaiso-9963950-usa-noaa", "Chile"],
+]);
+
+/** A database row's country, with COUNTRY_FIX applied; shared so tests classify stations as gen-tides.mjs does. */
+export const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
 
 /**
  * Two rules, because they answer different questions.

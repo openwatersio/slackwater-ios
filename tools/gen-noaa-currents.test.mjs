@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { stationsById } from "@slackwater/database";
-import { here } from "./bundle.mjs";
+import { here, undangle } from "./bundle.mjs";
 
 const stations = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "currents.json"), "utf8"));
@@ -117,4 +117,14 @@ test("a bin is named for its surface station", () => {
   assert.equal(bin.name, surface.name);
   assert.equal(bin.region, surface.region);
   assert.equal(bin.latitude, surface.latitude);
+});
+
+// With no context in the database, the region is borrowed from the nearest tide station.
+test("every station is named and placed by its database record", () => {
+  for (const s of stations) {
+    const d = stationsById.get(s.id.split("@")[0]) ?? stationsById.get(s.id);
+    assert.equal(s.name, d.name, s.id);
+    assert.deepEqual(s.aliases, d.aliases ?? [], s.id);
+    if (d.context) assert.equal(s.region, undangle(d.context), s.id);
+  }
 });

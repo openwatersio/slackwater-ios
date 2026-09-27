@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { allStations } from "@slackwater/database";
 import {
   here, REGION_WORD, FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
-  placesResolver, undangle,
+  undangle, countryOf,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck } from "./datum-check.mjs";
@@ -65,37 +65,39 @@ test("no name ends in its own region", () => {
   assert.deepEqual(doubled, []);
 });
 
-// Task 4 (region lines for the world). The gazetteer behind the derived
-// context tier is 9,660 US, Canadian and territory towns; outside those
-// countries it must never be trusted — nationally it produced "San Francisco
-// · near Olympia, WA", and Matamoros, MX sits 2.8 km from Brownsville, TX,
-// inside the resolver's own 40 km derivation radius. Nothing this close
-// currently reaches the naming stage (Matamoros ships as a `subordinate` row
-// and is filtered out earlier), which is why this asserts on the bundle
-// rather than reproducing a live failure — it is the guard against a future
-// upstream row landing where Matamoros almost does.
-test("no station outside North America carries a gazetteer-derived region", () => {
-  // stations.json carries no `country` field — correlate back to the
-  // upstream row by id, same as the licence and "reaches beyond North
-  // America" tests above.
+// A derived context names the region line only in North America; elsewhere
+// upstream's own region field is the presentation the source authority uses.
+test("no station outside North America carries a derived region", () => {
+  // stations.json carries no `country` field or derived flag — correlate back
+  // to the database record by id, the source gen-tides.mjs names from. A
+  // station outside North America whose shipped region is a context the
+  // database derived got past the gate, unless that context is only the
+  // station's own region or country ("Hokkaido"), which is the fallback anyway.
+  // Non-derived contexts ("Djakarta, Java" -> "Java") are upstream's own words
+  // and are allowed anywhere.
   const byId = new Map(allStations.map((s) => [s.id, s]));
-  // station-metadata 5.0.0 dropped the "~" a derived context used to carry,
-  // so a derived label can no longer be spotted by its glyph. Ask the same
-  // resolver gen-tides.mjs uses: a station outside North America whose
-  // shipped region is a context the resolver marked `derived` got past the
-  // gate. Non-derived contexts ("Djakarta, Java" -> "Java") are upstream's
-  // own words and are allowed anywhere.
-  const resolve = placesResolver();
   const borrowed = stations
     .filter((s) => {
-      const raw = byId.get(s.id);
-      const c = raw?.country;
-      if (!c || NORTH_AMERICA.has(c)) return false;
-      const r = resolve({ id: raw.id, name: raw.name, latitude: raw.latitude, longitude: raw.longitude });
-      return r.derived && s.region === undangle(r.context);
+      const d = byId.get(s.id);
+      if (!d?.country || NORTH_AMERICA.has(countryOf(d))) return false;
+      return d.context_derived && s.region === undangle(d.context) &&
+        s.region !== d.region && s.region !== countryOf(d);
     })
     .map((s) => `${s.name} · ${s.region}`);
   assert.deepEqual(borrowed, []);
+});
+
+// Names, contexts and aliases are the database's: the name as it is (less a
+// trailing region, see untrail), the context as the region line where it shows.
+test("every station is named from its database record", () => {
+  const byId = new Map(allStations.map((s) => [s.id, s]));
+  for (const s of stations) {
+    const d = byId.get(s.id);
+    assert.ok(d.name.startsWith(s.name), `${s.id}: "${s.name}" is not "${d.name}"`);
+    assert.deepEqual(s.aliases, d.aliases ?? [], s.id);
+    const na = NORTH_AMERICA.has(countryOf(d));
+    if (d.context && (na || !d.context_derived)) assert.equal(s.region, undangle(d.context), s.id);
+  }
 });
 
 test("every station has a region line and a usable model", () => {
@@ -115,19 +117,16 @@ test("every station has a region line and a usable model", () => {
 test("no bundled Canadian station duplicates a CHS station", () => {
   const chs = JSON.parse(readFileSync(
     join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
-  // The province code either IS the region line or ends it — "BC" and
-  // "Sidney, BC" are both Canadian. Matching only the bare code quietly
-  // shrank this check to 25 stations the day nearest-town labels landed, which
-  // is the wrong way for a duplicate-detector to fail. Read from the shipped
-  // file rather than the generator's own bookkeeping, deliberately: that is
-  // what makes this an independent check and not a restatement.
-  const ca = stations.filter((s) =>
-    /(^|,\s)(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NT|NU)$/.test(s.region));
+  // Canadian by the database's country, not by the region line, which may name
+  // the water rather than the province, nor by the "-can-" in a TICON id, which
+  // is the operating agency's: MEDS runs Patos Island, in Washington. Read the
+  // shipped file rather than the generator's own bookkeeping, deliberately:
+  // that is what makes this an independent check and not a restatement.
   // NOAA rows are exempt: their datums are adopted, and Hyder was already
   // shipping when CHS gauges Stewart 1.3 km away.
-  const contested = ca
-    .filter((s) => s.id.startsWith("ticon/") && chs.some((c) => km(s, c) <= 10))
-    .map((s) => s.name);
+  const country = new Map(allStations.map((s) => [s.id, s.country_code]));
+  const ca = stations.filter((s) => s.id.startsWith("ticon/") && country.get(s.id) === "CA");
+  const contested = ca.filter((s) => chs.some((c) => km(s, c) <= 10)).map((s) => s.name);
   assert.deepEqual(contested, []);
   assert.ok(ca.length > 30, `only ${ca.length} Canadian gap-fills`);
 });

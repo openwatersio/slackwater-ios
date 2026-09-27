@@ -44,25 +44,21 @@
  * questions asked.
  *
  * `country` itself is trustworthy for NOAA rows and NOT for TICON's, which is
- * why COUNTRY_FIX exists below: upstream reads a station's operating agency as
+ * why COUNTRY_FIX exists (bundle.mjs): upstream reads a station's operating agency as
  * its country, so the gauges NOAA runs abroad arrive claiming "United States".
  * With no COUNTRIES gate to drop them as a side effect, COUNTRY_FIX is what
  * lets them ship labelled honestly — Dakar as Senegal, not as a US station.
  * The other TICON-shaped correction, CA_PROVINCE, is documented at its
  * definition.
  *
- * NAMING. Same enrichment path as the Salish bundle: names, contexts and
- * aliases come from @openwaters/station-metadata so the iOS app, the
- * web app and the MCP fleet all say the same thing. Two guards the
- * Salish-sized bundle never needed, both in NORTH_AMERICA/upstreamRegion
- * below: the resolver's fourth tier is "nearest place from the bundled
- * gazetteer", and that gazetteer holds 9,660 US, Canadian and territory
- * towns — worldwide it stays out of the region line entirely outside those
- * countries, and upstream's own region field ("Scotland", "Bretagne") fills
+ * NAMING. Names, contexts and aliases are the database's, so the iOS app, the
+ * website and the MCP fleet all say the same thing. A context is the
+ * provider's own qualifier or curated water, else a place the database
+ * derives: a bay or strait, else the town a reader knows. A derived context
+ * names the region line only in North America (NORTH_AMERICA/upstreamRegion
+ * below); elsewhere upstream's own region field ("Scotland", "Bretagne") fills
  * in instead, the presentation the source authority itself uses.
  * ponytail: state code, not an expanded name, for the North American case.
- * Expand it when the registry grows a real national gazetteer, which is
- * where curation belongs anyway.
  *
  * And two presentation fixes at the data layer, once, rather than on every
  * render — see undangle() and untrail(). NOAA writes a qualifier as the phrase
@@ -80,43 +76,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@slackwater/database";
 import {
-  here, placesResolver, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
-  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
+  here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
+  FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 import { passesDatumCheck, DATUM_TOLERANCE_M } from "./datum-check.mjs";
 
 const NOAA = "US National Oceanic and Atmospheric Administration";
-
-/**
- * Upstream reads a station's OPERATING AGENCY as its country, so the 17 gauges
- * NOAA runs outside US waters arrive as "United States" — Dakar, Lagos, Suva,
- * Easter Island. Every one carries a `-usa-noaa` id suffix, which is the tell.
- *
- * Corrected, not deny-listed, because the correction is what is actually true
- * and it is the form the world bundle needs: these are keepers, they just have
- * to be labelled honestly — so worldwide they ship under the country this map
- * corrects them to, not as a seventh US territory.
- */
-const COUNTRY_FIX = new Map([
-  ["ticon/barbuda-9761115-usa-noaa", "Antigua and Barbuda"],
-  ["ticon/bermuda-2695540-usa-noaa", "Bermuda"],
-  ["ticon/bermuda_biological_station-2695535-usa-noaa", "Bermuda"],
-  ["ticon/chuuk-1840000-usa-noaa", "Micronesia"],
-  ["ticon/cochino_pequeno-9653601-usa-noaa", "Honduras"],
-  ["ticon/dakar-7691360-usa-noaa", "Senegal"],
-  ["ticon/diego_garcia-2431000-usa-noaa", "British Indian Ocean Territory"],
-  ["ticon/diego_ramirez_island-9952000-usa-noaa", "Chile"],
-  ["ticon/easter_island-9962420-usa-noaa", "Chile"],
-  ["ticon/esperanza-1495000-usa-noaa", "Antarctica"],
-  ["ticon/fare_ute_point-1732417-usa-noaa", "French Polynesia"],
-  ["ticon/kwajalein-1820000-usa-noaa", "Marshall Islands"],
-  ["ticon/lagos-7641400-usa-noaa", "Nigeria"],
-  ["ticon/madero-9500966-usa-noaa", "Mexico"],
-  ["ticon/settlement_point-9710441-usa-noaa", "Bahamas"],
-  ["ticon/suva-1910000-usa-noaa", "Fiji"],
-  ["ticon/valparaiso-9963950-usa-noaa", "Chile"],
-]);
 
 /**
  * Canadian rows carry GeoNames admin1 codes ("02"), not the province codes the
@@ -187,7 +153,6 @@ const out = join(here, "..", "Slackwater", "Resources", "stations.json");
 const unavailableOut = join(here, "..", "Slackwater", "Resources", "unavailable-stations.json");
 const chs = JSON.parse(
   readFileSync(join(here, "..", "Slackwater", "Resources", "chs-stations.json"), "utf8"));
-const resolve = placesResolver();
 
 /**
  * TICON repeats the state in the name, which the region line is already
@@ -226,7 +191,6 @@ const untrail = (name, ...regions) => {
 /** The state/province code a region line ends in — "LaSalle, ON" -> "ON". */
 const trailingCode = (region) => region.match(/\b([A-Z]{2})$/)?.[1];
 
-const countryOf = (s) => COUNTRY_FIX.get(s.id) ?? s.country;
 const regionOf = (s) => {
   const r = (countryOf(s) === "Canada" && CA_PROVINCE[s.region]) || s.region;
   // A GeoNames code that survived the map is a cross-border mislabel — five
@@ -237,10 +201,8 @@ const regionOf = (s) => {
 
 /**
  * Upstream's own `region` — "England", "Scotland", "Bretagne" — is the
- * presentation the source authority uses, and outside North America it is
- * the best context this pipeline has: the derived gazetteer tier never
- * reaches this far (see NORTH_AMERICA in bundle.mjs), and station-metadata
- * has no curated context for anywhere outside the Salish bundle yet.
+ * presentation the source authority uses, and outside North America it takes
+ * the place of a derived context (see NORTH_AMERICA in bundle.mjs).
  *
  * Two guards, both against a value that isn't a usable place name:
  *
@@ -310,7 +272,7 @@ const collides = (s) => {
 // Runs on the RESOLVED/display name, not the raw upstream one — raw names
 // disagree across networks for the exact same gauge ("HILO" vs "Hilo
 // Hawaii", "CHARLOTTE AMALIE, ST. THOMAS ISLAND" vs "Charlotte Amalie",
-// same station id both times) and only converge once station-metadata
+// same station id both times) and only converge once the database's naming
 // and untrail() have run. Matching on the raw name missed those pairs
 // entirely; this is why the dedupe below runs AFTER naming, not before.
 const byName = new Map();
@@ -337,7 +299,7 @@ const samePlace = (s) =>
 // Mossel Bay, Port Sonara and Inhambane. Neither feed is reliably right, so
 // the tiebreak stays the deterministic one every machine reproduces.
 // ponytail: leaves a pin up to ~22 km off at Mossel Bay. Fix by curating the
-// position in station-metadata, which is where station identity belongs.
+// position in the database's corrections, which is where station identity belongs.
 const uhslcKey = (id) =>
   id.match(/-(\d+)[a-z]?-([a-z]{3})-uhslc_(?:fd|rq)$/)?.slice(1, 3).join("-");
 const uhslcSeen = new Set();
@@ -416,10 +378,8 @@ function astronomicalBounds(s) {
   const reduce = (v, k) => (type === "ratio" ? k * v : v + k);
   return { latDatum: round3(reduce(lat, low)), hatDatum: round3(reduce(hat, high)) };
 }
-// Ids whose region came from the derived nearest-town tier (station-metadata
-// 5.0.0 dropped the "~" that used to mark this in the region string itself —
-// see `region` inside buildStation — so it has to be tracked here instead).
-const derivedTownIds = new Set();
+// Ids whose region line is a context the database derived, for the census below.
+const derivedIds = new Set();
 const kept = shippable
   .filter((s) => !FRESHWATER_NETWORKS.has(networkOf(s)))
   .filter((s) => (servedByChs(s) ? (cededToChs++, false) : true))
@@ -472,33 +432,23 @@ const stations = kept.filter((s) =>
 
 /** Builds the shape shipped in stations.json for one raw database row. */
 function buildStation(s) {
-    const r = resolve({ id: s.id, name: s.name, latitude: s.latitude, longitude: s.longitude });
     // The state/province code. Not always the region line any more — a derived
     // context outranks it — but still its own fact, and `untrail` needs it
     // whatever gets displayed (see below).
     const code = ((countryOf(s) === "United States" || countryOf(s) === "Canada") && regionOf(s)) || "";
     const na = NORTH_AMERICA.has(countryOf(s));
-    // Fallback chain: curated or derived context, then state/province or the
+    // Fallback chain: the database's context, then state/province or the
     // upstream region field, then country — the unincorporated Pacific
     // islands (Midway, Wake, Johnston Atoll) carry no region at all.
     //
-    // A DERIVED context is no longer discarded outright. It used to be,
-    // because the gazetteer behind it held 19 Salish towns and nationally
-    // produced "San Francisco · near Olympia, WA"; station-corrections 2.8.0
-    // derives from a national places list instead, capped at 40 km, so
-    // "Bellingham, WA" beats the bare "WA" it replaces — it says the same
-    // thing and more. That gazetteer is still North-American places only
-    // (see NORTH_AMERICA above), so a derived context is trusted only there;
-    // everywhere else the upstream region field is both correct and the
-    // presentation the source authority itself uses ("Scotland", not
-    // "Portsmouth Heights, VA").
-    const region =
-      (na || !r.derived ? undangle(r.context) : "") ||
-      (na ? code : upstreamRegion(s)) ||
-      countryOf(s);
-    // Track the derived-town tier ourselves — station-metadata 5.0.0 no
-    // longer marks it with a "~" in `region` itself, only with `r.derived`.
-    if (na && r.derived && undangle(r.context)) derivedTownIds.add(s.id);
+    // A derived context ("Bellingham, WA", "Grays Harbor") names the region
+    // line only in North America (see NORTH_AMERICA in bundle.mjs); everywhere
+    // else the upstream region field is the presentation the source authority
+    // itself uses ("Scotland").
+    const context = undangle(s.context);
+    const derived = Boolean(s.context_derived);
+    const region = (na || !derived ? context : "") || (na ? code : upstreamRegion(s)) || countryOf(s);
+    if (na && derived && context) derivedIds.add(s.id);
     return {
       id: s.id,
       // Trailing-state cleanup keys on the CODE, not the region line for the
@@ -511,9 +461,9 @@ function buildStation(s) {
       // it's a harmless miss (`region` there is either the same code
       // `trailingCode` already extracted, or a derived "Town, XX" that never
       // matches a bare name ending).
-      name: untrail(r.name, code, trailingCode(region), region),
+      name: untrail(s.name, code, trailingCode(region), region),
       region,
-      aliases: r.aliases ?? [],
+      aliases: s.aliases ?? [],
       latitude: s.latitude,
       longitude: s.longitude,
       timezone: s.timezone,
@@ -690,13 +640,13 @@ if (unavailable.some((s) => ids.has(s.id))) {
 const unavailableSize = writeBundle(unavailableOut, unavailable);
 
 const size = writeBundle(out, stations);
-const towns = stations.filter((s) => derivedTownIds.has(s.id)).length;
+const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
 const subordinates = stations.filter((s) => s.reference).length;
 console.log(
   `${stations.length} tide stations (${stations.length - subordinates} reference, ` +
   `${subordinates} subordinate, ${orphaned} orphaned subordinates dropped), ${size} ` +
-  `(${stations.length - towns - codes} curated contexts, ${towns} nearest town, ` +
+  `(${stations.length - derivedCount - codes} own contexts, ${derivedCount} derived, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +
   `${dropped} duplicates dropped; ${failedDatum} failed the ${DATUM_TOLERANCE_M} m datum check)`);

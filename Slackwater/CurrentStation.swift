@@ -1,8 +1,6 @@
-// Slackwater — GPL v3. Bundled NOAA Salish current stations (public domain
-// data, the same file slackwater-web ships as currents.json, enriched with
-// resolved names/regions/aliases from @openwaters/station-metadata —
-// harmonic and subordinate stations, primary bin plus the bins subordinates
-// reduce from).
+// Slackwater — GPL v3. Bundled NOAA current stations (public domain data,
+// named and placed by the station database — harmonic and subordinate
+// stations, primary bin plus the bins subordinates reduce from).
 import CoreLocation
 import Foundation
 import SlackwaterKit
