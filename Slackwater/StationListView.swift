@@ -887,7 +887,8 @@ struct StationListView: View {
                      action: "Find tides near me",
                      identifier: "location-ask-card",
                      icon: "location.fill",
-                     accent: SN.leaf) {
+                     accent: SN.leaf,
+                     iconLabel: "Location") {
             loc.request()
         }
     }
@@ -899,7 +900,8 @@ struct StationListView: View {
                      headline: "Turn on location in Settings to find nearby tides and currents.",
                      action: "Go to Settings",
                      identifier: "location-denied-card",
-                     icon: "location.slash") {
+                     icon: "location.slash",
+                     iconLabel: "Location unavailable") {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 UIApplication.shared.open(url)
             }
