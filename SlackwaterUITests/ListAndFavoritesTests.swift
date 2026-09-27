@@ -99,6 +99,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     func testM41DeniedSlot() throws {
         let app = launch("-seedGate", "-resetRecents", "-locDenied")
         XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
+        XCTAssert(app.images["Location unavailable"].exists)
         XCTAssert(app.staticTexts["Go to Settings"].exists)
         XCTAssertFalse(app.staticTexts["MY LOCATION"].exists)
         XCTAssert(app.staticTexts["CHESAPEAKE BAY"].exists)
@@ -118,6 +119,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     func testM41UndeterminedSlotOffersTheAsk() throws {
         let app = launch("-seedGate", "-resetRecents", "-locUndetermined")
         XCTAssert(app.staticTexts["Tides and currents near you"].appears(within: 5))
+        XCTAssert(app.images["Location"].exists)
         XCTAssert(app.staticTexts["Find tides near me"].exists)
         XCTAssertFalse(app.staticTexts["Location unavailable"].exists)
         XCTAssert(app.staticTexts["CHESAPEAKE BAY"].exists)
