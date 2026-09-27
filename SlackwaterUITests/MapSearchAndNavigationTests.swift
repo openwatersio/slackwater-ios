@@ -130,7 +130,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         // The card says two things and no more — the licence argument lives on
         // the detail page, not on the map.
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "not yet available")).firstMatch.exists,
+            NSPredicate(format: "label CONTAINS[c] %@", "predictions unavailable")).firstMatch.exists,
             "the card does not say the station is unavailable")
         XCTAssertFalse(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS[c] %@", "cc-by-nc")).firstMatch.exists,
@@ -141,7 +141,7 @@ final class MapSearchAndNavigationTests: ScreenshotTestCase {
         save(app, "m4-unavailable-station.png")
 
         // The card's one link opens the page that explains it.
-        app.staticTexts["We need your help"].firstMatch.tap()
+        app.staticTexts["About this station"].firstMatch.tap()
         let detail = app.descendants(matching: .any)["unavailable-detail"].firstMatch
         XCTAssert(detail.appears(within: 5), "the card's link opened no detail page")
         XCTAssert(app.descendants(matching: .any)["unavailable-support-ask"]
