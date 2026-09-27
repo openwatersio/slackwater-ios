@@ -342,9 +342,30 @@ struct OfflineManagerList: View {
                 Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
             }
 
-            Toggle(isOn: Binding(
-                get: { service.tier == .everything },
-                set: { on in service.accept(on ? .everything : .nearby) })) {
+            // A Button, NOT a Toggle. Every queue tick re-evaluates this
+            // body, and that cancels a UISwitch's in-flight gesture: while
+            // anything was downloading — which is precisely when someone
+            // opens this sheet — a tap on the switch was silently eaten,
+            // and the tier never widened. A Button fires on touch-up and
+            // survives the same churn. Measured both ways on an erased
+            // device before this was changed (#462).
+            //
+            // Losing the off position costs nothing it was honestly
+            // offering: turning it off never stopped the work already in
+            // flight, only the widening, which is why the copy below had to
+            // explain that away.
+            if service.tier == .everything {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Keep downloading Canadian stations within 150 km")
+                        .foregroundStyle(SN.leaf)
+                    Text("Adding more whenever Slackwater is open. \(service.queue.ready) so far.")
+                        .font(.footnote)
+                }
+                .accessibilityIdentifier("download-tier-everything-on")
+            } else {
+                Button {
+                    service.accept(.everything)
+                } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         // 150 km, not "Canadian stations" unqualified — this
                         // stops at ChsFitService.autoFitRadiusKm same as the
@@ -353,15 +374,16 @@ struct OfflineManagerList: View {
                         Text("Keep downloading Canadian stations within 150 km")
                         // No estimate and no percentage: 1,073 stations is
                         // hours of requests and has no finish line to show.
-                        // The queue only ever grows (M53) — off stops MORE
-                        // stations from being added, not what is already
-                        // in flight, and the copy says so rather than
-                        // implying a pause that doesn't happen.
-                        Text("Adds more whenever Slackwater is open. Turning this off doesn't stop what's already downloading. \(service.queue.ready) so far.")
+                        Text("Adds more whenever Slackwater is open, as far as 150 km out.")
                             .font(.footnote)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(SN.leaf)
                 .accessibilityIdentifier("download-tier-everything-toggle")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)

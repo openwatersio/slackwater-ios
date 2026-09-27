@@ -139,15 +139,15 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         // `.inView` cohort, so they only join the queue once the widest tier
         // is accepted (DownloadTier.swift) — this test is about queue order
         // and promotion, not tier gating, so pull the whole fixture set in.
-        let everythingToggle = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
-        XCTAssert(everythingToggle.appears(within: 5))
-        // Aim at the trailing edge, not the centre. SwiftUI publishes the whole
-        // Toggle row — its two-line explanation included — as one Switch element
-        // (338×98 pt here), so `tap()`'s centre point lands on the copy about
-        // 120 pt left of the control. A switch's label is not a tap target on
-        // iOS, so that tap is delivered and does nothing: the tier stayed
-        // `.inView` and Race Passage and Porlier Pass never joined the queue.
-        everythingToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let everything = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
+        XCTAssert(everything.appears(within: 5))
+        everything.tap()
+        // The widest tier has been accepted when the card stops offering it.
+        // Asserted here rather than left to the row waits below, so a tap that
+        // does not land fails as itself instead of as four missing stations —
+        // which is how the Toggle this replaced hid a real bug (#462).
+        XCTAssert(app.descendants(matching: .any)["download-tier-everything-on"]
+            .firstMatch.appears(within: 5), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
