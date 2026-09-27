@@ -31,8 +31,8 @@ final class UnitsCloud {
                 self.retry = nil
             }
             self.adopt(seedMissing: false)
-            if reason == NSUbiquitousKeyValueStoreInitialSyncChange {
-                // Initial downloads can defer writes; retry only keys still absent after the download.
+            if reason != NSUbiquitousKeyValueStoreAccountChange {
+                // Let cloud downloads settle, then recheck missing keys before seeding saved preferences.
                 self.retry?.cancel()
                 let retry = DispatchWorkItem { [weak self] in self?.adopt(seedMissing: true) }
                 self.retry = retry
@@ -40,7 +40,8 @@ final class UnitsCloud {
             }
         }
         cloud.synchronize()
-        adopt(seedMissing: true)
+        // synchronize() starts asynchronous work; an empty cache must not trigger uploads.
+        adopt(seedMissing: false)
     }
 
     deinit {

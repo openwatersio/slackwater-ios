@@ -41,6 +41,12 @@ final class UnitsCloudTests: XCTestCase {
         defaults.set("metric", forKey: unitsKey)
         defaults.set("unsupported", forKey: speedUnitKey)
         let sync = sync()
+        XCTAssertTrue(cloud.writes.isEmpty, "an empty launch cache is not evidence of an empty cloud")
+        expectation(for: NSPredicate { [cloud] _, _ in
+            cloud?.values[unitsKey] as? String == "metric"
+        }, evaluatedWith: nil)
+        cloud.notify(NSUbiquitousKeyValueStoreServerChange)
+        waitForExpectations(timeout: 3)
         withExtendedLifetime(sync) {
             XCTAssertEqual(cloud.writes, [unitsKey: "metric"])
             XCTAssertEqual(reloads, 0)
@@ -53,6 +59,26 @@ final class UnitsCloudTests: XCTestCase {
             XCTAssertTrue(cloud.writes.isEmpty)
             XCTAssertNil(defaults.object(forKey: unitsKey))
             XCTAssertNil(defaults.object(forKey: speedUnitKey))
+        }
+    }
+
+    func testLaunchWaitsForCloudAndRechecksValuesBeforeSeeding() {
+        defaults.set("metric", forKey: unitsKey)
+        defaults.set("kmh", forKey: speedUnitKey)
+        let sync = sync()
+        XCTAssertTrue(cloud.writes.isEmpty)
+
+        cloud.notify(NSUbiquitousKeyValueStoreInitialSyncChange)
+        XCTAssertTrue(cloud.writes.isEmpty)
+        cloud.values[unitsKey] = "imperial"
+        expectation(for: NSPredicate { [cloud] _, _ in
+            cloud?.values[speedUnitKey] as? String == "kmh"
+        }, evaluatedWith: nil)
+        waitForExpectations(timeout: 3)
+        withExtendedLifetime(sync) {
+            XCTAssertEqual(defaults.string(forKey: unitsKey), "imperial")
+            XCTAssertEqual(cloud.values[unitsKey] as? String, "imperial")
+            XCTAssertEqual(cloud.writes, [speedUnitKey: "kmh"])
         }
     }
 
