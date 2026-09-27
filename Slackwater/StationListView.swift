@@ -849,9 +849,10 @@ struct StationListView: View {
                      expectation: "It has been withdrawn from the hydrographic "
                         + "service, so it has no readings to show."
                         + (isFavorite ? " Swipe to remove it." : ""),
-                     action: isFavorite ? "Pick a replacement" : "Pick another station",
+                     action: "Choose another station",
                      identifier: "removed-station-card",
-                     icon: "mappin.slash") {
+                     icon: "mappin.slash",
+                     iconLabel: "Station removed") {
             chooser = StationMatches(place: gone?.name ?? "Removed station",
                                      matches: nearest(to: origin),
                                      replacing: .init(id: id, lat: origin.lat, lon: origin.lon))

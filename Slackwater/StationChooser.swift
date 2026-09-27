@@ -18,12 +18,6 @@ struct StationMatches: Identifiable, Hashable {
     }
     var replacing: Removed? = nil
     var id: String { place }
-
-    /// "2 other current locations": counts only the stations not on screen,
-    /// short enough to share a row with the page's tide or current link.
-    static func linkText(others: Int, series: StationSeries) -> String {
-        "\(others) other \(series.rawValue) location\(others == 1 ? "" : "s")"
-    }
 }
 
 /// The chooser's entry point on a station page, beside its tide or current
@@ -36,7 +30,7 @@ struct MatchingStationsLink: View {
 
     var body: some View {
         if let namesakes = StationItem.byPlace[item.placeKey], namesakes.count > 1 {
-            BranchLink(text: StationMatches.linkText(others: namesakes.count - 1, series: item.series),
+            BranchLink(text: "Other locations (\(namesakes.count - 1))",
                        id: "matching-stations", chevron: false) {
                 let from = LocationService.shared.rankingAnchor
                 place = StationMatches(place: item.name,
@@ -142,15 +136,16 @@ struct StationChooserSheet: View {
 
     private var explanation: String {
         if place.replacing != nil {
-            return "These stations are nearest to where it was. Pick one to use instead."
+            return "Choose a replacement near the removed station."
         }
-        let review = "Review the other locations if you need predictions for a different part of the water."
-        guard let shown = place.matches.first(where: { $0.id == place.shown }) else { return review }
+        guard let shown = place.matches.first(where: { $0.id == place.shown }) else {
+            return "Choose another station for a different part of the water."
+        }
         // "Closest" only holds when the distances are measured from a named point.
-        let lead = anchorName != nil && shown.id == place.matches.first?.id
-            ? "Slackwater is showing the closest station."
-            : "Slackwater is showing \(shown.placeLabel)."
-        return lead + " " + review
+        if anchorName != nil && shown.id == place.matches.first?.id {
+            return "Showing the closest station. Choose another station for a different part of the water."
+        }
+        return "Showing \(shown.placeLabel). Choose another station for a different part of the water."
     }
 
     /// Pins are SwiftUI views over the map rather than map layers, so one
