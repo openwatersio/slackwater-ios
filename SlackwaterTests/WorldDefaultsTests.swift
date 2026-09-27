@@ -69,7 +69,7 @@ final class WorldDefaultsTests: XCTestCase {
         let sierra = StationItem.all.filter { $0.name == "Sierra Point" }
         let here = try XCTUnwrap(sierra.first { $0.region == "1.1 nm ENE" })
         let far = try XCTUnwrap(sierra.first { $0.region == "3.8 nm east" })
-        d.set([far.placeKey: far.id], forKey: AppGroup.chosenStationsKey)
+        d.set([far.id], forKey: AppGroup.chosenStationsKey)
 
         XCTAssertTrue(LocationService.cacheNearestWidgetStation(
             lat: here.latitude, lon: here.longitude, defaults: d))
