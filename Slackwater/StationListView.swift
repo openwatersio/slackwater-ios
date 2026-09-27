@@ -550,13 +550,13 @@ struct StationListView: View {
 
     /// The ring's card: almost wordless on purpose (issue #401). Someone who
     /// tapped a ring in a harbour is asking "is this app broken", and that
-    /// answer is three words; the licence argument, the ask and the nearest
+    /// answer is a short status; the licence argument, the ask and the nearest
     /// alternatives are all a tap away in `UnavailableDetailView`.
     ///
     /// NO REGION on the headline, which is why the second line is a bare
     /// status. `region` is the country for 9 of the 139 rows — Alboran and
     /// Valencia are filed under "Spain", F3platform under "Netherlands" — so
-    /// "Netherlands — not yet available" is a card claiming a whole country
+    /// "Netherlands — predictions unavailable" is a card claiming a whole country
     /// is unavailable while the app ships 137 Dutch stations. The place is
     /// already on screen under the card; the detail page's header carries it
     /// in the one spot where it reads as context rather than as the subject.
@@ -566,8 +566,8 @@ struct StationListView: View {
     /// `PIN_NEUTRAL` the ring on the map is drawn in — one meaning, one value.
     private func unavailableCard(_ station: UnavailableStation) -> some View {
         ChsAmberCard(title: station.name,
-                     headline: "Not yet available.",
-                     action: "We need your help",
+                     headline: "Predictions unavailable.",
+                     action: "About this station",
                      identifier: "unavailable-station-card",
                      icon: "lock",
                      accent: SN.steel,

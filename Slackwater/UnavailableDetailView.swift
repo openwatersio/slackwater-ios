@@ -5,7 +5,7 @@ import SwiftUI
 
 /// A station we know about and may never serve, given a page of its own.
 ///
-/// The map card is deliberately almost wordless — "not yet available" and one
+/// The map card is deliberately almost wordless — "predictions unavailable" and one
 /// link — because someone tapping a ring in a harbour wants to know whether
 /// the app is broken, not to read about licensing. This is where the rest goes
 /// for the people who want it, in the order the ask deserves: the plain fact,
@@ -52,7 +52,7 @@ struct UnavailableDetailView: View {
 
     /// The fact, then the ask. In that order on purpose: a page that opens
     /// with an explanation is a page defending itself; one that opens with
-    /// "not yet" is answering the question that was actually asked.
+    /// the availability status is answering the question that was actually asked.
     ///
     /// NO REASON GIVEN, deliberately. An earlier draft explained the
     /// non-commercial licence and said buying it was the whole cost. We do not
@@ -65,12 +65,11 @@ struct UnavailableDetailView: View {
     /// people assuming a bug starts making a different wrong claim.
     private var explanation: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Not yet available", systemImage: "lock")
+            Label("Predictions unavailable", systemImage: "lock")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(SN.paper)
 
-            Text("There is a real tide station here, and Slackwater can't publish "
-                 + "predictions for it yet.")
+            Text("Slackwater doesn't have predictions for this tide station.")
                 .font(.callout)
                 .foregroundStyle(SN.foam.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
@@ -110,12 +109,10 @@ struct UnavailableDetailView: View {
     /// before this page asks for any.
     private var supportAsk: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("We need your help")
+            Text("Can you help?")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(SN.leaf)
-            Text("We don't yet know what it would take to add this one. If you "
-                 + "know a contact for this station, or anything about how its "
-                 + "data is licensed, please get in touch.")
+            Text("If you know who operates this station or how its data is licensed, let us know.")
                 .font(.footnote)
                 .lineSpacing(3)
                 .foregroundStyle(SN.foam.opacity(0.75))
@@ -131,7 +128,7 @@ struct UnavailableDetailView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "envelope")
                         .font(.caption2.weight(.semibold))
-                    Text("Contact us")
+                    Text("Share station details")
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.semibold))
                 }
@@ -144,10 +141,10 @@ struct UnavailableDetailView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("unavailable-support-ask")
-        .alert("No mail app", isPresented: $copied) {
+        .alert("Mail unavailable", isPresented: $copied) {
             Button("OK") {}
         } message: {
-            Text("Your message was copied. Send it to \(supportEmail).")
+            Text("Message copied. Send it to \(supportEmail).")
         }
     }
 
@@ -157,7 +154,7 @@ struct UnavailableDetailView: View {
     /// that names them per station, because "which licence, exactly" is a fair
     /// question with a real answer.
     ///
-    /// "Named from", not "published by". The same SEANOE deposit is credited
+    /// "Station name from", not "published by". The same SEANOE deposit is credited
     /// in Settings under CC BY 4.0, because its other half is CC BY 4.0 — so a
     /// line reading "published by TICON-4 under cc-by-nc-4.0" scans as the app
     /// contradicting itself. What is true is narrower: we took the NAME from
@@ -169,8 +166,7 @@ struct UnavailableDetailView: View {
     /// deliberately does not claim to know the reason. This is where the name
     /// came from, nothing more.
     private var provenance: some View {
-        Text("Named from \(station.source) (SEANOE), whose record for this "
-             + "station is licensed \(station.license).")
+        Text("Station name from \(station.source) (SEANOE). Its record is licensed under \(station.license).")
             .font(.caption2)
             .foregroundStyle(SN.foam.opacity(0.45))
             .multilineTextAlignment(.center)
