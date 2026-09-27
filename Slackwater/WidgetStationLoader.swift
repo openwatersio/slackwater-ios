@@ -16,15 +16,23 @@ enum WidgetRecord {
 }
 
 enum WidgetStationLoader {
+    /// Capture storage once; online coverage still depends on each entry's date.
+    static func recordSource(
+        id: String, locator: CatalogFileLocator = .shared
+    ) -> (Date) -> WidgetRecord? {
+        locator.load { directory in try recordSource(id: id, directory: directory) } ?? { _ in nil }
+    }
+
     /// Online gates need a saved window; widgets cannot request one themselves.
     static func loadRecord(
         id: String, at date: Date = .now, locator: CatalogFileLocator = .shared
     ) -> WidgetRecord? {
-        locator.load { directory in try loadRecord(id: id, at: date, directory: directory) }
+        recordSource(id: id, locator: locator)(date)
     }
 
-    private static func loadRecord(id: String, at date: Date, directory: URL) throws -> WidgetRecord? {
+    private static func recordSource(id: String, directory: URL) throws -> ((Date) -> WidgetRecord?)? {
         guard let item = try StationItem.widgetItem(id: id, directory: directory) else { return nil }
+        let record: WidgetRecord
         switch item {
         // `widgetItem` hands back identity only (#317), so the record costs a
         // second scan of the same mapped file. ponytail: two scans, not one;
@@ -35,46 +43,52 @@ enum WidgetStationLoader {
             let reference: TideStationRecord? = try r.reference.flatMap {
                 try catalogRecord("stations", id: $0, directory: directory)
             }
-            return .tide(r, station: r.engineStation(referenceRecord: reference))
+            record = .tide(r, station: r.engineStation(referenceRecord: reference))
         case .current(let info):
             guard let r: CurrentStationRecord = try catalogRecord("currents", id: info.id, directory: directory)
             else { return nil }
             let reference: CurrentStationRecord? = try r.reference.flatMap {
                 try catalogRecord("currents", id: $0, directory: directory)
             }
-            return .current(r, station: r.engineStation(referenceRecord: reference))
+            record = .current(r, station: r.engineStation(referenceRecord: reference))
         case .chs(let info):
             guard let model = ChsModelStore.load(info.id) else { return nil }
-            let record = info.record(with: model)
-            return .tide(record, station: record.harmonicStation)
+            let r = info.record(with: model)
+            record = .tide(r, station: r.harmonicStation)
         case .chsGate(let gate):
             // Mirrors DerivedGateRecord.engineGate (ChsGate.swift:40-43): the
             // reference port's fitted model → DerivedSlackStation(hwLag/lwLag).
             // nil when the reference port isn't fitted yet.
-            return try derivedRecord(for: gate, directory: directory)
+            guard let derived = try derivedRecord(for: gate, directory: directory) else { return nil }
+            record = derived
         case .chsCurrent(let info):
             if info.isOnline {
+                let blocks = ChsModelStore.loadOnline(info.id)?.blocks ?? []
                 var calendar = Calendar(identifier: .gregorian)
                 calendar.timeZone = info.tz
-                let neededStart = min(calendar.startOfDay(for: date),
-                                      date.addingTimeInterval(-StationCardGraph.backWindow))
-                let neededEnd = date.addingTimeInterval(2 * 86_400 + 6 * 3_600)
-                guard let window = ChsModelStore.loadOnline(info.id)?.blocks.first(where: {
-                    $0.start <= neededStart && $0.end >= neededEnd
-                        && $0.times.count > 1 && $0.times.count == $0.speeds.count
-                        && ($0.times.first ?? .infinity) <= neededStart.timeIntervalSince1970
-                        && ($0.times.last ?? -.infinity) >= neededEnd.timeIntervalSince1970
-                }) else { return nil }
-                // No harmonic fit exists here; the window supplies the actual predictions.
-                let record = CurrentStationRecord(
-                    id: info.id, name: info.name, region: info.region, aliases: info.aliases,
-                    latitude: info.latitude, longitude: info.longitude, timezone: info.timezone,
-                    floodDirection: window.floodDirection, ebbDirection: window.ebbDirection,
-                    meanFlow: 0, tideReference: info.tideReference, constituents: [])
-                return .current(record, station: window)
+                return { date in
+                    let neededStart = min(calendar.startOfDay(for: date),
+                                          date.addingTimeInterval(-StationCardGraph.backWindow))
+                    let neededEnd = date.addingTimeInterval(2 * 86_400 + 6 * 3_600)
+                    guard let window = blocks.first(where: {
+                        $0.start <= neededStart && $0.end >= neededEnd
+                            && $0.times.count > 1 && $0.times.count == $0.speeds.count
+                            && ($0.times.first ?? .infinity) <= neededStart.timeIntervalSince1970
+                            && ($0.times.last ?? -.infinity) >= neededEnd.timeIntervalSince1970
+                    }) else { return nil }
+                    // No harmonic fit exists here; the window supplies the actual predictions.
+                    let record = CurrentStationRecord(
+                        id: info.id, name: info.name, region: info.region, aliases: info.aliases,
+                        latitude: info.latitude, longitude: info.longitude, timezone: info.timezone,
+                        floodDirection: window.floodDirection, ebbDirection: window.ebbDirection,
+                        meanFlow: 0, tideReference: info.tideReference, constituents: [])
+                    return .current(record, station: window)
+                }
             }
-            return fittedCurrentRecord(for: info).map { .current($0, station: $0.harmonicStation) }
+            guard let r = fittedCurrentRecord(for: info) else { return nil }
+            record = .current(r, station: r.harmonicStation)
         }
+        return { _ in record }
     }
 
     static func load(id: String) -> WidgetStation? {

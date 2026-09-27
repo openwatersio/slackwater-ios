@@ -101,6 +101,63 @@ final class WidgetStationLoaderTests: XCTestCase {
         XCTAssertEqual(tide.name, "Remote Friday Harbor")
     }
 
+    func testTimelineSourceRetainsLoadedCatalogRecord() throws {
+        let storage = try makeStorage { directory in
+            try editStation(TideStationRecord.fridayHarborID, in: directory) { $0["name"] = "Timeline Friday Harbor" }
+        }
+        let source = WidgetStationLoader.recordSource(
+            id: TideStationRecord.fridayHarborID, locator: CatalogFileLocator(storage: storage))
+        try FileManager.default.removeItem(at: storage.root)
+
+        let start = Date(timeIntervalSince1970: 1_750_000_000)
+        let names = (0..<48).map { index -> String? in
+            guard case .tide(let record, _)? = source(start.addingTimeInterval(Double(index) * 1_800))
+            else { return nil }
+            return record.name
+        }
+        XCTAssertEqual(names, Array(repeating: "Timeline Friday Harbor", count: 48))
+    }
+
+    func testTimelineSourceChecksSavedOnlineCoverageForEachDate() throws {
+        let id = "chs-tillicum-bridge"
+        let gate = try XCTUnwrap(ChsCurrentGateInfo.all.first { $0.id == id })
+        let start = dayLocal(Date(timeIntervalSince1970: 1_750_000_000), gate.tz)
+        func window(from firstDay: Double, to lastDay: Double, speed: Double) -> ChsOnlineWindow {
+            let from = start.addingTimeInterval(firstDay * 86_400)
+            let to = start.addingTimeInterval(lastDay * 86_400)
+            let times = stride(from: from.timeIntervalSince1970,
+                               through: to.timeIntervalSince1970, by: 900).map { $0 }
+            return ChsOnlineWindow(
+                stationID: id, iwlsName: gate.name, timezone: gate.timezone,
+                fetchedAt: start, start: from, end: to,
+                floodDirection: 290, ebbDirection: 110,
+                times: times, speeds: Array(repeating: speed, count: times.count))
+        }
+        let url = ChsModelStore.onlineUrl(id)
+        let previous = try? Data(contentsOf: url)
+        defer {
+            if let previous { try? previous.write(to: url) }
+            else { try? FileManager.default.removeItem(at: url) }
+        }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(ChsOnlineStore(stationID: id, blocks: [
+            window(from: -1, to: 3, speed: 1), window(from: 8, to: 12, speed: 2),
+        ])).write(to: url)
+        let source = WidgetStationLoader.recordSource(id: id)
+        try FileManager.default.removeItem(at: url)
+
+        for (hours, speed) in [(6.0, 1.0), (216.0, 2.0)] {
+            let date = start.addingTimeInterval(hours * 3_600)
+            guard case .current(_, let station)? = source(date) else {
+                XCTFail("The saved block covering hour \(hours) was lost")
+                continue
+            }
+            XCTAssertEqual(station.speeds(from: date, to: date, step: 1).first?.speed, speed)
+        }
+        XCTAssertNil(source(start.addingTimeInterval(24 * 3_600)), "Do not reuse a block past its coverage")
+        XCTAssertNil(source(start.addingTimeInterval(7 * 86_400)), "Do not bridge gaps between saved blocks")
+    }
+
     func testWidgetDoesNotFallBackWhenStationWasRemoved() throws {
         let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
         let referenced = Set(bundled.tides.compactMap(\.reference))

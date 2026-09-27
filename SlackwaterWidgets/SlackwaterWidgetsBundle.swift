@@ -16,8 +16,8 @@ struct StationProvider: AppIntentTimelineProvider {
     /// full day of harmonic evaluation, and every widget reads exactly one of
     /// them — so building both was half of a 48-entry timeline thrown away.
     /// A locked accessory draws neither and needs no station record at all.
-    private func entry(_ intent: StationConfigIntent, at date: Date,
-                       for family: WidgetFamily) -> SlackwaterEntry {
+    private func entryBuilder(_ intent: StationConfigIntent,
+                              for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
         let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
         let accessory = Self.accessoryFamilies.contains(family)
         let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
@@ -28,24 +28,29 @@ struct StationProvider: AppIntentTimelineProvider {
         case AppGroup.nearestCurrentStationID: "Nearest Current"
         default: nil
         }
-        let record = accessory && !premium ? nil : WidgetStationLoader.loadRecord(id: id, at: date)
-        let snapshot = accessory
-            ? record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
-            : nil
-        let card = accessory ? nil : record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
-        return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
-                               premium: premium, stationID: id)
+        let source: (Date) -> WidgetRecord? = accessory && !premium
+            ? { _ in nil } : WidgetStationLoader.recordSource(id: id)
+        return { date in
+            let record = source(date)
+            let snapshot = accessory
+                ? record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
+                : nil
+            let card = accessory ? nil : record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
+            return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
+                                   premium: premium, stationID: id)
+        }
     }
     func placeholder(in context: Context) -> SlackwaterEntry {
-        entry(StationConfigIntent(), at: .now, for: context.family)
+        entryBuilder(StationConfigIntent(), for: context.family)(.now)
     }
     func snapshot(for intent: StationConfigIntent, in context: Context) async -> SlackwaterEntry {
-        entry(intent, at: .now, for: context.family)
+        entryBuilder(intent, for: context.family)(.now)
     }
     func timeline(for intent: StationConfigIntent, in context: Context) async -> Timeline<SlackwaterEntry> {
         let now = Date()
+        let entry = entryBuilder(intent, for: context.family)
         let entries = stride(from: 0.0, to: 86_400, by: 1_800)
-            .map { entry(intent, at: now.addingTimeInterval($0), for: context.family) }
+            .map { entry(now.addingTimeInterval($0)) }
         return Timeline(entries: entries, policy: .atEnd)
     }
 }
