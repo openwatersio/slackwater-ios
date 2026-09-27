@@ -10,12 +10,35 @@ import { createPlacesResolver } from "@openwaters/station-metadata";
 export const here = dirname(fileURLToPath(import.meta.url));
 
 const require = createRequire(import.meta.url);
-/** A @openwaters/station-metadata data file, parsed. */
-export const stationData = (file) =>
-  JSON.parse(readFileSync(require.resolve(`@openwaters/station-metadata/data/${file}`), "utf8"));
 
 /** The places resolver every generator names stations with. */
-export const placesResolver = () => createPlacesResolver(stationData("places.json"));
+export const placesResolver = () => createPlacesResolver(JSON.parse(
+  readFileSync(require.resolve("@openwaters/station-metadata/data/places.json"), "utf8")));
+
+/** The database's curated records (bare ids) by id, in the field names the CHS generators read. */
+export async function curatedRecords() {
+  // Imported lazily: the database is tens of MB and most importers want constants.
+  const { allStations } = await import("@slackwater/database");
+  return Object.fromEntries(allStations.filter((s) => !s.id.includes("/")).map((s) => {
+    const c = s.current ?? {};
+    return [s.id, {
+      name: s.name,
+      context: s.context,
+      // The database lists the lowercased name as the first alias; the artifacts never carry it.
+      aliases: (s.aliases ?? []).filter((a) => a !== s.name.toLowerCase()),
+      position: [s.latitude, s.longitude],
+      provider: s.source?.name === NOAA ? "noaa" : "chs",
+      kind: s.kind,
+      tideReference: c.tide_reference,
+      magnitudeNote: c.magnitude_note,
+      ...(c.derived && { derived: {
+        reference: c.derived.reference,
+        hwLagMinutes: c.derived.high_water_lag_minutes,
+        lwLagMinutes: c.derived.low_water_lag_minutes,
+      } }),
+    }];
+  }));
+}
 
 /** Codepoint compare with an id tiebreak, not localeCompare: the sort must be
  *  the same on every machine that regenerates these files. */

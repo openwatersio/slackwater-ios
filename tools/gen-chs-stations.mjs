@@ -22,7 +22,7 @@
  * without it could never become a working station.
  *
  * IDS. A registry entry wins outright: an IWLS station within
- * REGISTRY_MATCH_KM of a `station-metadata` CHS tide port takes that
+ * REGISTRY_MATCH_KM of a CHS tide port the database curates takes that
  * entry's id, curated name, context and aliases. This is load-bearing, not
  * tidiness — stored fitted models are keyed by id, and gen-chs-gates.mjs
  * points its derived gates and tide pairings at those same ids. Everything
@@ -46,14 +46,14 @@
  * it is ~890 KB. The generator prints the census so the labelling stays
  * reviewable, and the way to make any one station better is still the
  * registry, which is where curated identity belongs.
- * ponytail: two derived tiers; per-station context goes in station-metadata.
+ * ponytail: two derived tiers; per-station context goes in the database's registry.
  *
  * Run: cd tools && npm install && node gen-chs-stations.mjs
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import tzLookup from "tz-lookup";
-import { here, placesResolver, stationData, byNameThenId, tombstones, writeBundle } from "./bundle.mjs";
+import { here, placesResolver, curatedRecords, byNameThenId, tombstones, writeBundle } from "./bundle.mjs";
 import { km } from "./geo.mjs";
 
 const out = join(here, "..", "Slackwater", "Resources", "chs-stations.json");
@@ -65,7 +65,7 @@ const readArtifact = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); 
 const wasShipped = readArtifact(out);
 const wasTombstoned = readArtifact(tombstonesOut);
 const resolvePlace = placesResolver();
-const registry = stationData("registry.json");
+const registry = await curatedRecords();
 
 /** Same tolerance the app resolves with (ChsFitService.resolveToleranceKm). */
 const REGISTRY_MATCH_KM = 3.0;
@@ -224,7 +224,7 @@ for (const s of iwls) {
     // so a dead one is a registry problem to fix, not a station to quietly drop.
     if (!served.has(s.id)) {
       throw new Error(`registry tide port ${id} (${e.name}) serves no wlp data — ` +
-        `IWLS returns [] for it; correct or remove it in station-metadata`);
+        `IWLS returns [] for it; correct or remove it in slackwater-database metadata/registry.yaml`);
     }
     stations.push({
       id, name: e.name, region: e.context, aliases: e.aliases ?? [],
