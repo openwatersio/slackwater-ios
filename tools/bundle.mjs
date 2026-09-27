@@ -22,6 +22,11 @@ export const placesResolver = () => createPlacesResolver(stationData("places.jso
 export const byNameThenId = (a, b) =>
   a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : 1;
 
+/** NOAA publishes its decimals to three places at most; the database stores
+ *  them float32, so this rounds off the representation error
+ *  (0.79 arrives as 0.7900000214576721). */
+export const round3 = (v) => Number(v.toFixed(3));
+
 /** "6.6 nm SSE of" -> "6.6 nm SSE". */
 export const undangle = (s) => (s ?? "").replace(/\s+of$/i, "").trim();
 

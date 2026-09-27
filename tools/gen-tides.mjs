@@ -80,7 +80,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { allStations } from "@slackwater/database";
 import {
-  here, placesResolver, byNameThenId, undangle, REGION_WORD, writeBundle,
+  here, placesResolver, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM,
 } from "./bundle.mjs";
 import { km } from "./geo.mjs";
@@ -287,7 +287,6 @@ const shippable = allStations.filter((s) => (s.kind ?? "tide") === "tide" && s.l
  */
 const grid = new Map();
 const cell = (la, lo) => `${Math.round(la * 20)}:${Math.round(lo * 20)}`;
-const round3 = (v) => Number(v.toFixed(3));
 // +-2 cells of 0.05deg: >= 1.4 km of longitude even at Alert (82.5N), so the
 // search window always contains everything within DUPLICATE_KM.
 const collides = (s) => {
