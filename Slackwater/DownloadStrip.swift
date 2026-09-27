@@ -16,7 +16,12 @@ struct DownloadStrip: View {
     var body: some View {
         switch state {
         case .absent:
-            EmptyView()
+            // NOT EmptyView, which SwiftUI gives no place in the hierarchy:
+            // the station list hangs the cohort capture off this view, and a
+            // modifier on EmptyView never runs — so an empty strip meant the
+            // capture that creates the cohort never fired and nothing ever
+            // downloaded. A zero-height row is a view; EmptyView is a hole.
+            Color.clear.frame(height: 0)
         case let .working(done, total):
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 6) {

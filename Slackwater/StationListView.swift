@@ -753,13 +753,8 @@ struct StationListView: View {
                          recentIds: recents.ids, rankedIds: places.shownIds,
                          nearCount: nearCount)
         let cohortIds = cohortGroups.heroIds + cohortGroups.nearMe
-        // Deferred a run loop turn: capturing here directly would mutate
-        // `ChsFitService`'s `@Published` state while this view's body is
-        // still being evaluated.
-        let _ = DispatchQueue.main.async {
-            ChsFitService.shared.captureCohort(ids: cohortIds, heroID: cohortGroups.heroIds.first)
-        }
-
+        // The strip renders a zero-height row rather than EmptyView
+        // precisely so this modifier has somewhere to live (DownloadStrip).
         DownloadStrip(
             state: downloadStripState(cohort: chs.cohort, queue: chs.queue,
                                       tier: chs.tier, declined: chs.declinedNearby,
@@ -767,6 +762,22 @@ struct StationListView: View {
             onOpen: { showDownloads = true },
             onAccept: { ChsFitService.shared.accept(.nearby) },
             onDecline: { ChsFitService.shared.declineNearby() })
+            // On CHANGE, not on every body evaluation. Dispatching the
+            // capture from inside the builder ran it on every render, and a
+            // render happens on every queue tick — so a capture could land
+            // mid-flight in the list's own row animations, publish, and
+            // force a second update the list had not finished the first of.
+            // UICollectionView aborts the app for that, which is how it
+            // showed up: an intermittent crash while removing a favourite,
+            // reproducible in ListAndFavoritesTests about half the time.
+            //
+            // `capture` is already idempotent (it returns false unless the
+            // place is new), so this is not a correctness change — it is the
+            // difference between asking it constantly and asking it when the
+            // answer can differ.
+            .onChange(of: cohortIds, initial: true) { _, ids in
+                ChsFitService.shared.captureCohort(ids: ids, heroID: cohortGroups.heroIds.first)
+            }
 
         // My Location slot: the hero tile, its locating state, the amber
         // denied card, or — past the gate, with the choice never made — the ask
