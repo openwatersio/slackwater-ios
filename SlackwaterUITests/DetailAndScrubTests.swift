@@ -208,7 +208,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(rows.firstMatch.appears(within: 5), "Nearby lists no stations")
         XCTAssertEqual(rows.count, 6)
         for row in rows.allElementsBoundByIndex {
-            XCTAssert(row.label.contains("CURRENT"), "the Currents filter let through '\(row.label)'")
+            XCTAssert(row.label.contains("Current"), "the Currents filter let through '\(row.label)'")
         }
         save(app, "nearby-currents.png")
 

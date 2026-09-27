@@ -68,7 +68,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["9 kn flood & ebb"].appears(within: 5),
                   "derived gate lost the magnitude context under its tiles")
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        XCTAssert(app.staticTexts["SLACK"].firstMatch.appears(within: 5),
+        XCTAssert(app.staticTexts["Slack"].firstMatch.appears(within: 5),
                   "slack rows missing from the schedule")
         XCTAssert(app.staticTexts["Shape only"].firstMatch.exists)
         XCTAssert(app.staticTexts["No speed"].firstMatch.exists,
@@ -120,7 +120,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // The state line is the card: a VStack identifier does not surface as
         // its own element, so assert on what the user actually reads.
         let state = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'CHARTS'")).firstMatch
+            NSPredicate(format: "label BEGINSWITH 'Charts'")).firstMatch
         XCTAssert(state.appears(within: 10),
                   "the downloads manager must say what state the map is in")
         save(app, "chart-packs-manager.png")
@@ -268,7 +268,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Waiting for signal"].appears(within: 8),
                   "opening an undownloaded Canadian station must explain itself")
         XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'works offline'")).firstMatch.exists)
+            NSPredicate(format: "label CONTAINS 'permanent offline use'")).firstMatch.exists)
         // The waiting page wears the same name header the four scrub details
         // do, and nothing else above the status card — no map, no strip.
         XCTAssert(app.otherElements["detail-header"].exists,

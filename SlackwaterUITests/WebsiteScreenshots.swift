@@ -12,9 +12,9 @@ final class WebsiteScreenshots: ShotWalk {
 
         // List: My Location → Favorites → Near Me, every reading landed.
         var app = launchShots()
-        XCTAssert(app.staticTexts["MY LOCATION"].appears(within: 10))
-        XCTAssert(app.staticTexts["NEAR ME"].appears(within: 10))
-        settleLayout(app.staticTexts["NEAR ME"].firstMatch)
+        XCTAssert(app.staticTexts["My Location"].appears(within: 10))
+        XCTAssert(app.staticTexts["Near Me"].appears(within: 10))
+        settleLayout(app.staticTexts["Near Me"].firstMatch)
         save(app, "list.png")
 
         // Search: a query with tide and current hits.

@@ -149,7 +149,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let promoted = rows["download-row-chs-weynton-passage"].firstMatch
         XCTAssert(promoted.appears(within: 5))
-        XCTAssert(app.staticTexts["YOU OPENED"].firstMatch.exists)
+        XCTAssert(app.staticTexts["You opened"].firstMatch.exists)
         let promotedOrder = settled { [promoted.frame, porlier.frame] }
         XCTAssert(promotedOrder[0].minY < promotedOrder[1].minY)
     }
@@ -180,6 +180,6 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(row.appears(within: 10))
         XCTAssert(row.label.contains("Refining"))
-        XCTAssert(row.label.contains("FAST ANSWER ±35 MIN"))
+        XCTAssert(row.label.contains("Fast answer ±35 min"))
     }
 }
