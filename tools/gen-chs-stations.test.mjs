@@ -53,7 +53,7 @@ test("station 00550 ships its English name only", () => {
 });
 
 // CI never reruns the CHS generators (one needs the network), so a database
-// release that renames a curated gate or port would otherwise ship stale.
+// release that changes a curated gate or port would otherwise ship stale.
 test("every curated CHS station ships as the database curates it", async () => {
   const curated = Object.entries(await curatedRecords()).filter(([, e]) => e.provider === "chs");
   const shipped = new Map([...stations, ...resource("chs-current-gates.json"), ...resource("chs-gates.json")]
@@ -64,6 +64,15 @@ test("every curated CHS station ships as the database curates it", async () => {
     const s = shipped.get(id);
     assert.deepEqual([s.name, s.region, s.aliases, s.latitude, s.longitude],
       [e.name, e.context, e.aliases, ...e.position], id);
+    if (e.derived) {
+      // The lags are the derived gate's slack times, measured off its reference port.
+      assert.deepEqual([s.reference, s.hwLagMinutes, s.lwLagMinutes, s.magnitudeNote],
+        [e.derived.reference, e.derived.hwLagMinutes, e.derived.lwLagMinutes, e.magnitudeNote], id);
+    } else if (e.kind === "current") {
+      assert.equal(s.tideReference, e.tideReference, id);
+      // Only an online gate carries the note: the app shows it on online and derived gate pages alone.
+      if (s.online) assert.equal(s.magnitudeNote, e.magnitudeNote, id);
+    }
   }
 });
 
