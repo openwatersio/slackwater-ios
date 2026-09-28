@@ -55,6 +55,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// instruction to the payoff.
     @State private var tourArrived = false
     @State private var showPicker = false
+    @State private var showAlertPopup = false
     /// Between the header and the scrub card (the fast-answer amber card).
     @ViewBuilder var above: () -> Above
     /// Readout + strip (+ any notes), in the caller's order — everything in
@@ -148,6 +149,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
             .environment(\.openWeekPicker, { showPicker = true })
+            .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
             // link lands while this detail is already up — a second link to the
@@ -296,6 +298,17 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // strip's own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
+                // `.point(.center)` is the centerline, which is where the press just parked
+                // its moment. `.presentationCompactAdaptation(.popover)` keeps it an
+                // arrow-anchored card on iPhone instead of adapting to a sheet.
+                .popover(isPresented: $showAlertPopup, attachmentAnchor: .point(.center),
+                         arrowEdge: .top) {
+                    if let alertOffer {
+                        AlertPopup(stationID: favoriteId, offer: alertOffer,
+                                   moment: scrubTime, tz: tz, stationName: name)
+                            .presentationCompactAdaptation(.popover)
+                    }
+                }
 
             links(tl, jump)
                 .padding(.top, 12)
@@ -385,6 +398,20 @@ extension EnvironmentValues {
     var openWeekPicker: () -> Void {
         get { self[OpenWeekPickerKey.self] }
         set { self[OpenWeekPickerKey.self] = newValue }
+    }
+}
+
+/// How the strip tells the scaffold it was pressed and held. Same reasoning as
+/// `openWeekPicker`: the strip is three views deep in every detail, and the layers between
+/// have nothing to say about alerts.
+private struct OpenAlertPopupKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var openAlertPopup: () -> Void {
+        get { self[OpenAlertPopupKey.self] }
+        set { self[OpenAlertPopupKey.self] = newValue }
     }
 }
 

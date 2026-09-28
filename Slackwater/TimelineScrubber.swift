@@ -27,6 +27,8 @@ struct TimelineScrubber: UIViewRepresentable {
     /// A tap on the day row's DATE — the one label on the strip that names a
     /// day rather than a moment on it — opens the week picker.
     var onPickDate: () -> Void = {}
+    /// The strip was pressed and held; its moment is already on the centerline.
+    var onLongPress: () -> Void = {}
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -81,8 +83,15 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
-        sv.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator,
-                                                       action: #selector(Coordinator.handleTap(_:))))
+        let press = UILongPressGestureRecognizer(target: context.coordinator,
+                                                 action: #selector(Coordinator.handlePress(_:)))
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.handleTap(_:)))
+        // A press held and then lifted must not also scrub. The press fails the instant the
+        // finger leaves before its half second, so an ordinary tap is not delayed.
+        tap.require(toFail: press)
+        sv.addGestureRecognizer(press)
+        sv.addGestureRecognizer(tap)
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -494,6 +503,33 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
+        /// A press and hold: park its moment on the centerline and let the scaffold open the
+        /// popup there. Instant, not the tap's animated magnet ride — a press names one moment,
+        /// and a popup opening over a sliding strip could not say what it was about until the
+        /// slide landed. The day row belongs to the picker's tap and answers a press with
+        /// nothing.
+        @objc func handlePress(_ g: UILongPressGestureRecognizer) {
+            guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
+            let p = g.location(in: sv)
+            guard p.y <= (parent.geo.timeY + parent.geo.dayY) / 2 else { return }
+            stopIntro()
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            cancelMagnet()
+            // The same magnet the strip settles into: a press near a turn means that turn.
+            let target: Date
+            if let stop = nearest(parent.data.snapTimes, toX: p.x), stop.dx < Timeline.magnetPts {
+                target = stop.time
+            } else {
+                target = parent.data.time(atX: p.x)
+            }
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            sv.contentOffset = CGPoint(x: desired, y: 0)
+            parent.scrubTime = parent.data.time(atX: desired + sv.bounds.width / 2)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            parent.onLongPress()
+        }
+
         /// What a tap at this point on the strip means: the moment to bring to
         /// the centerline, or nil for the date — the one label that names a day
         /// rather than a moment, and so opens the picker.
@@ -581,6 +617,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.openWeekPicker) private var openWeekPicker
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openAlertPopup) private var openAlertPopup
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -590,7 +627,7 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker)
+                         onPickDate: openWeekPicker, onLongPress: openAlertPopup)
             .frame(height: geo.height)
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
