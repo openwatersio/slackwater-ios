@@ -22,6 +22,12 @@
             "state" : "translated",
             "value" : "Your location helps find nearby tide and current predictions. It stays on this device."
           }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre position permet de trouver des prévisions de marée et de courant à proximité. Elle reste sur cet appareil."
+          }
         }
       }
     }
