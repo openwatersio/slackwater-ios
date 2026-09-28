@@ -85,6 +85,18 @@ final class AlertOfferTests: XCTestCase {
         XCTAssertNotEqual(made.id, once.id)
     }
 
+    func testWithBothRulesSetATapRemovesOnlyItsOwn() {
+        let once = AlertRule(stationID: "a", trigger: .slack, once: moment)
+        let every = AlertRule(stationID: "a", trigger: .slack)
+
+        XCTAssertEqual(alertPopupToggle([once, every], stationID: "a", offer: .slack,
+                                        at: moment, row: .once),
+                       .remove(once.id))
+        XCTAssertEqual(alertPopupToggle([once, every], stationID: "a", offer: .slack,
+                                        at: moment, row: .every),
+                       .remove(every.id))
+    }
+
     func testASecondTapOnTheSameMomentDoesNotMakeASecondRule() {
         // Review Focus 5: a double tap, or a tap landing while the first write is in flight.
         let first = alertPopupToggle([], stationID: "a", offer: .slack, at: moment, row: .once)
@@ -103,7 +115,7 @@ final class AlertOfferTests: XCTestCase {
     }
 
     func testASwitchedOffRuleWakesInsteadOfASecondBeingMade() {
-        var off = AlertRule(stationID: "a", trigger: .slack)
+        var off = AlertRule(stationID: "a", trigger: .slack, lead: 900, daylightOnly: true)
         off.enabled = false
 
         guard case .upsert(let woken) = alertPopupToggle([off], stationID: "a", offer: .slack,
@@ -111,6 +123,8 @@ final class AlertOfferTests: XCTestCase {
         else { return XCTFail("expected the rule back") }
         XCTAssertEqual(woken.id, off.id)
         XCTAssertTrue(woken.enabled)
+        XCTAssertEqual(woken.lead, off.lead)
+        XCTAssertEqual(woken.daylightOnly, off.daylightOnly)
     }
 
     func testARuleOnAnotherStationOrTriggerIsNotThisRow() {
@@ -131,6 +145,23 @@ final class AlertOfferTests: XCTestCase {
 
         XCTAssertTrue(state.once)
         XCTAssertFalse(state.every)
+    }
+
+    func testWithBothRulesSetBothRowsReadOn() {
+        let rules = [AlertRule(stationID: "a", trigger: .slack, once: moment),
+                     AlertRule(stationID: "a", trigger: .slack)]
+
+        let state = alertPopupState(rules, stationID: "a", offer: .slack, at: moment, premium: true)
+
+        XCTAssertTrue(state.once)
+        XCTAssertTrue(state.every)
+    }
+
+    func testARowReadsOnFromAnUnflooredMoment() {
+        let rules = [AlertRule(stationID: "a", trigger: .slack, once: alertMinute(moment))]
+
+        XCTAssertTrue(alertPopupState(rules, stationID: "a", offer: .slack,
+                                      at: moment.addingTimeInterval(31), premium: true).once)
     }
 
     func testNothingReadsOnWithoutPremium() {
