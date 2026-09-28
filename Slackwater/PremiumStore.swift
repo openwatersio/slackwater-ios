@@ -11,7 +11,9 @@ import WidgetKit
 /// silent; only an unverified transaction is worth telling the user about.
 enum PremiumError: LocalizedError {
     case unverified
-    var errorDescription: String? { "Purchase couldn't be verified — try again." }
+    var errorDescription: String? {
+        String(localized: "Purchase couldn't be verified — try again.", comment: "Premium purchase verification error.")
+    }
 }
 
 @MainActor

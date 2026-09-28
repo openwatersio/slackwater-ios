@@ -29,8 +29,9 @@ func scheduleEntries(_ tl: TimelineData, floodDeg: Double, ebbDeg: Double, speed
 }
 
 func subordinateCurrentFooter(stationName: String, referenceName: String) -> String {
-    let reference = stationName == referenceName ? "" : "\(referenceName)'s "
-    return "NOAA subordinate station: \(reference)slacks and maxima, corrected by published offsets"
+    stationName == referenceName
+        ? String(localized: "NOAA subordinate station: slacks and maxima, corrected by published offsets", comment: "Station provenance. Keep NOAA exact.")
+        : String(localized: "NOAA subordinate station: \(referenceName)'s slacks and maxima, corrected by published offsets", comment: "Station provenance. The value is the reference-station name; keep NOAA exact.")
 }
 
 struct CurrentDetailView: View {
@@ -96,7 +97,7 @@ struct CurrentDetailView: View {
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
                             above: {
                                 if let gate = provisionalGate {
-                                    ChsAmberCard(title: "Fast answer", headline: gate.provisionalHeadline,
+                                    ChsAmberCard(title: String(localized: "Fast answer", comment: "Provisional current-model card title."), headline: gate.provisionalHeadline,
                                                  expectation: gate.provisionalExpectation(online: net.online),
                                                  action: "See all downloads",
                                                  identifier: "chs-provisional-warning") { showDownloads = true }

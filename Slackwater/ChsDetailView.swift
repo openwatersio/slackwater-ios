@@ -117,8 +117,6 @@ struct ChsWaitingView: View {
     private var job: ChsJob? { service.queue.job(jobID) }
     private var isCurrent: Bool { job?.isCurrent ?? false }
     /// "tidal" / "current" — the established plain register (ChsPendingCard).
-    private var series: String { isCurrent ? "current" : "tidal" }
-
     var body: some View {
         // GeometryReader reads the real top inset for DetailHeader (only the
         // ScrollView below ignores the safe area) — the scaffold in
@@ -159,11 +157,11 @@ struct ChsWaitingView: View {
 
     private var title: String {
         switch status {
-        case .downloading: "Downloading…"
-        case .queued: "Waiting"
-        case .retrying: "Retrying"
-        case .offline: "Waiting for signal"
-        case .failed: "Download failed"
+        case .downloading: String(localized: "Downloading…", comment: "Station download-card title.")
+        case .queued: String(localized: "Waiting", comment: "Station download-card title.")
+        case .retrying: String(localized: "Retrying", comment: "Station download-card title.")
+        case .offline: String(localized: "Waiting for signal", comment: "Station download-card title while offline.")
+        case .failed: String(localized: "Download failed", comment: "Station download-card title.")
         default: status.label
         }
     }
@@ -171,7 +169,9 @@ struct ChsWaitingView: View {
     private var statusCard: some View {
         VStack(spacing: 8) {
             ChsAmberCard(title: title, headline: headline, expectation: expectation,
-                         action: status == .failed ? "Retry" : "See all downloads",
+                         action: status == .failed
+                            ? String(localized: "Retry", comment: "Retry a failed station download.")
+                            : String(localized: "See all downloads", comment: "Open the offline-download manager."),
                          identifier: "chs-waiting-warning", status: status) {
                 if status == .failed { service.promote(jobID) }
                 else { showDownloads = true }
@@ -189,20 +189,34 @@ struct ChsWaitingView: View {
     /// The one-line "what is happening", in the same plain register as the
     /// download manager.
     private var headline: String {
-        let what = referenceName.map { "\($0)'s tide predictions" } ?? "This station's predictions"
         if !net.online {
-            return "\(what) need a connection before they can download."
+            return referenceName.map {
+                String(localized: "\($0)'s tide predictions need a connection before they can download.", comment: "Station download explanation. The value is a reference-station name.")
+            } ?? String(localized: "This station's predictions need a connection before they can download.", comment: "Station download explanation.")
         }
         if status == .retrying {
-            return "\(what) didn't finish downloading. Slackwater will try again."
+            return referenceName.map {
+                String(localized: "\($0)'s tide predictions didn't finish downloading. Slackwater will try again.", comment: "Station download retry explanation. The value is a reference-station name.")
+            } ?? String(localized: "This station's predictions didn't finish downloading. Slackwater will try again.", comment: "Station download retry explanation.")
         }
         switch job?.status {
         case .failed:
-            return "\(what) couldn't be downloaded."
+            return referenceName.map {
+                String(localized: "\($0)'s tide predictions couldn't be downloaded.", comment: "Station download failure. The value is a reference-station name.")
+            } ?? String(localized: "This station's predictions couldn't be downloaded.", comment: "Station download failure.")
         case .downloading:
-            return "Downloading Canadian \(series) predictions…"
+            return isCurrent
+                ? String(localized: "Downloading Canadian current predictions…", comment: "Station download progress.")
+                : String(localized: "Downloading Canadian tidal predictions…", comment: "Station download progress.")
         default:
-            return "\(what) aren't on this device yet. Downloading Canadian \(series) predictions…"
+            if let referenceName {
+                return isCurrent
+                    ? String(localized: "\(referenceName)'s tide predictions aren't on this device yet. Downloading Canadian current predictions…", comment: "Station download explanation. The value is a reference-station name.")
+                    : String(localized: "\(referenceName)'s tide predictions aren't on this device yet. Downloading Canadian tidal predictions…", comment: "Station download explanation. The value is a reference-station name.")
+            }
+            return isCurrent
+                ? String(localized: "This station's predictions aren't on this device yet. Downloading Canadian current predictions…", comment: "Station download explanation.")
+                : String(localized: "This station's predictions aren't on this device yet. Downloading Canadian tidal predictions…", comment: "Station download explanation.")
         }
     }
 
@@ -210,26 +224,30 @@ struct ChsWaitingView: View {
     /// it is once-and-for-all.
     private var expectation: String {
         guard net.online else {
-            return "Connect once to download this station for permanent offline use."
+            return String(localized: "Connect once to download this station for permanent offline use.", comment: "Station download expectation while offline.")
         }
         if job?.status == .failed {
-            return "Retry this station. Once downloaded, it stays available offline."
+            return String(localized: "Retry this station. Once downloaded, it stays available offline.", comment: "Station download expectation after failure.")
         }
         if status == .retrying {
-            return "Slackwater retries automatically when a connection is available."
+            return String(localized: "Slackwater retries automatically when a connection is available.", comment: "Station download retry expectation.")
         }
         if let job, job.status == .downloading, job.total > 0 {
-            return "\(job.done) of \(job.total) requests downloaded. This station stays available offline when finished."
+            return String(localized: "\(job.done) of \(job.total) requests downloaded. This station stays available offline when finished.", comment: "Station download progress. Values are completed and total request counts.")
         }
         let queued = service.queue.position(jobID).map { at -> String in
-            at <= 1 ? "It's first in line — moved to the front because you opened it."
-                    : "It's \(ordinal(at)) in line — moved up because you opened it."
+            at <= 1
+                ? String(localized: "It's first in line — moved to the front because you opened it.", comment: "Station download queue position.")
+                : String(localized: "It's \(ordinal(at)) in line — moved up because you opened it.", comment: "Station download queue position. The value is a locale-formatted ordinal.")
         } ?? ""
-        return "\(queued) Estimated wait: \(durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))). The station downloads once and stays available offline."
+        let wait = durationPhrase(service.queue.waitSeconds(jobID, perRequest: service.observedSecondsPerRequest))
+        return queued.isEmpty
+            ? String(localized: "Estimated wait: \(wait). The station downloads once and stays available offline.", comment: "Station download expectation. The value is an approximate duration.")
+            : String(localized: "\(queued) Estimated wait: \(wait). The station downloads once and stays available offline.", comment: "Station download expectation. Values are a localized queue sentence and approximate duration.")
     }
 
     private var footer: some View {
-        MonoLabel(text: "Predictions — not for navigation",
+        MonoLabel(text: String(localized: "Predictions — not for navigation", comment: "Safety disclaimer above station provenance."),
                   color: SN.foam.opacity(0.4), tracking: 1.4)
             .frame(maxWidth: .infinity)
             // 14, matching the scaffold's standard below-card gap — spacing 0
@@ -260,7 +278,7 @@ struct ChsAmberCard: View {
     /// passes its own, because "Warning" on a card whose text says it is not
     /// a warning is the screen reader telling a different story than the
     /// screen.
-    var iconLabel = "Warning"
+    var iconLabel = String(localized: "Warning", comment: "VoiceOver label for a warning icon.")
     var status: CardStatus? = nil
     let onAction: () -> Void
 

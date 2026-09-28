@@ -1417,16 +1417,18 @@ struct TimelineScrubber: UIViewRepresentable {
         func publishCenter(_ sv: UIScrollView) {
             guard sv.bounds.width > 0 else { return }
             let t = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
-            sv.accessibilityLabel = parent.geo.hasTide ? "Tide timeline" : "Current timeline"
+            sv.accessibilityLabel = parent.geo.hasTide
+                ? String(localized: "Tide timeline", comment: "VoiceOver label for the interactive tide chart.")
+                : String(localized: "Current timeline", comment: "VoiceOver label for the interactive current chart.")
             sv.accessibilityValue = [parent.spokenLead, spokenWhen(t, parent.data.tz)]
                 .filter { !$0.isEmpty }.joined(separator: ", ")
             sv.accessibilityCustomActions = [
-                UIAccessibilityCustomAction(name: "Next event") { [weak self, weak sv] _ in
+                UIAccessibilityCustomAction(name: String(localized: "Next event", comment: "VoiceOver chart action.")) { [weak self, weak sv] _ in
                     guard let self, let sv else { return false }
                     let after = self.parent.scrubTime.addingTimeInterval(1)
                     return self.jump(sv, to: self.parent.data.snapTimes.first { $0 > after })
                 },
-                UIAccessibilityCustomAction(name: "Previous event") { [weak self, weak sv] _ in
+                UIAccessibilityCustomAction(name: String(localized: "Previous event", comment: "VoiceOver chart action.")) { [weak self, weak sv] _ in
                     guard let self, let sv else { return false }
                     let before = self.parent.scrubTime.addingTimeInterval(-1)
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
@@ -1950,7 +1952,9 @@ struct MultiDaySchedule: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityIdentifier("schedule-day-d\(group.offset)")
-                    .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+                    .accessibilityValue(expanded
+                        ? String(localized: "Expanded", comment: "VoiceOver state for an expanded schedule day.")
+                        : String(localized: "Collapsed", comment: "VoiceOver state for a collapsed schedule day."))
 
                     if expanded {
                         VStack(spacing: 0) {

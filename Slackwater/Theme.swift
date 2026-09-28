@@ -865,10 +865,10 @@ struct SummaryTiles: View {
             if let moon {
                 let day = dayLocal(at, tz)
                 let dates = apsides?.day == day ? apsides : nil
-                ReadoutTile(label: "Moon", caption: moonTideLabel(
+                ReadoutTile(label: String(localized: "Moon", comment: "Moon summary tile label."), caption: moonTideLabel(
                     phase: moon.phase, at: at, perigee: dates?.perigee, apogee: dates?.apogee)
-                    ?? "\(Int((moon.fraction * 100).rounded()))% lit",
-                            accessibility: "Moon", detail: sheet) {
+                    ?? String(localized: "\(Int((moon.fraction * 100).rounded()))% lit", comment: "Moon illumination percentage. The integer is a percentage."),
+                            accessibility: String(localized: "Moon", comment: "VoiceOver moon summary label."), detail: sheet) {
                     if solarEclipse != nil {
                         SolarEclipseGlyph(obscuration: solarObscuration, size: 14)
                     } else {
@@ -1350,7 +1350,7 @@ struct DetailFooter<Note: View>: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            MonoLabel(text: "Predictions — not for navigation",
+            MonoLabel(text: String(localized: "Predictions — not for navigation", comment: "Safety disclaimer above station provenance."),
                       color: SN.foam.opacity(0.4), tracking: 1.4)
                 .frame(maxWidth: .infinity)
             note()
@@ -1537,7 +1537,7 @@ struct TideAtPortLink: View {
     @Environment(\.openTideDetail) private var openTide
 
     var body: some View {
-        BranchLink(text: "Tide at \(port.name)", id: "tide-at-port") { openTide(port) }
+        BranchLink(text: String(localized: "Tide at \(port.name)", comment: "Link to a related tide station. The value is a station name."), id: "tide-at-port") { openTide(port) }
     }
 }
 
@@ -1552,7 +1552,9 @@ struct NearbyStationLink: View {
 
     var body: some View {
         let currents = item.series == .current
-        BranchLink(text: "\(currents ? "Currents" : "Tide") at \(item.name) · \(formatNm(km))",
+        BranchLink(text: currents
+            ? String(localized: "Currents at \(item.name) · \(formatNm(km))", comment: "Link to a nearby current station. Values are station name and localized distance.")
+            : String(localized: "Tide at \(item.name) · \(formatNm(km))", comment: "Link to a nearby tide station. Values are station name and localized distance."),
                    id: currents ? "nearby-currents" : "nearby-tide") { open(item) }
     }
 }

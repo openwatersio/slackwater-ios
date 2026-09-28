@@ -37,7 +37,7 @@ final class ReportProblemTests: XCTestCase {
             let url = try XCTUnwrap(reportMailURL(kind: kind, stationID: station,
                                                   scrubTime: nil, now: now, tz: tz))
             let subject = try XCTUnwrap(queryValue("subject", in: url))
-            XCTAssertEqual(subject, kind.rawValue)
+            XCTAssertEqual(subject, kind.subject)
         }
     }
 

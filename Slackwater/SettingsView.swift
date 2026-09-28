@@ -83,8 +83,8 @@ struct SettingsView: View {
                         Button { showPremium = true } label: {
                             HStack {
                                 Text(premium.isPremium
-                                     ? "Premium — thank you for supporting the app"
-                                     : "Support the app — lock screen widgets and more")
+                                     ? String(localized: "Premium — thank you for supporting the app", comment: "Premium settings row for an existing supporter.")
+                                     : String(localized: "Support the app — lock screen widgets and more", comment: "Premium settings row for a non-subscriber."))
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))

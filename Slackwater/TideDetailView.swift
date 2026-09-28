@@ -57,8 +57,12 @@ struct TideDetailView: View {
         nextCommentaryStop(nextExtreme.map {
             let high = $0.kind == .high
             return CommentaryStop(time: $0.time,
-                                  label: high ? "High" : "Low",
-                                  spokenLabel: high ? "High tide" : "Low tide",
+                                  label: high
+                                    ? String(localized: "High", comment: "High-tide event label.")
+                                    : String(localized: "Low", comment: "Low-tide event label."),
+                                  spokenLabel: high
+                                    ? String(localized: "High tide", comment: "VoiceOver tide-event label.")
+                                    : String(localized: "Low tide", comment: "VoiceOver tide-event label."),
                                   systemImage: high ? "arrow.up" : "arrow.down")
         },
                            sun: timeline?.days ?? [], after: scrubTime)
@@ -182,17 +186,25 @@ struct TideDetailView: View {
     /// This swing's range: the extreme behind the scrub to the one ahead.
     private var range: (label: String, value: String, caption: String)? {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
-        return ("Range",
+        return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
-                prev.kind == .low ? "low to high" : "high to low")
+                prev.kind == .low
+                    ? String(localized: "low to high", comment: "Tide-range direction.")
+                    : String(localized: "high to low", comment: "Tide-range direction."))
     }
 
     private var leadState: String {
-        atTurn.map { $0.kind == .high ? "High" : "Low" } ?? (rising ? "Rising" : "Falling")
+        atTurn.map {
+            $0.kind == .high
+                ? String(localized: "High", comment: "High-tide state.")
+                : String(localized: "Low", comment: "Low-tide state.")
+        } ?? (rising
+            ? String(localized: "Rising", comment: "Rising-tide state.")
+            : String(localized: "Falling", comment: "Falling-tide state."))
     }
     /// The lead in words, for the strip's spoken value.
     private var spokenLead: String {
-        "\(leadState) \(formatHeight(scrubHeight, imperial: imperial)) \(spokenUnit(unit))"
+        String(localized: "\(leadState) \(formatHeight(scrubHeight, imperial: imperial)) \(spokenUnit(unit))", comment: "VoiceOver tide reading. Values are tide state, formatted height, and spoken unit.")
     }
 
     private func lead(sky: SkyState) -> some View {
@@ -302,7 +314,11 @@ struct TideDetailView: View {
 /// hour, signed; the height formatter converts it like a height.
 func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
     guard abs(rate) >= tideMovementRampAnchorsMHr[0] else { return nil }
-    return "\(rate < 0 ? "Falling" : "Rising") \(formatHeight(abs(rate), imperial: imperial)) \(heightUnit(imperial: imperial))/hr"
+    let value = formatHeight(abs(rate), imperial: imperial)
+    let unit = heightUnit(imperial: imperial)
+    return rate < 0
+        ? String(localized: "Falling \(value) \(unit)/hr", comment: "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.")
+        : String(localized: "Rising \(value) \(unit)/hr", comment: "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.")
 }
 
 #Preview {

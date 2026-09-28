@@ -746,7 +746,9 @@ struct StationListView: View {
         }
 
         HStack(alignment: .firstTextBaseline) {
-            MonoLabel(text: fix == nil && recents.lastOpened == nil ? "Chesapeake Bay" : "Near Me")
+            MonoLabel(text: fix == nil && recents.lastOpened == nil
+                ? String(localized: "Chesapeake Bay", comment: "Fallback nearby-stations section heading.")
+                : String(localized: "Near Me", comment: "Nearby-stations section heading."))
             Spacer(minLength: 8)
             SeriesFilterChips()
         }
@@ -840,17 +842,18 @@ struct StationListView: View {
         let gone = StationTombstone.byId[id]
         let origin = gone.map { (lat: $0.latitude, lon: $0.longitude) } ?? anchor
         let isFavorite = favorites.contains(id)
-        ChsAmberCard(title: gone?.name ?? "Station removed",
-                     headline: gone.map { "\($0.region) — no longer published." }
-                        ?? "This station is no longer published.",
-                     expectation: "It has been withdrawn from the hydrographic "
-                        + "service, so it has no readings to show."
-                        + (isFavorite ? " Swipe to remove it." : ""),
-                     action: "Choose another station",
+        ChsAmberCard(title: gone?.name ?? String(localized: "Station removed", comment: "Removed-station card title."),
+                     headline: gone.map {
+                        String(localized: "\($0.region) — no longer published.", comment: "Removed-station explanation. The value is the station region.")
+                     } ?? String(localized: "This station is no longer published.", comment: "Removed-station explanation."),
+                     expectation: isFavorite
+                        ? String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show. Swipe to remove it.", comment: "Removed favorite-station explanation.")
+                        : String(localized: "It has been withdrawn from the hydrographic service, so it has no readings to show.", comment: "Removed-station explanation."),
+                     action: String(localized: "Choose another station", comment: "Removed-station action."),
                      identifier: "removed-station-card",
                      icon: "mappin.slash",
-                     iconLabel: "Station removed") {
-            chooser = StationMatches(place: gone?.name ?? "Removed station",
+                     iconLabel: String(localized: "Station removed", comment: "VoiceOver label for a removed-station icon.")) {
+            chooser = StationMatches(place: gone?.name ?? String(localized: "Removed station", comment: "Removed-station chooser title."),
                                      matches: nearest(to: origin),
                                      replacing: .init(id: id, lat: origin.lat, lon: origin.lon))
         }
@@ -880,13 +883,13 @@ struct StationListView: View {
     /// action is the ask itself, not a trip to Settings: `.notDetermined` is
     /// the one state iOS still lets the app prompt from.
     private var askCard: some View {
-        ChsAmberCard(title: "Tides and currents near you",
-                     headline: "Turn on location to put nearby predictions first.",
-                     action: "Find tides near me",
+        ChsAmberCard(title: String(localized: "Tides and currents near you", comment: "Location-permission card title."),
+                     headline: String(localized: "Turn on location to put nearby predictions first.", comment: "Location-permission explanation."),
+                     action: String(localized: "Find tides near me", comment: "Request location permission action."),
                      identifier: "location-ask-card",
                      icon: "location.fill",
                      accent: SN.leaf,
-                     iconLabel: "Location") {
+                     iconLabel: String(localized: "Location", comment: "VoiceOver location icon label.")) {
             loc.request()
         }
     }
@@ -894,12 +897,12 @@ struct StationListView: View {
     /// Location denied — the app's one amber card (ChsAmberCard carries the
     /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
-        ChsAmberCard(title: "Location unavailable",
-                     headline: "Turn on location in Settings to find nearby tides and currents.",
-                     action: "Go to Settings",
+        ChsAmberCard(title: String(localized: "Location unavailable", comment: "Location-denied card title."),
+                     headline: String(localized: "Turn on location in Settings to find nearby tides and currents.", comment: "Location-denied explanation."),
+                     action: String(localized: "Go to Settings", comment: "Open iOS Settings to enable location."),
                      identifier: "location-denied-card",
                      icon: "location.slash",
-                     iconLabel: "Location unavailable") {
+                     iconLabel: String(localized: "Location unavailable", comment: "VoiceOver location-denied icon label.")) {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 UIApplication.shared.open(url)
             }
@@ -951,11 +954,15 @@ struct StationListView: View {
             // Over the map the left FAB locates instead of searching — the
             // list toggle is one tap away and search lives there.
             fab(showMap ? "location" : "magnifyingglass",
-                label: showMap ? "My Location" : "Search") {
+                label: showMap
+                    ? String(localized: "My Location", comment: "Map action using the person's location.")
+                    : String(localized: "Search", comment: "Station search action.")) {
                 if showMap { locateMe() } else { openSearch() }
             }
             Spacer()
-            fab(showMap ? "list.bullet" : "map", label: showMap ? "List" : "Map") {
+            fab(showMap ? "list.bullet" : "map", label: showMap
+                ? String(localized: "List", comment: "Switch to station list.")
+                : String(localized: "Map", comment: "Switch to station map.")) {
                 showMap.toggle()
                 // Regular width: opening the map replaces the shown detail;
                 // toggling back lands on the placeholder (the toggle is a
@@ -1058,7 +1065,7 @@ struct StationListView: View {
                         // ABOVE the results, where it is read, not 60 cards
                         // down where nobody scrolls.
                         if results.count == StationItem.searchLimit {
-                            MonoLabel(text: "Nearest \(StationItem.searchLimit) — keep typing to narrow",
+                            MonoLabel(text: String(localized: "Nearest \(StationItem.searchLimit) — keep typing to narrow", comment: "Station search limit notice. The integer is the maximum result count."),
                                       color: SN.foam.opacity(0.5), tracking: 1.2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 6)
@@ -1215,7 +1222,7 @@ struct MyLocationTile<Card: View>: View {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
                 Spacer(minLength: 8)
                 Text(formatCoord(lat: fix.lat, lon: fix.lon))
                     .font(.caption2.monospaced())
@@ -1249,7 +1256,7 @@ struct MyLocationLoadingTile: View {
                 Image(systemName: "location.north.fill")
                     .font(.caption2)
                     .rotationEffect(.degrees(45))
-                MonoLabel(text: "My Location", color: SN.foam.opacity(0.9))
+                MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
             }
             // sectionLabel's three paddings (private to this file) — a header
             // over a plain card, not a box (#253).

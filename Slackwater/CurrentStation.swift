@@ -439,10 +439,10 @@ enum StationItem: Identifiable, Hashable {
     /// name, series and provider are the difference that isn't distance.
     var kindLabel: String {
         switch self {
-        case .tide: "Tide · NOAA"
-        case .current: "Current · NOAA"
-        case .chs: "Tide · CHS"
-        case .chsGate, .chsCurrent: "Current · CHS"
+        case .tide: String(localized: "Tide · NOAA", comment: "Station type and provider. Keep NOAA exact.")
+        case .current: String(localized: "Current · NOAA", comment: "Station type and provider. Keep NOAA exact.")
+        case .chs: String(localized: "Tide · CHS", comment: "Station type and provider. Keep CHS exact.")
+        case .chsGate, .chsCurrent: String(localized: "Current · CHS", comment: "Station type and provider. Keep CHS exact.")
         }
     }
     /// "1.1 nm ENE of Sierra Point": NOAA regions are often a bare offset from

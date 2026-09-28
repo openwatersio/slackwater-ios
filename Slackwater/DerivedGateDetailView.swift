@@ -68,8 +68,9 @@ struct DerivedGateDetailView: View {
                             },
                             links: { tl, jump in
                                 VStack(alignment: .leading, spacing: 12) {
-                                    SummaryTiles(primary: ("Shape only", "No speed",
-                                                           "\(port.name) tides"),
+                                    SummaryTiles(primary: (String(localized: "Shape only", comment: "Derived-current summary label."),
+                                                           String(localized: "No speed", comment: "Derived-current summary value."),
+                                                           String(localized: "\(port.name) tides", comment: "Derived-current summary caption. The value is a reference tide-station name.")),
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },

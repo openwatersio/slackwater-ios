@@ -45,7 +45,7 @@ struct PremiumView: View {
                                     do {
                                         try await store.purchase(product)
                                     } catch {
-                                        purchaseError = "Purchase didn't go through — try again."
+                                        purchaseError = String(localized: "Purchase didn't go through — try again.", comment: "Premium purchase error.")
                                     }
                                 }
                             } label: {
