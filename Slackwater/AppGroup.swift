@@ -60,6 +60,8 @@ enum AppGroup {
     static let alertRulesKey = "slackwater.alertRules"
     /// The identifier of the "Slackwater" calendar the app created (notifications spec §5.1).
     static let alertCalendarKey = "slackwater.alertCalendar"
+    /// Which stations publish a calendar, and the identifier of each one (spec §5.1).
+    static let stationCalendarsKey = "slackwater.stationCalendars"
 
     private static let migratedKey = "slackwater.appgroup.migrated"
     private static let arrayKeys = [favoritesKey, recentsKey]
