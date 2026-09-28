@@ -588,7 +588,7 @@ final class ColourAndFormTests: XCTestCase {
                       "the schedule names the set as a compass word beside its arrow")
 
         let lead = try repoSource("Slackwater/CurrentLead.swift")
-        XCTAssertTrue(lead.contains("if isSlack { return \"Slack\" }"),
+        XCTAssertTrue(lead.contains("if isSlack { return String(localized: \"Slack\""),
                       "the measured-current lead names slack in words")
         XCTAssertTrue(lead.contains("Text(compass16(setDegrees))"),
                       "the measured-current lead names the set in words")
