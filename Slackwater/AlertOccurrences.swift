@@ -151,6 +151,12 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
 
     found = found.map { (event: alertMinute($0.event), end: $0.end.map(alertMinute), noWindow: $0.noWindow, heightM: $0.heightM) }
     found = found.filter { $0.event >= from && $0.event <= to }
+    if let once = rule.once {
+        // The stored instant is compared floored, so a caller that kept the popup's raw
+        // Date matches the same event the reschedule found.
+        let minute = alertMinute(once)
+        found = found.filter { $0.event == minute }
+    }
     if rule.daylightOnly {
         let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)
         found = found.filter { f in spans.contains { $0.contains(f.event) } }
@@ -159,4 +165,10 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
         AlertOccurrence(ruleID: rule.id, event: $0.event, fire: $0.event.addingTimeInterval(-rule.lead),
                         end: $0.end, noWindow: $0.noWindow, heightM: $0.heightM)
     }
+}
+
+/// `once` rules whose moment has passed. Their notification, if it had one, fired at
+/// `event − lead` and is long gone; the rule is what is left to clear (spec §6).
+func expiredRules(_ rules: [AlertRule], now: Date) -> [UUID] {
+    rules.filter { ($0.once ?? .distantFuture) < now }.map(\.id)
 }

@@ -68,6 +68,9 @@ struct AlertStatusSnapshot: Equatable {
     }
 
     func reschedule(now: Date = appNow()) async {
+        for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
+            AlertRuleStore.shared.remove(id)
+        }
         let rules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium

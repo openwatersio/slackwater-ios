@@ -173,4 +173,56 @@ import TideEngine
             }
         }
     }
+
+    func testAOnceRuleFindsOnlyItsOwnMoment() throws {
+        let id = TideStationRecord.fridayHarborID
+        let (station, position) = try load(id)
+        let every = AlertRule(stationID: id, trigger: .tideExtreme(high: false))
+        let all = alertOccurrences(every, station: station, position: position,
+                                   from: now, to: week, threshold: 0.5)
+        XCTAssertGreaterThan(all.count, 2, "the fixture needs several lows to pick one out of")
+        let chosen = all[1].event
+
+        var only = every
+        only.once = chosen
+        let found = alertOccurrences(only, station: station, position: position,
+                                     from: now, to: week, threshold: 0.5)
+
+        XCTAssertEqual(found.map(\.event), [chosen])
+    }
+
+    func testAOnceRuleGivenAnUnflooredInstantStillMatches() throws {
+        let id = TideStationRecord.fridayHarborID
+        let (station, position) = try load(id)
+        let every = AlertRule(stationID: id, trigger: .tideExtreme(high: false))
+        let chosen = alertOccurrences(every, station: station, position: position,
+                                      from: now, to: week, threshold: 0.5)[1].event
+
+        var only = every
+        only.once = chosen.addingTimeInterval(47)   // a caller's un-floored Date
+
+        XCTAssertEqual(alertOccurrences(only, station: station, position: position,
+                                        from: now, to: week, threshold: 0.5).map(\.event),
+                       [chosen])
+    }
+
+    func testAOnceRuleWhoseMomentIsNotAnEventFindsNothing() throws {
+        let id = TideStationRecord.fridayHarborID
+        let (station, position) = try load(id)
+        var only = AlertRule(stationID: id, trigger: .tideExtreme(high: false))
+        // 37 minutes past a 10-minute grid instant: no extreme lands on this minute.
+        only.once = now.addingTimeInterval(37 * 60)
+
+        XCTAssertEqual(alertOccurrences(only, station: station, position: position,
+                                        from: now, to: week, threshold: 0.5), [])
+    }
+
+    func testExpiryTakesOnlyOnceRulesWhoseMomentHasPassed() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let repeating = AlertRule(stationID: "a", trigger: .slack)
+        let past = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(-60))
+        let coming = AlertRule(stationID: "a", trigger: .slack, once: now.addingTimeInterval(60))
+
+        XCTAssertEqual(expiredRules([repeating, past, coming], now: now), [past.id])
+    }
 }
