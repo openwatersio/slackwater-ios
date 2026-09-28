@@ -1,0 +1,17 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "System location permission prompt. Explain why Slackwater requests location and that the location remains on this device.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your location helps find nearby tide and current predictions. It stays on this device."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
