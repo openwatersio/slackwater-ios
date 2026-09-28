@@ -38,8 +38,8 @@ func calendarTriggers(for kind: StationCalendarKind) -> [AlertTrigger] {
 
 /// The calendar's name, as it reads in someone's calendar list. The series is part of it
 /// because a place can have both: Friday Harbor is a tide station AND a current station, and
-/// one title between the two would have each reschedule adopt the other's calendar and
-/// rewrite its events.
+/// one title between the two would have each run adopt the other's calendar and rewrite its
+/// events.
 func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
     switch kind {
     case .tide: "\(name) Tides"

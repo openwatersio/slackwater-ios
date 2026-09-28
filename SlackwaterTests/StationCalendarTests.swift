@@ -83,6 +83,13 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(reloaded.calendarID(for: "a"), "cal-a")
     }
 
+    @MainActor func testASubscribedStationWithoutACalendarYetReturnsNilID() {
+        let store = StationCalendarStore(defaults: defaults())
+        store.subscribe("a")
+
+        XCTAssertNil(store.calendarID(for: "a"), "no EventKit calendar exists for it yet")
+    }
+
     @MainActor func testSubscribingTwiceKeepsOneSubscriptionAndItsCalendar() {
         let store = StationCalendarStore(defaults: defaults())
         store.subscribe("a")
