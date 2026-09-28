@@ -670,7 +670,11 @@ In `Slackwater/AppGroup.swift`, beside `alertCalendarKey`:
     static let stationCalendarsKey = "slackwater.stationCalendars"
 ```
 
-Leave `alertCalendarKey` in place: it still names the calendar an older build created, and Task 5 reads it to adopt that calendar rather than stranding it.
+There is no single app-wide calendar or key: each subscribed station gets its own calendar,
+stored under its own entry in `stationCalendarsKey`. A station without a stored identifier yet
+adopts a same-titled calendar only when Task 5's ownership check finds one of its own future
+events naming that station — proof this app wrote it for that station, not a same-named one or a
+calendar a person made by hand.
 
 - [ ] **Step 4: Write the model**
 

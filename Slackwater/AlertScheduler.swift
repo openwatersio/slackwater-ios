@@ -137,7 +137,7 @@ struct AlertStatusSnapshot: Equatable {
         }
 
         AlertCalendar.apply(entries(plan.calendar, includeLead: false, includePlace: false),
-                            skipping: resolved.unresolvedStations, now: now)
+                            subscribed: subscriptions, skipping: resolved.unresolvedStations, now: now)
         await AlertNotifications.apply(entries(plan.notifications, includeLead: true, includePlace: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),

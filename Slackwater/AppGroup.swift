@@ -58,8 +58,6 @@ enum AppGroup {
     /// Alert rules (notifications spec §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.
     static let alertRulesKey = "slackwater.alertRules"
-    /// The identifier of the "Slackwater" calendar the app created (notifications spec §5.1).
-    static let alertCalendarKey = "slackwater.alertCalendar"
     /// Which stations publish a calendar, and the identifier of each one (spec §5.1).
     static let stationCalendarsKey = "slackwater.stationCalendars"
 

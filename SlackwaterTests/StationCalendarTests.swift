@@ -127,6 +127,14 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(groups["a"]?.count, 0)
     }
 
+    func testASkippedStationsEntriesCannotResurrectIt() {
+        // A station's own entries must not override a skip: a plan for a station that could not
+        // load is a stale leftover, not proof it resolved after all.
+        let groups = calendarWriteGroups([entry("b")], subscribed: ["a", "b"], skipping: ["b"])
+
+        XCTAssertEqual(Set(groups.keys), ["a"])
+    }
+
     @MainActor func testASubscribedStationWithoutACalendarYetReturnsNilID() {
         let store = StationCalendarStore(defaults: defaults())
         store.subscribe("a")

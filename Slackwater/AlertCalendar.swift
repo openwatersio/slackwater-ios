@@ -34,23 +34,53 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
             + store.sources.filter { $0.sourceType == .local }
     }
 
-    /// This station's calendar: the stored identifier, else one already carrying the title,
-    /// else a new one.
+    /// Whether a calendar event's own `url` — built by `shareURL(forStationID:at:tz:) ??
+    /// deepLink(forStationID:)` when this app wrote the event — names `wanted`. A shareURL
+    /// carries the occurrence's own instant as a trailing path segment
+    /// (`https://slackwater.xyz/<kind>/<slug>[/<instant>]`); two devices under different comfort
+    /// speeds compute different instants for the same slack window, so this resolves the URL
+    /// back to a station id rather than comparing URLs whole — the instant never enters the
+    /// comparison. A deep link (`slackwater://station/<id>`) carries no instant at all. Any URL
+    /// this app didn't mint — a hand-made event's own link — resolves to no station and never
+    /// matches.
+    private static func urlNames(_ wanted: String, url: URL) -> Bool {
+        if let link = stationLink(from: url) { return stationItem(for: link)?.id == wanted }
+        if url.scheme == "slackwater" { return stationID(from: url) == wanted }
+        return false
+    }
+
+    /// Whether any of `calendar`'s future events proves this app made it for `stationID` — the
+    /// only evidence available that a same-titled calendar is this station's own and not a
+    /// same-named station's (340 current-station and 143 tide-station name collisions ship in the
+    /// bundled catalogs) or one a person made by hand under the same title.
+    private static func owns(_ calendar: EKCalendar, stationID: String, now: Date) -> Bool {
+        let predicate = store.predicateForEvents(
+            withStart: now, end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),
+            calendars: [calendar])
+        return store.events(matching: predicate).contains { event in
+            guard let url = event.url else { return false }
+            return urlNames(stationID, url: url)
+        }
+    }
+
+    /// This station's calendar: the stored identifier, else a same-titled calendar this app can
+    /// prove it made for this station, else a new one.
     ///
-    /// The title match is what keeps a second device from making a duplicate. These calendars
-    /// sync, so device B turning the same station on sees device A's calendar already there —
-    /// without adopting it, the user ends up with two calendars of one name and every event
-    /// twice. Adopting is safe here because a station calendar's contents are a function of the
-    /// station, not of anything device-local: both devices plan the same events. The exception
-    /// is a current station under two different comfort speeds, which rewrite each other's
-    /// windows; that setting describes one boat (spec §5.1).
-    static func calendarFor(stationID: String, title: String, create: Bool) -> EKCalendar? {
+    /// A title match alone is not enough to adopt: titles collide (two different stations can
+    /// share a place name), so adopting on title alone would let one station's sync empty and
+    /// overwrite another's, or capture — and later delete — a calendar a person made by hand
+    /// under the same name. Ownership is proved by content instead, via `owns`: a candidate is
+    /// adopted only when one of its own future events names this station, which only this app's
+    /// own past sync could have written. Two same-titled, unowned calendars are both left alone
+    /// — ambiguous in Calendar.app, never destructive.
+    static func calendarFor(stationID: String, title: String, create: Bool, now: Date) -> EKCalendar? {
         if let id = StationCalendarStore.shared.calendarID(for: stationID),
            let existing = store.calendar(withIdentifier: id) { return existing }
         let allowed = Set(sources.map(\.sourceIdentifier))
-        if let adopted = store.calendars(for: .event).first(where: {
+        let candidates = store.calendars(for: .event).filter {
             $0.title == title && allowed.contains($0.source.sourceIdentifier)
-        }) {
+        }
+        if let adopted = candidates.first(where: { owns($0, stationID: stationID, now: now) }) {
             StationCalendarStore.shared.setCalendarID(adopted.calendarIdentifier, for: stationID)
             return adopted
         }
@@ -84,25 +114,35 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
             calendars: [calendar])).count
     }
 
-    /// Makes each subscribed station's calendar match its plan: removes events that haven't
-    /// started and are no longer planned, and adds the missing ones. An event already under way
-    /// is left alone. It matches within a tolerance rather than by exact content, since the
-    /// engine's event search can land an instant a second apart from one reschedule to the next.
-    /// ponytail: an event the user edited by hand (moved, retitled) stops matching and is
-    /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
-    static func apply(_ entries: [AlertEntry], skipping: Set<String> = [], now: Date) {
+    /// Makes each subscribed station's calendar match its plan. `subscribed` is the caller's own
+    /// snapshot, not re-read from the store here: the toggle that changes a subscription is what
+    /// triggers a reschedule, so a run with a subscription change in flight is the normal case.
+    /// Re-reading the store here would see a station the resolve behind `entries` neither planned
+    /// for nor skipped, hand it an empty plan, and wipe a calendar that may already hold another
+    /// device's events.
+    static func apply(_ entries: [AlertEntry], subscribed: [String], skipping: Set<String> = [], now: Date) {
         guard authorized else { return }
-        let subscribed = StationCalendarStore.shared.subscriptions.map(\.stationID)
+        // The store is long-lived and caches what it has already seen. Without a reset, a
+        // calendar another device created and synced since this process last asked stays
+        // invisible here, and `calendarFor`'s ownership check creates the duplicate it exists to
+        // prevent.
+        store.reset()
         for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed, skipping: skipping) {
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
             // Nothing planned and no calendar yet: don't make an empty one.
             guard let calendar = calendarFor(stationID: stationID, title: title,
-                                             create: !planned.isEmpty) else { continue }
+                                             create: !planned.isEmpty, now: now) else { continue }
             sync(calendar, to: planned, now: now)
         }
     }
 
+    /// Makes `calendar`'s future match `entries`: removes events that haven't started and are no
+    /// longer planned, and adds the missing ones. An event already under way is left alone. It
+    /// matches within a tolerance rather than by exact content, since the engine's event search
+    /// can land an instant a second apart from one reschedule to the next.
+    /// ponytail: an event the user edited by hand (moved, retitled) stops matching and is
+    /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
     private static func sync(_ calendar: EKCalendar, to entries: [AlertEntry], now: Date) {
         let predicate = store.predicateForEvents(withStart: now,
                                                  end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),
