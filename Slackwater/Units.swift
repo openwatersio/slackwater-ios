@@ -47,11 +47,11 @@ func speedUnitLabel(_ unit: String) -> String {
 /// A printed unit as VoiceOver should say it: "kn" is read as a word.
 func spokenUnit(_ label: String) -> String {
     switch label {
-    case "kn": "knots"
-    case "km/h": "kilometres per hour"
-    case "m/s": "metres per second"
-    case "ft": "feet"
-    case "m": "metres"
+    case "kn": String(localized: "knots", comment: "Spoken expansion of the printed nautical speed unit 'kn'.")
+    case "km/h": String(localized: "kilometres per hour", comment: "Spoken metric speed unit.")
+    case "m/s": String(localized: "metres per second", comment: "Spoken metric speed unit.")
+    case "ft": String(localized: "feet", comment: "Spoken imperial height unit.")
+    case "m": String(localized: "metres", comment: "Spoken metric height unit.")
     default: label
     }
 }
@@ -61,5 +61,6 @@ func spokenUnit(_ label: String) -> String {
 /// "1.2 nm" / "14 nm" — the prototype's fmtDist.
 func formatNm(_ km: Double, locale: Locale = .autoupdatingCurrent) -> String {
     let nm = km / 1.852
-    return decimal(nm, places: nm < 10 ? 1 : 0, locale: locale) + " nm"
+    return String(localized: "\(decimal(nm, places: nm < 10 ? 1 : 0, locale: locale)) nm",
+                  comment: "Distance in nautical miles. The value is a locale-formatted number and 'nm' is nautical notation.")
 }

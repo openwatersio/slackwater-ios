@@ -4,28 +4,38 @@ import SlackwaterKit
 func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -> String {
     switch job.status {
     case .downloading:
-        return job.total > 0 ? "\(min(job.done, job.total)) of \(job.total) downloaded" : "Downloading"
+        return job.total > 0
+            ? String(localized: "\(min(job.done, job.total)) of \(job.total) downloaded", comment: "Compact download progress. Values are completed and total requests.")
+            : String(localized: "Downloading", comment: "Compact download status.")
     case .pending:
         if let due = job.retryAfter {
-            guard due > now else { return "Retrying" }
+            guard due > now else { return String(localized: "Retrying", comment: "Compact download status.") }
             let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
-            return "Retrying in \(minutes) min"
+            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
         }
-        return position.map { $0 <= 1 ? "Next" : "\(ordinal($0)) in line" } ?? "Queued"
-    case .ready: return "Queued"
-    case .failed: return "Failed"
+        return position.map {
+            $0 <= 1
+                ? String(localized: "Next", comment: "First position in the download queue.")
+                : String(localized: "\(ordinal($0)) in line", comment: "Download queue position. The value is a locale-formatted ordinal.")
+        } ?? String(localized: "Queued", comment: "Compact download status.")
+    case .ready: return String(localized: "Queued", comment: "Compact download status.")
+    case .failed: return String(localized: "Failed", comment: "Compact download status.")
     }
 }
 
 func onlineCardDownloadLabel(state: ChsFitService.OnlineFetchState, position: Int?,
                              at now: Date = appNow()) -> String? {
     switch state {
-    case .fetching: return "Downloading"
+    case .fetching: return String(localized: "Downloading", comment: "Compact download status.")
     case .deferred(let due):
-        guard due > now else { return "Retrying" }
+        guard due > now else { return String(localized: "Retrying", comment: "Compact download status.") }
         let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
-        return "Retrying in \(minutes) min"
-    case .idle: return position.map { $0 <= 1 ? "Next" : "\(ordinal($0)) in line" }
+        return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
+    case .idle: return position.map {
+        $0 <= 1
+            ? String(localized: "Next", comment: "First position in the download queue.")
+            : String(localized: "\(ordinal($0)) in line", comment: "Download queue position. The value is a locale-formatted ordinal.")
+    }
     case .failed: return nil
     }
 }

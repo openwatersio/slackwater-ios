@@ -43,20 +43,25 @@ func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
 
 func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
                provisional: Bool = false, at now: Date = appNow()) -> String {
-    if provisional { return "Refining…" }
+    if provisional { return String(localized: "Refining…", comment: "Compact prediction status.") }
     switch job.status {
-    case .ready: return "Available offline"
-    case .failed: return "Predictions unavailable"
+    case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
+    case .failed: return String(localized: "Predictions unavailable", comment: "Prediction download status.")
     case .downloading:
-        return job.total > 0 ? "Downloading · \(job.done) of \(job.total)" : "Downloading…"
+        return job.total > 0
+            ? String(localized: "Downloading · \(job.done) of \(job.total)", comment: "Download progress. Values are completed and total requests.")
+            : String(localized: "Downloading…", comment: "Download status.")
     case .pending:
-        guard online else { return "Waiting for signal" }
+        guard online else { return String(localized: "Waiting for signal", comment: "Download status while offline.") }
         if let due = job.retryAfter, due > now {
             let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
-            return "Retrying in \(minutes) min"
+            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
         }
-        return position.map { $0 <= 1 ? "Waiting · next" : "Waiting · \(ordinal($0)) in line" }
-            ?? "Waiting"
+        return position.map {
+            $0 <= 1
+                ? String(localized: "Waiting · next", comment: "Download status for the first queued station.")
+                : String(localized: "Waiting · \(ordinal($0)) in line", comment: "Download status. The value is a locale-formatted queue position.")
+        } ?? String(localized: "Waiting", comment: "Download status.")
     }
 }
 

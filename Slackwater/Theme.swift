@@ -378,7 +378,9 @@ struct SkyBackdrop: View {
 /// "42m" / "2h 14m" until `target`, floored at zero.
 func countdown(from: Date, to target: Date) -> String {
     let minutes = max(Int(target.timeIntervalSince(from) / 60), 0)
-    return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+    return minutes < 60
+        ? String(localized: "\(minutes)m", comment: "Compact countdown in minutes; 'm' is invariant notation.")
+        : String(localized: "\(minutes / 60)h \(minutes % 60)m", comment: "Compact countdown in hours and minutes; 'h' and 'm' are invariant notation.")
 }
 
 /// The lit region of a disc of radius `r`, lit from +x. The terminator is
@@ -417,32 +419,40 @@ func moonPhaseName(phase: Double) -> String {
     let syn = 29.53
     let age = phase * syn
     let waxing = age < syn / 2
-    if age < 1.7 || age > syn - 1.7 { return "New Moon" }
-    if abs(age - syn / 2) < 1.7 { return "Full Moon" }
-    if abs(age - syn / 4) < 1.4 { return "First Quarter" }
-    if abs(age - 3 * syn / 4) < 1.4 { return "Last Quarter" }
+    if age < 1.7 || age > syn - 1.7 { return String(localized: "New Moon", comment: "Moon phase name.") }
+    if abs(age - syn / 2) < 1.7 { return String(localized: "Full Moon", comment: "Moon phase name.") }
+    if abs(age - syn / 4) < 1.4 { return String(localized: "First Quarter", comment: "Moon phase name.") }
+    if abs(age - 3 * syn / 4) < 1.4 { return String(localized: "Last Quarter", comment: "Moon phase name.") }
     let fraction = (1 - cos(2 * .pi * age / syn)) / 2
-    if fraction < 0.5 { return waxing ? "Waxing Crescent" : "Waning Crescent" }
-    return waxing ? "Waxing Gibbous" : "Waning Gibbous"
+    if fraction < 0.5 {
+        return waxing
+            ? String(localized: "Waxing Crescent", comment: "Moon phase name.")
+            : String(localized: "Waning Crescent", comment: "Moon phase name.")
+    }
+    return waxing
+        ? String(localized: "Waxing Gibbous", comment: "Moon phase name.")
+        : String(localized: "Waning Gibbous", comment: "Moon phase name.")
 }
 
 /// The Moon tile's value line while an eclipse is underway. Presentation, the
 /// same way `moonPhaseName` is: Almanac reports a kind, the words are ours.
 func eclipseTileText(_ kind: LunarEclipseKind) -> String {
     switch kind {
-    case .total: "Total Eclipse"
-    case .partial: "Partial Eclipse"
-    case .penumbral: "Penumbral Eclipse"
+    case .total: String(localized: "Total Eclipse", comment: "Lunar eclipse name.")
+    case .partial: String(localized: "Partial Eclipse", comment: "Lunar eclipse name.")
+    case .penumbral: String(localized: "Penumbral Eclipse", comment: "Lunar eclipse name.")
     }
 }
 
-func solarEclipseTileText(_: SolarEclipseKind) -> String { "Solar Eclipse" }
+func solarEclipseTileText(_: SolarEclipseKind) -> String {
+    String(localized: "Solar Eclipse", comment: "Solar eclipse name shown in a compact tile.")
+}
 
 func solarEclipseName(_ kind: SolarEclipseKind) -> String {
     switch kind {
-    case .partial: "Partial Solar Eclipse"
-    case .annular: "Annular Solar Eclipse"
-    case .total: "Total Solar Eclipse"
+    case .partial: String(localized: "Partial Solar Eclipse", comment: "Solar eclipse name.")
+    case .annular: String(localized: "Annular Solar Eclipse", comment: "Solar eclipse name.")
+    case .total: String(localized: "Total Solar Eclipse", comment: "Solar eclipse name.")
     }
 }
 
@@ -455,49 +465,48 @@ func solarEclipseName(_ kind: SolarEclipseKind) -> String {
 /// covers eclipse titles with the same switch. `SkyBackdropTests` pins the
 /// names, and pins that every one of them has a line here.
 func moonPhaseBlurb(_ name: String) -> String {
-    switch name {
-    case "New Moon": "Between us and the sun, so its lit side faces away."
-    case "Waxing Crescent": "A sliver, growing a little fuller each night."
-    case "First Quarter": "Half lit — a quarter of the way through the cycle."
-    case "Waxing Gibbous": "More than half lit, filling toward full."
-    case "Full Moon": "Opposite the sun, with the whole face we see lit."
-    case "Waning Gibbous": "Past full: more than half lit, and shrinking."
-    case "Last Quarter": "Half lit again, three quarters through the cycle."
-    case "Waning Crescent": "A thinning sliver, a few nights from new."
-    case "Penumbral Eclipse": "In Earth's faint outer shadow — a dimming, not a bite."
-    case "Partial Eclipse": "Part of the moon crossing Earth's dark inner shadow."
-    case "Total Eclipse": "Fully inside Earth's shadow, reddened by Earth's sunsets."
-    case "Solar Eclipse": "The new moon crossing the sun as seen from here."
-    default: ""
-    }
+    if name == String(localized: "New Moon", comment: "Moon phase name.") { return String(localized: "Between us and the sun, so its lit side faces away.", comment: "Plain-language explanation of a new moon.") }
+    if name == String(localized: "Waxing Crescent", comment: "Moon phase name.") { return String(localized: "A sliver, growing a little fuller each night.", comment: "Plain-language explanation of a waxing crescent moon.") }
+    if name == String(localized: "First Quarter", comment: "Moon phase name.") { return String(localized: "Half lit — a quarter of the way through the cycle.", comment: "Plain-language explanation of a first-quarter moon.") }
+    if name == String(localized: "Waxing Gibbous", comment: "Moon phase name.") { return String(localized: "More than half lit, filling toward full.", comment: "Plain-language explanation of a waxing gibbous moon.") }
+    if name == String(localized: "Full Moon", comment: "Moon phase name.") { return String(localized: "Opposite the sun, with the whole face we see lit.", comment: "Plain-language explanation of a full moon.") }
+    if name == String(localized: "Waning Gibbous", comment: "Moon phase name.") { return String(localized: "Past full: more than half lit, and shrinking.", comment: "Plain-language explanation of a waning gibbous moon.") }
+    if name == String(localized: "Last Quarter", comment: "Moon phase name.") { return String(localized: "Half lit again, three quarters through the cycle.", comment: "Plain-language explanation of a last-quarter moon.") }
+    if name == String(localized: "Waning Crescent", comment: "Moon phase name.") { return String(localized: "A thinning sliver, a few nights from new.", comment: "Plain-language explanation of a waning crescent moon.") }
+    if name == String(localized: "Penumbral Eclipse", comment: "Lunar eclipse name.") { return String(localized: "In Earth's faint outer shadow — a dimming, not a bite.", comment: "Plain-language explanation of a penumbral lunar eclipse.") }
+    if name == String(localized: "Partial Eclipse", comment: "Lunar eclipse name.") { return String(localized: "Part of the moon crossing Earth's dark inner shadow.", comment: "Plain-language explanation of a partial lunar eclipse.") }
+    if name == String(localized: "Total Eclipse", comment: "Lunar eclipse name.") { return String(localized: "Fully inside Earth's shadow, reddened by Earth's sunsets.", comment: "Plain-language explanation of a total lunar eclipse.") }
+    if name == String(localized: "Solar Eclipse", comment: "Solar eclipse name shown in a compact tile.") { return String(localized: "The new moon crossing the sun as seen from here.", comment: "Plain-language explanation of a solar eclipse.") }
+    return ""
 }
 
 /// Lunar geometry describes a tendency in tidal range, not a local height prediction.
 func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
     enum RangeKind { case spring, neap }
-    let range: RangeKind? = switch moonPhaseName(phase: phase) {
-    case "New Moon", "Full Moon": .spring
-    case "First Quarter", "Last Quarter": .neap
-    default: nil
-    }
+    let name = moonPhaseName(phase: phase)
+    let range: RangeKind? = if name == String(localized: "New Moon", comment: "Moon phase name.")
+        || name == String(localized: "Full Moon", comment: "Moon phase name.") { .spring }
+        else if name == String(localized: "First Quarter", comment: "Moon phase name.")
+            || name == String(localized: "Last Quarter", comment: "Moon phase name.") { .neap }
+        else { nil }
     // Coastal tides can lag the astronomical event by a day or two.
     if let perigee, abs(perigee.timeIntervalSince(at)) <= 2 * 86_400 {
         return switch range {
-        case .spring: "Perigean spring tide"
-        case .neap: "Perigean neap tide"
-        case nil: "Perigean tide"
+        case .spring: String(localized: "Perigean spring tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+        case .neap: String(localized: "Perigean neap tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+        case nil: String(localized: "Perigean tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
         }
     }
     if let apogee, abs(apogee.timeIntervalSince(at)) <= 2 * 86_400 {
         return switch range {
-        case .spring: "Apogean spring tide"
-        case .neap: "Apogean neap tide"
-        case nil: "Apogean tide"
+        case .spring: String(localized: "Apogean spring tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
+        case .neap: String(localized: "Apogean neap tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
+        case nil: String(localized: "Apogean tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
         }
     }
     return switch range {
-    case .spring: "Spring tide"
-    case .neap: "Neap tide"
+    case .spring: String(localized: "Spring tide", comment: "Astronomical tidal-range tendency around a new or full moon.")
+    case .neap: String(localized: "Neap tide", comment: "Astronomical tidal-range tendency around a quarter moon.")
     case nil: nil
     }
 }
@@ -698,19 +707,20 @@ struct CommentaryContent: Equatable {
 
 func commentaryEventStop(_ label: String, at time: Date,
                          prefix: String = "") -> CommentaryStop {
+    let visible: String
     let spoken: String
     let systemImage: String
     switch label {
-    case "Sunrise": (spoken, systemImage) = ("Sunrise", "sunrise")
-    case "Sunset": (spoken, systemImage) = ("Sunset", "sunset")
-    case "Slack": (spoken, systemImage) = ("Slack current", "arrow.right.and.line.vertical.and.arrow.left")
-    case "Flood": (spoken, systemImage) = ("Flood current", "arrow.forward")
-    case "Ebb": (spoken, systemImage) = ("Ebb current", "arrow.backward")
-    case "Max flood": (spoken, systemImage) = ("Maximum flood current", "arrow.forward")
-    case "Max ebb": (spoken, systemImage) = ("Maximum ebb current", "arrow.backward")
+    case "Sunrise": (visible, spoken, systemImage) = (String(localized: "Sunrise", comment: "Next-event label."), String(localized: "Sunrise", comment: "VoiceOver next-event label."), "sunrise")
+    case "Sunset": (visible, spoken, systemImage) = (String(localized: "Sunset", comment: "Next-event label."), String(localized: "Sunset", comment: "VoiceOver next-event label."), "sunset")
+    case "Slack": (visible, spoken, systemImage) = (String(localized: "Slack", comment: "Current event: water is near zero speed."), String(localized: "Slack current", comment: "VoiceOver current-event label."), "arrow.right.and.line.vertical.and.arrow.left")
+    case "Flood": (visible, spoken, systemImage) = (String(localized: "Flood", comment: "Flood-current event label."), String(localized: "Flood current", comment: "VoiceOver current-event label."), "arrow.forward")
+    case "Ebb": (visible, spoken, systemImage) = (String(localized: "Ebb", comment: "Ebb-current event label."), String(localized: "Ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
+    case "Max flood": (visible, spoken, systemImage) = (String(localized: "Max flood", comment: "Maximum flood-current event label."), String(localized: "Maximum flood current", comment: "VoiceOver current-event label."), "arrow.forward")
+    case "Max ebb": (visible, spoken, systemImage) = (String(localized: "Max ebb", comment: "Maximum ebb-current event label."), String(localized: "Maximum ebb current", comment: "VoiceOver current-event label."), "arrow.backward")
     default: return CommentaryStop(time: time, label: prefix + label)
     }
-    return CommentaryStop(time: time, label: prefix + label,
+    return CommentaryStop(time: time, label: prefix + visible,
                           spokenLabel: prefix + spoken,
                           systemImage: systemImage)
 }
@@ -730,7 +740,7 @@ func commentaryContent(_ stop: CommentaryStop, from scrub: Date,
     let spokenDuration = formatter.string(from: max(0, stop.time.timeIntervalSince(scrub))) ?? duration
     return CommentaryContent(label: stop.label, duration: duration,
                              systemImage: stop.systemImage,
-                             accessibilityLabel: "\(stop.spokenLabel ?? stop.label) in \(spokenDuration)")
+                             accessibilityLabel: String(localized: "\(stop.spokenLabel ?? stop.label) in \(spokenDuration)", comment: "VoiceOver label for the next tide, current, or sun event. Values are the event and a localized duration."))
 }
 
 /// The stop the commentary names and its tap walks to: the water's next stop,

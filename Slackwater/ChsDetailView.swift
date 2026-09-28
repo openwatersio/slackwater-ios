@@ -328,26 +328,22 @@ struct ChsAmberCard: View {
     }
 }
 
-/// "1st" … — small enough that NumberFormatter's .ordinal (and its locale
-/// machinery) would be the heavier option.
-func ordinal(_ n: Int) -> String {
-    let suffix: String
-    switch (n % 10, n % 100) {
-    case (1, 11), (2, 12), (3, 13): suffix = "th"
-    case (1, _): suffix = "st"
-    case (2, _): suffix = "nd"
-    case (3, _): suffix = "rd"
-    default: suffix = "th"
-    }
-    return "\(n)\(suffix)"
+/// A locale-aware queue position ("1st", "1er", …).
+func ordinal(_ n: Int, locale: Locale = .autoupdatingCurrent) -> String {
+    let formatter = NumberFormatter()
+    formatter.locale = locale
+    formatter.numberStyle = .ordinal
+    return formatter.string(from: NSNumber(value: n)) ?? String(n)
 }
 
 /// "under a minute" / "about 3 minutes" — deliberately coarse: the estimate is
 /// a pacing constant, and a ticking countdown would claim precision it hasn't.
 func durationPhrase(_ seconds: Double) -> String {
-    if seconds < 90 { return "under a minute" }
+    if seconds < 90 { return String(localized: "under a minute", comment: "Approximate download duration under ninety seconds.") }
     let minutes = Int((seconds / 60).rounded())
-    if minutes < 60 { return "about \(minutes) minutes" }
+    if minutes < 60 { return String(localized: "about \(minutes) minutes", comment: "Approximate duration. The integer is a number of minutes; vary by plural.") }
     let hours = Int((Double(minutes) / 60).rounded())
-    return hours <= 1 ? "about an hour" : "about \(hours) hours"
+    return hours <= 1
+        ? String(localized: "about an hour", comment: "Approximate duration of one hour.")
+        : String(localized: "about \(hours) hours", comment: "Approximate duration. The integer is a number of hours; vary by plural.")
 }
