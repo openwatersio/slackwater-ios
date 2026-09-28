@@ -58,25 +58,25 @@ func moonApsides(around at: Date) -> (perigee: Date?, apogee: Date?) {
 }
 
 func moonTideExplanation(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String {
-    switch moonTideLabel(phase: phase, at: at, perigee: perigee, apogee: apogee) {
-    case "Perigean spring tide":
-        "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near perigee the Moon is closer, so its tidal effect is stronger: higher highs and lower lows than during an apogean spring tide."
-    case "Apogean spring tide":
-        "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near apogee the Moon is farther away, so its tidal effect is weaker: lower highs and higher lows than during a perigean spring tide."
-    case "Perigean neap tide":
-        "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near perigee, the closer Moon's stronger effect offsets some of the neap narrowing."
-    case "Apogean neap tide":
-        "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near apogee, the farther Moon's weaker effect narrows the range further."
-    case "Perigean tide":
-        "The Moon is near perigee, its closest point to Earth. Its stronger tidal effect tends to widen the range, raising highs and lowering lows compared with apogee."
-    case "Apogean tide":
-        "The Moon is near apogee, its farthest point from Earth. Its weaker tidal effect tends to narrow the range, lowering highs and raising lows compared with perigee."
-    case "Spring tide":
-        "The Sun and Moon line up, reinforcing each other's tidal effects. The wider range tends to bring higher highs and lower lows."
-    case "Neap tide":
-        "The Sun and Moon are at right angles, so their tidal effects partly offset. The narrower range tends to bring lower highs and higher lows."
-    default:
-        "Between spring and neap alignments, the tidal range is changing. The Moon's distance also matters: closer at perigee tends to widen the range, farther at apogee to narrow it."
+    switch moonTideKind(phase: phase, at: at, perigee: perigee, apogee: apogee) {
+    case .perigeanSpring:
+        String(localized: "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near perigee the Moon is closer, so its tidal effect is stronger: higher highs and lower lows than during an apogean spring tide.", comment: "Explanation of a perigean spring tide.")
+    case .apogeanSpring:
+        String(localized: "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near apogee the Moon is farther away, so its tidal effect is weaker: lower highs and higher lows than during a perigean spring tide.", comment: "Explanation of an apogean spring tide.")
+    case .perigeanNeap:
+        String(localized: "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near perigee, the closer Moon's stronger effect offsets some of the neap narrowing.", comment: "Explanation of a perigean neap tide.")
+    case .apogeanNeap:
+        String(localized: "At a quarter moon, the Sun and Moon's tidal effects partly offset, narrowing the range. Near apogee, the farther Moon's weaker effect narrows the range further.", comment: "Explanation of an apogean neap tide.")
+    case .perigean:
+        String(localized: "The Moon is near perigee, its closest point to Earth. Its stronger tidal effect tends to widen the range, raising highs and lowering lows compared with apogee.", comment: "Explanation of the Moon's tidal effect near perigee.")
+    case .apogean:
+        String(localized: "The Moon is near apogee, its farthest point from Earth. Its weaker tidal effect tends to narrow the range, lowering highs and raising lows compared with perigee.", comment: "Explanation of the Moon's tidal effect near apogee.")
+    case .spring:
+        String(localized: "The Sun and Moon line up, reinforcing each other's tidal effects. The wider range tends to bring higher highs and lower lows.", comment: "Explanation of a spring tide.")
+    case .neap:
+        String(localized: "The Sun and Moon are at right angles, so their tidal effects partly offset. The narrower range tends to bring lower highs and higher lows.", comment: "Explanation of a neap tide.")
+    case nil:
+        String(localized: "Between spring and neap alignments, the tidal range is changing. The Moon's distance also matters: closer at perigee tends to widen the range, farther at apogee to narrow it.", comment: "Explanation of a changing tidal range between spring and neap alignments.")
     }
 }
 

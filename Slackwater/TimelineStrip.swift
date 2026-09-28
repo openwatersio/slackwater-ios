@@ -1110,9 +1110,9 @@ func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
     return switch cal.dateComponents([.day], from: today, to: dayStart).day ?? 0 {
-    case 0: "Today"
-    case 1: "Tomorrow"
-    case -1: "Yesterday"
+    case 0: String(localized: "Today", comment: "Relative label for the current day.")
+    case 1: String(localized: "Tomorrow", comment: "Relative label for the next day.")
+    case -1: String(localized: "Yesterday", comment: "Relative label for the previous day.")
     default: shortWeekday(dayStart, tz)
     }
 }

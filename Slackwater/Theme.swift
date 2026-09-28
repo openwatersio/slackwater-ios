@@ -415,23 +415,37 @@ func moonUmbraShift(coverage: Double, radius: CGFloat) -> CGFloat {
 /// new/full, 1.4 d for the quarters, over the 29.53 d synodic month).
 /// Presentation, not astronomy: Almanac reports `phase`, and where the names
 /// change hands is this app's call.
-func moonPhaseName(phase: Double) -> String {
+private enum MoonPhaseKind {
+    case new, waxingCrescent, firstQuarter, waxingGibbous
+    case full, waningGibbous, lastQuarter, waningCrescent
+}
+
+private func moonPhaseKind(phase: Double) -> MoonPhaseKind {
     let syn = 29.53
     let age = phase * syn
     let waxing = age < syn / 2
-    if age < 1.7 || age > syn - 1.7 { return String(localized: "New Moon", comment: "Moon phase name.") }
-    if abs(age - syn / 2) < 1.7 { return String(localized: "Full Moon", comment: "Moon phase name.") }
-    if abs(age - syn / 4) < 1.4 { return String(localized: "First Quarter", comment: "Moon phase name.") }
-    if abs(age - 3 * syn / 4) < 1.4 { return String(localized: "Last Quarter", comment: "Moon phase name.") }
+    if age < 1.7 || age > syn - 1.7 { return .new }
+    if abs(age - syn / 2) < 1.7 { return .full }
+    if abs(age - syn / 4) < 1.4 { return .firstQuarter }
+    if abs(age - 3 * syn / 4) < 1.4 { return .lastQuarter }
     let fraction = (1 - cos(2 * .pi * age / syn)) / 2
     if fraction < 0.5 {
-        return waxing
-            ? String(localized: "Waxing Crescent", comment: "Moon phase name.")
-            : String(localized: "Waning Crescent", comment: "Moon phase name.")
+        return waxing ? .waxingCrescent : .waningCrescent
     }
-    return waxing
-        ? String(localized: "Waxing Gibbous", comment: "Moon phase name.")
-        : String(localized: "Waning Gibbous", comment: "Moon phase name.")
+    return waxing ? .waxingGibbous : .waningGibbous
+}
+
+func moonPhaseName(phase: Double) -> String {
+    switch moonPhaseKind(phase: phase) {
+    case .new: String(localized: "New Moon", comment: "Moon phase name.")
+    case .waxingCrescent: String(localized: "Waxing Crescent", comment: "Moon phase name.")
+    case .firstQuarter: String(localized: "First Quarter", comment: "Moon phase name.")
+    case .waxingGibbous: String(localized: "Waxing Gibbous", comment: "Moon phase name.")
+    case .full: String(localized: "Full Moon", comment: "Moon phase name.")
+    case .waningGibbous: String(localized: "Waning Gibbous", comment: "Moon phase name.")
+    case .lastQuarter: String(localized: "Last Quarter", comment: "Moon phase name.")
+    case .waningCrescent: String(localized: "Waning Crescent", comment: "Moon phase name.")
+    }
 }
 
 /// The Moon tile's value line while an eclipse is underway. Presentation, the
@@ -481,30 +495,48 @@ func moonPhaseBlurb(_ name: String) -> String {
 }
 
 /// Lunar geometry describes a tendency in tidal range, not a local height prediction.
-func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
+enum MoonTideKind {
+    case perigeanSpring, apogeanSpring, perigeanNeap, apogeanNeap
+    case perigean, apogean, spring, neap
+}
+
+func moonTideKind(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> MoonTideKind? {
     enum RangeKind { case spring, neap }
-    let name = moonPhaseName(phase: phase)
-    let range: RangeKind? = if name == String(localized: "New Moon", comment: "Moon phase name.")
-        || name == String(localized: "Full Moon", comment: "Moon phase name.") { .spring }
-        else if name == String(localized: "First Quarter", comment: "Moon phase name.")
-            || name == String(localized: "Last Quarter", comment: "Moon phase name.") { .neap }
-        else { nil }
+    let range: RangeKind? = switch moonPhaseKind(phase: phase) {
+    case .new, .full: .spring
+    case .firstQuarter, .lastQuarter: .neap
+    default: nil
+    }
     // Coastal tides can lag the astronomical event by a day or two.
     if let perigee, abs(perigee.timeIntervalSince(at)) <= 2 * 86_400 {
         return switch range {
-        case .spring: String(localized: "Perigean spring tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
-        case .neap: String(localized: "Perigean neap tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
-        case nil: String(localized: "Perigean tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+        case .spring: .perigeanSpring
+        case .neap: .perigeanNeap
+        case nil: .perigean
         }
     }
     if let apogee, abs(apogee.timeIntervalSince(at)) <= 2 * 86_400 {
         return switch range {
-        case .spring: String(localized: "Apogean spring tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
-        case .neap: String(localized: "Apogean neap tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
-        case nil: String(localized: "Apogean tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
+        case .spring: .apogeanSpring
+        case .neap: .apogeanNeap
+        case nil: .apogean
         }
     }
     return switch range {
+    case .spring: .spring
+    case .neap: .neap
+    case nil: nil
+    }
+}
+
+func moonTideLabel(phase: Double, at: Date, perigee: Date?, apogee: Date?) -> String? {
+    switch moonTideKind(phase: phase, at: at, perigee: perigee, apogee: apogee) {
+    case .perigeanSpring: String(localized: "Perigean spring tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+    case .apogeanSpring: String(localized: "Apogean spring tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
+    case .perigeanNeap: String(localized: "Perigean neap tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+    case .apogeanNeap: String(localized: "Apogean neap tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
+    case .perigean: String(localized: "Perigean tide", comment: "Astronomical tidal-range tendency near lunar perigee.")
+    case .apogean: String(localized: "Apogean tide", comment: "Astronomical tidal-range tendency near lunar apogee.")
     case .spring: String(localized: "Spring tide", comment: "Astronomical tidal-range tendency around a new or full moon.")
     case .neap: String(localized: "Neap tide", comment: "Astronomical tidal-range tendency around a quarter moon.")
     case nil: nil
@@ -1596,14 +1628,19 @@ struct SeriesFilterChips: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            chip("All", nil)
-            chip("Tides", .tide)
-            chip("Currents", .current)
+            chip(String(localized: "All", comment: "Station series filter showing all stations."), nil)
+            chip(String(localized: "Tides", comment: "Station series filter showing tide stations."), .tide)
+            chip(String(localized: "Currents", comment: "Station series filter showing current stations."), .current)
         }
     }
 
     private func chip(_ label: String, _ series: StationSeries?) -> some View {
         let selected = filter == series
+        let accessibility = switch series {
+        case nil: String(localized: "Show all", comment: "Accessibility label for the station filter that shows all stations.")
+        case .tide: String(localized: "Show tides", comment: "Accessibility label for the station filter that shows tide stations.")
+        case .current: String(localized: "Show currents", comment: "Accessibility label for the station filter that shows current stations.")
+        }
         // A tap gesture, not a Button: Nearby puts these below the strip,
         // where Button press tracking goes dead in the iPad split detail column.
         return Text(label)
@@ -1617,9 +1654,9 @@ struct SeriesFilterChips: View {
             .frame(minHeight: 44)
             .contentShape(Rectangle())
             .onTapGesture { filter = selected ? nil : series }
-            .accessibilityLabel("Show \(label.lowercased())")
+            .accessibilityLabel(accessibility)
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityIdentifier("series-filter-\(label.lowercased())")
+            .accessibilityIdentifier("series-filter-\(series.map { $0.rawValue + "s" } ?? "all")")
     }
 }
 
