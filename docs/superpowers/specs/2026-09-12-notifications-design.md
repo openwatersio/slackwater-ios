@@ -274,14 +274,14 @@ A `UILongPressGestureRecognizer` alongside the tap recognizer already on the scr
 `DragGesture` anywhere near the strip — the scrub is `UIScrollView`'s own pan, which never starts
 from a stationary touch — so the press needs nothing taken away from it.
 
-On recognition: stop the intro slide, cancel any fling or magnet ride, take a haptic, resolve what
-was pressed, and hand SwiftUI the moment together with its **viewport** x. Content x minus
-`contentOffset.x`; today `scrubTime` is the only value crossing that boundary, and this is the
-second. The plumbing is the `openWeekPicker` environment closure extended with an
-`onLongPress(Date, CGFloat)`, for the same reason it exists: state lives in
-`ScrubDetailScaffold` and threading more callbacks through four consumers is worse.
-
-While the popup is up the scroll view's pan is off, so the strip cannot slide out from under it.
+On recognition: stop the intro slide, cancel any fling or magnet ride, take a haptic, **park the
+pressed moment on the centerline**, and say so. Parking it is what keeps the rest simple. The
+centerline is where every detail view already reads its offer from, so the popup's subject is
+computed by code that exists and nothing but "the strip was pressed" has to cross from UIKit into
+SwiftUI — an `onLongPress()` closure alongside `openWeekPicker`, which exists because the strip is
+three views deep in every detail and the layers between have nothing to say. The jump is
+instant rather than the tap's animated magnet ride: a press names one moment, and a popup opening
+over a sliding strip would have to wait for it to land before it could say what it was about.
 
 What a press resolves to, from where it landed:
 
@@ -301,9 +301,9 @@ press only lands on a strip that is already still, none of the row's rest-state 
 ### 7.2 The popup
 
 A `.popover` with `.presentationCompactAdaptation(.popover)`, so it is an arrow-anchored card on
-iPhone as well as iPad, anchored to a 1 × 1 view placed at the press x inside the strip's existing
-overlay `GeometryReader` — hit-testing relaxed for that subview alone, the rest of the overlay
-staying transparent to touches. Dismissal, positioning and the arrow come with the popover.
+iPhone as well as iPad, attached to the strip at `.point(.center)` — the centerline the press just
+parked its moment on. Dismissal, positioning and the arrow come with the popover, and the strip's
+riding-dot overlay keeps `allowsHitTesting(false)` untouched.
 
 - A header: the station, then the moment and what it is — "Sat 14:32 · Max ebb".
 - **Alert me** — a rule with `once` set to that instant.
@@ -404,7 +404,9 @@ No engine or Almanac version change.
 - The popup — what each press resolves to per consumer, and what each row does to the rules.
 
 **A drift test** reschedules from two different 10-minute windows and requires the same instants to
-within a minute, for every trigger and every station-calendar kind.
+within a minute, for every trigger read off a sampled series — the ones whose results could move
+with the run's start time. An eclipse is searched from an absolute window rather than the sample
+grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
 **UI:** a long press on a tide strip and on a current strip opens the popup with the right header;
 a free user's Alert me opens the tier sheet; Settings → Calendar turns a station on.
