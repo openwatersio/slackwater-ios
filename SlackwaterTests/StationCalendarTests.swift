@@ -83,6 +83,50 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(reloaded.calendarID(for: "a"), "cal-a")
     }
 
+    // MARK: which calendars a run rewrites
+
+    private func entry(_ stationID: String) -> AlertEntry {
+        let t = Date(timeIntervalSince1970: 1_700_000_000)
+        return AlertEntry(stationID: stationID,
+                          occurrence: AlertOccurrence(ruleID: UUID(), event: t, fire: t),
+                          copy: AlertCopy(title: "Slack window", body: "14:32"),
+                          url: nil,
+                          place: AlertPlace(name: "Race Passage", tz: .gmt))
+    }
+
+    func testASubscribedStationWithNoEventsIsStillEmptied() {
+        // It resolved and genuinely has nothing in the next 90 days — an empty plan is the
+        // truth, and a calendar holding last month's events must be cleared.
+        let groups = calendarWriteGroups([], subscribed: ["a"], skipping: [])
+
+        XCTAssertEqual(Set(groups.keys), ["a"])
+        XCTAssertEqual(groups["a"]?.count, 0)
+    }
+
+    func testAStationThatCouldNotLoadIsLeftAlone() {
+        // "Nothing known yet" is not "delete the next 90 days" — a CHS station waiting on its
+        // fit must not have its calendar wiped on every foreground.
+        let groups = calendarWriteGroups([], subscribed: ["a", "b"], skipping: ["b"])
+
+        XCTAssertEqual(Set(groups.keys), ["a"])
+    }
+
+    func testEntriesGoToTheirOwnStationsCalendar() {
+        let groups = calendarWriteGroups([entry("a"), entry("b"), entry("a")],
+                                         subscribed: ["a", "b"], skipping: [])
+
+        XCTAssertEqual(groups["a"]?.count, 2)
+        XCTAssertEqual(groups["b"]?.count, 1)
+    }
+
+    func testAnUnsubscribedStationsEntriesAreDropped() {
+        // Belt and braces: a stale entry can't resurrect a calendar the user turned off.
+        let groups = calendarWriteGroups([entry("gone")], subscribed: ["a"], skipping: [])
+
+        XCTAssertEqual(Set(groups.keys), ["a"])
+        XCTAssertEqual(groups["a"]?.count, 0)
+    }
+
     @MainActor func testASubscribedStationWithoutACalendarYetReturnsNilID() {
         let store = StationCalendarStore(defaults: defaults())
         store.subscribe("a")
