@@ -927,7 +927,7 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibility)
             ZStack(alignment: .leading) {
-                Text("0").font(ReadoutType.hero).hidden()
+                Text(verbatim: "0").font(ReadoutType.hero).hidden()
                 value()
             }
             .foregroundStyle(valueColor)

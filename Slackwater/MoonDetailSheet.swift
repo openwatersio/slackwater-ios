@@ -433,7 +433,7 @@ struct MoonDetailSheet: View {
             // Nil reads "None visible from here." rather than vanishing: a
             // missing row would say the app forgot to look, and "none from
             // here" is the actual answer for an observer the shadow misses.
-            cell(label, value: "None visible from here.", jumpTo: nil, id: id) {
+            cell(label, value: String(localized: "None visible from here.", comment: "Lunar eclipse visibility value."), jumpTo: nil, id: id) {
                 Color.clear.frame(width: 78, height: 44)
             }
         }
@@ -464,7 +464,7 @@ struct MoonDetailSheet: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier(id)
         } else {
-            cell(label, value: "None visible from here.", jumpTo: nil, id: id) {
+            cell(label, value: String(localized: "None visible from here.", comment: "Solar eclipse visibility value."), jumpTo: nil, id: id) {
                 Color.clear.frame(width: 78, height: 44)
             }
         }

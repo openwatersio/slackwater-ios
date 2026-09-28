@@ -390,7 +390,7 @@ struct StationListView: View {
                 List {
                     Group {
                         if let id = linkedRemovedStationID {
-                            sectionLabel("Station unavailable")
+                            sectionLabel(String(localized: "Station unavailable", comment: "Unavailable-stations section heading."))
                             removedCard(id).padding(.bottom, 12)
                         }
                         locatedSections
@@ -724,7 +724,7 @@ struct StationListView: View {
         // resolve miss can only be a station the ranking itself produced, so
         // there is nothing to miss.
         if !groups.favorites.isEmpty {
-            sectionLabel("Favorites")
+            sectionLabel(String(localized: "Favorites", comment: "Favorite-stations section heading."))
             ForEach(groups.favorites, id: \.self) { id in
                 if let item = StationItem.byId[id] {
                     itemCard(item)
@@ -747,7 +747,7 @@ struct StationListView: View {
 
         HStack(alignment: .firstTextBaseline) {
             MonoLabel(text: fix == nil && recents.lastOpened == nil
-                ? String(localized: "Chesapeake Bay", comment: "Fallback nearby-stations section heading.")
+                ? "Chesapeake Bay"
                 : String(localized: "Near Me", comment: "Nearby-stations section heading."))
             Spacer(minLength: 8)
             SeriesFilterChips()
@@ -774,7 +774,7 @@ struct StationListView: View {
         // no distance — a recent is an explicit pick, not a ranked one.
         let recentItems = items(groups.recents)
         if !recentItems.isEmpty {
-            sectionLabel("Recents")
+            sectionLabel(String(localized: "Recents", comment: "Recent-stations section heading."))
             ForEach(recentItems) { item in
                 itemCard(item)
                     .padding(.horizontal, 16)

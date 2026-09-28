@@ -319,7 +319,7 @@ struct OfflineManagerList: View {
             // stalled download rather than as nothing to do (#205) — the
             // sentence below carries the whole state on its own.
             if !downloads.isEmpty {
-                MonoLabel(text: "\(readyCount) of \(downloads.count) ready")
+                MonoLabel(text: String(localized: "\(readyCount) of \(downloads.count) ready", comment: "Offline-download progress. Values are ready and total station counts."))
                 ProgressView(value: Double(readyCount), total: Double(downloads.count))
                     .tint(failedCount > 0 ? SN.amber : SN.leaf)
             }

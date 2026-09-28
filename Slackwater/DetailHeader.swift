@@ -110,7 +110,7 @@ struct DetailHeader: View {
                     Text(region)
                         .font(.caption)
                     if let km = kmFromFix {
-                        Text("•")
+                        Text(verbatim: "•")
                             .font(.caption)
                         Text(formatNm(km))
                             .font(.caption.monospacedDigit())

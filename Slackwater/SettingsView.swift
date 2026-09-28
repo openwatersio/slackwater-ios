@@ -26,7 +26,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    section("Tide height") {
+                    section(String(localized: "Tide height", comment: "Settings section heading.")) {
                         Picker("Tide height units", selection: Binding(
                             get: { units }, set: { UnitsCloud.shared.set($0, forKey: unitsKey) })) {
                             Text("Feet").tag("imperial")
@@ -35,17 +35,17 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                     }
 
-                    section("Current speed") {
+                    section(String(localized: "Current speed", comment: "Settings section heading.")) {
                         Picker("Current speed units", selection: Binding(
                             get: { speedUnit }, set: { UnitsCloud.shared.set($0, forKey: speedUnitKey) })) {
                             Text("Knots").tag("kn")
-                            Text("km/h").tag("kmh")
-                            Text("m/s").tag("ms")
+                            Text(verbatim: "km/h").tag("kmh")
+                            Text(verbatim: "m/s").tag("ms")
                         }
                         .pickerStyle(.segmented)
                     }
 
-                    section("Slack window") {
+                    section(String(localized: "Slack window", comment: "Settings section heading.")) {
                         Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1) {
                             HStack {
                                 Text("Comfort current")
@@ -53,7 +53,7 @@ struct SettingsView: View {
                                 Text(slackWindowSpeedBinding.wrappedValue,
                                      format: .number.precision(.fractionLength(1)))
                                     .monospacedDigit()
-                                Text("kn")
+                                Text(verbatim: "kn")
                             }
                         }
                         Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
@@ -61,7 +61,7 @@ struct SettingsView: View {
 
                     // The downloads manager also lives one tap from the list,
                     // behind the status indicator beside this screen's gear.
-                    section("Offline downloads") {
+                    section(String(localized: "Offline downloads", comment: "Settings section heading.")) {
                         NavigationLink {
                             OfflineManagerList()
                                 .navigationTitle("Downloads")
@@ -79,7 +79,7 @@ struct SettingsView: View {
                     }
 
                     #if PREMIUM_ENABLED
-                    section("Slackwater Premium") {
+                    section(String(localized: "Slackwater Premium", comment: "Settings section heading.")) {
                         Button { showPremium = true } label: {
                             HStack {
                                 Text(premium.isPremium
@@ -91,15 +91,15 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
-                        widgetsButton("Widgets — add them to your home and lock screen")
+                        widgetsButton(String(localized: "Widgets — add them to your home and lock screen", comment: "Settings link to the widget gallery."))
                     }
                     #else
-                    section("Widgets") {
-                        widgetsButton("Widgets — add them to your home screen")
+                    section(String(localized: "Widgets", comment: "Settings section heading.")) {
+                        widgetsButton(String(localized: "Widgets — add them to your home screen", comment: "Settings link to the widget gallery."))
                     }
                     #endif
 
-                    section("About these predictions") {
+                    section(String(localized: "About these predictions", comment: "Settings section heading.")) {
                         Text("Slackwater computes harmonic tide and current predictions on this device. They are not observations; actual conditions vary with weather, river flow, and local effects.")
                         Text("Not for navigation.")
                             .font(.footnote.weight(.semibold))
@@ -107,7 +107,7 @@ struct SettingsView: View {
                         Text("Canadian (CHS) stations use harmonic models fitted on this device from CHS (IWLS) predictions under DFO's terms (clause 10). They are not CHS-published numbers and are not for navigation. A few Canadian waters without CHS gauges use bundled TICON-4 constants.")
                     }
 
-                    section("Data & attribution") {
+                    section(String(localized: "Data & attribution", comment: "Settings section heading.")) {
                         Text("US stations: NOAA CO-OPS harmonic constituents (public domain).")
                         Text("Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129).")
                         // Issue #401. The same deposit also holds a
@@ -128,18 +128,18 @@ struct SettingsView: View {
                         Text("Prediction engine: Slackwater (MIT).")
                     }
 
-                    section("Privacy") {
+                    section(String(localized: "Privacy", comment: "Settings section heading.")) {
                         Link("Privacy Policy", destination: URL(string: "https://slackwater.xyz/privacy")!)
                             .foregroundStyle(SN.leaf)
                     }
 
-                    section("License") {
+                    section(String(localized: "License", comment: "Settings section heading.")) {
                         Text("Slackwater is open source: this app under GPL-3.0, the prediction engine under MIT.")
                         Link("Source on GitHub", destination: URL(string: "https://github.com/openwatersio/slackwater-ios")!)
                             .foregroundStyle(SN.leaf)
                     }
 
-                    section("Version") {
+                    section(String(localized: "Version", comment: "Settings section heading.")) {
                         Text(version)
                             .font(.footnote.monospaced())
                             .foregroundStyle(SN.foam.opacity(0.7))
