@@ -81,7 +81,9 @@ struct WidgetSnapshot: Equatable {
                 .filter { $0.time > now }
             let event = { (extreme: TideExtreme) in
                 Event(time: extreme.time,
-                      label: (extreme.kind == .high ? "High" : "Low")
+                      label: (extreme.kind == .high
+                        ? String(localized: "High", comment: "Widget high-tide event label.")
+                        : String(localized: "Low", comment: "Widget low-tide event label."))
                           + " \(formatHeight(extreme.height, imperial: imperial)) \(heightUnit(imperial: imperial))",
                       symbol: extreme.kind == .high ? "arrow.up" : "arrow.down")
             }
@@ -117,12 +119,12 @@ struct WidgetSnapshot: Equatable {
             }
             let next = ev.map {
                 switch $0.kind {
-                case .slack: Event(time: $0.time, label: "Slack", symbol: "minus")
+                case .slack: Event(time: $0.time, label: String(localized: "Slack", comment: "Widget slack-current event label."), symbol: "minus")
                 case .maxFlood: Event(time: $0.time,
-                                      label: "Max flood \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
+                                      label: String(localized: "Max flood \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget maximum flood-current event. Values are formatted speed and compact unit."),
                                       symbol: "arrow.up.right")
                 case .maxEbb: Event(time: $0.time,
-                                    label: "Max ebb \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))",
+                                    label: String(localized: "Max ebb \(formatSpeed(abs($0.speed), unit: speedUnit)) \(speedUnitLabel(speedUnit))", comment: "Widget maximum ebb-current event. Values are formatted speed and compact unit."),
                                     symbol: "arrow.down.right")
                 }
             }
@@ -147,7 +149,7 @@ struct WidgetSnapshot: Equatable {
                                   to: now.addingTimeInterval(172_800))
             let nextSlack = slacks.first { $0.time > now }
             let next = nextSlack.map {
-                Event(time: $0.time, label: "Slack", symbol: "minus")
+                Event(time: $0.time, label: String(localized: "Slack", comment: "Widget slack-current event label."), symbol: "minus")
             }
             // Explicit instants across the real day length, not the engine's
             // floor/ceil-to-step bucketing — the only way to keep this at

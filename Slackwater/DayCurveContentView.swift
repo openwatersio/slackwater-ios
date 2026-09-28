@@ -23,7 +23,7 @@ struct DayCurveContentView: View {
                 // past swing — space the forecast no longer needs — so the
                 // reading keeps the speed and the set.
                 VStack(alignment: .leading, spacing: 1) {
-                    MonoLabel(text: "Slack ends", color: SN.go.opacity(0.7), tracking: 1.2)
+                    MonoLabel(text: String(localized: "Slack ends", comment: "Widget label above a live slack-window countdown."), color: SN.go.opacity(0.7), tracking: 1.2)
                     // A live timer Text is greedy in WidgetKit — it takes
                     // every point it is offered; pin it so the chip hugs
                     // the text and leaves the forecast visible.
