@@ -166,8 +166,8 @@ struct MoonOrbitMark: View {
                 .overlay(Circle().strokeBorder(SN.canvas.opacity(0.6), lineWidth: 1))
                 .position(moon)
 
-            if let perigee { vertex("Closest", perigee, at: near, floor: cy + b * squash) }
-            if let apogee { vertex("Farthest", apogee, at: far, floor: cy + b * squash) }
+            if let perigee { vertex(String(localized: "Closest", comment: "Moon-orbit closest point."), perigee, at: near, floor: cy + b * squash, closest: true) }
+            if let apogee { vertex(String(localized: "Farthest", comment: "Moon-orbit farthest point."), apogee, at: far, floor: cy + b * squash, closest: false) }
         }
     }
 
@@ -175,7 +175,7 @@ struct MoonOrbitMark: View {
     /// under it. Tappable on the same terms as everything else in this sheet
     /// that names a time.
     private func vertex(_ label: String, _ date: Date, at p: CGPoint,
-                        floor: CGFloat) -> some View {
+                        floor: CGFloat, closest: Bool) -> some View {
         ZStack {
             Circle().fill(SN.foam.opacity(0.75)).frame(width: 5, height: 5)
                 .position(p)
@@ -193,9 +193,11 @@ struct MoonOrbitMark: View {
             .contentShape(Rectangle())
             .onTapGesture { onJump(date) }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(label.lowercased()) \(monthDay(date, tz))")
+            .accessibilityLabel(closest
+                ? String(localized: "closest \(monthDay(date, tz))", comment: "VoiceOver moon-orbit closest point. The value is a localized date.")
+                : String(localized: "farthest \(monthDay(date, tz))", comment: "VoiceOver moon-orbit farthest point. The value is a localized date."))
             .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier(label == "Closest" ? "moon-perigee" : "moon-apogee")
+            .accessibilityIdentifier(closest ? "moon-perigee" : "moon-apogee")
             .position(x: p.x, y: floor + 24)
         }
     }

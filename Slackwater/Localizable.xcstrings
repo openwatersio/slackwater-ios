@@ -1,0 +1,1849 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
+    " %@" : {
+      "shouldTranslate" : false
+    },
+    "— details —" : {
+      "comment" : "Heading in a generated problem-report email."
+    },
+    "(Tell us what you know — who runs this gauge, a contact there, or anything about how its data is licensed.)" : {
+      "comment" : "Prompt in an email about an unavailable station."
+    },
+    "(Tell us what you saw — what the water was doing, and when.)" : {
+      "comment" : "Prompt in an email reporting a prediction problem."
+    },
+    "%@" : {
+      "shouldTranslate" : false
+    },
+    "%@ — no longer published." : {
+      "comment" : "Removed-station explanation. The value is the station region."
+    },
+    "%@ · %@" : {
+      "comment" : "Moon event date and time. Values are a localized date and time.\nNearby station region and localized type. The first value is catalog data.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@ %@" : {
+      "comment" : "Problem-report moment. Values are a localized date, localized time, and time-zone abbreviation.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@ (NOAA chart datum)" : {
+      "comment" : "Station-detail datum. The value is a datum acronym; keep NOAA exact."
+    },
+    "%@ %@" : {
+      "comment" : "Nearby station distance and compass bearing. Values are a localized nautical-mile distance and invariant bearing.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ %@ · %@" : {
+      "comment" : "Inline widget event. Values are event label, localized time, and station name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@ %@ %@" : {
+      "comment" : "VoiceOver tide reading. Values are tide state, formatted height, and spoken unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ %3$@"
+          }
+        }
+      }
+    },
+    "%@ %@ toward ebb" : {
+      "comment" : "Station-detail mean flow. Values are a formatted speed and compact unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ toward ebb"
+          }
+        }
+      }
+    },
+    "%@ %@ toward flood" : {
+      "comment" : "Station-detail mean flow. Values are a formatted speed and compact unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ toward flood"
+          }
+        }
+      }
+    },
+    "%@ %@%@ %@" : {
+      "comment" : "VoiceOver current reading. Values are current state, optional approximation mark, formatted speed, and spoken unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@%3$@ %4$@"
+          }
+        }
+      }
+    },
+    "%@ chart datum" : {
+      "comment" : "Station-detail datum. The value is a datum acronym."
+    },
+    "%@ chart datum. Based on %@ tides and NOAA's published offsets; computed on this device." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ chart datum. Based on %2$@ tides and NOAA's published offsets; computed on this device."
+          }
+        }
+      }
+    },
+    "%@ chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context."
+    },
+    "%@ chart datum. NOAA harmonic prediction." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context."
+    },
+    "%@ chart datum. TICON-4 harmonic prediction." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context."
+    },
+    "%@ Estimated wait: %@. The station downloads once and stays available offline." : {
+      "comment" : "Station download expectation. Values are a localized queue sentence and approximate duration.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ Estimated wait: %2$@. The station downloads once and stays available offline."
+          }
+        }
+      }
+    },
+    "%@ from %@" : {
+      "comment" : "Station distance. Values are a localized nautical-mile distance and its origin.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ from %2$@"
+          }
+        }
+      }
+    },
+    "%@ in %@" : {
+      "comment" : "VoiceOver label for the next tide, current, or sun event. Values are the event and a localized duration.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ in %2$@"
+          }
+        }
+      }
+    },
+    "%@ in line" : {
+      "comment" : "Download queue position. The value is a locale-formatted ordinal."
+    },
+    "%@ min" : {
+      "comment" : "Compact signed time offset in minutes; 'min' remains invariant."
+    },
+    "%@ nm" : {
+      "comment" : "Distance in nautical miles. The value is a locale-formatted number and 'nm' is nautical notation."
+    },
+    "%@ tides" : {
+      "comment" : "Derived-current summary caption. The value is a reference tide-station name."
+    },
+    "%@." : {
+      "comment" : "Offline-prediction validity sentence. The value is a localized expiry phrase."
+    },
+    "%@. Flood sets %lld°T." : {
+      "comment" : "Tide and current interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. Flood sets %2$lld°T."
+          }
+        }
+      }
+    },
+    "%@'s tide predictions aren't on this device yet. Downloading Canadian current predictions…" : {
+      "comment" : "Station download explanation. The value is a reference-station name."
+    },
+    "%@'s tide predictions aren't on this device yet. Downloading Canadian tidal predictions…" : {
+      "comment" : "Station download explanation. The value is a reference-station name."
+    },
+    "%@'s tide predictions couldn't be downloaded." : {
+      "comment" : "Station download failure. The value is a reference-station name."
+    },
+    "%@'s tide predictions didn't finish downloading. Slackwater will try again." : {
+      "comment" : "Station download retry explanation. The value is a reference-station name."
+    },
+    "%@'s tide predictions need a connection before they can download." : {
+      "comment" : "Station download explanation. The value is a reference-station name."
+    },
+    "%lld harmonic constituents computed on this device" : {
+      "comment" : "Station-detail prediction provenance. The integer is a constituent count; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld harmonic constituent computed on this device"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld harmonic constituents computed on this device"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld more Canadian stations are searchable everywhere — open one and it downloads." : {
+      "comment" : "Offline-download catalog note. The integer is a station count; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more Canadian station is searchable everywhere — open it and it downloads."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld more Canadian stations are searchable everywhere — open one and it downloads."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld of %lld days downloaded. The on-device fit is still refining. Flood sets %lld°T." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld days downloaded. The on-device fit is still refining. Flood sets %3$lld°T."
+          }
+        }
+      }
+    },
+    "%lld of %lld downloaded" : {
+      "comment" : "Compact download progress. Values are completed and total requests.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld downloaded"
+          }
+        }
+      }
+    },
+    "%lld of %lld nearby Canadian stations on this device" : {
+      "comment" : "Station discovery interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld nearby Canadian stations on this device"
+          }
+        }
+      }
+    },
+    "%lld of %lld ready" : {
+      "comment" : "Offline-download progress. Values are ready and total station counts.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld ready"
+          }
+        }
+      }
+    },
+    "%lld of %lld requests downloaded. This station stays available offline when finished." : {
+      "comment" : "Station download progress. Values are completed and total request counts.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld requests downloaded. This station stays available offline when finished."
+          }
+        }
+      }
+    },
+    "%lld-hour curve" : {
+      "comment" : "Slackwater interface text. Placeholders are runtime values shown in context."
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "%lld%% lit" : {
+      "comment" : "Moon illumination percentage. The integer is a percentage."
+    },
+    "%lldh %lldm" : {
+      "comment" : "Compact countdown in hours and minutes; 'h' and 'm' are invariant notation.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lldh %2$lldm"
+          }
+        }
+      }
+    },
+    "%lldm" : {
+      "comment" : "Compact countdown in minutes; 'm' is invariant notation."
+    },
+    "±%lld min" : {
+      "comment" : "Measured slack-current timing tolerance in minutes; 'min' remains invariant."
+    },
+    "A glance: arrow and time." : {
+      "comment" : "Circular widget description."
+    },
+    "A sliver, growing a little fuller each night." : {
+      "comment" : "Plain-language explanation of a waxing crescent moon."
+    },
+    "A thinning sliver, a few nights from new." : {
+      "comment" : "Plain-language explanation of a waning crescent moon."
+    },
+    "about %lld hours" : {
+      "comment" : "Approximate duration. The integer is a number of hours; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "about %lld hour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "about %lld hours"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "about %lld minutes" : {
+      "comment" : "Approximate duration. The integer is a number of minutes; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "about %lld minute"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "about %lld minutes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "about an hour" : {
+      "comment" : "Approximate duration of one hour."
+    },
+    "About Slackwater Premium" : {
+      "comment" : "Premium interface text."
+    },
+    "About these predictions" : {
+      "comment" : "Settings section heading."
+    },
+    "Above the clock: the next event and time." : {
+      "comment" : "Inline widget description."
+    },
+    "Activate" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Add favorite" : {
+      "comment" : "VoiceOver action for a station."
+    },
+    "Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129)." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Annular Solar Eclipse" : {
+      "comment" : "Solar eclipse name."
+    },
+    "Any Station" : {
+      "comment" : "Widget station-picker choice that follows the nearest station."
+    },
+    "Apogean neap tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar apogee."
+    },
+    "Apogean spring tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar apogee."
+    },
+    "Apogean tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar apogee."
+    },
+    "App: %@" : {
+      "comment" : "App-version line in a generated problem-report email. The value is a version and build number."
+    },
+    "Available offline" : {
+      "comment" : "Offline-download status."
+    },
+    "Available offline for %lld more days" : {
+      "comment" : "Offline-download validity. The integer is a number of calendar days; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Available offline for %lld more day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Available offline for %lld more days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Back" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Between us and the sun, so its lit side faces away." : {
+      "comment" : "Plain-language explanation of a new moon."
+    },
+    "by Open Waters" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Can you help?" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Canadian (CHS) stations use harmonic models fitted on this device from CHS (IWLS) predictions under DFO's terms (clause 10). They are not CHS-published numbers and are not for navigation. A few Canadian waters without CHS gauges use bundled TICON-4 constants." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada." : {
+      "comment" : "Slackwater interface text."
+    },
+    "Cancel" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Charts" : {
+      "comment" : "Offline-map card title."
+    },
+    "Charts · %lld of %lld ready" : {
+      "comment" : "Offline-map card title. Values are ready and total area counts.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Charts · %1$lld of %2$lld ready"
+          }
+        }
+      }
+    },
+    "Choose a date" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Choose a replacement near the removed station." : {
+      "comment" : "Station chooser explanation."
+    },
+    "Choose another station" : {
+      "comment" : "Removed-station action."
+    },
+    "Choose another station for a different part of the water." : {
+      "comment" : "Station chooser explanation."
+    },
+    "Choose the station this widget shows." : {
+      "comment" : "Widget interface text."
+    },
+    "CHS-published predictions downloaded %@; available through %@. Not computed on this device." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "CHS-published predictions downloaded %1$@; available through %2$@. Not computed on this device."
+          }
+        }
+      }
+    },
+    "Clear search text" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Close" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Close search" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Closest" : {
+      "comment" : "Moon-orbit closest point."
+    },
+    "closest %@" : {
+      "comment" : "VoiceOver moon-orbit closest point. The value is a localized date."
+    },
+    "Collapsed" : {
+      "comment" : "VoiceOver state for a collapsed schedule day."
+    },
+    "Comfort current" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Coming to the same tier: the live slack tile, alerts, go-windows for your boat" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Concerns or Feedback" : {
+      "comment" : "Problem-report interface text."
+    },
+    "Connect for a moment to download about a month of predictions." : {
+      "comment" : "Offline-prediction download explanation while offline."
+    },
+    "Connect once to download this station for permanent offline use." : {
+      "comment" : "Station download expectation while offline."
+    },
+    "Connect to download" : {
+      "comment" : "Offline-prediction action while offline."
+    },
+    "Current · %@" : {
+      "comment" : "Download row station type and region. The value is catalog data."
+    },
+    "Current · CHS" : {
+      "comment" : "Station type and provider. Keep CHS exact."
+    },
+    "Current · NOAA" : {
+      "comment" : "Station type and provider. Keep NOAA exact."
+    },
+    "Current speed" : {
+      "comment" : "Settings section heading."
+    },
+    "Current speed units" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Current Station" : {
+      "comment" : "Widget station-picker choice that follows the nearest current station."
+    },
+    "Current timeline" : {
+      "comment" : "VoiceOver label for the interactive current chart."
+    },
+    "currently shown" : {
+      "comment" : "VoiceOver station-selection state."
+    },
+    "Currents at %@ · %@" : {
+      "comment" : "Link to a nearby current station. Values are station name and localized distance.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Currents at %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Data & attribution" : {
+      "comment" : "Settings section heading."
+    },
+    "Data downloaded" : {
+      "comment" : "Offline-download interface text."
+    },
+    "Distance from Earth" : {
+      "comment" : "Moon distance chart label."
+    },
+    "Done" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Download" : {
+      "comment" : "Offline-prediction action."
+    },
+    "Download all %lld Canadian currents · %@" : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Download all %1$lld Canadian currents · %2$@"
+          }
+        }
+      }
+    },
+    "Download failed" : {
+      "comment" : "Offline-prediction card title.\nOffline-prediction status.\nStation download-card title."
+    },
+    "Download for offline use" : {
+      "comment" : "Offline-prediction card title."
+    },
+    "Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets %lld°T." : {
+      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context."
+    },
+    "Downloaded predictions are ready offline. Downloads that expire show their remaining time below." : {
+      "comment" : "Offline-download completion summary."
+    },
+    "Downloading" : {
+      "comment" : "Compact download status.\nOffline-prediction card title."
+    },
+    "Downloading — Canadian predictions download once, then work offline." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Downloading · %lld of %lld" : {
+      "comment" : "Download progress. Values are completed and total requests.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Downloading · %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Downloading Canadian current predictions…" : {
+      "comment" : "Station download progress."
+    },
+    "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, %@ for the rest." : {
+      "comment" : "Offline-download progress summary. The value is an approximate duration."
+    },
+    "Downloading Canadian tidal predictions…" : {
+      "comment" : "Station download progress."
+    },
+    "Downloading map areas — the world, the water around you, and your saved stations." : {
+      "comment" : "Offline-map download status."
+    },
+    "Downloading, %lld of %lld ready" : {
+      "comment" : "VoiceOver download summary. Values are ready and total station counts.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Downloading, %1$lld of %2$lld ready"
+          }
+        }
+      }
+    },
+    "Downloading…" : {
+      "comment" : "Download status.\nOffline-prediction action while downloading.\nOffline-prediction status.\nStation download-card title."
+    },
+    "Downloads" : {
+      "comment" : "Offline-download interface text."
+    },
+    "Downloads cover about a month and can be refreshed at any time." : {
+      "comment" : "Offline-prediction download explanation."
+    },
+    "Ebb" : {
+      "comment" : "Ebb-current event label."
+    },
+    "Ebb at %@" : {
+      "comment" : "Current summary caption. The value is a localized time."
+    },
+    "Ebb current" : {
+      "comment" : "VoiceOver current-event label."
+    },
+    "Ebbing" : {
+      "comment" : "Current phase: water moving in the ebb direction."
+    },
+    "Eclipse" : {
+      "comment" : "Moon and sky interface text."
+    },
+    "Estimated wait: %@. The station downloads once and stays available offline." : {
+      "comment" : "Station download expectation. The value is an approximate duration."
+    },
+    "Everything you use today stays free, forever. Premium adds the lock screen — and it's how Slackwater's development gets funded. Buy it because you want it, or because you want to say thanks." : {
+      "comment" : "Widget interface text."
+    },
+    "Expanded" : {
+      "comment" : "VoiceOver state for an expanded schedule day."
+    },
+    "Expired" : {
+      "comment" : "Compact offline-download status."
+    },
+    "Expired — get back online to download current predictions." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Expires in %lld days" : {
+      "comment" : "Offline-download expiry. The integer is a number of calendar days; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Expires in %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Expires in %lld days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Expires today" : {
+      "comment" : "Offline-download expiry status."
+    },
+    "Failed" : {
+      "comment" : "Compact download status."
+    },
+    "Falling" : {
+      "comment" : "Falling-tide state."
+    },
+    "Falling %@ %@/hr" : {
+      "comment" : "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Falling %1$@ %2$@/hr"
+          }
+        }
+      }
+    },
+    "Farthest" : {
+      "comment" : "Moon-orbit farthest point."
+    },
+    "farthest %@" : {
+      "comment" : "VoiceOver moon-orbit farthest point. The value is a localized date."
+    },
+    "Fast answer" : {
+      "comment" : "Provisional current-model card title."
+    },
+    "Fast answer %@" : {
+      "comment" : "Provisional prediction badge. The value is a localized timing tolerance."
+    },
+    "Favorite" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Favorites" : {
+      "comment" : "Favorite-stations section heading.\nWidget station-picker section."
+    },
+    "feet" : {
+      "comment" : "Spoken imperial height unit."
+    },
+    "Feet" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Find tides near me" : {
+      "comment" : "Request location permission action."
+    },
+    "Finding nearby tides and currents…" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Finding your location…" : {
+      "comment" : "Station discovery interface text."
+    },
+    "First Quarter" : {
+      "comment" : "Moon phase name."
+    },
+    "Fitted from the last %lld days — slack at %@ can be off by up to ~%lld min." : {
+      "comment" : "Provisional current-model warning. Values are fitting days, station name, and measured timing error; vary days by plural.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fitted from the last %1$lld days — slack at %2$@ can be off by up to ~%3$lld min."
+          }
+        }
+      }
+    },
+    "Flood" : {
+      "comment" : "Flood-current event label."
+    },
+    "flood ×%@ · ebb ×%@" : {
+      "comment" : "NOAA subordinate-station speed ratios. Values are decimal multipliers.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "flood ×%1$@ · ebb ×%2$@"
+          }
+        }
+      }
+    },
+    "Flood at %@" : {
+      "comment" : "Current summary caption. The value is a localized time."
+    },
+    "Flood current" : {
+      "comment" : "VoiceOver current-event label."
+    },
+    "Flooding" : {
+      "comment" : "Current phase: water moving in the flood direction."
+    },
+    "Full Moon" : {
+      "comment" : "Moon phase name."
+    },
+    "Fully inside Earth's shadow, reddened by Earth's sunsets." : {
+      "comment" : "Plain-language explanation of a total lunar eclipse."
+    },
+    "Get the next high tide at your local Slackwater station." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Get the next low tide at your local Slackwater station." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Get the next slack window at your nearest current station." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Go to Settings" : {
+      "comment" : "Open iOS Settings to enable location."
+    },
+    "Half lit — a quarter of the way through the cycle." : {
+      "comment" : "Plain-language explanation of a first-quarter moon."
+    },
+    "Half lit again, three quarters through the cycle." : {
+      "comment" : "Plain-language explanation of a last-quarter moon."
+    },
+    "Harbor, bay, or channel" : {
+      "comment" : "Slackwater interface text."
+    },
+    "High" : {
+      "comment" : "High-tide event label.\nHigh-tide state.\nWidget high-tide event label."
+    },
+    "High tide" : {
+      "comment" : "VoiceOver tide-event label."
+    },
+    "high to low" : {
+      "comment" : "Tide-range direction."
+    },
+    "Holding %@." : {
+      "comment" : "Offline-map storage size. The value is a localized byte count."
+    },
+    "Home screen — free" : {
+      "comment" : "Widget gallery section title."
+    },
+    "I can help with an unavailable station" : {
+      "comment" : "Problem-report subject."
+    },
+    "If you know who operates this station or how its data is licensed, let us know." : {
+      "comment" : "Station discovery interface text."
+    },
+    "In Earth's faint outer shadow — a dimming, not a bite." : {
+      "comment" : "Plain-language explanation of a penumbral lunar eclipse."
+    },
+    "incoming" : {
+      "comment" : "Plain-language gloss for a flooding current."
+    },
+    "It has been withdrawn from the hydrographic service, so it has no readings to show." : {
+      "comment" : "Removed-station explanation."
+    },
+    "It has been withdrawn from the hydrographic service, so it has no readings to show. Swipe to remove it." : {
+      "comment" : "Removed favorite-station explanation."
+    },
+    "It's %@ in line — moved up because you opened it." : {
+      "comment" : "Station download queue position. The value is a locale-formatted ordinal."
+    },
+    "It's first in line — moved to the front because you opened it." : {
+      "comment" : "Station download queue position."
+    },
+    "Keeps working offline." : {
+      "comment" : "Offline-download interface text."
+    },
+    "kilometres per hour" : {
+      "comment" : "Spoken metric speed unit."
+    },
+    "knots" : {
+      "comment" : "Spoken expansion of the printed nautical speed unit 'kn'."
+    },
+    "Knots" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Large-tide context: %@. This is not a prediction for this pass." : {
+      "comment" : "Tide and current interface text. Placeholders are runtime values shown in context."
+    },
+    "Last lunar eclipse" : {
+      "comment" : "Previous lunar-eclipse label."
+    },
+    "Last Quarter" : {
+      "comment" : "Moon phase name."
+    },
+    "Last solar eclipse" : {
+      "comment" : "Previous solar-eclipse label."
+    },
+    "License" : {
+      "comment" : "Settings section heading."
+    },
+    "Link: %@" : {
+      "comment" : "Link line in a generated problem-report email. The value is a URL."
+    },
+    "List" : {
+      "comment" : "Switch to station list."
+    },
+    "LLWLT (CHS chart datum)" : {
+      "comment" : "Station-detail datum. Keep LLWLT and CHS exact."
+    },
+    "Location" : {
+      "comment" : "VoiceOver location icon label."
+    },
+    "Location unavailable" : {
+      "comment" : "Location-denied card title.\nVoiceOver location-denied icon label."
+    },
+    "Lock screen — Premium" : {
+      "comment" : "Widget gallery section title."
+    },
+    "Lock screen widgets — next slack, next turn, the workable window" : {
+      "comment" : "Widget interface text."
+    },
+    "Long-press your home screen → + → Slackwater." : {
+      "comment" : "Instructions for adding a home-screen widget."
+    },
+    "Long-press your lock screen → Customize → add Slackwater above or below the clock." : {
+      "comment" : "Instructions for adding a lock-screen widget."
+    },
+    "Low" : {
+      "comment" : "Low-tide event label.\nLow-tide state.\nWidget low-tide event label."
+    },
+    "Low tide" : {
+      "comment" : "VoiceOver tide-event label."
+    },
+    "low to high" : {
+      "comment" : "Tide-range direction."
+    },
+    "Mail unavailable" : {
+      "comment" : "Problem-report interface text."
+    },
+    "Map" : {
+      "comment" : "Switch to station map."
+    },
+    "Map tiles by OpenFreeMap (openfreemap.org), © OpenMapTiles, data © OpenStreetMap contributors, cached on this device for offline use." : {
+      "comment" : "Offline-download interface text."
+    },
+    "Max ebb" : {
+      "comment" : "Maximum ebb-current event label.\nMaximum ebb-current state."
+    },
+    "Max ebb %@ %@" : {
+      "comment" : "Widget maximum ebb-current event. Values are formatted speed and compact unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Max ebb %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Max flood" : {
+      "comment" : "Maximum flood-current event label.\nMaximum flood-current state."
+    },
+    "Max flood %@ %@" : {
+      "comment" : "Widget maximum flood-current event. Values are formatted speed and compact unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Max flood %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Maximum ebb current" : {
+      "comment" : "VoiceOver current-event label."
+    },
+    "Maximum flood current" : {
+      "comment" : "VoiceOver current-event label."
+    },
+    "Message copied. Send it to %@." : {
+      "comment" : "Problem-report interface text. Placeholders are runtime values shown in context."
+    },
+    "Meters" : {
+      "comment" : "Slackwater interface text."
+    },
+    "metres" : {
+      "comment" : "Spoken metric height unit."
+    },
+    "metres per second" : {
+      "comment" : "Spoken metric speed unit."
+    },
+    "Moment: %@" : {
+      "comment" : "Time line in a generated problem-report email. The value is a localized date, time, and time zone."
+    },
+    "Moon" : {
+      "comment" : "Moon summary tile label.\nVoiceOver moon summary label."
+    },
+    "More than half lit, filling toward full." : {
+      "comment" : "Plain-language explanation of a waxing gibbous moon."
+    },
+    "My Location" : {
+      "comment" : "Current-location section heading.\nMap action using the person's location."
+    },
+    "Neap tide" : {
+      "comment" : "Astronomical tidal-range tendency around a quarter moon."
+    },
+    "Near Me" : {
+      "comment" : "Nearby-stations section heading."
+    },
+    "Nearby" : {
+      "comment" : "Nearby-stations section heading."
+    },
+    "Nearest %lld — keep typing to narrow" : {
+      "comment" : "Station search limit notice. The integer is the maximum result count."
+    },
+    "Nearest Station" : {
+      "comment" : "Widget station-picker section."
+    },
+    "New Moon" : {
+      "comment" : "Moon phase name."
+    },
+    "Next" : {
+      "comment" : "First position in the download queue."
+    },
+    "Next event" : {
+      "comment" : "VoiceOver chart action."
+    },
+    "Next Event" : {
+      "comment" : "Widget name."
+    },
+    "Next Event (circular)" : {
+      "comment" : "Widget name and family."
+    },
+    "Next event plus the workable window." : {
+      "comment" : "Rectangular widget description."
+    },
+    "Next full" : {
+      "comment" : "Next full-moon label."
+    },
+    "Next High Tide" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Next Low Tide" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Next lunar eclipse" : {
+      "comment" : "Next lunar-eclipse label."
+    },
+    "Next max" : {
+      "comment" : "Current summary label for the next maximum speed."
+    },
+    "Next new" : {
+      "comment" : "Next new-moon label."
+    },
+    "Next Slack" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Next Slack (inline)" : {
+      "comment" : "Widget name and family."
+    },
+    "Next slack or turn at a glance." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Next Slack Window" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Next solar eclipse" : {
+      "comment" : "Next solar-eclipse label."
+    },
+    "No Canadian predictions to download here — you're outside the range where they'd be useful. Stations near you work offline already." : {
+      "comment" : "Offline-download summary outside Canadian coverage."
+    },
+    "No mail app" : {
+      "comment" : "Problem-report interface text."
+    },
+    "No speed" : {
+      "comment" : "Derived-current summary value."
+    },
+    "NOAA harmonic current prediction. Flood sets %lld°T. Speeds use %@." : {
+      "comment" : "Tide and current interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "NOAA harmonic current prediction. Flood sets %1$lld°T. Speeds use %2$@."
+          }
+        }
+      }
+    },
+    "NOAA reference slacks and maxima, adjusted by published offsets and computed on this device" : {
+      "comment" : "Station-detail prediction provenance. Keep NOAA exact."
+    },
+    "NOAA subordinate station: %@'s slacks and maxima, corrected by published offsets" : {
+      "comment" : "Station provenance. The value is the reference-station name; keep NOAA exact."
+    },
+    "NOAA subordinate station: slacks and maxima, corrected by published offsets" : {
+      "comment" : "Station provenance. Keep NOAA exact."
+    },
+    "None measured" : {
+      "comment" : "Station-detail mean-flow value."
+    },
+    "None visible from here." : {
+      "comment" : "Lunar eclipse visibility value.\nSolar eclipse visibility value."
+    },
+    "Not downloaded" : {
+      "comment" : "Compact offline-download status.\nOffline-prediction status."
+    },
+    "Not downloaded — get back online to download predictions." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Not for navigation." : {
+      "comment" : "Slackwater interface text."
+    },
+    "Now" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Now, which way it's going, and the next turn." : {
+      "comment" : "Next Event widget description."
+    },
+    "Offline" : {
+      "comment" : "Compact network status."
+    },
+    "Offline — needs a moment of signal. Canadian predictions download once, then work offline." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Offline download expired" : {
+      "comment" : "Offline-download expiry status.\nOffline-prediction card title."
+    },
+    "Offline downloads" : {
+      "comment" : "Settings section heading."
+    },
+    "Offline, %lld still to download" : {
+      "comment" : "VoiceOver network and download summary. The integer is a station count; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld still to download"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline, %lld still to download"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Offline, all stations downloaded" : {
+      "comment" : "VoiceOver network and download summary."
+    },
+    "OK" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Online" : {
+      "comment" : "VoiceOver network status."
+    },
+    "Online, all stations downloaded" : {
+      "comment" : "VoiceOver network and download summary."
+    },
+    "Open Slackwater" : {
+      "comment" : "Widget interface text."
+    },
+    "Open Slackwater to download this station" : {
+      "comment" : "Widget interface text."
+    },
+    "Opposite the sun, with the whole face we see lit." : {
+      "comment" : "Plain-language explanation of a full moon."
+    },
+    "Other locations (%lld)" : {
+      "comment" : "Link to same-named stations. The integer is the number of other locations; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Other location (%lld)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Other locations (%lld)"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "outgoing" : {
+      "comment" : "Plain-language gloss for an ebbing current."
+    },
+    "Part of the moon crossing Earth's dark inner shadow." : {
+      "comment" : "Plain-language explanation of a partial lunar eclipse."
+    },
+    "Partial Eclipse" : {
+      "comment" : "Lunar eclipse name."
+    },
+    "Partial Solar Eclipse" : {
+      "comment" : "Solar eclipse name."
+    },
+    "Past full: more than half lit, and shrinking." : {
+      "comment" : "Plain-language explanation of a waning gibbous moon."
+    },
+    "Pay once, never again." : {
+      "comment" : "Slackwater interface text."
+    },
+    "Penumbral Eclipse" : {
+      "comment" : "Lunar eclipse name."
+    },
+    "Perigean neap tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar perigee."
+    },
+    "Perigean spring tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar perigee."
+    },
+    "Perigean tide" : {
+      "comment" : "Astronomical tidal-range tendency near lunar perigee."
+    },
+    "Pick a station" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Prediction engine: Slackwater (MIT)." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Predictions — not for navigation" : {
+      "comment" : "Safety disclaimer above station provenance."
+    },
+    "Predictions are not downloaded." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Predictions unavailable" : {
+      "comment" : "Prediction download status."
+    },
+    "Premium" : {
+      "comment" : "Premium interface text."
+    },
+    "Premium — thank you for supporting the app" : {
+      "comment" : "Premium settings row for an existing supporter."
+    },
+    "Premium isn't on sale yet — these widgets are still being finished. Everything you use today stays free either way." : {
+      "comment" : "Widget interface text."
+    },
+    "Preparing the map for offline use…" : {
+      "comment" : "Offline-map download status."
+    },
+    "Previous event" : {
+      "comment" : "VoiceOver chart action."
+    },
+    "Privacy" : {
+      "comment" : "Settings section heading."
+    },
+    "Privacy Policy" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Purchase couldn't be verified — try again." : {
+      "comment" : "Premium purchase verification error."
+    },
+    "Purchase didn't go through — try again." : {
+      "comment" : "Premium purchase error."
+    },
+    "Queued" : {
+      "comment" : "Compact download status."
+    },
+    "Queued — Canadian predictions download once, then work offline." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Range" : {
+      "comment" : "Tide-range summary label."
+    },
+    "Real example station" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Recents" : {
+      "comment" : "Recent-stations section heading.\nWidget station-picker section."
+    },
+    "Refining" : {
+      "comment" : "Compact prediction status."
+    },
+    "Refining — showing the fast answer, slack accurate to %@. The full model is still downloading." : {
+      "comment" : "VoiceOver prediction status. The value is a measured time tolerance."
+    },
+    "Refining — showing the fast answer. The full model is still downloading." : {
+      "comment" : "VoiceOver prediction status."
+    },
+    "Refining · %@" : {
+      "comment" : "Compact prediction status. The value is a measured time tolerance."
+    },
+    "Refining…" : {
+      "comment" : "Compact prediction status."
+    },
+    "Refresh" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Refresh charts" : {
+      "comment" : "Refresh offline maps action."
+    },
+    "Remove" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Remove favorite" : {
+      "comment" : "VoiceOver action for a saved station."
+    },
+    "Removed station" : {
+      "comment" : "Removed-station chooser title."
+    },
+    "Restore purchase" : {
+      "comment" : "Premium interface text."
+    },
+    "Retry" : {
+      "comment" : "Offline-prediction action.\nRetry a failed station download."
+    },
+    "Retry %lld unfinished" : {
+      "comment" : "Retry unfinished offline-map areas. The integer is an area count; vary by plural.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Retry %lld unfinished"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Retry %lld unfinished"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Retry now" : {
+      "comment" : "Offline-prediction action."
+    },
+    "Retry this station. Once downloaded, it stays available offline." : {
+      "comment" : "Station download expectation after failure."
+    },
+    "Retrying" : {
+      "comment" : "Compact download status.\nStation download-card title."
+    },
+    "Retrying — Slackwater tries again on its own. Canadian predictions download once, then work offline." : {
+      "comment" : "VoiceOver download status."
+    },
+    "Retrying in %lld min" : {
+      "comment" : "Compact retry delay. The integer is a number of minutes; 'min' remains invariant."
+    },
+    "Return to now" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Rise" : {
+      "comment" : "Moonrise label."
+    },
+    "Rising" : {
+      "comment" : "Rising-tide state."
+    },
+    "Rising %@ %@/hr" : {
+      "comment" : "Fast tide movement. Values are a formatted rate and compact height unit; '/hr' remains notation.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rising %1$@ %2$@/hr"
+          }
+        }
+      }
+    },
+    "Search" : {
+      "comment" : "Station search action."
+    },
+    "Search for a place" : {
+      "comment" : "Station discovery interface text."
+    },
+    "See all downloads" : {
+      "comment" : "Open the offline-download manager."
+    },
+    "Set" : {
+      "comment" : "Moonset label."
+    },
+    "Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn)." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Settings" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Shape only" : {
+      "comment" : "Derived-current summary label."
+    },
+    "Share" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Share station details" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Show" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Show %@" : {
+      "comment" : "Slackwater interface text. Placeholders are runtime values shown in context."
+    },
+    "Showing %@. Choose another station for a different part of the water." : {
+      "comment" : "Station chooser explanation. The value is a station place name."
+    },
+    "Showing %@. Tap to choose a date." : {
+      "comment" : "Slackwater interface text. Placeholders are runtime values shown in context."
+    },
+    "Showing the closest station. Choose another station for a different part of the water." : {
+      "comment" : "Station chooser explanation."
+    },
+    "Shown" : {
+      "comment" : "Marks the station currently displayed."
+    },
+    "Slack" : {
+      "comment" : "Current event: water is near zero speed.\nCurrent phase: water is near zero speed.\nWidget slack-current event label."
+    },
+    "Slack · %@" : {
+      "comment" : "Tide and current interface text. Placeholders are runtime values shown in context."
+    },
+    "slack before flood %@ · max flood %@ · slack before ebb %@ · max ebb %@" : {
+      "comment" : "NOAA subordinate-station time offsets. Values are compact signed minute offsets.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "slack before flood %1$@ · max flood %2$@ · slack before ebb %3$@ · max ebb %4$@"
+          }
+        }
+      }
+    },
+    "Slack current" : {
+      "comment" : "VoiceOver current-event label."
+    },
+    "Slack ends" : {
+      "comment" : "Widget label above a live slack-window countdown."
+    },
+    "Slack window" : {
+      "comment" : "Settings section heading."
+    },
+    "Slack Window" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Slack Window (rectangular)" : {
+      "comment" : "Widget name and family."
+    },
+    "Slackwater" : {
+      "shouldTranslate" : false
+    },
+    "Slackwater computes harmonic tide and current predictions on this device. They are not observations; actual conditions vary with weather, river flow, and local effects." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Slackwater couldn't find a slack window for your nearest current station." : {
+      "comment" : "Spoken Siri failure response."
+    },
+    "Slackwater couldn't find a tide prediction for your local station." : {
+      "comment" : "Spoken Siri failure response."
+    },
+    "Slackwater doesn't have predictions for this tide station." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Slackwater estimates %@ slack times from high and low water at %@, using a cruising rule of thumb. CHS does not publish current predictions for this pass." : {
+      "comment" : "Tide and current interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slackwater estimates %1$@ slack times from high and low water at %2$@, using a cruising rule of thumb. CHS does not publish current predictions for this pass."
+          }
+        }
+      }
+    },
+    "Slackwater is open source: this app under GPL-3.0, the prediction engine under MIT." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Slackwater Premium" : {
+      "comment" : "Settings section heading."
+    },
+    "Slackwater retries automatically when a connection is available." : {
+      "comment" : "Station download retry expectation."
+    },
+    "Slackwater will try again automatically." : {
+      "comment" : "Offline-prediction retry explanation."
+    },
+    "Solar Eclipse" : {
+      "comment" : "Solar eclipse name shown in a compact tile."
+    },
+    "Some map areas haven't finished. They resume on their own when you're connected." : {
+      "comment" : "Offline-map download failure status."
+    },
+    "Source on GitHub" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Spring tide" : {
+      "comment" : "Astronomical tidal-range tendency around a new or full moon."
+    },
+    "Station" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Station details" : {
+      "comment" : "Station discovery interface text."
+    },
+    "Station is in the wrong place" : {
+      "comment" : "Problem-report subject."
+    },
+    "Station name from %@ (SEANOE). Its record is licensed under %@." : {
+      "comment" : "Station discovery interface text. Placeholders are runtime values shown in context.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Station name from %1$@ (SEANOE). Its record is licensed under %2$@."
+          }
+        }
+      }
+    },
+    "Station name or details are wrong" : {
+      "comment" : "Problem-report subject."
+    },
+    "Station names and pairings: Slackwater database and @openwaters/station-metadata (MIT)." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Station removed" : {
+      "comment" : "Removed-station card title.\nVoiceOver label for a removed-station icon."
+    },
+    "Station unavailable" : {
+      "comment" : "Unavailable-stations section heading."
+    },
+    "Station unavailable." : {
+      "comment" : "VoiceOver station status."
+    },
+    "Station: %@ (%@)" : {
+      "comment" : "Station line in a generated problem-report email. Values are the station name and stable identifier.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Station: %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Stations marked \"Predictions unavailable\" are named from non-commercial records in the same SEANOE deposit (CC BY-NC 4.0). Slackwater does not bundle or serve their harmonic constants." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Stay connected for %@ more and Slackwater refines it to the full %lld-day model, in place — nothing to tap." : {
+      "comment" : "Online prediction-refinement explanation. Values are an approximate duration and model length in days.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stay connected for %1$@ more and Slackwater refines it to the full %2$lld-day model, in place — nothing to tap."
+          }
+        }
+      }
+    },
+    "Sunrise" : {
+      "comment" : "Next-event label.\nVoiceOver next-event label."
+    },
+    "Sunrise %@" : {
+      "comment" : "Moon and sky interface text. Placeholders are runtime values shown in context."
+    },
+    "Sunset" : {
+      "comment" : "Next-event label.\nVoiceOver next-event label."
+    },
+    "Sunset %@" : {
+      "comment" : "Moon and sky interface text. Placeholders are runtime values shown in context."
+    },
+    "Support the app — lock screen widgets and more" : {
+      "comment" : "Premium settings row for a non-subscriber."
+    },
+    "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full %lld-day model — nothing to tap." : {
+      "comment" : "Offline prediction-refinement explanation. The integer is the full model length in days."
+    },
+    "The map works offline here: the world, the water around you, and your saved stations." : {
+      "comment" : "Offline-map availability summary."
+    },
+    "The new moon crossing the sun as seen from here." : {
+      "comment" : "Plain-language explanation of a solar eclipse."
+    },
+    "The next event, above the clock." : {
+      "comment" : "Slackwater interface text."
+    },
+    "The next high tide at %@ is %@, at %@ %@." : {
+      "comment" : "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The next high tide at %1$@ is %2$@, at %3$@ %4$@."
+          }
+        }
+      }
+    },
+    "The next low tide at %@ is %@, at %@ %@." : {
+      "comment" : "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The next low tide at %1$@ is %2$@, at %3$@ %4$@."
+          }
+        }
+      }
+    },
+    "The next slack window at %@ is from %@ to %@ and is open now." : {
+      "comment" : "Spoken Siri slack-window answer. Values are station name and localized start and end times.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The next slack window at %1$@ is from %2$@ to %3$@ and is open now."
+          }
+        }
+      }
+    },
+    "The next slack window at %@ is from %@ to %@, and starts %@." : {
+      "comment" : "Spoken Siri slack-window answer. Values are station name, localized start and end times, and a relative start time.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The next slack window at %1$@ is from %2$@ to %3$@, and starts %4$@."
+          }
+        }
+      }
+    },
+    "Then" : {
+      "comment" : "Following lunar-eclipse label."
+    },
+    "This station is no longer published." : {
+      "comment" : "Removed-station explanation."
+    },
+    "This station's predictions aren't on this device yet. Downloading Canadian current predictions…" : {
+      "comment" : "Station download explanation."
+    },
+    "This station's predictions aren't on this device yet. Downloading Canadian tidal predictions…" : {
+      "comment" : "Station download explanation."
+    },
+    "This station's predictions couldn't be downloaded." : {
+      "comment" : "Station download failure."
+    },
+    "This station's predictions didn't finish downloading. Slackwater will try again." : {
+      "comment" : "Station download retry explanation."
+    },
+    "This station's predictions need a connection before they can download." : {
+      "comment" : "Station download explanation."
+    },
+    "Tidal range" : {
+      "comment" : "Fallback lunar tidal-range label."
+    },
+    "Tide · %@" : {
+      "comment" : "Download row station type and region. The value is catalog data."
+    },
+    "Tide · CHS" : {
+      "comment" : "Station type and provider. Keep CHS exact."
+    },
+    "Tide · NOAA" : {
+      "comment" : "Station type and provider. Keep NOAA exact."
+    },
+    "Tide and Current predictions nearby." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Tide at %@" : {
+      "comment" : "Link to a related tide station. The value is a station name."
+    },
+    "Tide at %@ · %@" : {
+      "comment" : "Link to a nearby tide station. Values are station name and localized distance.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tide at %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Tide height" : {
+      "comment" : "Settings section heading."
+    },
+    "Tide height looks wrong" : {
+      "comment" : "Problem-report subject."
+    },
+    "Tide height units" : {
+      "comment" : "Tide and current interface text."
+    },
+    "Tide Station" : {
+      "comment" : "Widget station-picker choice that follows the nearest tide station."
+    },
+    "Tide timeline" : {
+      "comment" : "VoiceOver label for the interactive tide chart."
+    },
+    "Tides and currents near you" : {
+      "comment" : "Location-permission card title."
+    },
+    "Tides and currents open here." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Today's Curve" : {
+      "comment" : "Widget name."
+    },
+    "Today's curve with the next event." : {
+      "comment" : "Today's Curve widget description."
+    },
+    "Today's tide or current curve, with the next event." : {
+      "comment" : "Tide and current interface text."
+    },
+    "Total Eclipse" : {
+      "comment" : "Lunar eclipse name."
+    },
+    "Total Solar Eclipse" : {
+      "comment" : "Solar eclipse name."
+    },
+    "Try %@ instead" : {
+      "comment" : "Link to a nearby station with offline predictions. The value is a station name."
+    },
+    "Turn on location in Settings to find nearby tides and currents." : {
+      "comment" : "Location-denied explanation."
+    },
+    "Turn on location to put nearby predictions first." : {
+      "comment" : "Location-permission explanation."
+    },
+    "under a minute" : {
+      "comment" : "Approximate download duration under ninety seconds."
+    },
+    "Unfavorite" : {
+      "comment" : "Station discovery interface text."
+    },
+    "US channel bathymetry: NOAA National Bathymetric Source (public domain)." : {
+      "comment" : "Slackwater interface text."
+    },
+    "US stations: NOAA CO-OPS harmonic constituents (public domain)." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Version" : {
+      "comment" : "Settings section heading."
+    },
+    "Waiting" : {
+      "comment" : "Download status.\nStation download-card title."
+    },
+    "Waiting · %@ in line" : {
+      "comment" : "Download status. The value is a locale-formatted queue position.\nOffline-prediction queue status. The value is a locale-formatted ordinal."
+    },
+    "Waiting · next" : {
+      "comment" : "Download status for the first queued station.\nOffline-prediction queue status."
+    },
+    "Waiting for signal" : {
+      "comment" : "Download status while offline.\nOffline-prediction card title.\nStation download-card title while offline."
+    },
+    "Waiting for signal. Areas already downloaded keep working offline." : {
+      "comment" : "Offline-map download status."
+    },
+    "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline." : {
+      "comment" : "Offline-download summary while offline."
+    },
+    "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected." : {
+      "comment" : "Offline-map download status."
+    },
+    "Waiting to retry" : {
+      "comment" : "Offline-prediction card title."
+    },
+    "Waning Crescent" : {
+      "comment" : "Moon phase name."
+    },
+    "Waning Gibbous" : {
+      "comment" : "Moon phase name."
+    },
+    "Warning" : {
+      "comment" : "VoiceOver label for a warning icon."
+    },
+    "Waxing Crescent" : {
+      "comment" : "Moon phase name."
+    },
+    "Waxing Gibbous" : {
+      "comment" : "Moon phase name."
+    },
+    "Week starting" : {
+      "comment" : "Slackwater interface text."
+    },
+    "Widgets" : {
+      "comment" : "Widget interface text."
+    },
+    "Widgets — add them to your home and lock screen" : {
+      "comment" : "Settings link to the widget gallery."
+    },
+    "window %@–%@" : {
+      "comment" : "Rectangular widget slack window. Values are localized start and end times.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "window %1$@–%2$@"
+          }
+        }
+      }
+    },
+    "you" : {
+      "comment" : "Distance origin meaning the person's location."
+    },
+    "You have Premium — thank you." : {
+      "comment" : "Premium interface text."
+    },
+    "You opened" : {
+      "comment" : "Marks a download promoted because its station was opened."
+    },
+    "Your location stays on this device." : {
+      "comment" : "Station discovery interface text."
+    },
+    "Your report was copied. Send it to %@." : {
+      "comment" : "Problem-report interface text. Placeholders are runtime values shown in context."
+    }
+  },
+  "version" : "1.0"
+}

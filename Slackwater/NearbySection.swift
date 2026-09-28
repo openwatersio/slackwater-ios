@@ -38,7 +38,7 @@ struct NearbySection: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                MonoLabel(text: "Nearby")
+                MonoLabel(text: String(localized: "Nearby", comment: "Nearby-stations section heading."))
                 Spacer(minLength: 8)
                 SeriesFilterChips()
             }
@@ -79,8 +79,8 @@ struct NearbySection: View {
         let bearing = bearingDeg(lat, lon, near.latitude, near.longitude)
         return StationChoiceRow(title: near.name,
                                 caption: near.region.isEmpty ? near.kindLabel
-                                    : "\(near.region) · \(near.kindLabel)",
-                                distance: "\(formatNm(km)) \(compass16(bearing))")
+                                    : String(localized: "\(near.region) · \(near.kindLabel)", comment: "Nearby station region and localized type. The first value is catalog data."),
+                                distance: String(localized: "\(formatNm(km)) \(compass16(bearing))", comment: "Nearby station distance and compass bearing. Values are a localized nautical-mile distance and invariant bearing."))
             // Not a Button: press tracking goes dead below the strip in the
             // iPad split detail column (OpenTideDetailKey, Theme.swift).
             .onTapGesture { open(near) }

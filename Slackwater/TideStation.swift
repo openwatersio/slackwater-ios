@@ -83,9 +83,9 @@ struct CardState {
 
 extension TideStationRecord {
     var detailsDatum: String {
-        if isChs { return "LLWLT (CHS chart datum)" }
-        if id.hasPrefix("noaa/") { return "\(chartDatum) (NOAA chart datum)" }
-        return "\(chartDatum) chart datum"
+        if isChs { return String(localized: "LLWLT (CHS chart datum)", comment: "Station-detail datum. Keep LLWLT and CHS exact.") }
+        if id.hasPrefix("noaa/") { return String(localized: "\(chartDatum) (NOAA chart datum)", comment: "Station-detail datum. The value is a datum acronym; keep NOAA exact.") }
+        return String(localized: "\(chartDatum) chart datum", comment: "Station-detail datum. The value is a datum acronym.")
     }
 
     func cardState(at now: Date) -> CardState {

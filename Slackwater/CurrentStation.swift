@@ -251,15 +251,19 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// it. Below 0.05 kn the speed formatter rounds to 0.0 and the direction
     /// is noise, so it reads as none rather than as a confident 0.0 ebb.
     func detailsMeanFlow(unit: String) -> String {
-        guard abs(meanFlow) >= 0.05 else { return "None measured" }
-        return "\(formatSpeed(abs(meanFlow), unit: unit)) \(speedUnitLabel(unit)) toward \(meanFlow > 0 ? "flood" : "ebb")"
+        guard abs(meanFlow) >= 0.05 else { return String(localized: "None measured", comment: "Station-detail mean-flow value.") }
+        let speed = formatSpeed(abs(meanFlow), unit: unit)
+        let unitLabel = speedUnitLabel(unit)
+        return meanFlow > 0
+            ? String(localized: "\(speed) \(unitLabel) toward flood", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
+            : String(localized: "\(speed) \(unitLabel) toward ebb", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
     }
 
     /// How the prediction under this station is made, in one line.
     var detailsPrediction: String {
         isSubordinate
-            ? "NOAA reference slacks and maxima, adjusted by published offsets and computed on this device"
-            : "\(constituents.count) harmonic constituents computed on this device"
+            ? String(localized: "NOAA reference slacks and maxima, adjusted by published offsets and computed on this device", comment: "Station-detail prediction provenance. Keep NOAA exact.")
+            : String(localized: "\(constituents.count) harmonic constituents computed on this device", comment: "Station-detail prediction provenance. The integer is a constituent count; vary by plural.")
     }
 
     /// NOAA's subordinate table as the table itself states it — the four time
@@ -267,8 +271,8 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     /// for a harmonic station, which has no table.
     var detailsOffsets: (times: String, ratios: String)? {
         guard isSubordinate else { return nil }
-        return ("slack before flood \(offsetMinutes(slackBeforeFloodOffset)) · max flood \(offsetMinutes(floodTimeOffset)) · slack before ebb \(offsetMinutes(slackBeforeEbbOffset)) · max ebb \(offsetMinutes(ebbTimeOffset))",
-                "flood ×\(ratioText(floodSpeedRatio)) · ebb ×\(ratioText(ebbSpeedRatio))")
+        return (String(localized: "slack before flood \(offsetMinutes(slackBeforeFloodOffset)) · max flood \(offsetMinutes(floodTimeOffset)) · slack before ebb \(offsetMinutes(slackBeforeEbbOffset)) · max ebb \(offsetMinutes(ebbTimeOffset))", comment: "NOAA subordinate-station time offsets. Values are compact signed minute offsets."),
+                String(localized: "flood ×\(ratioText(floodSpeedRatio)) · ebb ×\(ratioText(ebbSpeedRatio))", comment: "NOAA subordinate-station speed ratios. Values are decimal multipliers."))
     }
 
     static let all: [CurrentStationRecord] = bundled("currents")
@@ -279,7 +283,8 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
 /// "+38 min" — a NOAA table offset, stored in seconds, as the table prints it.
 private func offsetMinutes(_ seconds: Double?) -> String {
     let m = Int(((seconds ?? 0) / 60).rounded())
-    return m == 0 ? "0 min" : String(format: "%+d min", m)
+    let value = m == 0 ? "0" : String(format: "%+d", m)
+    return String(localized: "\(value) min", comment: "Compact signed time offset in minutes; 'min' remains invariant.")
 }
 
 /// "0.85" — a NOAA speed ratio. Two places: the table publishes two.
@@ -306,9 +311,9 @@ enum CurrentPhase {
     /// "Flooding" / "Ebbing" / "Slack" — the phase pill's word.
     var word: String {
         switch self {
-        case .flood: "Flooding"
-        case .ebb: "Ebbing"
-        case .slack: "Slack"
+        case .flood: String(localized: "Flooding", comment: "Current phase: water moving in the flood direction.")
+        case .ebb: String(localized: "Ebbing", comment: "Current phase: water moving in the ebb direction.")
+        case .slack: String(localized: "Slack", comment: "Current phase: water is near zero speed.")
         }
     }
 
@@ -318,8 +323,8 @@ enum CurrentPhase {
     /// "under 0.5 kn" at its render sites.
     var gloss: String? {
         switch self {
-        case .flood: "incoming"
-        case .ebb: "outgoing"
+        case .flood: String(localized: "incoming", comment: "Plain-language gloss for a flooding current.")
+        case .ebb: String(localized: "outgoing", comment: "Plain-language gloss for an ebbing current.")
         case .slack: nil
         }
     }
@@ -364,9 +369,9 @@ extension CurrentEvent {
     /// "Slack" / "Max flood" / "Max ebb" — web StationCard TURN_LABEL.
     var turnLabel: String {
         switch kind {
-        case .slack: "Slack"
-        case .maxFlood: "Max flood"
-        case .maxEbb: "Max ebb"
+        case .slack: String(localized: "Slack", comment: "Current event: water is near zero speed.")
+        case .maxFlood: String(localized: "Max flood", comment: "Maximum flood-current event label.")
+        case .maxEbb: String(localized: "Max ebb", comment: "Maximum ebb-current event label.")
         }
     }
 }
@@ -434,10 +439,10 @@ enum StationItem: Identifiable, Hashable {
     /// name, series and provider are the difference that isn't distance.
     var kindLabel: String {
         switch self {
-        case .tide: "Tide · NOAA"
-        case .current: "Current · NOAA"
-        case .chs: "Tide · CHS"
-        case .chsGate, .chsCurrent: "Current · CHS"
+        case .tide: String(localized: "Tide · NOAA", comment: "Station type and provider. Keep NOAA exact.")
+        case .current: String(localized: "Current · NOAA", comment: "Station type and provider. Keep NOAA exact.")
+        case .chs: String(localized: "Tide · CHS", comment: "Station type and provider. Keep CHS exact.")
+        case .chsGate, .chsCurrent: String(localized: "Current · CHS", comment: "Station type and provider. Keep CHS exact.")
         }
     }
     /// "1.1 nm ENE of Sierra Point": NOAA regions are often a bare offset from

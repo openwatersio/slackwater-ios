@@ -285,23 +285,23 @@ struct OnlineGateDetailView: View {
 
     private var downloadTitle: String {
         switch downloadStatus {
-        case .downloading: "Downloading"
-        case .retrying: "Waiting to retry"
-        case .failed: "Download failed"
-        case .offline: "Waiting for signal"
-        case .expired: "Offline download expired"
-        default: "Download for offline use"
+        case .downloading: String(localized: "Downloading", comment: "Offline-prediction card title.")
+        case .retrying: String(localized: "Waiting to retry", comment: "Offline-prediction card title.")
+        case .failed: String(localized: "Download failed", comment: "Offline-prediction card title.")
+        case .offline: String(localized: "Waiting for signal", comment: "Offline-prediction card title.")
+        case .expired: String(localized: "Offline download expired", comment: "Offline-prediction card title.")
+        default: String(localized: "Download for offline use", comment: "Offline-prediction card title.")
         }
     }
 
     private var downloadAction: String {
         switch downloadStatus {
-        case .downloading: "Downloading…"
-        case .retrying: "Retry now"
-        case .failed: "Retry"
-        case .expired: "Download"
-        case .offline: "Connect to download"
-        default: "Download"
+        case .downloading: String(localized: "Downloading…", comment: "Offline-prediction action while downloading.")
+        case .retrying: String(localized: "Retry now", comment: "Offline-prediction action.")
+        case .failed: String(localized: "Retry", comment: "Offline-prediction action.")
+        case .expired: String(localized: "Download", comment: "Offline-prediction action.")
+        case .offline: String(localized: "Connect to download", comment: "Offline-prediction action while offline.")
+        default: String(localized: "Download", comment: "Offline-prediction action.")
         }
     }
 
@@ -310,23 +310,24 @@ struct OnlineGateDetailView: View {
         // `Timeline.onlineFetchDays` forward of the anchor. The footer two
         // views up prints the real covers-to date, and the two lines sat on
         // one screen contradicting each other.
-        var text = net.online
-            ? "Downloads cover about a month and can be refreshed at any time."
-            : "Connect for a moment to download about a month of predictions."
+        var lines = [net.online
+            ? String(localized: "Downloads cover about a month and can be refreshed at any time.", comment: "Offline-prediction download explanation.")
+            : String(localized: "Connect for a moment to download about a month of predictions.", comment: "Offline-prediction download explanation while offline.")]
         // Deliberate: a disk read per body evaluation, but this only renders
         // on the honesty path — re-pick into state if it ever shows in a trace.
         if let window = ChsModelStore.loadOnline(gate.id)?.blocks.last {
-            text += " \(onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar))."
+            let validity = onlineDownloadValidity(end: window.offlineValidUntil, calendar: calendar)
+            lines.append(String(localized: "\(validity).", comment: "Offline-prediction validity sentence. The value is a localized expiry phrase."))
         }
         if case .deferred = fetchState {
-            text += " Slackwater will try again automatically."
+            lines.append(String(localized: "Slackwater will try again automatically.", comment: "Offline-prediction retry explanation."))
         }
-        return text
+        return lines.joined(separator: " ")
     }
 
     @ViewBuilder private var nearestGateLink: some View {
         if let nearest = nearestShipped {
-            BranchLink(text: "Try \(nearest.name) instead", id: "nearest-gate-link") {
+            BranchLink(text: String(localized: "Try \(nearest.name) instead", comment: "Link to a nearby station with offline predictions. The value is a station name."), id: "nearest-gate-link") {
                 openChsRoute(.currentGate(nearest))
             }
             .padding(.horizontal, 36)  // lines up with ChsAmberCard's text inset (16 outer + 20 inner)

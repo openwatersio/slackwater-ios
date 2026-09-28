@@ -91,7 +91,9 @@ struct DetailHeader: View {
                                 .frame(width: 44, height: 44)
                                 .glassEffect(.regular.interactive(), in: Circle())
                         }
-                        .accessibilityLabel(fav ? "Remove favorite" : "Add favorite")
+                        .accessibilityLabel(fav
+                            ? String(localized: "Remove favorite", comment: "VoiceOver action for a saved station.")
+                            : String(localized: "Add favorite", comment: "VoiceOver action for a station."))
                         .accessibilityIdentifier("detail-favorite")
                     }
                 }
@@ -108,7 +110,7 @@ struct DetailHeader: View {
                     Text(region)
                         .font(.caption)
                     if let km = kmFromFix {
-                        Text("•")
+                        Text(verbatim: "•")
                             .font(.caption)
                         Text(formatNm(km))
                             .font(.caption.monospacedDigit())

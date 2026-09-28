@@ -23,16 +23,19 @@ struct StationQuery: EntityQuery {
     private let locator: CatalogFileLocator
     private let defaults: UserDefaults
     private let currentLocation = StationChoice(
-        id: AppGroup.currentLocationStationID, name: "Any Station")
+        id: AppGroup.currentLocationStationID,
+        name: String(localized: "Any Station", comment: "Widget station-picker choice that follows the nearest station."))
     /// Any Station's series-narrowed siblings: follow the fix, but to the
     /// nearest station that measures tide (or current) specifically —
     /// otherwise a fix beside a tide gauge makes every widget a tide widget.
     /// All three read under the "Nearest Station" section header, which
     /// carries the "nearest" for them.
     private let nearestTide = StationChoice(
-        id: AppGroup.nearestTideStationID, name: "Tide Station")
+        id: AppGroup.nearestTideStationID,
+        name: String(localized: "Tide Station", comment: "Widget station-picker choice that follows the nearest tide station."))
     private let nearestCurrent = StationChoice(
-        id: AppGroup.nearestCurrentStationID, name: "Current Station")
+        id: AppGroup.nearestCurrentStationID,
+        name: String(localized: "Current Station", comment: "Widget station-picker choice that follows the nearest current station."))
     private var sentinels: [StationChoice] { [currentLocation, nearestTide, nearestCurrent] }
 
     init() {
@@ -57,9 +60,9 @@ struct StationQuery: EntityQuery {
                 return StationChoice(id: id, name: item.name)
             }
         }
-        return [(title: "Nearest Station", items: sentinels),
-                (title: "Favorites", items: resolve(AppGroup.favoritesKey)),
-                (title: "Recents", items: resolve(AppGroup.recentsKey))]
+        return [(title: String(localized: "Nearest Station", comment: "Widget station-picker section."), items: sentinels),
+                (title: String(localized: "Favorites", comment: "Widget station-picker section."), items: resolve(AppGroup.favoritesKey)),
+                (title: String(localized: "Recents", comment: "Widget station-picker section."), items: resolve(AppGroup.recentsKey))]
             .filter { !$0.items.isEmpty }
     }
     func entities(for identifiers: [String]) async throws -> [StationChoice] {

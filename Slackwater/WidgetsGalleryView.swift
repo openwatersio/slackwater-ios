@@ -14,21 +14,21 @@ struct WidgetsGalleryView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    group("Home screen — free",
-                          note: "Long-press your home screen → + → Slackwater.",
-                          rows: [("Next Event", "square.grid.2x2",
-                                  "Now, which way it's going, and the next turn."),
-                                 ("Today's Curve", "waveform.path.ecg",
-                                  "Today's curve with the next event.")])
+                    group(String(localized: "Home screen — free", comment: "Widget gallery section title."),
+                          note: String(localized: "Long-press your home screen → + → Slackwater.", comment: "Instructions for adding a home-screen widget."),
+                          rows: [(String(localized: "Next Event", comment: "Widget name."), "square.grid.2x2",
+                                  String(localized: "Now, which way it's going, and the next turn.", comment: "Next Event widget description.")),
+                                 (String(localized: "Today's Curve", comment: "Widget name."), "waveform.path.ecg",
+                                  String(localized: "Today's curve with the next event.", comment: "Today's Curve widget description."))])
                     #if PREMIUM_ENABLED
-                    group("Lock screen — Premium",
-                          note: "Long-press your lock screen → Customize → add Slackwater above or below the clock.",
-                          rows: [("Next Slack (inline)", "lock.iphone",
-                                  "Above the clock: the next event and time."),
-                                 ("Next Event (circular)", "circle.dashed",
-                                  "A glance: arrow and time."),
-                                 ("Slack Window (rectangular)", "rectangle.dashed",
-                                  "Next event plus the workable window.")])
+                    group(String(localized: "Lock screen — Premium", comment: "Widget gallery section title."),
+                          note: String(localized: "Long-press your lock screen → Customize → add Slackwater above or below the clock.", comment: "Instructions for adding a lock-screen widget."),
+                          rows: [(String(localized: "Next Slack (inline)", comment: "Widget name and family."), "lock.iphone",
+                                  String(localized: "Above the clock: the next event and time.", comment: "Inline widget description.")),
+                                 (String(localized: "Next Event (circular)", comment: "Widget name and family."), "circle.dashed",
+                                  String(localized: "A glance: arrow and time.", comment: "Circular widget description.")),
+                                 (String(localized: "Slack Window (rectangular)", comment: "Widget name and family."), "rectangle.dashed",
+                                  String(localized: "Next event plus the workable window.", comment: "Rectangular widget description."))])
                     if !store.isPremium {
                         Button { showPremium = true } label: {
                             Text("About Slackwater Premium")

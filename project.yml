@@ -1,6 +1,8 @@
 name: Slackwater
 options:
   bundleIdPrefix: io.openwaters
+  developmentLanguage: en
+  knownRegions: [Base, en]
   # iOS 26: Liquid Glass chrome with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
@@ -25,6 +27,7 @@ settings:
     # say what changed. Pinned at the value already in use, so this changes
     # no behaviour. Moving to 6 is a migration, not a setting.
     SWIFT_VERSION: "5.0"
+    SWIFT_EMIT_LOC_STRINGS: YES
   configs:
     # Premium (the lock-screen widgets, its sheet, and slackwater://premium) is
     # Debug-only until it ships (#463). Add PREMIUM_ENABLED to Release to ship
@@ -132,6 +135,7 @@ targets:
     platform: iOS
     sources:
       - SlackwaterWidgets
+      - Slackwater/Localizable.xcstrings
       # Explicit station catalogs only — NOT the whole Resources folder. That
       # folder also holds resources (fill bundles, glyphs) that nothing in
       # this appex reads; bundling it all inflated every widget build.

@@ -24,9 +24,9 @@ struct SlackInlineWidget: Widget {
                     // e.g. "Slack 14:32 · Race Passage" — label carries a
                     // formatted height/speed on a max event, so it gets the same
                     // .monospacedDigit() as the clock half.
-                    (Text(next.label + " ").monospacedDigit()
-                        + Text(next.time, style: .time) + Text(" · " + s.stationName))
-                        .environment(\.timeZone, s.tz)
+                    Text("\(next.label) \(cardTime(next.time, s.tz)) · \(s.stationName)",
+                         comment: "Inline widget event. Values are event label, localized time, and station name.")
+                        .monospacedDigit()
                 } else { Text("Open Slackwater") }
             }
             .widgetURL(accessoryDeepLink(entry))
@@ -74,13 +74,13 @@ struct SlackRectangularWidget: Widget {
                             Image(systemName: next.symbol)
                             Text(next.time, style: .time).fontWeight(.semibold)
                                 .environment(\.timeZone, s.tz)
-                            Text(next.label).monospacedDigit().lineLimit(1)
+                            Text(verbatim: next.label).monospacedDigit().lineLimit(1)
                         }
                         .font(.caption)
                         if let w = s.window {
-                            (Text("window ") + Text(w.start, style: .time) + Text("–") + Text(w.end, style: .time))
+                            Text("window \(cardTime(w.start, s.tz))–\(cardTime(w.end, s.tz))",
+                                 comment: "Rectangular widget slack window. Values are localized start and end times.")
                                 .font(.caption2).foregroundStyle(.secondary)
-                                .environment(\.timeZone, s.tz)
                         }
                     }
                 } else { Text("Open Slackwater") }

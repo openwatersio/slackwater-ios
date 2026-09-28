@@ -30,7 +30,7 @@ struct MatchingStationsLink: View {
 
     var body: some View {
         if let namesakes = StationItem.byPlace[item.placeKey], namesakes.count > 1 {
-            BranchLink(text: "Other locations (\(namesakes.count - 1))",
+            BranchLink(text: String(localized: "Other locations (\(namesakes.count - 1))", comment: "Link to same-named stations. The integer is the number of other locations; vary by plural."),
                        id: "matching-stations", chevron: false) {
                 let from = LocationService.shared.rankingAnchor
                 place = StationMatches(place: item.name,
@@ -40,7 +40,9 @@ struct MatchingStationsLink: View {
             .sheet(item: $place) { place in
                 let loc = LocationService.shared
                 StationChooserSheet(place: place, anchor: loc.rankingAnchor,
-                                    anchorName: loc.authorized && loc.location != nil ? "you" : nil) { picked in
+                                    anchorName: loc.authorized && loc.location != nil
+                                        ? String(localized: "you", comment: "Distance origin meaning the person's location.")
+                                        : nil) { picked in
                     ChosenStationsStore.shared.choose(picked)
                     if picked.id != item.id { open(picked) }
                 }
@@ -136,16 +138,16 @@ struct StationChooserSheet: View {
 
     private var explanation: String {
         if place.replacing != nil {
-            return "Choose a replacement near the removed station."
+            return String(localized: "Choose a replacement near the removed station.", comment: "Station chooser explanation.")
         }
         guard let shown = place.matches.first(where: { $0.id == place.shown }) else {
-            return "Choose another station for a different part of the water."
+            return String(localized: "Choose another station for a different part of the water.", comment: "Station chooser explanation.")
         }
         // "Closest" only holds when the distances are measured from a named point.
         if anchorName != nil && shown.id == place.matches.first?.id {
-            return "Showing the closest station. Choose another station for a different part of the water."
+            return String(localized: "Showing the closest station. Choose another station for a different part of the water.", comment: "Station chooser explanation.")
         }
-        return "Showing \(shown.placeLabel). Choose another station for a different part of the water."
+        return String(localized: "Showing \(shown.placeLabel). Choose another station for a different part of the water.", comment: "Station chooser explanation. The value is a station place name.")
     }
 
     /// Pins are SwiftUI views over the map rather than map layers, so one
@@ -200,7 +202,9 @@ struct StationChooserSheet: View {
             StationChoiceRow(title: item.placeLabel,
                              caption: item.kindLabel,
                              distance: distance(item),
-                             note: item.id == place.shown ? "Shown" : nil,
+                             note: item.id == place.shown
+                                ? String(localized: "Shown", comment: "Marks the station currently displayed.")
+                                : nil,
                              selected: item.id == selected)
         }
         .buttonStyle(.plain)
@@ -211,11 +215,12 @@ struct StationChooserSheet: View {
     /// "2.1 nm from you", or empty without an `anchorName`.
     private func distance(_ item: StationItem) -> String {
         guard let anchorName else { return "" }
-        return "\(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon))) from \(anchorName)"
+        return String(localized: "\(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon))) from \(anchorName)", comment: "Station distance. Values are a localized nautical-mile distance and its origin.")
     }
 
     private func spoken(_ item: StationItem) -> String {
-        [item.placeLabel, distance(item), item.id == place.shown ? "currently shown" : ""]
+        [item.placeLabel, distance(item), item.id == place.shown
+            ? String(localized: "currently shown", comment: "VoiceOver station-selection state.") : ""]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }

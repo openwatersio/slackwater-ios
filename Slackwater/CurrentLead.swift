@@ -74,9 +74,11 @@ struct CurrentLead: View {
         guard let e = timeline.currentEvents
             .filter({ $0.kind != .slack && $0.time > scrubTime })
             .min(by: { $0.time < $1.time }) else { return nil }
-        return ("Next max",
+        return (String(localized: "Next max", comment: "Current summary label for the next maximum speed."),
                 "\(tilde)\(formatSpeed(abs(e.speed), unit: speedUnit))\u{00a0}\(speedUnitLabel(speedUnit))",
-                "\(e.kind == .maxFlood ? "Flood" : "Ebb") at \(chartTime(e.time, tz))")
+                e.kind == .maxFlood
+                    ? String(localized: "Flood at \(chartTime(e.time, tz))", comment: "Current summary caption. The value is a localized time.")
+                    : String(localized: "Ebb at \(chartTime(e.time, tz))", comment: "Current summary caption. The value is a localized time."))
     }
 
     /// At a max the water is at its fastest; otherwise it is flooding or
@@ -86,14 +88,18 @@ struct CurrentLead: View {
     }
 
     private var state: String {
-        if isSlack { return "Slack" }
-        if let max = atMax { return max.kind == .maxFlood ? "Max flood" : "Max ebb" }
+        if isSlack { return String(localized: "Slack", comment: "Current phase: water is near zero speed.") }
+        if let max = atMax {
+            return max.kind == .maxFlood
+                ? String(localized: "Max flood", comment: "Maximum flood-current state.")
+                : String(localized: "Max ebb", comment: "Maximum ebb-current state.")
+        }
         return phase.word
     }
 
     /// The lead in words, for the strip's spoken value.
     var spoken: String {
-        "\(state) \(tilde)\(formatSpeed(abs(signed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))"
+        String(localized: "\(state) \(tilde)\(formatSpeed(abs(signed), unit: speedUnit)) \(spokenUnit(speedUnitLabel(speedUnit)))", comment: "VoiceOver current reading. Values are current state, optional approximation mark, formatted speed, and spoken unit.")
     }
 
     var body: some View {

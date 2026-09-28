@@ -5,17 +5,24 @@ import UIKit
 
 let supportEmail = "slackwater@openwaters.io"
 
-/// What a report is about. The case IS the subject line, and picking it from
-/// the menu is the whole form — the note is whatever they type in Mail.
+/// What a report is about. Picking it from the menu is the whole form — the
+/// note is whatever they type in Mail.
 enum ReportKind: String, CaseIterable, Identifiable {
-    case location = "Station is in the wrong place"
-    case metadata = "Station name or details are wrong"
-    case height = "Tide height looks wrong"
+    case location, metadata, height
     /// An unavailable station's page (issue #401), where the app has no
     /// predictions and is asking for a contact or a licence instead.
-    case unavailable = "I can help with an unavailable station"
+    case unavailable
 
     var id: String { rawValue }
+
+    var subject: String {
+        switch self {
+        case .location: String(localized: "Station is in the wrong place", comment: "Problem-report subject.")
+        case .metadata: String(localized: "Station name or details are wrong", comment: "Problem-report subject.")
+        case .height: String(localized: "Tide height looks wrong", comment: "Problem-report subject.")
+        case .unavailable: String(localized: "I can help with an unavailable station", comment: "Problem-report subject.")
+        }
+    }
 
     /// What the detail footer's menu offers. NOT `allCases`: `.unavailable`
     /// belongs to a station that has no footer, and offering it beside "Tide
@@ -28,10 +35,9 @@ enum ReportKind: String, CaseIterable, Identifiable {
     var prompt: String {
         switch self {
         case .unavailable:
-            "(Tell us what you know — who runs this gauge, a contact there, or "
-                + "anything about how its data is licensed.)"
+            String(localized: "(Tell us what you know — who runs this gauge, a contact there, or anything about how its data is licensed.)", comment: "Prompt in an email about an unavailable station.")
         case .location, .metadata, .height:
-            "(Tell us what you saw — what the water was doing, and when.)"
+            String(localized: "(Tell us what you saw — what the water was doing, and when.)", comment: "Prompt in an email reporting a prediction problem.")
         }
     }
 
@@ -54,7 +60,7 @@ func reportMoment(_ date: Date, _ tz: TimeZone,
                   locale: Locale = .autoupdatingCurrent) -> String {
     let day = monthDayYear(date, tz, locale: locale)
     let zone = localizedFormatter("z", tz, locale: locale).string(from: date)
-    return "\(day) · \(chartTime(date, tz, locale: locale)) \(zone)"
+    return String(localized: "\(day) · \(chartTime(date, tz, locale: locale)) \(zone)", comment: "Problem-report moment. Values are a localized date, localized time, and time-zone abbreviation.")
 }
 
 /// ponytail: the predicted height is deliberately absent. Station plus moment
@@ -72,18 +78,18 @@ func reportBody(kind: ReportKind, stationID: String, scrubTime: Date?,
         kind.prompt,
         "",
         "",
-        "— details —",
-        "Station: \(name) (\(stationID))",
+        String(localized: "— details —", comment: "Heading in a generated problem-report email."),
+        String(localized: "Station: \(name) (\(stationID))", comment: "Station line in a generated problem-report email. Values are the station name and stable identifier."),
     ]
     if kind.carriesMoment {
-        lines.append("Moment: \(reportMoment(scrubTime ?? now, tz))")
+        lines.append(String(localized: "Moment: \(reportMoment(scrubTime ?? now, tz))", comment: "Time line in a generated problem-report email. The value is a localized date, time, and time zone."))
     }
     // The share button's own link, so the two never disagree about which
     // moment they mean. Nil for a station with no published slug.
     if let link = detailShareURL(stationID: stationID, scrubTime: scrubTime, now: now, tz: tz) {
-        lines.append("Link: \(link.absoluteString)")
+        lines.append(String(localized: "Link: \(link.absoluteString)", comment: "Link line in a generated problem-report email. The value is a URL."))
     }
-    lines.append("App: \(appVersionLabel)")
+    lines.append(String(localized: "App: \(appVersionLabel)", comment: "App-version line in a generated problem-report email. The value is a version and build number."))
     return lines.joined(separator: "\n")
 }
 
@@ -98,7 +104,7 @@ private let mailtoAllowed: CharacterSet = {
 func reportMailURL(kind: ReportKind, stationID: String, scrubTime: Date?,
                    now: Date = Date(), tz: TimeZone) -> URL? {
     let body = reportBody(kind: kind, stationID: stationID, scrubTime: scrubTime, now: now, tz: tz)
-    guard let subject = kind.rawValue.addingPercentEncoding(withAllowedCharacters: mailtoAllowed),
+    guard let subject = kind.subject.addingPercentEncoding(withAllowedCharacters: mailtoAllowed),
           let encoded = body.addingPercentEncoding(withAllowedCharacters: mailtoAllowed)
     else { return nil }
     return URL(string: "mailto:\(supportEmail)?subject=\(subject)&body=\(encoded)")
@@ -118,7 +124,7 @@ func sendReport(_ kind: ReportKind, stationID: String, scrubTime: Date? = nil,
         // clipboard is the difference between a lost report and a paste into
         // whatever they do use.
         guard !opened else { return }
-        UIPasteboard.general.string = kind.rawValue + "\n\n"
+        UIPasteboard.general.string = kind.subject + "\n\n"
             + reportBody(kind: kind, stationID: stationID, scrubTime: scrubTime, tz: tz)
         onCopied()
     }
@@ -136,7 +142,7 @@ struct ReportProblemMenu: View {
     var body: some View {
         Menu {
             ForEach(ReportKind.menuCases) { kind in
-                Button(kind.rawValue) {
+                Button(kind.subject) {
                     sendReport(kind, stationID: stationID, scrubTime: scrubTime,
                                tz: tz, openURL: openURL) { copied = true }
                 }

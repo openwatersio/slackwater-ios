@@ -65,34 +65,38 @@ enum CardStatus: Equatable {
     /// Scannable, not read. Two or three words, no sentence.
     var label: String {
         switch self {
-        case .downloading: "Downloading"
-        case .queued: "Queued"
-        case .retrying: "Retrying"
+        case .downloading: String(localized: "Downloading", comment: "Compact download status.")
+        case .queued: String(localized: "Queued", comment: "Compact download status.")
+        case .retrying: String(localized: "Retrying", comment: "Compact download status.")
         case .notQueued: ""
-        case .offline: "Offline"
-        case .expired: "Expired"
-        case .notDownloaded: "Not downloaded"
-        case .failed: "Failed"
-        case .refining(let tolerance): tolerance.map { "Refining · \($0)" } ?? "Refining"
+        case .offline: String(localized: "Offline", comment: "Compact network status.")
+        case .expired: String(localized: "Expired", comment: "Compact offline-download status.")
+        case .notDownloaded: String(localized: "Not downloaded", comment: "Compact offline-download status.")
+        case .failed: String(localized: "Failed", comment: "Compact download status.")
+        case .refining(let tolerance):
+            tolerance.map {
+                String(localized: "Refining · \($0)", comment: "Compact prediction status. The value is a measured time tolerance.")
+            } ?? String(localized: "Refining", comment: "Compact prediction status.")
         }
     }
 
     /// VoiceOver keeps the sentence the strip dropped — including when the
     /// active queue states reduce to an icon (#93).
     var accessibilityLabel: String {
-        let once = "Canadian predictions download once, then work offline."
         switch self {
-        case .downloading: return "Downloading — \(once)"
-        case .queued: return "Queued — \(once)"
-        case .retrying: return "Retrying — Slackwater tries again on its own. \(once)"
-        case .notQueued: return "Predictions are not downloaded."
-        case .offline: return "Offline — needs a moment of signal. \(once)"
-        case .expired: return "Expired — get back online to download current predictions."
-        case .notDownloaded: return "Not downloaded — get back online to download predictions."
-        case .failed: return "Station unavailable."
+        case .downloading: return String(localized: "Downloading — Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
+        case .queued: return String(localized: "Queued — Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
+        case .retrying: return String(localized: "Retrying — Slackwater tries again on its own. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
+        case .notQueued: return String(localized: "Predictions are not downloaded.", comment: "VoiceOver download status.")
+        case .offline: return String(localized: "Offline — needs a moment of signal. Canadian predictions download once, then work offline.", comment: "VoiceOver download status.")
+        case .expired: return String(localized: "Expired — get back online to download current predictions.", comment: "VoiceOver download status.")
+        case .notDownloaded: return String(localized: "Not downloaded — get back online to download predictions.", comment: "VoiceOver download status.")
+        case .failed: return String(localized: "Station unavailable.", comment: "VoiceOver station status.")
         case .refining(let tolerance):
-            let howWrong = tolerance.map { ", slack accurate to \($0)" } ?? ""
-            return "Refining — showing the fast answer\(howWrong). The full model is still downloading."
+            if let tolerance {
+                return String(localized: "Refining — showing the fast answer, slack accurate to \(tolerance). The full model is still downloading.", comment: "VoiceOver prediction status. The value is a measured time tolerance.")
+            }
+            return String(localized: "Refining — showing the fast answer. The full model is still downloading.", comment: "VoiceOver prediction status.")
         }
     }
 
@@ -115,12 +119,12 @@ enum CardStatus: Equatable {
 /// source is irrelevant here; people only need to know how long the local
 /// copy remains useful.
 func onlineDownloadValidity(end: Date, now: Date = appNow(), calendar: Calendar = .current) -> String {
-    guard end > now else { return "Offline download expired" }
+    guard end > now else { return String(localized: "Offline download expired", comment: "Offline-download expiry status.") }
     let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
                                        to: calendar.startOfDay(for: end)).day ?? 0
-    if days <= 0 { return "Expires today" }
-    if days <= 3 { return "Expires in \(days) day\(days == 1 ? "" : "s")" }
-    return "Available offline for \(days) more days"
+    if days <= 0 { return String(localized: "Expires today", comment: "Offline-download expiry status.") }
+    if days <= 3 { return String(localized: "Expires in \(days) days", comment: "Offline-download expiry. The integer is a number of calendar days; vary by plural.") }
+    return String(localized: "Available offline for \(days) more days", comment: "Offline-download validity. The integer is a number of calendar days; vary by plural.")
 }
 
 /// Compact status used in the reading slot for automatic work and below the

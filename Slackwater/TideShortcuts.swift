@@ -32,11 +32,13 @@ struct TideShortcutResult {
 
     var spoken: String {
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
-        let kind = extreme.kind == .high ? "high" : "low"
         let time = extreme.time.formatted(Date.FormatStyle(
             date: .complete, time: .shortened, timeZone: timeZone))
         let height = formatHeight(extreme.height, imperial: imperial)
-        return "The next \(kind) tide at \(stationName) is \(time), at \(height) \(imperial ? "feet" : "metres")."
+        let unit = spokenUnit(heightUnit(imperial: imperial))
+        return extreme.kind == .high
+            ? String(localized: "The next high tide at \(stationName) is \(time), at \(height) \(unit).", comment: "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.")
+            : String(localized: "The next low tide at \(stationName) is \(time), at \(height) \(unit).", comment: "Spoken Siri tide answer. Values are station name, localized date and time, formatted height, and spoken unit.")
     }
 }
 
@@ -63,13 +65,15 @@ struct SlackWindowShortcutResult {
 
     var spoken: String {
         let style = Date.FormatStyle(date: .complete, time: .shortened, timeZone: timeZone)
-        let window = "The next slack window at \(stationName) is from \(start.formatted(style)) "
-            + "to \(end.formatted(style))"
-        if start <= queriedAt { return window + " and is open now." }
+        let startTime = start.formatted(style)
+        let endTime = end.formatted(style)
+        if start <= queriedAt {
+            return String(localized: "The next slack window at \(stationName) is from \(startTime) to \(endTime) and is open now.", comment: "Spoken Siri slack-window answer. Values are station name and localized start and end times.")
+        }
         let relative = RelativeDateTimeFormatter()
         relative.unitsStyle = .full
-        return window + ", and starts "
-            + relative.localizedString(for: start, relativeTo: queriedAt) + "."
+        let starts = relative.localizedString(for: start, relativeTo: queriedAt)
+        return String(localized: "The next slack window at \(stationName) is from \(startTime) to \(endTime), and starts \(starts).", comment: "Spoken Siri slack-window answer. Values are station name, localized start and end times, and a relative start time.")
     }
 }
 
@@ -96,7 +100,7 @@ struct NextLowTideIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let answer = await TideShortcutQuery.next(.low)?.spoken
-            ?? "Slackwater couldn't find a tide prediction for your local station."
+            ?? String(localized: "Slackwater couldn't find a tide prediction for your local station.", comment: "Spoken Siri failure response.")
         return .result(dialog: IntentDialog(stringLiteral: answer))
     }
 }
@@ -107,7 +111,7 @@ struct NextHighTideIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let answer = await TideShortcutQuery.next(.high)?.spoken
-            ?? "Slackwater couldn't find a tide prediction for your local station."
+            ?? String(localized: "Slackwater couldn't find a tide prediction for your local station.", comment: "Spoken Siri failure response.")
         return .result(dialog: IntentDialog(stringLiteral: answer))
     }
 }
@@ -118,7 +122,7 @@ struct NextSlackWindowIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let answer = await SlackWindowShortcutQuery.next()?.spoken
-            ?? "Slackwater couldn't find a slack window for your nearest current station."
+            ?? String(localized: "Slackwater couldn't find a slack window for your nearest current station.", comment: "Spoken Siri failure response.")
         return .result(dialog: IntentDialog(stringLiteral: answer))
     }
 }

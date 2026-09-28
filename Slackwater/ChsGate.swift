@@ -65,9 +65,9 @@ extension DerivedPhase {
     /// "Flooding" / "Ebbing" / "Slack" — the phase pill's word.
     var word: String {
         switch self {
-        case .flood: "Flooding"
-        case .ebb: "Ebbing"
-        case .slack: "Slack"
+        case .flood: String(localized: "Flooding", comment: "Current phase: water moving in the flood direction.")
+        case .ebb: String(localized: "Ebbing", comment: "Current phase: water moving in the ebb direction.")
+        case .slack: String(localized: "Slack", comment: "Current phase: water is near zero speed.")
         }
     }
 
@@ -75,8 +75,8 @@ extension DerivedPhase {
     /// `CurrentPhase.gloss`, see the rationale there (#59).
     var gloss: String? {
         switch self {
-        case .flood: "incoming"
-        case .ebb: "outgoing"
+        case .flood: String(localized: "incoming", comment: "Plain-language gloss for a flooding current.")
+        case .ebb: String(localized: "outgoing", comment: "Plain-language gloss for an ebbing current.")
         case .slack: nil
         }
     }

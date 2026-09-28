@@ -43,20 +43,25 @@ func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
 
 func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
                provisional: Bool = false, at now: Date = appNow()) -> String {
-    if provisional { return "Refining…" }
+    if provisional { return String(localized: "Refining…", comment: "Compact prediction status.") }
     switch job.status {
-    case .ready: return "Available offline"
-    case .failed: return "Predictions unavailable"
+    case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
+    case .failed: return String(localized: "Predictions unavailable", comment: "Prediction download status.")
     case .downloading:
-        return job.total > 0 ? "Downloading · \(job.done) of \(job.total)" : "Downloading…"
+        return job.total > 0
+            ? String(localized: "Downloading · \(job.done) of \(job.total)", comment: "Download progress. Values are completed and total requests.")
+            : String(localized: "Downloading…", comment: "Download status.")
     case .pending:
-        guard online else { return "Waiting for signal" }
+        guard online else { return String(localized: "Waiting for signal", comment: "Download status while offline.") }
         if let due = job.retryAfter, due > now {
             let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded(.up)))
-            return "Retrying in \(minutes) min"
+            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
         }
-        return position.map { $0 <= 1 ? "Waiting · next" : "Waiting · \(ordinal($0)) in line" }
-            ?? "Waiting"
+        return position.map {
+            $0 <= 1
+                ? String(localized: "Waiting · next", comment: "Download status for the first queued station.")
+                : String(localized: "Waiting · \(ordinal($0)) in line", comment: "Download status. The value is a locale-formatted queue position.")
+        } ?? String(localized: "Waiting", comment: "Download status.")
     }
 }
 
@@ -202,10 +207,13 @@ struct OfflineStatusButton: View {
 
     private var spoken: String {
         switch state {
-        case .downloading(let ready, let total): "Downloading, \(ready) of \(total) ready"
-        case .online: service.queue.complete ? "Online, all stations downloaded" : "Online"
-        case .offline: service.queue.complete ? "Offline, all stations downloaded"
-                                              : "Offline, \(service.queue.total - service.queue.ready) still to download"
+        case .downloading(let ready, let total): String(localized: "Downloading, \(ready) of \(total) ready", comment: "VoiceOver download summary. Values are ready and total station counts.")
+        case .online: service.queue.complete
+            ? String(localized: "Online, all stations downloaded", comment: "VoiceOver network and download summary.")
+            : String(localized: "Online", comment: "VoiceOver network status.")
+        case .offline: service.queue.complete
+            ? String(localized: "Offline, all stations downloaded", comment: "VoiceOver network and download summary.")
+            : String(localized: "Offline, \(service.queue.total - service.queue.ready) still to download", comment: "VoiceOver network and download summary. The integer is a station count; vary by plural.")
         }
     }
 }
@@ -311,7 +319,7 @@ struct OfflineManagerList: View {
             // stalled download rather than as nothing to do (#205) — the
             // sentence below carries the whole state on its own.
             if !downloads.isEmpty {
-                MonoLabel(text: "\(readyCount) of \(downloads.count) ready")
+                MonoLabel(text: String(localized: "\(readyCount) of \(downloads.count) ready", comment: "Offline-download progress. Values are ready and total station counts."))
                 ProgressView(value: Double(readyCount), total: Double(downloads.count))
                     .tint(failedCount > 0 ? SN.amber : SN.leaf)
             }
@@ -354,7 +362,9 @@ struct OfflineManagerList: View {
     private var chartsCard: some View {
         let state = charts.summary
         return VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: state.total == 0 ? "Charts" : "Charts · \(state.ready) of \(state.total) ready")
+            MonoLabel(text: state.total == 0
+                ? String(localized: "Charts", comment: "Offline-map card title.")
+                : String(localized: "Charts · \(state.ready) of \(state.total) ready", comment: "Offline-map card title. Values are ready and total area counts."))
             if state.total > 0 {
                 ProgressView(value: Double(state.ready), total: Double(max(state.total, 1)))
                     .tint(state.failed > 0 ? SN.amber : SN.leaf)
@@ -366,7 +376,9 @@ struct OfflineManagerList: View {
                 .fixedSize(horizontal: false, vertical: true)
             if net.online {
                 Button { charts.refresh() } label: {
-                    Text(state.failed > 0 ? "Retry \(state.failed) unfinished" : "Refresh charts")
+                    Text(state.failed > 0
+                        ? String(localized: "Retry \(state.failed) unfinished", comment: "Retry unfinished offline-map areas. The integer is an area count; vary by plural.")
+                        : String(localized: "Refresh charts", comment: "Refresh offline maps action."))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(state.failed > 0 ? SN.amber : SN.leaf)
                 }
@@ -383,22 +395,23 @@ struct OfflineManagerList: View {
 
     private func chartsLine(_ state: ChartPackSummary) -> String {
         let held = state.bytes > 0
-            ? " Holding \(ByteCountFormatter.string(fromByteCount: state.bytes, countStyle: .file))."
-            : ""
+            ? String(localized: "Holding \(ByteCountFormatter.string(fromByteCount: state.bytes, countStyle: .file)).", comment: "Offline-map storage size. The value is a localized byte count.")
+            : nil
+        let base: String
         if state.total == 0 {
-            return net.online
-                ? "Preparing the map for offline use…"
-                : "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected."
+            base = net.online
+                ? String(localized: "Preparing the map for offline use…", comment: "Offline-map download status.")
+                : String(localized: "Waiting for signal. The map downloads the world, the water around you, and your saved stations as soon as you're connected.", comment: "Offline-map download status.")
+        } else if state.failed > 0 {
+            base = String(localized: "Some map areas haven't finished. They resume on their own when you're connected.", comment: "Offline-map download failure status.")
+        } else if state.downloading {
+            base = net.online
+                ? String(localized: "Downloading map areas — the world, the water around you, and your saved stations.", comment: "Offline-map download status.")
+                : String(localized: "Waiting for signal. Areas already downloaded keep working offline.", comment: "Offline-map download status.")
+        } else {
+            base = String(localized: "The map works offline here: the world, the water around you, and your saved stations.", comment: "Offline-map availability summary.")
         }
-        if state.failed > 0 {
-            return "Some map areas haven't finished.\(held) They resume on their own when you're connected."
-        }
-        if state.downloading {
-            return net.online
-                ? "Downloading map areas — the world, the water around you, and your saved stations.\(held)"
-                : "Waiting for signal. Areas already downloaded keep working offline.\(held)"
-        }
-        return "The map works offline here: the world, the water around you, and your saved stations.\(held)"
+        return [base, held].compactMap { $0 }.joined(separator: " ")
     }
 
     /// What the manager is honest about at national scale (M53): this list is
@@ -414,21 +427,25 @@ struct OfflineManagerList: View {
         // the app can still do, which for that user is everything: the NOAA
         // and TICON stations they are actually near are bundled.
         if downloads.isEmpty {
-            return "No Canadian predictions to download here — you're outside the range where they'd be useful. Stations near you work offline already.\(onDemandLine)"
+            return [String(localized: "No Canadian predictions to download here — you're outside the range where they'd be useful. Stations near you work offline already.", comment: "Offline-download summary outside Canadian coverage."), onDemandLine]
+                .filter { !$0.isEmpty }.joined(separator: " ")
         }
         if readyCount == downloads.count {
-            return "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.\(onDemandLine)"
+            return [String(localized: "Downloaded predictions are ready offline. Downloads that expire show their remaining time below.", comment: "Offline-download completion summary."), onDemandLine]
+                .filter { !$0.isEmpty }.joined(separator: " ")
         }
         if !net.online {
-            return "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.\(onDemandLine)"
+            return [String(localized: "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.", comment: "Offline-download summary while offline."), onDemandLine]
+                .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        return "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.\(onDemandLine)"
+        let base = String(localized: "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.", comment: "Offline-download progress summary. The value is an approximate duration.")
+        return [base, onDemandLine].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     private var onDemandLine: String {
         let rest = service.notQueued
         guard rest > 0 else { return "" }
-        return " \(rest) more Canadian stations are searchable everywhere — open one and it downloads."
+        return String(localized: "\(rest) more Canadian stations are searchable everywhere — open one and it downloads.", comment: "Offline-download catalog note. The integer is a station count; vary by plural.")
     }
 
     private var remainingSeconds: Double {
@@ -513,17 +530,19 @@ struct OfflineManagerList: View {
 
     private func onlineStatus(_ gate: ChsCurrentGateInfo) -> String {
         switch service.onlineState(gate.id) {
-        case .fetching: return "Downloading…"
+        case .fetching: return String(localized: "Downloading…", comment: "Offline-prediction status.")
         case .deferred(let due):
             let minutes = max(1, Int((due.timeIntervalSince(appNow()) / 60).rounded(.up)))
-            return "Retrying in \(minutes) min"
-        case .failed: return "Download failed"
+            return String(localized: "Retrying in \(minutes) min", comment: "Compact retry delay. The integer is a number of minutes; 'min' remains invariant.")
+        case .failed: return String(localized: "Download failed", comment: "Offline-prediction status.")
         case .idle:
             if let position = service.onlinePosition(gate.id) {
-                return position <= 1 ? "Waiting · next" : "Waiting · \(ordinal(position)) in line"
+                return position <= 1
+                    ? String(localized: "Waiting · next", comment: "Offline-prediction queue status.")
+                    : String(localized: "Waiting · \(ordinal(position)) in line", comment: "Offline-prediction queue status. The value is a locale-formatted ordinal.")
             }
         }
-        guard let window = onlineWindow(gate) else { return "Not downloaded" }
+        guard let window = onlineWindow(gate) else { return String(localized: "Not downloaded", comment: "Offline-prediction status.") }
         return onlineDownloadValidity(end: window.offlineValidUntil, calendar: gateCalendar(gate))
     }
 
@@ -615,19 +634,21 @@ struct OfflineManagerList: View {
                     // The promotion, made visible: this is the one you opened.
                     // On the subtitle line, so a badge never truncates a name.
                     if queue.isPromoted(job.id) {
-                        MonoLabel(text: "You opened", color: SN.amber, tracking: 1.2)
+                        MonoLabel(text: String(localized: "You opened", comment: "Marks a download promoted because its station was opened."), color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(SN.amber.opacity(0.16), in: Capsule())
                     }
                     // Usable now, not finished — and it says by how much.
                     if service.isProvisional(job.id),
                        let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
-                        MonoLabel(text: "Fast answer \(gate.provisionalTolerance)",
+                        MonoLabel(text: String(localized: "Fast answer \(gate.provisionalTolerance)", comment: "Provisional prediction badge. The value is a localized timing tolerance."),
                                   color: SN.amber, tracking: 1.2)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(SN.amber.opacity(0.18), in: Capsule())
                     }
-                    Text("\(job.isCurrent ? "Current" : "Tide") · \(job.region)")
+                    Text(job.isCurrent
+                        ? String(localized: "Current · \(job.region)", comment: "Download row station type and region. The value is catalog data.")
+                        : String(localized: "Tide · \(job.region)", comment: "Download row station type and region. The value is catalog data."))
                         .font(.caption)
                         .foregroundStyle(SN.foam.opacity(0.55))
                         .lineLimit(1)

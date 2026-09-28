@@ -370,7 +370,10 @@ final class ChsQueueTests: XCTestCase {
     }
 
     func testOrdinal() {
-        XCTAssertEqual([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal),
+        XCTAssertEqual([1, 2, 3, 4, 11, 12, 13, 21, 22]
+            .map { ordinal($0, locale: Locale(identifier: "en_US")) },
                        ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd"])
+        XCTAssertEqual([1, 2, 22].map { ordinal($0, locale: Locale(identifier: "fr_CA")) },
+                       ["1er", "2e", "22e"])
     }
 }

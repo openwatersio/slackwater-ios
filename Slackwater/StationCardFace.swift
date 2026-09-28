@@ -73,7 +73,7 @@ struct StationCard<Trailing: View>: View {
                         .lineLimit(chrome ? nil : 1)
                         .fixedSize(horizontal: false, vertical: chrome)
                     if extras, let km {
-                        Text("•")
+                        Text(verbatim: "•")
                             .font(.caption)
                             // 0.7, not 0.5: under a pending card's 0.82 the
                             // separator has to keep 4.5:1 on the card fill.
@@ -219,7 +219,7 @@ struct ConditionsItem: View {
              + Text(" \(heightUnit(imperial: imperial))")
                 .font(.body)
             if compact {
-                (value + Text(" ") + arrow)
+                (value + Text(verbatim: " ") + arrow)
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .accessibilityLabel(spoken)
@@ -289,7 +289,7 @@ struct ConditionsItem: View {
     @ViewBuilder
     private func set(deg: Double, signed: Double, tint: Color, font: Font, arrowFirst: Bool) -> some View {
         if abs(signed) < 0.05 {
-            Text("•").font(font).foregroundStyle(SN.foam.opacity(0.6))
+            Text(verbatim: "•").font(font).foregroundStyle(SN.foam.opacity(0.6))
                 .frame(width: 30)
         } else {
             HStack(spacing: arrowFirst ? 2 : 4) {
