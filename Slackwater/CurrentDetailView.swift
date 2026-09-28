@@ -99,7 +99,7 @@ struct CurrentDetailView: View {
                                 if let gate = provisionalGate {
                                     ChsAmberCard(title: String(localized: "Fast answer", comment: "Provisional current-model card title."), headline: gate.provisionalHeadline,
                                                  expectation: gate.provisionalExpectation(online: net.online),
-                                                 action: "See all downloads",
+                                                 action: String(localized: "See all downloads", comment: "Open the offline-download manager."),
                                                  identifier: "chs-provisional-warning") { showDownloads = true }
                                         .padding(.bottom, 14)
                                 }

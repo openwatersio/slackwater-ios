@@ -253,10 +253,10 @@ struct CurrentStationRecord: Decodable, Identifiable, Hashable, StationIdentity 
     func detailsMeanFlow(unit: String) -> String {
         guard abs(meanFlow) >= 0.05 else { return String(localized: "None measured", comment: "Station-detail mean-flow value.") }
         let speed = formatSpeed(abs(meanFlow), unit: unit)
-        let unit = speedUnitLabel(unit)
+        let unitLabel = speedUnitLabel(unit)
         return meanFlow > 0
-            ? String(localized: "\(speed) \(unit) toward flood", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
-            : String(localized: "\(speed) \(unit) toward ebb", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
+            ? String(localized: "\(speed) \(unitLabel) toward flood", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
+            : String(localized: "\(speed) \(unitLabel) toward ebb", comment: "Station-detail mean flow. Values are a formatted speed and compact unit.")
     }
 
     /// How the prediction under this station is made, in one line.
