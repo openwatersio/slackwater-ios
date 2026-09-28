@@ -511,17 +511,14 @@ struct TimelineScrubber: UIViewRepresentable {
         @objc func handlePress(_ g: UILongPressGestureRecognizer) {
             guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
             let p = g.location(in: sv)
-            guard p.y <= (parent.geo.timeY + parent.geo.dayY) / 2 else { return }
+            // The row-split guard above already keeps this in the plot region, so `tapTarget`
+            // always takes its plot branch here — the same magnet the strip settles into: a
+            // press near a turn means that turn.
+            guard p.y <= (parent.geo.timeY + parent.geo.dayY) / 2, let target = tapTarget(x: p.x, y: p.y)
+            else { return }
             stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
             cancelMagnet()
-            // The same magnet the strip settles into: a press near a turn means that turn.
-            let target: Date
-            if let stop = nearest(parent.data.snapTimes, toX: p.x), stop.dx < Timeline.magnetPts {
-                target = stop.time
-            } else {
-                target = parent.data.time(atX: p.x)
-            }
             let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
             let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
             sv.contentOffset = CGPoint(x: desired, y: 0)

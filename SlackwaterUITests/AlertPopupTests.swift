@@ -46,10 +46,42 @@ final class AlertPopupTests: ScreenshotTestCase {
         XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
     }
 
-    // KNOWN GAP, not fixed here (task-7-report.md): the scrub card's popover does not dismiss on
-    // an outside tap in this simulator, so a dismiss-then-scrub test cannot pass against real
-    // behavior. What follows covers the actual regression risk instead — gesture coexistence —
-    // without going through the popover.
+    func testTheStripIsStillScrubbableAfterThePopupCloses() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        pressStrip(app)
+        XCTAssert(app.buttons["alert-popup-once"].appears(within: 5))
+        // Dismiss by tapping outside the popover.
+        app.tap()
+
+        let reading = app.descendants(matching: .any)["detail-reading"].firstMatch
+        let before = reading.label
+        app.otherElements["timeline-strip"].firstMatch.swipeLeft()
+
+        XCTAssertNotEqual(reading.label, before)
+    }
+
+    /// The invariant `tap.require(toFail: press)` (TimelineStrip.swift) exists to protect: a
+    /// press that ends in a lift leaves the reading exactly where the press put it, with no
+    /// second scrub landing on top of it. Off-centre, not `pressStrip`'s centerline — a press
+    /// there is self-stabilizing (the jump parks the pressed moment ON the centerline, so a
+    /// stray tap recomputed from that same now-shifted screen point lands back on the identical
+    /// moment) — off-centre, a stray rescrub would land on a visibly different one. In practice
+    /// removing `require(toFail:)` does not fail this test on this simulator (iOS's own
+    /// continuous-vs-discrete gesture exclusivity already keeps the tap from firing once the
+    /// press has begun) — kept anyway as a direct assertion of the documented invariant.
+    func testAPressDoesNotAlsoFireATapScrub() {
+        let app = launch("-seedGate")
+        openFridayHarbor(app)
+        let strip = app.otherElements["timeline-strip"].firstMatch
+        XCTAssert(strip.appears(within: 5))
+
+        strip.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.6)).press(forDuration: 1.0)
+        let afterPress = scrubClock(app)
+        settleScrub(app)  // let a stray tap-triggered glide land, if one fired
+
+        XCTAssertEqual(scrubClock(app), afterPress, "a lifted press also fired a tap-triggered scrub")
+    }
 
     /// An ordinary tap must still scrub after the press recognizer is added beside it.
     func testAnOrdinaryTapStillScrubsAfterThePressGestureIsAdded() {
