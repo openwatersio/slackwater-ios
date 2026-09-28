@@ -42,7 +42,7 @@ import EventKit
     /// can land an instant a second apart from one reschedule to the next.
     /// ponytail: an event the user edited by hand (moved, a second alarm) stops matching and is
     /// replaced. Runs on the main actor — a few hundred EventKit saves; move off it if it measures.
-    static func apply(_ entries: [AlertEntry], now: Date) {
+    static func apply(_ entries: [AlertEntry], skipping: Set<String> = [], now: Date) {
         guard authorized, let calendar = slackwaterCalendar(create: !entries.isEmpty) else { return }
         let predicate = store.predicateForEvents(withStart: now,
                                                  end: now.addingTimeInterval(AlertHorizon.calendar + 86_400),

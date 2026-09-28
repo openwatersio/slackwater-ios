@@ -3,6 +3,8 @@ import Foundation
 
 /// One planned delivery with everything a writer needs.
 struct AlertEntry {
+    /// Which station's calendar this belongs in.
+    let stationID: String
     let occurrence: AlertOccurrence
     let copy: AlertCopy
     let url: URL?
@@ -10,20 +12,32 @@ struct AlertEntry {
 }
 
 struct ResolvedAlerts: Sendable {
+    /// From rules: what becomes a notification.
     var occurrences: [AlertOccurrence] = []
-    /// Keyed by `AlertRule.stationID`.
+    /// From station subscriptions: what the calendar publishes.
+    var calendarOccurrences: [AlertOccurrence] = []
+    /// The throwaway rules behind `calendarOccurrences`, so copy has a trigger to read.
+    var calendarRules: [UUID: AlertRule] = [:]
+    /// Which station each of those belongs to, so the writer knows the calendar.
+    var calendarStations: [UUID: String] = [:]
+    /// Keyed by station id.
     var places: [String: AlertPlace] = [:]
     /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
     /// device, or an id that left the catalog.
     var unresolved: Set<UUID> = []
+    /// Subscribed stations that can't be loaded. Their calendars are left exactly as they
+    /// are: an empty plan is "nothing known yet", not "delete the next 90 days".
+    var unresolvedStations: Set<String> = []
 }
 
-/// Occurrences for every enabled rule from `now` to the calendar horizon. Off the main
-/// actor: a season-scale scan per station is real work.
+/// Occurrences for every enabled rule and every subscribed station, from `now` to the calendar
+/// horizon. Off the main actor: a season-scale scan per station is real work.
 /// ponytail: two rules on one station load it twice; share the record if that ever measures.
-func resolveAlerts(_ rules: [AlertRule], now: Date, threshold: Double) -> ResolvedAlerts {
+func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
+                   now: Date, threshold: Double) -> ResolvedAlerts {
     var resolved = ResolvedAlerts()
     let until = now.addingTimeInterval(AlertHorizon.calendar)
+
     for rule in rules where rule.enabled {
         guard let record = WidgetStationLoader.loadRecord(id: rule.stationID) else {
             resolved.unresolved.insert(rule.id)
@@ -33,6 +47,25 @@ func resolveAlerts(_ rules: [AlertRule], now: Date, threshold: Double) -> Resolv
         resolved.occurrences += alertOccurrences(rule, station: WidgetStationLoader.station(from: record),
                                                  position: record.alertPosition,
                                                  from: now, to: until, threshold: threshold)
+    }
+
+    for stationID in subscriptions {
+        guard let record = WidgetStationLoader.loadRecord(id: stationID) else {
+            resolved.unresolvedStations.insert(stationID)
+            continue
+        }
+        resolved.places[stationID] = record.alertPlace
+        let station = WidgetStationLoader.station(from: record)
+        for trigger in calendarTriggers(for: record.calendarKind) {
+            // A throwaway rule per trigger. Its id only has to be unique within this run:
+            // a calendar event is matched by its content, never by an occurrence key.
+            let rule = AlertRule(stationID: stationID, trigger: trigger)
+            resolved.calendarRules[rule.id] = rule
+            resolved.calendarStations[rule.id] = stationID
+            resolved.calendarOccurrences += alertOccurrences(rule, station: station,
+                                                             position: record.alertPosition,
+                                                             from: now, to: until, threshold: threshold)
+        }
     }
     return resolved
 }
@@ -76,29 +109,36 @@ struct AlertStatusSnapshot: Equatable {
         let premium = PremiumStore.shared.isPremium
         let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
 
+        let subscriptions = StationCalendarStore.shared.subscriptions.map(\.stationID)
+
         let resolved = await Task.detached(priority: .utility) {
-            resolveAlerts(rules, now: now, threshold: threshold)
+            resolveAlerts(rules, subscriptions: subscriptions, now: now, threshold: threshold)
         }.value
         let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
-                                calendarOccurrences: [], now: now, premium: premium)
+                                calendarOccurrences: resolved.calendarOccurrences,
+                                now: now, premium: premium)
         // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
         let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            .merging(resolved.calendarRules) { mine, _ in mine }
 
-        func entries(_ list: [AlertOccurrence], includeLead: Bool) -> [AlertEntry] {
+        func entries(_ list: [AlertOccurrence], includeLead: Bool, includePlace: Bool) -> [AlertEntry] {
             list.compactMap { o in
                 guard let rule = byID[o.ruleID], let place = resolved.places[rule.stationID] else { return nil }
                 return AlertEntry(
+                    stationID: rule.stationID,
                     occurrence: o,
                     copy: alertCopy(rule, o, place: place, imperial: imperial,
-                                    threshold: threshold, includeLead: includeLead),
+                                    threshold: threshold, includeLead: includeLead,
+                                    includePlace: includePlace),
                     url: shareURL(forStationID: rule.stationID, at: o.event, tz: place.tz)
                         ?? deepLink(forStationID: rule.stationID),
                     place: place)
             }
         }
 
-        AlertCalendar.apply(entries(plan.calendar, includeLead: false), now: now)
-        await AlertNotifications.apply(entries(plan.notifications, includeLead: true))
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false, includePlace: false),
+                            skipping: resolved.unresolvedStations, now: now)
+        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, includePlace: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,

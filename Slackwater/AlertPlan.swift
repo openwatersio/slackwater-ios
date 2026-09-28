@@ -66,12 +66,14 @@ private func leadAmount(_ lead: TimeInterval) -> String {
     }
 }
 
-/// Title and body for one occurrence. The title is the place, then the event in as few words
-/// as it takes; the body is the time in the station's zone, with the span, threshold or height
-/// where they matter. The calendar passes `includeLead: false`: an event sits at its own time,
-/// so "in 30 min" means nothing there.
+/// Title and body for one occurrence. A notification's title is the place, then the event in
+/// as few words as it takes; a calendar event's carries no place, because its calendar is named
+/// for one (spec §5.1) — and a tide's height rides in the title there, where the body is a note
+/// nobody opens. The calendar passes `includeLead: false`: an event sits at its own time, so
+/// "in 30 min" means nothing there.
 func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imperial: Bool,
-               threshold: Double, includeLead: Bool, locale: Locale = .autoupdatingCurrent) -> AlertCopy {
+               threshold: Double, includeLead: Bool, includePlace: Bool = true,
+               locale: Locale = .autoupdatingCurrent) -> AlertCopy {
     let clock = Date.FormatStyle(date: .omitted, time: .shortened, timeZone: place.tz).locale(locale)
     let time = o.event.formatted(clock)
     let limit = String(format: "%.1f kn", threshold)
@@ -90,7 +92,12 @@ func alertCopy(_ rule: AlertRule, _ o: AlertOccurrence, place: AlertPlace, imper
     if includeLead, rule.lead > 0 { body += " · in \(leadAmount(rule.lead))" }
 
     let event = alertEventName(rule.trigger, noWindow: o.noWindow, imperial: imperial)
-    return AlertCopy(title: "\(place.name) - \(event)", body: body)
+    if includePlace { return AlertCopy(title: "\(place.name) - \(event)", body: body) }
+    guard case .tideExtreme = rule.trigger, let h = o.heightM else {
+        return AlertCopy(title: event, body: body)
+    }
+    return AlertCopy(title: "\(event) \(formatHeight(h, imperial: imperial)) \(heightUnit(imperial: imperial))",
+                     body: body)
 }
 
 /// What a calendar event is compared by.

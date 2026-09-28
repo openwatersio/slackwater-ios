@@ -8,12 +8,13 @@ final class AlertCopyTests: XCTestCase {
     private let event = Date(timeIntervalSince1970: 1_786_372_320)   // 2026-08-10 14:32 UTC
 
     private func copy(_ trigger: AlertTrigger, lead: TimeInterval = 0, end: Date? = nil, noWindow: Bool = false,
-                      heightM: Double? = nil, imperial: Bool = true, includeLead: Bool = true) -> AlertCopy {
+                      heightM: Double? = nil, imperial: Bool = true, includeLead: Bool = true,
+                      includePlace: Bool = true) -> AlertCopy {
         let rule = AlertRule(stationID: "x", trigger: trigger, lead: lead)
         let o = AlertOccurrence(ruleID: rule.id, event: event, fire: event.addingTimeInterval(-lead),
                                 end: end, noWindow: noWindow, heightM: heightM)
         return alertCopy(rule, o, place: place, imperial: imperial, threshold: 0.5,
-                         includeLead: includeLead, locale: gb)
+                         includeLead: includeLead, includePlace: includePlace, locale: gb)
     }
 
     func testAWindowNamesItsSpanAndThreshold() {
@@ -42,6 +43,30 @@ final class AlertCopyTests: XCTestCase {
     func testSlackAndEclipse() {
         XCTAssertEqual(copy(.slack), AlertCopy(title: "Race Passage - Slack", body: "14:32"))
         XCTAssertEqual(copy(.eclipse), AlertCopy(title: "Race Passage - Lunar eclipse", body: "14:32"))
+    }
+
+    func testACalendarTitleLeavesThePlaceToTheCalendarsName() {
+        XCTAssertEqual(copy(.slackWindowOpens, end: event.addingTimeInterval(38 * 60),
+                            includeLead: false, includePlace: false).title,
+                       "Slack window")
+    }
+
+    func testANotificationTitleStillLeadsWithThePlace() {
+        XCTAssertEqual(copy(.slackWindowOpens).title, "Race Passage - Slack window")
+    }
+
+    func testACalendarTideTitleCarriesItsHeight() {
+        XCTAssertEqual(copy(.tideExtreme(high: true), heightM: 1.0, imperial: false,
+                            includeLead: false, includePlace: false).title,
+                       "High tide 1.00 m")
+    }
+
+    func testACalendarSlackWithNoWindowStillGetsAnEvent() {
+        // A gap in the calendar would read as missing data rather than a shut gate.
+        let c = copy(.slackWindowOpens, noWindow: true, includeLead: false, includePlace: false)
+
+        XCTAssertEqual(c.title, "Slack")
+        XCTAssertTrue(c.body.contains("no window under 0.5 kn"))
     }
 
     func testLeadLabels() {

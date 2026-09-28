@@ -3,7 +3,7 @@ import Foundation
 
 /// The water event a rule watches (notifications spec §3). Which stations each case
 /// applies to is spec §8; a case that doesn't fit the station finds nothing.
-enum AlertTrigger: Codable, Equatable {
+enum AlertTrigger: Codable, Hashable {
     case slackWindowOpens
     /// A derived gate's slack: an instant, with no speed series to open a window from.
     case slack
