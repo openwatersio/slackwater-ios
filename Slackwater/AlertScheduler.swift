@@ -7,8 +7,6 @@ struct AlertEntry {
     let copy: AlertCopy
     let url: URL?
     let place: AlertPlace
-    /// A calendar event's alarm, relative to its start. Nil for a free user, and for notifications.
-    var alarmOffset: TimeInterval? = nil
 }
 
 struct ResolvedAlerts: Sendable {
@@ -78,11 +76,12 @@ struct AlertStatusSnapshot: Equatable {
         let resolved = await Task.detached(priority: .utility) {
             resolveAlerts(rules, now: now, threshold: threshold)
         }.value
-        let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences, now: now, premium: premium)
+        let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
+                                calendarOccurrences: [], now: now, premium: premium)
         // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
         let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
-        func entries(_ list: [AlertOccurrence], includeLead: Bool, alarm: Bool) -> [AlertEntry] {
+        func entries(_ list: [AlertOccurrence], includeLead: Bool) -> [AlertEntry] {
             list.compactMap { o in
                 guard let rule = byID[o.ruleID], let place = resolved.places[rule.stationID] else { return nil }
                 return AlertEntry(
@@ -91,14 +90,12 @@ struct AlertStatusSnapshot: Equatable {
                                     threshold: threshold, includeLead: includeLead),
                     url: shareURL(forStationID: rule.stationID, at: o.event, tz: place.tz)
                         ?? deepLink(forStationID: rule.stationID),
-                    place: place,
-                    alarmOffset: alarm ? -rule.lead : nil)
+                    place: place)
             }
         }
 
-        // Premium puts an alarm on every calendar event (spec §5.1).
-        AlertCalendar.apply(entries(plan.calendar, includeLead: false, alarm: premium), now: now)
-        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, alarm: false))
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false), now: now)
+        await AlertNotifications.apply(entries(plan.notifications, includeLead: true))
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,

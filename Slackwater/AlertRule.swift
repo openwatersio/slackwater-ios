@@ -14,22 +14,17 @@ enum AlertTrigger: Codable, Equatable {
     case eclipse
 }
 
-enum AlertLevel: String, Codable {
-    case none, notification
-}
-
 struct AlertRule: Codable, Identifiable, Equatable {
     var id = UUID()
     /// A `StationItem` id — `current:`-prefixed for NOAA currents.
     var stationID: String
     var trigger: AlertTrigger
-    /// Seconds before the event that a notification fires and a Premium calendar alarm rings.
+    /// Set: the single occurrence on this minute, and the rule expires once it is past
+    /// (spec §3). Unset: every occurrence of the trigger.
+    var once: Date?
+    /// Seconds before the event that the notification fires.
     var lead: TimeInterval = 0
     var daylightOnly = false
-    /// Free: write occurrences into the Slackwater calendar.
-    var calendar = true
-    /// Premium: interrupt.
-    var alert: AlertLevel = .none
     var enabled = true
 }
 

@@ -15,32 +15,34 @@ struct DeliveryPlan: Equatable {
     var notifications: [AlertOccurrence] = []
 }
 
-/// Which occurrences go to the calendar (free) and which become notifications (Premium).
-/// The calendar keeps an event until it happens; a notification is gone once its fire time passes.
-/// Whether a calendar event carries an alarm is the writer's call, from the same `premium`.
-func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence], now: Date, premium: Bool) -> DeliveryPlan {
-    let live = Dictionary(rules.filter(\.enabled).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-    let ordered = occurrences.sorted { $0.fire < $1.fire }
-
-    let calendar = ordered.filter {
-        live[$0.ruleID]?.calendar == true
-            && $0.event > now && $0.event <= now.addingTimeInterval(AlertHorizon.calendar)
-    }
+/// Which occurrences the calendar publishes and which become notifications. The two have
+/// separate sources: `calendarOccurrences` come from a station's subscription (spec §5.1) and
+/// are free at any tier; `occurrences` come from rules, and rules are Premium. The calendar
+/// keeps an event until it happens; a notification is gone once its fire time passes.
+func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
+                  calendarOccurrences: [AlertOccurrence],
+                  now: Date, premium: Bool) -> DeliveryPlan {
+    let calendar = calendarOccurrences
+        .filter { $0.event > now && $0.event <= now.addingTimeInterval(AlertHorizon.calendar) }
+        .sorted { $0.event < $1.event }
     guard premium else { return DeliveryPlan(calendar: calendar) }
-    let notifications = ordered.filter {
-        live[$0.ruleID]?.alert == .notification
-            && $0.fire > now && $0.fire <= now.addingTimeInterval(AlertHorizon.notifications)
-    }
+    // A duplicated rule id would trap uniqueKeysWithValues; keep the first.
+    let live = Dictionary(rules.filter(\.enabled).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    let notifications = occurrences
+        .sorted { $0.fire < $1.fire }
+        .filter {
+            live[$0.ruleID] != nil
+                && $0.fire > now && $0.fire <= now.addingTimeInterval(AlertHorizon.notifications)
+        }
     return DeliveryPlan(calendar: calendar,
                         notifications: Array(notifications.prefix(AlertHorizon.notificationLimit)))
 }
 
-/// Each rule's last delivered moment — a calendar event's time or a notification's fire —
-/// for the Alerts screen's "Scheduled through".
+/// Each rule's last scheduled notification, for the Alerts screen's "Scheduled through".
 func scheduledThrough(_ plan: DeliveryPlan) -> [UUID: Date] {
     var through: [UUID: Date] = [:]
-    for (id, moment) in plan.calendar.map({ ($0.ruleID, $0.event) }) + plan.notifications.map({ ($0.ruleID, $0.fire) }) {
-        through[id] = max(through[id] ?? moment, moment)
+    for o in plan.notifications {
+        through[o.ruleID] = max(through[o.ruleID] ?? o.fire, o.fire)
     }
     return through
 }

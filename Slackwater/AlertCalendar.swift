@@ -54,7 +54,7 @@ import EventKit
         }
         let planned = entries.map { entry in
             CalendarEventShape(title: entry.copy.title, start: entry.occurrence.event,
-                               end: entry.occurrence.end ?? entry.occurrence.event, alarmOffset: entry.alarmOffset)
+                               end: entry.occurrence.end ?? entry.occurrence.event, alarmOffset: nil)
         }
         let changes = calendarChanges(existing: stored, wanted: planned, now: now)
         for i in changes.remove {
@@ -70,7 +70,6 @@ import EventKit
             event.endDate = entry.occurrence.end ?? entry.occurrence.event
             event.timeZone = entry.place.tz
             event.url = entry.url
-            if let offset = entry.alarmOffset { event.addAlarm(EKAlarm(relativeOffset: offset)) }
             try? store.save(event, span: .thisEvent, commit: false)
         }
         try? store.commit()

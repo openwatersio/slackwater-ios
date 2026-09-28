@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Edit one alert rule — lead, daylight, deliveries — from the Alerts screen (notifications spec §7.2).
+// Slackwater — GPL v3. Edit one alert rule — lead and daylight — from the Alerts screen (notifications spec §7.2).
 import SwiftUI
 
 struct AlertSheet: View {
@@ -26,19 +26,6 @@ struct AlertSheet: View {
                     Toggle("Daylight only", isOn: $rule.daylightOnly)
                 }
                 Section {
-                    Toggle("Add to Calendar", isOn: $rule.calendar)
-                    Toggle(isOn: notify) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Notify me")
-                            if !premium.isPremium {
-                                Text("Slackwater Premium").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } footer: {
-                    Text("With Slackwater Premium, calendar events carry an alarm and alerts arrive as notifications.")
-                }
-                Section {
                     Toggle("On", isOn: $rule.enabled)
                     Button("Delete Alert", role: .destructive) {
                         store.remove(rule.id)
@@ -56,7 +43,7 @@ struct AlertSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(saving || (!rule.calendar && rule.alert == .none))
+                        .disabled(saving)
                 }
             }
             .sheet(isPresented: $showPremium) { PremiumView() }
@@ -64,22 +51,10 @@ struct AlertSheet: View {
         .preferredColorScheme(.dark)
     }
 
-    private var notify: Binding<Bool> {
-        Binding(get: { rule.alert == .notification },
-                set: { on in
-                    if on && !premium.isPremium {
-                        showPremium = true
-                        return
-                    }
-                    rule.alert = on ? .notification : .none
-                })
-    }
-
     /// A denial still saves the rule; the Alerts screen says why it is quiet.
     private func save() async {
         saving = true
-        if rule.calendar && !AlertCalendar.authorized { _ = await AlertCalendar.requestAccess() }
-        if rule.alert == .notification { _ = await AlertNotifications.requestAccess() }
+        _ = await AlertNotifications.requestAccess()
         store.upsert(rule)
         dismiss()
     }

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. What the alert row offers for the moment under the centerline, and what a tap on it does (notifications spec §7.1).
+// Slackwater — GPL v3. What the strip offers for the moment on the centerline (notifications spec §7.1).
 import Foundation
 
 /// A height as the strip shows it — 0.1 ft, or 0.01 m — so a crossing rule is the reading the user
@@ -37,46 +37,7 @@ func isOnEclipseContact(_ time: Date, _ eclipses: [WindowEclipse]) -> Bool {
     eclipses.contains { $0.contacts.contains { abs($0.timeIntervalSince(time)) < 1 } }
 }
 
-enum AlertDelivery {
-    case calendar, live
-}
-
 enum AlertRuleChange: Equatable {
     case upsert(AlertRule)
     case remove(UUID)
-}
-
-/// A rule made from the row reminds half an hour ahead; the Alerts screen changes it.
-let alertRowLead: TimeInterval = 1_800
-
-/// One tap on Calendar or Live for this station and offer: turn that delivery on or off on the
-/// matching rule, create the rule with it on, or remove a rule left with nothing. Waking a rule
-/// that was switched off turns on only the delivery tapped, not both.
-func alertRowToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
-                    delivery: AlertDelivery) -> AlertRuleChange {
-    guard var rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer }) else {
-        return .upsert(AlertRule(stationID: stationID, trigger: offer, lead: alertRowLead,
-                                 calendar: delivery == .calendar,
-                                 alert: delivery == .live ? .notification : .none))
-    }
-    if !rule.enabled {
-        // Waking a switched-off rule turns on only what was tapped; the row showed both off.
-        rule.enabled = true
-        rule.calendar = delivery == .calendar
-        rule.alert = delivery == .live ? .notification : .none
-        return .upsert(rule)
-    }
-    switch delivery {
-    case .calendar: rule.calendar.toggle()
-    case .live: rule.alert = rule.alert == .notification ? .none : .notification
-    }
-    return (!rule.calendar && rule.alert == .none) ? .remove(rule.id) : .upsert(rule)
-}
-
-/// Which of the row's two buttons read on for this station and offer. Live reads on only with
-/// Premium: without it, notifications never fire, however the stored rule reads.
-func alertRowState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger, premium: Bool) -> (calendar: Bool, live: Bool) {
-    guard let rule = rules.first(where: { $0.stationID == stationID && $0.trigger == offer && $0.enabled })
-    else { return (false, false) }
-    return (rule.calendar, rule.alert == .notification && premium)
 }

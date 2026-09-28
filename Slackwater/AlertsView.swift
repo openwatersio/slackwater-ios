@@ -6,11 +6,8 @@ func alertStatusText(_ rule: AlertRule, _ status: AlertStatusSnapshot, premium: 
                      tz: TimeZone = .current, locale: Locale = .autoupdatingCurrent) -> String {
     if !rule.enabled { return "Off" }
     if status.unresolved.contains(rule.id) { return "Waiting for station data" }
-    if rule.calendar && !status.calendarAuthorized { return "Calendar access is off in Settings" }
-    if rule.alert == .notification && !premium {
-        return rule.calendar ? "Calendar only — notifications are Premium" : "Notifications are Premium"
-    }
-    if rule.alert == .notification && !status.notificationsAuthorized { return "Notifications are off in Settings" }
+    if !premium { return "Notifications are Premium" }
+    if !status.notificationsAuthorized { return "Notifications are off in Settings" }
     guard let date = status.scheduledThrough[rule.id] else { return "Nothing coming up" }
     return "Scheduled through \(date.formatted(Date.FormatStyle(timeZone: tz).day().month(.abbreviated).locale(locale)))"
 }
@@ -42,7 +39,7 @@ struct AlertsView: View {
     var body: some View {
         List {
             if store.rules.isEmpty {
-                Text("No alerts yet. Tap Calendar or Live under any station's timeline to set one.")
+                Text("No alerts yet. Press and hold any station's timeline to set one.")
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
             ForEach(alertStationGroups(store.rules, name: { name($0) })) { group in

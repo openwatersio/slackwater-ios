@@ -15,7 +15,7 @@ import XCTest
                              lead: 1_800, daylightOnly: true)
         store.upsert(rule)
         var edited = rule
-        edited.calendar = false
+        edited.daylightOnly = false
         store.upsert(edited)
 
         XCTAssertEqual(AlertRuleStore(defaults: defaults).rules, [edited])
@@ -28,11 +28,10 @@ import XCTest
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }
         let known = AlertRule(stationID: "noaa/9449880", trigger: .tideExtreme(high: false))
-        // A rule from a newer build, with an alert level this build has no case for.
+        // A rule from a newer build, with a trigger case this build has no case for.
         let future: [String: Any] = [
             "id": UUID().uuidString, "stationID": "current:noaa/PUG1701",
-            "trigger": ["slackWindowOpens": [String: Any]()], "lead": 0, "daylightOnly": false,
-            "calendar": true, "alert": "alarm", "enabled": true,
+            "trigger": ["moonPhase": [String: Any]()], "lead": 0, "daylightOnly": false, "enabled": true,
         ]
         let knownJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(known))
         defaults.set(try JSONSerialization.data(withJSONObject: [knownJSON, future]), forKey: AppGroup.alertRulesKey)
@@ -44,7 +43,7 @@ import XCTest
         let data = try XCTUnwrap(defaults.data(forKey: AppGroup.alertRulesKey))
         let stored = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         XCTAssertEqual(stored.count, 3)
-        XCTAssertTrue(stored.contains { $0["alert"] as? String == "alarm" })
+        XCTAssertTrue(stored.contains { ($0["trigger"] as? [String: Any])?["moonPhase"] != nil })
     }
 
     func testARuleThatCannotBeEncodedDoesNotWipeTheStore() {
@@ -68,12 +67,11 @@ import XCTest
         XCTAssertEqual(decoded, triggers)
     }
 
-    func testDefaultsAreCalendarOnAndNotificationsOff() {
+    func testDefaultsFireAtTheEventAndRepeat() {
         let rule = AlertRule(stationID: "noaa/9449880", trigger: .tideExtreme(high: false))
         XCTAssertEqual(rule.lead, 0)
         XCTAssertFalse(rule.daylightOnly)
-        XCTAssertTrue(rule.calendar)
-        XCTAssertEqual(rule.alert, .none)
+        XCTAssertNil(rule.once)
         XCTAssertTrue(rule.enabled)
     }
 
@@ -96,5 +94,47 @@ import XCTest
 
     func testAHairlineSlackIsJustSlack() {
         XCTAssertEqual(alertEventName(.slackWindowOpens, noWindow: true, imperial: true), "Slack")
+    }
+
+    func testARuleWrittenByTheRowEraBuildStillDecodes() {
+        // calendar/alert are gone from the type; a stored rule that still carries them
+        // must read back as the notification rule it always was.
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let stored: [[String: Any]] = [[
+            "id": UUID().uuidString, "stationID": TideStationRecord.fridayHarborID,
+            "trigger": ["tideExtreme": ["high": false]],
+            "lead": 1_800, "daylightOnly": false,
+            "calendar": true, "alert": "notification", "enabled": true,
+        ]]
+        defaults.set(try! JSONSerialization.data(withJSONObject: stored), forKey: AppGroup.alertRulesKey)
+
+        let store = AlertRuleStore(defaults: defaults)
+
+        XCTAssertEqual(store.rules.count, 1, "an old rule must not land in `unreadable`")
+        XCTAssertEqual(store.rules.first?.stationID, TideStationRecord.fridayHarborID)
+        XCTAssertEqual(store.rules.first?.lead, 1_800)
+        XCTAssertNil(store.rules.first?.once, "a rule from before `once` existed repeats")
+    }
+
+    func testOnceSurvivesARoundTrip() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        let moment = Date(timeIntervalSince1970: 1_700_000_040)
+        AlertRuleStore(defaults: defaults)
+            .upsert(AlertRule(stationID: "a", trigger: .slack, once: moment))
+
+        XCTAssertEqual(AlertRuleStore(defaults: defaults).rules.first?.once, moment)
+    }
+
+    func testARuleWithoutOnceEncodesWithoutTheKey() {
+        let defaults = UserDefaults(suiteName: #function)!
+        defer { defaults.removePersistentDomain(forName: #function) }
+        AlertRuleStore(defaults: defaults).upsert(AlertRule(stationID: "a", trigger: .slack))
+
+        let raw = try! JSONSerialization.jsonObject(
+            with: defaults.data(forKey: AppGroup.alertRulesKey)!) as! [[String: Any]]
+
+        XCTAssertNil(raw.first?["once"])
     }
 }

@@ -47,8 +47,8 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     /// A detail can supply its scrub-time sky without changing the scaffold's
     /// generic signature.
     var topBackdrop: AnyView? = nil
-    /// The rule the alert row offers for the moment on screen (notifications spec §7.1). Nil —
-    /// the online gate — leaves the row out.
+    /// What a long press on the strip offers to alert on (spec §7.1). Nil — the online
+    /// gate — means a press does nothing.
     var alertOffer: AlertTrigger? = nil
     @State private var topHeight: CGFloat = 0
     /// The tour's glide has settled, which swaps the stars copy from the
@@ -296,12 +296,6 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             // strip's own opening slide-into-place is the affordance now —
             // `TimelineScrubber.centerIfNeeded`.
             card(tl)
-
-            if let alertOffer {
-                AlertRow(stationID: favoriteId, offer: alertOffer, scrubTime: scrubTime)
-                    .padding(.top, 12)
-                    .padding(.horizontal, 16)
-            }
 
             links(tl, jump)
                 .padding(.top, 12)
