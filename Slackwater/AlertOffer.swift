@@ -41,3 +41,63 @@ enum AlertRuleChange: Equatable {
     case upsert(AlertRule)
     case remove(UUID)
 }
+
+/// The popup's two rows (spec §7.2): this moment, or every one like it.
+enum AlertPopupRow: Equatable {
+    case once, every
+}
+
+/// A rule made from the popup reminds half an hour ahead; the Alerts screen changes it.
+let alertPopupLead: TimeInterval = 1_800
+
+/// The rule a row would own: same station, same trigger, and either bound to this minute or
+/// not bound at all.
+private func popupRule(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
+                       at moment: Date, row: AlertPopupRow, enabled: Bool) -> AlertRule? {
+    let want: Date? = row == .once ? alertMinute(moment) : nil
+    return rules.first {
+        $0.stationID == stationID && $0.trigger == offer && $0.once == want && $0.enabled == enabled
+    }
+}
+
+/// Which rows read on. Neither does without Premium: notifications never fire without it,
+/// however the stored rule reads.
+func alertPopupState(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
+                     at moment: Date, premium: Bool) -> (once: Bool, every: Bool) {
+    guard premium else { return (false, false) }
+    return (popupRule(rules, stationID: stationID, offer: offer, at: moment,
+                      row: .once, enabled: true) != nil,
+            popupRule(rules, stationID: stationID, offer: offer, at: moment,
+                      row: .every, enabled: true) != nil)
+}
+
+/// One tap on a row: remove the rule it owns, wake the switched-off one, or make it. The
+/// moment is floored, so a second tap finds the first tap's rule however the caller rounded.
+func alertPopupToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigger,
+                      at moment: Date, row: AlertPopupRow) -> AlertRuleChange {
+    if let on = popupRule(rules, stationID: stationID, offer: offer, at: moment,
+                          row: row, enabled: true) {
+        return .remove(on.id)
+    }
+    if var off = popupRule(rules, stationID: stationID, offer: offer, at: moment,
+                           row: row, enabled: false) {
+        off.enabled = true
+        return .upsert(off)
+    }
+    return .upsert(AlertRule(stationID: stationID, trigger: offer,
+                             once: row == .once ? alertMinute(moment) : nil,
+                             lead: alertPopupLead))
+}
+
+/// The repeating row's words. A crossing needs a clause — "Every rising past 3.3 ft" is not
+/// English — and everything else is its event name with a small letter.
+func alertEveryLabel(_ trigger: AlertTrigger, imperial: Bool) -> String {
+    switch trigger {
+    case .tideCrossing(let heightM, let rising):
+        return "Every time it \(rising ? "rises" : "falls") past "
+            + "\(formatHeight(heightM, imperial: imperial)) \(heightUnit(imperial: imperial))"
+    default:
+        let name = alertEventName(trigger, imperial: imperial)
+        return "Every \(name.prefix(1).lowercased())\(name.dropFirst())"
+    }
+}

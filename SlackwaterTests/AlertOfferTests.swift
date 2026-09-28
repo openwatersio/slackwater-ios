@@ -45,4 +45,124 @@ final class AlertOfferTests: XCTestCase {
         XCTAssertFalse(isOnEclipseContact(contact.addingTimeInterval(5), eclipses))
         XCTAssertFalse(isOnEclipseContact(contact, []))
     }
+
+    // MARK: the popup's two rows
+
+    private let moment = Date(timeIntervalSince1970: 1_700_000_040)
+
+    func testTheFirstTapMakesARuleForThatMomentAlone() {
+        let change = alertPopupToggle([], stationID: "a", offer: .slack, at: moment, row: .once)
+
+        guard case .upsert(let rule) = change else { return XCTFail("expected a new rule") }
+        XCTAssertEqual(rule.once, moment)
+        XCTAssertEqual(rule.lead, alertPopupLead)
+        XCTAssertEqual(rule.trigger, .slack)
+        XCTAssertTrue(rule.enabled)
+    }
+
+    func testTheEveryRowMakesARuleWithNoMoment() {
+        let change = alertPopupToggle([], stationID: "a", offer: .slack, at: moment, row: .every)
+
+        guard case .upsert(let rule) = change else { return XCTFail("expected a new rule") }
+        XCTAssertNil(rule.once)
+    }
+
+    func testTappingARowThatIsOnRemovesItsRule() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: moment)
+
+        XCTAssertEqual(alertPopupToggle([rule], stationID: "a", offer: .slack, at: moment, row: .once),
+                       .remove(rule.id))
+    }
+
+    func testTheTwoRowsAreIndependent() {
+        let once = AlertRule(stationID: "a", trigger: .slack, once: moment)
+
+        // The every row doesn't see the once rule as its own.
+        guard case .upsert(let made) = alertPopupToggle([once], stationID: "a", offer: .slack,
+                                                        at: moment, row: .every)
+        else { return XCTFail("expected a new rule") }
+        XCTAssertNil(made.once)
+        XCTAssertNotEqual(made.id, once.id)
+    }
+
+    func testASecondTapOnTheSameMomentDoesNotMakeASecondRule() {
+        // Review Focus 5: a double tap, or a tap landing while the first write is in flight.
+        let first = alertPopupToggle([], stationID: "a", offer: .slack, at: moment, row: .once)
+        guard case .upsert(let rule) = first else { return XCTFail("expected a new rule") }
+
+        XCTAssertEqual(alertPopupToggle([rule], stationID: "a", offer: .slack, at: moment, row: .once),
+                       .remove(rule.id))
+    }
+
+    func testAnUnflooredMomentFindsTheRuleMadeFromItsMinute() {
+        let rule = AlertRule(stationID: "a", trigger: .slack, once: alertMinute(moment))
+
+        XCTAssertEqual(alertPopupToggle([rule], stationID: "a", offer: .slack,
+                                        at: moment.addingTimeInterval(31), row: .once),
+                       .remove(rule.id))
+    }
+
+    func testASwitchedOffRuleWakesInsteadOfASecondBeingMade() {
+        var off = AlertRule(stationID: "a", trigger: .slack)
+        off.enabled = false
+
+        guard case .upsert(let woken) = alertPopupToggle([off], stationID: "a", offer: .slack,
+                                                         at: moment, row: .every)
+        else { return XCTFail("expected the rule back") }
+        XCTAssertEqual(woken.id, off.id)
+        XCTAssertTrue(woken.enabled)
+    }
+
+    func testARuleOnAnotherStationOrTriggerIsNotThisRow() {
+        let elsewhere = AlertRule(stationID: "b", trigger: .slack, once: moment)
+        let other = AlertRule(stationID: "a", trigger: .tideExtreme(high: true), once: moment)
+
+        guard case .upsert = alertPopupToggle([elsewhere, other], stationID: "a", offer: .slack,
+                                              at: moment, row: .once)
+        else { return XCTFail("expected a new rule") }
+    }
+
+    // MARK: which rows read on
+
+    func testARowReadsOnOnlyForItsOwnRule() {
+        let rules = [AlertRule(stationID: "a", trigger: .slack, once: moment)]
+
+        let state = alertPopupState(rules, stationID: "a", offer: .slack, at: moment, premium: true)
+
+        XCTAssertTrue(state.once)
+        XCTAssertFalse(state.every)
+    }
+
+    func testNothingReadsOnWithoutPremium() {
+        // However the stored rule reads, notifications never fire without it.
+        let rules = [AlertRule(stationID: "a", trigger: .slack, once: moment)]
+
+        XCTAssertEqual(alertPopupState(rules, stationID: "a", offer: .slack, at: moment,
+                                       premium: false).once, false)
+    }
+
+    func testASwitchedOffRuleReadsOff() {
+        var off = AlertRule(stationID: "a", trigger: .slack, once: moment)
+        off.enabled = false
+
+        XCTAssertEqual(alertPopupState([off], stationID: "a", offer: .slack, at: moment,
+                                       premium: true).once, false)
+    }
+
+    // MARK: the repeating row's words
+
+    func testTheEveryLabelReadsAsASentence() {
+        XCTAssertEqual(alertEveryLabel(.slackWindowOpens, imperial: true), "Every slack window")
+        XCTAssertEqual(alertEveryLabel(.tideExtreme(high: false), imperial: true), "Every low tide")
+        XCTAssertEqual(alertEveryLabel(.currentPeak(flood: true), imperial: true), "Every max flood")
+        XCTAssertEqual(alertEveryLabel(.eclipse, imperial: true), "Every lunar eclipse")
+    }
+
+    func testACrossingsEveryLabelIsAClause() {
+        // "Every rising past 3.3 ft" is not English.
+        XCTAssertEqual(alertEveryLabel(.tideCrossing(heightM: 1.0, rising: false), imperial: false),
+                       "Every time it falls past 1.00 m")
+        XCTAssertEqual(alertEveryLabel(.tideCrossing(heightM: 1.0, rising: true), imperial: false),
+                       "Every time it rises past 1.00 m")
+    }
 }

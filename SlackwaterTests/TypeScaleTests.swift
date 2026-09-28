@@ -165,6 +165,9 @@ extension TypeScaleTests {
             // (AlertsView.swift, AlertSheet.swift); its other reader is alert copy, which
             // the system renders.
             "AlertRule.swift:alertEventName",
+            // The popup's repeating row: built here, rendered by AlertPopup's one Text, which
+            // carries the mono trait (AlertPopup.swift).
+            "AlertOffer.swift:alertEveryLabel",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = [
