@@ -10,6 +10,7 @@ xcuserdata/
 Slackwater.xcodeproj/
 Slackwater/Info.plist
 SlackwaterWidgets/Info.plist
+SlackwaterWatch/Info.plist
 
 # tools/ npm deps (npm install in tools/ to regenerate)
 tools/node_modules/
