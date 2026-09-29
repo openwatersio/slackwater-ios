@@ -10,7 +10,7 @@ Tides are worldwide. Currents are the United States and Canada. Any copy that de
 | ------------------------ | ----- | ------------------------------------------------------------ |
 | Bundled tide stations    | 4,782 | 3,262 NOAA, 1,520 TICON across 105 countries and territories |
 | Bundled current stations | 2,534 | NOAA                                                         |
-| Canadian tide stations   | 1,060 | CHS, fetched once per station, then offline for good         |
+| Canadian tide stations   | 1,057 | CHS, fetched once per station, then offline for good         |
 | Canadian current passes  | 22    | CHS, same fetch-once model                                   |
 | Listed but blank         | 139   | Stations we cannot publish numbers for                       |
 

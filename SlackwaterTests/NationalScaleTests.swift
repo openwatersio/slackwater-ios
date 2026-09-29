@@ -570,7 +570,7 @@ final class NationalScaleTests: XCTestCase {
     func testOnDemandStationIsVisibleWithoutAnActionPrompt() throws {
         let service = ChsFitService.shared
         let far = try XCTUnwrap(ChsStationInfo.all.first {
-            !service.isQueued($0.id) && $0.region == "Atlantic Coast"
+            !service.isQueued($0.id) && $0.longitude > -66   // Atlantic Canada
         })
         XCTAssertTrue(StationItem.search(far.name.lowercased(), near: firstRunFix).contains { $0.id == far.id },
                       "an undownloaded station still has to be findable")

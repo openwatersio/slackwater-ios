@@ -4442,13 +4442,13 @@
         }
       }
     },
-    "Station names and pairings: Slackwater database and @openwaters/station-metadata (MIT)." : {
+    "Station names and pairings: Slackwater database (MIT)." : {
       "comment" : "Station discovery interface text.",
       "localizations" : {
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Noms et appariements des stations : base de données Slackwater et @openwaters/station-metadata (MIT)."
+            "value" : "Noms et appariements des stations : base de données Slackwater (MIT)."
           }
         }
       }

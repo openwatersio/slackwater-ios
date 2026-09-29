@@ -117,18 +117,16 @@ jobs:
       - name: Fixture tooling
         run: node --test scripts/iwls-fixtures.test.mjs
 
-      # gen-chs-stations.mjs is the only generator that needs the network (the
-      # DFO IWLS API), so it stays out of CI and its artefact is trusted as
-      # committed. The other two read local files only, which means CI can
-      # regenerate them and prove the committed bundles still match — a
-      # generator edited without a rerun fails here instead of shipping stale
-      # data to the App Store.
-      - name: Regenerate the offline bundles
+      # Every generator reads local files only, which means CI can regenerate
+      # them and prove the committed bundles still match — a generator edited
+      # without a rerun fails here instead of shipping stale data to the App
+      # Store.
+      - name: Regenerate the bundles
         working-directory: tools
-        run: node gen-tides.mjs && node gen-noaa-currents.mjs && node gen-slugs.mjs && node gen-station-index.mjs
+        run: npm run build:data
 
       - name: Committed bundles match their generators
-        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json Slackwater/Resources/unavailable-stations.json
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json Slackwater/Resources/unavailable-stations.json Slackwater/Resources/chs-stations.json Slackwater/Resources/chs-tombstones.json Slackwater/Resources/chs-gates.json Slackwater/Resources/chs-current-gates.json
 
       - name: Bundle invariants
         working-directory: tools

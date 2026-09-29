@@ -16,5 +16,5 @@ Do not edit these committed artifacts directly:
   change and can never name a station they don't ship.
 
 Their canonical station metadata comes from the packages and sources read by those
-generators, including `@openwaters/station-metadata`. Change the canonical
+generators, chiefly `@slackwater/database`. Change the canonical
 source first, then regenerate with `cd tools && npm run build:data`.

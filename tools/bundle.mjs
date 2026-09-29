@@ -1,21 +1,13 @@
 /** Shared scaffolding for the Resources/*.json generators. Side-effect-free at
  *  import so gen-tides.test.mjs can pull constants without running a generator. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { createPlacesResolver } from "@openwaters/station-metadata";
 
 /** tools/ — every generator resolves its paths from here. */
 export const here = dirname(fileURLToPath(import.meta.url));
 
-const require = createRequire(import.meta.url);
-
-/** The places resolver every generator names stations with. */
-export const placesResolver = () => createPlacesResolver(JSON.parse(
-  readFileSync(require.resolve("@openwaters/station-metadata/data/places.json"), "utf8")));
-
-/** The database's curated records (bare ids) by id, in the field names the CHS generators read. */
+/** The database's bare-id records by id, in the field names the CHS generators read. */
 export async function curatedRecords() {
   // Imported lazily: the database is tens of MB and most importers want constants.
   const { allStations } = await import("@slackwater/database");
@@ -27,6 +19,9 @@ export async function curatedRecords() {
       // The database lists the lowercased name as the first alias; the artifacts never carry it.
       aliases: (s.aliases ?? []).filter((a) => a !== s.name.toLowerCase()),
       position: [s.latitude, s.longitude],
+      timezone: s.timezone,
+      // "CA-BC" -> "BC"
+      province: s.region_code?.split("-")[1],
       provider: s.source?.name === NOAA ? "noaa" : "chs",
       kind: s.kind,
       tideReference: c.tide_reference,
@@ -73,27 +68,25 @@ export const REGION_WORD = {
  * still name what someone starred three releases ago, or offer them something
  * near it instead of silently dropping the row (issue #91).
  *
- * Cumulative, and unioned from three places because no one of them is enough:
+ * Cumulative, and unioned from two places because neither is enough:
  *
- * - `dead` — advertises `wlp`, serves no predictions. This run knows the most
- *   about these, so it wins the id.
- * - `previous` — the artifact as it stood before this run. A station IWLS
- *   withdraws OUTRIGHT never reaches `dead` at all; it just stops appearing,
- *   and this is the only place its identity survives.
+ * - `previous` — the artifact as it stood before this run. A station the
+ *   database drops (it stopped serving `wlp`, or IWLS withdrew it) just stops
+ *   appearing, and this is the only place its identity survives. It wins the
+ *   id because it is the fresher identity.
  * - `existing` — the tombstone file, holding everything older than one
  *   generation. Without it the list would only ever remember one release back.
  *
  * A tombstoned station that starts serving again drops out, so the result only
  * ever describes the gap between what a device stored and what ships today.
  *
- * Lives here rather than in the generator so it can be tested without the
- * ~20-minute live DFO probe the generator opens with — the same reason this
- * module is side-effect-free at import.
+ * Lives here rather than in the generator so it can be tested on fixtures —
+ * the same reason this module is side-effect-free at import.
  */
-export function tombstones({ shipping, dead = [], previous = [], existing = [] }) {
+export function tombstones({ shipping, previous = [], existing = [] }) {
   const live = new Set(shipping.map((s) => s.id));
   const gone = new Map();
-  for (const s of [...dead, ...previous, ...existing]) {
+  for (const s of [...previous, ...existing]) {
     if (live.has(s.id) || gone.has(s.id)) continue;
     gone.set(s.id, {
       id: s.id, name: s.name.trim(), region: s.region,

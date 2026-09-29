@@ -125,8 +125,8 @@ const DUPLICATE_KM = 1.0;
  * this water already served", not "is this the same station" — hence 10 km
  * rather than the 3 km the registry uses for station identity.
  *
- * Read from the committed artefact, not regenerated: gen-chs-stations.mjs hits
- * the DFO API, and the tide bundle must not need a network to build.
+ * Read from the committed artefact, which gen-chs-stations.mjs writes first in
+ * `npm run build:data`.
  */
 const CHS_COVERAGE_KM = 10;
 
