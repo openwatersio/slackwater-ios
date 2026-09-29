@@ -15,6 +15,12 @@
             "state" : "translated",
             "value" : "— détails —"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "— detalles —"
+          }
         }
       }
     },
@@ -26,6 +32,12 @@
             "state" : "translated",
             "value" : "(Dites-nous ce que vous savez — qui exploite cette station, une personne-ressource ou toute information sur la licence de ses données.)"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Cuéntanos lo que sepas: quién gestiona este mareógrafo, algún contacto o cualquier dato sobre la licencia de sus datos.)"
+          }
         }
       }
     },
@@ -36,6 +48,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "(Dites-nous ce que vous avez observé — ce que faisait l’eau et à quel moment.)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Cuéntanos lo que viste: qué hacía el agua y cuándo.)"
           }
         }
       }
@@ -51,6 +69,12 @@
             "state" : "translated",
             "value" : "Publication interrompue pour %@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ — ya no se publica."
+          }
         }
       }
     },
@@ -64,6 +88,12 @@
           }
         },
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ · %2$@"
@@ -85,6 +115,12 @@
             "state" : "translated",
             "value" : "%1$@ · %2$@ %3$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ %3$@"
+          }
         }
       }
     },
@@ -95,6 +131,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ (zéro des cartes NOAA)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (cero hidrográfico de NOAA)"
           }
         }
       }
@@ -109,6 +151,12 @@
           }
         },
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ %2$@"
@@ -130,6 +178,12 @@
             "state" : "translated",
             "value" : "%1$@ %2$@ · %3$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ · %3$@"
+          }
         }
       }
     },
@@ -143,6 +197,12 @@
           }
         },
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ %3$@"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ %2$@ %3$@"
@@ -164,6 +224,12 @@
             "state" : "translated",
             "value" : "%1$@ %2$@ vers le courant de jusant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ hacia el reflujo"
+          }
         }
       }
     },
@@ -180,6 +246,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ %2$@ vers le courant de flot"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@ hacia el flujo"
           }
         }
       }
@@ -198,6 +270,12 @@
             "state" : "translated",
             "value" : "%1$@ %2$@%3$@ %4$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$@%3$@ %4$@"
+          }
         }
       }
     },
@@ -208,6 +286,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zéro des cartes : %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %@"
           }
         }
       }
@@ -226,6 +310,12 @@
             "state" : "translated",
             "value" : "Zéro des cartes : %1$@. D’après les marées de %2$@ et les corrections publiées par NOAA; calculé sur cet appareil."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %1$@. Basado en las mareas de %2$@ y los desfases publicados por NOAA; calculado en este dispositivo."
+          }
         }
       }
     },
@@ -236,6 +326,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zéro des cartes : %1$@. Données téléchargées de CHS (IWLS), puis ajustées et calculées sur cet appareil. Ces prévisions ne sont pas publiées par CHS."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %@. Descargado de CHS (IWLS), ajustado y calculado en este dispositivo. No son predicciones publicadas por CHS."
           }
         }
       }
@@ -248,6 +344,12 @@
             "state" : "translated",
             "value" : "Zéro des cartes : %1$@. Prévision harmonique NOAA."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %@. Predicción armónica de NOAA."
+          }
         }
       }
     },
@@ -258,6 +360,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zéro des cartes : %1$@. Prévision harmonique TICON-4."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cero hidrográfico: %@. Predicción armónica de TICON-4."
           }
         }
       }
@@ -276,6 +384,12 @@
             "state" : "translated",
             "value" : "%1$@ Temps d’attente estimé : %2$@. La station est téléchargée une seule fois et reste disponible hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Tiempo de espera estimado: %2$@. La estación se descarga una vez y queda disponible sin conexión."
+          }
         }
       }
     },
@@ -292,6 +406,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ de %2$@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ desde %2$@"
           }
         }
       }
@@ -310,6 +430,12 @@
             "state" : "translated",
             "value" : "%1$@ dans %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ en %2$@"
+          }
         }
       }
     },
@@ -321,6 +447,12 @@
             "state" : "translated",
             "value" : "%@ dans la file"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en la cola"
+          }
         }
       }
     },
@@ -328,6 +460,12 @@
       "comment" : "Compact signed time offset in minutes; 'min' remains invariant.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ min"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ min"
@@ -343,6 +481,12 @@
             "state" : "translated",
             "value" : "%@ nm"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ nm"
+          }
         }
       }
     },
@@ -354,6 +498,12 @@
             "state" : "translated",
             "value" : "Marées de %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mareas de %@"
+          }
         }
       }
     },
@@ -361,6 +511,12 @@
       "comment" : "Offline-prediction validity sentence. The value is a localized expiry phrase.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@."
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@."
@@ -382,6 +538,12 @@
             "state" : "translated",
             "value" : "%1$@. Le flot porte au %2$lld°T."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@. La corriente de flujo se establece a %lld°T."
+          }
         }
       }
     },
@@ -392,6 +554,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prédictions de marées de %@ ne sont pas encore sur cet appareil. Téléchargement des prédictions de courant canadien…"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de marea de %@ aún no están en este dispositivo. Descargando predicciones de corrientes canadienses…"
           }
         }
       }
@@ -404,6 +572,12 @@
             "state" : "translated",
             "value" : "Les prédictions de marées de %@ ne sont pas encore sur cet appareil. Téléchargement des prédictions de marées canadiennes…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de marea de %@ aún no están en este dispositivo. Descargando predicciones de mareas canadienses…"
+          }
         }
       }
     },
@@ -414,6 +588,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prédictions de marées de %@ n’ont pas pu être téléchargées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron descargar las predicciones de marea de %@."
           }
         }
       }
@@ -426,6 +606,12 @@
             "state" : "translated",
             "value" : "Les prédictions de marées de %@ n’ont pas terminé le téléchargement. Slackwater réessayera."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No terminó la descarga de las predicciones de marea de %@. Slackwater volverá a intentarlo."
+          }
         }
       }
     },
@@ -436,6 +622,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prédictions de marées de %@ nécessitent une connexion avant de pouvoir être téléchargées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de marea de %@ necesitan conexión para descargarse."
           }
         }
       }
@@ -474,6 +666,24 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld constituants harmoniques calculés sur cet appareil"
+                }
+              }
+            }
+          }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld componente armónico calculado en este dispositivo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld componentes armónicos calculados en este dispositivo"
                 }
               }
             }
@@ -519,6 +729,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld estación canadiense más disponible en la búsqueda; ábrela para descargarla."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld estaciones canadienses más disponibles en la búsqueda; abre una para descargarla."
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -535,6 +763,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld jours sur %2$lld téléchargés. L’ajustement sur cet appareil s’affine encore. Le flot porte au %3$lld°T."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld días descargados. El ajuste en el dispositivo aún se está refinando. La corriente de flujo se establece a %3$lld°T."
           }
         }
       }
@@ -553,6 +787,12 @@
             "state" : "translated",
             "value" : "%1$lld sur %2$lld téléchargés"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld descargadas"
+          }
         }
       }
     },
@@ -569,6 +809,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld sur %2$lld stations canadiennes à proximité sur cet appareil"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld estaciones canadienses cercanas en este dispositivo"
           }
         }
       }
@@ -587,6 +833,12 @@
             "state" : "translated",
             "value" : "%1$lld sur %2$lld prêts"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld listas"
+          }
         }
       }
     },
@@ -604,6 +856,12 @@
             "state" : "translated",
             "value" : "%1$lld sur %2$lld demandes téléchargées. Cette station restera disponible hors ligne une fois terminée."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld de %2$lld solicitudes descargadas. Esta estación quedará disponible sin conexión al terminar."
+          }
         }
       }
     },
@@ -614,6 +872,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "courbe de %lld heures"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curva de %lld horas"
           }
         }
       }
@@ -637,6 +901,12 @@
             "state" : "translated",
             "value" : "%lld %% éclairée"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% iluminada"
+          }
         }
       }
     },
@@ -654,6 +924,12 @@
             "state" : "translated",
             "value" : "%1$lldh %2$lldm"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lldh %2$lldm"
+          }
         }
       }
     },
@@ -661,6 +937,12 @@
       "comment" : "Compact countdown in minutes; 'm' is invariant notation.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldm"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lldm"
@@ -676,6 +958,12 @@
             "state" : "translated",
             "value" : "±%lld min"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "±%lld min"
+          }
         }
       }
     },
@@ -686,6 +974,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un aperçu : flèche et heure."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De un vistazo: flecha y hora."
           }
         }
       }
@@ -698,6 +992,12 @@
             "state" : "translated",
             "value" : "Un croissant, qui grandit un peu plus chaque nuit."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un fino creciente que aumenta un poco cada noche."
+          }
         }
       }
     },
@@ -708,6 +1008,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Un croissant qui s’amincit, à quelques nuits de la nouvelle lune."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un fino menguante, a pocas noches de la luna nueva."
           }
         }
       }
@@ -746,6 +1052,24 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "environ %lld heures"
+                }
+              }
+            }
+          }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "aproximadamente %lld hora"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "aproximadamente %lld horas"
                 }
               }
             }
@@ -791,6 +1115,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "aproximadamente %lld minuto"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "aproximadamente %lld minutos"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -801,6 +1143,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "environ une heure"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aproximadamente una hora"
           }
         }
       }
@@ -813,6 +1161,12 @@
             "state" : "translated",
             "value" : "À propos de Slackwater Premium"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acerca de Slackwater Premium"
+          }
         }
       }
     },
@@ -823,6 +1177,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À propos de ces prédictions"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acerca de estas predicciones"
           }
         }
       }
@@ -835,6 +1195,12 @@
             "state" : "translated",
             "value" : "Au-dessus de l’horloge : le prochain événement et l’heure."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sobre el reloj: el próximo evento y su hora."
+          }
         }
       }
     },
@@ -845,6 +1211,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activer"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activar"
           }
         }
       }
@@ -857,6 +1229,12 @@
             "state" : "translated",
             "value" : "Ajouter aux favoris"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir a favoritos"
+          }
         }
       }
     },
@@ -867,6 +1245,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des stations supplémentaires utilisent des constantes harmoniques TICON-4 de SEANOE sous CC BY 4.0 (seanoe.org/data/00980/109129)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otras estaciones usan constantes armónicas TICON-4 de SEANOE bajo licencia CC BY 4.0 (seanoe.org/data/00980/109129)."
           }
         }
       }
@@ -879,6 +1263,12 @@
             "state" : "translated",
             "value" : "Éclipse solaire annulaire"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse solar anular"
+          }
         }
       }
     },
@@ -889,6 +1279,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toute station"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cualquier estación"
           }
         }
       }
@@ -901,6 +1297,12 @@
             "state" : "translated",
             "value" : "Marée de morte-eau apogéenne"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea muerta de apogeo"
+          }
         }
       }
     },
@@ -911,6 +1313,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée de vive-eau apogéenne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea viva de apogeo"
           }
         }
       }
@@ -923,6 +1331,12 @@
             "state" : "translated",
             "value" : "Marée apogéenne"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea de apogeo"
+          }
         }
       }
     },
@@ -934,6 +1348,12 @@
             "state" : "translated",
             "value" : "App : %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App: %@"
+          }
         }
       }
     },
@@ -944,6 +1364,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Disponible hors ligne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disponible sin conexión"
           }
         }
       }
@@ -986,6 +1412,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Disponible sin conexión durante %lld día más"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Disponible sin conexión durante %lld días más"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -996,6 +1440,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retour"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
           }
         }
       }
@@ -1008,6 +1458,12 @@
             "state" : "translated",
             "value" : "Entre nous et le Soleil, sa face éclairée est tournée dans l’autre direction."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre nosotros y el Sol, con la cara iluminada orientada en sentido contrario."
+          }
         }
       }
     },
@@ -1018,6 +1474,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "par Open Waters"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "por Open Waters"
           }
         }
       }
@@ -1030,6 +1492,12 @@
             "state" : "translated",
             "value" : "Pouvez-vous aider ?"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Puedes ayudarnos?"
+          }
         }
       }
     },
@@ -1040,6 +1508,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les stations canadiennes (CHS) utilisent des modèles harmoniques ajustés sur cet appareil à partir des prévisions de CHS (IWLS), selon les conditions du MPO (clause 10). Ces prévisions ne sont pas publiées par CHS et ne doivent pas servir à la navigation. Quelques eaux canadiennes sans station CHS utilisent les constantes TICON-4 intégrées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las estaciones canadienses (CHS) usan modelos armónicos ajustados en este dispositivo a partir de predicciones de CHS (IWLS), conforme a las condiciones de DFO (cláusula 10). No son cifras publicadas por CHS ni sirven para la navegación. Algunas aguas canadienses sin mareógrafos de CHS usan constantes TICON-4 incluidas en la app."
           }
         }
       }
@@ -1052,6 +1526,12 @@
             "state" : "translated",
             "value" : "Bathymétrie des chenaux canadiens : GSC Canada West Coast Topo-Bathymetric DEM. Contient de l’information visée par la Licence du gouvernement ouvert – Canada."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batimetría de canales canadienses: modelo digital topo-batimétrico de la costa oeste de Canadá de GSC. Contiene información bajo la Licencia de Gobierno Abierto de Canadá."
+          }
         }
       }
     },
@@ -1062,6 +1542,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Annuler"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
           }
         }
       }
@@ -1074,6 +1560,12 @@
             "state" : "translated",
             "value" : "Les profils transversaux des zones de courant étendues sont dérivés de cette bathymétrie; les données de levé brutes ne sont pas incluses."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las secciones transversales de los canales para los parches de corriente ampliados se derivan de esta batimetría; no se incluyen los datos brutos del estudio."
+          }
         }
       }
     },
@@ -1084,6 +1576,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cartes"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartas"
           }
         }
       }
@@ -1102,6 +1600,12 @@
             "state" : "translated",
             "value" : "Cartes · %1$lld sur %2$lld prêtes"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartas · %1$lld de %2$lld listas"
+          }
         }
       }
     },
@@ -1112,6 +1616,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir une date"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir una fecha"
           }
         }
       }
@@ -1124,6 +1634,12 @@
             "state" : "translated",
             "value" : "Choisissez une station de remplacement près de la station retirée."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige una alternativa cerca de la estación retirada."
+          }
         }
       }
     },
@@ -1134,6 +1650,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir une autre station"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir otra estación"
           }
         }
       }
@@ -1146,6 +1668,12 @@
             "state" : "translated",
             "value" : "Choisissez une autre station pour un autre secteur."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige otra estación para otra zona del agua."
+          }
         }
       }
     },
@@ -1156,6 +1684,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez la station affichée par ce widget."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige la estación que muestra este widget."
           }
         }
       }
@@ -1174,6 +1708,12 @@
             "state" : "translated",
             "value" : "Prévisions publiées par CHS. Téléchargement : %1$@; disponibles jusqu’au %2$@. Non calculées sur cet appareil."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones publicadas por CHS descargadas el %1$@; disponibles hasta el %2$@. No se calculan en este dispositivo."
+          }
         }
       }
     },
@@ -1184,6 +1724,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Effacer le texte de recherche"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar texto de búsqueda"
           }
         }
       }
@@ -1196,6 +1742,12 @@
             "state" : "translated",
             "value" : "Fermer"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar"
+          }
         }
       }
     },
@@ -1206,6 +1758,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fermer la recherche"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar búsqueda"
           }
         }
       }
@@ -1218,6 +1776,12 @@
             "state" : "translated",
             "value" : "Plus proche"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más cercano"
+          }
         }
       }
     },
@@ -1228,6 +1792,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "plus proche %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "más cercano %@"
           }
         }
       }
@@ -1240,6 +1810,12 @@
             "state" : "translated",
             "value" : "Replié"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contraído"
+          }
         }
       }
     },
@@ -1250,6 +1826,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant confortable"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente cómoda"
           }
         }
       }
@@ -1262,6 +1844,12 @@
             "state" : "translated",
             "value" : "Bientôt dans la même offre : la tuile d’étale en direct, les alertes et les fenêtres de sortie pour votre bateau"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximamente en el mismo nivel: el indicador de estoa en directo, alertas y ventanas de navegación para tu embarcación"
+          }
         }
       }
     },
@@ -1272,6 +1860,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Questions ou commentaires"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consultas o comentarios"
           }
         }
       }
@@ -1284,6 +1878,12 @@
             "state" : "translated",
             "value" : "Connectez-vous pendant un moment pour télécharger environ un mois de prévisions."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conéctate un momento para descargar aproximadamente un mes de predicciones."
+          }
         }
       }
     },
@@ -1294,6 +1894,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Connectez-vous une fois pour télécharger cette station pour une utilisation hors ligne permanente."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conéctate una vez para descargar esta estación y usarla siempre sin conexión."
           }
         }
       }
@@ -1306,6 +1912,12 @@
             "state" : "translated",
             "value" : "Connectez-vous pour télécharger"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectarse para descargar"
+          }
         }
       }
     },
@@ -1316,6 +1928,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant · %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente · %@"
           }
         }
       }
@@ -1328,6 +1946,12 @@
             "state" : "translated",
             "value" : "Courant · CHS"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente · CHS"
+          }
         }
       }
     },
@@ -1338,6 +1962,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant · NOAA"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente · NOAA"
           }
         }
       }
@@ -1350,6 +1980,12 @@
             "state" : "translated",
             "value" : "Vitesse du courant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Velocidad de la corriente"
+          }
         }
       }
     },
@@ -1360,6 +1996,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unités de vitesse du courant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unidades de velocidad de la corriente"
           }
         }
       }
@@ -1372,6 +2014,12 @@
             "state" : "translated",
             "value" : "Station de courant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación de corrientes"
+          }
         }
       }
     },
@@ -1383,6 +2031,12 @@
             "state" : "translated",
             "value" : "Chronologie des courants"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cronología de corrientes"
+          }
         }
       }
     },
@@ -1393,6 +2047,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "actuellement affiché"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "mostrada actualmente"
           }
         }
       }
@@ -1411,6 +2071,12 @@
             "state" : "translated",
             "value" : "Courants à %1$@ · %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrientes en %1$@ · %2$@"
+          }
         }
       }
     },
@@ -1421,6 +2087,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Données et attributions"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datos y atribución"
           }
         }
       }
@@ -1433,6 +2105,12 @@
             "state" : "translated",
             "value" : "Données téléchargées"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datos descargados"
+          }
         }
       }
     },
@@ -1443,6 +2121,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Distance de la Terre"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distancia a la Tierra"
           }
         }
       }
@@ -1455,6 +2139,12 @@
             "state" : "translated",
             "value" : "Terminé"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hecho"
+          }
         }
       }
     },
@@ -1465,6 +2155,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Télécharger"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargar"
           }
         }
       }
@@ -1483,6 +2179,12 @@
             "state" : "translated",
             "value" : "Télécharger tous les %1$lld courants canadiens · %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargar las %lld corrientes canadienses · %@"
+          }
         }
       }
     },
@@ -1493,6 +2195,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Échec du téléchargement"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error de descarga"
           }
         }
       }
@@ -1505,6 +2213,12 @@
             "state" : "translated",
             "value" : "Télécharger pour utilisation hors ligne"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargar para usar sin conexión"
+          }
         }
       }
     },
@@ -1515,6 +2229,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Données téléchargées de CHS (IWLS), puis ajustées et calculées sur cet appareil. Ces prévisions ne sont pas publiées par CHS. Le flot porte au %lld°T."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargado de CHS (IWLS), ajustado y calculado en este dispositivo. No son predicciones publicadas por CHS. La corriente de flujo se establece a %lld°T."
           }
         }
       }
@@ -1527,6 +2247,12 @@
             "state" : "translated",
             "value" : "Les prévisions téléchargées sont prêtes pour une utilisation hors ligne. Les téléchargements qui expirent affichent leur temps restant ci-dessous."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones descargadas están listas sin conexión. Las descargas que caducan muestran abajo el tiempo restante."
+          }
         }
       }
     },
@@ -1538,6 +2264,12 @@
             "state" : "translated",
             "value" : "Téléchargement"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando"
+          }
         }
       }
     },
@@ -1548,6 +2280,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargement — les prévisions canadiennes sont téléchargées une fois, puis fonctionnent hors ligne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando — las predicciones canadienses se descargan una vez y después funcionan sin conexión."
           }
         }
       }
@@ -1566,6 +2304,12 @@
             "state" : "translated",
             "value" : "Téléchargement — %1$lld sur %2$lld"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando · %1$lld de %2$lld"
+          }
         }
       }
     },
@@ -1576,6 +2320,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargement des prévisions de courant canadien…"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando predicciones de corrientes canadienses…"
           }
         }
       }
@@ -1588,6 +2338,12 @@
             "state" : "translated",
             "value" : "Téléchargement des prévisions de marée et de courant canadiennes… Les plus proches de vous d’abord, et tout ce que vous ouvrez saute la file d’attente. À la vitesse actuelle, %@ pour le reste."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando predicciones canadienses de mareas y corrientes… Primero las más cercanas; las que abras avanzan en la cola. A la velocidad actual, faltan %@."
+          }
         }
       }
     },
@@ -1599,6 +2355,12 @@
             "state" : "translated",
             "value" : "Téléchargement des prévisions de marée canadiennes…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando predicciones de mareas canadienses…"
+          }
         }
       }
     },
@@ -1609,6 +2371,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargement des zones de carte — le monde, l’eau autour de vous et vos stations enregistrées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando zonas del mapa: el mundo, el agua a tu alrededor y tus estaciones guardadas."
           }
         }
       }
@@ -1627,6 +2395,12 @@
             "state" : "translated",
             "value" : "Téléchargement, %1$lld sur %2$lld prêt"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando, %1$lld de %2$lld listas"
+          }
         }
       }
     },
@@ -1637,6 +2411,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargement…"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando…"
           }
         }
       }
@@ -1649,6 +2429,12 @@
             "state" : "translated",
             "value" : "Téléchargements"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargas"
+          }
         }
       }
     },
@@ -1659,6 +2445,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les téléchargements couvrent environ un mois et peuvent être actualisés à tout moment."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las descargas cubren aproximadamente un mes y se pueden actualizar en cualquier momento."
           }
         }
       }
@@ -1671,6 +2463,12 @@
             "state" : "translated",
             "value" : "Jusant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reflujo"
+          }
         }
       }
     },
@@ -1681,6 +2479,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Jusant à %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reflujo a las %@"
           }
         }
       }
@@ -1693,6 +2497,12 @@
             "state" : "translated",
             "value" : "Courant de jusant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente de reflujo"
+          }
         }
       }
     },
@@ -1703,6 +2513,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Jusant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En reflujo"
           }
         }
       }
@@ -1715,6 +2531,12 @@
             "state" : "translated",
             "value" : "Éclipse"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse"
+          }
         }
       }
     },
@@ -1725,6 +2547,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Temps d’attente estimé : %@. La station est téléchargée une fois et reste disponible hors ligne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiempo de espera estimado: %@. La estación se descarga una vez y queda disponible sin conexión."
           }
         }
       }
@@ -1737,6 +2565,12 @@
             "state" : "translated",
             "value" : "Tout ce que vous utilisez aujourd’hui restera gratuit. Premium ajoute l’écran de verrouillage et finance le développement de Slackwater. Achetez-le parce qu’il vous plaît ou pour nous remercier."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo lo que usas hoy seguirá siendo gratis para siempre. Premium añade la pantalla de bloqueo y ayuda a financiar el desarrollo de Slackwater. Cómpralo porque lo quieres o para darnos las gracias."
+          }
         }
       }
     },
@@ -1747,6 +2581,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déployé"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expandido"
           }
         }
       }
@@ -1759,6 +2599,12 @@
             "state" : "translated",
             "value" : "Expiré"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caducada"
+          }
         }
       }
     },
@@ -1769,6 +2615,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Expiré — reconnectez-vous pour télécharger les prévisions de courant."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caducada — vuelve a conectarte para descargar las predicciones de corrientes."
           }
         }
       }
@@ -1811,6 +2663,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Caduca en %lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Caduca en %lld días"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -1821,6 +2691,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Expire aujourd’hui"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Caduca hoy"
           }
         }
       }
@@ -1833,6 +2709,12 @@
             "state" : "translated",
             "value" : "Échec"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fallida"
+          }
         }
       }
     },
@@ -1843,6 +2725,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Descendante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bajando"
           }
         }
       }
@@ -1861,6 +2749,12 @@
             "state" : "translated",
             "value" : "Descendante %1$@ %2$@/h"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bajando %1$@ %2$@/h"
+          }
         }
       }
     },
@@ -1871,6 +2765,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus éloignée"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más lejano"
           }
         }
       }
@@ -1883,6 +2783,12 @@
             "state" : "translated",
             "value" : "plus éloignée %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "más lejano %@"
+          }
         }
       }
     },
@@ -1893,6 +2799,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réponse rapide"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respuesta rápida"
           }
         }
       }
@@ -1905,6 +2817,12 @@
             "state" : "translated",
             "value" : "Réponse rapide %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respuesta rápida %@"
+          }
         }
       }
     },
@@ -1915,6 +2833,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Favori"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorito"
           }
         }
       }
@@ -1927,6 +2851,12 @@
             "state" : "translated",
             "value" : "Favoris"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favoritos"
+          }
         }
       }
     },
@@ -1937,6 +2867,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "pieds"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pies"
           }
         }
       }
@@ -1949,6 +2885,12 @@
             "state" : "translated",
             "value" : "Pieds"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pies"
+          }
         }
       }
     },
@@ -1959,6 +2901,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trouver les marées près de moi"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar mareas cerca de mí"
           }
         }
       }
@@ -1971,6 +2919,12 @@
             "state" : "translated",
             "value" : "Recherche de marées et de courants à proximité…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando mareas y corrientes cercanas…"
+          }
         }
       }
     },
@@ -1982,6 +2936,12 @@
             "state" : "translated",
             "value" : "Recherche de votre emplacement…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscando tu ubicación…"
+          }
         }
       }
     },
@@ -1992,6 +2952,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Premier quartier"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuarto creciente"
           }
         }
       }
@@ -2010,6 +2976,12 @@
             "state" : "translated",
             "value" : "Ajustement fondé sur les %1$lld derniers jours — l’étale à %2$@ peut varier d’environ %3$lld min."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustada con los últimos %1$lld días: la estoa en %2$@ puede desviarse hasta ~%3$lld min."
+          }
         }
       }
     },
@@ -2020,6 +2992,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flot"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flujo"
           }
         }
       }
@@ -2038,6 +3016,12 @@
             "state" : "translated",
             "value" : "flot ×%1$@ · jusant ×%2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "flujo ×%1$@ · reflujo ×%2$@"
+          }
         }
       }
     },
@@ -2048,6 +3032,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flot à %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flujo a las %@"
           }
         }
       }
@@ -2060,6 +3050,12 @@
             "state" : "translated",
             "value" : "Courant de flot"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente de flujo"
+          }
         }
       }
     },
@@ -2070,6 +3066,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flot"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En flujo"
           }
         }
       }
@@ -2082,6 +3084,12 @@
             "state" : "translated",
             "value" : "Pleine lune"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna llena"
+          }
         }
       }
     },
@@ -2092,6 +3100,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entièrement dans l’ombre de la Terre, rougie par les couchers de soleil terrestres."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Totalmente dentro de la sombra oscura de la Tierra, enrojecida por los atardeceres terrestres."
           }
         }
       }
@@ -2104,6 +3118,12 @@
             "state" : "translated",
             "value" : "Obtenez la prochaine marée haute à votre station Slackwater locale."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtén la próxima pleamar en tu estación local de Slackwater."
+          }
         }
       }
     },
@@ -2114,6 +3134,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Obtenez la prochaine marée basse à votre station Slackwater locale."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtén la próxima bajamar en tu estación local de Slackwater."
           }
         }
       }
@@ -2126,6 +3152,12 @@
             "state" : "translated",
             "value" : "Obtenez la prochaine fenêtre d’étale à votre station de courant la plus proche."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Obtén la próxima ventana de estoa en la estación de corrientes más cercana."
+          }
         }
       }
     },
@@ -2136,6 +3168,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Accéder aux Réglages"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ir a Ajustes"
           }
         }
       }
@@ -2148,6 +3186,12 @@
             "state" : "translated",
             "value" : "À moitié éclairée — au quart du cycle."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media luna iluminada: ha transcurrido un cuarto del ciclo."
+          }
         }
       }
     },
@@ -2158,6 +3202,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "De nouveau à moitié éclairée — aux trois quarts du cycle."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media luna iluminada de nuevo: han transcurrido tres cuartos del ciclo."
           }
         }
       }
@@ -2170,6 +3220,12 @@
             "state" : "translated",
             "value" : "Port, baie ou chenal"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puerto, bahía o canal"
+          }
         }
       }
     },
@@ -2180,6 +3236,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Haute"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pleamar"
           }
         }
       }
@@ -2192,6 +3254,12 @@
             "state" : "translated",
             "value" : "Marée haute"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pleamar"
+          }
         }
       }
     },
@@ -2202,6 +3270,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "de pleine mer à basse mer"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de pleamar a bajamar"
           }
         }
       }
@@ -2214,6 +3288,12 @@
             "state" : "translated",
             "value" : "Maintien %@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocupa %@."
+          }
         }
       }
     },
@@ -2224,6 +3304,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écran d’accueil — gratuit"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pantalla de inicio — gratis"
           }
         }
       }
@@ -2236,6 +3322,12 @@
             "state" : "translated",
             "value" : "Je peux aider avec une station indisponible"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedo ayudar con una estación no disponible"
+          }
         }
       }
     },
@@ -2246,6 +3338,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Si vous savez qui exploite cette station ou sous quelle licence ses données sont diffusées, dites-le-nous."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Si sabes quién gestiona esta estación o qué licencia tienen sus datos, cuéntanoslo."
           }
         }
       }
@@ -2258,6 +3356,12 @@
             "state" : "translated",
             "value" : "Dans la faible pénombre de la Terre — un assombrissement, pas une échancrure."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En la tenue sombra exterior de la Tierra: un oscurecimiento, no un mordisco."
+          }
         }
       }
     },
@@ -2268,6 +3372,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "entrant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "entrante"
           }
         }
       }
@@ -2280,6 +3390,12 @@
             "state" : "translated",
             "value" : "Elle a été retirée du service hydrographique et n’a donc aucun relevé à afficher."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se ha retirado del servicio hidrográfico, por lo que no hay lecturas que mostrar."
+          }
         }
       }
     },
@@ -2290,6 +3406,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirée du service hydrographique, elle ne fournit plus de relevés. Balayez pour la supprimer."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se ha retirado del servicio hidrográfico, por lo que no hay lecturas que mostrar. Desliza para eliminarla."
           }
         }
       }
@@ -2302,6 +3424,12 @@
             "state" : "translated",
             "value" : "Elle est %@ dans la file — déplacée vers le haut car vous l’avez ouverte."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Está en el puesto %@ de la cola; ha avanzado porque la abriste."
+          }
         }
       }
     },
@@ -2312,6 +3440,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elle est en première position — déplacée au premier rang car vous l’avez ouverte."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es la primera de la cola; ha avanzado al principio porque la abriste."
           }
         }
       }
@@ -2324,6 +3458,12 @@
             "state" : "translated",
             "value" : "Fonctionne hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sigue funcionando sin conexión."
+          }
         }
       }
     },
@@ -2334,6 +3474,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "kilomètres par heure"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "kilómetros por hora"
           }
         }
       }
@@ -2346,6 +3492,12 @@
             "state" : "translated",
             "value" : "nœuds"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "nudos"
+          }
         }
       }
     },
@@ -2356,6 +3508,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nœuds"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nudos"
           }
         }
       }
@@ -2368,6 +3526,12 @@
             "state" : "translated",
             "value" : "Contexte de grande marée : %@. Il ne s’agit pas d’une prévision pour ce passage."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contexto de mareas amplias: %@. Esto no es una predicción para este paso."
+          }
         }
       }
     },
@@ -2378,6 +3542,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière éclipse lunaire"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Último eclipse lunar"
           }
         }
       }
@@ -2390,6 +3560,12 @@
             "state" : "translated",
             "value" : "Dernier quartier"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuarto menguante"
+          }
         }
       }
     },
@@ -2400,6 +3576,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernière éclipse solaire"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Último eclipse solar"
           }
         }
       }
@@ -2412,6 +3594,12 @@
             "state" : "translated",
             "value" : "Licence"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licencia"
+          }
         }
       }
     },
@@ -2422,6 +3610,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lien : %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enlace: %@"
           }
         }
       }
@@ -2434,6 +3628,12 @@
             "state" : "translated",
             "value" : "Liste"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lista"
+          }
         }
       }
     },
@@ -2444,6 +3644,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LLWLT (zéro des cartes CHS)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LLWLT (cero hidrográfico de CHS)"
           }
         }
       }
@@ -2456,6 +3662,12 @@
             "state" : "translated",
             "value" : "Emplacement"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicación"
+          }
         }
       }
     },
@@ -2466,6 +3678,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Emplacement indisponible"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicación no disponible"
           }
         }
       }
@@ -2478,6 +3696,12 @@
             "state" : "translated",
             "value" : "Écran verrouillé — Premium"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pantalla de bloqueo — Premium"
+          }
         }
       }
     },
@@ -2488,6 +3712,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Widgets de l’écran verrouillé — prochaine étale, prochain renversement, fenêtre d’étale praticable"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets de pantalla de bloqueo: próxima estoa, próximo cambio y ventana navegable"
           }
         }
       }
@@ -2500,6 +3730,12 @@
             "state" : "translated",
             "value" : "Appuyez longuement sur l’écran d’accueil → + → Slackwater."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada la pantalla de inicio → + → Slackwater."
+          }
         }
       }
     },
@@ -2510,6 +3746,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Appuyez longuement sur l’écran verrouillé → Personnaliser → ajoutez Slackwater au-dessus ou en dessous de l’horloge."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada la pantalla de bloqueo → Personalizar → añade Slackwater encima o debajo del reloj."
           }
         }
       }
@@ -2522,6 +3764,12 @@
             "state" : "translated",
             "value" : "Basse"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bajamar"
+          }
         }
       }
     },
@@ -2532,6 +3780,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée basse"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bajamar"
           }
         }
       }
@@ -2544,6 +3798,12 @@
             "state" : "translated",
             "value" : "de basse mer à pleine mer"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "de bajamar a pleamar"
+          }
         }
       }
     },
@@ -2554,6 +3814,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Messagerie indisponible"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correo no disponible"
           }
         }
       }
@@ -2566,6 +3832,12 @@
             "state" : "translated",
             "value" : "Carte"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mapa"
+          }
         }
       }
     },
@@ -2577,6 +3849,12 @@
             "state" : "translated",
             "value" : "Tuiles cartographiques par OpenFreeMap (openfreemap.org), © OpenMapTiles, données © contributeurs d’OpenStreetMap, mises en cache sur cet appareil pour l’utilisation hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teselas de mapa de OpenFreeMap (openfreemap.org), © OpenMapTiles, datos © colaboradores de OpenStreetMap, almacenadas en este dispositivo para usarlas sin conexión."
+          }
         }
       }
     },
@@ -2587,6 +3865,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Jusant max."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máximo reflujo"
           }
         }
       }
@@ -2605,6 +3889,12 @@
             "state" : "translated",
             "value" : "Jusant max. %1$@ %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máximo reflujo %1$@ %2$@"
+          }
         }
       }
     },
@@ -2615,6 +3905,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flot max."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máximo flujo"
           }
         }
       }
@@ -2633,6 +3929,12 @@
             "state" : "translated",
             "value" : "Flot max. %1$@ %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máximo flujo %1$@ %2$@"
+          }
         }
       }
     },
@@ -2643,6 +3945,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant de jusant maximal"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente máxima de reflujo"
           }
         }
       }
@@ -2655,6 +3963,12 @@
             "state" : "translated",
             "value" : "Courant de flot maximal"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente máxima de flujo"
+          }
         }
       }
     },
@@ -2665,6 +3979,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Message copié. Envoyez-le à %@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mensaje copiado. Envíalo a %@."
           }
         }
       }
@@ -2677,6 +3997,12 @@
             "state" : "translated",
             "value" : "Mètres"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Metros"
+          }
         }
       }
     },
@@ -2687,6 +4013,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "mètres"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "metros"
           }
         }
       }
@@ -2699,6 +4031,12 @@
             "state" : "translated",
             "value" : "mètres par seconde"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "metros por segundo"
+          }
         }
       }
     },
@@ -2709,6 +4047,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Moment : %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Momento: %@"
           }
         }
       }
@@ -2721,6 +4065,12 @@
             "state" : "translated",
             "value" : "Lune"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna"
+          }
         }
       }
     },
@@ -2731,6 +4081,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Plus de la moitié éclairée, en phase croissante vers la pleine lune."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más de la mitad iluminada, creciendo hacia la luna llena."
           }
         }
       }
@@ -2743,6 +4099,12 @@
             "state" : "translated",
             "value" : "Ma position"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mi ubicación"
+          }
         }
       }
     },
@@ -2753,6 +4115,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée de morte-eau"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea muerta"
           }
         }
       }
@@ -2765,6 +4133,12 @@
             "state" : "translated",
             "value" : "Près de moi"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca de mí"
+          }
         }
       }
     },
@@ -2775,6 +4149,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À proximité"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca"
           }
         }
       }
@@ -2787,6 +4167,12 @@
             "state" : "translated",
             "value" : "Les %lld plus proches — continuez à taper pour préciser"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las %lld más cercanas — sigue escribiendo para afinar"
+          }
         }
       }
     },
@@ -2797,6 +4183,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Station la plus proche"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación más cercana"
           }
         }
       }
@@ -2809,6 +4201,12 @@
             "state" : "translated",
             "value" : "Nouvelle lune"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna nueva"
+          }
         }
       }
     },
@@ -2819,6 +4217,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suivant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente"
           }
         }
       }
@@ -2831,6 +4235,12 @@
             "state" : "translated",
             "value" : "Événement suivant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evento siguiente"
+          }
         }
       }
     },
@@ -2841,6 +4251,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Événement suivant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evento siguiente"
           }
         }
       }
@@ -2853,6 +4269,12 @@
             "state" : "translated",
             "value" : "Événement suivant (circulaire)"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evento siguiente (circular)"
+          }
         }
       }
     },
@@ -2863,6 +4285,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prochain événement et fenêtre d’étale."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El próximo evento y la ventana navegable."
           }
         }
       }
@@ -2875,6 +4303,12 @@
             "state" : "translated",
             "value" : "Pleine lune suivante"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima luna llena"
+          }
         }
       }
     },
@@ -2885,6 +4319,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée haute suivante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima pleamar"
           }
         }
       }
@@ -2897,6 +4337,12 @@
             "state" : "translated",
             "value" : "Marée basse suivante"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima bajamar"
+          }
         }
       }
     },
@@ -2907,6 +4353,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Éclipse lunaire suivante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo eclipse lunar"
           }
         }
       }
@@ -2919,6 +4371,12 @@
             "state" : "translated",
             "value" : "Prochain maximum"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo máximo"
+          }
         }
       }
     },
@@ -2929,6 +4387,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle lune suivante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima luna nueva"
           }
         }
       }
@@ -2941,6 +4405,12 @@
             "state" : "translated",
             "value" : "Étale suivante"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima estoa"
+          }
         }
       }
     },
@@ -2951,6 +4421,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Étale suivante (en ligne)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima estoa (en línea)"
           }
         }
       }
@@ -2963,6 +4439,12 @@
             "state" : "translated",
             "value" : "Prochaine étale ou prochain renversement, en un coup d’œil."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima estoa o cambio de un vistazo."
+          }
         }
       }
     },
@@ -2973,6 +4455,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fenêtre d’étale suivante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima ventana de estoa"
           }
         }
       }
@@ -2985,6 +4473,12 @@
             "state" : "translated",
             "value" : "Éclipse solaire suivante"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo eclipse solar"
+          }
         }
       }
     },
@@ -2995,6 +4489,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune prévision canadienne à télécharger ici — vous êtes hors de la zone utile. Les stations proches fonctionnent déjà hors ligne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay predicciones canadienses que descargar aquí: estás fuera de la zona donde serían útiles. Las estaciones cercanas ya funcionan sin conexión."
           }
         }
       }
@@ -3007,6 +4507,12 @@
             "state" : "translated",
             "value" : "Aucune app de messagerie"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay app de correo"
+          }
         }
       }
     },
@@ -3017,6 +4523,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune vitesse"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin velocidad"
           }
         }
       }
@@ -3035,6 +4547,12 @@
             "state" : "translated",
             "value" : "Prévision harmonique de courant NOAA. Le flot porte au %1$lld°T. Vitesses exprimées en %2$@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicción armónica de corrientes de NOAA. La corriente de flujo se establece a %1$lld°T. Las velocidades usan %2$@."
+          }
         }
       }
     },
@@ -3045,6 +4563,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Étales et maximums de référence NOAA, corrigés selon les décalages publiés et calculés sur cet appareil"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estoas y máximos de referencia de NOAA, ajustados con los desfases publicados y calculados en este dispositivo"
           }
         }
       }
@@ -3057,6 +4581,12 @@
             "state" : "translated",
             "value" : "Station subordonnée NOAA : étales et maximums de %@, corrigés selon les décalages publiés"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación subordinada de NOAA: estoas y máximos de %@, corregidos con los desfases publicados"
+          }
         }
       }
     },
@@ -3067,6 +4597,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Station subordonnée NOAA : étales et maximums, corrigés selon les décalages publiés"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación subordinada de NOAA: estoas y máximos corregidos con los desfases publicados"
           }
         }
       }
@@ -3079,6 +4615,12 @@
             "state" : "translated",
             "value" : "Aucune mesure"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguna medida"
+          }
         }
       }
     },
@@ -3089,6 +4631,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aucune visible d’ici."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ninguno visible desde aquí."
           }
         }
       }
@@ -3101,6 +4649,12 @@
             "state" : "translated",
             "value" : "Non téléchargé"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No descargada"
+          }
         }
       }
     },
@@ -3111,6 +4665,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non téléchargé — reconnectez-vous pour télécharger les prévisions."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No descargada — vuelve a conectarte para descargar las predicciones."
           }
         }
       }
@@ -3123,6 +4683,12 @@
             "state" : "translated",
             "value" : "Non destiné à la navigation."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No usar para la navegación."
+          }
         }
       }
     },
@@ -3133,6 +4699,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Maintenant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ahora"
           }
         }
       }
@@ -3145,6 +4717,12 @@
             "state" : "translated",
             "value" : "Courant actuel, direction et prochain renverse."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El estado actual, su dirección y el próximo cambio."
+          }
         }
       }
     },
@@ -3155,6 +4733,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hors ligne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin conexión"
           }
         }
       }
@@ -3167,6 +4751,12 @@
             "state" : "translated",
             "value" : "Hors ligne — nécessite un instant de connexion. Les prévisions canadiennes se téléchargent une fois, puis fonctionnent hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin conexión — necesita un momento de señal. Las predicciones canadienses se descargan una vez y después funcionan sin conexión."
+          }
         }
       }
     },
@@ -3178,6 +4768,12 @@
             "state" : "translated",
             "value" : "Téléchargement hors ligne expiré"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descarga sin conexión caducada"
+          }
         }
       }
     },
@@ -3188,6 +4784,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargements hors ligne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargas sin conexión"
           }
         }
       }
@@ -3230,6 +4832,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sin conexión, queda %lld por descargar"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sin conexión, quedan %lld por descargar"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -3240,6 +4860,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hors ligne, toutes les stations sont téléchargées"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin conexión, todas las estaciones descargadas"
           }
         }
       }
@@ -3252,6 +4878,12 @@
             "state" : "translated",
             "value" : "OK"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aceptar"
+          }
         }
       }
     },
@@ -3262,6 +4894,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En ligne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con conexión"
           }
         }
       }
@@ -3274,6 +4912,12 @@
             "state" : "translated",
             "value" : "En ligne, toutes les stations sont téléchargées"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con conexión, todas las estaciones descargadas"
+          }
         }
       }
     },
@@ -3284,6 +4928,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir Slackwater"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Slackwater"
           }
         }
       }
@@ -3296,6 +4946,12 @@
             "state" : "translated",
             "value" : "Ouvrir Slackwater pour télécharger cette station"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Slackwater para descargar esta estación"
+          }
         }
       }
     },
@@ -3306,6 +4962,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Opposée au soleil, toute la face visible est éclairée."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opuesta al Sol, con toda la cara visible iluminada."
           }
         }
       }
@@ -3348,6 +5010,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Otra ubicación (%lld)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Otras ubicaciones (%lld)"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -3358,6 +5038,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "sortant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "saliente"
           }
         }
       }
@@ -3370,6 +5056,12 @@
             "state" : "translated",
             "value" : "Une partie de la Lune traverse le cône d’ombre de la Terre."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parte de la Luna atraviesa la sombra interior oscura de la Tierra."
+          }
         }
       }
     },
@@ -3380,6 +5072,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Éclipse partielle"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse parcial"
           }
         }
       }
@@ -3392,6 +5090,12 @@
             "state" : "translated",
             "value" : "Éclipse solaire partielle"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse solar parcial"
+          }
         }
       }
     },
@@ -3402,6 +5106,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pleine lune passée : plus de la moitié éclairée et en décroissance."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Después de la luna llena: más de la mitad iluminada y menguando."
           }
         }
       }
@@ -3414,6 +5124,12 @@
             "state" : "translated",
             "value" : "Payez une fois, c’est tout."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paga una vez, para siempre."
+          }
         }
       }
     },
@@ -3424,6 +5140,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Éclipse pénombrale"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse penumbral"
           }
         }
       }
@@ -3436,6 +5158,12 @@
             "state" : "translated",
             "value" : "Marée de morte-eau périgéenne"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea muerta de perigeo"
+          }
         }
       }
     },
@@ -3446,6 +5174,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée de vive-eau périgéenne"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea viva de perigeo"
           }
         }
       }
@@ -3458,6 +5192,12 @@
             "state" : "translated",
             "value" : "Marée périgéenne"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea de perigeo"
+          }
         }
       }
     },
@@ -3468,6 +5208,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisir une station"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir una estación"
           }
         }
       }
@@ -3480,6 +5226,12 @@
             "state" : "translated",
             "value" : "Moteur de prévisions : Slackwater (MIT)."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motor de predicción: Slackwater (MIT)."
+          }
         }
       }
     },
@@ -3490,6 +5242,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prévisions — non destinées à la navigation"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones — no usar para la navegación"
           }
         }
       }
@@ -3502,6 +5260,12 @@
             "state" : "translated",
             "value" : "Les prévisions ne sont pas téléchargées."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones no están descargadas."
+          }
         }
       }
     },
@@ -3513,6 +5277,12 @@
             "state" : "translated",
             "value" : "Prévisions indisponibles"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones no disponibles"
+          }
         }
       }
     },
@@ -3520,6 +5290,12 @@
       "comment" : "Premium interface text.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Premium"
@@ -3535,6 +5311,12 @@
             "state" : "translated",
             "value" : "Premium — merci de soutenir l’app"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium — gracias por apoyar la app"
+          }
         }
       }
     },
@@ -3545,6 +5327,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le Premium n’est pas encore en vente — ces widgets sont encore en cours de finalisation. Tout ce que vous utilisez aujourd’hui restera gratuit, quoi qu’il arrive."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premium aún no está a la venta; estos widgets todavía están en desarrollo. Todo lo que usas hoy seguirá siendo gratis en cualquier caso."
           }
         }
       }
@@ -3557,6 +5345,12 @@
             "state" : "translated",
             "value" : "Préparation de la carte pour une utilisation hors ligne…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando el mapa para usarlo sin conexión…"
+          }
         }
       }
     },
@@ -3567,6 +5361,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Événement précédent"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evento anterior"
           }
         }
       }
@@ -3579,6 +5379,12 @@
             "state" : "translated",
             "value" : "Confidentialité"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacidad"
+          }
         }
       }
     },
@@ -3589,6 +5395,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Politique de confidentialité"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Política de privacidad"
           }
         }
       }
@@ -3601,6 +5413,12 @@
             "state" : "translated",
             "value" : "L’achat n’a pas pu être vérifié — réessayez."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo verificar la compra. Inténtalo de nuevo."
+          }
         }
       }
     },
@@ -3611,6 +5429,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’achat n’a pas abouti — réessayez."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se completó la compra. Inténtalo de nuevo."
           }
         }
       }
@@ -3623,6 +5447,12 @@
             "state" : "translated",
             "value" : "En file d’attente"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cola"
+          }
         }
       }
     },
@@ -3633,6 +5463,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En file d’attente — les prévisions canadiennes se téléchargent une fois, puis fonctionnent hors ligne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cola — las predicciones canadienses se descargan una vez y después funcionan sin conexión."
           }
         }
       }
@@ -3645,6 +5481,12 @@
             "state" : "translated",
             "value" : "Marnage"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amplitud"
+          }
         }
       }
     },
@@ -3655,6 +5497,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Exemple de station réelle"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación de ejemplo real"
           }
         }
       }
@@ -3667,6 +5515,12 @@
             "state" : "translated",
             "value" : "Récents"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recientes"
+          }
         }
       }
     },
@@ -3677,6 +5531,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajustement"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinando"
           }
         }
       }
@@ -3689,6 +5549,12 @@
             "state" : "translated",
             "value" : "Ajustement — la réponse rapide est affichée; l’étale est précise à %@. Le modèle complet est encore en téléchargement."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinando — se muestra la respuesta rápida, con una precisión de estoa de %@. El modelo completo aún se está descargando."
+          }
         }
       }
     },
@@ -3699,6 +5565,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajustement — la réponse rapide est affichée. Le modèle complet est encore en téléchargement."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinando — se muestra la respuesta rápida. El modelo completo aún se está descargando."
           }
         }
       }
@@ -3711,6 +5583,12 @@
             "state" : "translated",
             "value" : "Ajustement · %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinando · %@"
+          }
         }
       }
     },
@@ -3721,6 +5599,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajustement…"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refinando…"
           }
         }
       }
@@ -3733,6 +5617,12 @@
             "state" : "translated",
             "value" : "Actualiser"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar"
+          }
         }
       }
     },
@@ -3743,6 +5633,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Actualiser les cartes"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualizar cartas"
           }
         }
       }
@@ -3755,6 +5651,12 @@
             "state" : "translated",
             "value" : "Supprimer"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar"
+          }
         }
       }
     },
@@ -3765,6 +5667,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer des favoris"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar de favoritos"
           }
         }
       }
@@ -3777,6 +5685,12 @@
             "state" : "translated",
             "value" : "Station supprimée"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación retirada"
+          }
         }
       }
     },
@@ -3788,6 +5702,12 @@
             "state" : "translated",
             "value" : "Restaurer l’achat"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar compra"
+          }
         }
       }
     },
@@ -3798,6 +5718,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar"
           }
         }
       }
@@ -3840,6 +5766,24 @@
               }
             }
           }
+        },
+        "es-ES" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Reintentar %lld sin terminar"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Reintentar %lld sin terminar"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -3850,6 +5794,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessayer maintenant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentar ahora"
           }
         }
       }
@@ -3862,6 +5812,12 @@
             "state" : "translated",
             "value" : "Réessayer cette station. Une fois téléchargée, elle reste disponible hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vuelve a intentar esta estación. Una vez descargada, queda disponible sin conexión."
+          }
         }
       }
     },
@@ -3872,6 +5828,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle tentative"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentando"
           }
         }
       }
@@ -3884,6 +5846,12 @@
             "state" : "translated",
             "value" : "Réessai en cours — Slackwater réessaie automatiquement. Les prévisions canadiennes se téléchargent une fois, puis fonctionnent hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentando — Slackwater vuelve a intentarlo automáticamente. Las predicciones canadienses se descargan una vez y después funcionan sin conexión."
+          }
         }
       }
     },
@@ -3894,6 +5862,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réessai dans %lld min"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reintentando en %lld min"
           }
         }
       }
@@ -3906,6 +5880,12 @@
             "state" : "translated",
             "value" : "Revenir à maintenant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a ahora"
+          }
         }
       }
     },
@@ -3917,6 +5897,12 @@
             "state" : "translated",
             "value" : "Lever"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salida"
+          }
         }
       }
     },
@@ -3927,6 +5913,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Montante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subiendo"
           }
         }
       }
@@ -3945,6 +5937,12 @@
             "state" : "translated",
             "value" : "Montante %1$@ %2$@/h"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subiendo %1$@ %2$@/h"
+          }
         }
       }
     },
@@ -3955,6 +5953,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rechercher"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar"
           }
         }
       }
@@ -3967,6 +5971,12 @@
             "state" : "translated",
             "value" : "Rechercher un lieu"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar un lugar"
+          }
         }
       }
     },
@@ -3977,6 +5987,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Voir tous les téléchargements"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver todas las descargas"
           }
         }
       }
@@ -3989,6 +6005,12 @@
             "state" : "translated",
             "value" : "Coucher"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puesta"
+          }
         }
       }
     },
@@ -3999,6 +6021,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Définit la vitesse de courant maximale que Slackwater considère comme une fenêtre d’étale utilisable (0,1 à 10 kn)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Establece la corriente más rápida que Slackwater considera una ventana de estoa utilizable (0,1–10 kn)."
           }
         }
       }
@@ -4011,6 +6039,12 @@
             "state" : "translated",
             "value" : "Réglages"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes"
+          }
         }
       }
     },
@@ -4021,6 +6055,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Forme uniquement"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo forma"
           }
         }
       }
@@ -4033,6 +6073,12 @@
             "state" : "translated",
             "value" : "Partager"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir"
+          }
         }
       }
     },
@@ -4043,6 +6089,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partager les détails de la station"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compartir detalles de la estación"
           }
         }
       }
@@ -4055,6 +6107,12 @@
             "state" : "translated",
             "value" : "Afficher"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar"
+          }
         }
       }
     },
@@ -4065,6 +6123,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout afficher"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar todo"
           }
         }
       }
@@ -4077,6 +6141,12 @@
             "state" : "translated",
             "value" : "Afficher les courants"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar corrientes"
+          }
         }
       }
     },
@@ -4087,6 +6157,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Afficher les marées"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar mareas"
           }
         }
       }
@@ -4099,6 +6175,12 @@
             "state" : "translated",
             "value" : "Affichage de %@. Choisissez une autre station pour un autre secteur."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrando %@. Elige otra estación para otra zona del agua."
+          }
         }
       }
     },
@@ -4109,6 +6191,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affichage de %@. Appuyez pour choisir une date."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrando %@. Toca para elegir una fecha."
           }
         }
       }
@@ -4121,6 +6209,12 @@
             "state" : "translated",
             "value" : "Affichage de la station la plus proche. Choisissez une autre station pour un autre secteur."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrando la estación más cercana. Elige otra estación para otra zona del agua."
+          }
         }
       }
     },
@@ -4131,6 +6225,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Affiché"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrada"
           }
         }
       }
@@ -4143,6 +6243,12 @@
             "state" : "translated",
             "value" : "Étale"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estoa"
+          }
         }
       }
     },
@@ -4153,6 +6259,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Étale · %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estoa · %@"
           }
         }
       }
@@ -4171,6 +6283,12 @@
             "state" : "translated",
             "value" : "étale avant le courant de flot %1$@ · courant de flot maximal %2$@ · étale avant le courant de jusant %3$@ · courant de jusant maximal %4$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "estoa antes del flujo %1$@ · flujo máximo %2$@ · estoa antes del reflujo %3$@ · reflujo máximo %4$@"
+          }
         }
       }
     },
@@ -4181,6 +6299,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Étale"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corriente en estoa"
           }
         }
       }
@@ -4193,6 +6317,12 @@
             "state" : "translated",
             "value" : "Fin de l’étale"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fin de la estoa"
+          }
         }
       }
     },
@@ -4203,6 +6333,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fenêtre d’étale"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ventana de estoa"
           }
         }
       }
@@ -4215,6 +6351,12 @@
             "state" : "translated",
             "value" : "Fenêtre d’étale"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ventana de estoa"
+          }
         }
       }
     },
@@ -4225,6 +6367,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fenêtre d’étale (rectangulaire)"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ventana de estoa (rectangular)"
           }
         }
       }
@@ -4240,6 +6388,12 @@
             "state" : "translated",
             "value" : "Slackwater calcule les prévisions harmoniques des marées et courants sur cet appareil. Il ne s’agit pas d’observations; les conditions réelles varient selon la météo, le débit des cours d’eau et les effets locaux."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater calcula predicciones armónicas de mareas y corrientes en este dispositivo. No son observaciones; las condiciones reales varían con el tiempo, el caudal de los ríos y los efectos locales."
+          }
         }
       }
     },
@@ -4250,6 +6404,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slackwater n’a pas trouvé de fenêtre d’étale pour votre station de courant la plus proche."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater no encontró una ventana de estoa para la estación de corrientes más cercana."
           }
         }
       }
@@ -4262,6 +6422,12 @@
             "state" : "translated",
             "value" : "Slackwater n’a pas trouvé de prévision de marée pour votre station locale."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater no encontró una predicción de marea para tu estación local."
+          }
         }
       }
     },
@@ -4272,6 +6438,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slackwater ne dispose pas de prévisions pour cette station de marée."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater no tiene predicciones para esta estación de mareas."
           }
         }
       }
@@ -4290,6 +6462,12 @@
             "state" : "translated",
             "value" : "Slackwater estime %1$@ périodes d’étale à partir des hautes et basses eaux à %2$@, selon une règle empirique de navigation. CHS ne publie pas de prévisions de courant pour ce passage."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater estima las horas de estoa de %@ a partir de la pleamar y la bajamar en %@, mediante una regla práctica de navegación. CHS no publica predicciones de corrientes para este paso."
+          }
         }
       }
     },
@@ -4301,6 +6479,12 @@
             "state" : "translated",
             "value" : "Slackwater est à code source ouvert : cette app est sous GPL-3.0 et le moteur de prévision, sous MIT."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater es de código abierto: esta app usa GPL-3.0 y el motor de predicción usa MIT."
+          }
         }
       }
     },
@@ -4308,6 +6492,12 @@
       "comment" : "Settings section heading.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater Premium"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slackwater Premium"
@@ -4323,6 +6513,12 @@
             "state" : "translated",
             "value" : "Slackwater réessaie automatiquement dès qu’une connexion est disponible."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater vuelve a intentarlo automáticamente cuando hay conexión."
+          }
         }
       }
     },
@@ -4333,6 +6529,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Slackwater réessaiera automatiquement."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater volverá a intentarlo automáticamente."
           }
         }
       }
@@ -4345,6 +6547,12 @@
             "state" : "translated",
             "value" : "Éclipse solaire"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse solar"
+          }
         }
       }
     },
@@ -4355,6 +6563,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Certaines zones de la carte ne sont pas terminées. Elles reprennent automatiquement dès que vous êtes connecté."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Algunas zonas del mapa no han terminado. Se reanudan automáticamente cuando tienes conexión."
           }
         }
       }
@@ -4367,6 +6581,12 @@
             "state" : "translated",
             "value" : "Code source sur GitHub"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Código fuente en GitHub"
+          }
         }
       }
     },
@@ -4377,6 +6597,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée de vive-eau"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea viva"
           }
         }
       }
@@ -4389,6 +6615,12 @@
             "state" : "translated",
             "value" : "Station"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación"
+          }
         }
       }
     },
@@ -4400,6 +6632,12 @@
             "state" : "translated",
             "value" : "Détails de la station"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detalles de la estación"
+          }
         }
       }
     },
@@ -4410,6 +6648,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La station est au mauvais endroit"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La estación está en el lugar equivocado"
           }
         }
       }
@@ -4428,6 +6672,12 @@
             "state" : "translated",
             "value" : "Nom de la station issu de %1$@ (SEANOE). Son enregistrement est sous licence %2$@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de la estación de %@ (SEANOE). Su registro tiene licencia %@."
+          }
         }
       }
     },
@@ -4438,6 +6688,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le nom ou les détails de la station sont incorrects"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre o los detalles de la estación son incorrectos"
           }
         }
       }
@@ -4450,6 +6706,12 @@
             "state" : "translated",
             "value" : "Noms et appariements des stations : base de données Slackwater (MIT)."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombres y asociaciones de estaciones: base de datos de Slackwater (MIT)."
+          }
         }
       }
     },
@@ -4460,6 +6722,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Station supprimée"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación retirada"
           }
         }
       }
@@ -4472,6 +6740,12 @@
             "state" : "translated",
             "value" : "Station indisponible"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación no disponible"
+          }
         }
       }
     },
@@ -4482,6 +6756,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Station indisponible."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación no disponible."
           }
         }
       }
@@ -4500,6 +6780,12 @@
             "state" : "translated",
             "value" : "Station : %1$@ (%2$@)"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación: %1$@ (%2$@)"
+          }
         }
       }
     },
@@ -4510,6 +6796,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les stations marquées « Prévisions indisponibles » sont nommées à partir d’enregistrements non commerciaux dans le même dépôt SEANOE (CC BY-NC 4.0). Slackwater n’inclut ni ne diffuse leurs constantes harmoniques."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las estaciones marcadas como «Predicciones no disponibles» reciben sus nombres de registros no comerciales del mismo depósito de SEANOE (CC BY-NC 4.0). Slackwater no incluye ni distribuye sus constantes armónicas."
           }
         }
       }
@@ -4528,6 +6820,12 @@
             "state" : "translated",
             "value" : "Restez connecté encore %1$@ et Slackwater affinera cette réponse grâce au modèle complet de %2$lld jours, sans aucune action de votre part."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén la conexión %@ más y Slackwater la refinará al modelo completo de %lld días, sin que tengas que tocar nada."
+          }
         }
       }
     },
@@ -4538,6 +6836,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lever du soleil"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amanecer"
           }
         }
       }
@@ -4550,6 +6854,12 @@
             "state" : "translated",
             "value" : "Lever du soleil %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amanecer %@"
+          }
         }
       }
     },
@@ -4560,6 +6870,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Coucher du soleil"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atardecer"
           }
         }
       }
@@ -4572,6 +6888,12 @@
             "state" : "translated",
             "value" : "Coucher du soleil %@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atardecer %@"
+          }
         }
       }
     },
@@ -4582,6 +6904,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Soutenir l’app — widgets de l’écran verrouillé et plus encore"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoya la app — widgets de pantalla de bloqueo y más"
           }
         }
       }
@@ -4594,6 +6922,12 @@
             "state" : "translated",
             "value" : "La réponse rapide est déjà sur cet appareil; à la prochaine connexion, Slackwater l’affinera grâce au modèle complet de %lld jours, sans aucune action de votre part."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La respuesta rápida ya está en este dispositivo; la próxima vez que te conectes, Slackwater la refinará al modelo completo de %lld días, sin que tengas que tocar nada."
+          }
         }
       }
     },
@@ -4604,6 +6938,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La carte fonctionne hors ligne ici : le monde entier, les eaux autour de vous et vos stations enregistrées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El mapa funciona aquí sin conexión: el mundo, el agua a tu alrededor y tus estaciones guardadas."
           }
         }
       }
@@ -4616,6 +6956,12 @@
             "state" : "translated",
             "value" : "La nouvelle lune passe devant le Soleil, vue d’ici."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La luna nueva cruza el Sol vista desde aquí."
+          }
         }
       }
     },
@@ -4626,6 +6972,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’événement suivant, au-dessus de l’horloge."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El próximo evento, sobre el reloj."
           }
         }
       }
@@ -4644,6 +6996,12 @@
             "state" : "translated",
             "value" : "La prochaine marée haute à %1$@ est prévue %2$@ et atteindra %3$@ %4$@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La próxima pleamar en %1$@ es el %2$@, a las %3$@, con %4$@."
+          }
         }
       }
     },
@@ -4660,6 +7018,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La prochaine marée basse à %1$@ est prévue %2$@ et atteindra %3$@ %4$@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La próxima bajamar en %1$@ es el %2$@, a las %3$@, con %4$@."
           }
         }
       }
@@ -4678,6 +7042,12 @@
             "state" : "translated",
             "value" : "La prochaine fenêtre d’étale à %1$@ s’étend de %2$@ à %3$@ et est ouverte maintenant."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La próxima ventana de estoa en %1$@ va de %2$@ a %3$@ y está abierta ahora."
+          }
         }
       }
     },
@@ -4695,6 +7065,12 @@
             "state" : "translated",
             "value" : "La prochaine fenêtre d’étale à %1$@ s’étend de %2$@ à %3$@ et commencera %4$@."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La próxima ventana de estoa en %1$@ va de %2$@ a %3$@ y comienza %4$@."
+          }
         }
       }
     },
@@ -4705,6 +7081,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Puis"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Después"
           }
         }
       }
@@ -4717,6 +7099,12 @@
             "state" : "translated",
             "value" : "Cette station n’est plus publiée."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta estación ya no se publica."
+          }
         }
       }
     },
@@ -4727,6 +7115,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prévisions de cette station ne sont pas encore sur cet appareil. Téléchargement des prévisions canadiennes de courant…"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de esta estación aún no están en este dispositivo. Descargando predicciones de corrientes canadienses…"
           }
         }
       }
@@ -4739,6 +7133,12 @@
             "state" : "translated",
             "value" : "Les prévisions de cette station ne sont pas encore sur cet appareil. Téléchargement des prévisions canadiennes de marée…"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de esta estación aún no están en este dispositivo. Descargando predicciones de mareas canadienses…"
+          }
         }
       }
     },
@@ -4749,6 +7149,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prévisions de cette station n’ont pas pu être téléchargées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron descargar las predicciones de esta estación."
           }
         }
       }
@@ -4761,6 +7167,12 @@
             "state" : "translated",
             "value" : "Le téléchargement des prévisions de cette station est incomplet. Slackwater réessaiera."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No terminó la descarga de las predicciones de esta estación. Slackwater volverá a intentarlo."
+          }
         }
       }
     },
@@ -4771,6 +7183,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les prévisions de cette station nécessitent une connexion avant de pouvoir être téléchargées."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las predicciones de esta estación necesitan conexión para descargarse."
           }
         }
       }
@@ -4783,6 +7201,12 @@
             "state" : "translated",
             "value" : "Marnage"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amplitud de marea"
+          }
         }
       }
     },
@@ -4793,6 +7217,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée · %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea · %@"
           }
         }
       }
@@ -4805,6 +7235,12 @@
             "state" : "translated",
             "value" : "Marée · CHS"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea · CHS"
+          }
         }
       }
     },
@@ -4815,6 +7251,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée · NOAA"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea · NOAA"
           }
         }
       }
@@ -4827,6 +7269,12 @@
             "state" : "translated",
             "value" : "Prévisions de marée et de courant à proximité."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones cercanas de mareas y corrientes."
+          }
         }
       }
     },
@@ -4837,6 +7285,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marée à %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea en %@"
           }
         }
       }
@@ -4855,6 +7309,12 @@
             "state" : "translated",
             "value" : "Marée à %1$@ · %2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea en %1$@ · %2$@"
+          }
         }
       }
     },
@@ -4865,6 +7325,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hauteur de la marée"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Altura de marea"
           }
         }
       }
@@ -4877,6 +7343,12 @@
             "state" : "translated",
             "value" : "La hauteur de la marée semble incorrecte"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La altura de marea parece incorrecta"
+          }
         }
       }
     },
@@ -4887,6 +7359,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unités de hauteur de marée"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unidades de altura de marea"
           }
         }
       }
@@ -4899,6 +7377,12 @@
             "state" : "translated",
             "value" : "Station de marée"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estación de mareas"
+          }
         }
       }
     },
@@ -4909,6 +7393,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chronologie des marées"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cronología de mareas"
           }
         }
       }
@@ -4921,6 +7411,12 @@
             "state" : "translated",
             "value" : "Marées et courants à proximité"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mareas y corrientes cerca de ti"
+          }
         }
       }
     },
@@ -4931,6 +7427,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marées et courants accessibles ici."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mareas y corrientes disponibles aquí."
           }
         }
       }
@@ -4943,6 +7445,12 @@
             "state" : "translated",
             "value" : "Courbe du jour"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Curva de hoy"
+          }
         }
       }
     },
@@ -4953,6 +7461,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La courbe du jour avec l’événement suivant."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La curva de hoy con el próximo evento."
           }
         }
       }
@@ -4965,6 +7479,12 @@
             "state" : "translated",
             "value" : "Courbe de marée ou de courant du jour, avec l’événement suivant."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La curva de mareas o corrientes de hoy, con el próximo evento."
+          }
         }
       }
     },
@@ -4975,6 +7495,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Éclipse totale"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse total"
           }
         }
       }
@@ -4987,6 +7513,12 @@
             "state" : "translated",
             "value" : "Éclipse solaire totale"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse solar total"
+          }
         }
       }
     },
@@ -4997,6 +7529,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Essayez %@ plutôt"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prueba %@ en su lugar"
           }
         }
       }
@@ -5009,6 +7547,12 @@
             "state" : "translated",
             "value" : "Activez la localisation dans Réglages pour trouver les marées et courants à proximité."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa la ubicación en Ajustes para encontrar mareas y corrientes cercanas."
+          }
         }
       }
     },
@@ -5019,6 +7563,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activez la localisation pour afficher les prévisions à proximité en premier."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activa la ubicación para mostrar primero las predicciones cercanas."
           }
         }
       }
@@ -5031,6 +7581,12 @@
             "state" : "translated",
             "value" : "moins d’une minute"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "menos de un minuto"
+          }
         }
       }
     },
@@ -5041,6 +7597,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer des favoris"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar de favoritos"
           }
         }
       }
@@ -5053,6 +7615,12 @@
             "state" : "translated",
             "value" : "Bathymétrie des chenaux américains : NOAA National Bathymetric Source (domaine public)."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batimetría de canales de EE. UU.: National Bathymetric Source de NOAA (dominio público)."
+          }
         }
       }
     },
@@ -5063,6 +7631,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stations américaines : constituants harmoniques de NOAA CO-OPS (domaine public)."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estaciones de EE. UU.: componentes armónicos de NOAA CO-OPS (dominio público)."
           }
         }
       }
@@ -5075,6 +7649,12 @@
             "state" : "translated",
             "value" : "Version"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión"
+          }
         }
       }
     },
@@ -5085,6 +7665,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando"
           }
         }
       }
@@ -5097,6 +7683,12 @@
             "state" : "translated",
             "value" : "En attente · %@ en file d’attente"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando · %@ en la cola"
+          }
         }
       }
     },
@@ -5107,6 +7699,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente · suivant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando · siguiente"
           }
         }
       }
@@ -5119,6 +7717,12 @@
             "state" : "translated",
             "value" : "En attente de signal"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando señal"
+          }
         }
       }
     },
@@ -5129,6 +7733,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente de signal. Les zones déjà téléchargées continuent de fonctionner hors ligne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando señal. Las zonas ya descargadas siguen funcionando sin conexión."
           }
         }
       }
@@ -5141,6 +7751,12 @@
             "state" : "translated",
             "value" : "En attente de signal. Les téléchargements reprennent dès que vous êtes connecté ; tout ce qui est déjà disponible continue de fonctionner hors ligne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando señal. Las descargas se reanudan cuando te conectas; todo lo que ya está disponible sigue funcionando sin conexión."
+          }
         }
       }
     },
@@ -5151,6 +7767,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente de signal. La carte télécharge le monde entier, les eaux autour de vous et vos stations enregistrées dès que vous êtes connecté."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando señal. El mapa descargará el mundo, el agua a tu alrededor y tus estaciones guardadas en cuanto te conectes."
           }
         }
       }
@@ -5163,6 +7785,12 @@
             "state" : "translated",
             "value" : "En attente de nouvelle tentative"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando para reintentar"
+          }
         }
       }
     },
@@ -5173,6 +7801,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dernier croissant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna menguante"
           }
         }
       }
@@ -5185,6 +7819,12 @@
             "state" : "translated",
             "value" : "Gibbeuse décroissante"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gibosa menguante"
+          }
         }
       }
     },
@@ -5195,6 +7835,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Avertissement"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Advertencia"
           }
         }
       }
@@ -5207,6 +7853,12 @@
             "state" : "translated",
             "value" : "Premier croissant"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna creciente"
+          }
         }
       }
     },
@@ -5217,6 +7869,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gibbeuse croissante"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gibosa creciente"
           }
         }
       }
@@ -5229,6 +7887,12 @@
             "state" : "translated",
             "value" : "Semaine du"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Semana del"
+          }
         }
       }
     },
@@ -5236,6 +7900,12 @@
       "comment" : "Widget interface text.",
       "localizations" : {
         "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets"
+          }
+        },
+        "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Widgets"
@@ -5250,6 +7920,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Widgets — ajoutez-les à votre écran d’accueil et à l’écran de verrouillage"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widgets — añádelos a tus pantallas de inicio y de bloqueo"
           }
         }
       }
@@ -5268,6 +7944,12 @@
             "state" : "translated",
             "value" : "fenêtre d’étale %1$@–%2$@"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ventana %@–%@"
+          }
         }
       }
     },
@@ -5278,6 +7960,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "vous"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ti"
           }
         }
       }
@@ -5290,6 +7978,12 @@
             "state" : "translated",
             "value" : "Vous avez Premium — merci."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tienes Premium — gracias."
+          }
         }
       }
     },
@@ -5300,6 +7994,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vous avez ouvert"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La abriste"
           }
         }
       }
@@ -5312,6 +8012,12 @@
             "state" : "translated",
             "value" : "Votre position reste sur cet appareil."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ubicación permanece en este dispositivo."
+          }
         }
       }
     },
@@ -5322,6 +8028,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre rapport a été copié. Envoyez-le à %@."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu informe se ha copiado. Envíalo a %@."
           }
         }
       }
@@ -5334,6 +8046,12 @@
             "state" : "translated",
             "value" : "Tout"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todo"
+          }
         }
       }
     },
@@ -5344,6 +8062,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À la nouvelle lune ou à la pleine lune, le Soleil et la Lune renforcent mutuellement leurs effets, ce qui augmente le marnage. Près de l’apogée, la Lune est plus éloignée et son effet sur les marées est donc plus faible : les hautes eaux sont moins hautes et les basses eaux moins basses que pendant une marée de vive-eau périgéenne."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En luna nueva o llena, el Sol y la Luna refuerzan mutuamente sus efectos y amplían la amplitud de marea. Cerca del apogeo, la Luna está más lejos y su efecto de marea es menor: pleamares más bajas y bajamares más altas que durante una marea viva de perigeo."
           }
         }
       }
@@ -5356,6 +8080,12 @@
             "state" : "translated",
             "value" : "À la nouvelle lune ou à la pleine lune, le Soleil et la Lune renforcent mutuellement leurs effets, ce qui augmente le marnage. Près du périgée, la Lune est plus proche et son effet sur les marées est donc plus fort : les hautes eaux sont plus hautes et les basses eaux plus basses que pendant une marée de vive-eau apogéenne."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En luna nueva o llena, el Sol y la Luna refuerzan mutuamente sus efectos y amplían la amplitud de marea. Cerca del perigeo, la Luna está más cerca y su efecto de marea es mayor: pleamares más altas y bajamares más bajas que durante una marea viva de apogeo."
+          }
         }
       }
     },
@@ -5366,6 +8096,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Au quartier de lune, les effets de marée du Soleil et de la Lune se compensent en partie, ce qui réduit le marnage. Près de l’apogée, l’effet plus faible de la Lune plus éloignée le réduit davantage."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cuarto lunar, los efectos de marea del Sol y la Luna se compensan en parte y reducen la amplitud. Cerca del apogeo, el efecto menor de la Luna más lejana la reduce aún más."
           }
         }
       }
@@ -5378,6 +8114,12 @@
             "state" : "translated",
             "value" : "Au quartier de lune, les effets de marée du Soleil et de la Lune se compensent en partie, ce qui réduit le marnage. Près du périgée, l’effet plus fort de la Lune plus proche atténue une partie de la réduction des marées de morte-eau."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cuarto lunar, los efectos de marea del Sol y la Luna se compensan en parte y reducen la amplitud. Cerca del perigeo, el efecto mayor de la Luna más cercana contrarresta parte de la reducción propia de la marea muerta."
+          }
         }
       }
     },
@@ -5388,6 +8130,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entre les alignements de vive-eau et de morte-eau, le marnage évolue. La distance de la Lune compte aussi : plus proche au périgée, elle tend à augmenter le marnage; plus éloignée à l’apogée, elle tend à le réduire."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre las alineaciones de marea viva y muerta, la amplitud de marea está cambiando. La distancia de la Luna también importa: más cerca en el perigeo tiende a ampliarla y más lejos en el apogeo, a reducirla."
           }
         }
       }
@@ -5400,6 +8148,12 @@
             "state" : "translated",
             "value" : "Courants"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Corrientes"
+          }
         }
       }
     },
@@ -5410,6 +8164,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La Lune est près de l’apogée, son point le plus éloigné de la Terre. Son effet plus faible sur les marées tend à réduire le marnage, avec des hautes eaux moins hautes et des basses eaux moins basses qu’au périgée."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Luna está cerca del apogeo, su punto más lejano de la Tierra. Su efecto de marea más débil tiende a reducir la amplitud, con pleamares más bajas y bajamares más altas que en el perigeo."
           }
         }
       }
@@ -5422,6 +8182,12 @@
             "state" : "translated",
             "value" : "La Lune est près du périgée, son point le plus proche de la Terre. Son effet plus fort sur les marées tend à augmenter le marnage, avec des hautes eaux plus hautes et des basses eaux plus basses qu’à l’apogée."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La Luna está cerca del perigeo, su punto más cercano a la Tierra. Su efecto de marea más fuerte tiende a ampliar la amplitud, con pleamares más altas y bajamares más bajas que en el apogeo."
+          }
         }
       }
     },
@@ -5432,6 +8198,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le Soleil et la Lune sont à angle droit, de sorte que leurs effets sur les marées se compensent en partie. Le marnage réduit tend à produire des hautes eaux moins hautes et des basses eaux moins basses."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol y la Luna forman un ángulo recto, por lo que sus efectos de marea se compensan en parte. La menor amplitud tiende a producir pleamares más bajas y bajamares más altas."
           }
         }
       }
@@ -5444,6 +8216,12 @@
             "state" : "translated",
             "value" : "Le Soleil et la Lune sont alignés, ce qui renforce leurs effets sur les marées. Le marnage accru tend à produire des hautes eaux plus hautes et des basses eaux plus basses."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El Sol y la Luna están alineados y refuerzan mutuamente sus efectos de marea. La mayor amplitud tiende a producir pleamares más altas y bajamares más bajas."
+          }
         }
       }
     },
@@ -5454,6 +8232,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marées"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mareas"
           }
         }
       }
@@ -5466,6 +8250,12 @@
             "state" : "translated",
             "value" : "Aujourd’hui"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoy"
+          }
         }
       }
     },
@@ -5477,6 +8267,12 @@
             "state" : "translated",
             "value" : "Demain"
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mañana"
+          }
         }
       }
     },
@@ -5487,6 +8283,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hier"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ayer"
           }
         }
       }

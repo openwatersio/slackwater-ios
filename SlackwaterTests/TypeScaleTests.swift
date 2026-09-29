@@ -1,7 +1,17 @@
+import SwiftUI
 import XCTest
 @testable import Slackwater
 
 final class TypeScaleTests: XCTestCase {
+
+    @MainActor
+    func testSeriesFiltersWrapWholePillsAtNarrowWidths() {
+        let height = UIHostingController(rootView: SeriesFilterChips().frame(width: 130))
+            .sizeThatFits(in: CGSize(width: 130, height: 1_000)).height
+
+        XCTAssertGreaterThanOrEqual(height, 88,
+                                    "narrow filters compressed their labels instead of wrapping pills")
+    }
 
     /// Repo-wide, not file-scoped, and deliberately so: the last time this
     /// project guarded a retired token one file at a time, the survivor was in
