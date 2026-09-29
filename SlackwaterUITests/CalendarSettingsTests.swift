@@ -68,8 +68,13 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         // omitted — Apple's own documented popover behavior: tapping outside the dialog
         // serves as cancel, so an explicit Cancel row would be redundant. Dismiss the same
         // way AlertPopupTests does for its own popover, off-center so the tap can't land on
-        // the dialog itself.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+        // the dialog itself. dy: 0.7, not a point near the top: on iPad, Settings presents as a
+        // bounded (not full-screen) sheet and this confirmationDialog anchors as a popover near
+        // the toggle — high on screen, not centered the way it renders on iPhone — so a
+        // near-top point lands on the popover itself instead of past it. The lower-middle of the
+        // screen is empty on both form factors, well below either popover position and still
+        // inside the Calendar screen's own bounds.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).tap()
         XCTAssertEqual(toggle.value as? String, "1", "dismissing outside the dialog must leave the toggle on")
 
         toggle.tap()

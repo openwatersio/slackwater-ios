@@ -10,6 +10,8 @@ struct CalendarStationsView: View {
     @State private var denied = false
     @State private var failed = false
     @State private var failedName = ""
+    @State private var revoked = false
+    @State private var revokedName = ""
 
     /// A calendar (and its events) about to go away before this toggle finishes — an outright
     /// turn-off, or the free tier's swap. `on` is nil for a plain turn-off and set to the
@@ -25,18 +27,15 @@ struct CalendarStationsView: View {
 
     private func name(_ stationID: String) -> String { StationItem.byId[stationID]?.name ?? stationID }
 
-    /// A station can publish only what this device can predict offline. An online-only CHS
-    /// gate has no loader record, so it has nothing to write (spec §8).
-    private func canPublish(_ stationID: String) -> Bool {
-        WidgetStationLoader.loadRecord(id: stationID) != nil
-    }
-
     var body: some View {
         ScrollView {
             // A plain VStack, not LazyVStack or List: a Toggle hosted in either of those never
             // delivers its tap to the Toggle's own Binding on this simulator's iOS build — a
-            // person's tap would hit the same dead control, not just this test harness. The
-            // favorites list a person stars is small; eager layout costs nothing here.
+            // person's tap would hit the same dead control, not just this test harness.
+            // ponytail: eager layout, not lazy — unlike OfflineManagerList's queue (bounded by
+            // construction), nothing in FavoritesStore caps how many stations a person can star.
+            // Revisit (a capped list, or a lazy container once the Toggle-tap bug above is
+            // understood) if a real favorites list ever gets long enough for this to measure.
             VStack(alignment: .leading, spacing: 10) {
                 if favorites.ids.isEmpty {
                     Text("Save a station and it can publish its tides or slack windows to your calendar.")
@@ -71,6 +70,11 @@ struct CalendarStationsView: View {
         } message: {
             Text("Slackwater couldn't create a calendar for it. Some calendar accounts — Google, Exchange — don't allow new calendars.")
         }
+        .alert("\(revokedName) is off", isPresented: $revoked) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Slackwater will stop publishing to this calendar, but calendar access is off, so it can't remove the calendar itself. Delete it by hand in Calendar if you don't want it anymore.")
+        }
         .confirmationDialog(pendingTitle, isPresented: pendingPrompt, presenting: pending) { removal in
             Button(removal.on == nil ? "Turn Off" : "Replace", role: .destructive) { Task { await apply(removal) } }
             if removal.on != nil { Button("Get Premium") { showPremium = true } }
@@ -98,20 +102,25 @@ struct CalendarStationsView: View {
 
     private func row(_ stationID: String) -> some View {
         let on = calendars.subscriptions.contains { $0.stationID == stationID }
-        let publishable = canPublish(stationID)
+        // A station can publish only what this device can predict offline. An online-only CHS
+        // gate has no loader record, so it has nothing to write (spec §8). Resolved once — the
+        // record is read again below for the calendar kind, and a second `loadRecord` call in
+        // the same render pass would be a second catalog scan for a value already in hand.
+        let record = WidgetStationLoader.loadRecord(id: stationID)
+        let subtitle: String = if let record {
+            on ? stationCalendarTitle(name: name(stationID), kind: record.calendarKind) : "Publish this station's events"
+        } else {
+            "Needs a download before it can publish"
+        }
         return Toggle(isOn: Binding(get: { on }, set: { _ in Task { await toggle(stationID) } })) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name(stationID)).foregroundStyle(.white)
-                Text(publishable
-                     ? (on ? stationCalendarTitle(name: name(stationID),
-                                                  kind: WidgetStationLoader.loadRecord(id: stationID)!.calendarKind)
-                           : "Publish this station's events")
-                     : "Needs a download before it can publish")
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(SN.foam.opacity(0.62))
             }
         }
-        .disabled(!publishable)
+        .disabled(record == nil)
         .padding(16)
         .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -123,6 +132,18 @@ struct CalendarStationsView: View {
         switch calendarSubscriptionChange(calendars.subscriptions, stationID: stationID,
                                           premium: premium.isPremium) {
         case .remove:
+            // `futureEventCount`/`removeCalendar` both no-op without `authorized` (Task 5's own
+            // guard) — a station subscribed while permission existed and revoked since would
+            // otherwise get the normal destructive confirmation promising a deletion this device
+            // cannot perform, agree to it, and keep the calendar syncing everywhere else while
+            // this toggle reads off. Tell the truth instead: drop the subscription, which is all
+            // this device can actually do, and say so.
+            guard AlertCalendar.authorized else {
+                calendars.unsubscribe(stationID)
+                revokedName = name(stationID)
+                revoked = true
+                return
+            }
             pending = PendingRemoval(off: stationID, offName: name(stationID),
                                      events: AlertCalendar.futureEventCount(for: stationID, now: appNow()),
                                      on: nil)
@@ -144,18 +165,19 @@ struct CalendarStationsView: View {
         if let on = removal.on { await subscribeAndVerify(on) }
     }
 
-    /// Subscribes, then runs the scheduler's own reschedule — the same pass `onChange` already
-    /// fires in the background, awaited directly here so this toggle can see the outcome.
-    /// `subscribe` first: `StationCalendarStore.setCalendarID` silently drops the id for a
-    /// station not yet subscribed. EventKit's writes in `AlertCalendar` are all `try?` with no
-    /// logging, so a source that refuses new calendars — Google, Exchange — would otherwise
-    /// leave the toggle on with a calendar that never arrives and no explanation.
+    /// Subscribes — without notifying (`notify: false`): this call drives its own reschedule and
+    /// awaits it directly below, so letting `subscribe` also fire `onChange` would start a
+    /// second, unawaited pass over the same work — then runs that reschedule so this toggle can
+    /// see the real outcome. `subscribe` first: `StationCalendarStore.setCalendarID` silently
+    /// drops the id for a station not yet subscribed. EventKit's writes in `AlertCalendar` are
+    /// all `try?` with no logging, so a source that refuses new calendars — Google, Exchange —
+    /// would otherwise leave the toggle on with a calendar that never arrives and no explanation.
     /// ponytail: a station with zero occurrences in the 90-day horizon would read the same as a
     /// creation failure (`AlertCalendar.apply` skips making an empty calendar) — not reachable
     /// by any bundled tide or current station, which always has a next high/low or slack window
     /// inside that window.
     private func subscribeAndVerify(_ stationID: String) async {
-        calendars.subscribe(stationID)
+        calendars.subscribe(stationID, notify: false)
         await AlertScheduler.shared.reschedule()
         guard calendars.calendarID(for: stationID) == nil else { return }
         calendars.unsubscribe(stationID)

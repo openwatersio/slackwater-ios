@@ -161,4 +161,20 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(store.subscriptions, [])
         XCTAssertNil(store.calendarID(for: "a"))
     }
+
+    @MainActor func testSubscribeSkipsNotifyingOnlyWhenToldTo() {
+        // A caller that drives its own `AlertScheduler.reschedule()` and awaits the result
+        // (CalendarStationsView.subscribeAndVerify) passes `notify: false` so `onChange` doesn't
+        // also fire `requestReschedule()` — that would be a second, unawaited pass over the same
+        // 90-day resolve. Every other caller keeps the default.
+        let store = StationCalendarStore(defaults: defaults())
+        var notified = 0
+        store.onChange = { notified += 1 }
+
+        store.subscribe("a", notify: false)
+        XCTAssertEqual(notified, 0)
+
+        store.subscribe("b")
+        XCTAssertEqual(notified, 1)
+    }
 }

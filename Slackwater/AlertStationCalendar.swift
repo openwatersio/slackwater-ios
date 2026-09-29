@@ -90,10 +90,12 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
     }
 
     /// Idempotent: subscribing to a station already on keeps the calendar it already has.
-    func subscribe(_ stationID: String) {
+    /// `notify: false` is for a caller that drives its own reschedule and awaits the result —
+    /// firing `onChange` too would start a second, unawaited pass over the same work.
+    func subscribe(_ stationID: String, notify: Bool = true) {
         guard !subscriptions.contains(where: { $0.stationID == stationID }) else { return }
         subscriptions.append(StationCalendar(stationID: stationID))
-        persist()
+        persist(notify: notify)
     }
 
     func unsubscribe(_ stationID: String) {
@@ -107,8 +109,8 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
         persist()
     }
 
-    private func persist() {
-        defer { onChange() }
+    private func persist(notify: Bool = true) {
+        defer { if notify { onChange() } }
         // An encoding failure keeps what's stored rather than overwriting it with nothing.
         guard let data = try? JSONEncoder().encode(subscriptions) else { return }
         defaults.set(data, forKey: AppGroup.stationCalendarsKey)
