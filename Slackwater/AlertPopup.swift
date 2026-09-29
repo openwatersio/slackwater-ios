@@ -26,13 +26,17 @@ struct AlertPopup: View {
         let state = alertPopupState(store.rules, stationID: stationID, offer: offer,
                                     at: moment, premium: premium.isPremium)
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(stationName)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(SN.foam.opacity(0.62))
-                Text("\(moment.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, timeZone: tz))) · \(alertEventName(offer, imperial: imperial))")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(.white)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stationName)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(SN.foam.opacity(0.62))
+                    Text("\(moment.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, timeZone: tz))) · \(alertEventName(offer, imperial: imperial))")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+                Spacer(minLength: 0)
+                close
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -45,6 +49,23 @@ struct AlertPopup: View {
         .frame(width: 280)
         .background(SN.cardFill)
         .sheet(isPresented: $showPremium) { PremiumView() }
+    }
+
+    /// A way out that isn't a row: a press landed by accident must not have to set an alert to
+    /// get rid of this. Dismissing by tapping outside a popover is iPad's own affordance and
+    /// stays, but it is a hard target over a split layout — the UI test that relies on it takes
+    /// minutes of retries to land one.
+    private var close: some View {
+        Image(systemName: "xmark")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(SN.foam.opacity(0.62))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            // A tap gesture, not a Button, for the same reason the rows below use one.
+            .onTapGesture { dismiss() }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("alert-popup-close")
     }
 
     private func row(_ title: String, on: Bool, id: String,

@@ -51,8 +51,12 @@ final class AlertPopupTests: ScreenshotTestCase {
         openFridayHarbor(app)
         pressStrip(app)
         XCTAssert(app.buttons["alert-popup-once"].appears(within: 5))
-        // Dismiss by tapping outside the popover.
-        app.tap()
+        // The popup's own close control. A tap outside the popover dismisses it too, but on
+        // iPad that tap lands somewhere in a split layout and XCUITest can spend minutes
+        // retrying it — several times the whole rest of this suite.
+        app.descendants(matching: .any)["alert-popup-close"].firstMatch.tap()
+        XCTAssert(app.buttons["alert-popup-once"].disappears(within: 5),
+                  "the popup stayed open after its close control was tapped")
 
         let reading = app.descendants(matching: .any)["detail-reading"].firstMatch
         let before = reading.label
