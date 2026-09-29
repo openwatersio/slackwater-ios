@@ -74,7 +74,6 @@ struct AlertStatusSnapshot: Equatable {
     var scheduledThrough: [UUID: Date] = [:]
     var unresolved: Set<UUID> = []
     var notificationsAuthorized = false
-    var calendarAuthorized = false
 }
 
 @MainActor final class AlertScheduler: ObservableObject {
@@ -100,6 +99,23 @@ struct AlertStatusSnapshot: Equatable {
         running = false
     }
 
+    /// One full pass: expire what's due, resolve 90 days off the main actor, then write the
+    /// calendars and the notifications.
+    ///
+    /// Two constraints hold it up, and both are invisible at the call site.
+    ///
+    /// It must be callable directly and run to completion, not only through `coalesced()`:
+    /// `CalendarStationsView.subscribeAndVerify` awaits this exact call and reads whether a
+    /// calendar came out of it, which is the only signal that a source refused to make one.
+    /// Routing it through the coalescer would return before the work it is inspecting happened.
+    ///
+    /// And it must stay safe to interleave with a coalesced pass, because that direct call can
+    /// land in the middle of one. Both writers are built for that: `AlertCalendar.apply` has no
+    /// `await` in it, so its EventKit removes and adds are atomic against the other pass, and it
+    /// writes only stations the live store and the caller's snapshot agree on;
+    /// `AlertNotifications.apply` keys every request on the occurrence, so two passes over the
+    /// same rules converge on the same set instead of doubling it. Anything added here that
+    /// suspends mid-write, or writes off a snapshot without re-checking it, breaks that.
     func reschedule(now: Date = appNow()) async {
         for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
             AlertRuleStore.shared.remove(id)
@@ -142,7 +158,6 @@ struct AlertStatusSnapshot: Equatable {
 
         status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
                                      unresolved: resolved.unresolved,
-                                     notificationsAuthorized: await AlertNotifications.authorized(),
-                                     calendarAuthorized: AlertCalendar.authorized)
+                                     notificationsAuthorized: await AlertNotifications.authorized())
     }
 }

@@ -48,7 +48,10 @@ struct AlertRule: Codable, Identifiable, Equatable {
     var trigger: AlertTrigger
     /// Set: only the occurrence at this instant, and the rule expires once it passes.
     var once: Date?
-    var lead: TimeInterval = 1_800
+    /// Seconds before the event that the notification fires. Zero by default: the calendar's
+    /// throwaway rules (§5.1) are rules with no lead, and the long-press popup passes its own
+    /// half hour (§7.2).
+    var lead: TimeInterval = 0
     var daylightOnly = false
     var enabled = true
 }

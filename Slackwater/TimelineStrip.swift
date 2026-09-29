@@ -44,8 +44,8 @@ enum Timeline {
     static let magnetPts: CGFloat = 46    // snap radius around the centerline
     static let accessibilityStep: TimeInterval = 300    // one VoiceOver increment
     static let pillTarget: CGFloat = 44    // a pill's semantic hit target; the capsule is ~30
-    /// No scrub change for this long is a strip at rest: the chrome comes back and the alert
-    /// row's taps start counting.
+    /// No scrub change for this long is a strip at rest, and the chrome — commentary, the Now
+    /// pill — comes back over it.
     static let rest: Duration = .milliseconds(450)
     /// The one-shot loading affordance: show two hours of tide/current and sky
     /// motion, then settle on the live reading before the page feels delayed.

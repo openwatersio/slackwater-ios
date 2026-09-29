@@ -88,7 +88,8 @@ final class PremiumStore: ObservableObject {
         isPremium = premium
         Self.cache(premium, into: AppGroup.defaults)
         WidgetCenter.shared.reloadAllTimelines()
-        // Gaining Premium schedules notifications and calendar alarms; losing it clears them
+        // Notifications are what the tier decides: gaining Premium schedules them, losing it
+        // clears them. Station calendars publish at any tier and are left exactly as they are
         // (notifications spec §6).
         AlertScheduler.requestReschedule()
     }

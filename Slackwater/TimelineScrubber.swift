@@ -511,11 +511,9 @@ struct TimelineScrubber: UIViewRepresentable {
         @objc func handlePress(_ g: UILongPressGestureRecognizer) {
             guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
             let p = g.location(in: sv)
-            // The row-split guard above already keeps this in the plot region, so `tapTarget`
-            // always takes its plot branch here — the same magnet the strip settles into: a
-            // press near a turn means that turn.
-            guard p.y <= (parent.geo.timeY + parent.geo.dayY) / 2, let target = tapTarget(x: p.x, y: p.y)
-            else { return }
+            // The plot region only, so `tapTarget` always takes its plot branch here — the same
+            // magnet the strip settles into: a press near a turn means that turn.
+            guard p.y <= rowSplit, let target = tapTarget(x: p.x, y: p.y) else { return }
             stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
             cancelMagnet()
@@ -530,11 +528,12 @@ struct TimelineScrubber: UIViewRepresentable {
         /// What a tap at this point on the strip means: the moment to bring to
         /// the centerline, or nil for the date — the one label that names a day
         /// rather than a moment, and so opens the picker.
+        /// The line between the plot with its axis times (at or above) and the day row (below),
+        /// from the two rows' own y's: the strip's geometry is all literal points and moves.
+        private var rowSplit: CGFloat { (parent.geo.timeY + parent.geo.dayY) / 2 }
+
         private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
             let data = parent.data
-            // Between the axis times' row and the day row, from the two rows'
-            // own y's: the strip's geometry is all literal points and moves.
-            let rowSplit = (parent.geo.timeY + parent.geo.dayY) / 2
             guard y > rowSplit else {
                 // The plot and its axis: the tapped moment, pulled onto a stop
                 // by the same magnet a drag settles into.
