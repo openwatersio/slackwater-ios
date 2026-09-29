@@ -19,6 +19,17 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showWidgets = false
     @ObservedObject private var alerts = AlertRuleStore.shared
+    @ObservedObject private var calendars = StationCalendarStore.shared
+
+    /// What the Calendar row says it is doing, from what is actually subscribed.
+    private var calendarSummary: String {
+        let on = calendars.subscriptions.map(\.stationID)
+        return switch on.count {
+        case 0: "Publish a station's tides or slack windows to your calendar"
+        case 1: StationItem.byId[on[0]]?.name ?? "1 station"
+        default: "\(on.count) stations"
+        }
+    }
 
     private var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -80,6 +91,24 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
+                    }
+
+                    section("Calendar") {
+                        NavigationLink {
+                            CalendarStationsView()
+                                .navigationTitle("Calendar")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text(calendarSummary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
+                        .accessibilityIdentifier("settings-calendar-row")
                     }
 
                     // The downloads manager also lives one tap from the list,

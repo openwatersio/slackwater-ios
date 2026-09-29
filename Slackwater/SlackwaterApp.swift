@@ -24,6 +24,7 @@ struct SlackwaterApp: App {
         }
         _ = UnitsCloud.shared
         AlertRuleStore.shared.onChange = { AlertScheduler.requestReschedule() }
+        StationCalendarStore.shared.onChange = { AlertScheduler.requestReschedule() }
         // Before launch finishes, so a tap that cold-launches the app is delivered.
         UNUserNotificationCenter.current().delegate = AlertNotificationDelegate.shared
         // Chart packs download whether or not the map is ever opened.

@@ -73,6 +73,13 @@ func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: S
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        // UI-test hook, like FavoritesStore's `-resetFavorites`: this store and the
+        // EventKit calendars it names both persist across a run's separate app launches
+        // (same simulator, same App Group), so a test that toggles a calendar on needs its
+        // own way back to a clean slate.
+        if CommandLine.arguments.contains("-resetCalendars") {
+            defaults.removeObject(forKey: AppGroup.stationCalendarsKey)
+        }
         subscriptions = defaults.data(forKey: AppGroup.stationCalendarsKey)
             .flatMap { try? JSONDecoder().decode([StationCalendar].self, from: $0) } ?? []
     }
