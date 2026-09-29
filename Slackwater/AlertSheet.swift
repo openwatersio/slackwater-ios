@@ -4,11 +4,9 @@ import SwiftUI
 struct AlertSheet: View {
     @State var rule: AlertRule
     let stationName: String
-    @ObservedObject private var premium = PremiumStore.shared
     @ObservedObject private var store = AlertRuleStore.shared
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @Environment(\.dismiss) private var dismiss
-    @State private var showPremium = false
     @State private var saving = false
 
     var body: some View {
@@ -24,6 +22,16 @@ struct AlertSheet: View {
                         ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
                     }
                     Toggle("Daylight only", isOn: $rule.daylightOnly)
+                    if let when = alertRuleWhen(rule, tz: .current) {
+                        LabeledContent("This one", value: when)
+                            .monospacedDigit()
+                    }
+                    // Off and disabled once the rule already repeats: there's no moment left to
+                    // bind back to, and offering to pick one here would need a date picker — the
+                    // long-press popover that created this rule already is one.
+                    Toggle("Every time", isOn: Binding(get: { rule.once == nil },
+                                                       set: { rule.once = $0 ? nil : rule.once }))
+                        .disabled(rule.once == nil)
                 }
                 Section {
                     Toggle("On", isOn: $rule.enabled)
@@ -46,7 +54,6 @@ struct AlertSheet: View {
                         .disabled(saving)
                 }
             }
-            .sheet(isPresented: $showPremium) { PremiumView() }
         }
         .preferredColorScheme(.dark)
     }

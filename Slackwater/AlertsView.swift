@@ -27,6 +27,16 @@ func alertStationGroups(_ rules: [AlertRule], name: (String) -> String) -> [Aler
         .sorted { ($0.name, $0.stationID) < ($1.name, $1.stationID) }
 }
 
+/// When a `once` rule fires, for the Alerts list and the rule sheet. Nil for a repeating rule:
+/// it has no one moment to name.
+func alertRuleWhen(_ rule: AlertRule, tz: TimeZone,
+                   locale: Locale = .autoupdatingCurrent) -> String? {
+    rule.once.map {
+        $0.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, timeZone: tz)
+            .locale(locale))
+    }
+}
+
 struct AlertsView: View {
     @ObservedObject private var store = AlertRuleStore.shared
     @ObservedObject private var scheduler = AlertScheduler.shared
@@ -51,6 +61,15 @@ struct AlertsView: View {
                                                       imperial: units == "imperial"))
                                     .monospacedDigit()
                                     .foregroundStyle(.white)
+                                // ponytail: tz: .current reads the device's zone, not the station's — a
+                                // Pacific rule read from an eastbound phone shows the wrong hour. Fix by
+                                // threading AlertPlace.tz (AlertScheduler.places[rule.stationID]) through
+                                // to this row once the list carries station places, not just names.
+                                if let when = alertRuleWhen(rule, tz: .current) {
+                                    Text(when)
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(SN.foam.opacity(0.62))
+                                }
                                 Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
                                     .font(.caption)
                                     .foregroundStyle(SN.foam.opacity(0.62))

@@ -52,4 +52,22 @@ final class AlertStatusTests: XCTestCase {
         XCTAssertEqual(groups.map(\.stationID), ["current:noaa/PUG1515", "noaa/9449880"])
         XCTAssertEqual(groups.map(\.rules), [[current], [tide]])
     }
+
+    func testAOnceRuleNamesItsDayAndARepeatingOneDoesNot() {
+        let moment = Date(timeIntervalSince1970: 1_700_000_040)
+        let once = AlertRule(stationID: "a", trigger: .slack, once: moment)
+
+        XCTAssertNotNil(alertRuleWhen(once, tz: .gmt))
+        XCTAssertNil(alertRuleWhen(AlertRule(stationID: "a", trigger: .slack), tz: .gmt))
+    }
+
+    func testAOnceRuleReadsInTheStationsZone() {
+        let moment = Date(timeIntervalSince1970: 1_700_000_040)   // 2023-11-14 22:13 UTC
+
+        let utc = alertRuleWhen(AlertRule(stationID: "a", trigger: .slack, once: moment), tz: .gmt)
+        let pacific = alertRuleWhen(AlertRule(stationID: "a", trigger: .slack, once: moment),
+                                    tz: TimeZone(identifier: "America/Los_Angeles")!)
+
+        XCTAssertNotEqual(utc, pacific)
+    }
 }
