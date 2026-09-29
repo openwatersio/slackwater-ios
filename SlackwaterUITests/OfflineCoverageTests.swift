@@ -162,11 +162,11 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
     func testTappingADeferredRowOpensTheStation() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
-                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria-harbour",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openDownloads(app)
-        let row = app.descendants(matching: .any)["download-row-chs-victoria-harbour"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded deferred row is missing")
         XCTAssert(reachInSheet(row, in: app), "the deferred row never became hittable")
         XCTAssert(row.label.contains("Retrying in"), "deferred row says: \(row.label)")
@@ -180,7 +180,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
 
     func testRetryNowAppearsWhileSomethingIsDeferred() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
-                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria-harbour",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openDownloads(app)
