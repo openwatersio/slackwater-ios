@@ -97,7 +97,7 @@ final class StationCalendarTests: XCTestCase {
     func testASubscribedStationWithNoEventsIsStillEmptied() {
         // It resolved and genuinely has nothing in the next 90 days — an empty plan is the
         // truth, and a calendar holding last month's events must be cleared.
-        let groups = calendarWriteGroups([], subscribed: ["a"], skipping: [])
+        let groups = calendarWriteGroups([], subscribed: ["a"], live: ["a"], skipping: [])
 
         XCTAssertEqual(Set(groups.keys), ["a"])
         XCTAssertEqual(groups["a"]?.count, 0)
@@ -106,31 +106,46 @@ final class StationCalendarTests: XCTestCase {
     func testAStationThatCouldNotLoadIsLeftAlone() {
         // "Nothing known yet" is not "delete the next 90 days" — a CHS station waiting on its
         // fit must not have its calendar wiped on every foreground.
-        let groups = calendarWriteGroups([], subscribed: ["a", "b"], skipping: ["b"])
+        let groups = calendarWriteGroups([], subscribed: ["a", "b"], live: ["a", "b"], skipping: ["b"])
 
         XCTAssertEqual(Set(groups.keys), ["a"])
     }
 
     func testEntriesGoToTheirOwnStationsCalendar() {
         let groups = calendarWriteGroups([entry("a"), entry("b"), entry("a")],
-                                         subscribed: ["a", "b"], skipping: [])
+                                         subscribed: ["a", "b"], live: ["a", "b"], skipping: [])
 
         XCTAssertEqual(groups["a"]?.count, 2)
         XCTAssertEqual(groups["b"]?.count, 1)
     }
 
-    func testAnUnsubscribedStationsEntriesAreDropped() {
-        // Belt and braces: a stale entry can't resurrect a calendar the user turned off.
-        let groups = calendarWriteGroups([entry("gone")], subscribed: ["a"], skipping: [])
+    func testAStationTurnedOffDuringTheResolveIsNotWritten() {
+        // The real shape of it: `subscribed` is the snapshot the 90-day resolve started from, so
+        // a station turned off since is still in it, carrying a full plan. Writing that plan
+        // would build a fresh calendar seconds after the user watched its own be deleted — one
+        // the app holds no id for and can never remove.
+        let groups = calendarWriteGroups([entry("gone"), entry("a")],
+                                         subscribed: ["a", "gone"], live: ["a"], skipping: [])
 
         XCTAssertEqual(Set(groups.keys), ["a"])
-        XCTAssertEqual(groups["a"]?.count, 0)
+        XCTAssertEqual(groups["a"]?.count, 1)
+    }
+
+    func testAStationTurnedOnDuringTheResolveWaitsForItsOwnPass() {
+        // The other side of the intersection: the store holds it, but this run's resolve never
+        // planned for it. An empty plan would read as "delete the next 90 days" on a calendar
+        // another device may already have filled. Its own toggle drives the pass that fills it.
+        let groups = calendarWriteGroups([entry("a")], subscribed: ["a"], live: ["a", "new"],
+                                         skipping: [])
+
+        XCTAssertEqual(Set(groups.keys), ["a"])
     }
 
     func testASkippedStationsEntriesCannotResurrectIt() {
         // A station's own entries must not override a skip: a plan for a station that could not
         // load is a stale leftover, not proof it resolved after all.
-        let groups = calendarWriteGroups([entry("b")], subscribed: ["a", "b"], skipping: ["b"])
+        let groups = calendarWriteGroups([entry("b")], subscribed: ["a", "b"], live: ["a", "b"],
+                                         skipping: ["b"])
 
         XCTAssertEqual(Set(groups.keys), ["a"])
     }

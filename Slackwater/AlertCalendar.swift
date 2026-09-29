@@ -1,14 +1,25 @@
 // Slackwater — GPL v3. One calendar per subscribed station, and only the calendars this app made (notifications spec §5.1).
 import EventKit
+import os
 
 /// Which calendars this run rewrites, and with what. A subscribed station that resolved gets
 /// its plan even when that plan is empty — it genuinely has nothing coming, and last month's
 /// events have to go. A station that could NOT be loaded is absent instead: an empty plan from
 /// a CHS station still waiting on its fit would read as "delete the next 90 days".
-func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
+///
+/// `subscribed` is the snapshot the 90-day resolve behind `entries` ran against; `live` is what
+/// the store holds now. Only a station in both is written, because the two disagree whenever a
+/// toggle lands during that resolve: a station turned off in the gap still carries a full plan
+/// here, and writing it would build a fresh calendar seconds after the user watched its own be
+/// deleted — one the app holds no id for and can never remove again. A station turned on in the
+/// gap is missing from `subscribed` instead, has no plan, and waits for the pass its own toggle
+/// starts.
+func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String], live: Set<String>,
                          skipping: Set<String>) -> [String: [AlertEntry]] {
     var groups: [String: [AlertEntry]] = [:]
-    for stationID in subscribed where !skipping.contains(stationID) { groups[stationID] = [] }
+    for stationID in subscribed where live.contains(stationID) && !skipping.contains(stationID) {
+        groups[stationID] = []
+    }
     for entry in entries where groups[entry.stationID] != nil {
         groups[entry.stationID]?.append(entry)
     }
@@ -17,6 +28,7 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
 
 @MainActor enum AlertCalendar {
     private static let store = EKEventStore()
+    private static let logger = Logger(subsystem: "org.openwaters.slackwater", category: "Calendar")
 
     /// Full access only. Write-only access can save new events but never read back or
     /// remove them, so a comfort-speed change would strand the old windows in someone's calendar.
@@ -84,7 +96,11 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
             StationCalendarStore.shared.setCalendarID(adopted.calendarIdentifier, for: stationID)
             return adopted
         }
-        guard create else { return nil }
+        // Only a station the store holds right now gets a calendar made for it. A creation the
+        // store has no subscription for is one `setCalendarID` would drop on the floor, leaving
+        // a calendar syncing to every device that this app has no id for and cannot remove.
+        guard create, StationCalendarStore.shared.subscriptions.contains(where: { $0.stationID == stationID })
+        else { return nil }
         for source in sources {
             let calendar = EKCalendar(for: .event, eventStore: store)
             calendar.title = title
@@ -114,12 +130,11 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
             calendars: [calendar])).count
     }
 
-    /// Makes each subscribed station's calendar match its plan. `subscribed` is the caller's own
-    /// snapshot, not re-read from the store here: the toggle that changes a subscription is what
-    /// triggers a reschedule, so a run with a subscription change in flight is the normal case.
-    /// Re-reading the store here would see a station the resolve behind `entries` neither planned
-    /// for nor skipped, hand it an empty plan, and wipe a calendar that may already hold another
-    /// device's events.
+    /// Makes each subscribed station's calendar match its plan — but only where the caller's
+    /// snapshot and the live store agree on the station (`calendarWriteGroups`). The toggle that
+    /// changes a subscription is what triggers a reschedule, so a run with a subscription change
+    /// in flight is the normal case, and each side of the disagreement is wrong to write for its
+    /// own reason.
     static func apply(_ entries: [AlertEntry], subscribed: [String], skipping: Set<String> = [], now: Date) {
         guard authorized else { return }
         // The store is long-lived and caches what it has already seen. Without a reset, a
@@ -127,7 +142,9 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
         // invisible here, and `calendarFor`'s ownership check creates the duplicate it exists to
         // prevent.
         store.reset()
-        for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed, skipping: skipping) {
+        let live = Set(StationCalendarStore.shared.subscriptions.map(\.stationID))
+        for (stationID, planned) in calendarWriteGroups(entries, subscribed: subscribed,
+                                                        live: live, skipping: skipping) {
             guard let record = WidgetStationLoader.loadRecord(id: stationID) else { continue }
             let title = stationCalendarTitle(name: record.alertPlace.name, kind: record.calendarKind)
             // Nothing planned and no calendar yet: don't make an empty one.
@@ -172,6 +189,13 @@ func calendarWriteGroups(_ entries: [AlertEntry], subscribed: [String],
             event.url = entry.url
             try? store.save(event, span: .thisEvent, commit: false)
         }
-        try? store.commit()
+        // The one failure worth a log: a refused commit discards the whole batch — every remove
+        // and every add — and reads from outside as "the calendar just stopped updating". The
+        // individual saves above are `try?` because one refused event is not the run.
+        do { try store.commit() } catch {
+            // The calendar's own title is a station name — a place this person watches — so it
+            // stays out of the system log; the error is what says why.
+            logger.error("Calendar commit failed: \(String(describing: error), privacy: .public)")
+        }
     }
 }
