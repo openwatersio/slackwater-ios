@@ -138,7 +138,7 @@ import TideEngine
         }
         print("90 days of daylight slack windows: \(took * 1000) ms, \(found.count) occurrences")
         XCTAssertGreaterThan(found.count, 100)
-        // Spec §11 spike 3. If this fails, report the printed time; do not widen the budget.
+        // Spec §11 spike 2 (cost). If this fails, report the printed time; do not widen the budget.
         XCTAssertLessThan(took, 1.0 * perfScale)
     }
 
@@ -158,10 +158,12 @@ import TideEngine
         let later = now.addingTimeInterval(3_700)
         // Clear of `later`, so an instant flooring across it can't change either run's count.
         let cut = later.addingTimeInterval(120)
+        var ran = 0
         for (id, trigger) in cases {
             // A CHS derived gate predicts only once its reference port is fitted, which not
             // every machine has done. Skipping is right; asserting would fail by geography.
             guard let record = WidgetStationLoader.loadRecord(id: id) else { continue }
+            ran += 1
             let (station, position) = (WidgetStationLoader.station(from: record), record.alertPosition)
             let rule = AlertRule(stationID: id, trigger: trigger)
             let first = alertOccurrences(rule, station: station, position: position, from: now, to: week, threshold: 0.5)
@@ -176,6 +178,10 @@ import TideEngine
                                          "\(trigger) window end drifted past a minute")
             }
         }
+        // Only the CHS derived gate is allowed to be absent. If the bundled six stop loading,
+        // this test passes on an empty loop while every foreground silently rewrites the user's
+        // calendar — the one thing it exists to catch.
+        XCTAssertGreaterThanOrEqual(ran, 6, "the bundled cases must all load")
     }
 
     func testAOnceRuleFindsOnlyItsOwnMoment() throws {

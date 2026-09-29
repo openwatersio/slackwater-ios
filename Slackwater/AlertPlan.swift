@@ -119,6 +119,11 @@ struct CalendarEventShape: Equatable {
     let title: String
     let start: Date
     let end: Date
+    /// Always nil on a planned event: no Slackwater calendar event carries an alarm — the
+    /// calendar is a published record and a reminder is a notification (spec §5.1). Still read
+    /// off stored events and still compared, because that is what makes an event that does
+    /// carry one — written by a build whose events had alarms, and synced from a device that
+    /// hasn't updated — fail to match and be replaced by one that doesn't.
     let alarmOffset: TimeInterval?
 }
 
