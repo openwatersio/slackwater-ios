@@ -106,6 +106,13 @@ The order that works, when a target gains an entitlement:
 5. **Add the appex to `exportOptions`' `provisioningProfiles` dict** in
    `testflight.sh`. A missing entry fails the export *after* a successful archive.
 
+The watch app follows the same order before it can ship. Until its two bundle IDs
+and profiles exist, only Debug builds embed it: the app's Release block sets
+`EXCLUDED_SOURCE_FILE_NAMES: SlackwaterWatch.app`, which skips the Embed Watch
+Content copy, and the watch target builds unsigned in Release. The archive still
+compiles the watch app for the device but leaves it out. Remove both settings in
+the change that registers the watch bundle IDs.
+
 Verify before archiving, rather than after:
 
 ```sh

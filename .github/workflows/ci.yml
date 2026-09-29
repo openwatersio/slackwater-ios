@@ -193,6 +193,10 @@ jobs:
             -testPlan Slackwater -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
             | tail -40
+          # The watch app compiles for the watch simulator as the app's
+          # dependency and embeds in Debug. Its absence means it silently
+          # stopped building, not that the app is fine.
+          test -d build/DerivedData/Build/Products/Debug-iphonesimulator/Slackwater.app/Watch/SlackwaterWatch.app
           # tar, not a bare artifact upload: that drops the executable bits
           # and symlinks the app and the test runner need.
           tar -C build/DerivedData/Build -czf build/products.tgz Products

@@ -9,6 +9,9 @@ options:
   # concern, not this app's.
   deploymentTarget:
     iOS: "26.0"
+    # Matches the iOS floor under the same no-#available-fences rule, and
+    # covers every watch back to Series 6 (#482).
+    watchOS: "26.0"
 settings:
   base:
     # Shared by both targets so the appex's Info.plist $(MARKETING_VERSION)/
@@ -47,6 +50,61 @@ packages:
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
+targetTemplates:
+  # The app sources that build for every platform: no UIKit, no app lifecycle.
+  # The widget extension and the watch app both compile this one list, so a
+  # file added here reaches both. XcodeGen appends a target's own `sources`
+  # and `dependencies` to these.
+  PortableSources:
+    sources:
+      - Slackwater/Localizable.xcstrings
+      # Explicit station catalogs only — NOT the whole Resources folder. That
+      # folder also holds resources (fill bundles, glyphs) that neither the
+      # widget nor the watch reads; bundling it all inflated every widget build.
+      # Keep this list in sync with the `bundled("...")` calls in the model
+      # files below (grep bundled\( to verify).
+      - path: Slackwater/Resources/stations.json
+      - path: Slackwater/Resources/currents.json
+      - path: Slackwater/Resources/chs-stations.json
+      - path: Slackwater/Resources/chs-gates.json
+      - path: Slackwater/Resources/chs-current-gates.json
+      - path: Slackwater/Resources/chs-tombstones.json
+      # 20 KB, and no widget reads it today. It is here because ChsStation.swift
+      # (compiled from this list below) declares `bundled("unavailable-stations")`,
+      # and `bundled` is a preconditionFailure on a missing file — the first
+      # code to touch `UnavailableStation.all` would crash the target, not
+      # degrade. The list's sync rule above is what prevents that.
+      - path: Slackwater/Resources/unavailable-stations.json
+      - Slackwater/AppGroup.swift
+      - Slackwater/Units.swift
+      - Slackwater/Palette.swift
+      - Slackwater/DeepLink.swift
+      - Slackwater/SlackWindow.swift
+      - Slackwater/CardStatus.swift
+      - Slackwater/StationCardFace.swift
+      - Slackwater/StationCardGraph.swift
+      - Slackwater/CurveDrawing.swift
+      - Slackwater/TideMovement.swift
+      - Slackwater/CatalogSnapshot.swift
+      - Slackwater/CatalogStorage.swift
+      - Slackwater/WidgetStationLoader.swift
+      - Slackwater/StationIntent.swift
+      - Slackwater/WidgetSnapshot.swift
+      - Slackwater/DayCurveContentView.swift
+      - Slackwater/NextEventContentView.swift
+      - Slackwater/TideStation.swift
+      - Slackwater/CurrentStation.swift
+      # The types only; station-index.json stays out of the widget on purpose.
+      # The widget resolves one station by id through `decodeCatalogRecord`
+      # and never builds `StationItem.all`, so it never loads the index. The
+      # watch adds the index in its own target below.
+      - Slackwater/StationIndex.swift
+      - Slackwater/ChsStation.swift
+      - Slackwater/ChsGate.swift
+      - Slackwater/ChsCurrentGate.swift
+    dependencies:
+      - package: slackwater
+        product: SlackwaterKit
 targets:
   Slackwater:
     type: application
@@ -61,6 +119,8 @@ targets:
         product: MapLibre
       - target: SlackwaterWidgets
         embed: true
+      # Embedded in Debug only; see EXCLUDED_SOURCE_FILE_NAMES under Release.
+      - target: SlackwaterWatch
     info:
       path: Slackwater/Info.plist
       properties:
@@ -130,58 +190,17 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Apple Distribution"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater App Store"
+          # Keeps the watch app out of the archive until it has its own bundle
+          # IDs and App Store profiles (#482, Phase 3). Xcode applies this
+          # setting to the Embed Watch Content copy as well as to sources, and
+          # skipping the copy also skips its embedded-binary validation. Delete
+          # it, and SlackwaterWatch's Release block, in the provisioning PR.
+          EXCLUDED_SOURCE_FILE_NAMES: SlackwaterWatch.app
   SlackwaterWidgets:
     type: app-extension
     platform: iOS
-    sources:
-      - SlackwaterWidgets
-      - Slackwater/Localizable.xcstrings
-      # Explicit station catalogs only — NOT the whole Resources folder. That
-      # folder also holds resources (fill bundles, glyphs) that nothing in
-      # this appex reads; bundling it all inflated every widget build.
-      # Keep this list in sync with the `bundled("...")` calls in the model
-      # files below (grep bundled\( to verify).
-      - path: Slackwater/Resources/stations.json
-      - path: Slackwater/Resources/currents.json
-      - path: Slackwater/Resources/chs-stations.json
-      - path: Slackwater/Resources/chs-gates.json
-      - path: Slackwater/Resources/chs-current-gates.json
-      - path: Slackwater/Resources/chs-tombstones.json
-      # 20 KB, and no widget reads it today. It is here because ChsStation.swift
-      # (compiled into this appex below) declares `bundled("unavailable-stations")`,
-      # and `bundled` is a preconditionFailure on a missing file — the first
-      # widget to touch `UnavailableStation.all` would crash the appex, not
-      # degrade. The list's sync rule above is what prevents that.
-      - path: Slackwater/Resources/unavailable-stations.json
-      - Slackwater/AppGroup.swift
-      - Slackwater/Units.swift
-      - Slackwater/Palette.swift
-      - Slackwater/DeepLink.swift
-      - Slackwater/SlackWindow.swift
-      - Slackwater/CardStatus.swift
-      - Slackwater/StationCardFace.swift
-      - Slackwater/StationCardGraph.swift
-      - Slackwater/CurveDrawing.swift
-      - Slackwater/TideMovement.swift
-      - Slackwater/CatalogSnapshot.swift
-      - Slackwater/CatalogStorage.swift
-      - Slackwater/WidgetStationLoader.swift
-      - Slackwater/StationIntent.swift
-      - Slackwater/WidgetSnapshot.swift
-      - Slackwater/DayCurveContentView.swift
-      - Slackwater/NextEventContentView.swift
-      - Slackwater/TideStation.swift
-      - Slackwater/CurrentStation.swift
-      # The types only; station-index.json stays out of the appex on purpose.
-      # The widget resolves one station by id through `decodeCatalogRecord`
-      # and never builds `StationItem.all`, so it never loads the index.
-      - Slackwater/StationIndex.swift
-      - Slackwater/ChsStation.swift
-      - Slackwater/ChsGate.swift
-      - Slackwater/ChsCurrentGate.swift
-    dependencies:
-      - package: slackwater
-        product: SlackwaterKit
+    templates: [PortableSources]
+    sources: [SlackwaterWidgets]
     info:
       path: SlackwaterWidgets/Info.plist
       properties:
@@ -213,6 +232,44 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Apple Distribution"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater Widgets App Store"
+  SlackwaterWatch:
+    type: application
+    platform: watchOS
+    templates: [PortableSources]
+    sources:
+      - SlackwaterWatch
+      # The full catalog ships on the watch (#482). The index is the one file
+      # the widget leaves out: the watch browses, so it builds `StationItem.all`.
+      - path: Slackwater/Resources/station-index.json
+    dependencies:
+      - package: Almanac
+        product: Almanac
+    info:
+      path: SlackwaterWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Slackwater
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: io.openwaters.slackwater
+        # Standalone-capable: catalogs are bundled, favorites arrive over
+        # iCloud KVS, and nothing needs the phone (#482).
+        WKRunsIndependentlyOfCompanionApp: true
+    settings:
+      base:
+        # Permanent once registered (#207): the companion's id plus .watchkitapp.
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.watchkitapp
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Z59BQLF5VQ
+        GENERATE_INFOPLIST_FILE: NO
+      configs:
+        # A Release archive still builds this target, because the app depends
+        # on it, but does not embed it (the app's EXCLUDED_SOURCE_FILE_NAMES).
+        # There is no distribution profile to sign it with yet, so it builds
+        # unsigned; XcodeGen's watchOS preset already sets SKIP_INSTALL, which
+        # keeps it out of the archive's products.
+        Release:
+          CODE_SIGNING_ALLOWED: NO
   SlackwaterTests:
     type: bundle.unit-test
     platform: iOS
