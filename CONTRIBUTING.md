@@ -114,7 +114,7 @@ Five jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in c
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 
-`gen-chs-stations.mjs` stays out of CI because it is the only generator that needs the network; its artifact is trusted as committed.
+Every generator reads local files only, so CI regenerates all of them with `npm run build:data`.
 
 ## Documentation
 

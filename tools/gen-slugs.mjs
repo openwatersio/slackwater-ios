@@ -64,19 +64,10 @@ function narrow(kind, files) {
   const table = {};
   const former = { ...(previous.former?.[kind] ?? {}) };
   const missing = [];
-  let reserved = 0;
   for (const id of files.flatMap(ids)) {
     const route = routes.get(id);
     if (!route) {
-      // A CHS port the database reserves a slug for but does not route — the
-      // 1,050 whose identity is published nowhere yet (#17). It keeps the slug
-      // this table last shipped, which is the reservation. Anything else with
-      // no route is a broken catalog, not a gap to paper over.
-      const carried = id.startsWith("chs-") ? previous[kind]?.[id] : undefined;
-      if (carried) {
-        table[id] = carried;
-        reserved++;
-      } else missing.push(id);
+      missing.push(id);
       continue;
     }
     table[id] = route.slug;
@@ -87,7 +78,6 @@ function narrow(kind, files) {
   if (missing.length) {
     throw new Error(`${missing.length} bundled ${kind} station(s) have no published route: ${missing.slice(0, 5).join(", ")}`);
   }
-  if (reserved) console.log(`${kind}: ${reserved} CHS stations on a reserved slug the database does not route yet`);
   // History only for stations still in the bundle: the app cannot open an id
   // it does not carry, and the database's own former paths bring the entry
   // back if the station returns.

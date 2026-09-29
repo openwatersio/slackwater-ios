@@ -124,7 +124,7 @@ struct SettingsView: View {
                         Text("Canadian channel bathymetry: GSC Canada West Coast Topo-Bathymetric DEM. Contains information licensed under the Open Government Licence – Canada.")
                         Text("US channel bathymetry: NOAA National Bathymetric Source (public domain).")
                         Text("Channel cross-sections for grown current patches are derived from this bathymetry; raw survey data is not included.")
-                        Text("Station names and pairings: Slackwater database and @openwaters/station-metadata (MIT).")
+                        Text("Station names and pairings: Slackwater database (MIT).")
                         Text("Prediction engine: Slackwater (MIT).")
                     }
 
