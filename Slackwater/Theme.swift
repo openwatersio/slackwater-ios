@@ -1627,10 +1627,16 @@ struct SeriesFilterChips: View {
     @AppStorage(seriesFilterKey) private var filter: StationSeries?
 
     var body: some View {
-        HStack(spacing: 6) {
-            chip(String(localized: "All", comment: "Station series filter showing all stations."), nil)
-            chip(String(localized: "Tides", comment: "Station series filter showing tide stations."), .tide)
-            chip(String(localized: "Currents", comment: "Station series filter showing current stations."), .current)
+        let all = chip(String(localized: "All", comment: "Station series filter showing all stations."), nil)
+        let tides = chip(String(localized: "Tides", comment: "Station series filter showing tide stations."), .tide)
+        let currents = chip(String(localized: "Currents", comment: "Station series filter showing current stations."), .current)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { all; tides; currents }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) { all; tides }
+                currents
+            }
+            VStack(alignment: .leading, spacing: 0) { all; tides; currents }
         }
     }
 
@@ -1645,6 +1651,7 @@ struct SeriesFilterChips: View {
         // where Button press tracking goes dead in the iPad split detail column.
         return Text(label)
             .font(.caption.weight(.medium))
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(selected ? SN.leaf : SN.foam.opacity(0.6))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)

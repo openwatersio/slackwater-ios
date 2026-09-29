@@ -28,6 +28,12 @@
             "state" : "translated",
             "value" : "Votre position permet de trouver des prévisions de marée et de courant à proximité. Elle reste sur cet appareil."
           }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ubicación ayuda a encontrar predicciones cercanas de mareas y corrientes. Permanece en este dispositivo."
+          }
         }
       }
     }

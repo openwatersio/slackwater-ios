@@ -2,7 +2,7 @@ name: Slackwater
 options:
   bundleIdPrefix: io.openwaters
   developmentLanguage: en
-  knownRegions: [Base, en, fr-CA]
+  knownRegions: [Base, en, es-ES, fr-CA]
   # iOS 26: Liquid Glass chrome with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
