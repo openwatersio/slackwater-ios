@@ -62,9 +62,11 @@ struct AlertsView: View {
                                     .monospacedDigit()
                                     .foregroundStyle(.white)
                                 // ponytail: tz: .current reads the device's zone, not the station's — a
-                                // Pacific rule read from an eastbound phone shows the wrong hour. Fix by
-                                // threading AlertPlace.tz (AlertScheduler.places[rule.stationID]) through
-                                // to this row once the list carries station places, not just names.
+                                // Pacific rule read from an eastbound phone shows the wrong hour. The
+                                // station's zone is AlertPlace.tz, but today it only exists as a local
+                                // inside AlertScheduler.reschedule() (via resolveAlerts); AlertScheduler
+                                // publishes just `status`. Fix needs it to also publish the resolved
+                                // place table so a view can read a station's zone at all.
                                 if let when = alertRuleWhen(rule, tz: .current) {
                                     Text(when)
                                         .font(.caption.monospacedDigit())
