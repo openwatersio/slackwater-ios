@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var showWidgets = false
     @ObservedObject private var alerts = AlertRuleStore.shared
     @ObservedObject private var calendars = StationCalendarStore.shared
+    @State private var settle: Task<Void, Never>?
 
     /// What the Calendar row says it is doing, from what is actually subscribed.
     private var calendarSummary: String {
@@ -235,8 +236,18 @@ struct SettingsView: View {
         Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
                 set: {
                     slackWindowSpeed = normalizedSlackThresholdKn($0)
-                    // Every scheduled slack window was computed at the old threshold.
-                    AlertScheduler.requestReschedule()
+                    // Every scheduled slack window was computed at the old threshold — but only
+                    // the value the user stops on is worth rewriting them for. Holding the
+                    // stepper walks ~99 of them under auto-repeat, and each pass removes and
+                    // re-adds every window in every subscribed calendar, over CalDAV, at a
+                    // threshold nobody asked to keep.
+                    // ponytail: a fixed 400 ms settle on the one control that repeats. A shared
+                    // debouncer when a second control needs one.
+                    settle?.cancel()
+                    settle = Task {
+                        guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return }
+                        AlertScheduler.requestReschedule()
+                    }
                 })
     }
 

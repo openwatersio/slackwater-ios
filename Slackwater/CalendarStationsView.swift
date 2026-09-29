@@ -150,6 +150,10 @@ struct CalendarStationsView: View {
         case .add:
             guard await grantedAccess() else { return }
             await subscribeAndVerify(stationID)
+        case .upsell:
+            // More calendars on than free grants — a lapsed Premium. What they have keeps
+            // publishing; adding to it is what Premium buys.
+            showPremium = true
         case .replace(let off):
             guard await grantedAccess() else { return }
             pending = PendingRemoval(off: off, offName: name(off),

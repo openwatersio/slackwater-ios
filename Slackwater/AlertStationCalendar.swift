@@ -53,14 +53,21 @@ enum CalendarSubscriptionChange: Equatable {
     /// Free holds one calendar: this station goes on and the named one comes off, once the
     /// user has read what that removes (spec §5.1).
     case replace(stationID: String)
+    /// Nothing changes and the tier sheet opens: free, with more calendars already on than free
+    /// grants.
+    case upsell
     case remove
 }
 
 func calendarSubscriptionChange(_ subscriptions: [StationCalendar], stationID: String,
                                 premium: Bool) -> CalendarSubscriptionChange {
     if subscriptions.contains(where: { $0.stationID == stationID }) { return .remove }
-    if !premium, let only = subscriptions.first { return .replace(stationID: only.stationID) }
-    return .add
+    if premium || subscriptions.isEmpty { return .add }
+    // Free holds one calendar. Several on at once is a lapsed Premium, and those stay published
+    // (spec §5.1) — but the free tier's one calendar is a ceiling on adding, not just on
+    // swapping, or dropping one of five and turning a sixth on keeps five of them free forever.
+    guard subscriptions.count == 1 else { return .upsell }
+    return .replace(stationID: subscriptions[0].stationID)
 }
 
 @MainActor final class StationCalendarStore: ObservableObject {

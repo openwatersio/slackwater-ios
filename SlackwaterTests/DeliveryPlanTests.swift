@@ -73,6 +73,55 @@ final class DeliveryPlanTests: XCTestCase {
         XCTAssertEqual(plan, DeliveryPlan(calendar: [], notifications: [o]))
     }
 
+    func testTwoRulesOnTheSameMomentDeliverOneNotification() {
+        // Both popup rows on for one moment: "Alert me" makes a `once` rule, "Every low tide" a
+        // repeating one, and at the moment itself the two carry the same title and the same body.
+        let station = "a"
+        let trigger = AlertTrigger.tideExtreme(high: false)
+        let every = AlertRule(stationID: station, trigger: trigger, lead: 1_800)
+        let event = now.addingTimeInterval(7_200)
+        let once = AlertRule(stationID: station, trigger: trigger, once: event, lead: 1_800)
+        let fire = event.addingTimeInterval(-1_800)
+
+        let plan = deliveryPlan(rules: [every, once],
+                                occurrences: [AlertOccurrence(ruleID: every.id, event: event, fire: fire),
+                                              AlertOccurrence(ruleID: once.id, event: event, fire: fire)],
+                                calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.notifications.count, 1)
+        XCTAssertEqual(plan.notifications.first?.event, event)
+    }
+
+    func testTheSameMomentAtTwoLeadsStaysTwoReminders() {
+        // Half an hour before and a day before are genuinely two different reminders.
+        let station = "a"
+        let trigger = AlertTrigger.tideExtreme(high: false)
+        let soon = AlertRule(stationID: station, trigger: trigger, lead: 1_800)
+        let day = AlertRule(stationID: station, trigger: trigger, lead: 86_400)
+        let event = now.addingTimeInterval(2 * 86_400)
+
+        let plan = deliveryPlan(rules: [soon, day],
+                                occurrences: [occurrence(soon, eventIn: 2 * 86_400),
+                                              occurrence(day, eventIn: 2 * 86_400)],
+                                calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.notifications.count, 2)
+        XCTAssertEqual(Set(plan.notifications.map(\.fire)),
+                       [event.addingTimeInterval(-1_800), event.addingTimeInterval(-86_400)])
+    }
+
+    func testTwoStationsOnTheSameMomentBothDeliver() {
+        let here = AlertRule(stationID: "a", trigger: .slack)
+        let there = AlertRule(stationID: "b", trigger: .slack)
+
+        let plan = deliveryPlan(rules: [here, there],
+                                occurrences: [occurrence(here, eventIn: 3_600),
+                                              occurrence(there, eventIn: 3_600)],
+                                calendarOccurrences: [], now: now, premium: true)
+
+        XCTAssertEqual(plan.notifications.count, 2)
+    }
+
     func testCalendarOccurrencesStopAtNinetyDaysAndSortByEvent() {
         let rule = AlertRule(stationID: "a", trigger: .slack)
         let late = occurrence(rule, eventIn: 91 * 86_400)

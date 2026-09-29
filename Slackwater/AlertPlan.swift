@@ -28,11 +28,25 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
     guard premium else { return DeliveryPlan(calendar: calendar) }
     // A duplicated rule id would trap uniqueKeysWithValues; keep the first.
     let live = Dictionary(rules.filter(\.enabled).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    // Rules are independent, but a banner is not: "Alert me" on one moment and "every <event>"
+    // at the same lead are two rules that arrive as two banners with the same title and the same
+    // body, and the popup's two rows invite exactly that. One reminder per thing-the-user-sees.
+    // The fire time is part of that: the same moment at 30 minutes and at a day is two reminders
+    // and stays two.
+    struct Perceived: Hashable {
+        let stationID: String
+        let trigger: AlertTrigger
+        let event: Date
+        let fire: Date
+    }
+    var seen = Set<Perceived>()
     let notifications = occurrences
         .sorted { $0.fire < $1.fire }
-        .filter {
-            live[$0.ruleID] != nil
-                && $0.fire > now && $0.fire <= now.addingTimeInterval(AlertHorizon.notifications)
+        .filter { o in
+            guard let rule = live[o.ruleID], o.fire > now,
+                  o.fire <= now.addingTimeInterval(AlertHorizon.notifications) else { return false }
+            return seen.insert(Perceived(stationID: rule.stationID, trigger: rule.trigger,
+                                         event: o.event, fire: o.fire)).inserted
         }
     return DeliveryPlan(calendar: calendar,
                         notifications: Array(notifications.prefix(AlertHorizon.notificationLimit)))

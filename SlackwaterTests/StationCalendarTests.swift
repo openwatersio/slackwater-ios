@@ -58,6 +58,16 @@ final class StationCalendarTests: XCTestCase {
                        .replace(stationID: "a"))
     }
 
+    func testAFreeUserWhoKeptSeveralCalendarsCannotAddAnother() {
+        // A lapsed Premium keeps what it published (spec §5.1). Swapping one of them for a new
+        // station would make the free tier hold as many calendars as Premium ever did.
+        let on = (1...3).map { StationCalendar(stationID: "s\($0)", calendarID: "cal-\($0)") }
+
+        XCTAssertEqual(calendarSubscriptionChange(on, stationID: "new", premium: false), .upsell)
+        XCTAssertEqual(calendarSubscriptionChange(on, stationID: "s2", premium: false), .remove,
+                       "turning one of them off is still allowed")
+    }
+
     func testPremiumAddsAlongsideWhatIsAlreadyOn() {
         let on = [StationCalendar(stationID: "a", calendarID: "cal-a")]
         XCTAssertEqual(calendarSubscriptionChange(on, stationID: "b", premium: true), .add)
