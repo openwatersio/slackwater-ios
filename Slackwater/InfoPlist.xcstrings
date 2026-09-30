@@ -14,6 +14,30 @@
         }
       }
     },
+    "NSCalendarsFullAccessUsageDescription" : {
+      "comment" : "Privacy - Calendars Full Access Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slackwater gives each station you switch on its own calendar, named for that station, and keeps its tide or current events up to date. Switch the station off and Slackwater deletes that calendar and its events. It never reads or changes your other calendars."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater crea un calendario para cada estación que actives, con el nombre de esa estación, y mantiene al día sus eventos de marea o corriente. Desactiva la estación y Slackwater elimina ese calendario y sus eventos. Nunca lee ni modifica tus otros calendarios."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater crée un calendrier pour chaque station que vous activez, nommé d’après cette station, et y maintient à jour ses marées ou ses courants. Désactivez la station et Slackwater supprime ce calendrier et ses événements. Il ne lit ni ne modifie jamais vos autres calendriers."
+          }
+        }
+      }
+    },
     "NSLocationWhenInUseUsageDescription" : {
       "comment" : "System location permission prompt. Explain why Slackwater requests location and that the location remains on this device.",
       "localizations" : {
