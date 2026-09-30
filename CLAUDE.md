@@ -75,7 +75,7 @@ xcrun xcresulttool export attachments --path <bundle> --output-path <dir>    # U
 ```
 
 - **`gh run watch --exit-status` can exit 0 for a failed run.** Confirm with `gh run view <run-id> --json conclusion`.
-- **Classify by the message before re-running.** An assertion string is a test defect. `Failed to get screenshot`, `Failed to get matching snapshots`, and `Failed to terminate` are XCUITest's own services timing out on the runner, so re-run. The same test failing at the same line on unrelated branches is not flake. Before blaming a branch, check whether `main` failed the same lane recently (#331, #378).
+- **Classify by the message before re-running.** An assertion string is a test defect. `Failed to get screenshot`, `Failed to get matching snapshots`, and `Failed to terminate` are XCUITest's own services timing out on the runner; CI already reruns just the failed tests once when every message in a shard is one of those (`ci.yml`, "Rerun the tests XCUITest's services timed out on"), so a shard that is still red has either an assertion or a second service timeout, and the job log shows which. The same test failing at the same line on unrelated branches is not flake. Before blaming a branch, check whether `main` failed the same lane recently (#331, #378).
 - **For a tap that did nothing,** line up the timestamps from `xcrun xcresulttool get test-results activities --test-id <id>` against frames from the screen-recording attachment. Recordings are variable-frame-rate, so list the real frame times with `ffprobe -show_entries frame=pts_time` before sampling.
 
 ## What a UI test cannot control
