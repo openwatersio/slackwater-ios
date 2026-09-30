@@ -310,6 +310,17 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Slackwater
+  # Drives the watch app on a watch simulator. Its own target: the phone's
+  # UI tests cannot host a watch app.
+  SlackwaterWatchUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources: [SlackwaterWatchUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: SlackwaterWatch
 schemes:
   Slackwater:
     build:
@@ -333,8 +344,12 @@ schemes:
     build:
       targets:
         SlackwaterWatch: all
+        SlackwaterWatchUITests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets: [SlackwaterWatchUITests]
   # First-run state on every launch, for iterating on the gate. Location stays
   # real, so the permission prompt needs a device erased by scripts/first-run.sh.
   Slackwater First Run:
