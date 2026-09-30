@@ -24,6 +24,17 @@ final class BrowseGroupsTests: XCTestCase {
         XCTAssertEqual(g.favorites, [TideStationRecord.fridayHarborID])
     }
 
+    /// Location off still gets places, ranked around the fallback anchor, but
+    /// never a My Location card claiming the wearer is there.
+    func testNoFixRanksNearbyAroundTheFallback() throws {
+        let harbor = try XCTUnwrap(StationItem.byId[TideStationRecord.fridayHarborID])
+        let g = BrowseGroups(fix: nil, fallback: (harbor.latitude, harbor.longitude),
+                             favoriteIds: [], recentIds: [], fitted: [])
+        XCTAssertTrue(g.hero.isEmpty)
+        XCTAssertEqual(g.nearby.count, 4)
+        XCTAssertEqual(g.nearby.first?.id, harbor.id)
+    }
+
     func testVictoriaFixOffersNoUnfittedCanadianStation() {
         let g = BrowseGroups(fix: victoria, favoriteIds: [], recentIds: [], fitted: [])
         XCTAssertFalse(g.hero.isEmpty)

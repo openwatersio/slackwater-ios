@@ -1,45 +1,42 @@
-// Slackwater — GPL v3. One place in the watch list: its name, then the
-// reading and next event once its station loads (#521).
+// Slackwater — GPL v3. One place in the watch list: the small widget's card,
+// with a corner mark in place of a group heading (#521).
 import SwiftUI
 
-/// The reading is the widgets' own (`WidgetSnapshot`), from one record
-/// resolved off the main thread. Never a catalog (#317).
+/// The card is the small widget's own (`NextEventContentView`), from one
+/// record resolved off the main thread. Never a catalog (#317).
 struct StationRow: View {
     let item: StationItem
-    var km: Double? = nil
+    let mark: PlaceMark?
+    /// When the wearer last raised the app: the card reads at this instant.
     let now: Date
-    @State private var snapshot: WidgetSnapshot?
+    @State private var card: WidgetCard?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: item.name)
-                .font(.headline)
-                .lineLimit(2)
-            if let s = snapshot {
-                Text(verbatim: "\(s.value) · \(s.state)")
-                    .font(.footnote.monospacedDigit())
-                if let next = s.next {
-                    HStack(spacing: 4) {
-                        Image(systemName: next.symbol)
-                        Text(verbatim: "\(next.label) \(cardTime(next.time, s.tz))")
-                    }
-                    .font(.footnote.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                }
+        Group {
+            if let card {
+                NextEventContentView(card: card, mark: mark)
             } else {
-                Text(verbatim: [item.kindLabel, km.map { formatNm($0) }]
-                    .compactMap { $0 }.joined(separator: " · "))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                // While the record loads, and for good when this device
+                // cannot predict the place.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: item.name).font(.caption2).foregroundStyle(SN.foam).lineLimit(1)
+                    Text(verbatim: item.kindLabel).font(.footnote).foregroundStyle(SN.foam.opacity(0.6))
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(SN.cardFill)
             }
         }
+        .frame(height: 150)
+        .background(SN.canvas)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .task(id: "\(item.id)|\(now.timeIntervalSince1970)") {
             let id = item.id, now = now
             let next = await Task.detached(priority: .utility) {
-                WidgetStationLoader.load(id: id).map { WidgetSnapshot.build($0, now: now) }
+                WidgetStationLoader.loadRecord(id: id, at: now).map { WidgetCard.build($0, now: now) }
             }.value
             guard !Task.isCancelled else { return }
-            snapshot = next
+            card = next
         }
     }
 }

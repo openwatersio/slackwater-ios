@@ -8,6 +8,8 @@ struct AddPlace: View {
     @ObservedObject private var favorites = FavoritesStore.shared
     @State private var query = ""
     @State private var results: [StationItem] = []
+    /// The query the results answer, so a finished empty search can say so.
+    @State private var searched = ""
 
     /// The fix, else the last place opened, else the phone's first-run anchor.
     private var anchor: (lat: Double, lon: Double) {
@@ -20,6 +22,16 @@ struct AddPlace: View {
         List {
             TextField(String(localized: "Search for a place", comment: "Station discovery interface text."),
                       text: $query)
+                .accessibilityIdentifier("place-search-field")
+            // The first search builds the whole search index, which a watch
+            // feels; without this the screen just sits there.
+            if query != searched {
+                ProgressView().frame(maxWidth: .infinity)
+            } else if results.isEmpty && !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text("No places found", comment: "Watch place search with no matches.")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("search-empty")
+            }
             ForEach(results) { item in
                 HStack {
                     NavigationLink(value: BrowseRoute.station(item)) {
@@ -30,6 +42,7 @@ struct AddPlace: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .accessibilityIdentifier("search-result")
                     Button { openAndSave(item) } label: {
                         Image(systemName: favorites.contains(item.id) ? "star.fill" : "plus")
                     }
@@ -43,13 +56,14 @@ struct AddPlace: View {
         .navigationTitle(Text("Add Place", comment: "Watch list row that opens place search."))
         .task(id: query) {
             let q = query, a = anchor
-            guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; return }
+            guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; searched = q; return }
             let found = await Task.detached(priority: .userInitiated) {
                 StationItem.searchResolvable(q, near: a, fitted: ChsModelStore.fittedIDs())
             }.value
             // An earlier keystroke's scan can finish after this one's.
             guard !Task.isCancelled else { return }
             results = found
+            searched = q
         }
     }
 

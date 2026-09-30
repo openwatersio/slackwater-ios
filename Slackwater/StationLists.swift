@@ -232,20 +232,20 @@ struct BrowseGroups {
     let nearby: [StationItem]
     let recents: [StationItem]
 
-    init(fix: (lat: Double, lon: Double)?, favoriteIds: [String], recentIds: [String],
-         fitted: Set<String>, nearbyCount: Int = 4) {
+    /// `fallback` ranks Near Me when there is no fix (the phone's rule: the
+    /// last place opened, else `firstRunFix`). Only a fix makes a My Location.
+    init(fix: (lat: Double, lon: Double)?, fallback: (lat: Double, lon: Double)? = nil,
+         favoriteIds: [String], recentIds: [String], fitted: Set<String>, nearbyCount: Int = 4) {
         var ranked: [StationItem] = []
         var hero: [StationItem] = []
-        // No fix, no location groups: a fallback anchor would title a list
-        // "Near Me" for somewhere the wearer is not.
-        if let fix {
+        if let anchor = fix ?? fallback {
             let open = StationItem.all.filter { $0.isResolvable(fitted: fitted) }
             // One per place, the nearest: `StationGroups` with no picks, which
             // the watch does not have (`ChosenStationsStore`).
             var seen = Set<String>()
-            ranked = StationItem.rankedByDistance(open, lat: fix.lat, lon: fix.lon)
+            ranked = StationItem.rankedByDistance(open, lat: anchor.lat, lon: anchor.lon)
                 .filter { seen.insert($0.placeKey).inserted }
-            hero = StationItem.heroItems(ranked: ranked, lat: fix.lat, lon: fix.lon)
+            if fix != nil { hero = StationItem.heroItems(ranked: ranked, lat: anchor.lat, lon: anchor.lon) }
         }
         let groups = ListGroups(
             heroIds: hero.map(\.id),

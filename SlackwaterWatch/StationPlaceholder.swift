@@ -26,8 +26,8 @@ struct StationPlaceholder: View {
                     Image(systemName: favorites.contains(item.id) ? "star.fill" : "star")
                 }
                 .accessibilityLabel(favorites.contains(item.id)
-                    ? String(localized: "Unfavorite", comment: "Watch place page: remove from favorites.")
-                    : String(localized: "Favorite", comment: "Watch place page: add to favorites."))
+                    ? String(localized: "Unfavorite", comment: "Station discovery interface text.")
+                    : String(localized: "Favorite", comment: "Station discovery interface text."))
             }
         }
         .onAppear { RecentsStore.shared.record(item.id) }

@@ -1,5 +1,6 @@
-// Slackwater — GPL v3. The watch's one list (#521): My Location, Favorites,
-// Near Me, Recents, then Add Place. The phone's groups, sized for a wrist.
+// Slackwater — GPL v3. The watch's one list (#521): the place nearest the
+// wearer, favorites, places near, recents, then Add Place. The phone's
+// groups, with a card's corner mark where a wrist has no room for headings.
 import SwiftUI
 
 enum BrowseRoute: Hashable {
@@ -27,13 +28,15 @@ struct StationBrowser: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                if let groups { sections(groups) }
+                if location.fix == nil { locationCard }
+                if let groups { rows(groups) }
                 NavigationLink(value: BrowseRoute.addPlace) {
                     Label(String(localized: "Add Place", comment: "Watch list row that opens place search."),
                           systemImage: "plus")
                 }
+                .accessibilityIdentifier("add-place-row")
+                footer
             }
-            .navigationTitle(Text(verbatim: "Slackwater"))
             .navigationDestination(for: BrowseRoute.self) { route in
                 switch route {
                 case .station(let item): StationPlaceholder(item: item)
@@ -43,11 +46,13 @@ struct StationBrowser: View {
         }
         .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids)) {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
+            // The phone's anchor without a fix: the last place opened, else its first-run default.
+            let fallback = recents.lastOpened.map { (lat: $0.latitude, lon: $0.longitude) } ?? firstRunFix
             let favoriteIds = favorites.ids, recentIds = recents.ids
             // Ranking the whole catalog is too slow for the watch's main thread.
             let next = await Task.detached(priority: .userInitiated) {
-                BrowseGroups(fix: fix, favoriteIds: favoriteIds, recentIds: recentIds,
-                             fitted: ChsModelStore.fittedIDs())
+                BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
+                             recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
             }.value
             // A newer input's ranking may have landed first.
             guard !Task.isCancelled else { return }
@@ -61,61 +66,93 @@ struct StationBrowser: View {
         }
     }
 
-    @ViewBuilder private func sections(_ g: BrowseGroups) -> some View {
-        if !g.hero.isEmpty {
-            Section(String(localized: "My Location", comment: "Current-location section heading.")) {
-                ForEach(g.hero) { row($0) }
+    /// Stands where My Location would be, so the top of the list is never
+    /// blank while there is no fix.
+    private var locationCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if location.unavailable {
+                Label(String(localized: "Location unavailable", comment: "Location-denied card title."),
+                      systemImage: "location.slash")
+                    .font(.headline)
+                Text("Turn on location in Settings to find nearby tides and currents.",
+                     comment: "Location-denied explanation.")
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.7))
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView().fixedSize()
+                    Text("Finding your location…", comment: "Station discovery interface text.")
+                        .font(.footnote)
+                }
             }
         }
-        if !g.favorites.isEmpty {
-            Section(String(localized: "Favorites", comment: "Favorite-stations section heading.")) {
-                ForEach(g.favorites, id: \.self) { id in
-                    if let item = StationItem.byId[id] {
-                        row(item)
-                            // Re-files to Recents, as on the phone: no destructive full swipe.
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button { favorites.toggle(id) } label: {
-                                    Label("Unfavorite", systemImage: "star.slash")
-                                }
-                                .tint(SN.steel)
-                            }
-                    } else {
-                        Text("Place removed", comment: "Watch favorite whose place has left the app.")
-                            .foregroundStyle(.secondary)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) { favorites.forget(id) } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                            }
+        .foregroundStyle(SN.foam)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(SN.canvas, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("location-card")
+    }
+
+    @ViewBuilder private func rows(_ g: BrowseGroups) -> some View {
+        ForEach(g.hero) { row($0, mark: .location) }
+        ForEach(g.favorites, id: \.self) { id in
+            if let item = StationItem.byId[id] {
+                row(item, mark: .favorite)
+                    // Re-files to Recents, as on the phone: no destructive full swipe.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button { favorites.toggle(id) } label: {
+                            Label("Unfavorite", systemImage: "star.slash")
+                        }
+                        .tint(SN.steel)
+                    }
+            } else {
+                Text("Place removed", comment: "Watch favorite whose place has left the app.")
+                    .foregroundStyle(.secondary)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { favorites.forget(id) } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+        // Without a fix these rank around the fallback, which is not near
+        // the wearer, so they carry no location mark.
+        ForEach(g.nearby) { item in
+            row(item, mark: location.fix == nil ? nil : .nearby)
+                .swipeActions(edge: .leading) { favoriteButton(item) }
+        }
+        ForEach(g.recents) { item in
+            row(item, mark: .recent)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { recents.remove(item.id) } label: {
+                        Label("Remove", systemImage: "trash")
                     }
                 }
-            }
-        }
-        if !g.nearby.isEmpty {
-            Section(String(localized: "Near Me", comment: "Nearby-stations section heading.")) {
-                ForEach(g.nearby) { item in
-                    row(item, km: location.fix.map { item.km(fromLat: $0.lat, lon: $0.lon) })
-                        .swipeActions(edge: .leading) { favoriteButton(item) }
-                }
-            }
-        }
-        if !g.recents.isEmpty {
-            Section(String(localized: "Recents", comment: "Recent-stations section heading.")) {
-                ForEach(g.recents) { item in
-                    row(item)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { recents.remove(item.id) } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
-                        .swipeActions(edge: .leading) { favoriteButton(item) }
-                }
-            }
+                .swipeActions(edge: .leading) { favoriteButton(item) }
         }
     }
 
-    private func row(_ item: StationItem, km: Double? = nil) -> some View {
-        NavigationLink(value: BrowseRoute.station(item)) { StationRow(item: item, km: km, now: shownAt) }
+    /// The phone list's sign-off.
+    private var footer: some View {
+        VStack(spacing: 2) {
+            Text("Slackwater").font(.footnote.weight(.semibold))
+            Text("by Open Waters").font(.caption2)
+        }
+        .foregroundStyle(SN.foam.opacity(0.55))
+        .frame(maxWidth: .infinity)
+        .listRowBackground(Color.clear)
+    }
+
+    private func row(_ item: StationItem, mark: PlaceMark?) -> some View {
+        NavigationLink(value: BrowseRoute.station(item)) {
+            StationRow(item: item, mark: mark, now: shownAt)
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+        .accessibilityIdentifier("place-row")
     }
 
     private func favoriteButton(_ item: StationItem) -> some View {
