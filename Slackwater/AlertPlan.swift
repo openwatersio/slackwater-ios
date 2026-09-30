@@ -41,7 +41,14 @@ func deliveryPlan(rules: [AlertRule], occurrences: [AlertOccurrence],
     }
     var seen = Set<Perceived>()
     let notifications = occurrences
-        .sorted { $0.fire < $1.fire }
+        // Same fire time: the `once` rule keeps it. That rule has exactly one occurrence, so
+        // losing it would leave the Alerts screen reading "Nothing coming up" against a rule
+        // that is about to be delivered by its repeating twin; the repeating rule has the rest
+        // of the season to name a date from.
+        .sorted { a, b in
+            a.fire == b.fire ? (live[a.ruleID]?.once != nil && live[b.ruleID]?.once == nil)
+                             : a.fire < b.fire
+        }
         .filter { o in
             guard let rule = live[o.ruleID], o.fire > now,
                   o.fire <= now.addingTimeInterval(AlertHorizon.notifications) else { return false }

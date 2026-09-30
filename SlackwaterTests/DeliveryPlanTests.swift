@@ -90,6 +90,10 @@ final class DeliveryPlanTests: XCTestCase {
 
         XCTAssertEqual(plan.notifications.count, 1)
         XCTAssertEqual(plan.notifications.first?.event, event)
+        // The `once` rule is the one kept: it has no other occurrence to show on the Alerts
+        // screen, while the repeating rule names its next low tide either way.
+        XCTAssertEqual(plan.notifications.first?.ruleID, once.id)
+        XCTAssertNotNil(scheduledThrough(plan)[once.id])
     }
 
     func testTheSameMomentAtTwoLeadsStaysTwoReminders() {

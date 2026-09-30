@@ -199,6 +199,11 @@ a second station is offered the swap. Both paths go through one confirmation nam
 the number of events that will disappear; nothing synced vanishes off the user's Mac without them
 having read that sentence.
 
+**A lapsed Premium keeps its calendars** — they stay subscribed and keep publishing — but free
+holds one, so with more than one on, turning another station on opens the tier sheet and changes
+nothing. The swap is offered at exactly one; otherwise dropping one of five and adding a sixth
+would hold five for free.
+
 ### 5.2 Notifications
 
 - Interruption level `.active`. `.timeSensitive` needs the time-sensitive entitlement, which
@@ -212,6 +217,11 @@ having read that sentence.
   Body "14:32–15:10, under 0.5 kn · in 30 min", in the station's time zone. With `noWindow`:
   "Race Passage - Slack", "14:32, no window under 0.5 kn".
 - Never provisional: provisional delivery does not reach the Lock Screen.
+- One notification per thing the user perceives: two rules agreeing on station, trigger, moment
+  and fire time deliver once — a `once` rule and its repeating twin are separate rules (§3) and
+  the long-press popup offers both rows for the same moment (§7.2). The same moment at two
+  different leads stays two reminders. The `once` rule keeps the delivery, since it has no other
+  occurrence to show on the Alerts screen (§7.3).
 
 ### 5.3 Alarms and the countdown
 
