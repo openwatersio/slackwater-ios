@@ -407,8 +407,21 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssertFalse(tomorrowRow.exists, "Tomorrow's rows should start collapsed")
         let tomorrowDay = app.buttons.matching(identifier: "schedule-day-d1").firstMatch
         XCTAssert(tomorrowDay.exists, "Tomorrow's day header is not expandable")
-        tomorrowDay.tap()
-        XCTAssert(tomorrowRow.appears(within: 5), "Tomorrow's rows did not expand")
+        // The scrub above re-anchors the schedule under this header, and a tap
+        // taken while it reflows is dropped. Settle it, then a bounded retap
+        // with the rows appearing as the landed signal (pickSearchResult's
+        // shape). A retap cannot fold the day back: it only fires while the
+        // rows are still absent. `exists`, not `isHittable`: the header
+        // reports unhittable (its hit point resolves to the label inside)
+        // while a tap on it lands — guarded on hittability, no tap was ever
+        // synthesized.
+        settleLayout(tomorrowDay)
+        var expanded = false
+        for _ in 0..<3 {
+            if tomorrowDay.exists { tomorrowDay.tap() }
+            if tomorrowRow.appears(within: 5) { expanded = true; break }
+        }
+        XCTAssert(expanded, "Tomorrow's rows did not expand")
         XCTAssertFalse(app.buttons.matching(identifier: "schedule-row-d0").firstMatch.exists,
                        "opening Tomorrow should collapse Today")
 
