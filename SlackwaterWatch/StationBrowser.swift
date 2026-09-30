@@ -34,7 +34,7 @@ struct StationBrowser: View {
             .navigationDestination(for: BrowseRoute.self) { route in
                 switch route {
                 case .station(let item): StationPlaceholder(item: item)
-                case .addPlace: Text(verbatim: "")  // Task 6
+                case .addPlace: AddPlace(fix: location.fix, path: $path)
                 }
             }
         }
