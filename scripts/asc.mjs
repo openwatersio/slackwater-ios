@@ -53,7 +53,8 @@ async function appId() {
 async function waitForBuild(version, buildNumber) {
   let build;
   for (let i = 0; i < 60; i++) {
-    const r = await api('GET', `/v1/builds?filter[app]=${await appId()}&limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups`);
+    const numberFilter = buildNumber ? `&filter[version]=${encodeURIComponent(buildNumber)}` : '';
+    const r = await api('GET', `/v1/builds?filter[app]=${await appId()}${numberFilter}&limit=10&sort=-uploadedDate&include=preReleaseVersion,betaGroups`);
     const included = (id) => r.included?.find((item) => item.id === id);
     build = r.data.find((candidate) => {
       const train = included(candidate.relationships?.preReleaseVersion?.data?.id)?.attributes?.version;

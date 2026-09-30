@@ -17,10 +17,12 @@ verify_release() {
 }
 
 prepare() {
-  local build=$1 tag version commit previous sha title branch existing tmp notes manifest body
+  local build=$1 tag_output tag version commit previous sha title branch existing tmp notes manifest body
   [[ $build == <-> ]] || fail 'build must contain digits only'
   local -a tags
-  tags=("${(@f)$(git tag --list "nightly-*-$build")}")
+  tag_output=$(git tag --list "nightly-*-$build")
+  tags=()
+  [[ -z $tag_output ]] || tags=("${(@f)tag_output}")
   (( ${#tags} == 1 )) || fail "expected one nightly tag for build $build, found ${#tags}"
   tag=$tags[1]
   version=${tag#nightly-}
@@ -71,19 +73,23 @@ prepare() {
 }
 
 release() {
-  local manifest=$1 fields version build tag commit final_target nightly_notes annotated
+  local manifest=$1 fields version build tag commit final_commit release_exists=no nightly_notes annotated
   fields=$(node -e 'const fs=require("fs"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8")),keys=Object.keys(m).sort().join(",");if(keys!=="build,commit,tag,version"||!Number.isSafeInteger(m.build))process.exit(1);process.stdout.write([m.version,m.build,m.tag,m.commit].join("\t"))' "$manifest") || fail "invalid promotion record: $manifest"
   IFS=$'\t' read -r version build tag commit <<< "$fields"
   verify_release "$version" "$build" "$tag" "$commit"
 
-  final_target=$(gh release view "v$version" --json targetCommitish --jq '.targetCommitish' 2>/dev/null || true)
-  if [[ -n $final_target && $final_target != $commit ]]; then
-    fail "v$version already targets $final_target, expected $commit"
+  final_commit=$(git rev-parse -q --verify "refs/tags/v$version^{commit}" 2>/dev/null || true)
+  if [[ -n $final_commit && $final_commit != $commit ]]; then
+    fail "v$version already points to $final_commit, expected $commit"
+  fi
+  if gh release view "v$version" >/dev/null 2>&1; then
+    release_exists=yes
+    [[ $final_commit == $commit ]] || fail "GitHub release v$version has no matching fetched tag"
   fi
 
   node scripts/asc.mjs notes "$build" "docs/release-notes/$version.md"
   node scripts/asc.mjs promote "$version" "$build" .github/testflight-beta-groups.txt
-  if [[ -z $final_target ]]; then
+  if [[ $release_exists == no ]]; then
     gh release create "v$version" --title "$version ($build)" --notes-file "docs/release-notes/$version.md" --target "$commit"
   fi
 
