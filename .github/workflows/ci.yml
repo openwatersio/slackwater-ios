@@ -359,8 +359,11 @@ jobs:
         run: test "${{ steps.tests.outcome }}" = success || test "${{ steps.rerun.outcome }}" = success
 
       # There is no runner to ssh into, so the evidence has to travel.
+      # always(): by this step "Test result" has already failed the job, and
+      # a condition without a status function is gated on success — the first
+      # run under this workflow lost its evidence that way (#552's list shard).
       - name: Upload screenshots and results on failure
-        if: steps.tests.outcome == 'failure'
+        if: always() && steps.tests.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: test-evidence-${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && '-ipad' || '' }}
