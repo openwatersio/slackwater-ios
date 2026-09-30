@@ -3,7 +3,7 @@
 import Foundation
 import SlackwaterKit
 
-struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
+struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     let id: String
     let name: String
     let region: String
@@ -21,7 +21,7 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     var offsets: TideOffsets? = nil
 
     var isSubordinate: Bool { reference != nil }
-    var referenceRecord: TideStationRecord? { reference.flatMap { TideStationRecord.byId[$0] } }
+    var referenceRecord: TideStationRecord? { reference.flatMap(TideStationRecord.record(id:)) }
 
     var engineStation: any TidePredicting {
         engineStation(referenceRecord: referenceRecord)
@@ -49,17 +49,12 @@ struct TideStationRecord: Decodable, Identifiable, Hashable, StationIdentity {
     /// no longer pinned to the head of the list (world coverage: a home-water
     /// courtesy that reads as a bug from anywhere else).
     static let fridayHarborID = "noaa/9449880"
-
-    /// All bundled stations, alphabetical.
-    static let all: [TideStationRecord] = bundled("stations")
-    static let byId: [String: TideStationRecord] =
-        Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 }
 
 /// Minutes and metres (or a ratio), exactly as NOAA publishes them.
-struct TideOffsets: Decodable, Hashable {
-    struct Time: Decodable, Hashable { let high: Double; let low: Double }
-    struct Height: Decodable, Hashable { let type: String; let high: Double; let low: Double }
+struct TideOffsets: Codable, Hashable {
+    struct Time: Codable, Hashable { let high: Double; let low: Double }
+    struct Height: Codable, Hashable { let type: String; let high: Double; let low: Double }
     let time: Time
     let height: Height
 }

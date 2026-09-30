@@ -17,9 +17,10 @@ final class CatalogStorageTests: XCTestCase {
 
     private func copyCatalogs(to directory: URL) throws {
         for resource in CatalogSnapshot.resources {
+            let file = CatalogSnapshot.fileName(resource)
             try FileManager.default.copyItem(
-                at: XCTUnwrap(Bundle.main.url(forResource: resource, withExtension: "json")),
-                to: directory.appendingPathComponent(resource + ".json"))
+                at: XCTUnwrap(Bundle.main.url(forResource: file, withExtension: nil)),
+                to: directory.appendingPathComponent(file))
         }
     }
 
@@ -49,7 +50,7 @@ final class CatalogStorageTests: XCTestCase {
         let badBatch = UUID()
         let staging = try storage.prepareStaging(for: badBatch)
         try copyCatalogs(to: staging)
-        try Data("broken".utf8).write(to: staging.appendingPathComponent("stations.json"))
+        try Data("broken".utf8).write(to: staging.appendingPathComponent("stations.tcdb"))
 
         XCTAssertThrowsError(try storage.commit(batch: badBatch, etags: [:], active: original.snapshot))
         XCTAssertEqual(try String(contentsOf: storage.currentURL, encoding: .utf8), original.name)
@@ -84,7 +85,7 @@ final class CatalogStorageTests: XCTestCase {
         var directories: [URL] = []
         let result: String? = CatalogFileLocator(storage: storage).load { directory in
             directories += [directory, directory]
-            _ = try Data(contentsOf: directory.appendingPathComponent("stations.json"))
+            _ = try Data(contentsOf: directory.appendingPathComponent("stations.tcdb"))
             _ = try Data(contentsOf: directory.appendingPathComponent("currents.json"))
             return "ok"
         }

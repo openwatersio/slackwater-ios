@@ -8,9 +8,10 @@ final class CatalogSnapshotTests: XCTestCase {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for resource in CatalogSnapshot.resources {
+            let file = CatalogSnapshot.fileName(resource)
             try FileManager.default.copyItem(
-                at: XCTUnwrap(Bundle.main.url(forResource: resource, withExtension: "json")),
-                to: directory.appendingPathComponent(resource + ".json"))
+                at: XCTUnwrap(Bundle.main.url(forResource: file, withExtension: nil)),
+                to: directory.appendingPathComponent(file))
         }
     }
 
@@ -35,6 +36,34 @@ final class CatalogSnapshotTests: XCTestCase {
         try Data(("[" + records.joined(separator: ",") + "]").utf8).write(to: url)
     }
 
+    /// The JSON catalogs; tide stations are a binary database, edited below
+    /// as decoded records instead.
+    private let jsonResources = CatalogSnapshot.resources.filter { $0 != "stations" }
+
+    /// The bundled tide records as JSON rows, encoded once. Validation reads
+    /// records, so a change to a row reaches it exactly as a bad file would.
+    private static let tideRows: [[String: Any]] = {
+        let data = try! JSONEncoder().encode(TideStationRecord.all)
+        return try! JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+    }()
+
+    private func snapshot(tides change: (inout [[String: Any]]) -> Void) throws -> CatalogSnapshot {
+        var rows = Self.tideRows
+        change(&rows)
+        let tides = try JSONDecoder().decode(
+            [TideStationRecord].self, from: JSONSerialization.data(withJSONObject: rows))
+        return try CatalogSnapshot(tides: tides, directory: directory)
+    }
+
+    private func rejectedTides(file: StaticString = #filePath, line: UInt = #line,
+                               _ change: (inout [[String: Any]]) -> Void) {
+        XCTAssertThrowsError(try snapshot(tides: change), file: file, line: line) {
+            guard let error = $0 as? CatalogError else { return XCTFail("Unexpected error: \($0)", file: file, line: line) }
+            XCTAssertEqual(error.resource, "stations", file: file, line: line)
+            XCTAssertEqual(error.stage, .validation, file: file, line: line)
+        }
+    }
+
     private func rejected(_ resource: String, stage: CatalogError.Stage = .validation,
                           active: CatalogSnapshot? = nil, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertThrowsError(try CatalogSnapshot(directory: directory, active: active), file: file, line: line) {
@@ -49,38 +78,42 @@ final class CatalogSnapshotTests: XCTestCase {
         XCTAssertEqual(original.items.count, StationItem.all.count)
         XCTAssertEqual(original.byID.count, original.items.count)
         var correctedID = ""
-        try edit("stations") { correctedID = $0[0]["id"] as! String; $0[0]["name"] = "Corrected name" }
+        try edit("chs-stations") { correctedID = $0[0]["id"] as! String; $0[0]["name"] = "Corrected name" }
         let corrected = try CatalogSnapshot(directory: directory, active: original)
         XCTAssertEqual(corrected.byID[correctedID]?.name, "Corrected name")
         XCTAssertNotEqual(original.byID[correctedID]?.name, "Corrected name")
     }
 
     func testMissingMalformedAndEmptyFilesAreNamedErrors() throws {
-        let url = directory.appendingPathComponent("stations.json")
-        try FileManager.default.removeItem(at: url)
-        rejected("stations", stage: .lookup)
-        try Data("broken".utf8).write(to: url)
-        rejected("stations", stage: .decode)
-        try Data("[]".utf8).write(to: url)
-        rejected("stations")
-        try FileManager.default.removeItem(at: url)
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
-        rejected("stations", stage: .read)
+        for resource in ["stations", "currents"] {
+            let url = directory.appendingPathComponent(CatalogSnapshot.fileName(resource))
+            let saved = try Data(contentsOf: url)
+            try FileManager.default.removeItem(at: url)
+            rejected(resource, stage: .lookup)
+            try Data("broken".utf8).write(to: url)
+            rejected(resource, stage: .decode)
+            try FileManager.default.removeItem(at: url)
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            rejected(resource, stage: .read)
+            try FileManager.default.removeItem(at: url)
+            try saved.write(to: url)
+        }
     }
 
     func testRequiredCatalogNeverConvertsFailureToEmpty() throws {
         let missing = directory.appendingPathComponent("missing", isDirectory: true)
         XCTAssertThrowsError(
-            try requiredCatalog("stations", directory: missing) as [TideStationRecord]
+            try requiredCatalog("currents", directory: missing) as [CurrentStationRecord]
         ) { error in
             let catalog = error as? CatalogError
-            XCTAssertEqual(catalog?.resource, "stations")
+            XCTAssertEqual(catalog?.resource, "currents")
             XCTAssertEqual(catalog?.stage, .lookup)
         }
     }
 
     func testEveryCatalogMustRemainNonempty() throws {
-        for resource in CatalogSnapshot.resources {
+        rejectedTides { $0 = [] }
+        for resource in jsonResources {
             let url = directory.appendingPathComponent(resource + ".json")
             let saved = try Data(contentsOf: url)
             try Data("[]".utf8).write(to: url)
@@ -90,7 +123,12 @@ final class CatalogSnapshotTests: XCTestCase {
     }
 
     func testInvalidIdentityAndDuplicateIDs() throws {
-        for resource in CatalogSnapshot.resources {
+        for (key, value) in [("id", "" as Any), ("name", "  "), ("latitude", 91), ("longitude", -181)] {
+            rejectedTides { $0[0][key] = value }
+        }
+        rejectedTides { $0.append($0[0]) }
+        rejectedTides { $0[0]["timezone"] = "not/a/timezone" }
+        for resource in jsonResources {
             let url = directory.appendingPathComponent(resource + ".json")
             let saved = try Data(contentsOf: url)
             for (key, value) in [("id", "" as Any), ("name", "  "), ("latitude", 91), ("longitude", -181)] {
@@ -110,9 +148,14 @@ final class CatalogSnapshotTests: XCTestCase {
     }
 
     func testModelsAndReferences() throws {
+        for (key, value) in [("constituents", [] as Any), ("reference", "missing")] {
+            rejectedTides { rows in
+                let index = rows.firstIndex { $0["reference"] == nil }!
+                rows[index][key] = value
+            }
+        }
         let mutations: [(String, String, Any)] = [
-            ("stations", "constituents", []), ("currents", "constituents", []),
-            ("stations", "reference", "missing"), ("currents", "tideReference", "missing"),
+            ("currents", "constituents", []), ("currents", "tideReference", "missing"),
             ("chs-gates", "reference", "missing"), ("chs-current-gates", "tideReference", "missing")]
         for (resource, key, value) in mutations {
             let url = directory.appendingPathComponent(resource + ".json")
@@ -157,39 +200,35 @@ final class CatalogSnapshotTests: XCTestCase {
     }
 
     func testSubordinateTideRequiresOffsetsAndHarmonicReference() throws {
-        let url = directory.appendingPathComponent("stations.json")
-        let saved = try Data(contentsOf: url)
-        try edit("stations") { rows in
+        rejectedTides { rows in
             let i = rows.firstIndex { $0["reference"] != nil }!
             rows[i].removeValue(forKey: "offsets")
         }
-        rejected("stations")
-        try saved.write(to: url)
-        try edit("stations") { rows in
+        rejectedTides { rows in
             let i = rows.firstIndex { $0["reference"] != nil }!
             rows[i]["reference"] = rows[i]["id"]
         }
-        rejected("stations")
     }
 
     func testNonfiniteNumbersAndUnusableConstituents() throws {
-        for resource in ["stations", "currents"] {
-            let url = directory.appendingPathComponent(resource + ".json")
-            let saved = try Data(contentsOf: url)
-            for constituents: [[String: Any]] in [
-                [["name": "M2", "amplitude": -1, "phase": 0]],
-                [["name": "M2", "amplitude": 0, "phase": 0]],
-                [["name": "", "amplitude": 1, "phase": 0]]
-            ] {
-                try edit(resource) { rows in
-                    let i = rows.firstIndex { $0["reference"] == nil }!
-                    rows[i]["constituents"] = constituents
-                }
-                rejected(resource)
-                try saved.write(to: url)
-            }
-        }
         let url = directory.appendingPathComponent("currents.json")
+        let saved = try Data(contentsOf: url)
+        for constituents: [[String: Any]] in [
+            [["name": "M2", "amplitude": -1, "phase": 0]],
+            [["name": "M2", "amplitude": 0, "phase": 0]],
+            [["name": "", "amplitude": 1, "phase": 0]]
+        ] {
+            rejectedTides { rows in
+                let i = rows.firstIndex { $0["reference"] == nil }!
+                rows[i]["constituents"] = constituents
+            }
+            try edit("currents") { rows in
+                let i = rows.firstIndex { $0["reference"] == nil }!
+                rows[i]["constituents"] = constituents
+            }
+            rejected("currents")
+            try saved.write(to: url)
+        }
         // JSONDecoder rejects overflowing numbers before validation; never accept
         // infinity as a correction even though it has JSON-number syntax.
         let json = try String(contentsOf: url, encoding: .utf8)
@@ -202,24 +241,18 @@ final class CatalogSnapshotTests: XCTestCase {
 
     func testFixedOffsetIsNotAnIANAIdentifier() throws {
         for zone in ["GMT+0100", "UTC+0100", "GMT+0000", "UTC-0000"] {
-            try edit("stations") { $0[0]["timezone"] = zone }
-            rejected("stations")
+            rejectedTides { $0[0]["timezone"] = zone }
         }
         for zone in ["UTC", "Etc/GMT+5", "US/Pacific"] {
-            try edit("stations") { $0[0]["timezone"] = zone }
-            XCTAssertNoThrow(try CatalogSnapshot(directory: directory))
+            XCTAssertNoThrow(try snapshot { $0[0]["timezone"] = zone })
         }
     }
 
     func testNOAACatalogRequiresWidgetFormat() throws {
-        for resource in ["stations", "currents"] {
-            let url = directory.appendingPathComponent(resource + ".json")
-            let saved = try Data(contentsOf: url)
-            let rows = try JSONSerialization.jsonObject(with: saved)
-            try JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted).write(to: url)
-            rejected(resource)
-            try saved.write(to: url)
-        }
+        let url = directory.appendingPathComponent("currents.json")
+        let rows = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
+        try JSONSerialization.data(withJSONObject: rows, options: .prettyPrinted).write(to: url)
+        rejected("currents")
     }
 
     func testHistoricalTombstonesPersistUnlessStationReturns() throws {

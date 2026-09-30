@@ -11,7 +11,7 @@ final class StationIndexTests: XCTestCase {
         XCTAssertEqual(rows.count, TideStationRecord.all.count)
         for record in TideStationRecord.all {
             guard let row = rows[record.id] else {
-                return XCTFail("stations.json \(record.id) is missing from station-index.json")
+                return XCTFail("stations.tcdb \(record.id) is missing from station-index.json")
             }
             XCTAssertEqual(row.name, record.name, record.id)
             XCTAssertEqual(row.region, record.region, record.id)
@@ -74,14 +74,17 @@ final class StationIndexTests: XCTestCase {
         }
     }
 
-    /// The point of the file: it has to be a fraction of what it replaces.
+    /// The point of the file: it has to be a fraction of the catalogs it is
+    /// generated from. stations.json is build-time only, so it is read from
+    /// the repository rather than the bundle.
     func testIndexIsFarSmallerThanTheCatalogsItReplaces() throws {
         func bytes(_ name: String) throws -> Int {
             let url = try XCTUnwrap(Bundle.main.url(forResource: name, withExtension: "json"))
             return try Data(contentsOf: url).count
         }
+        let stations = repoRoot.appendingPathComponent("Slackwater/Resources/stations.json")
         let index = try bytes("station-index")
-        let catalogs = try bytes("stations") + bytes("currents")
+        let catalogs = try Data(contentsOf: stations).count + bytes("currents")
         XCTAssertLessThan(index * 4, catalogs, "index \(index) vs catalogs \(catalogs)")
     }
 }
