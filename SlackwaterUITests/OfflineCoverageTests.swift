@@ -160,13 +160,18 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                        "tapping a row must dismiss the Downloads sheet")
     }
 
+    /// Selkirk Water, the queue's second job, never Victoria, its first: on
+    /// iPad the split layout opens the first row on launch, and opening a
+    /// station promotes its download (`ChsDetailView.onAppear`), which clears
+    /// the very deferral this test seeds. It failed on every iPad run for a
+    /// week reading "Waiting · next" where it wanted "Retrying in".
     func testTappingADeferredRowOpensTheStation() throws {
         let app = launch("-seedGate", "-chsResetModels", "-networkKillSwitch",
-                         "-connectivityOnline", "-chsDeferOnly", "chs-victoria",
+                         "-connectivityOnline", "-chsDeferOnly", "chs-selkirk-water",
                          "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
         openDownloads(app)
-        let row = app.descendants(matching: .any)["download-row-chs-victoria"].firstMatch
+        let row = app.descendants(matching: .any)["download-row-chs-selkirk-water"].firstMatch
         XCTAssert(row.appears(within: 5), "the seeded deferred row is missing")
         XCTAssert(reachInSheet(row, in: app), "the deferred row never became hittable")
         XCTAssert(row.label.contains("Retrying in"), "deferred row says: \(row.label)")

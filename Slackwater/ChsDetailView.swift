@@ -247,8 +247,10 @@ struct ChsWaitingView: View {
     }
 
     private var footer: some View {
+        // 0.62, like the card body text: 0.4 measures 3.4:1 over the canvas,
+        // under WCAG's 4.5. Same value as the shared footer in Theme.swift.
         MonoLabel(text: String(localized: "Predictions — not for navigation", comment: "Safety disclaimer above station provenance."),
-                  color: SN.foam.opacity(0.4), tracking: 1.4)
+                  color: SN.foam.opacity(0.62), tracking: 1.4)
             .frame(maxWidth: .infinity)
             // 14, matching the scaffold's standard below-card gap — spacing 0
             // above means this padding is the whole card→footer gap now.
@@ -330,7 +332,12 @@ struct ChsAmberCard: View {
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(status?.tint ?? accent)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                // 44pt tall: the text alone is an 18pt hit region, which the
+                // platform audit rejects (it was the one link on the CHS
+                // waiting page, and a finger's worth of card around it did
+                // nothing).
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
