@@ -254,6 +254,11 @@ targets:
       # The full catalog ships on the watch (#482). The index is the one file
       # the widget leaves out: the watch browses, so it builds `StationItem.all`.
       - path: Slackwater/Resources/station-index.json
+      # The list's stores and their iCloud sync. Not in PortableSources: the
+      # widget never reads favourites through them.
+      - Slackwater/StationLists.swift
+      - Slackwater/FavoritesCloud.swift
+      - Slackwater/UnitsCloud.swift
     dependencies:
       - package: Almanac
         product: Almanac
@@ -268,6 +273,9 @@ targets:
         # Standalone-capable: catalogs are bundled, favorites arrive over
         # iCloud KVS, and nothing needs the phone (#482).
         WKRunsIndependentlyOfCompanionApp: true
+        NSLocationWhenInUseUsageDescription: >-
+          Your location helps find nearby tide and current predictions.
+          It stays on this device.
     settings:
       base:
         # Permanent once registered (#207): the companion's id plus .watchkitapp.
@@ -275,6 +283,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: SlackwaterWatch/SlackwaterWatch.entitlements
       configs:
         # A Release archive still builds this target, because the app depends
         # on it, but does not embed it (the app's EXCLUDED_SOURCE_FILE_NAMES).
