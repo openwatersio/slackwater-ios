@@ -1,6 +1,6 @@
 # Release notes
 
-One file per version, named for its `MARKETING_VERSION`. `scripts/testflight.sh` posts `docs/release-notes/$VERSION.md` as the build's TestFlight "What to Test" and as the body of the `v$VERSION` GitHub release, so the file is the single source both read.
+One file per version, named for its `MARKETING_VERSION`. The promotion workflow drafts it from merged pull request titles, posts it as the build's TestFlight "What to Test", and uses it as the body of the `v$VERSION` GitHub release. Reviewers replace the generic `Worth testing:` paragraph when a release needs specific checks.
 
 ## Format
 

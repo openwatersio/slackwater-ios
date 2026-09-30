@@ -6,20 +6,7 @@
 #   SIGNING_P12, SIGNING_P12_PASSWORD     Apple Distribution identity, base64 .p12
 set -euo pipefail
 cd "$(dirname "$0")/.."
-
-# --external also promotes the finished build to EVERY external beta group.
-# Opt-in rather than the default because those groups sit behind public links
-# and the promotion submits the build to Apple's beta review — a real release,
-# not another nightly. The internal Nightly group needs no flag; it takes every
-# upload on its own.
-#
-# It was --family, and that named ONE group. A second external group was added
-# later and nothing here knew: build 27 reached three groups, build 28 reached
-# two, and the public link kept serving the older release. asc.mjs now
-# discovers the external groups instead of naming one, so adding another needs
-# no change here. --family still works and means the same thing.
-EXTERNAL=no
-case "${1:-}" in --external|--family) EXTERNAL=yes ;; esac
+(( $# == 0 )) || { print -u2 'testflight.sh takes no arguments; use Promote Nightly to Beta for releases'; exit 1; }
 
 : "${ASC_KEY_ID:?}" "${ASC_ISSUER_ID:?}" "${ASC_KEY:?}" "${SIGNING_P12:?}" "${SIGNING_P12_PASSWORD:?}"
 mkdir -p build
@@ -116,25 +103,6 @@ else
   echo "no $NOTES — build $BUILD ships with no release notes"
 fi
 
-if [[ $EXTERNAL == yes ]]; then
-  # Waits out processing itself, so this blocks for as long as Apple takes.
-  node scripts/asc.mjs promote "$BUILD"
-
-  # One GitHub release per TestFlight release, from the same notes file ASC got
-  # so the two can never disagree. Only on the external path: a bare run is a
-  # build Nightly needs, not a release, and tagging those would put two tags on
-  # one version. Never fatal — the build is uploaded and promoted by the time we
-  # get here, and a missing tag is a one-liner to add by hand.
-  git diff --quiet || echo "warning: working tree dirty — v$VERSION tags HEAD, not what was archived"
-  if [[ -f $NOTES ]]; then
-    gh release create "v$VERSION" --title "$VERSION ($BUILD)" --notes-file "$NOTES" \
-      --target "$(git rev-parse HEAD)" \
-      || echo "github release failed — by hand: gh release create v$VERSION --title '$VERSION ($BUILD)' --notes-file $NOTES"
-  else
-    echo "no $NOTES — no GitHub release for $VERSION ($BUILD)"
-  fi
-else
-  echo "Nightly has it. For the external groups: node scripts/asc.mjs promote $BUILD"
-fi
+echo 'Nightly has it. It remains Nightly-only until the Promote Nightly to Beta release pull request merges.'
 
 node scripts/asc.mjs builds
