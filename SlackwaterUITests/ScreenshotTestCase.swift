@@ -386,10 +386,20 @@ class ScreenshotTestCase: XCTestCase {
 
     /// A pin tap raises the preview card, not the detail — the card is the
     /// second tap. Waits for it and taps through to the detail.
+    ///
+    /// Settled first: the card slides in from the bottom edge and grows once
+    /// its curve resolves (`previewPanel`'s `minHeight`), and XCUITest reads
+    /// the tap point before it synthesizes the event. A point read mid-move
+    /// can land beside the card, on the map, whose tap handler deselects
+    /// (`MapScreen.handleTap` → `onDeselect`) — the card is gone and no
+    /// detail opens, which is exactly the #448 artifact. From the test's
+    /// side that is indistinguishable from a landed tap that lost its route,
+    /// so a bounded retap cannot help here: there is nothing left to tap.
     func tapThroughPreview(_ app: XCUIApplication) {
         let card = app.descendants(matching: .any)
             .matching(identifier: "map-preview-card").firstMatch
         XCTAssert(card.appears(within: 5), "pin tap did not raise the preview card")
+        settleLayout(card)
         card.tap()
     }
 
