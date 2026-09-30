@@ -240,7 +240,11 @@ struct BrowseGroups {
         // "Near Me" for somewhere the wearer is not.
         if let fix {
             let open = StationItem.all.filter { $0.isResolvable(fitted: fitted) }
+            // One per place, the nearest: `StationGroups` with no picks, which
+            // the watch does not have (`ChosenStationsStore`).
+            var seen = Set<String>()
             ranked = StationItem.rankedByDistance(open, lat: fix.lat, lon: fix.lon)
+                .filter { seen.insert($0.placeKey).inserted }
             hero = StationItem.heroItems(ranked: ranked, lat: fix.lat, lon: fix.lon)
         }
         let groups = ListGroups(
