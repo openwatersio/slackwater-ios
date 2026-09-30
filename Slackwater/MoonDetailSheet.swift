@@ -173,6 +173,9 @@ struct MoonDetailSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     if let facts {
                         head(facts)
+                        // Straight under the tide label: perigee and apogee
+                        // are half of what that label names (#535).
+                        distance(facts)
                         group {
                             horizonCell(String(localized: "Rise", comment: "Moonrise label."), facts.rise, rising: true, facts, id: "moon-rise")
                             divider
@@ -185,7 +188,6 @@ struct MoonDetailSheet: View {
                             phaseCell(String(localized: "Next new", comment: "Next new-moon label."), facts.nextNew, jumpTo: facts.newNight,
                                       fraction: 0, id: "moon-next-new")
                         }
-                        distance(facts)
                         group {
                             eclipseRow(String(localized: "Last lunar eclipse", comment: "Previous lunar-eclipse label."), facts.last,
                                        id: "moon-last-eclipse", color: SN.umbraLabel)
