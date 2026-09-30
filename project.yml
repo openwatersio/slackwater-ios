@@ -69,6 +69,7 @@ targetTemplates:
       # Keep this list in sync with the `bundled("...")` calls in the model
       # files below (grep bundled\( to verify).
       - path: Slackwater/Resources/stations.json
+      - path: Slackwater/Resources/stations.tcdb
       - path: Slackwater/Resources/currents.json
       - path: Slackwater/Resources/chs-stations.json
       - path: Slackwater/Resources/chs-gates.json
