@@ -7,7 +7,7 @@ struct CatalogError: Error, CustomStringConvertible {
     let stage: Stage
     let reason: String
 
-    var description: String { "\(resource).json: \(stage.rawValue): \(reason)" }
+    var description: String { "\(resource): \(stage.rawValue): \(reason)" }
 }
 
 /// Reads one complete catalog or throws; recovery belongs to the snapshot store.
@@ -28,7 +28,7 @@ func readCatalog<T: Decodable & StationIdentity>(_ resource: String, directory: 
     }
     // ponytail: sample per design rule 12; use a linear whole-file format check
     // if generators ever emit heterogeneous record layouts.
-    if ["stations", "currents"].contains(resource), let sample = records.first {
+    if resource == "currents", let sample = records.first {
         do {
             let scanned: T? = try decodeCatalogRecord(data, id: sample.id)
             guard scanned?.id == sample.id else {
@@ -45,6 +45,10 @@ func readCatalog<T: Decodable & StationIdentity>(_ resource: String, directory: 
 /// No global catalog accessors are used: validation also works before app startup.
 struct CatalogSnapshot {
     static let resources = ["stations", "currents", "chs-stations", "chs-gates", "chs-current-gates", "chs-tombstones"]
+    /// Tide stations are the one binary resource; see TideStationDatabase.swift.
+    static func fileName(_ resource: String) -> String {
+        resource == "stations" ? "stations.tcdb" : resource + ".json"
+    }
 
     let tides: [TideStationRecord]
     let currents: [CurrentStationRecord]
@@ -56,7 +60,14 @@ struct CatalogSnapshot {
     let byID: [String: StationItem]
 
     init(directory: URL, active: CatalogSnapshot? = nil) throws {
-        tides = try readCatalog("stations", directory: directory)
+        try self.init(tides: tideDatabase(directory: directory).map(TideStationRecord.init),
+                      directory: directory, active: active)
+    }
+
+    /// Validates tide records already read from a directory's database, with
+    /// that directory's JSON catalogs.
+    init(tides: [TideStationRecord], directory: URL, active: CatalogSnapshot? = nil) throws {
+        self.tides = tides.sorted { $0.name == $1.name ? $0.id < $1.id : $0.name < $1.name }
         currents = try readCatalog("currents", directory: directory)
         chsStations = try readCatalog("chs-stations", directory: directory)
         chsGates = try readCatalog("chs-gates", directory: directory)

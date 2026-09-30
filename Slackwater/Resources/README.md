@@ -9,8 +9,11 @@ Do not edit these committed artifacts directly:
   we ship comes within 50 km of (issue #401). Identity only — the generator
   throws if a constituent reaches it.
 - `stations.tcdb` — `tools/gen-tides.mjs`, the same stations as `stations.json`
-  written by `@slackwater/database`'s `buildDatabase`, for lookup by id from a
+  written by `@slackwater/database`'s `buildDatabase`. It is the tide catalog
+  the app, widget and watch ship and read, one station at a time by id from a
   memory-mapped file (issue #459). Binary; `git diff` shows only that it changed.
+  `stations.json` is not bundled. It stays here as the reviewable record of the
+  same stations and as input to the generators that follow gen-tides.
 - `currents.json` — `tools/gen-noaa-currents.mjs`
 - `chs-gates.json` and `chs-current-gates.json` — `tools/gen-chs-gates.mjs`
 - `station-index.json` — `tools/gen-station-index.mjs`, the identity fields of

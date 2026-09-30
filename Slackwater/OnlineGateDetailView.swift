@@ -43,7 +43,7 @@ struct OnlineGateDetailView: View {
     /// does — this gate has no `CurrentStationRecord` of its own to hang it off.
     private var pairedTide: TideStationRecord? {
         gate.tideReference.flatMap { rid in
-            if let bundled = TideStationRecord.all.first(where: { $0.id == rid }) { return bundled }
+            if let bundled = TideStationRecord.record(id: rid) { return bundled }
             if case .fitted(let record) = ChsFitService.shared.state(rid) { return record }
             return nil
         }

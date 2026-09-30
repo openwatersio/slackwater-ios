@@ -110,16 +110,6 @@ func bundled<T: Decodable & StationIdentity>(_ resource: String) -> [T] {
     }
 }
 
-/// Decode one record without materializing a multi-megabyte catalog in a
-/// memory-limited extension.
-/// ponytail: relies on generated compact JSON keeping `id` first; add an
-/// offset index if that catalog format changes.
-func bundled<T: Decodable & StationIdentity>(_ resource: String, id: String) -> T? {
-    guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
-          let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
-    return try? decodeCatalogRecord(data, id: id)
-}
-
 func catalogRecord<T: Decodable & StationIdentity>(
     _ resource: String, id: String, directory: URL
 ) throws -> T? {
@@ -136,6 +126,8 @@ func catalogRecord<T: Decodable & StationIdentity>(
 
 /// Shared with candidate validation so downloaded NOAA files must satisfy the
 /// exact same compact-record contract as widget lookups.
+/// ponytail: relies on generated compact JSON keeping `id` first; add an
+/// offset index if that catalog format changes.
 func decodeCatalogRecord<T: Decodable>(_ data: Data, id: String) throws -> T? {
     guard data.first == 91, data.last == 93 else {
         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "invalid compact catalog framing"))
@@ -586,8 +578,7 @@ enum StationItem: Identifiable, Hashable {
             let currents: [ChsCurrentGateInfo] = try readCatalog("chs-current-gates", directory: directory)
             return currents.first(where: { $0.id == id }).map(StationItem.chsCurrent)
         }
-        let record: TideStationRecord? = try catalogRecord("stations", id: id, directory: directory)
-        return record.map { .tide(StationIndexInfo($0)) }
+        return try tideRecord(id: id, directory: directory).map { .tide(StationIndexInfo($0)) }
     }
 
     /// How many results the search screen shows.

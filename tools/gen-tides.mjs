@@ -1,5 +1,7 @@
 /**
- * Generate Resources/stations.json — every bundled tide station.
+ * Generate Resources/stations.tcdb — every bundled tide station — and
+ * Resources/stations.json, the same stations as reviewable JSON that the
+ * later generators read and the app does not bundle.
  *
  * Bundled harmonic constants are the whole reason this app works with no
  * signal and no account, so the only question that decides what ships is

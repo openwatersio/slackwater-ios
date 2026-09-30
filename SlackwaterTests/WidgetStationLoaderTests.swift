@@ -21,9 +21,10 @@ final class WidgetStationLoaderTests: XCTestCase {
         let batch = UUID()
         let directory = try storage.prepareStaging(for: batch)
         for resource in CatalogSnapshot.resources {
+            let file = CatalogSnapshot.fileName(resource)
             try FileManager.default.copyItem(
-                at: XCTUnwrap(Bundle.main.url(forResource: resource, withExtension: "json")),
-                to: directory.appendingPathComponent(resource + ".json"))
+                at: XCTUnwrap(Bundle.main.url(forResource: file, withExtension: nil)),
+                to: directory.appendingPathComponent(file))
         }
         try change(directory)
         _ = try storage.commit(batch: batch, etags: [:], active: nil)
@@ -35,7 +36,7 @@ final class WidgetStationLoaderTests: XCTestCase {
         let url = directory.appendingPathComponent(resource + ".json")
         var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         change(&rows)
-        if ["stations", "currents"].contains(resource) {
+        if resource == "currents" {
             let records = try rows.map { row -> String in
                 var rest = row
                 let id = rest.removeValue(forKey: "id")!
@@ -51,21 +52,33 @@ final class WidgetStationLoaderTests: XCTestCase {
         }
     }
 
+    /// A generation's changes are made to current stations: they are JSON a
+    /// test can edit, where tide stations are a binary database. The locator
+    /// and the generation work the same for both. This is a listed harmonic
+    /// current that no subordinate predicts from, so it can be renamed or
+    /// removed without breaking the catalog's joins.
+    private var current: CurrentStationRecord {
+        let referenced = Set(CurrentStationRecord.all.compactMap(\.reference))
+        return CurrentStationRecord.all.first {
+            !$0.isSubordinate && $0.referenceOnly != true && !referenced.contains($0.id)
+        }!
+    }
+
     private func editStation(_ id: String, in directory: URL,
                              change: (inout [String: Any]) -> Void) throws {
-        try edit("stations", in: directory) { rows in
+        try edit("currents", in: directory) { rows in
             change(&rows[rows.firstIndex { $0["id"] as? String == id }!])
         }
     }
 
     private func removeStation(_ id: String, from directory: URL) throws {
-        try edit("stations", in: directory) { rows in
+        try edit("currents", in: directory) { rows in
             rows.remove(at: rows.firstIndex { $0["id"] as? String == id }!)
         }
     }
 
     private func appendStation(copying id: String, as newID: String, name: String, in directory: URL) throws {
-        try edit("stations", in: directory) { rows in
+        try edit("currents", in: directory) { rows in
             var station = rows[rows.firstIndex { $0["id"] as? String == id }!]
             station["id"] = newID
             station["name"] = name
@@ -91,31 +104,33 @@ final class WidgetStationLoaderTests: XCTestCase {
     }
 
     func testWidgetReadsCorrectedActiveStation() throws {
+        let id = current.id
         let storage = try makeStorage { directory in
-            try editStation(TideStationRecord.fridayHarborID, in: directory) { $0["name"] = "Remote Friday Harbor" }
+            try editStation(id, in: directory) { $0["name"] = "Remote current" }
         }
         let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
-            id: TideStationRecord.fridayHarborID,
+            id: "current:" + id,
             locator: CatalogFileLocator(storage: storage)))
-        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
-        XCTAssertEqual(tide.name, "Remote Friday Harbor")
+        guard case .current(let current, _) = record else { return XCTFail("Expected current") }
+        XCTAssertEqual(current.name, "Remote current")
     }
 
     func testTimelineSourceRetainsLoadedCatalogRecord() throws {
+        let id = current.id
         let storage = try makeStorage { directory in
-            try editStation(TideStationRecord.fridayHarborID, in: directory) { $0["name"] = "Timeline Friday Harbor" }
+            try editStation(id, in: directory) { $0["name"] = "Timeline current" }
         }
         let source = WidgetStationLoader.recordSource(
-            id: TideStationRecord.fridayHarborID, locator: CatalogFileLocator(storage: storage))
+            id: "current:" + id, locator: CatalogFileLocator(storage: storage))
         try FileManager.default.removeItem(at: storage.root)
 
         let start = Date(timeIntervalSince1970: 1_750_000_000)
         let names = (0..<48).map { index -> String? in
-            guard case .tide(let record, _)? = source(start.addingTimeInterval(Double(index) * 1_800))
+            guard case .current(let record, _)? = source(start.addingTimeInterval(Double(index) * 1_800))
             else { return nil }
             return record.name
         }
-        XCTAssertEqual(names, Array(repeating: "Timeline Friday Harbor", count: 48))
+        XCTAssertEqual(names, Array(repeating: "Timeline current", count: 48))
     }
 
     func testTimelineSourceChecksSavedOnlineCoverageForEachDate() throws {
@@ -159,42 +174,38 @@ final class WidgetStationLoaderTests: XCTestCase {
     }
 
     func testWidgetDoesNotFallBackWhenStationWasRemoved() throws {
-        let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
-        let referenced = Set(bundled.tides.compactMap(\.reference))
-            .union(bundled.currents.compactMap(\.tideReference))
-        let removed = try XCTUnwrap(bundled.tides.first {
-            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
-        })
+        let removed = current.id
         let storage = try makeStorage { directory in
-            try removeStation(removed.id, from: directory)
-            try appendTombstone(removed.id, to: directory)
+            try removeStation(removed, from: directory)
+            try appendTombstone("current:" + removed, to: directory)
         }
         XCTAssertNil(WidgetStationLoader.loadRecord(
-            id: removed.id,
+            id: "current:" + removed,
             locator: CatalogFileLocator(storage: storage)))
     }
 
-    func testCorruptActiveNOAAFileFallsBackToBundle() throws {
+    func testCorruptActiveTideDatabaseFallsBackToBundle() throws {
         let storage = try makeStorage()
         let directory = try XCTUnwrap(storage.activeDirectory())
-        try Data("broken".utf8).write(to: directory.appendingPathComponent("stations.json"))
+        try Data("broken".utf8).write(to: directory.appendingPathComponent("stations.tcdb"))
         let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
             id: TideStationRecord.fridayHarborID,
             locator: CatalogFileLocator(storage: storage)))
         guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
-        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+        XCTAssertEqual(tide.name, TideStationRecord.record(id: TideStationRecord.fridayHarborID)?.name)
     }
 
     func testTruncatedNestedActiveNOAAFileFallsBackToBundle() throws {
+        let id = current.id
         let storage = try makeStorage()
         let directory = try XCTUnwrap(storage.activeDirectory())
         try Data("[{\"id\":\"first\",\"aliases\":[]".utf8)
-            .write(to: directory.appendingPathComponent("stations.json"))
+            .write(to: directory.appendingPathComponent("currents.json"))
         let record = try XCTUnwrap(WidgetStationLoader.loadRecord(
-            id: TideStationRecord.fridayHarborID,
+            id: "current:" + id,
             locator: CatalogFileLocator(storage: storage)))
-        guard case .tide(let tide, _) = record else { return XCTFail("Expected tide") }
-        XCTAssertEqual(tide.name, TideStationRecord.byId[TideStationRecord.fridayHarborID]?.name)
+        guard case .current(let current, _) = record else { return XCTFail("Expected current") }
+        XCTAssertEqual(current.name, CurrentStationRecord.byId[id]?.name)
     }
 
     func testCompactScannerRejectsInvalidOuterGrammar() {
@@ -282,22 +293,18 @@ final class WidgetStationLoaderTests: XCTestCase {
     }
 
     func testWidgetIdentityCallersUseActiveCatalog() async throws {
-        let bundled = try CatalogSnapshot(directory: Bundle.main.resourceURL ?? Bundle.main.bundleURL)
-        let referenced = Set(bundled.tides.compactMap(\.reference))
-            .union(bundled.currents.compactMap(\.tideReference))
-        let removed = try XCTUnwrap(bundled.tides.first {
-            $0.id != TideStationRecord.fridayHarborID && !referenced.contains($0.id)
-        })
-        let addedID = "999999999"
+        let removedRecord = current.id
+        let removed = "current:" + removedRecord
+        let addedID = "current:999999999"
         let storage = try makeStorage { directory in
-            try appendStation(copying: removed.id, as: addedID, name: "Remote only", in: directory)
-            try removeStation(removed.id, from: directory)
-            try appendTombstone(removed.id, to: directory)
+            try appendStation(copying: removedRecord, as: "999999999", name: "Remote only", in: directory)
+            try removeStation(removedRecord, from: directory)
+            try appendTombstone(removed, to: directory)
         }
         let locator = CatalogFileLocator(storage: storage)
         let defaults = UserDefaults(suiteName: #function)!
         defer { defaults.removePersistentDomain(forName: #function) }
-        defaults.set([addedID, removed.id], forKey: AppGroup.favoritesKey)
+        defaults.set([addedID, removed], forKey: AppGroup.favoritesKey)
 
         let query = StationQuery(locator: locator, defaults: defaults)
         let sections = query.sectionedChoices()
@@ -309,24 +316,17 @@ final class WidgetStationLoaderTests: XCTestCase {
                         AppGroup.nearestCurrentStationID])
         let suggestions = sections.flatMap(\.items)
         XCTAssertEqual(suggestions.first { $0.id == addedID }?.name, "Remote only")
-        XCTAssertNil(suggestions.first { $0.id == removed.id })
-        let resolved = try await query.entities(for: [addedID, removed.id])
+        XCTAssertNil(suggestions.first { $0.id == removed })
+        let resolved = try await query.entities(for: [addedID, removed])
         XCTAssertEqual(resolved.map(\.id), [addedID])
 
         defaults.set(addedID, forKey: AppGroup.currentLocationStationKey)
         XCTAssertEqual(WidgetStationLoader.resolvedStationID(
             AppGroup.currentLocationStationID, defaults: defaults, locator: locator), addedID)
-        defaults.set(removed.id, forKey: AppGroup.currentLocationStationKey)
+        defaults.set(removed, forKey: AppGroup.currentLocationStationKey)
         XCTAssertEqual(WidgetStationLoader.resolvedStationID(
             AppGroup.currentLocationStationID, defaults: defaults, locator: locator),
                        addedID)
-    }
-
-    func testTargetedBundledLookupFindsOneStation() {
-        let record: TideStationRecord? = bundled(
-            "stations", id: TideStationRecord.fridayHarborID)
-
-        XCTAssertEqual(record?.id, TideStationRecord.fridayHarborID)
     }
 
     func testBundledTideStationLoads() {

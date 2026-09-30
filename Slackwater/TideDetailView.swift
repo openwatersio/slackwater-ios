@@ -323,6 +323,6 @@ func tideRateCommentary(rate: Double, imperial: Bool) -> String? {
 
 #Preview {
     NavigationStack {
-        TideDetailView(record: TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!)
+        TideDetailView(record: TideStationRecord.record(id: TideStationRecord.fridayHarborID)!)
     }
 }

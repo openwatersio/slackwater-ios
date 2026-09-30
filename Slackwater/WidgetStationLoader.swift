@@ -38,11 +38,9 @@ enum WidgetStationLoader {
         // second scan of the same mapped file. ponytail: two scans, not one;
         // give `widgetItem` a record-returning sibling if this ever measures.
         case .tide(let info):
-            guard let r: TideStationRecord = try catalogRecord("stations", id: info.id, directory: directory)
-            else { return nil }
-            let reference: TideStationRecord? = try r.reference.flatMap {
-                try catalogRecord("stations", id: $0, directory: directory)
-            }
+            let database = try tideDatabase(directory: directory)
+            guard let r = database.station(id: info.id).map(TideStationRecord.init) else { return nil }
+            let reference = r.reference.flatMap { database.station(id: $0) }.map(TideStationRecord.init)
             record = .tide(r, station: r.engineStation(referenceRecord: reference))
         case .current(let info):
             guard let r: CurrentStationRecord = try catalogRecord("currents", id: info.id, directory: directory)
