@@ -1,9 +1,9 @@
-// Slackwater — GPL v3. Settings → Calendar: subscribe a station, one at a time without Premium (notifications spec §7.4).
+// Slackwater — GPL v3. Settings → Calendar: subscribe a station, one at a time without Premium (docs/alerts.md §7.4).
 import XCTest
 
 final class CalendarSettingsTests: ScreenshotTestCase {
     private func openCalendarSettings(_ app: XCUIApplication) {
-        app.buttons["Settings"].tap()
+        openSettings(app)
         let row = app.buttons["settings-calendar-row"].firstMatch
         for _ in 0..<4 where !row.isHittable { app.swipeUp() }
         row.tap()
