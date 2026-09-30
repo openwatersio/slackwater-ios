@@ -1382,8 +1382,11 @@ struct DetailFooter<Note: View>: View {
 
     var body: some View {
         VStack(spacing: 6) {
+            // 0.62: 0.4 measures 3.4:1 over the canvas, under WCAG's 4.5. The
+            // platform audit only caught it on the CHS waiting page, where
+            // the footer is above the fold; it is the same line everywhere.
             MonoLabel(text: String(localized: "Predictions — not for navigation", comment: "Safety disclaimer above station provenance."),
-                      color: SN.foam.opacity(0.4), tracking: 1.4)
+                      color: SN.foam.opacity(0.62), tracking: 1.4)
                 .frame(maxWidth: .infinity)
             note()
             ReportProblemMenu(stationID: stationID, scrubTime: scrubTime, tz: tz)
