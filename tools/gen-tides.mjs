@@ -72,9 +72,9 @@
  *
  * Run: cd tools && npm install && node gen-tides.mjs
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allStations } from "@slackwater/database";
+import { allStations, buildDatabase } from "@slackwater/database";
 import {
   here, byNameThenId, undangle, round3, REGION_WORD, writeBundle,
   FRESHWATER_NETWORKS, networkOf, NORTH_AMERICA, SAME_PLACE_KM, countryOf,
@@ -640,12 +640,39 @@ if (unavailable.some((s) => ids.has(s.id))) {
 const unavailableSize = writeBundle(unavailableOut, unavailable);
 
 const size = writeBundle(out, stations);
+
+/**
+ * Resources/stations.tcdb — the same stations as stations.json, as the
+ * memory-mapped file the app and widget look stations up in by id (#459).
+ *
+ * Each record is the database's own row with the display name and region line
+ * resolved above, trimmed to what predicts: a reference keeps only its
+ * non-zero constituents, and a subordinate keeps its offsets and nothing of
+ * its reference's, because upstream copies the reference's constituents and
+ * datums onto it and the reader resolves them through the reference anyway.
+ * Quality detail stays out; nothing in the app reads it.
+ */
+const rawById = new Map(allStations.map((s) => [s.id, s]));
+const databaseVersion = JSON.parse(readFileSync(
+  join(here, "node_modules", "@slackwater", "database", "package.json"), "utf8")).version;
+const tcdb = buildDatabase(stations.map((b) => ({
+  ...rawById.get(b.id),
+  name: b.name,
+  region: b.region,
+  aliases: b.aliases,
+  quality: undefined,
+  harmonic_constituents: b.constituents,
+  datums: b.reference ? {} : rawById.get(b.id).datums,
+})), { version: databaseVersion });
+writeFileSync(join(here, "..", "Slackwater", "Resources", "stations.tcdb"), tcdb);
+
 const derivedCount = stations.filter((s) => derivedIds.has(s.id)).length;
 const codes = stations.filter((s) => /^[A-Z]{2}$/.test(s.region)).length;
 const subordinates = stations.filter((s) => s.reference).length;
 console.log(
   `${stations.length} tide stations (${stations.length - subordinates} reference, ` +
   `${subordinates} subordinate, ${orphaned} orphaned subordinates dropped), ${size} ` +
+  `(${(tcdb.length / 1024 / 1024).toFixed(2)} MB as tcdb) ` +
   `(${stations.length - derivedCount - codes} own contexts, ${derivedCount} derived, ` +
   `${codes} state/province; ` +
   `${canadian.length} Canadian gap-fills, ${cededToChs} ceded to CHS; ` +

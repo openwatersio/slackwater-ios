@@ -126,7 +126,7 @@ jobs:
         run: npm run build:data
 
       - name: Committed bundles match their generators
-        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json Slackwater/Resources/unavailable-stations.json Slackwater/Resources/chs-stations.json Slackwater/Resources/chs-tombstones.json Slackwater/Resources/chs-gates.json Slackwater/Resources/chs-current-gates.json
+        run: git diff --exit-code Slackwater/Resources/stations.json Slackwater/Resources/stations.tcdb Slackwater/Resources/currents.json Slackwater/Resources/slugs.json Slackwater/Resources/station-index.json Slackwater/Resources/unavailable-stations.json Slackwater/Resources/chs-stations.json Slackwater/Resources/chs-tombstones.json Slackwater/Resources/chs-gates.json Slackwater/Resources/chs-current-gates.json
 
       - name: Bundle invariants
         working-directory: tools

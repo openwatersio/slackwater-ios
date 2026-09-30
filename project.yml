@@ -47,6 +47,11 @@ packages:
     # at the deliberate 1.0.0 release. Native CHS fitting requires #341.
     url: https://github.com/openwatersio/slackwater
     revision: 6021524a3f2c5f609cd41af645ebea4a0e135bf8
+  SlackwaterDatabase:
+    # Exact, and the same release as @slackwater/database in tools/package.json:
+    # the reader and the stations.tcdb that gen-tides builds must match.
+    url: https://github.com/openwatersio/slackwater-database
+    exactVersion: 1.0.0-beta.20260929
   MapLibre:
     url: https://github.com/maplibre/maplibre-gl-native-distribution
     from: 6.9.0
@@ -93,6 +98,7 @@ targetTemplates:
       - Slackwater/DayCurveContentView.swift
       - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
+      - Slackwater/TideStationDatabase.swift
       - Slackwater/CurrentStation.swift
       # The types only; station-index.json stays out of the widget on purpose.
       # The widget resolves one station by id through `decodeCatalogRecord`
@@ -105,6 +111,8 @@ targetTemplates:
     dependencies:
       - package: slackwater
         product: SlackwaterKit
+      - package: SlackwaterDatabase
+        product: SlackwaterDatabase
 targets:
   Slackwater:
     type: application
@@ -115,6 +123,8 @@ targets:
         product: Almanac
       - package: slackwater
         product: SlackwaterKit
+      - package: SlackwaterDatabase
+        product: SlackwaterDatabase
       - package: MapLibre
         product: MapLibre
       - target: SlackwaterWidgets
