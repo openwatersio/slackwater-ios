@@ -2037,16 +2037,20 @@ struct MultiDaySchedule: View {
                 .background(SN.graphLow, in: Capsule())
         case .flood, .ebb:
             // Direction-first (#59): arrow + cardinal lead, the flood/ebb
-            // word demotes to a dimmer label for those who want it.
+            // word demotes to a dimmer label for those who want it. 0.9, not
+            // lower: navyDeep at 0.7 over the flood blue is 3.6:1, under
+            // WCAG's 4.5 (the platform audit flags it on iPad, where the
+            // schedule sits above the fold), and over the ebb amber it is
+            // 4.65:1, one rendering away from the same. 0.9 gives 5.2 and 7.1.
             HStack(spacing: 3) {
                 if let deg = e.arrowDeg {
                     CompassArrow(deg: deg)
                     Text(compass16(deg))
                 }
                 if e.pill == .flood {
-                    Text("Flood").opacity(0.7)
+                    Text("Flood").opacity(0.9)
                 } else {
-                    Text("Ebb").opacity(0.7)
+                    Text("Ebb").opacity(0.9)
                 }
             }
             .textCase(.uppercase)
