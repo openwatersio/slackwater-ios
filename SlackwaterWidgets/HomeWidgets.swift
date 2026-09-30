@@ -26,7 +26,7 @@ struct NextEventView: View {
     var body: some View {
         Group {
             if let card = entry.card {
-                NextEventContentView(card: card)
+                NextEventContentView(card: card, mark: card.locationMark ? .location : nil)
             } else {
                 // Content margins are off, so the empty state pads itself.
                 Text("Open Slackwater to download this station")
