@@ -8,6 +8,9 @@ Do not edit these committed artifacts directly:
   stations that exist, that upstream states we may not use, and that nothing
   we ship comes within 50 km of (issue #401). Identity only — the generator
   throws if a constituent reaches it.
+- `stations.tcdb` — `tools/gen-tides.mjs`, the same stations as `stations.json`
+  written by `@slackwater/database`'s `buildDatabase`, for lookup by id from a
+  memory-mapped file (issue #459). Binary; `git diff` shows only that it changed.
 - `currents.json` — `tools/gen-noaa-currents.mjs`
 - `chs-gates.json` and `chs-current-gates.json` — `tools/gen-chs-gates.mjs`
 - `station-index.json` — `tools/gen-station-index.mjs`, the identity fields of
