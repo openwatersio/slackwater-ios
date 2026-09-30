@@ -162,6 +162,30 @@ enum ChsModelStore {
     static func save(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "") }
 }
 
+extension ChsModelStore {
+    /// Every model on this device, by file stem: one directory listing, so a
+    /// list can ask about thousands of stations without decoding a model.
+    static func fittedIDs(in directory: URL = dir) -> Set<String> {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return Set(names.filter { $0.hasSuffix(".json") }.map { String($0.dropLast(5)) })
+    }
+}
+
+extension StationItem {
+    /// Whether this device holds the model `WidgetStationLoader` would read
+    /// for this station. The watch lists nothing it cannot open (#521).
+    /// An online current's saved window can still miss the date; that stays
+    /// the loader's check, and its detail says so.
+    func isResolvable(fitted: Set<String>) -> Bool {
+        switch self {
+        case .tide, .current: true
+        case .chs(let s): fitted.contains(s.id)
+        case .chsGate(let g): fitted.contains(g.reference)
+        case .chsCurrent(let c): fitted.contains(c.id + (c.isOnline ? "-online" : "-current"))
+        }
+    }
+}
+
 extension ChsStationInfo {
     /// A fitted CHS station renders through the exact same record/engine/view
     /// path as a bundled NOAA station — provenance shows only in the footer.
