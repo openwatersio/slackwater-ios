@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. The pure pieces alert occurrences are built from.
 import XCTest
 @testable import Slackwater
-import TideEngine
+import SlackwaterKit
 
 final class AlertPrimitivesTests: XCTestCase {
     private let t0 = Date(timeIntervalSince1970: 1_700_000_000)

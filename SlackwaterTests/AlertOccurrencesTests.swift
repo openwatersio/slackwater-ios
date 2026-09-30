@@ -2,7 +2,7 @@
 import XCTest
 @testable import Slackwater
 import Almanac
-import TideEngine
+import SlackwaterKit
 
 @MainActor final class AlertOccurrencesTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_755_800_000)   // 2025-08-21

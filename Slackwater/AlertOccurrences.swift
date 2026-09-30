@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Alert rules → dated occurrences, read from the producers the strip already draws (notifications spec §4).
 import Almanac
 import Foundation
-import TideEngine
+import SlackwaterKit
 
 /// Sample series start on a fixed 10-minute grid, so every reschedule interpolates the same
 /// instants and a calendar event keeps its identity from one run to the next.
