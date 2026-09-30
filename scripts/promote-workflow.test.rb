@@ -15,4 +15,10 @@ raise "release cannot create GitHub releases" unless release.dig("permissions", 
 raise "prepare lacks protected credentials" unless prepare["environment"] == "testflight"
 raise "release lacks protected credentials" unless release["environment"] == "testflight"
 
+[prepare, release].each do |job|
+  install = job["steps"].index { |step| step["run"] == "sudo apt-get update && sudo apt-get install -y zsh" }
+  invocation = job["steps"].index { |step| step["run"]&.include?("zsh scripts/promote-nightly.sh") }
+  raise "promotion job must install zsh before using it" unless install && invocation && install < invocation
+end
+
 puts "promotion workflow checks passed"

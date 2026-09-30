@@ -40,6 +40,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
       - name: Open release pull request
         env:
           BUILD: ${{ inputs.build }}
@@ -67,6 +70,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
+
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
 
       - name: Promote the merged release
         env:
