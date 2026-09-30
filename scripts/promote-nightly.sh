@@ -81,6 +81,7 @@ release() {
     fail "v$version already targets $final_target, expected $commit"
   fi
 
+  node scripts/asc.mjs notes "$build" "docs/release-notes/$version.md"
   node scripts/asc.mjs promote "$version" "$build" .github/testflight-beta-groups.txt
   if [[ -z $final_target ]]; then
     gh release create "v$version" --title "$version ($build)" --notes-file "docs/release-notes/$version.md" --target "$commit"

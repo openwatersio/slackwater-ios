@@ -54,7 +54,7 @@ Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `A
    Keep `dist.key`/`dist.p12` in 1Password and delete the local copies.
 7. **Tester groups.** Create an internal "Nightly" group with access to all builds, and the external "Beta" group with a public link (see Tester groups).
 
-To release by hand from a Mac, export the same five variables and run `scripts/testflight.sh`.
+To upload by hand from a Mac, export the same five variables and run `scripts/testflight.sh`. Promotion to Beta still goes through the `Promote Nightly to Beta` workflow and its release pull request.
 
 ## Why a throwaway keychain
 
@@ -65,9 +65,9 @@ Non-GUI sessions (agents, launchd, ssh, CI) see the **login keychain as locked**
 | Group | Kind | Gets builds | Link |
 |---|---|---|---|
 | Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
-| Beta | external, public link | only what `asc.mjs promote` adds, **after Apple beta review** | <https://testflight.apple.com/join/5gwh791N> |
+| Beta | external, public link | builds approved through the promotion workflow, **after Apple beta review** | <https://testflight.apple.com/join/5gwh791N> |
 
-Beta is the only external group. `slackwater.xyz` publishes its link as the download button
+Beta is the only external group and is listed in `.github/testflight-beta-groups.txt`. The promotion workflow requires that file to match App Store Connect exactly, so group changes stop a release until the policy change is reviewed. `slackwater.xyz` publishes its link as the download button
 (`src/lib/links.ts`, shared by the homepage and every station page), so a release that skips
 the promotion leaves the public page on the previous build. Update that file when the link
 changes.
@@ -153,16 +153,9 @@ repeated name in that output is the bug.
 
 ## Cadence
 
-Per-release procedure lives in the `releasing-to-testflight` skill
-(`.claude/skills/`) — bump, test, PR, upload, verify. What follows is the state
-that procedure sits on.
+Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/skills/`).
 
-- **A release goes to every external group, not one.** `./scripts/testflight.sh --external`
-  (the flag was `--family`, still accepted) promotes to all groups with
-  `isInternalGroup: false`, discovered at run time rather than named — adding a fourth
-  group needs no code change. Beta review is submitted **once per build**; it is not
-  per group and a second submission 409s. Check with `node scripts/asc.mjs builds`,
-  whose group column is the only place the asymmetry is visible.
+- **A release goes to every checked-in external group.** Dispatch `Promote Nightly to Beta` with the nightly build number. It opens a pull request containing `docs/release-notes/<version>.md` and the retained `docs/release-promotions/<version>.json` record. Merging approves group attachment, one beta review submission, and the final GitHub release. Check the result with `node scripts/asc.mjs builds`.
 - Bump `CURRENT_PROJECT_VERSION` in `project.yml` per upload (App Store Connect rejects reused
   build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
   because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and

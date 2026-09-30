@@ -119,6 +119,7 @@ grep -q '^Worth testing:' "$REPO/docs/release-notes/1.15.0.md"
 [[ $(events '^pr:create:') == 1 ]]
 
 release docs/release-promotions/1.15.0.json
+[[ $(events '^asc:notes$') == 1 ]]
 [[ $(events '^asc:promote$') == 1 ]]
 grep -q "^release:create:v1.15.0:$NIGHTLY_COMMIT$" "$STATE/events"
 [[ $(events '^release:edit:nightly-1.15.0-48$') == 1 ]]
@@ -132,5 +133,8 @@ release docs/release-promotions/1.15.0.json
 before=$(events '^asc:promote$')
 ! release docs/release-promotions/1.15.0.json || fail 'accepted a changed manifest commit'
 [[ $(events '^asc:promote$') == $before ]]
+
+legacy=$(cd "$ROOT" && zsh scripts/testflight.sh --external 2>&1) && fail 'testflight.sh accepted manual promotion'
+[[ $legacy == *'takes no arguments'* ]] || fail 'testflight.sh did not explain that manual promotion is gone'
 
 print 'nightly promotion checks passed'
