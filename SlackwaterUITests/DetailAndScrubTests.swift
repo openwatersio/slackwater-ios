@@ -620,7 +620,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                           "the commentary must name the next stop, not the one just landed on")
         save(app, "commentary-tapped.png")
 
-        app.buttons["detail-return-now"].firstMatch.tap()
+        returnToNow(app)
         XCTAssert(waitFor(pill, "isHittable == true AND label == '\(saidBefore)'"),
                   "the commentary did not come back after returning to now: '\(pill.label)'")
     }
@@ -644,9 +644,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(places[0].midX > places[1].midX,
                   "scrubbed into history, the Now pill belongs on the right: "
                   + "\(places[0].midX) vs strip mid \(places[1].midX)")
-        XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
-        now.tap()
-        XCTAssert(now.disappears(within: 10), "return-to-now did not bring the strip home")
+        returnToNow(app)
         save(app, "history-after-now.png")
     }
 
@@ -700,10 +698,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   + "\(nowFrame.midX) vs pane mid \(paneMidX)")
 
         // And it still does its job — back to now, and gone again.
-        now.tap()
-        _ = now.disappears(within: 10)
-        XCTAssertFalse(app.buttons["detail-return-now"].exists,
-                       "return-to-now did not clear after returning to now")
+        returnToNow(app)
         XCTAssertEqual(settled { star.frame }.minX, starBefore.minX, accuracy: 0.5,
                        "the star moved when return-to-now went away")
     }

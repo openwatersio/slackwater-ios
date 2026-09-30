@@ -276,6 +276,24 @@ class ScreenshotTestCase: XCTestCase {
                 strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
     }
 
+    /// Tap the Now pill and confirm the strip came home: the pill leaves once
+    /// it has. Parked first (`settleScrub`) — a tap taken while the magnet is
+    /// still snapping after a scrub is dropped, which is how
+    /// `testM46MalibuDerivedGateSeededOffline` went red on unrelated branches
+    /// (#378). Bounded retap on the same landed signal, `pickSearchResult`'s
+    /// shape; a retap cannot scrub away again, the pill is gone once home.
+    func returnToNow(_ app: XCUIApplication) {
+        let now = app.buttons["detail-return-now"].firstMatch
+        XCTAssert(now.appears(within: 5), "scrubbing away revealed no return-to-now")
+        settleScrub(app)
+        var home = false
+        for _ in 0..<3 {
+            if now.exists { now.tap() }
+            if now.disappears(within: 5) { home = true; break }
+        }
+        XCTAssert(home, "return-to-now did not bring the strip home")
+    }
+
     /// The standard preamble: launch with `args`, wait for the list. Tests
     /// whose first screen is not the list (the FTUE gate, -openMap) and
     /// mid-test relaunches on an existing app stay inline.

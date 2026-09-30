@@ -91,13 +91,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // A derived gate scrubs like the other three, so it needs the same way
         // home: the Now pill on the strip's chrome row.
         scrubStrip(app)
-        let now = app.buttons["detail-return-now"].firstMatch
-        XCTAssert(now.appears(within: 5),
-                  "scrubbing a derived gate revealed no return-to-now")
-        XCTAssert(now.isHittable, "return-to-now is not hittable: \(now.frame)")
-        now.tap()
-        XCTAssert(now.disappears(within: 10),
-                  "return-to-now did not bring the derived-gate strip home")
+        returnToNow(app)
     }
 
     /// Issue #33: a Downloads row is a live tap — it closes the sheet and opens
