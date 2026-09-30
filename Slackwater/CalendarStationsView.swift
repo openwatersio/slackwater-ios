@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Which stations publish a calendar: one for free, as many as you like with Premium (notifications spec §7.4).
+// Slackwater — GPL v3. Which stations publish a calendar: one for free, as many as you like with Premium (docs/alerts.md §7.4).
 import SwiftUI
 
 struct CalendarStationsView: View {

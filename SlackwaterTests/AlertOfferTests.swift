@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. What the strip offers for the moment on the centerline (notifications spec §7.1).
+// Slackwater — GPL v3. What the strip offers for the moment on the centerline (docs/alerts.md §7.1).
 import XCTest
 @testable import Slackwater
 import Almanac

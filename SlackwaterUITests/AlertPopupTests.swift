@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. A long press on the strip offers an alert for the moment under it (notifications spec §7.1–§7.2).
+// Slackwater — GPL v3. A long press on the strip offers an alert for the moment under it (docs/alerts.md §7.1–§7.2).
 import XCTest
 
 final class AlertPopupTests: ScreenshotTestCase {

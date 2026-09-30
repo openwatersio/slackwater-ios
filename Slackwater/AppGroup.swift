@@ -55,7 +55,7 @@ enum AppGroup {
     static let chosenStationsKey = "slackwater.chosenStations"
     static let premiumKey = "slackwater.premium"
     static let slackWindowSpeedKey = "slackwater.slackWindowSpeedKn"
-    /// Alert rules (notifications spec §3): JSON, device-local — two devices holding one
+    /// Alert rules (docs/alerts.md §3): JSON, device-local — two devices holding one
     /// rule would each deliver it.
     static let alertRulesKey = "slackwater.alertRules"
     /// Which stations publish a calendar, and the identifier of each one (spec §5.1).

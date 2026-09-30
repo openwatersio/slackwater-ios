@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Alert rules → dated occurrences, read from the producers the strip already draws (notifications spec §4).
+// Slackwater — GPL v3. Alert rules → dated occurrences, read from the producers the strip already draws (docs/alerts.md §4).
 import Almanac
 import Foundation
 import SlackwaterKit
@@ -73,7 +73,7 @@ func slackWindowOpenings(_ station: any CurrentPredicting, from: Date, to: Date,
     return (opened + hairline).sorted { $0.event < $1.event }
 }
 
-/// One dated event a rule found (notifications spec §4).
+/// One dated event a rule found (docs/alerts.md §4).
 struct AlertOccurrence: Equatable, Sendable {
     let ruleID: UUID
     /// The water event itself.

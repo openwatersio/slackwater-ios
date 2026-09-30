@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Which stations publish a calendar of their own, and what goes in one (notifications spec §5.1).
+// Slackwater — GPL v3. Which stations publish a calendar of their own, and what goes in one (docs/alerts.md §5.1).
 import Foundation
 
 /// One station's calendar. `calendarID` is empty until EventKit has made or adopted it.

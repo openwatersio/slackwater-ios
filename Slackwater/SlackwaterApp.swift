@@ -17,7 +17,7 @@ struct SlackwaterApp: App {
         // until the app assigns it, so the widget extension — which also
         // compiles ChsModelStore.save — never triggers its own reload.
         // Every CHS model save funnels through this hook, and a newly fitted station can
-        // make a waiting alert schedulable (notifications spec §6).
+        // make a waiting alert schedulable (docs/alerts.md §6).
         WidgetReload.trigger = {
             WidgetCenter.shared.reloadAllTimelines()
             AlertScheduler.requestReschedule()

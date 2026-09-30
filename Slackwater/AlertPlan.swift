@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Occurrences → what gets delivered where, and what it says (notifications spec §5–§6).
+// Slackwater — GPL v3. Occurrences → what gets delivered where, and what it says (docs/alerts.md §5–§6).
 import Foundation
 
 enum AlertHorizon {

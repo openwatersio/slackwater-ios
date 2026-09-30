@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Schedules Premium alert notifications and routes a tap to the station at the event (notifications spec §5.2).
+// Slackwater — GPL v3. Schedules Premium alert notifications and routes a tap to the station at the event (docs/alerts.md §5.2).
 import UserNotifications
 
 @MainActor enum AlertNotifications {

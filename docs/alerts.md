@@ -1,8 +1,8 @@
-# Alerts — design
+# Alerts
 
-*2026-09-12. A calendar per station, subscribed in Settings, and notifications set by long-pressing
-the moment you care about on the strip. Refines the free/paid line in
-[widgets-premium §2 and §5](2026-08-21-widgets-premium-design.md).*
+*A calendar per station, subscribed in Settings, and notifications set by long-pressing the
+moment you care about on the strip. The calendar is free; anything that interrupts is Premium.
+Source comments cite this document by section number.*
 
 ## 1. Goal
 
@@ -366,7 +366,7 @@ subscription stay, read "Premium needed", and deliver again the moment the entit
 | CHS derived gate | `.derived` once its reference port is fitted | `.slack`, `.eclipse` | once fitted |
 | CHS current gate, online | nil | none | no |
 
-Online gates predict only from a network fetch ([online-gates §1](2026-08-08-online-gates-design.md))
+Online gates predict only from a network fetch ([chs-data-model](chs-data-model.md))
 and the loader returns nil for them, so nothing could be scheduled offline. A long press there does
 nothing and their Settings row is unavailable, rather than offering an alert that never fires.
 
@@ -463,5 +463,5 @@ yet on sale. The free single calendar depends on neither and can ship first.
 ## 14. Out of scope
 
 Server push and webcal feeds — Canadian predictions stay on the device
-([chs-data-model §3](../../chs-data-model.md)). `BGAppRefreshTask` (§6). Wind and weather
+([chs-data-model §3](chs-data-model.md)). `BGAppRefreshTask` (§6). Wind and weather
 conditions. Apple Watch. Rule sync across devices. A widget showing the next alert.

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. What the strip offers for the moment on the centerline (notifications spec §7.1).
+// Slackwater — GPL v3. What the strip offers for the moment on the centerline (docs/alerts.md §7.1).
 import Foundation
 
 /// A height as the strip shows it — 0.1 ft, or 0.01 m — so a crossing rule is the reading the user

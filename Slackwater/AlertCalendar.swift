@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. One calendar per subscribed station, and only the calendars this app made (notifications spec §5.1).
+// Slackwater — GPL v3. One calendar per subscribed station, and only the calendars this app made (docs/alerts.md §5.1).
 import EventKit
 import os
 

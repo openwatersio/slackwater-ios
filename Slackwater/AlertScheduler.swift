@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Runs the alert pipeline — rules → occurrences → plan → writers — on launch and on every change (notifications spec §6).
+// Slackwater — GPL v3. Runs the alert pipeline — rules → occurrences → plan → writers — on launch and on every change (docs/alerts.md §6).
 import Foundation
 
 /// One planned delivery with everything a writer needs.

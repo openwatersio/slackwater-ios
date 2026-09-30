@@ -1,7 +1,7 @@
 // Slackwater — GPL v3. Alert rules — what the user asked to be told about — and the store that keeps them.
 import Foundation
 
-/// The water event a rule watches (notifications spec §3). Which stations each case
+/// The water event a rule watches (docs/alerts.md §3). Which stations each case
 /// applies to is spec §8; a case that doesn't fit the station finds nothing.
 enum AlertTrigger: Codable, Hashable {
     case slackWindowOpens

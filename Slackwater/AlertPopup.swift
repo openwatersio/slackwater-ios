@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Press and hold a moment on the strip: alert me then, or every time (notifications spec §7.2).
+// Slackwater — GPL v3. Press and hold a moment on the strip: alert me then, or every time (docs/alerts.md §7.2).
 import SwiftUI
 
 /// Two rows and a header naming what the press landed on. No lead picker: half an hour, and

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Edit one alert rule — lead and daylight — from the Alerts screen (notifications spec §7.2).
+// Slackwater — GPL v3. Edit one alert rule — lead and daylight — from the Alerts screen (docs/alerts.md §7.2).
 import SwiftUI
 
 struct AlertSheet: View {

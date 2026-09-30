@@ -90,7 +90,7 @@ final class PremiumStore: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         // Notifications are what the tier decides: gaining Premium schedules them, losing it
         // clears them. Station calendars publish at any tier and are left exactly as they are
-        // (notifications spec §6).
+        // (docs/alerts.md §6).
         AlertScheduler.requestReschedule()
     }
 }
