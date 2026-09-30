@@ -29,6 +29,12 @@ An erased simulator is signed out of iCloud, so it starts with no favorites. Eac
 
 For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
 
+## Screenshotting a deep-linked screen
+
+`xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens the Widgets gallery) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.
+
+Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `testArguments(["-seedGate", "-locDenied"])` (`-seedGate` skips the first-run gate), open the link with `XCUIDevice.shared.system.open(url)`, then tap `XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Open"]` for as long as it exists. Run only that test with `-only-testing:`, passing `TEST_RUNNER_M1_SHOT_DIR` for the screenshot, and under the test lock described in CLAUDE.md. Delete the file and run `xcodegen generate` again before committing.
+
 ## User-facing copy
 
 Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
