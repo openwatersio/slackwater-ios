@@ -40,8 +40,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "m1-detail-scrubbed.png")
 
         // Back to the station list (search closed itself on the pick).
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         settleLayout(stationList(app).firstMatch)  // the pop slides the list in
         save(app, "m1-list.png")
 
@@ -84,8 +83,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
                   "the lead did not re-render in metres: \(leadReading(app).label)")
         save(app, "m1-detail-metric.png")
         // Leave the store imperial for the other tests.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         setUnits(app, "Feet")
     }
 
@@ -221,8 +219,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         wait(for: [expectation(for: NSPredicate(format: "label BEGINSWITH %@", name),
                                evaluatedWith: title)], timeout: 10)
 
-        app.buttons["detail-back"].firstMatch.tap()
         let map = nearby.descendants(matching: .any)["nearby-map"].firstMatch
+        goBack(app, to: map)
         XCTAssert(map.appears(within: 10), "back from the pushed station lost the Nearby map")
         // A coordinate tap never scrolls, and the map sits below the rows.
         let window = app.windows.firstMatch.frame
@@ -357,8 +355,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         save(app, "m41-detail-header.png")
 
         // The header carries the current-station detail too.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass (Narrows)"].firstMatch)
         XCTAssert(app.otherElements["detail-header"].appears(within: 5),

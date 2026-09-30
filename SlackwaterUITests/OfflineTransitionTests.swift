@@ -110,7 +110,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         app.buttons["Done"].tap()
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)
-        app.buttons["detail-back"].firstMatch.tap()
+        goBack(app)
         openDownloads(app)
         let tofino = app.descendants(matching: .any)["download-row-chs-tofino"].firstMatch
         releaseFixture(token, "dodd-first-chunk")
@@ -145,7 +145,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(NSPredicate(
             format: "label CONTAINS 'first in line'"
         )).firstMatch.appears(within: 5))
-        app.buttons["detail-back"].firstMatch.tap()
+        goBack(app)
         openDownloads(app)
         let promoted = rows["download-row-chs-weynton-passage"].firstMatch
         XCTAssert(promoted.appears(within: 5))
