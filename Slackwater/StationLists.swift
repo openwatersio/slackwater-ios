@@ -215,3 +215,53 @@ struct ListGroups {
         recents = recentIds.filter { !shown.contains($0) }
     }
 }
+
+// MARK: - The watch list (#521)
+
+/// The watch list's groups: the phone's dedupe (`ListGroups`) over only the
+/// places this device can open. Pure, so what a watch-only wearer sees is
+/// testable on the phone's test host.
+///
+/// Favorites filter differently from everything else. A favorite missing
+/// from the bundle keeps its id, so the list can show "Place removed" and
+/// offer to forget it (#91); a favorite that is only unfitted here is
+/// dropped from view but stays starred, because the phone can open it.
+struct BrowseGroups {
+    let hero: [StationItem]
+    let favorites: [String]
+    let nearby: [StationItem]
+    let recents: [StationItem]
+
+    init(fix: (lat: Double, lon: Double)?, favoriteIds: [String], recentIds: [String],
+         fitted: Set<String>, nearbyCount: Int = 4) {
+        var ranked: [StationItem] = []
+        var hero: [StationItem] = []
+        // No fix, no location groups: a fallback anchor would title a list
+        // "Near Me" for somewhere the wearer is not.
+        if let fix {
+            let open = StationItem.all.filter { $0.isResolvable(fitted: fitted) }
+            ranked = StationItem.rankedByDistance(open, lat: fix.lat, lon: fix.lon)
+            hero = StationItem.heroItems(ranked: ranked, lat: fix.lat, lon: fix.lon)
+        }
+        let groups = ListGroups(
+            heroIds: hero.map(\.id),
+            favoriteIds: favoriteIds.filter { StationItem.byId[$0]?.isResolvable(fitted: fitted) ?? true },
+            recentIds: recentIds.filter { StationItem.byId[$0]?.isResolvable(fitted: fitted) ?? false },
+            rankedIds: ranked.map(\.id),
+            nearCount: nearbyCount)
+        self.hero = hero
+        favorites = groups.favorites
+        nearby = groups.nearMe.compactMap { StationItem.byId[$0] }
+        recents = groups.recents.compactMap { StationItem.byId[$0] }
+    }
+}
+
+extension StationItem {
+    /// `search`, minus places this device cannot open. Filtered after the
+    /// 60-row cap: a query crowded with hidden places comes back short, not
+    /// refilled. ponytail: pass `fitted` into `search` if that ever shows.
+    static func searchResolvable(_ query: String, near anchor: (lat: Double, lon: Double),
+                                 fitted: Set<String>) -> [StationItem] {
+        search(query, near: anchor).filter { $0.isResolvable(fitted: fitted) }
+    }
+}
