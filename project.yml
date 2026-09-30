@@ -328,6 +328,13 @@ schemes:
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true
+  # The watch app's own run target; the app schemes can't deploy to a watch.
+  SlackwaterWatch:
+    build:
+      targets:
+        SlackwaterWatch: all
+    run:
+      config: Debug
   # First-run state on every launch, for iterating on the gate. Location stays
   # real, so the permission prompt needs a device erased by scripts/first-run.sh.
   Slackwater First Run:
