@@ -54,7 +54,8 @@ struct AddPlace: View {
             }
         }
         .navigationTitle(Text("Add Place", comment: "Watch list row that opens place search."))
-        .task(id: query) {
+        // The anchor too: a fix that lands mid-search re-ranks the results.
+        .task(id: "\(query)|\(anchor.lat)|\(anchor.lon)") {
             let q = query, a = anchor
             guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; searched = q; return }
             let found = await Task.detached(priority: .userInitiated) {

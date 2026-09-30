@@ -9,6 +9,10 @@ struct StationRow: View {
     let mark: PlaceMark?
     /// When the wearer last raised the app: the card reads at this instant.
     let now: Date
+    // Read by `WidgetCard.build`; iCloud can deliver the phone's units after
+    // a card has loaded, and a card must not keep the fallback ones.
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = ""
+    @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = ""
     @State private var card: WidgetCard?
 
     var body: some View {
@@ -30,7 +34,7 @@ struct StationRow: View {
         .frame(height: 150)
         .background(SN.canvas)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .task(id: "\(item.id)|\(now.timeIntervalSince1970)") {
+        .task(id: "\(item.id)|\(now.timeIntervalSince1970)|\(units)|\(speedUnit)") {
             let id = item.id, now = now
             let next = await Task.detached(priority: .utility) {
                 WidgetStationLoader.loadRecord(id: id, at: now).map { WidgetCard.build($0, now: now) }
