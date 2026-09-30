@@ -18,7 +18,7 @@ struct AddPlace: View {
 
     var body: some View {
         List {
-            TextField(String(localized: "Search places", comment: "Watch place-search field placeholder."),
+            TextField(String(localized: "Search for a place", comment: "Station discovery interface text."),
                       text: $query)
             ForEach(results) { item in
                 HStack {
@@ -34,8 +34,9 @@ struct AddPlace: View {
                         Image(systemName: favorites.contains(item.id) ? "star.fill" : "plus")
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel(String(localized: "Add to favorites",
-                                               comment: "Watch search result: save this place."))
+                    .accessibilityLabel(favorites.contains(item.id)
+                        ? String(localized: "Open", comment: "Watch search result already a favorite: open it.")
+                        : String(localized: "Add favorite", comment: "VoiceOver action for a station."))
                 }
             }
         }
@@ -43,9 +44,12 @@ struct AddPlace: View {
         .task(id: query) {
             let q = query, a = anchor
             guard !q.trimmingCharacters(in: .whitespaces).isEmpty else { results = []; return }
-            results = await Task.detached(priority: .userInitiated) {
+            let found = await Task.detached(priority: .userInitiated) {
                 StationItem.searchResolvable(q, near: a, fitted: ChsModelStore.fittedIDs())
             }.value
+            // An earlier keystroke's scan can finish after this one's.
+            guard !Task.isCancelled else { return }
+            results = found
         }
     }
 

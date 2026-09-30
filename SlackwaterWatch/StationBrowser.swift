@@ -13,6 +13,9 @@ struct StationBrowser: View {
     @ObservedObject private var recents = RecentsStore.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var groups: BrowseGroups?
+    /// When the wearer last raised the app: rows read at this instant. No
+    /// live tick; a reading refreshes on the next look, as on the phone.
+    @State private var shownAt = Date()
     @State private var path: [BrowseRoute] = []
 
     private struct Inputs: Hashable {
@@ -42,14 +45,19 @@ struct StationBrowser: View {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
             let favoriteIds = favorites.ids, recentIds = recents.ids
             // Ranking the whole catalog is too slow for the watch's main thread.
-            groups = await Task.detached(priority: .userInitiated) {
+            let next = await Task.detached(priority: .userInitiated) {
                 BrowseGroups(fix: fix, favoriteIds: favoriteIds, recentIds: recentIds,
                              fitted: ChsModelStore.fittedIDs())
             }.value
+            // A newer input's ranking may have landed first.
+            guard !Task.isCancelled else { return }
+            groups = next
         }
         .onAppear { location.refresh() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { location.refresh() }
+            guard phase == .active else { return }
+            shownAt = .now
+            location.refresh()
         }
     }
 
@@ -107,7 +115,7 @@ struct StationBrowser: View {
     }
 
     private func row(_ item: StationItem, km: Double? = nil) -> some View {
-        NavigationLink(value: BrowseRoute.station(item)) { StationRow(item: item, km: km) }
+        NavigationLink(value: BrowseRoute.station(item)) { StationRow(item: item, km: km, now: shownAt) }
     }
 
     private func favoriteButton(_ item: StationItem) -> some View {

@@ -14,8 +14,7 @@ struct StationPlaceholder: View {
                 Text(verbatim: item.placeLabel).font(.footnote).foregroundStyle(.secondary)
                 Text(verbatim: item.kindLabel).font(.footnote).foregroundStyle(.secondary)
                 if resolved == false {
-                    Text("Predictions unavailable.",
-                         comment: "Watch place page when this device cannot predict the place.")
+                    Text("Predictions unavailable", comment: "Prediction download status.")
                         .font(.footnote)
                 }
             }

@@ -7,6 +7,7 @@ import SwiftUI
 struct StationRow: View {
     let item: StationItem
     var km: Double? = nil
+    let now: Date
     @State private var snapshot: WidgetSnapshot?
 
     var body: some View {
@@ -32,11 +33,13 @@ struct StationRow: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .task(id: item.id) {
-            let id = item.id
-            snapshot = await Task.detached(priority: .utility) {
-                WidgetStationLoader.load(id: id).map { WidgetSnapshot.build($0, now: .now) }
+        .task(id: "\(item.id)|\(now.timeIntervalSince1970)") {
+            let id = item.id, now = now
+            let next = await Task.detached(priority: .utility) {
+                WidgetStationLoader.load(id: id).map { WidgetSnapshot.build($0, now: now) }
             }.value
+            guard !Task.isCancelled else { return }
+            snapshot = next
         }
     }
 }
