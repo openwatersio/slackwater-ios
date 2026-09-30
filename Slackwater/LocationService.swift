@@ -6,13 +6,6 @@ import WidgetKit
 
 let seenGateKey = "slackwater.seenGate"  // mirrors the web's SEEN_GATE flag
 
-/// Annapolis, Chesapeake Bay — the last-resort ranking anchor, used only on a first run
-/// with no fix and nothing opened yet. Everywhere else the anchor follows the
-/// user: a real fix first, then the station they last opened (prototype
-/// NearMe.dc.html FALLBACK: denied/undetermined still gets a Near Me list).
-/// NOAA tides and currents here ship with the app and work on first launch.
-let firstRunFix = (lat: 38.9750, lon: -76.4550)
-
 final class LocationService: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = LocationService()
 
