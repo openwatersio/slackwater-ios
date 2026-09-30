@@ -11,8 +11,7 @@ struct SlackwaterWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Text(verbatim: "Slackwater")
-                .foregroundStyle(SN.foam)
+            StationBrowser()
         }
     }
 }
