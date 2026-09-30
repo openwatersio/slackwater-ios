@@ -66,7 +66,7 @@ Not with CI — every lane is GitHub-hosted since #327. Shared with the other wo
 
 ## Reading a CI failure
 
-`scripts/test.sh` pipes `xcodebuild` through `tail`, so a job log holds only the "Failing tests:" block, where names repeat even for a single attempt. The failure itself is in the `test-evidence-<shard>` artifact:
+`scripts/test.sh` pipes `xcodebuild` through `tail`, so the test step's log holds only the "Failing tests:" block, where names repeat even for a single attempt. The assertion text is in the job's "Failure messages" step and its step summary; the UI hierarchy and screen recording are in the `test-evidence-<shard>` artifact:
 
 ```sh
 gh run download <run-id> -D <dir>

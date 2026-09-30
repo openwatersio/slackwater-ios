@@ -297,6 +297,28 @@ jobs:
           SLACKWATER_ONLY: ${{ matrix.shard.only }}
           SLACKWATER_SKIP: ${{ matrix.shard.skip }}
 
+      # test.sh pipes xcodebuild through tail, so the job log holds test
+      # names and no assertion text. Print each failure's message here, and
+      # into the step summary, so a red shard can be read without downloading
+      # its 150 MB bundle. An assertion string is a test or app defect; a
+      # "Timed out while evaluating UI query" is XCUITest's own service and a
+      # re-run (CLAUDE.md, "Reading a CI failure"). For a week every push to
+      # main was red on two iPad-only assertions that read as more flake
+      # because nothing surfaced their text.
+      - name: Failure messages
+        if: failure()
+        run: |
+          {
+            echo '```'
+            for bundle in build/*.xcresult; do
+              [ -d "$bundle" ] || continue
+              xcrun xcresulttool get test-results tests --path "$bundle" 2>/dev/null \
+                | jq -r '.. | objects | select(.nodeType == "Test Case" and .result == "Failed")
+                         | .name, (.. | objects | select(.nodeType == "Failure Message") | "    " + .name)'
+            done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       # There is no runner to ssh into, so the evidence has to travel.
       - name: Upload screenshots and results on failure
         if: failure()
