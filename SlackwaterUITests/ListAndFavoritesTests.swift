@@ -35,8 +35,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Visit a station; it must appear under Recents — the last station
         // group (order: My Location → Favorites → Near Me → Recents).
         openFridayHarbor(app)
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         let near = app.staticTexts["Near Me"].firstMatch
         XCTAssert(near.appears(within: 5))
         let recentsLabel = app.staticTexts["Recents"].firstMatch
@@ -89,9 +88,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(title.label.contains("Victoria"),
                   "tapping the first hero card opened \(title.label)")
         // One back, and you are on the list — not on the other hero station.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5),
-                  "back from the hero detail landed somewhere other than the list")
+        goBack(app)
     }
 
     // Location denied — the amber card sits in the My Location slot, above
@@ -159,7 +156,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Back to the list: the favorite must RESOLVE — a Favorites group
         // with the gate in it, not a phantom id and no group at all.
-        app.buttons["detail-back"].firstMatch.tap()
+        goBack(app)
         // iPhone closes search with the push; the iPad sidebar keeps it open.
         if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
         XCTAssert(stationList(app).appears(within: 5))
@@ -233,7 +230,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Back to Sechelt's own (still-honesty) detail — one pop, since the
         // link pushed rather than reset the path.
-        app.buttons["detail-back"].firstMatch.tap()
+        goBack(app, to: app.descendants(matching: .any)["online-honesty-card"].firstMatch)
         XCTAssert(app.descendants(matching: .any)["online-honesty-card"].firstMatch.appears(within: 5),
                   "one back from the nearest-gate-link push should land on Sechelt's own honesty card")
 
@@ -246,7 +243,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Back to the list: the favorite must RESOLVE — a Favorites group with
         // Sechelt Rapids in it, not a phantom id and no group at all.
-        app.buttons["detail-back"].firstMatch.tap()
+        goBack(app)
         // iPhone closes search with the push; the iPad sidebar keeps it open.
         if app.buttons["Close search"].firstMatch.exists { closeSearch(app) }
         XCTAssert(stationList(app).appears(within: 5))
@@ -282,8 +279,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Back: a Favorites group holds it, and it does NOT repeat in Recents
         // (it was just visited — favorites win the dedupe).
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         XCTAssert(app.staticTexts["Favorites"].appears(within: 5))
         XCTAssert(app.staticTexts["Friday Harbor"].firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Recents"].exists,
@@ -293,8 +289,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         openSearch(app, "deception")
         pickSearchResult(app, app.staticTexts["Deception Pass State Park"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         XCTAssert(app.staticTexts["My Location"].appears(within: 5))
         XCTAssert(app.staticTexts["Favorites"].exists)
         XCTAssert(app.staticTexts["Near Me"].exists)
@@ -363,8 +358,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // Leave the store on knots for the other tests. No launch argument
         // resets the unit — it is plain persisted app state — so the way back
         // is the same Settings round trip that set it.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         openSettings(app)
         let kn = app.buttons["Knots"]
         XCTAssert(kn.appears(within: 5))
@@ -458,10 +452,13 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // the list, which remembers it — the chosen station takes the place's
         // entry. Each station's region is literally its bearing string, so a
         // bare text match is unambiguous.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(app.otherElements["detail-header"].appears(within: 5))
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        // Landed on the nearest station's page, by its region in the header —
+        // the pushed page has a header and a back button of its own, so
+        // neither says which page is showing. Scoped to the header: the iPad
+        // sidebar carries the same string.
+        goBack(app, to: app.otherElements["detail-header"].firstMatch.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", "3.0 nm NE")).firstMatch)
+        goBack(app)
         let list = listContainer(app)
         XCTAssert(list.staticTexts["6.6 nm SSE"].firstMatch.appears(within: 5),
                   "the list must show the chosen station")
@@ -570,8 +567,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         pick.tap()
 
         // Picking swaps the favorite in place and opens the station.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         XCTAssert(app.staticTexts["Favorites"].appears(within: 5),
                   "the swap emptied Favorites instead of taking the removed station's slot")
         XCTAssertFalse(app.staticTexts["North Galiano"].firstMatch.exists,

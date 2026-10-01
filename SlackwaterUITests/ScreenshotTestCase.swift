@@ -207,6 +207,29 @@ class ScreenshotTestCase: XCTestCase {
         app.descendants(matching: .any)["station-list"].firstMatch
     }
 
+    /// Leave a detail through its back button and confirm the pop landed. A
+    /// back tap taken while the detail is still settling is dropped — the
+    /// offline lane lost it on `main` (#378) and
+    /// `testM43FavoritesAndSwipeActions` lost it on #552 — so this is a
+    /// bounded retap on a landed signal, `pickSearchResult`'s shape.
+    ///
+    /// The signal is the button leaving: the list has none, and neither does
+    /// the iPad's empty detail pane, while the sidebar's list is on screen
+    /// before AND after the pop and cannot say whether it landed. A pop that
+    /// returns to another detail names it as `landed` instead, since that
+    /// detail has a back button of its own.
+    func goBack(_ app: XCUIApplication, to landed: XCUIElement? = nil) {
+        let back = app.buttons["detail-back"].firstMatch
+        XCTAssert(back.appears(within: 5), "no back button on the detail")
+        var popped = false
+        for _ in 0..<3 {
+            if back.exists { back.tap() }
+            let done = landed.map { $0.appears(within: 5) } ?? back.disappears(within: 5)
+            if done { popped = true; break }
+        }
+        XCTAssert(popped, "the back tap did not leave the detail")
+    }
+
     /// The list's own scroll container. `app.swipeUp()` gestures at the centre
     /// of the whole app, which in the iPad split lands in the DETAIL pane and
     /// scrolls nothing — the sidebar list has to be swiped directly. The pane

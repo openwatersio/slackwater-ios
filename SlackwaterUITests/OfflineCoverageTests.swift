@@ -243,8 +243,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         save(app, "m53-us-station.png")
 
         // And the west coast, through the same path.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         openSearch(app, "san francisco")
         pickSearchResult(app, app.staticTexts["San Francisco (Golden Gate)"].firstMatch)
         XCTAssert(app.staticTexts["Today"].appears(within: 10))
@@ -278,8 +277,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
                        "an undownloaded station has nothing to draw")
 
         // Opening it put it in the download set, at the front.
-        app.buttons["detail-back"].firstMatch.tap()
-        XCTAssert(stationList(app).appears(within: 5))
+        goBack(app)
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-halifax"].firstMatch
         XCTAssert(row.appears(within: 5),
