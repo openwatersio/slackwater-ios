@@ -1,6 +1,278 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld of %lld": {
+      "comment": "Completed and total station downloads.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld sur %2$lld"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld de %2$lld"
+          }
+        }
+      }
+    },
+    "Adding more whenever Slackwater is open. %lld so far.": {
+      "comment": "Download tier summary. The integer is the number of downloaded stations.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "D’autres stations sont ajoutées quand Slackwater est ouvert. %lld jusqu’ici."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade más cuando Slackwater está abierto. %lld hasta ahora."
+          }
+        }
+      }
+    },
+    "Adds more whenever Slackwater is open, as far as 150 km out.": {
+      "comment": "Explanation of the widest station-download tier.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoute d’autres stations quand Slackwater est ouvert, dans un rayon de 150 km."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añade más cuando Slackwater está abierto, hasta un radio de 150 km."
+          }
+        }
+      }
+    },
+    "Download %lld more": {
+      "comment": "Accessibility label for accepting additional station downloads.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger %lld de plus"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar %lld más"
+          }
+        }
+      }
+    },
+    "Download %lld more within 25 km": {
+      "comment": "Accept additional station downloads within a 25 km radius.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger %lld de plus dans un rayon de 25 km"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargar %lld más en un radio de 25 km"
+          }
+        }
+      }
+    },
+    "Download %lld more?": {
+      "comment": "Offer to download additional nearby stations.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Télécharger %lld de plus?"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Descargar %lld más?"
+          }
+        }
+      }
+    },
+    "Downloading nearby stations": {
+      "comment": "Station-list download progress heading.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement des stations à proximité"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando estaciones cercanas"
+          }
+        }
+      }
+    },
+    "Downloading tide stations": {
+      "comment": "Background station-download activity title.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Téléchargement des stations de marée"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargando estaciones de mareas"
+          }
+        }
+      }
+    },
+    "In view": {
+      "comment": "Download tier containing stations shown in the station list.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À l’écran"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En pantalla"
+          }
+        }
+      }
+    },
+    "Keep downloading Canadian stations within 150 km": {
+      "comment": "Accept ongoing downloads of Canadian stations within a 150 km radius.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuer à télécharger les stations canadiennes dans un rayon de 150 km"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seguir descargando estaciones canadienses en un radio de 150 km"
+          }
+        }
+      }
+    },
+    "Nearby (25 km) — downloading": {
+      "comment": "Status of the nearby station-download tier.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À proximité (25 km) — téléchargement en cours"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca (25 km) — descargando"
+          }
+        }
+      }
+    },
+    "Not now": {
+      "comment": "Accessibility label for declining additional station downloads.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas maintenant"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora no"
+          }
+        }
+      }
+    },
+    "Stations ready: %lld of %lld": {
+      "comment": "Background download activity. Values are ready and total station counts.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stations prêtes : %1$lld sur %2$lld"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estaciones listas: %1$lld de %2$lld"
+          }
+        }
+      }
+    },
+    "The stations on your list download on their own.": {
+      "comment": "Explanation of automatic downloads for stations in view.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les stations de votre liste se téléchargent automatiquement."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las estaciones de tu lista se descargan automáticamente."
+          }
+        }
+      }
+    },
+    "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice.": {
+      "comment": "Offline-download progress summary.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les stations que vous avez ouvertes sont prêtes et restent disponibles hors ligne. Les autres s’ajoutent à mesure que vous utilisez l’app, et aucune n’est téléchargée deux fois."
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las estaciones que has abierto están listas y siguen disponibles sin conexión. Las demás se añaden a medida que usas la app, y ninguna se descarga dos veces."
+          }
+        }
+      }
+    },
+    "Waiting to retry…": {
+      "comment": "Background download activity while waiting to retry.",
+      "localizations": {
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente d’une nouvelle tentative…"
+          }
+        },
+        "es-ES": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esperando para reintentar…"
+          }
+        }
+      }
+    },
     "" : {
       "shouldTranslate" : false
     },

@@ -45,6 +45,12 @@ Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `tes
 
 Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
 
+## Localization
+
+Every user-facing string ships in English, Canadian French (`fr-CA`), and Spanish (`es-ES`). Include translations in the same pull request as any new or changed copy, including accessibility labels and system notifications. Use SwiftUI's localized string APIs or `String(localized:)`; plain Swift strings passed to system APIs are not localized automatically.
+
+Update `Slackwater/Localizable.xcstrings` with translator context and complete translations for both supported locales. Preserve format placeholders, add plural variants where the wording requires them, and remove unused keys when deleting copy. Review the catalog diff for missing translations and unrelated Xcode rewrites, then build and check the changed screens in both languages before opening the pull request. English fallback is not a completed translation.
+
 ## Running the tests
 
 One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;
