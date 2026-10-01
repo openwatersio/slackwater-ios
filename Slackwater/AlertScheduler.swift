@@ -1,0 +1,168 @@
+// Slackwater — GPL v3. Runs the alert pipeline — rules → occurrences → plan → writers — on launch and on every change (docs/alerts.md §6).
+import Foundation
+
+/// One planned delivery with everything a writer needs.
+struct AlertEntry {
+    /// Which station's calendar this belongs in.
+    let stationID: String
+    let occurrence: AlertOccurrence
+    let copy: AlertCopy
+    let url: URL?
+    let place: AlertPlace
+}
+
+struct ResolvedAlerts: Sendable {
+    /// From rules: what becomes a notification.
+    var occurrences: [AlertOccurrence] = []
+    /// From station subscriptions: what the calendar publishes.
+    var calendarOccurrences: [AlertOccurrence] = []
+    /// The throwaway rules behind `calendarOccurrences`, so copy has a trigger to read.
+    var calendarRules: [UUID: AlertRule] = [:]
+    /// Which station each of those belongs to, so the writer knows the calendar.
+    var calendarStations: [UUID: String] = [:]
+    /// Keyed by station id.
+    var places: [String: AlertPlace] = [:]
+    /// Enabled rules whose station can't be loaded yet — a CHS station not fitted on this
+    /// device, or an id that left the catalog.
+    var unresolved: Set<UUID> = []
+    /// Subscribed stations that can't be loaded. Their calendars are left exactly as they
+    /// are: an empty plan is "nothing known yet", not "delete the next 90 days".
+    var unresolvedStations: Set<String> = []
+}
+
+/// Occurrences for every enabled rule and every subscribed station, from `now` to the calendar
+/// horizon. Off the main actor: a season-scale scan per station is real work.
+/// ponytail: two rules on one station load it twice; share the record if that ever measures.
+func resolveAlerts(_ rules: [AlertRule], subscriptions: [String],
+                   now: Date, threshold: Double) -> ResolvedAlerts {
+    var resolved = ResolvedAlerts()
+    let until = now.addingTimeInterval(AlertHorizon.calendar)
+
+    for rule in rules where rule.enabled {
+        guard let record = WidgetStationLoader.loadRecord(id: rule.stationID) else {
+            resolved.unresolved.insert(rule.id)
+            continue
+        }
+        resolved.places[rule.stationID] = record.alertPlace
+        resolved.occurrences += alertOccurrences(rule, station: WidgetStationLoader.station(from: record),
+                                                 position: record.alertPosition,
+                                                 from: now, to: until, threshold: threshold)
+    }
+
+    for stationID in subscriptions {
+        guard let record = WidgetStationLoader.loadRecord(id: stationID) else {
+            resolved.unresolvedStations.insert(stationID)
+            continue
+        }
+        resolved.places[stationID] = record.alertPlace
+        let station = WidgetStationLoader.station(from: record)
+        for trigger in calendarTriggers(for: record.calendarKind) {
+            // A throwaway rule per trigger. Its id only has to be unique within this run:
+            // a calendar event is matched by its content, never by an occurrence key.
+            let rule = AlertRule(stationID: stationID, trigger: trigger)
+            resolved.calendarRules[rule.id] = rule
+            resolved.calendarStations[rule.id] = stationID
+            resolved.calendarOccurrences += alertOccurrences(rule, station: station,
+                                                             position: record.alertPosition,
+                                                             from: now, to: until, threshold: threshold)
+        }
+    }
+    return resolved
+}
+
+struct AlertStatusSnapshot: Equatable {
+    var scheduledThrough: [UUID: Date] = [:]
+    var unresolved: Set<UUID> = []
+    var notificationsAuthorized = false
+}
+
+@MainActor final class AlertScheduler: ObservableObject {
+    static let shared = AlertScheduler()
+
+    @Published private(set) var status = AlertStatusSnapshot()
+    private var running = false
+    private var again = false
+
+    /// Safe from anywhere. One run at a time; any number of requests during a run buy
+    /// exactly one more.
+    nonisolated static func requestReschedule() {
+        Task { @MainActor in await shared.coalesced() }
+    }
+
+    private func coalesced() async {
+        if running { again = true; return }
+        running = true
+        repeat {
+            again = false
+            await reschedule()
+        } while again
+        running = false
+    }
+
+    /// The pass in flight, if any. Every pass runs after the one before it: a direct call and a
+    /// coalesced one never interleave, so neither can write off a snapshot the other has already
+    /// superseded — `AlertNotifications.apply` suspends between removing requests and adding
+    /// them, and an older pass resuming there would restore what a newer one had cleared after a
+    /// rule or tier change.
+    private var pass: Task<Void, Never>?
+
+    /// One full pass: expire what's due, resolve 90 days off the main actor, then write the
+    /// calendars and the notifications. Queued behind any pass already running, and awaited to
+    /// completion: `CalendarStationsView.subscribeAndVerify` reads whether a calendar came out of
+    /// this exact pass, which is the only signal that a source refused to make one. Routing it
+    /// through the coalescer would return before the work it is inspecting happened.
+    func reschedule(now: Date = appNow()) async {
+        let previous = pass
+        let mine = Task { @MainActor in
+            await previous?.value
+            await self.runPass(now: now)
+        }
+        pass = mine
+        await mine.value
+    }
+
+    private func runPass(now: Date) async {
+        for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
+            AlertRuleStore.shared.remove(id)
+        }
+        let rules = AlertRuleStore.shared.rules
+        let threshold = slackThresholdKn
+        let premium = PremiumStore.shared.isPremium
+        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+
+        let subscriptions = StationCalendarStore.shared.subscriptions.map(\.stationID)
+
+        let resolved = await Task.detached(priority: .utility) {
+            resolveAlerts(rules, subscriptions: subscriptions, now: now, threshold: threshold)
+        }.value
+        let plan = deliveryPlan(rules: rules, occurrences: resolved.occurrences,
+                                calendarOccurrences: resolved.calendarOccurrences,
+                                now: now, premium: premium)
+        // A duplicated rule id would trap uniqueKeysWithValues; keep the first, as deliveryPlan does.
+        let byID = Dictionary(rules.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            .merging(resolved.calendarRules) { mine, _ in mine }
+
+        func entries(_ list: [AlertOccurrence], includeLead: Bool, includePlace: Bool) -> [AlertEntry] {
+            list.compactMap { o in
+                guard let rule = byID[o.ruleID], let place = resolved.places[rule.stationID] else { return nil }
+                return AlertEntry(
+                    stationID: rule.stationID,
+                    occurrence: o,
+                    copy: alertCopy(rule, o, place: place, imperial: imperial,
+                                    threshold: threshold, includeLead: includeLead,
+                                    includePlace: includePlace),
+                    url: shareURL(forStationID: rule.stationID, at: o.event, tz: place.tz)
+                        ?? deepLink(forStationID: rule.stationID),
+                    place: place)
+            }
+        }
+
+        AlertCalendar.apply(entries(plan.calendar, includeLead: false, includePlace: false),
+                            subscribed: subscriptions, skipping: resolved.unresolvedStations, now: now)
+        await AlertNotifications.apply(entries(plan.notifications, includeLead: true, includePlace: true))
+
+        status = AlertStatusSnapshot(scheduledThrough: scheduledThrough(plan),
+                                     unresolved: resolved.unresolved,
+                                     notificationsAuthorized: await AlertNotifications.authorized())
+    }
+}

@@ -8,6 +8,7 @@ Documentation here describes the current product, maintained operating procedure
 |---|---|
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
+| [Alerts](alerts.md) | Station calendars and notification rules: triggers, occurrence resolution, delivery horizons, the free/Premium line, and permissions |
 | [CHS data model](chs-data-model.md) | Canadian coverage, local fitting, validation, and data-use boundaries |
 | [App Store metadata](appstore-metadata.md) | Listing copy, privacy answers, and accessibility declarations |
 | [Licensing](licensing.md) | App licensing and the contributor agreement |
@@ -32,7 +33,7 @@ Documentation here describes the current product, maintained operating procedure
 
 Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and [CLAUDE.md](../CLAUDE.md) for agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
 
-Strategy, market research, and future product planning live in the private [planning repository](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Reviewed proposals remain available in their PRs: [download tiers #453](https://github.com/openwatersio/slackwater-ios/pull/453), [catalog delivery #297](https://github.com/openwatersio/slackwater-ios/pull/297), and [alerts #371](https://github.com/openwatersio/slackwater-ios/pull/371). A merged design proposal alone does not mean its behavior ships.
+Strategy, market research, and future product planning live in the private [planning repository](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Reviewed proposals remain available in their PRs: [download tiers #453](https://github.com/openwatersio/slackwater-ios/pull/453) and [catalog delivery #297](https://github.com/openwatersio/slackwater-ios/pull/297). A merged design proposal alone does not mean its behavior ships.
 
 ## Archived source citations
 

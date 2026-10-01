@@ -7,6 +7,13 @@ enum WidgetStation {
     case tide(any TidePredicting, tz: TimeZone, name: String)
     case current(any CurrentPredicting, tz: TimeZone, name: String)
     case derived(DerivedSlackStation, tz: TimeZone, name: String)
+
+    /// The station's own zone — what its times are read in, wherever the phone is.
+    var tz: TimeZone {
+        switch self {
+        case .tide(_, let tz, _), .current(_, let tz, _), .derived(_, let tz, _): tz
+        }
+    }
 }
 
 enum WidgetRecord {

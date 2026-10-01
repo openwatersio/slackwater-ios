@@ -1,0 +1,89 @@
+// Slackwater — GPL v3. Settings → Calendar: subscribe a station, with Premium (docs/alerts.md §7.4).
+import XCTest
+
+final class CalendarSettingsTests: ScreenshotTestCase {
+    private func openCalendarSettings(_ app: XCUIApplication) {
+        openSettings(app)
+        let row = app.buttons["settings-calendar-row"].firstMatch
+        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        row.tap()
+        XCTAssert(app.navigationBars["Calendar"].appears(within: 5))
+    }
+
+    /// One tide station and one current station: the two calendar kinds, both in the bundle.
+    private let tide = "noaa/9444900"
+    private let current = "current:noaa/PUG1701"
+
+    /// The toggle reads on only once the station's calendar is written and verified, which
+    /// is a full reschedule. Seconds here; on a hosted runner the same thing has taken over
+    /// a minute, because every XCUITest step there waits out the app-idle timeout while a
+    /// download is in flight (#556). `scaled` caps this at the local value plus a minute.
+    private let settle: TimeInterval = 60
+
+    func testTheCalendarSectionListsSavedStations() {
+        let app = launch("-seedGate", "-seedFavorites", "\(tide),\(current)")
+        openCalendarSettings(app)
+
+        XCTAssert(app.switches["calendar-station-\(tide)"].appears(within: 5))
+        XCTAssert(app.switches["calendar-station-\(current)"].exists)
+    }
+
+    func testAStationWithNoSavedStationsExplainsItself() {
+        let app = launch("-seedGate", "-resetFavorites")
+        openCalendarSettings(app)
+
+        XCTAssert(app.staticTexts["calendar-empty"].appears(within: 5))
+    }
+
+    func testAFreeUsersToggleOpensTheTierSheet() {
+        let app = launch("-seedGate", "-resetCalendars", "-seedFavorites", "\(tide),\(current)")
+        openCalendarSettings(app)
+        let tideSwitch = app.switches["calendar-station-\(tide)"]
+        tideSwitch.tap()
+
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+    }
+
+    /// The calendar prompt is a system alert and only appears on the first run of a fresh sim.
+    private func allowCalendarIfAsked(_ app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        guard springboard.alerts.firstMatch.appears(within: 6) else { return }
+        for label in ["Allow Full Access", "Allow", "OK", "Continue"] {
+            let button = springboard.alerts.buttons[label].firstMatch
+            if button.exists { button.tap(); return }
+        }
+    }
+
+    /// Turning a station off is destructive — its calendar and events go too — so it reads
+    /// through a confirmation first (global constraint: nothing synced vanishes without the
+    /// user reading the cost first). Dismissing leaves the toggle exactly where it was;
+    /// confirming turns it off.
+    func testTurningAStationOffAsksFirst() {
+        let app = launch("-seedGate", "-seedPremium", "-resetCalendars", "-seedFavorites", tide)
+        openCalendarSettings(app)
+        let toggle = app.switches["calendar-station-\(tide)"]
+        toggle.tap()
+        allowCalendarIfAsked(app)
+        XCTAssert(waitFor(toggle, "value == '1'", timeout: settle), "turning on did not settle")
+
+        toggle.tap()
+        XCTAssert(app.buttons["Turn Off"].appears(within: 15))
+        // On this simulator's confirmationDialog presentation the explicit Cancel role is
+        // omitted — Apple's own documented popover behavior: tapping outside the dialog
+        // serves as cancel, so an explicit Cancel row would be redundant. Dismiss the same
+        // way AlertPopupTests does for its own popover, off-center so the tap can't land on
+        // the dialog itself. dy: 0.7, not a point near the top: on iPad, Settings presents as a
+        // bounded (not full-screen) sheet and this confirmationDialog anchors as a popover near
+        // the toggle — high on screen, not centered the way it renders on iPhone — so a
+        // near-top point lands on the popover itself instead of past it. The lower-middle of the
+        // screen is empty on both form factors, well below either popover position and still
+        // inside the Calendar screen's own bounds.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).tap()
+        XCTAssertEqual(toggle.value as? String, "1", "dismissing outside the dialog must leave the toggle on")
+
+        toggle.tap()
+        XCTAssert(app.buttons["Turn Off"].appears(within: 15))
+        app.buttons["Turn Off"].tap()
+        XCTAssert(waitFor(toggle, "value == '0'"), "confirming did not turn the station off")
+    }
+}

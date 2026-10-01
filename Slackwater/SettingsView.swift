@@ -18,6 +18,19 @@ struct SettingsView: View {
     #endif
     @Environment(\.dismiss) private var dismiss
     @State private var showWidgets = false
+    @ObservedObject private var alerts = AlertRuleStore.shared
+    @ObservedObject private var calendars = StationCalendarStore.shared
+    @State private var settle: Task<Void, Never>?
+
+    /// What the Calendar row says it is doing, from what is actually subscribed.
+    private var calendarSummary: String {
+        let on = calendars.subscriptions.map(\.stationID)
+        return switch on.count {
+        case 0: "Publish a station's tides or slack windows to your calendar"
+        case 1: StationItem.byId[on[0]]?.name ?? "1 station"
+        default: "\(on.count) stations"
+        }
+    }
 
     private var version: String {
         let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -60,6 +73,43 @@ struct SettingsView: View {
                             }
                         }
                         Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
+                    }
+
+                    section("Alerts") {
+                        NavigationLink {
+                            AlertsView()
+                                .navigationTitle("Alerts")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text(alerts.rules.isEmpty
+                                     ? "Press and hold any station's timeline to set an alert"
+                                     : "\(alerts.rules.count) alert\(alerts.rules.count == 1 ? "" : "s")")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
+                    }
+
+                    section("Calendar") {
+                        NavigationLink {
+                            CalendarStationsView()
+                                .navigationTitle("Calendar")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .toolbarBackground(SN.canvas, for: .navigationBar)
+                        } label: {
+                            HStack {
+                                Text(calendarSummary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                            }
+                            .foregroundStyle(SN.leaf)
+                        }
+                        .accessibilityIdentifier("settings-calendar-row")
                     }
 
                     // The downloads manager also lives one tap from the list,
@@ -184,7 +234,21 @@ struct SettingsView: View {
 
     private var slackWindowSpeedBinding: Binding<Double> {
         Binding(get: { normalizedSlackThresholdKn(slackWindowSpeed) },
-                set: { slackWindowSpeed = normalizedSlackThresholdKn($0) })
+                set: {
+                    slackWindowSpeed = normalizedSlackThresholdKn($0)
+                    // Every scheduled slack window was computed at the old threshold — but only
+                    // the value the user stops on is worth rewriting them for. Holding the
+                    // stepper walks ~99 of them under auto-repeat, and each pass removes and
+                    // re-adds every window in every subscribed calendar, over CalDAV, at a
+                    // threshold nobody asked to keep.
+                    // ponytail: a fixed 400 ms settle on the one control that repeats. A shared
+                    // debouncer when a second control needs one.
+                    settle?.cancel()
+                    settle = Task {
+                        guard (try? await Task.sleep(for: .milliseconds(400))) != nil else { return }
+                        AlertScheduler.requestReschedule()
+                    }
+                })
     }
 
     private func widgetsButton(_ title: String) -> some View {

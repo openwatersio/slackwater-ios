@@ -27,6 +27,10 @@ struct TimelineScrubber: UIViewRepresentable {
     /// A tap on the day row's DATE — the one label on the strip that names a
     /// day rather than a moment on it — opens the week picker.
     var onPickDate: () -> Void = {}
+    /// The strip was pressed and held; its moment is already on the centerline. Nil where the
+    /// host has nothing to open — a list card's strip — and then the strip carries neither the
+    /// press recognizer nor the matching VoiceOver action.
+    var onLongPress: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -81,8 +85,17 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
-        sv.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator,
-                                                       action: #selector(Coordinator.handleTap(_:))))
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.handleTap(_:)))
+        if onLongPress != nil {
+            let press = UILongPressGestureRecognizer(target: context.coordinator,
+                                                     action: #selector(Coordinator.handlePress(_:)))
+            // A press held and then lifted must not also scrub. The press fails the instant the
+            // finger leaves before its half second, so an ordinary tap is not delayed.
+            tap.require(toFail: press)
+            sv.addGestureRecognizer(press)
+        }
+        sv.addGestureRecognizer(tap)
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
             coordinator.layoutDidRun(sv)
@@ -322,6 +335,14 @@ struct TimelineScrubber: UIViewRepresentable {
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
                 },
             ]
+            // The press and hold, as an action: the moment is already on the centerline, so
+            // the host opens the popup for it exactly as it would after a press.
+            if let onLongPress = parent.onLongPress {
+                sv.accessibilityCustomActions?.append(
+                    UIAccessibilityCustomAction(name: String(localized: "Set an alert", comment: "VoiceOver chart action.")) { _ in
+                        onLongPress(); return true
+                    })
+            }
         }
 
         /// A VoiceOver increment: five minutes, landed directly.
@@ -494,14 +515,37 @@ struct TimelineScrubber: UIViewRepresentable {
             }
         }
 
+        /// A press and hold: park its moment on the centerline and let the scaffold open the
+        /// popup there. Instant, not the tap's animated magnet ride — a press names one moment,
+        /// and a popup opening over a sliding strip could not say what it was about until the
+        /// slide landed. The day row belongs to the picker's tap and answers a press with
+        /// nothing.
+        @objc func handlePress(_ g: UILongPressGestureRecognizer) {
+            guard g.state == .began, let sv = g.view as? UIScrollView, sv.bounds.width > 0 else { return }
+            let p = g.location(in: sv)
+            // The plot region only, so `tapTarget` always takes its plot branch here — the same
+            // magnet the strip settles into: a press near a turn means that turn.
+            guard p.y <= rowSplit, let target = tapTarget(x: p.x, y: p.y) else { return }
+            stopIntro()
+            sv.setContentOffset(sv.contentOffset, animated: false)
+            cancelMagnet()
+            let maxOffset = max(parent.data.totalWidth - sv.bounds.width, 0)
+            let desired = min(max(parent.data.x(target) - sv.bounds.width / 2, 0), maxOffset)
+            sv.contentOffset = CGPoint(x: desired, y: 0)
+            parent.scrubTime = parent.data.time(atX: desired + sv.bounds.width / 2)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            parent.onLongPress?()
+        }
+
         /// What a tap at this point on the strip means: the moment to bring to
         /// the centerline, or nil for the date — the one label that names a day
         /// rather than a moment, and so opens the picker.
+        /// The line between the plot with its axis times (at or above) and the day row (below),
+        /// from the two rows' own y's: the strip's geometry is all literal points and moves.
+        private var rowSplit: CGFloat { (parent.geo.timeY + parent.geo.dayY) / 2 }
+
         private func tapTarget(x: CGFloat, y: CGFloat) -> Date? {
             let data = parent.data
-            // Between the axis times' row and the day row, from the two rows'
-            // own y's: the strip's geometry is all literal points and moves.
-            let rowSplit = (parent.geo.timeY + parent.geo.dayY) / 2
             guard y > rowSplit else {
                 // The plot and its axis: the tapped moment, pulled onto a stop
                 // by the same magnet a drag settles into.
@@ -581,6 +625,7 @@ struct TimelineScrubStrip: View {
     @Environment(\.openWeekPicker) private var openWeekPicker
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openAlertPopup) private var openAlertPopup
     @State private var jumpToken = 0
     @State private var settled = false
 
@@ -590,7 +635,7 @@ struct TimelineScrubStrip: View {
                          floodDeg: floodDeg, ebbDeg: ebbDeg, scrubTime: $scrubTime,
                          spokenLead: spokenLead,
                          jumpToken: jumpToken, scrollGate: scrollGate,
-                         onPickDate: openWeekPicker)
+                         onPickDate: openWeekPicker, onLongPress: openAlertPopup)
             .frame(height: geo.height)
             // `onGeometryChange`, not a GeometryReader's `onChange(initial:)`:
             // the latter reports the first width from inside the update pass,
@@ -658,7 +703,7 @@ struct TimelineScrubStrip: View {
             // Rest = no scrub change for this long. A cancelled sleep is a
             // scrub still in motion, not a rest.
             settled = false
-            guard (try? await Task.sleep(for: .milliseconds(450))) != nil else { return }
+            guard (try? await Task.sleep(for: Timeline.rest)) != nil else { return }
             settled = true
         }
         // The pills' 44-point semantic rows are centred on the 30-point

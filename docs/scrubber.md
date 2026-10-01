@@ -244,6 +244,10 @@ In the day/date/sun row, a sunrise or sunset tap centers that event; a date tap 
 
 Every tap stops opening motion, momentum, and an earlier settle before acting. Opening the date picker must stop motion even though it does not select another instant. Time taps use the ordinary settling animation; Reduce Motion or travel below 0.5 unit lands directly.
 
+#### 6.5.1 Press and hold
+
+A press held on the plot or event-time row resolves like a tap (the magnet within 46 units, else the exact instant), stops opening motion, momentum, and any settle, parks that instant on the centerline immediately with no settling animation, gives a medium haptic, and tells the host the strip was pressed; the host opens the alert popup over the centerline (docs/alerts.md §7). A press on the day/date/sun row does nothing: that row belongs to the date picker's tap. The tap recognizer waits for the press to fail, so a press held and then lifted does not also scrub, and a press lifted before its half second is an ordinary tap with no added delay. VoiceOver reaches the same thing without a held gesture: the strip's custom actions carry "Set an alert" beside "Next event" and "Previous event", which hands the centerline moment to the host exactly as a press does. A strip whose host has no popup to open (a list card) carries neither the recognizer nor the action.
+
 ## 7. Magnetic settling
 
 The magnet runs only after a person-driven scroll comes fully to rest:

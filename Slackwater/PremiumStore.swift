@@ -30,6 +30,12 @@ final class PremiumStore: ObservableObject {
 
     private init() {
         isPremium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        #if DEBUG
+        // UI-test hook, like TestSeeds' -seed* arguments: -seedPremium holds the tier on for
+        // the run. Without the early return, refreshEntitlement would set it back to what the
+        // simulator's empty StoreKit account owns.
+        if CommandLine.arguments.contains("-seedPremium") { isPremium = true; return }
+        #endif
         updatesTask = Task { [weak self] in
             for await _ in Transaction.updates { await self?.refreshEntitlement() }
         }
@@ -88,5 +94,9 @@ final class PremiumStore: ObservableObject {
         isPremium = premium
         Self.cache(premium, into: AppGroup.defaults)
         WidgetCenter.shared.reloadAllTimelines()
+        // Notifications are what the tier decides: gaining Premium schedules them, losing it
+        // clears them. Station calendars publish at any tier and are left exactly as they are
+        // (docs/alerts.md §6).
+        AlertScheduler.requestReschedule()
     }
 }

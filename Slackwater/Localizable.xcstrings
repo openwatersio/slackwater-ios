@@ -8377,6 +8377,532 @@
           }
         }
       }
+    },
+    "%@ is off" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ está desactivada"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ est désactivée"
+          }
+        }
+      }
+    },
+    "%lld alert%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld alert%2$@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld alerta%@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld alerte%@"
+          }
+        }
+      }
+    },
+    "Alert" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alerta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alerte"
+          }
+        }
+      }
+    },
+    "Alerts" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alertas"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alertes"
+          }
+        }
+      }
+    },
+    "Calendar" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendario"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendrier"
+          }
+        }
+      }
+    },
+    "Calendar access is off" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El acceso al calendario está desactivado"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’accès au calendrier est désactivé"
+          }
+        }
+      }
+    },
+    "Couldn't publish %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo publicar %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de publier %@"
+          }
+        }
+      }
+    },
+    "Daylight only" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo de día"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le jour seulement"
+          }
+        }
+      }
+    },
+    "Delete Alert" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar alerta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer l’alerte"
+          }
+        }
+      }
+    },
+    "Every time" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada vez"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque fois"
+          }
+        }
+      }
+    },
+    "No alerts yet. Press and hold any station's timeline to set one." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no hay alertas. Mantén pulsada la cronología de una estación para crear una."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune alerte pour l’instant. Maintenez le doigt sur la chronologie d’une station pour en créer une."
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activada"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activée"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir Ajustes"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les Réglages"
+          }
+        }
+      }
+    },
+    "Press and hold any station's timeline to set an alert" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantén pulsada la cronología de una estación para crear una alerta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maintenez le doigt sur la chronologie d’une station pour créer une alerte"
+          }
+        }
+      }
+    },
+    "Remind me" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordarme"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Me rappeler"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer"
+          }
+        }
+      }
+    },
+    "Save a station and it can publish its tides or slack windows to your calendar." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guarda una estación y podrá publicar sus mareas o ventanas de estoa en tu calendario."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrez une station et elle pourra publier ses marées ou ses fenêtres d’étale dans votre calendrier."
+          }
+        }
+      }
+    },
+    "Slackwater couldn't create a calendar for it. Some calendar accounts — Google, Exchange — don't allow new calendars." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater no pudo crear un calendario para esta estación. Algunas cuentas de calendario — Google, Exchange — no permiten crear calendarios."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater n’a pas pu créer de calendrier pour cette station. Certains comptes de calendrier — Google, Exchange — n’autorisent pas la création de calendriers."
+          }
+        }
+      }
+    },
+    "Slackwater needs calendar access to publish a station's events. Turn it on in Settings → Slackwater." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater necesita acceso al calendario para publicar los eventos de una estación. Actívalo en Ajustes → Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater a besoin d’accéder au calendrier pour publier les événements d’une station. Activez-le dans Réglages → Slackwater."
+          }
+        }
+      }
+    },
+    "Slackwater will stop publishing to this calendar, but calendar access is off, so it can't remove the calendar itself. Delete it by hand in Calendar if you don't want it anymore." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater dejará de publicar en este calendario, pero el acceso al calendario está desactivado, así que no puede eliminar el calendario. Elimínalo a mano en Calendario si ya no lo quieres."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater cessera de publier dans ce calendrier, mais l’accès au calendrier est désactivé et il ne peut donc pas supprimer le calendrier lui-même. Supprimez-le manuellement dans Calendrier si vous n’en voulez plus."
+          }
+        }
+      }
+    },
+    "This alert repeats. There's no single moment to switch back to." : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta alerta se repite. No hay un momento único al que volver."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette alerte se répète. Il n’y a pas de moment unique auquel revenir."
+          }
+        }
+      }
+    },
+    "This one" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celle-ci"
+          }
+        }
+      }
+    },
+    "Turn Off" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivar"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactiver"
+          }
+        }
+      }
+    },
+    "When" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuándo"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand"
+          }
+        }
+      }
+    },
+    "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off." : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los calendarios de estación forman parte de Slackwater Premium: cada estación tiene su propio calendario que puedes activar o desactivar."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les calendriers de station font partie de Slackwater Premium : chaque station a son propre calendrier que vous pouvez activer ou désactiver."
+          }
+        }
+      }
+    },
+    "Lunar eclipse" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse lunar"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éclipse lunaire"
+          }
+        }
+      }
+    },
+    "Rising past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sube por encima de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monte au-dessus de %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Falling past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baja por debajo de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descend sous %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every time it rises past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada vez que sube por encima de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque fois qu’elle monte au-dessus de %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every time it falls past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada vez que baja por debajo de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque fois qu’elle descend sous %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque %@"
+          }
+        }
+      }
+    },
+    "Set an alert" : {
+      "comment" : "VoiceOver chart action.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear una alerta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer une alerte"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
