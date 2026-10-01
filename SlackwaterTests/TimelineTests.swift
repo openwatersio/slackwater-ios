@@ -109,7 +109,7 @@ final class TimelineTests: XCTestCase {
             XCTAssertTrue(source.contains("CurrentScrubCard("), "\(file) must draw the shared scrub card")
             XCTAssertTrue(source.contains("onReturn: returnToNow"), "\(file) must offer a way back to now")
         }
-        let strip = try repoSource("Slackwater/TimelineStrip.swift")
+        let strip = try repoSource("Slackwater/TimelineScrubber.swift")
         XCTAssertTrue(strip.contains("scrubbedAway(scrubTime, from: now)"))
         XCTAssertTrue(strip.contains("detail-return-now"))
     }
@@ -475,7 +475,7 @@ final class TimelineTests: XCTestCase {
     /// neither. The UI suite covers what a scrub actually does; this only
     /// guards the accessibility branch from being simplified away.
     func testExternalScrubHonoursReduceMotion() throws {
-        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
         guard let start = lines.firstIndex(where: { $0.contains("if co.seenJump != jumpToken {") }),
               let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
@@ -494,7 +494,7 @@ final class TimelineTests: XCTestCase {
     /// 11). The same source-scan shape as the jump tripwire above, for the
     /// same reason: `magnet` needs a live `UIScrollView` and `UIAccessibility`.
     func testDragEndMagnetHonoursReduceMotion() throws {
-        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
         guard let start = lines.firstIndex(where: { $0.contains("private func magnet(_ sv: UIScrollView)") }),
               let end = lines[(start + 1)...].firstIndex(where: { $0.contains("animated: true") })
@@ -502,7 +502,7 @@ final class TimelineTests: XCTestCase {
         let magnet = lines[start...end].joined(separator: "\n")
         XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
-        XCTAssertTrue(magnet.contains("park(sv, at: best.time)"),
+        XCTAssertTrue(magnet.contains("park(sv, at: target)"),
                       "the direct landing parks on the target itself")
     }
 
@@ -511,7 +511,7 @@ final class TimelineTests: XCTestCase {
     /// injected into a view body from this target, so a source scan guards
     /// every `settled` animation reading the environment flag.
     func testPillSettleFadeHonoursReduceMotion() throws {
-        let source = try repoSource("Slackwater/TimelineStrip.swift")
+        let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let fades = source.components(separatedBy: .newlines)
             .filter { $0.contains(".animation(") && $0.contains("value: settled") }
         XCTAssertFalse(fades.isEmpty, "the settle fade was not found — this tripwire needs retargeting")

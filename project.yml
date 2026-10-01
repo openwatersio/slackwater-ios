@@ -259,6 +259,14 @@ targets:
       - Slackwater/StationLists.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
+      # The phone's timeline data and drawing, and the detail pieces over it.
+      # Not in PortableSources: they need Almanac, which the widget does not link.
+      - Slackwater/TimelineStrip.swift
+      - Slackwater/TimelineChunks.swift
+      - Slackwater/Eclipse.swift
+      - Slackwater/DetailPieces.swift
+      - Slackwater/MoonDetailSheet.swift
+      - Slackwater/MoonMarks.swift
     dependencies:
       - package: Almanac
         product: Almanac

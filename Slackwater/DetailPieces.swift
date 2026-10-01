@@ -256,6 +256,8 @@ struct SkyState {
 
 struct SkyBackdrop: View {
     let sky: SkyState
+    /// The strip's plot depth, which the sky runs on under: shorter on the watch.
+    var plotDepth: CGFloat = TimelineGeo.plotDepth
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -265,7 +267,7 @@ struct SkyBackdrop: View {
             // the frame runs on to the plot's floor so a body's glow can
             // reach the water.
             let size = CGSize(width: proxy.size.width,
-                              height: proxy.size.height - TimelineGeo.plotDepth + skyHorizonOverlap)
+                              height: proxy.size.height - plotDepth + skyHorizonOverlap)
             let horizonStop = size.height / proxy.size.height
             ZStack {
                 LinearGradient(stops: [.init(color: Color(hex: paint.top), location: 0),
