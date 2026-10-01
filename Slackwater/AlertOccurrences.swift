@@ -152,10 +152,21 @@ func alertOccurrences(_ rule: AlertRule, station: WidgetStation, position: (lat:
     found = found.map { (event: alertMinute($0.event), end: $0.end.map(alertMinute), noWindow: $0.noWindow, heightM: $0.heightM) }
     found = found.filter { $0.event >= from && $0.event <= to }
     if let once = rule.once {
-        // The stored instant is compared floored, so a caller that kept the popup's raw
-        // Date matches the same event the reschedule found.
+        // The stored instant is the pressed minute, which is not always the event's own: a
+        // press on a current strip parks on the slack instant while the occurrence is the
+        // window's opening, and a press on the curve names a minute the rounded height crosses
+        // a little before or after. The occurrence nearest the press is the one meant. Six
+        // hours is under the gap between two occurrences of any trigger, so nearest is never
+        // ambiguous, and far enough to reach a window that opens long before its slack.
         let minute = alertMinute(once)
-        found = found.filter { $0.event == minute }
+        let distance = { (o: (event: Date, end: Date?, noWindow: Bool, heightM: Double?)) in
+            abs(o.event.timeIntervalSince(minute))
+        }
+        if let nearest = found.min(by: { distance($0) < distance($1) }), distance(nearest) <= 6 * 3600 {
+            found = [nearest]
+        } else {
+            found = []
+        }
     }
     if rule.daylightOnly {
         let spans = daylightSpans(from: from, to: to, lat: position.lat, lon: position.lon)

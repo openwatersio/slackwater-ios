@@ -70,7 +70,11 @@ enum AlertTrigger: Codable, Equatable {
 - A rule names a place the user chose. Rules are created from a detail view, whose station id is
   always concrete, so a rule never follows Current Location.
 - **`once` is the whole difference between the popup's two offers.** Set, the rule watches for the
-  single occurrence at that instant and the reschedule drops it once the instant is past. Unset,
+  single occurrence nearest that instant — within six hours, under the gap between two of any
+  trigger — because the pressed minute is not always the event's own: a press on a current strip
+  parks on the slack instant while the occurrence is the window's opening, and a press on the
+  curve names a minute the rounded height crosses a little before or after. The reschedule drops
+  the rule once the instant is past. Unset,
   the rule watches every occurrence of its trigger. Copy comes from `trigger` either way, so
   nothing stores a rendered string.
 - `tideCrossing` stores metres, the engine's unit, and displays in the user's units. `rising` is

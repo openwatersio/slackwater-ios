@@ -94,6 +94,40 @@ import SlackwaterKit
         XCTAssertLessThan(same.event, first.event)
     }
 
+    // MARK: a once rule takes the occurrence nearest the pressed minute
+
+    func testAOnceRuleInsideAWindowResolvesToItsOpening() throws {
+        // A press on a current strip parks on the slack instant, inside the window; the
+        // occurrence is the window's opening, earlier. Exact-minute matching found nothing.
+        let (station, position) = try load(deception)
+        let every = AlertRule(stationID: deception, trigger: .slackWindowOpens)
+        let opening = try XCTUnwrap(alertOccurrences(every, station: station, position: position,
+                                                     from: now, to: week, threshold: 2.0).first { !$0.noWindow })
+        let close = try XCTUnwrap(opening.end)
+        let press = opening.event.addingTimeInterval(close.timeIntervalSince(opening.event) / 2)
+        XCTAssertNotEqual(alertMinute(press), opening.event)
+
+        let once = AlertRule(stationID: deception, trigger: .slackWindowOpens, once: press)
+        let found = alertOccurrences(once, station: station, position: position, from: now, to: week, threshold: 2.0)
+
+        XCTAssertEqual(found.map(\.event), [opening.event])
+    }
+
+    func testAOnceRuleMinutesOffACrossingResolvesToIt() throws {
+        // A press on the curve names the minute under the finger; the rounded height crosses a
+        // few minutes away.
+        let (station, position) = try load(TideStationRecord.fridayHarborID)
+        let every = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideCrossing(heightM: 1.0, rising: true))
+        let crossing = try XCTUnwrap(alertOccurrences(every, station: station, position: position,
+                                                      from: now, to: week, threshold: 0.5).first)
+
+        let once = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .tideCrossing(heightM: 1.0, rising: true),
+                             once: crossing.event.addingTimeInterval(7 * 60))
+        let found = alertOccurrences(once, station: station, position: position, from: now, to: week, threshold: 0.5)
+
+        XCTAssertEqual(found.map(\.event), [crossing.event])
+    }
+
     func testATriggerThatDoesNotFitTheStationFindsNothing() throws {
         let (station, position) = try load(TideStationRecord.fridayHarborID)
         let rule = AlertRule(stationID: TideStationRecord.fridayHarborID, trigger: .slackWindowOpens)
