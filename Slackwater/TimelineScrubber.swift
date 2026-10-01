@@ -27,8 +27,10 @@ struct TimelineScrubber: UIViewRepresentable {
     /// A tap on the day row's DATE — the one label on the strip that names a
     /// day rather than a moment on it — opens the week picker.
     var onPickDate: () -> Void = {}
-    /// The strip was pressed and held; its moment is already on the centerline.
-    var onLongPress: () -> Void = {}
+    /// The strip was pressed and held; its moment is already on the centerline. Nil where the
+    /// host has nothing to open — a list card's strip — and then the strip carries neither the
+    /// press recognizer nor the matching VoiceOver action.
+    var onLongPress: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -83,14 +85,16 @@ struct TimelineScrubber: UIViewRepresentable {
         sv.addSubview(host.view)
         sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
         context.coordinator.host = host
-        let press = UILongPressGestureRecognizer(target: context.coordinator,
-                                                 action: #selector(Coordinator.handlePress(_:)))
         let tap = UITapGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handleTap(_:)))
-        // A press held and then lifted must not also scrub. The press fails the instant the
-        // finger leaves before its half second, so an ordinary tap is not delayed.
-        tap.require(toFail: press)
-        sv.addGestureRecognizer(press)
+        if onLongPress != nil {
+            let press = UILongPressGestureRecognizer(target: context.coordinator,
+                                                     action: #selector(Coordinator.handlePress(_:)))
+            // A press held and then lifted must not also scrub. The press fails the instant the
+            // finger leaves before its half second, so an ordinary tap is not delayed.
+            tap.require(toFail: press)
+            sv.addGestureRecognizer(press)
+        }
         sv.addGestureRecognizer(tap)
         sv.onLayout = { [weak sv, coordinator = context.coordinator] in
             guard let sv else { return }
@@ -331,6 +335,14 @@ struct TimelineScrubber: UIViewRepresentable {
                     return self.jump(sv, to: self.parent.data.snapTimes.last { $0 < before })
                 },
             ]
+            // The press and hold, as an action: the moment is already on the centerline, so
+            // the host opens the popup for it exactly as it would after a press.
+            if let onLongPress = parent.onLongPress {
+                sv.accessibilityCustomActions?.append(
+                    UIAccessibilityCustomAction(name: String(localized: "Set an alert", comment: "VoiceOver chart action.")) { _ in
+                        onLongPress(); return true
+                    })
+            }
         }
 
         /// A VoiceOver increment: five minutes, landed directly.
@@ -522,7 +534,7 @@ struct TimelineScrubber: UIViewRepresentable {
             sv.contentOffset = CGPoint(x: desired, y: 0)
             parent.scrubTime = parent.data.time(atX: desired + sv.bounds.width / 2)
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            parent.onLongPress()
+            parent.onLongPress?()
         }
 
         /// What a tap at this point on the strip means: the moment to bring to
