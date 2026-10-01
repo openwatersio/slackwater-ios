@@ -19,8 +19,59 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// guarantees the reference ships (tools/gen-tides.mjs, isSubordinate).
     var reference: String? = nil
     var offsets: TideOffsets? = nil
+    /// The station's yearly swing is larger than its largest tidal constituent:
+    /// a Great Lakes gauge, a river reach, a Baltic bodden. The database decides
+    /// this (`quality.seasonal_dominant`) so the app and slackwater.xyz cannot
+    /// describe the same water two ways; the detail view decides what to say.
+    ///
+    /// Optional for the same reason `reference` is: gen-tides writes it into
+    /// stations.json only where it is true, and a non-optional `Bool` would make
+    /// the synthesized decoder demand the key on all 4,409 records that omit it.
+    var seasonalDominant: Bool? = nil
 
     var isSubordinate: Bool { reference != nil }
+
+    /// Above this, the yearly swing is not merely comparable to the tide, it is
+    /// the signal — so the detail view leads with it rather than footnoting it.
+    ///
+    /// 3 is where the bundle turns into rivers, lakes and lagoons: Rochester on
+    /// Lake Ontario at 273x, Algonac on the St Clair at 100x. Below it are Gulf
+    /// and Chesapeake ports with a real tide and a comparable annual signal, and
+    /// Annapolis is why the line is not at 1 — it carries the database's flag at
+    /// 1.008 and calling that "mostly seasonal" would be false in effect while
+    /// true in arithmetic. slackwater.xyz splits at the same place, which is the
+    /// point: the flag is the database's and the loudness has to agree too.
+    static let seasonalLeadRatio = 3.0
+
+    /// How many times the yearly swing exceeds the largest tidal constituent,
+    /// for a flagged station. Computed rather than stored: the bundle carries
+    /// the database's verdict as one bit and the constituents are already here,
+    /// so a second field would be a second thing to keep in step.
+    ///
+    /// Measured on the model the station predicts from, which for a subordinate
+    /// is its reference's — it ships none of its own, and reading its empty list
+    /// would drop a flagged subordinate into the quieter band by accident.
+    var seasonalRatio: Double? {
+        guard seasonalDominant == true else { return nil }
+        let model = constituents.isEmpty ? referenceRecord?.constituents ?? [] : constituents
+        let amplitude = { (name: String) in
+            abs(model.first { $0.name == name }?.amplitude ?? 0)
+        }
+        let seasonal = max(amplitude("SA"), amplitude("SSA"))
+        let tidal = TideStationRecord.tidalConstituents.map(amplitude).max() ?? 0
+        guard tidal > 0 else { return nil }
+        return seasonal / tidal
+    }
+
+    /// The constituents that are the tide itself, mirroring the database's own
+    /// list. The minor terms are not padding: at some flagged stations the
+    /// largest tidal constituent is one of them, and dropping them would inflate
+    /// the ratio and make those screens overstate their case.
+    private static let tidalConstituents = [
+        "M2", "S2", "N2", "K2", "L2", "T2", "NU2", "MU2", "2N2", "LDA2",
+        "K1", "O1", "P1", "Q1", "J1", "M1", "OO1", "RHO1", "2Q1", "SIGMA1",
+        "CHI1", "PI1", "PHI1", "THETA1", "S1",
+    ]
     var referenceRecord: TideStationRecord? { reference.flatMap(TideStationRecord.record(id:)) }
 
     var engineStation: any TidePredicting {
@@ -49,6 +100,15 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// no longer pinned to the head of the list (world coverage: a home-water
     /// courtesy that reads as a bug from anywhere else).
     static let fridayHarborID = "noaa/9449880"
+}
+
+/// A seasonal ratio as a screen says it: rounded to a ten once there is a ten
+/// to round to, so the number reads as the estimate "about" promises. 43.3 is
+/// "about 40", not "about 43", which invites a reader to trust a figure that
+/// came out of a constituent fit. slackwater.xyz rounds identically.
+func seasonalTimes(_ ratio: Double) -> String {
+    let rounded = ratio >= 10 ? (ratio / 10).rounded() * 10 : (ratio * 10).rounded() / 10
+    return rounded.formatted(.number.grouping(.automatic))
 }
 
 /// Minutes and metres (or a ratio), exactly as NOAA publishes them.

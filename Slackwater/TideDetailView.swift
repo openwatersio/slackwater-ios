@@ -101,7 +101,23 @@ struct TideDetailView: View {
                             anchor: $anchor,
                             onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
-                            above: { EmptyView() },
+                            above: {
+                                // Directly under the name, where a reader meets
+                                // it before the high and the low rather than
+                                // after. Not an amber card: nothing here is
+                                // provisional or wrong — the prediction is
+                                // right and it is the frame that misleads.
+                                if let ratio = record.seasonalRatio,
+                                   ratio >= TideStationRecord.seasonalLeadRatio {
+                                    Text("Mostly seasonal — the yearly change in water level here is about \(seasonalTimes(ratio)) times the daily tide.",
+                                         comment: "Shown under the place name where the annual cycle is larger than the tide.")
+                                        .font(.caption)
+                                        .foregroundStyle(SN.foam.opacity(0.55))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 24)
+                                        .padding(.top, 6)
+                                }
+                            },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
@@ -268,6 +284,12 @@ struct TideDetailView: View {
         StationDetails {
             StationDetailRow("Datum", record.detailsDatum)
             StationDetailNote("Heights are measured from chart datum. A negative value predicts less water than the charted depth.")
+            // The quieter band says it here instead, beside the datum note,
+            // because it is the same kind of fact: what these heights are
+            // measured against and how they behave across a year.
+            if let ratio = record.seasonalRatio, ratio < TideStationRecord.seasonalLeadRatio {
+                StationDetailNote("Seasonal level change here is comparable to the daily tide, so heights drift through the year.")
+            }
             StationDetailRow("Station", record.id)
             StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
             StationDetailRow("Time zone", record.timezone)

@@ -482,6 +482,11 @@ function buildStation(s) {
       // reference's own datumOffset is the one that applies. NOAA's values
       // are 2dp decimals, but the database stores them float32, so round off
       // the representation error (0.79 arrives as 0.7900000214576721).
+      // Written only where true, like the subordinate fields below: the flag is
+      // rare, and an explicit false on 4,409 records would bury it in review.
+      // The tcdb carries the same bit in its Quality table; this is the half a
+      // reader can diff.
+      ...(s.quality?.seasonal_dominant && { seasonalDominant: true }),
       ...(isSubordinate(s) && {
         datumOffset: 0,
         reference: s.offsets.reference,
@@ -652,7 +657,13 @@ const size = writeBundle(out, stations);
  * non-zero constituents, and a subordinate keeps its offsets and nothing of
  * its reference's, because upstream copies the reference's constituents and
  * datums onto it and the reader resolves them through the reference anyway.
- * Quality detail stays out; nothing in the app reads it.
+ *
+ * Quality detail stays out except for one bit. `seasonal_dominant` says the
+ * station's yearly swing exceeds its largest tidal constituent — a Great Lakes
+ * gauge, a river reach, a Baltic bodden — and the detail view says so rather
+ * than presenting lake stage as a tide table. Carried as a Quality table
+ * holding only that flag, so the factors, the issue strings and the rejection
+ * reasons, which nothing here reads, stay out of the bundle.
  */
 const rawById = new Map(allStations.map((s) => [s.id, s]));
 const databaseVersion = JSON.parse(readFileSync(
@@ -662,7 +673,7 @@ const tcdb = buildDatabase(stations.map((b) => ({
   name: b.name,
   region: b.region,
   aliases: b.aliases,
-  quality: undefined,
+  quality: rawById.get(b.id).quality?.seasonal_dominant ? { seasonal_dominant: true } : undefined,
   harmonic_constituents: b.constituents,
   datums: b.reference ? {} : rawById.get(b.id).datums,
 })), { version: databaseVersion });

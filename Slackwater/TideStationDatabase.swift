@@ -71,6 +71,11 @@ extension TideStationRecord {
                       height: .init(type: $0.heightType == .fixed ? "fixed" : "ratio",
                                     high: ($0.heightHigh * 1000).rounded() / 1000,
                                     low: ($0.heightLow * 1000).rounded() / 1000))
-            })
+            },
+            // nil rather than false, so a record read from the database and the
+            // same record decoded from stations.json are the same value. The
+            // flag means one thing and absence means the other; two spellings
+            // of "no" would make any comparison of the two sources a trap.
+            seasonalDominant: station.seasonalDominant ? true : nil)
     }
 }
