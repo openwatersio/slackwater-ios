@@ -284,10 +284,11 @@ class ScreenshotTestCase: XCTestCase {
     @discardableResult
     func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
         for _ in 0..<tries {
-            if waitFor(el, "isHittable == true", timeout: 2) { return true }
+            if el.exists, !el.frame.isEmpty, el.frame.intersects(app.frame),
+               waitFor(el, "isHittable == true", timeout: 2) { return true }
             app.swipeUp()
         }
-        return el.isHittable
+        return el.exists && !el.frame.isEmpty && el.frame.intersects(app.frame) && el.isHittable
     }
 
     /// Pan the timeline strip under its fixed centerline (drag left = later).
