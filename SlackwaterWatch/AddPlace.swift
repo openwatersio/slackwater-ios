@@ -34,7 +34,7 @@ struct AddPlace: View {
             }
             ForEach(results) { item in
                 HStack {
-                    NavigationLink(value: BrowseRoute.station(item)) {
+                    NavigationLink(value: BrowseRoute.station(item, nil)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(verbatim: item.name).font(.headline).lineLimit(2)
                             Text(verbatim: "\(item.kindLabel) · \(formatNm(item.km(fromLat: anchor.lat, lon: anchor.lon)))")
@@ -72,6 +72,6 @@ struct AddPlace: View {
     /// place already saved just opens.
     private func openAndSave(_ item: StationItem) {
         if !favorites.contains(item.id) { favorites.toggle(item.id) }
-        path.append(.station(item))
+        path.append(.station(item, nil))
     }
 }

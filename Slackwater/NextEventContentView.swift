@@ -56,7 +56,7 @@ struct NextEventContentView: View {
 
 /// The corner icons: the wearer's location in white, a nearby place in
 /// steel, a favorite in the star's sun, a recent one as a clock.
-enum PlaceMark {
+enum PlaceMark: Hashable {
     case location, nearby, favorite, recent
 
     var symbol: String {

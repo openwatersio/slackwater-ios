@@ -4,7 +4,7 @@
 import SwiftUI
 
 enum BrowseRoute: Hashable {
-    case station(StationItem)
+    case station(StationItem, PlaceMark?)
     case addPlace
 }
 
@@ -39,7 +39,8 @@ struct StationBrowser: View {
             }
             .navigationDestination(for: BrowseRoute.self) { route in
                 switch route {
-                case .station(let item): StationPlaceholder(item: item)
+                case .station(let item, let mark):
+                    PlaceDetail(item: item, mark: mark) { path.removeAll() }
                 case .addPlace: AddPlace(fix: location.fix, path: $path)
                 }
             }
@@ -147,7 +148,7 @@ struct StationBrowser: View {
     }
 
     private func row(_ item: StationItem, mark: PlaceMark?) -> some View {
-        NavigationLink(value: BrowseRoute.station(item)) {
+        NavigationLink(value: BrowseRoute.station(item, mark)) {
             StationRow(item: item, mark: mark, now: shownAt)
         }
         .listRowBackground(Color.clear)

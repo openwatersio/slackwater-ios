@@ -15,8 +15,13 @@ struct CrownScrubStrip: View {
 
     /// The watch's geometry: a short sky and plot, so the card fits below.
     /// ponytail: tuned on the 46mm simulator; retune on the wrist.
-    static let padTop: CGFloat = 36
-    static let plotDepth: CGFloat = 64
+    static let padTop: CGFloat = 26
+    static let plotDepth: CGFloat = 52
+    /// The strip ends under its row of hours: the phone's day and sun rows
+    /// below that have no room on a wrist, so they are clipped off.
+    static func height(_ geo: TimelineGeo) -> CGFloat { geo.timeY + 10 }
+    /// Where the sky's horizon sits: the bottom of the plot.
+    static var skyHeight: CGFloat { padTop + 10 + plotDepth }
     /// How far a turn of the Crown carries the strip: the feel knob.
     /// ponytail: one number; tune on a real Crown.
     static let crownSensitivity: DigitalCrownRotationalSensitivity = .medium
@@ -26,9 +31,9 @@ struct CrownScrubStrip: View {
     @State private var landed = 0
 
     var body: some View {
+        let geo = TimelineGeo(data: data, scale: scale, padTop: Self.padTop, plotDepth: Self.plotDepth)
         GeometryReader { proxy in
             let width = proxy.size.width
-            let geo = TimelineGeo(data: data, scale: scale, padTop: Self.padTop, plotDepth: Self.plotDepth)
             let center = data.x(scrubTime)
             let firstTile = max(Int((center - width) / TimelineCanvas.tileWidth), 0)
             ZStack(alignment: .topLeading) {
@@ -37,9 +42,10 @@ struct CrownScrubStrip: View {
                     .offset(x: width / 2 - center)
                 ring(geo: geo, width: width)
             }
-            .frame(width: width, height: geo.height, alignment: .topLeading)
+            .frame(width: width, height: Self.height(geo), alignment: .topLeading)
             .clipped()
         }
+        .frame(height: Self.height(geo))
         .focusable()
         .digitalCrownRotation($crownX, from: 0, through: Double(data.totalWidth),
                               sensitivity: Self.crownSensitivity, isContinuous: false,

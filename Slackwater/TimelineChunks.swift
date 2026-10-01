@@ -32,32 +32,34 @@ import UIKit
 /// bounded by what was downloaded, not by what can be computed.
 enum TimelineSource {
     case tide(TideStationRecord)
-    case current(CurrentStationRecord, threshold: Double)
+    /// `station`, when given, is the record's engine already resolved from
+    /// single records (the watch's widget loader); nil resolves it here.
+    case current(CurrentStationRecord, threshold: Double, station: (any CurrentPredicting)? = nil)
     case gate(DerivedGateRecord)
 
     var tz: TimeZone {
         switch self {
         case .tide(let r): r.tz
-        case .current(let r, _): r.tz
+        case .current(let r, _, _): r.tz
         case .gate(let r): r.gate.tz
         }
     }
     var latitude: Double {
         switch self {
         case .tide(let r): r.latitude
-        case .current(let r, _): r.latitude
+        case .current(let r, _, _): r.latitude
         case .gate(let r): r.gate.latitude
         }
     }
     var longitude: Double {
         switch self {
         case .tide(let r): r.longitude
-        case .current(let r, _): r.longitude
+        case .current(let r, _, _): r.longitude
         case .gate(let r): r.gate.longitude
         }
     }
     var threshold: Double {
-        if case .current(_, let t) = self { return t }
+        if case .current(_, let t, _) = self { return t }
         return defaultSlackThresholdKn
     }
     var isSchematic: Bool {
@@ -128,8 +130,8 @@ struct TimelineChunk {
             tideRates = s.rates(from: start, to: end, step: 600).filter { $0.time < end }
             tideExtremes = s.extremes(from: start.addingTimeInterval(-pad),
                                       to: end.addingTimeInterval(pad)).filter { inSpan($0.time) }
-        case .current(let record, let threshold):
-            let s = record.engineStation
+        case .current(let record, let threshold, let station):
+            let s = station ?? record.engineStation
             // Padded samples feed the slack-window measurement so a window
             // whose slack sits near the seam still sees its far shoulder;
             // only the in-span samples are drawn.
