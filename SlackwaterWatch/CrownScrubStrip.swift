@@ -27,7 +27,11 @@ struct CrownScrubStrip: View {
     static let crownSensitivity: DigitalCrownRotationalSensitivity = .medium
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var crownX: Double = 0
+    /// The Crown's position in strip points from a fixed origin, not from
+    /// `data.start`: the store prepends and evicts chunks, which moves
+    /// `data.start`, and a position measured from it would then name another
+    /// moment. Same points per hour as the strip, so the feel is the strip's.
+    @State private var crown: Double = 0
     @State private var landed = 0
 
     var body: some View {
@@ -47,16 +51,16 @@ struct CrownScrubStrip: View {
         }
         .frame(height: Self.height(geo))
         .focusable()
-        .digitalCrownRotation($crownX, from: 0, through: Double(data.totalWidth),
+        .digitalCrownRotation($crown, from: Self.crown(data.start), through: Self.crown(data.end),
                               sensitivity: Self.crownSensitivity, isContinuous: false,
                               isHapticFeedbackEnabled: false,
-                              onChange: { event in scrubTime = data.time(atX: CGFloat(event.offset)) },
+                              onChange: { event in scrubTime = Self.time(atCrown: event.offset) },
                               onIdle: settle)
-        .onAppear { crownX = Double(data.x(scrubTime)) }
-        // A jump from outside (return to now, a re-anchored store) moves the Crown's origin too.
+        .onAppear { crown = Self.crown(scrubTime) }
+        // A move from outside (return to now, the snap) carries the Crown with it.
         .onChange(of: scrubTime) { _, t in
-            let x = Double(data.x(t))
-            if abs(x - crownX) > 1 { crownX = x }
+            let c = Self.crown(t)
+            if abs(c - crown) > 1 { crown = c }
         }
         .sensoryFeedback(.impact(weight: .light), trigger: landed)
     }
@@ -71,9 +75,17 @@ struct CrownScrubStrip: View {
             .position(x: width / 2, y: y)
     }
 
+    private static func crown(_ t: Date) -> Double {
+        t.timeIntervalSinceReferenceDate / 3600 * Double(Timeline.pph)
+    }
+
+    private static func time(atCrown c: Double) -> Date {
+        Date(timeIntervalSinceReferenceDate: c / Double(Timeline.pph) * 3600)
+    }
+
     private func settle() {
-        guard let target = data.magnetTarget(nearX: CGFloat(crownX)) else { return }
-        let move = { scrubTime = target; crownX = Double(data.x(target)) }
+        guard let target = data.magnetTarget(nearX: data.x(Self.time(atCrown: crown))) else { return }
+        let move = { scrubTime = target; crown = Self.crown(target) }
         if reduceMotion { move() } else { withAnimation(.snappy) { move() } }
         landed += 1
     }
