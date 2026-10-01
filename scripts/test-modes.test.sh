@@ -160,11 +160,19 @@ assert_has "node scripts/iwls-fixtures.mjs prepare"
 assert_lacks "xcodegen"
 assert_lacks "xcodebuild"
 
-# Exercise the normal machine-lock probe and re-exec once; the table above
-# bypasses it so each assertion can focus on a single mode decision.
+# The CI budget reaches xcodebuild as given; the default is clamped to 2–4.
+SLACKWATER_WORKERS=1 run_mode --unit
+assert_has "-parallel-testing-worker-count 1 "
+run_mode --unit
+grep -Eq -- '-parallel-testing-worker-count [234] ' "$log" || { print -u2 -- "default workers outside 2–4"; cat "$log"; exit 1; }
+
+# Exercise the lock probes and the re-exec once, worktree lock outside the
+# machine lock; the table above bypasses them so each assertion can focus on a
+# single mode decision.
 : > "$log"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/test.sh" --live >/dev/null
-assert_count '^lockf ' 2
+assert_count '^lockf ' 4
+assert_has "lockf $scratch/repo/scripts/../build/xcodebuild.lock lockf /tmp/slackwater-test.lock"
 assert_has "xcodebuild test"
 
 : > "$log"

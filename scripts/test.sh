@@ -46,14 +46,16 @@ fi
 # this way five times on 2026-08-02, the last with CI and a local run on
 # different devices. Whoever gets here second waits.
 #
-# The lock covers `xcodebuild test` and NOTHING ELSE. A bare `xcodebuild build`
-# or `build-for-testing` in this worktree takes no lock and writes the same
-# DerivedData, so running one while tests are in flight swaps Slackwater.app out
-# from under the live run. Every remaining UI test then fails with "Cannot launch
-# simulated executable: no file found at .../Slackwater.app" — zero assertion
-# failures, which again reads as a real regression and isn't one. Same shape if
-# you kill a run and then clean its DerivedData. Don't run any xcodebuild in a
-# worktree that has tests running; wait for the lock like everyone else.
+# A second lock, build/xcodebuild.lock, is per WORKTREE and covers this
+# worktree's DerivedData. A bare `xcodebuild build` or `build-for-testing` here
+# writes the same DerivedData, so running one while tests are in flight swaps
+# Slackwater.app out from under the live run. Every remaining UI test then fails
+# with "Cannot launch simulated executable: no file found at .../Slackwater.app"
+# — zero assertion failures, which again reads as a real regression and isn't
+# one. Same shape if you kill a run and then clean its DerivedData. Builds take
+# this lock (CLAUDE.md has the recipe) and ONLY this lock: another worktree's
+# DerivedData is not this one's, and a build waiting on the machine lock behind
+# an hour-long run was measured, not imagined.
 #
 # lockf(1) holds the lock in the kernel for the lifetime of the process, so a
 # killed or cancelled run releases it — a lock file with a PID in it would wedge
@@ -61,9 +63,13 @@ fi
 # against the caller's directory.
 if [[ -z "${SLACKWATER_TEST_LOCK:-}" ]]; then
   export SLACKWATER_TEST_LOCK=1
+  wtlock="$(dirname "$0")/../build/xcodebuild.lock"
+  mkdir -p "${wtlock:h}"
+  lockf -t 0 "$wtlock" true 2>/dev/null \
+    || echo "an xcodebuild holds $wtlock — waiting for it"
   lockf -t 0 /tmp/slackwater-test.lock true 2>/dev/null \
     || echo "another test run holds /tmp/slackwater-test.lock — waiting for it"
-  exec lockf /tmp/slackwater-test.lock "$0" "$@"
+  exec lockf "$wtlock" lockf /tmp/slackwater-test.lock "$0" "$@"
 fi
 
 cd "$(dirname "$0")/.."
@@ -201,8 +207,15 @@ for i in {1..$#sims}; do
   # desktop running, four clones push swap past physical RAM — load average
   # then counts thousands of page-in-blocked threads (430 observed, CPU 89%
   # idle), SpringBoard frames stall for seconds, and taps drop. Two clones fit
-  # on 16 GB; set SLACKWATER_WORKERS to the machine's budget (CI sets 1 — a
-  # hosted arm runner has ~7 GB).
+  # on 16 GB, so the default is one per 8 GB. It stops at four: the fast plan
+  # has seven UI classes and xcodebuild distributes whole classes, so the
+  # longest (DetailAndScrub) bounds the run past that, and every erased clone's
+  # first boot spends ~10 cores on iOS widget rendering for a minute. CI sets
+  # SLACKWATER_WORKERS=1 — a hosted arm runner has ~7 GB.
+  workers=$(( $(sysctl -n hw.memsize) / 8589934592 ))
+  (( workers < 2 )) && workers=2
+  (( workers > 4 )) && workers=4
+  workers=${SLACKWATER_WORKERS:-$workers}
   if [[ -n "${SLACKWATER_XCTESTRUN:-}" ]]; then
     action=(test-without-building -xctestrun "$SLACKWATER_XCTESTRUN")
   else
@@ -210,7 +223,7 @@ for i in {1..$#sims}; do
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
   fi
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
-    -parallel-testing-worker-count "${SLACKWATER_WORKERS:-2}" \
+    -parallel-testing-worker-count "$workers" \
     -collect-test-diagnostics "$diagnostics" \
     "${selection[@]}" \
     -resultBundlePath "$bundle" \

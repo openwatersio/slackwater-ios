@@ -212,7 +212,9 @@ local against local — another worktree, another agent session — which this m
 has more of than it ever had CI runs. `scripts/test.sh` takes a machine-wide
 `lockf(1)` lock and whoever arrives second waits; it prints a line when it's
 waiting. The lock lives in the kernel, so a killed or cancelled run releases it and
-nothing wedges.
+nothing wedges. A second, per-worktree lock (`build/xcodebuild.lock`) is what a
+bare build takes: it keeps a build out of a worktree whose tests are running
+without making it wait for every other worktree's run.
 
 Two smaller pieces of the same story:
 
