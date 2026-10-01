@@ -267,6 +267,7 @@ targets:
       - Slackwater/DetailPieces.swift
       - Slackwater/MoonDetailSheet.swift
       - Slackwater/MoonMarks.swift
+      - Slackwater/ScrubReading.swift
     dependencies:
       - package: Almanac
         product: Almanac
