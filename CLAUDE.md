@@ -42,18 +42,20 @@ SwiftUI's `.task` runs inside UIKit's first-commit block, so synchronous work th
 
 ## The test machine is shared
 
-Not with CI — every lane is GitHub-hosted since #327. Shared with the other worktrees and sessions on this Mac, of which there are usually several: two `xcodebuild test` runs here still SIGKILL each other. `scripts/test.sh` self-serializes on `/tmp/slackwater-test.lock` and explains the contention failure modes in its header comments. What the script cannot tell you:
+Not with CI — every lane is GitHub-hosted since #327. Shared with the other worktrees and sessions on this Mac, of which there are usually several: two `xcodebuild test` runs here still SIGKILL each other. `scripts/test.sh` self-serializes on `/tmp/slackwater-test.lock` (machine-wide, test runs only) and `build/xcodebuild.lock` (this worktree's DerivedData), and explains the contention failure modes in its header comments. What the script cannot tell you:
 
-- **Compile-check before (and instead of) the suite** — a minute versus fifteen:
+- **Run the shard you touched, not the suite.** CI's shard variables work locally: `SLACKWATER_ONLY=SlackwaterUITests/DetailAndScrubTests ./scripts/test.sh` is ~8 minutes against 17 for the fast run. `--full` is 65 minutes and holds the machine lock for all of it; it is the pre-release check, and every push to `main` runs it on hosted runners, so it is not a local gate for a PR.
+- **Compile-check before (and instead of) the suite** — a minute versus fifteen, and it takes only this worktree's lock, so another worktree's test run never blocks it:
 
   ```sh
-  lockf -t 0 /tmp/slackwater-test.lock xcodebuild build-for-testing \
+  mkdir -p build && lockf -t 0 build/xcodebuild.lock xcodebuild build-for-testing \
     -project Slackwater.xcodeproj -scheme Slackwater \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -derivedDataPath build/DerivedData \
     -clonedSourcePackagesDirPath build/SourcePackages 2>&1 | tail -20
   ```
 
-  `lockf -t 0` fails immediately if a run holds the machine — wait, never force it.
+  `lockf -t 0` fails immediately if a test run holds this worktree — wait, never force it. `-derivedDataPath build/DerivedData` is the path `scripts/test.sh` builds into, so the suite that follows is incremental; without it the build lands in `~/Library/Developer/Xcode/DerivedData` and the suite rebuilds from scratch.
 
 - **The first `xcodebuild` in a new worktree can hang silently.** SwiftPM downloads MapLibre's xcframework and reads github.com credentials from the login keychain, which raises a macOS permission dialog that a detached shell has nowhere to show. `sample <xcodebuild pid>` shows `SecItemCopyMatching` under `BinaryArtifactsManager.download`. Don't wait it out: hand the command to the human to run in their own terminal and choose Always Allow. Seeding `build/SourcePackages` from a sibling worktree doesn't avoid it, because `workspace-state.json` records absolute paths.
 - **One package path per worktree.** Pointing `-clonedSourcePackagesDirPath` at another checkout's `build/SourcePackages` and back re-copies MapLibre's headers, and the next build fails with "MLNShapeSource.h has been modified since the module file … was built", which is not a code error. Delete that worktree's DerivedData after confirming its `info.plist` `WorkspacePath` names the worktree.
