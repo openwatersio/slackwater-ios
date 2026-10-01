@@ -4,6 +4,9 @@
 import SwiftUI
 
 struct SettingsView: View {
+    /// Opens the tour's station directly — see `StationListView.replayTour`
+    /// for why this cannot just arm-and-dismiss.
+    let onReplayTour: () -> Void
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
@@ -76,6 +79,20 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(SN.leaf)
                         }
+                    }
+
+                    section(String(localized: "How to read a station", comment: "Settings section heading.")) {
+                        Button {
+                            dismiss()
+                            onReplayTour()
+                        } label: {
+                            HStack {
+                                Text("Show the tour again", comment: "Settings row that replays the first-run tour.")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .accessibilityIdentifier("settings-replay-tour")
                     }
 
                     #if PREMIUM_ENABLED

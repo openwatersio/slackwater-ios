@@ -265,6 +265,9 @@ targets:
       - Slackwater/TimelineChunks.swift
       - Slackwater/Eclipse.swift
       - Slackwater/DetailPieces.swift
+      # The tour's anchors ride on the detail pieces; nothing on the watch
+      # reads them. The tour itself (TourCoach, TourOverlay) is phone-only.
+      - Slackwater/TourAnchor.swift
       - Slackwater/MoonDetailSheet.swift
       - Slackwater/MoonMarks.swift
       - Slackwater/ScrubReading.swift
