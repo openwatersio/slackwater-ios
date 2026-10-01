@@ -26,6 +26,21 @@ struct CrownScrubStrip: View {
     /// ponytail: one number; tune on a real Crown.
     static let crownSensitivity: DigitalCrownRotationalSensitivity = .medium
 
+    init(data: TimelineData, scale: TimelineScale?, now: Date, imperial: Bool, speedUnit: String,
+         floodDeg: Double? = nil, ebbDeg: Double? = nil, scrubTime: Binding<Date>) {
+        self.data = data
+        self.scale = scale
+        self.now = now
+        self.imperial = imperial
+        self.speedUnit = speedUnit
+        self.floodDeg = floodDeg
+        self.ebbDeg = ebbDeg
+        _scrubTime = scrubTime
+        // Seeded here, not on appear: a Crown whose value starts outside its
+        // range may clamp it to the strip's start on the first frame.
+        _crown = State(initialValue: Self.crown(scrubTime.wrappedValue))
+    }
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The Crown's position in strip points from a fixed origin, not from
     /// `data.start`: the store prepends and evicts chunks, which moves
@@ -56,7 +71,6 @@ struct CrownScrubStrip: View {
                               isHapticFeedbackEnabled: false,
                               onChange: { event in scrubTime = Self.time(atCrown: event.offset) },
                               onIdle: settle)
-        .onAppear { crown = Self.crown(scrubTime) }
         // A move from outside (return to now, the snap) carries the Crown with it.
         .onChange(of: scrubTime) { _, t in
             let c = Self.crown(t)

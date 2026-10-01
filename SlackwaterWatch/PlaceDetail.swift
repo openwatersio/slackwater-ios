@@ -23,6 +23,7 @@ struct PlaceDetail: View {
 
     @ObservedObject private var favorites = FavoritesStore.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @State private var store: TimelineWindowStore?
@@ -65,6 +66,12 @@ struct PlaceDetail: View {
             store?.setAnchor(next)
         }
         .sheet(isPresented: $showSheet) { sheet }
+        // A raised wrist is a new look, as reopening is on the phone: at now,
+        // follow now; scrubbed away, stay there against the new now.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, store != nil else { return }
+            if scrubbedAway { live = Date() } else { returnToNow() }
+        }
     }
 
     private func load() async {
@@ -85,17 +92,21 @@ struct PlaceDetail: View {
     private func page(_ tl: TimelineData, _ source: TimelineSource) -> some View {
         let sky = SkyState(time: scrubTime, latitude: source.latitude, longitude: source.longitude,
                            days: tl.days, eclipses: tl.eclipses)
-        let reading = ScrubReading.at(scrubTime, in: tl, imperial: imperial, speedUnit: speedUnit)
+        let reading = ScrubReading.at(scrubTime, in: tl, imperial: imperial, speedUnit: speedUnit,
+                                      floodDeg: flow?.flood, ebbDeg: flow?.ebb)
         return VStack(spacing: 6) {
             CrownScrubStrip(data: tl, scale: store?.scale, now: live, imperial: imperial,
-                            speedUnit: speedUnit, scrubTime: $scrubTime)
+                            speedUnit: speedUnit, floodDeg: flow?.flood, ebbDeg: flow?.ebb,
+                            scrubTime: $scrubTime)
                 .background(alignment: .top) {
                     SkyBackdrop(sky: sky, plotDepth: CrownScrubStrip.plotDepth)
                         .frame(height: CrownScrubStrip.skyHeight)
                 }
                 .accessibilityElement()
                 .accessibilityLabel(Text(verbatim: item.name))
-                .accessibilityValue(Text(verbatim: "\(leadWhen(scrubTime, source.tz)), \(reading.title) \(reading.value ?? "")"))
+                .accessibilityValue(Text(verbatim: [spokenWhen(scrubTime, source.tz), reading.title,
+                                                    reading.value, reading.unit.map(spokenUnit), reading.set]
+                    .compactMap { $0 }.joined(separator: " ")))
                 .accessibilityAdjustableAction { direction in
                     let step: TimeInterval = direction == .increment ? 300 : -300
                     scrubTime = scrubTime.addingTimeInterval(step)
@@ -121,13 +132,14 @@ struct PlaceDetail: View {
                 }
                 if let value = r.value {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text(verbatim: value).font(.system(.title, design: .rounded).weight(.semibold))
+                        Text(verbatim: value).font(.system(.title, design: .rounded).weight(.semibold).monospacedDigit())
                         if let unit = r.unit { Text(verbatim: unit).font(.headline) }
+                        if let set = r.set { Text(verbatim: set).font(.headline).foregroundStyle(SN.foam.opacity(0.7)) }
                         if let symbol = r.symbol { Image(systemName: symbol).font(.headline) }
                     }
                 }
                 if let next = r.next {
-                    Text(verbatim: next).font(.footnote).foregroundStyle(SN.foam.opacity(0.7)).lineLimit(1)
+                    Text(verbatim: next).font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7)).lineLimit(1)
                 }
             }
             .foregroundStyle(SN.foam)
@@ -166,14 +178,22 @@ struct PlaceDetail: View {
         // The store may not hold now any more; it jumps first, as the phone's does.
         store?.jump(to: live, anchor: today)
         anchor = today
-        if reduceMotion { scrubTime = live } else { withAnimation(.snappy) { scrubTime = live } }
+        // Beyond a week the strip under the travel is not loaded: land, as the phone's Now does.
+        let far = abs(scrubTime.timeIntervalSince(live)) > Timeline.snapJumpHours * 3600
+        if reduceMotion || far { scrubTime = live } else { withAnimation(.snappy) { scrubTime = live } }
+    }
+
+    /// A current's flood and ebb bearings: the strip's arrows and the card's set.
+    private var flow: (flood: Double, ebb: Double)? {
+        guard case .current(let r, _, _) = source else { return nil }
+        return (r.floodDirection, r.ebbDirection)
     }
 
     private var sheet: some View {
         List {
             if let tl = store?.timeline {
                 ForEach(ScrubReading.todaysEvents(after: scrubTime, in: tl, imperial: imperial,
-                                                  speedUnit: speedUnit), id: \.self) { Text(verbatim: $0) }
+                                                  speedUnit: speedUnit), id: \.self) { Text(verbatim: $0).monospacedDigit() }
             }
             Button {
                 favorites.toggle(item.id)

@@ -62,4 +62,24 @@ final class ScrubReadingTests: XCTestCase {
         XCTAssertLessThanOrEqual(events.count, 4)
         XCTAssertTrue(events.allSatisfy { $0.hasPrefix("High") || $0.hasPrefix("Low") }, "\(events)")
     }
+
+    /// A Crown at rest within 0.5 pt of a turn (about 100 s) is not snapped,
+    /// and still sits on the turn: the card must call it the turn.
+    func testRestingJustShortOfATurnReadsTheTurn() throws {
+        let tl = try tide()
+        let high = try XCTUnwrap(tl.tideExtremes.first { $0.kind == .high && $0.time > at })
+        let r = ScrubReading.at(high.time.addingTimeInterval(-80), in: tl, imperial: true, speedUnit: "kn")
+        XCTAssertEqual(r.title, "High")
+        XCTAssertTrue(r.next?.hasPrefix("Low") == true, r.next ?? "nil")
+    }
+
+    func testACurrentReadsItsSet() throws {
+        let tl = try current()
+        let flood = try XCTUnwrap(tl.currentEvents.first { $0.kind == .maxFlood && $0.time > at })
+        let r = ScrubReading.at(flood.time, in: tl, imperial: true, speedUnit: "kn", floodDeg: 225, ebbDeg: 45)
+        XCTAssertEqual(r.set, "SW")
+        let ebb = try XCTUnwrap(tl.currentEvents.first { $0.kind == .maxEbb && $0.time > at })
+        XCTAssertEqual(ScrubReading.at(ebb.time, in: tl, imperial: true, speedUnit: "kn",
+                                       floodDeg: 225, ebbDeg: 45).set, "NE")
+    }
 }

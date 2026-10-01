@@ -8,13 +8,16 @@ struct ScrubReading: Equatable {
     let value: String?
     let unit: String?
     let symbol: String?
+    /// A current's set as a compass point ("SW"); nil for tides and at slack.
+    let set: String?
     let next: String?
 
-    /// Within this of an event, the scrub is on it: the magnet parks exactly,
-    /// the Crown lands within a few seconds.
-    private static let onEvent: TimeInterval = 60
+    /// Within this of an event, the scrub is on it. One strip point: the
+    /// magnet leaves a rest within half a point of a stop where it is
+    /// (`TimelineData.magnetTarget`), so a Crown can stop up to ~100 s off.
+    private static let onEvent: TimeInterval = Timeline.scrubbedSeconds
 
-    static func at(_ t: Date, in data: TimelineData, imperial: Bool, speedUnit: String) -> ScrubReading {
+    static func at(_ t: Date, in data: TimelineData, imperial: Bool, speedUnit: String, floodDeg: Double? = nil, ebbDeg: Double? = nil) -> ScrubReading {
         if data.hasTide {
             let turn = data.tideExtremes.first { abs($0.time.timeIntervalSince(t)) < onEvent }
             let next = data.tideExtremes.first { $0.time.timeIntervalSince(t) >= onEvent }
@@ -26,15 +29,22 @@ struct ScrubReading: Equatable {
                 ?? (rising ? "arrow.up.right" : "arrow.down.right")
             return ScrubReading(title: title,
                                 value: formatHeight(data.heightAt(t), imperial: imperial),
-                                unit: heightUnit(imperial: imperial), symbol: symbol,
+                                unit: heightUnit(imperial: imperial), symbol: symbol, set: nil,
                                 next: next.map { tideLine($0, data, imperial) })
         }
         let v = data.velocityAt(t)
         let next = data.currentEvents.first { $0.time.timeIntervalSince(t) >= onEvent }
         let schematic = data.speedsAreSchematic
-        return ScrubReading(title: currentPhase(signed: v).word,
+        let phase = currentPhase(signed: v)
+        let bearing: Double? = switch phase {
+        case .flood: floodDeg
+        case .ebb: ebbDeg
+        case .slack: nil
+        }
+        return ScrubReading(title: phase.word,
                             value: schematic ? nil : formatSpeed(abs(v), unit: speedUnit),
                             unit: schematic ? nil : speedUnitLabel(speedUnit), symbol: nil,
+                            set: bearing.map(compass16),
                             next: next.map { currentLine($0, data, speedUnit) })
     }
 

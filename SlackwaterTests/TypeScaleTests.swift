@@ -124,6 +124,12 @@ extension TypeScaleTests {
             // (StationChooser.swift). The chooser's pin reads the same string
             // aloud only.
             "StationChooser.swift:distance",
+            // The watch card's reading and next event, and its sheet's
+            // events: built in ScrubReading and drawn by PlaceDetail's
+            // Texts, which carry the mono trait (SlackwaterWatch/).
+            "ScrubReading.swift:at",
+            "ScrubReading.swift:tideLine",
+            "ScrubReading.swift:currentLine",
             "NearbySection.swift:row",
             "CurrentDetailView.swift:scheduleEntries",
             "CurrentDetailView.swift:body",
