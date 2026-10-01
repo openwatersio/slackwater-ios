@@ -30,4 +30,16 @@ final class TimelineSnapTests: XCTestCase {
         let stop = try XCTUnwrap(tl.snapTimes.dropFirst(3).first)
         XCTAssertNil(tl.magnetTarget(nearX: tl.x(stop) + 0.2))
     }
+
+    func testReanchorOnlyOutsideTheWindow() throws {
+        let tz = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let anchor = dayLocal(Date(timeIntervalSince1970: 1_790_000_000), tz)
+        let w = Timeline.window(anchor: anchor)
+        XCTAssertNil(Timeline.reanchor(settledAt: w.start.addingTimeInterval(3_600), anchor: anchor, tz: tz))
+        XCTAssertNil(Timeline.reanchor(settledAt: w.end, anchor: anchor, tz: tz))
+        let beyond = w.end.addingTimeInterval(3_600)
+        XCTAssertEqual(Timeline.reanchor(settledAt: beyond, anchor: anchor, tz: tz), dayLocal(beyond, tz))
+        let before = w.start.addingTimeInterval(-3_600)
+        XCTAssertEqual(Timeline.reanchor(settledAt: before, anchor: anchor, tz: tz), dayLocal(before, tz))
+    }
 }

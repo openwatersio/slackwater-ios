@@ -111,9 +111,9 @@ struct DerivedGateDetailView: View {
             .task(id: scrubTime) {
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
                 // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
-                if let w = timeline.map({ Timeline.window(anchor: $0.anchor) }),
-                   scrubTime < w.start || scrubTime > w.end {
-                    anchor = dayLocal(scrubTime, tz)
+                if let tl = timeline,
+                   let next = Timeline.reanchor(settledAt: scrubTime, anchor: tl.anchor, tz: tz) {
+                    anchor = next
                     store?.setAnchor(anchor)
                 }
             }

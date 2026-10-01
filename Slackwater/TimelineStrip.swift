@@ -137,6 +137,14 @@ enum Timeline {
         (anchor.addingTimeInterval(-backHours * 3600),
          anchor.addingTimeInterval(forwardHours * 3600))
     }
+
+    /// Where a scrub that has come to rest re-anchors the schedule: the
+    /// day it rests on, when that is outside the current anchor's window;
+    /// nil inside it. The phone's details and the watch settle by this.
+    static func reanchor(settledAt t: Date, anchor: Date, tz: TimeZone) -> Date? {
+        let w = window(anchor: anchor)
+        return t < w.start || t > w.end ? dayLocal(t, tz) : nil
+    }
 }
 
 /// Is the strip parked somewhere other than now? The one definition, shared by
