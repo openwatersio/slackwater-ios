@@ -42,7 +42,7 @@ SwiftUI's `.task` runs inside UIKit's first-commit block, so synchronous work th
 
 ## The test machine is shared
 
-Not with CI — every lane is GitHub-hosted since #327. Shared with the other worktrees and sessions on this Mac, of which there are usually several: two `xcodebuild test` runs here still SIGKILL each other. `scripts/test.sh` self-serializes on `/tmp/slackwater-test.lock` (machine-wide, test runs only) and `build/xcodebuild.lock` (this worktree's DerivedData), and explains the contention failure modes in its header comments. What the script cannot tell you:
+Not with CI — every lane is GitHub-hosted since #327. Shared with the other worktrees and sessions on this Mac, of which there are usually several. Runs in different worktrees run at once: each takes only its own `build/xcodebuild.lock`, and overlapped runs on their own devices do not kill each other (measured; `scripts/test.sh` has the numbers and the history). Overlap makes UI waits ~2× slower, which the script's `TEST_RUNNER_SLACKWATER_PERF_SCALE` default absorbs; a test that fails only under overlap is a wait budget, not a race, and the first move is to re-run it alone. What the script cannot tell you:
 
 - **Run the shard you touched, not the suite.** CI's shard variables work locally: `SLACKWATER_ONLY=SlackwaterUITests/DetailAndScrubTests ./scripts/test.sh` is ~8 minutes against 17 for the fast run. `--full` is 65 minutes and holds the machine lock for all of it; it is the pre-release check, and every push to `main` runs it on hosted runners, so it is not a local gate for a PR.
 - **Compile-check before (and instead of) the suite** — a minute versus fifteen, and it takes only this worktree's lock, so another worktree's test run never blocks it:

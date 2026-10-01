@@ -39,23 +39,22 @@ if [[ $MODE == unit || $MODE == live ]]; then
   [[ ${#sims} == 1 ]] || { print -u2 "$MODE mode requires exactly one simulator"; exit 2; }
 fi
 
-# One test run at a time on this machine. Two concurrent `xcodebuild test` runs
-# SIGKILL each other's test runner — every UI test in the losing run reports
-# "Test crashed with signal kill" with zero assertion failures, which reads as a
-# real failure and isn't one. Separate simulator devices do NOT avoid it: CI died
-# this way five times on 2026-08-02, the last with CI and a local run on
-# different devices. Whoever gets here second waits.
-#
-# A second lock, build/xcodebuild.lock, is per WORKTREE and covers this
-# worktree's DerivedData. A bare `xcodebuild build` or `build-for-testing` here
+# One xcodebuild at a time per WORKTREE. build/xcodebuild.lock covers this
+# worktree's DerivedData: a bare `xcodebuild build` or `build-for-testing` here
 # writes the same DerivedData, so running one while tests are in flight swaps
 # Slackwater.app out from under the live run. Every remaining UI test then fails
 # with "Cannot launch simulated executable: no file found at .../Slackwater.app"
-# — zero assertion failures, which again reads as a real regression and isn't
-# one. Same shape if you kill a run and then clean its DerivedData. Builds take
-# this lock (CLAUDE.md has the recipe) and ONLY this lock: another worktree's
-# DerivedData is not this one's, and a build waiting on the machine lock behind
-# an hour-long run was measured, not imagined.
+# — zero assertion failures, which reads as a real regression and isn't one.
+# Same shape if you kill a run and then clean its DerivedData. Builds take this
+# lock too (CLAUDE.md has the recipe).
+#
+# Other worktrees' runs are not waited for. Runs on separate devices with
+# separate DerivedData do not disturb each other: measured 2026-10-01, two runs
+# overlapped for eight minutes with four clones each, no "Test crashed with
+# signal kill" in either (the signature that justified a machine-wide lock on
+# 2026-08-02, when DerivedData was still shared — docs/testflight.md). What
+# overlap does cost is speed, ~2× on UI waits, which the PERF_SCALE default
+# below absorbs.
 #
 # lockf(1) holds the lock in the kernel for the lifetime of the process, so a
 # killed or cancelled run releases it — a lock file with a PID in it would wedge
@@ -67,9 +66,7 @@ if [[ -z "${SLACKWATER_TEST_LOCK:-}" ]]; then
   mkdir -p "${wtlock:h}"
   lockf -t 0 "$wtlock" true 2>/dev/null \
     || echo "an xcodebuild holds $wtlock — waiting for it"
-  lockf -t 0 /tmp/slackwater-test.lock true 2>/dev/null \
-    || echo "another test run holds /tmp/slackwater-test.lock — waiting for it"
-  exec lockf "$wtlock" lockf /tmp/slackwater-test.lock "$0" "$@"
+  exec lockf "$wtlock" "$0" "$@"
 fi
 
 cd "$(dirname "$0")/.."
@@ -79,6 +76,13 @@ cd "$(dirname "$0")/.."
 # M1_SHOT_DIR in this shell never reaches it (the tests fall back to /tmp).
 export TEST_RUNNER_M1_SHOT_DIR="${SHOT_DIR:-/tmp/slackwater-shots}"
 mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
+
+# Every wait in the UI target and the unit tests' wall-clock budgets were
+# calibrated on this Mac running one suite alone. Several worktrees now run at
+# once, and under overlap the same tests ran ~2× slower (31/42/45 s alone,
+# 50/91/71 s overlapped) and three of twelve tripped their waits. CI sets 4 for
+# its runners (.github/workflows/ci.yml) and that is taken as given.
+export TEST_RUNNER_SLACKWATER_PERF_SCALE="${TEST_RUNNER_SLACKWATER_PERF_SCALE:-2}"
 
 # SLACKWATER_XCTESTRUN names a .xctestrun from an earlier build-for-testing
 # (CI builds once and shards the tests across jobs). The fixture is compiled
@@ -117,12 +121,15 @@ fi
 # CI gets a fresh runner image every run, so an erased device is the only local
 # configuration that runs the same experiment CI does.
 #
-# Its own devices, never yours. `Slackwater <type>` is created on first run;
-# your `iPhone 17` keeps the favourites you put there. An explicit
-# SLACKWATER_SIMS is taken as given and NOT erased for the same reason — it may
-# be the device you use by hand.
+# Its own devices, never yours, and one per WORKTREE: `Slackwater <type> ·
+# <worktree>` is created on first run. Your `iPhone 17` keeps the favourites
+# you put there, and another worktree's run must never erase or clone the base
+# device this one is cloning — two runs booting one device was the first
+# documented way to get "Test crashed with signal kill" (docs/testflight.md).
+# An explicit SLACKWATER_SIMS is taken as given and NOT erased for the same
+# reason — it may be the device you use by hand.
 own_sim() {
-  local type=$1 name="Slackwater $1" found count udid
+  local type=$1 name="Slackwater $1 · ${PWD:t}" found count udid
   found=$(xcrun simctl list devices available | grep -F "$name (") || true
   count=$(printf '%s' "$found" | grep -c . || true)
   # Two devices with one name is not hypothetical — it has happened here, and
@@ -166,9 +173,19 @@ case $MODE in
   unit) selection=(-only-testing:SlackwaterTests) ;;
   live) selection=(-only-testing:SlackwaterUITests/LiveFetchTests) ;;
 esac
-# A PR failure with no recording is a blind re-run (#474); the cost is paid
-# only by a failing test.
-diagnostics=on-failure
+# Never, because "on-failure" is not what it says. xcodebuild runs
+# `simctl diagnose` on EVERY run and discards the result on success, and on
+# this Mac the `log collect` inside the clone hangs until diagnose's own
+# 600 s timeout: three UI tests (118 s) took 764 s, a 243 s unit run took 819 s,
+# seven runs in three days, on iOS 27.0 and 27.2 devices, with one worker and
+# four. The clone's logd then dies of XPC_EXIT_REASON_SIGTERM_TIMEOUT at
+# teardown. Measured 2026-10-01 with `sample` on the hung simctl.
+#
+# The evidence #474 wanted survives: the screen recording and the UI
+# hierarchy are XCTest attachments, not simctl diagnostics. A failing test
+# under `never` left an .mp4 and the hierarchy .txt in an 11 MB bundle, 60 s
+# end to end. Only the sysdiagnose-style simctl_diagnostics directory is gone.
+diagnostics=never
 
 # One shard's share of the suite, comma-separated. CI's matrix sets exactly one
 # of these per shard (.github/workflows/ci.yml); a local run sets neither and

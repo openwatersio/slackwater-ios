@@ -43,7 +43,7 @@ mkdir -p "$TEST_RUNNER_M1_SHOT_DIR"
 xcodegen generate
 rm -rf build/results-shots.xcresult
 mkdir -p build
-lockf build/xcodebuild.lock lockf /tmp/slackwater-test.lock xcodebuild test \
+lockf build/xcodebuild.lock xcodebuild test \
   -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater \
   -destination "platform=iOS Simulator,id=$udid" \
   -only-testing:SlackwaterUITests/$walk \

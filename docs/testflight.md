@@ -207,14 +207,22 @@ separation does not avoid it. The exact kill mechanism was never pinned down; th
 CoreSimulator logs had already rolled off. The correlation with overlap was 5 for 5.
 
 Those five were CI against a local run, from when the macOS lane was self-hosted on
-this Mac. CI is GitHub-hosted now (#327), so the overlap left to guard against is
-local against local — another worktree, another agent session — which this machine
-has more of than it ever had CI runs. `scripts/test.sh` takes a machine-wide
-`lockf(1)` lock and whoever arrives second waits; it prints a line when it's
-waiting. The lock lives in the kernel, so a killed or cancelled run releases it and
-nothing wedges. A second, per-worktree lock (`build/xcodebuild.lock`) is what a
-bare build takes: it keeps a build out of a worktree whose tests are running
-without making it wait for every other worktree's run.
+this Mac, and every run then built into one shared `~/Library/Developer/Xcode/DerivedData`.
+`scripts/test.sh` took a machine-wide `lockf(1)` lock on the strength of that correlation.
+
+Re-tested 2026-10-01 with per-worktree DerivedData (#5152f04 made that the default):
+two `xcodebuild test` runs in different worktrees, on their own devices, four clones
+each, overlapped for eight minutes — no `signal kill` in either. The machine-wide lock
+is gone. What remains is the per-worktree `build/xcodebuild.lock`, which keeps a bare
+build out of a worktree whose tests are running (it swaps `Slackwater.app` out from
+under them). Overlap costs speed, about 2× on UI waits, which `scripts/test.sh`'s
+`TEST_RUNNER_SLACKWATER_PERF_SCALE` default of 2 absorbs.
+
+The ten minutes every local run spent after its last test were something else:
+`-collect-test-diagnostics on-failure` runs `simctl diagnose` on every run and
+discards the result on success, and the `log collect` inside the clone hangs until
+diagnose's 600 s timeout on this Mac. It is `never` now; a failing test still leaves
+its screen recording and UI hierarchy, which are XCTest attachments.
 
 Two smaller pieces of the same story:
 
