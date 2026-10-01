@@ -99,24 +99,29 @@ struct AlertStatusSnapshot: Equatable {
         running = false
     }
 
+    /// The pass in flight, if any. Every pass runs after the one before it: a direct call and a
+    /// coalesced one never interleave, so neither can write off a snapshot the other has already
+    /// superseded — `AlertNotifications.apply` suspends between removing requests and adding
+    /// them, and an older pass resuming there would restore what a newer one had cleared after a
+    /// rule or tier change.
+    private var pass: Task<Void, Never>?
+
     /// One full pass: expire what's due, resolve 90 days off the main actor, then write the
-    /// calendars and the notifications.
-    ///
-    /// Two constraints hold it up, and both are invisible at the call site.
-    ///
-    /// It must be callable directly and run to completion, not only through `coalesced()`:
-    /// `CalendarStationsView.subscribeAndVerify` awaits this exact call and reads whether a
-    /// calendar came out of it, which is the only signal that a source refused to make one.
-    /// Routing it through the coalescer would return before the work it is inspecting happened.
-    ///
-    /// And it must stay safe to interleave with a coalesced pass, because that direct call can
-    /// land in the middle of one. Both writers are built for that: `AlertCalendar.apply` has no
-    /// `await` in it, so its EventKit removes and adds are atomic against the other pass, and it
-    /// writes only stations the live store and the caller's snapshot agree on;
-    /// `AlertNotifications.apply` keys every request on the occurrence, so two passes over the
-    /// same rules converge on the same set instead of doubling it. Anything added here that
-    /// suspends mid-write, or writes off a snapshot without re-checking it, breaks that.
+    /// calendars and the notifications. Queued behind any pass already running, and awaited to
+    /// completion: `CalendarStationsView.subscribeAndVerify` reads whether a calendar came out of
+    /// this exact pass, which is the only signal that a source refused to make one. Routing it
+    /// through the coalescer would return before the work it is inspecting happened.
     func reschedule(now: Date = appNow()) async {
+        let previous = pass
+        let mine = Task { @MainActor in
+            await previous?.value
+            await self.runPass(now: now)
+        }
+        pass = mine
+        await mine.value
+    }
+
+    private func runPass(now: Date) async {
         for id in expiredRules(AlertRuleStore.shared.rules, now: now) {
             AlertRuleStore.shared.remove(id)
         }
