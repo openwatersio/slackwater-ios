@@ -283,6 +283,11 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
+        # Building the watch scheme alone in Xcode syncs Localizable.xcstrings
+        # from the watch's strings only, dropping the comments the phone's
+        # code supplies for shared keys. The phone and widget extract; the
+        # watch's own strings are added to the catalog by hand.
+        SWIFT_EMIT_LOC_STRINGS: NO
         CODE_SIGN_ENTITLEMENTS: SlackwaterWatch/SlackwaterWatch.entitlements
       configs:
         # A Release archive still builds this target, because the app depends
