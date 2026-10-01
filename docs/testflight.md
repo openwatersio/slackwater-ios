@@ -54,7 +54,7 @@ Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `A
    Keep `dist.key`/`dist.p12` in 1Password and delete the local copies.
 7. **Tester groups.** Create an internal "Nightly" group with access to all builds, and the external "Beta" group with a public link (see Tester groups).
 
-To upload by hand from a Mac, export the same five variables and run `scripts/testflight.sh`. Promotion to Beta still goes through the `Promote Nightly to Beta` workflow and its release pull request.
+To upload by hand from a Mac, export the same five variables and run `scripts/testflight.sh`. Promotion to Beta uses the `Promote Nightly to Beta` workflow with an existing build number; it does not build the app or open a pull request.
 
 ## Why a throwaway keychain
 
@@ -67,7 +67,7 @@ Non-GUI sessions (agents, launchd, ssh, CI) see the **login keychain as locked**
 | Nightly | internal (`hasAccessToAllBuilds`) | every upload, automatically, no review | — |
 | Beta | external, public link | builds approved through the promotion workflow, **after Apple beta review** | <https://testflight.apple.com/join/5gwh791N> |
 
-Beta is the only external group and is listed in `.github/testflight-beta-groups.txt`. The promotion workflow requires that file to match App Store Connect exactly, so group changes stop a release until the policy change is reviewed. `slackwater.xyz` publishes its link as the download button
+Beta is the only external group and is listed in `.github/testflight-beta-groups.txt`. The promotion workflow requires that file to match App Store Connect exactly. `slackwater.xyz` publishes its link as the download button
 (`src/lib/links.ts`, shared by the homepage and every station page), so a release that skips
 the promotion leaves the public page on the previous build. Update that file when the link
 changes.
@@ -155,7 +155,7 @@ repeated name in that output is the bug.
 
 Per-release procedure lives in the `releasing-to-testflight` skill (`.claude/skills/`).
 
-- **A release goes to every checked-in external group.** Dispatch `Promote Nightly to Beta` with the nightly build number. It opens a pull request containing `docs/release-notes/<version>.md` and the retained `docs/release-promotions/<version>.json` record. Merging approves group attachment, one beta review submission, and the final GitHub release. Check the result with `node scripts/asc.mjs builds`.
+- **A release goes to every checked-in external group.** Dispatch `Promote Nightly to Beta` with the nightly build number. It uses collected notes from `docs/release-notes/<version>-<build>.md` when present; otherwise it collects PR titles since the previous Beta tag (or version tag), falling back to commit titles for direct commits. It updates TestFlight notes, attaches the existing build to Beta, and submits it for Apple beta review. A `beta-<version>-<build>` GitHub release records the notes and provides the baseline for the next promotion. No release PR, archive, upload, or app CI run is involved. Check the result with `node scripts/asc.mjs builds`.
 - Bump `CURRENT_PROJECT_VERSION` in `project.yml` per upload (App Store Connect rejects reused
   build numbers per version); `MARKETING_VERSION` per release. **Both reach the bundle only
   because `info.properties` maps them to `CFBundleVersion` / `CFBundleShortVersionString` and

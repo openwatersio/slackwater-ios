@@ -7,23 +7,19 @@ on:
         description: Nightly build number
         required: true
         type: string
-  push:
-    branches: [main]
-    paths: ['docs/release-promotions/*.json']
 
 concurrency:
   group: beta-promotion
   cancel-in-progress: false
 
 jobs:
-  prepare:
-    name: Prepare release pull request
+  promote:
+    name: Promote existing Nightly build
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: testflight
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - name: Require an owner
         env:
@@ -43,7 +39,7 @@ jobs:
       - name: Install zsh
         run: sudo apt-get update && sudo apt-get install -y zsh
 
-      - name: Open release pull request
+      - name: Update notes and promote to Beta
         env:
           BUILD: ${{ inputs.build }}
           GH_TOKEN: ${{ github.token }}
@@ -51,37 +47,4 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY: ${{ secrets.ASC_KEY }}
         run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          zsh scripts/promote-nightly.sh prepare "$BUILD"
-
-  release:
-    name: Promote reviewed build
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: testflight
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 24
-
-      - name: Install zsh
-        run: sudo apt-get update && sudo apt-get install -y zsh
-
-      - name: Promote the merged release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY: ${{ secrets.ASC_KEY }}
-        run: |
-          files=("${(@f)$(git diff --name-only --diff-filter=A HEAD^ HEAD -- 'docs/release-promotions/*.json')}")
-          (( ${#files} == 1 )) || { print -u2 "expected one added promotion record, found ${#files}"; exit 1; }
-          zsh scripts/promote-nightly.sh release "$files[1]"
-        shell: zsh {0}
+          zsh scripts/promote-nightly.sh "$BUILD"
