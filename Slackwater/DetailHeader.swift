@@ -95,6 +95,8 @@ struct DetailHeader: View {
                             ? String(localized: "Remove favorite", comment: "VoiceOver action for a saved station.")
                             : String(localized: "Add favorite", comment: "VoiceOver action for a station."))
                         .accessibilityIdentifier("detail-favorite")
+                        .tourAnchor(.star)
+                        .id(TourCoach.Step.star)
                     }
                 }
             }

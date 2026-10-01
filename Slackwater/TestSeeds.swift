@@ -15,6 +15,15 @@ func applySeedHooksIfRequested() {
     if CommandLine.arguments.contains("-seedGate") {
         UserDefaults.standard.set(true, forKey: seenGateKey)
     }
+    // Same shape as -resetGate/-seedGate: a UI test forces or suppresses the
+    // first-run tour by writing the persisted flag, because an
+    // arguments-domain value would mask the in-app write.
+    if CommandLine.arguments.contains("-resetTour") {
+        UserDefaults.standard.removeObject(forKey: seenTourKey)
+    }
+    if CommandLine.arguments.contains("-seedTour") {
+        UserDefaults.standard.set(true, forKey: seenTourKey)
+    }
     if CommandLine.arguments.contains("-resetSeriesFilter") {
         UserDefaults.standard.removeObject(forKey: seriesFilterKey)
     }

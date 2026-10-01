@@ -717,6 +717,8 @@ struct LeadCard<Eyebrow: View>: View {
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("detail-reading")
+        .tourAnchor(.read)
+        .id(TourStep.read)
         .accessibilityValue(time.replacingOccurrences(of: "\u{2007}", with: ""))
     }
 }
@@ -919,6 +921,9 @@ struct SummaryTiles: View {
                             ?? moonPhaseName(phase: moon.phase))
                         .font(ReadoutType.tileText)
                 }
+                .accessibilityIdentifier("tile-moon")
+                .tourAnchor(.moonCard)
+                .id(TourStep.moonCard)
             }
         }
         .task(id: dayLocal(at, tz)) {
