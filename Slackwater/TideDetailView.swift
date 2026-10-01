@@ -101,23 +101,7 @@ struct TideDetailView: View {
                             anchor: $anchor,
                             onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
-                            above: {
-                                // Directly under the name, where a reader meets
-                                // it before the high and the low rather than
-                                // after. Not an amber card: nothing here is
-                                // provisional or wrong — the prediction is
-                                // right and it is the frame that misleads.
-                                if let ratio = record.seasonalRatio,
-                                   ratio >= TideStationRecord.seasonalLeadRatio {
-                                    Text("Mostly seasonal — the yearly change in water level here is about \(seasonalTimes(ratio)) times the daily tide.",
-                                         comment: "Shown under the place name where the annual cycle is larger than the tide.")
-                                        .font(.caption)
-                                        .foregroundStyle(SN.foam.opacity(0.55))
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 24)
-                                        .padding(.top, 6)
-                                }
-                            },
+                            above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
@@ -136,7 +120,12 @@ struct TideDetailView: View {
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
-                                    SummaryTiles(primary: range, moon: sky.illumination, at: scrubTime,
+                                    SummaryTiles(primary: range,
+                                                 primaryDetail: rangeDetail,
+                                                 // A year, which is what the tile is
+                                                 // flagging: this water follows one.
+                                                 primarySymbol: record.seasonalRatio == nil ? nil : "calendar",
+                                                 moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
                                                  solarObscuration: sky.obscuration,
@@ -204,9 +193,27 @@ struct TideDetailView: View {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
         return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
-                prev.kind == .low
-                    ? String(localized: "low to high", comment: "Tide-range direction.")
-                    : String(localized: "high to low", comment: "Tide-range direction."))
+                // At a seasonal station the caption gives up the direction for
+                // the reason the number is small. The direction is the lesser
+                // fact — the curve and the schedule both show it — and a tile
+                // caption is one line, so the two cannot both be here.
+                record.seasonalRatio.map(seasonalCaption) ?? rangeDirection)
+    }
+
+    /// Which way this swing runs, when there is nothing more pressing to say.
+    private var rangeDirection: String {
+        prevExtreme?.kind == .low
+            ? String(localized: "low to high", comment: "Tide-range direction.")
+            : String(localized: "high to low", comment: "Tide-range direction.")
+    }
+
+    /// The Range tile's sheet, and the marker on the tile that says it is there.
+    /// Both appear only where the water is seasonal rather than tidal.
+    private var rangeDetail: (() -> AnyView)? {
+        guard let ratio = record.seasonalRatio, let range else { return nil }
+        let place = record.name
+        return { AnyView(RangeDetailSheet(value: range.value, direction: self.rangeDirection,
+                                          seasonalRatio: ratio, place: place)) }
     }
 
     private var leadState: String {
@@ -284,12 +291,6 @@ struct TideDetailView: View {
         StationDetails {
             StationDetailRow("Datum", record.detailsDatum)
             StationDetailNote("Heights are measured from chart datum. A negative value predicts less water than the charted depth.")
-            // The quieter band says it here instead, beside the datum note,
-            // because it is the same kind of fact: what these heights are
-            // measured against and how they behave across a year.
-            if let ratio = record.seasonalRatio, ratio < TideStationRecord.seasonalLeadRatio {
-                StationDetailNote("Seasonal level change here is comparable to the daily tide, so heights drift through the year.")
-            }
             StationDetailRow("Station", record.id)
             StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
             StationDetailRow("Time zone", record.timezone)

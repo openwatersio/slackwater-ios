@@ -60,6 +60,14 @@ final class SeasonalWaterTests: XCTestCase {
         }
     }
 
+    func testTheTileCaptionIsGradedByHowFarTheTideIsLeftBehind() {
+        // The caption replaces the swing's direction, so it has to earn the
+        // line: two words that change the reading of the number above them.
+        XCTAssertEqual(seasonalCaption(161.6), "mostly seasonal")
+        XCTAssertEqual(seasonalCaption(3), "mostly seasonal")
+        XCTAssertEqual(seasonalCaption(1.008), "partly seasonal")
+    }
+
     func testRoundsToAFigureAReaderCanCarry() {
         // None of the precision is meaningful: it came out of a constituent fit.
         XCTAssertEqual(seasonalTimes(3.74), "3.7")

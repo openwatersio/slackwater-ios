@@ -102,6 +102,15 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     static let fridayHarborID = "noaa/9449880"
 }
 
+/// The Range tile's caption where the water is seasonal: two words standing in
+/// for the swing's direction, graded by how far the tide has been left behind.
+/// The sheet behind the tile carries the rest.
+func seasonalCaption(_ ratio: Double) -> String {
+    ratio >= TideStationRecord.seasonalLeadRatio
+        ? String(localized: "mostly seasonal", comment: "Tide-range caption where the yearly cycle dwarfs the daily tide.")
+        : String(localized: "partly seasonal", comment: "Tide-range caption where the yearly cycle rivals the daily tide.")
+}
+
 /// A seasonal ratio as a screen says it: rounded to a ten once there is a ten
 /// to round to, so the number reads as the estimate "about" promises. 43.3 is
 /// "about 40", not "about 43", which invites a reader to trust a figure that
