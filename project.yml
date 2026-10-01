@@ -175,7 +175,8 @@ targets:
           Slackwater gives each station you switch on its own calendar, named
           for that station, and keeps its tide or current events up to date.
           Switch the station off and Slackwater deletes that calendar and its
-          events. It never reads or changes your other calendars.
+          events. It reads only calendars named for a station, to find its
+          own, and never changes your other calendars.
         # iPhone: portrait-only, as ever. iPad: all four + no UIRequiresFullScreen
         # so Split View / Slide Over work (App Store validation 90474 requires
         # exactly this set when multitasking is supported).

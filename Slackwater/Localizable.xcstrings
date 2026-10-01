@@ -8790,6 +8790,119 @@
           }
         }
       }
+    },
+    "Lunar eclipse" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eclipse lunar"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éclipse lunaire"
+          }
+        }
+      }
+    },
+    "Rising past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sube por encima de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monte au-dessus de %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Falling past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baja por debajo de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descend sous %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every time it rises past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada vez que sube por encima de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque fois qu’elle monte au-dessus de %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every time it falls past %@ %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada vez que baja por debajo de %1$@ %2$@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque fois qu’elle descend sous %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Every %@" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cada %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque %@"
+          }
+        }
+      }
+    },
+    "Set an alert" : {
+      "comment" : "VoiceOver chart action.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear una alerta"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer une alerte"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

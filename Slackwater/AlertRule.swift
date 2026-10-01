@@ -87,13 +87,15 @@ struct AlertRule: Codable, Identifiable, Equatable {
 /// The place goes in front of it (`alertRuleSummary`, `alertCopy`).
 func alertEventName(_ trigger: AlertTrigger, noWindow: Bool = false, imperial: Bool) -> String {
     switch trigger {
-    case .slackWindowOpens: noWindow ? "Slack" : "Slack window"
-    case .slack: "Slack"
-    case .currentPeak(let flood): flood ? "Max flood" : "Max ebb"
-    case .tideExtreme(let high): high ? "High tide" : "Low tide"
+    case .slackWindowOpens: return noWindow ? String(localized: "Slack") : String(localized: "Slack window")
+    case .slack: return String(localized: "Slack")
+    case .currentPeak(let flood): return flood ? String(localized: "Max flood") : String(localized: "Max ebb")
+    case .tideExtreme(let high): return high ? String(localized: "High tide") : String(localized: "Low tide")
     case .tideCrossing(let heightM, let rising):
-        "\(rising ? "Rising" : "Falling") past \(formatHeight(heightM, imperial: imperial)) \(heightUnit(imperial: imperial))"
-    case .eclipse: "Lunar eclipse"
+        let height = formatHeight(heightM, imperial: imperial), unit = heightUnit(imperial: imperial)
+        return rising ? String(localized: "Rising past \(height) \(unit)")
+                      : String(localized: "Falling past \(height) \(unit)")
+    case .eclipse: return String(localized: "Lunar eclipse")
     }
 }
 

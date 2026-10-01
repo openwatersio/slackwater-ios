@@ -94,10 +94,11 @@ func alertPopupToggle(_ rules: [AlertRule], stationID: String, offer: AlertTrigg
 func alertEveryLabel(_ trigger: AlertTrigger, imperial: Bool) -> String {
     switch trigger {
     case .tideCrossing(let heightM, let rising):
-        return "Every time it \(rising ? "rises" : "falls") past "
-            + "\(formatHeight(heightM, imperial: imperial)) \(heightUnit(imperial: imperial))"
+        let height = formatHeight(heightM, imperial: imperial), unit = heightUnit(imperial: imperial)
+        return rising ? String(localized: "Every time it rises past \(height) \(unit)")
+                      : String(localized: "Every time it falls past \(height) \(unit)")
     default:
         let name = alertEventName(trigger, imperial: imperial)
-        return "Every \(name.prefix(1).lowercased())\(name.dropFirst())"
+        return String(localized: "Every \(name.prefix(1).lowercased() + name.dropFirst())")
     }
 }
