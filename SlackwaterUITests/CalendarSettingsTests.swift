@@ -14,6 +14,12 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     private let tide = "noaa/9444900"
     private let current = "current:noaa/PUG1701"
 
+    /// The toggle reads on only once the station's calendar is written and verified, which
+    /// is a full reschedule. Seconds here; on a hosted runner the same thing has taken over
+    /// a minute, because every XCUITest step there waits out the app-idle timeout while a
+    /// download is in flight (#556). `scaled` caps this at the local value plus a minute.
+    private let settle: TimeInterval = 60
+
     func testTheCalendarSectionListsSavedStations() {
         let app = launch("-seedGate", "-seedFavorites", "\(tide),\(current)")
         openCalendarSettings(app)
@@ -36,7 +42,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         tideSwitch.tap()
         allowCalendarIfAsked(app)
 
-        XCTAssert(waitFor(tideSwitch, "value == '1'", timeout: 15), "turning tide on did not settle")
+        XCTAssert(waitFor(tideSwitch, "value == '1'", timeout: settle), "turning tide on did not settle")
         XCTAssertEqual(app.switches["calendar-station-\(current)"].value as? String, "0")
     }
 
@@ -60,7 +66,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         let toggle = app.switches["calendar-station-\(tide)"]
         toggle.tap()
         allowCalendarIfAsked(app)
-        XCTAssert(waitFor(toggle, "value == '1'", timeout: 15), "turning on did not settle")
+        XCTAssert(waitFor(toggle, "value == '1'", timeout: settle), "turning on did not settle")
 
         toggle.tap()
         XCTAssert(app.buttons["Turn Off"].appears(within: 15))
