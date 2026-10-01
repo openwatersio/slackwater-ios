@@ -22,13 +22,8 @@ struct AlertSheet: View {
                         ForEach(alertLeads, id: \.self) { Text(alertLeadLabel($0)).tag($0) }
                     }
                     Toggle("Daylight only", isOn: $rule.daylightOnly)
-                    // ponytail: tz: .current reads the device's zone, not the station's — a
-                    // Pacific rule read from an eastbound phone shows the wrong hour. The
-                    // station's zone is AlertPlace.tz, but today it only exists as a local
-                    // inside AlertScheduler.reschedule() (via resolveAlerts); AlertScheduler
-                    // publishes just `status`. Fix needs it to also publish the resolved
-                    // place table so a view can read a station's zone at all.
-                    if let when = alertRuleWhen(rule, tz: .current) {
+                    // In the station's zone, wherever the phone is reading it.
+                    if let when = alertRuleWhen(rule, tz: alertStationZone(rule.stationID)) {
                         LabeledContent("This one", value: when)
                             .monospacedDigit()
                     }

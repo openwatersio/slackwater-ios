@@ -40,7 +40,10 @@ struct CalendarStationsView: View {
                         .foregroundStyle(SN.foam.opacity(0.62))
                         .accessibilityIdentifier("calendar-empty")
                 }
-                ForEach(favorites.ids, id: \.self) { stationID in
+                // Saved stations, then any station still publishing after it was unsaved: a
+                // subscription outlives the favorite, and the toggle is the only way to end it.
+                ForEach(favorites.ids + calendars.subscriptions.map(\.stationID)
+                            .filter { !favorites.ids.contains($0) }, id: \.self) { stationID in
                     row(stationID)
                 }
                 if !premium.isPremium, !favorites.ids.isEmpty {

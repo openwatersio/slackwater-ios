@@ -27,6 +27,12 @@ func alertStationGroups(_ rules: [AlertRule], name: (String) -> String) -> [Aler
         .sorted { ($0.name, $0.stationID) < ($1.name, $1.stationID) }
 }
 
+/// A station's own zone for reading its moments, from the record the widgets also load. The
+/// device's zone when the station can't be loaded yet — a CHS station not fitted on this device.
+func alertStationZone(_ stationID: String) -> TimeZone {
+    WidgetStationLoader.loadRecord(id: stationID).map(WidgetStationLoader.station(from:))?.tz ?? .current
+}
+
 /// When a `once` rule fires, for the Alerts list and the rule sheet. Nil for a repeating rule:
 /// it has no one moment to name.
 func alertRuleWhen(_ rule: AlertRule, tz: TimeZone,
@@ -61,13 +67,7 @@ struct AlertsView: View {
                                                       imperial: units == "imperial"))
                                     .monospacedDigit()
                                     .foregroundStyle(.white)
-                                // ponytail: tz: .current reads the device's zone, not the station's — a
-                                // Pacific rule read from an eastbound phone shows the wrong hour. The
-                                // station's zone is AlertPlace.tz, but today it only exists as a local
-                                // inside AlertScheduler.reschedule() (via resolveAlerts); AlertScheduler
-                                // publishes just `status`. Fix needs it to also publish the resolved
-                                // place table so a view can read a station's zone at all.
-                                if let when = alertRuleWhen(rule, tz: .current) {
+                                if let when = alertRuleWhen(rule, tz: alertStationZone(rule.stationID)) {
                                     Text(when)
                                         .font(.caption.monospacedDigit())
                                         .foregroundStyle(SN.foam.opacity(0.62))
