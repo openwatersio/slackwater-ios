@@ -14,7 +14,7 @@ log="$scratch/calls"
 for tool in node open xcodegen xcodebuild; do
   cat > "$scratch/bin/$tool" <<'STUB'
 #!/bin/zsh
-print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-}" >> "$CALL_LOG"
+print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-} perf=${TEST_RUNNER_SLACKWATER_PERF_SCALE:-}" >> "$CALL_LOG"
 [[ ${0:t} == open && $* == '-a DeviceHub' && ${NO_DEVICE_HUB:-0} == 1 ]] && exit 1
 [[ ${0:t} == node && ${FAIL_PREPARE:-0} == 1 ]] && {
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
@@ -60,12 +60,12 @@ assert_count() { [[ $(grep -c -- "$1" "$log") == "$2" ]] || { print -u2 -- "wron
 
 run_mode
 assert_has "node scripts/iwls-fixtures.mjs prepare"
-assert_has "xcrun simctl create Slackwater iPhone 17 iPhone 17"
-assert_has "xcrun simctl erase SIM-Slackwater_iPhone_17"
-assert_has "id=SIM-Slackwater_iPhone_17"
+assert_has "xcrun simctl create Slackwater iPhone 17 · repo iPhone 17"
+assert_has "xcrun simctl erase SIM-Slackwater_iPhone_17_·_repo"
+assert_has "id=SIM-Slackwater_iPhone_17_·_repo"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
-assert_has "-collect-test-diagnostics on-failure"
+assert_has "-collect-test-diagnostics never"
 assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
@@ -75,24 +75,24 @@ assert_lacks "live=1"
 
 run_mode --full
 assert_count '^xcodebuild ' 2
-assert_has "xcrun simctl create Slackwater iPad Pro 11-inch (M5) iPad Pro 11-inch (M5)"
-assert_has "id=SIM-Slackwater_iPad_Pro_11-inch_(M5)"
+assert_has "xcrun simctl create Slackwater iPad Pro 11-inch (M5) · repo iPad Pro 11-inch (M5)"
+assert_has "id=SIM-Slackwater_iPad_Pro_11-inch_(M5)_·_repo"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
-assert_has "-collect-test-diagnostics on-failure"
+assert_has "-collect-test-diagnostics never"
 assert_lacks "NationalScaleTests"
 assert_lacks "live=1"
 
 run_mode --unit
 assert_count '^xcodebuild ' 1
 assert_has "-only-testing:SlackwaterTests"
-assert_has "-collect-test-diagnostics on-failure"
+assert_has "-collect-test-diagnostics never"
 assert_lacks "NationalScaleTests"
 
 run_mode --live
 assert_count '^xcodebuild ' 1
 assert_lacks "iwls-fixtures.mjs prepare"
 assert_has "-only-testing:SlackwaterUITests/LiveFetchTests"
-assert_has "-collect-test-diagnostics on-failure"
+assert_has "-collect-test-diagnostics never"
 assert_has "live=1 full="
 
 TEST_RUNNER_SLACKWATER_LIVE=1 TEST_RUNNER_SLACKWATER_FULL=1 run_mode
@@ -166,13 +166,20 @@ assert_has "-parallel-testing-worker-count 1 "
 run_mode --unit
 grep -Eq -- '-parallel-testing-worker-count [234] ' "$log" || { print -u2 -- "default workers outside 2–4"; cat "$log"; exit 1; }
 
-# Exercise the lock probes and the re-exec once, worktree lock outside the
-# machine lock; the table above bypasses them so each assertion can focus on a
-# single mode decision.
+# The wait scale defaults to 2 locally; CI's explicit value is taken as given.
+run_mode --unit
+assert_has "perf=2"
+TEST_RUNNER_SLACKWATER_PERF_SCALE=4 run_mode --unit
+assert_has "perf=4"
+
+# Exercise the worktree-lock probe and the re-exec once; the table above
+# bypasses them so each assertion can focus on a single mode decision. No
+# machine-wide lock: that is what it checks.
 : > "$log"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" zsh "$scratch/repo/scripts/test.sh" --live >/dev/null
-assert_count '^lockf ' 4
-assert_has "lockf $scratch/repo/scripts/../build/xcodebuild.lock lockf /tmp/slackwater-test.lock"
+assert_count '^lockf ' 2
+assert_has "lockf $scratch/repo/scripts/../build/xcodebuild.lock $scratch/repo/scripts/test.sh"
+assert_lacks "slackwater-test.lock"
 assert_has "xcodebuild test"
 
 : > "$log"

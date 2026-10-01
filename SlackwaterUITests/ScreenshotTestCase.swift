@@ -761,7 +761,9 @@ class ShotWalk: ScreenshotTestCase {
 /// (#331). Nothing was wrong with those four waits in particular — the whole
 /// suite sits at the edge, so tuning the ones that lost would only move the
 /// failure. CI passes TEST_RUNNER_SLACKWATER_PERF_SCALE (the same knob the
-/// unit-test wall-clock budgets read); local runs stay at 1×.
+/// unit-test wall-clock budgets read); `scripts/test.sh` defaults it to 2,
+/// because several worktrees' runs overlap on this Mac and the same tests
+/// measured ~2× slower under overlap. A bare `xcodebuild` runs at 1×.
 private let uiWaitScale = Double(ProcessInfo.processInfo.environment["SLACKWATER_PERF_SCALE"] ?? "1") ?? 1
 
 /// Widening is free where it matters: a wait that is met returns when it is
