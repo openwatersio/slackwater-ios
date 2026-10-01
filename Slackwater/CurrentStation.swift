@@ -382,6 +382,13 @@ enum StationSeries: String {
 /// about the same water.
 let nearbyStationRadiusKm = 20.0
 
+/// Annapolis, Chesapeake Bay — the last-resort ranking anchor, used only on a first run
+/// with no fix and nothing opened yet. Everywhere else the anchor follows the
+/// user: a real fix first, then the station they last opened (prototype
+/// NearMe.dc.html FALLBACK: denied/undetermined still gets a Near Me list).
+/// NOAA tides and currents here ship with the app and work on first launch.
+let firstRunFix = (lat: 38.9750, lon: -76.4550)
+
 enum StationItem: Identifiable, Hashable {
     // The two NOAA cases carry identity, not the record: the list, the search
     // and the map pins need nothing else, and decoding 9.1 MB of constituents

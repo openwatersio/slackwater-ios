@@ -7,6 +7,91 @@
     " %@" : {
       "shouldTranslate" : false
     },
+    "Add Place" : {
+      "comment" : "Watch list row that opens place search.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un lieu"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir un lugar"
+          }
+        }
+      }
+    },
+    "No places found" : {
+      "comment" : "Watch place search with no matches.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun lieu trouvé"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron lugares"
+          }
+        }
+      }
+    },
+    "Open" : {
+      "comment" : "Watch search result already a favorite: open it.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir"
+          }
+        }
+      }
+    },
+    "Place removed" : {
+      "comment" : "Watch favorite whose place has left the app.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu retiré"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugar retirado"
+          }
+        }
+      }
+    },
+    "Places" : {
+      "comment" : "Watch button back to the list of places.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieux"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugares"
+          }
+        }
+      }
+    },
     "— details —" : {
       "comment" : "Heading in a generated problem-report email.",
       "localizations" : {

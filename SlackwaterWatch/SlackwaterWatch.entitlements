@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The phone's store, named outright. The phone's own entitlement uses
+	     $(CFBundleIdentifier), which here would be the watch's bundle id: a
+	     separate store that never holds a favorite. -->
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)io.openwaters.slackwater</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.io.openwaters.slackwater</string>
+	</array>
+</dict>
+</plist>

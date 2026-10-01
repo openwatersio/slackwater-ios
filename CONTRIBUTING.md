@@ -29,6 +29,12 @@ An erased simulator is signed out of iCloud, so it starts with no favorites. Eac
 
 For quick iteration on the gate itself, the `Slackwater First Run` scheme relaunches into first-run state without erasing anything. It clears the gate, recents, favorites, and downloaded CHS models on every launch. Location is left real, so the permission prompt only appears on a simulator that has never answered it.
 
+## Running the watch app
+
+Run the `SlackwaterWatch` scheme on a watch simulator; the phone schemes cannot deploy to a watch. Its UI tests run the same way, `xcodebuild test -scheme SlackwaterWatch -destination 'platform=watchOS Simulator,name=<watch>'`, under the test lock described in CLAUDE.md. `-locDenied` skips the location prompt, as on the phone.
+
+Building the watch scheme in Xcode rewrites `Slackwater/Localizable.xcstrings` from the watch's strings alone. Shared strings lose the translator comments that only the phone's code supplies (for example "High" and "Downloading"), and the whole file reorders. Do not commit that diff: `git checkout Slackwater/Localizable.xcstrings`, then add any new watch string to the catalog by hand.
+
 ## Screenshotting a deep-linked screen
 
 `xcrun simctl openurl` with a `slackwater://` link (for example `slackwater://premium`, which opens the Widgets gallery) raises a system "Open in “Slackwater”?" prompt that nothing on the command line can accept. The prompt stays up and covers later screenshots.

@@ -254,6 +254,20 @@ targets:
       # The full catalog ships on the watch (#482). The index is the one file
       # the widget leaves out: the watch browses, so it builds `StationItem.all`.
       - path: Slackwater/Resources/station-index.json
+      # The list's stores and their iCloud sync. Not in PortableSources: the
+      # widget never reads favourites through them.
+      - Slackwater/StationLists.swift
+      - Slackwater/FavoritesCloud.swift
+      - Slackwater/UnitsCloud.swift
+      # The phone's timeline data and drawing, and the detail pieces over it.
+      # Not in PortableSources: they need Almanac, which the widget does not link.
+      - Slackwater/TimelineStrip.swift
+      - Slackwater/TimelineChunks.swift
+      - Slackwater/Eclipse.swift
+      - Slackwater/DetailPieces.swift
+      - Slackwater/MoonDetailSheet.swift
+      - Slackwater/MoonMarks.swift
+      - Slackwater/ScrubReading.swift
     dependencies:
       - package: Almanac
         product: Almanac
@@ -268,6 +282,9 @@ targets:
         # Standalone-capable: catalogs are bundled, favorites arrive over
         # iCloud KVS, and nothing needs the phone (#482).
         WKRunsIndependentlyOfCompanionApp: true
+        NSLocationWhenInUseUsageDescription: >-
+          Your location helps find nearby tide and current predictions.
+          It stays on this device.
     settings:
       base:
         # Permanent once registered (#207): the companion's id plus .watchkitapp.
@@ -275,6 +292,12 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
+        # Building the watch scheme alone in Xcode syncs Localizable.xcstrings
+        # from the watch's strings only, dropping the comments the phone's
+        # code supplies for shared keys. The phone and widget extract; the
+        # watch's own strings are added to the catalog by hand.
+        SWIFT_EMIT_LOC_STRINGS: NO
+        CODE_SIGN_ENTITLEMENTS: SlackwaterWatch/SlackwaterWatch.entitlements
       configs:
         # A Release archive still builds this target, because the app depends
         # on it, but does not embed it (the app's EXCLUDED_SOURCE_FILE_NAMES).
@@ -301,6 +324,17 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: Slackwater
+  # Drives the watch app on a watch simulator. Its own target: the phone's
+  # UI tests cannot host a watch app.
+  SlackwaterWatchUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources: [SlackwaterWatchUITests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: SlackwaterWatch
 schemes:
   Slackwater:
     build:
@@ -319,6 +353,17 @@ schemes:
       testPlans:
         - path: TestPlans/Slackwater.xctestplan
           defaultPlan: true
+  # The watch app's own run target; the app schemes can't deploy to a watch.
+  SlackwaterWatch:
+    build:
+      targets:
+        SlackwaterWatch: all
+        SlackwaterWatchUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [SlackwaterWatchUITests]
   # First-run state on every launch, for iterating on the gate. Location stays
   # real, so the permission prompt needs a device erased by scripts/first-run.sh.
   Slackwater First Run:

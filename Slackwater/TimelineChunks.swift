@@ -32,32 +32,34 @@ import UIKit
 /// bounded by what was downloaded, not by what can be computed.
 enum TimelineSource {
     case tide(TideStationRecord)
-    case current(CurrentStationRecord, threshold: Double)
+    /// `station`, when given, is the record's engine already resolved from
+    /// single records (the watch's widget loader); nil resolves it here.
+    case current(CurrentStationRecord, threshold: Double, station: (any CurrentPredicting)? = nil)
     case gate(DerivedGateRecord)
 
     var tz: TimeZone {
         switch self {
         case .tide(let r): r.tz
-        case .current(let r, _): r.tz
+        case .current(let r, _, _): r.tz
         case .gate(let r): r.gate.tz
         }
     }
     var latitude: Double {
         switch self {
         case .tide(let r): r.latitude
-        case .current(let r, _): r.latitude
+        case .current(let r, _, _): r.latitude
         case .gate(let r): r.gate.latitude
         }
     }
     var longitude: Double {
         switch self {
         case .tide(let r): r.longitude
-        case .current(let r, _): r.longitude
+        case .current(let r, _, _): r.longitude
         case .gate(let r): r.gate.longitude
         }
     }
     var threshold: Double {
-        if case .current(_, let t) = self { return t }
+        if case .current(_, let t, _) = self { return t }
         return defaultSlackThresholdKn
     }
     var isSchematic: Bool {
@@ -128,8 +130,8 @@ struct TimelineChunk {
             tideRates = s.rates(from: start, to: end, step: 600).filter { $0.time < end }
             tideExtremes = s.extremes(from: start.addingTimeInterval(-pad),
                                       to: end.addingTimeInterval(pad)).filter { inSpan($0.time) }
-        case .current(let record, let threshold):
-            let s = record.engineStation
+        case .current(let record, let threshold, let station):
+            let s = station ?? record.engineStation
             // Padded samples feed the slack-window measurement so a window
             // whose slack sits near the seam still sees its far shoulder;
             // only the in-span samples are drawn.
@@ -338,58 +340,6 @@ final class ScrollGate {
     var onQuiet: (() -> Void)?
 }
 
-// MARK: - The rescale glide
-
-/// Walks the drawn scale to the governor's target over a short beat — the
-/// same display-link pattern the opening slide uses, for the same reason:
-/// the strip's canvas is re-hosted on discrete values behind a
-/// UIViewRepresentable, where SwiftUI's own animation cannot reach.
-///
-/// Retargetable mid-flight: a governor that adopts again while the glide is
-/// running restarts it from wherever the scale currently is, so a fling that
-/// crosses two spring weeks bends rather than jumps. Self-terminating — the
-/// link invalidates itself on arrival, so an animator abandoned mid-glide
-/// (its page closed) lives at most one beat longer than its store.
-@MainActor final class ScaleAnimator: NSObject {
-    static let duration: TimeInterval = 0.3
-
-    private var link: CADisplayLink?
-    private var from: TimelineScale?
-    private var to: TimelineScale?
-    private var startedAt: CFTimeInterval?
-    /// Each frame's blended scale, ending exactly on the target.
-    var onFrame: (@MainActor (TimelineScale) -> Void)?
-
-    func glide(from current: TimelineScale, to target: TimelineScale) {
-        from = current
-        to = target
-        startedAt = nil
-        guard link == nil else { return }   // retarget: the running link continues
-        let l = CADisplayLink(target: self, selector: #selector(tick))
-        // The redraw this drives re-renders every mounted tile; 60 is smooth
-        // and half the cost of letting ProMotion run it at 120.
-        l.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
-        l.add(to: .main, forMode: .common)
-        link = l
-    }
-
-    @objc private func tick(_ link: CADisplayLink) {
-        guard let from, let to else { return cancel() }
-        if startedAt == nil { startedAt = link.timestamp }
-        let t = (link.timestamp - (startedAt ?? link.timestamp)) / Self.duration
-        onFrame?(TimelineScale.lerp(from, to, TimelineScale.eased(t)))
-        if t >= 1 { cancel() }
-    }
-
-    func cancel() {
-        link?.invalidate()
-        link = nil
-        from = nil
-        to = nil
-        startedAt = nil
-    }
-}
-
 // MARK: - The store
 
 /// One per detail view: owns the chunk cache, builds off-main around the
@@ -407,7 +357,9 @@ final class ScrollGate {
     private(set) var scale: TimelineScale?
     /// Where the glide is headed: the governor's last adopted fit.
     private var targetScale: TimelineScale?
+    #if os(iOS)
     private let animator = ScaleAnimator()
+    #endif
     let gate = ScrollGate()
 
     /// Chunk 0's local midnight — the first anchor. Never moves; chunk
@@ -459,7 +411,9 @@ final class ScrollGate {
                 }
             }
         }
+        #if os(iOS)
         animator.onFrame = { [weak self] in self?.scale = $0 }
+        #endif
     }
 
     /// First build, synchronous — the opening view needs its own chunks the
@@ -660,12 +614,16 @@ final class ScrollGate {
     /// Motion lands directly, like the opening slide and the Now jump.
     private func adopt(_ next: TimelineScale) {
         targetScale = next
-        guard let shown = scale, !UIAccessibility.isReduceMotionEnabled else {
-            animator.cancel()
-            scale = next
+        #if os(iOS)
+        if let shown = scale, !UIAccessibility.isReduceMotionEnabled {
+            animator.glide(from: shown, to: next)
             return
         }
-        animator.glide(from: shown, to: next)
+        animator.cancel()
+        #endif
+        // The watch has no display link to glide on; its rescale lands, as
+        // the phone's does under Reduce Motion.
+        scale = next
     }
 
     /// Contiguous sub-array with `keyPath` in [from, to], by binary search —
