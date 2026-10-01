@@ -1,6 +1,6 @@
-// Slackwater — GPL v3. A place on the watch: the reading card under the
-// phone's timeline, scrubbed with the Crown (#522). One screen: the Crown
-// only scrubs.
+// Slackwater — GPL v3. A place on the watch: a glass reading card over the
+// sky, above the phone's timeline, scrubbed with the Crown (#522, #563).
+// One screen: the Crown only scrubs.
 import SwiftUI
 
 extension TimelineSource {
@@ -49,10 +49,6 @@ struct PlaceDetail: View {
             }
         }
         .navigationBarBackButtonHidden(true)
-        // watchOS sets an inline title under the clock: the place, or the
-        // scrubbed time while away from now.
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .onAppear { RecentsStore.shared.record(item.id) }
         .task(id: item.id) { await load() }
@@ -95,13 +91,11 @@ struct PlaceDetail: View {
         let reading = ScrubReading.at(scrubTime, in: tl, imperial: imperial, speedUnit: speedUnit,
                                       floodDeg: flow?.flood, ebbDeg: flow?.ebb)
         return VStack(spacing: 6) {
+            card(reading)
+                .padding(.horizontal, 4)
             CrownScrubStrip(data: tl, scale: store?.scale, now: live, imperial: imperial,
                             speedUnit: speedUnit, floodDeg: flow?.flood, ebbDeg: flow?.ebb,
                             scrubTime: $scrubTime)
-                .background(alignment: .top) {
-                    SkyBackdrop(sky: sky, plotDepth: CrownScrubStrip.plotDepth)
-                        .frame(height: CrownScrubStrip.skyHeight)
-                }
                 .accessibilityElement()
                 .accessibilityLabel(Text(verbatim: item.name))
                 .accessibilityValue(Text(verbatim: [spokenWhen(scrubTime, source.tz), reading.title,
@@ -117,7 +111,16 @@ struct PlaceDetail: View {
                 .accessibilityAction(named: Text("Previous event", comment: "VoiceOver chart action.")) {
                     if let t = tl.snapTimes.last(where: { $0 < scrubTime.addingTimeInterval(-1) }) { scrubTime = t }
                 }
-            card(reading)
+        }
+        // Top-aligned, the card starts beside the clock; the hours row is
+        // the first thing a short screen loses.
+        .frame(maxHeight: .infinity, alignment: .top)
+        // The sky runs behind the card from the top of the screen and sets
+        // at the plot's floor, so the bodies rise and set behind the glass.
+        .background(alignment: .top) {
+            SkyBackdrop(sky: sky, plotDepth: CrownScrubStrip.plotDepth)
+                .padding(.bottom, CrownScrubStrip.belowHorizon)
+                .ignoresSafeArea(edges: .top)
         }
         .ignoresSafeArea(edges: .horizontal)
     }
@@ -125,34 +128,46 @@ struct PlaceDetail: View {
     private func card(_ r: ScrubReading) -> some View {
         Button { showSheet = true } label: {
             VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(verbatim: r.title).font(.headline)
-                    Spacer()
-                    Image(systemName: "info.circle").foregroundStyle(SN.steel)
-                }
-                if let value = r.value {
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                // The card's first row is the title, beside the clock: the
+                // place, or the scrubbed time while away from now.
+                // ponytail: the clock's width tuned on the 46mm simulator.
+                title.font(.headline).lineLimit(1)
+                    // The scrubbed time shrinks rather than lose its minutes.
+                    .minimumScaleFactor(0.7)
+                    .padding(.trailing, 48)
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    if let value = r.value {
                         Text(verbatim: value).font(.system(.title, design: .rounded).weight(.semibold).monospacedDigit())
-                        if let unit = r.unit { Text(verbatim: unit).font(.headline) }
-                        if let set = r.set { Text(verbatim: set).font(.headline).foregroundStyle(SN.foam.opacity(0.7)) }
-                        if let symbol = r.symbol { Image(systemName: symbol).font(.headline) }
+                    }
+                    if let unit = r.unit { Text(verbatim: unit).font(.headline) }
+                    if let set = r.set { Text(verbatim: set).font(.headline).foregroundStyle(SN.foam.opacity(0.7)) }
+                    // A tide's arrow says rising, falling, or the turn; a
+                    // current has no arrow, so its phase keeps the word.
+                    if let symbol = r.symbol {
+                        Image(systemName: symbol).font(.headline)
+                    } else {
+                        Text(verbatim: r.title).font(.headline)
                     }
                 }
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 if let next = r.next {
                     Text(verbatim: next).font(.footnote.monospacedDigit()).foregroundStyle(SN.foam.opacity(0.7)).lineLimit(1)
                 }
             }
             .foregroundStyle(SN.foam)
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("reading-card")
     }
 
+    /// In the bottom-left corner, under the card, so the card has the top.
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItemGroup(placement: .bottomBar) {
             if scrubbedAway {
                 Button { returnToNow() } label: { Image(systemName: "xmark") }
                     .accessibilityLabel(Text("Now", comment: "Slackwater interface text."))
@@ -162,6 +177,8 @@ struct PlaceDetail: View {
                     .accessibilityLabel(Text("Places", comment: "Watch button back to the list of places."))
                     .accessibilityIdentifier("back-to-list")
             }
+            // A lone bottom-bar item centres; the spacer keeps it in the corner.
+            Spacer()
         }
     }
 

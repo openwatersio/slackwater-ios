@@ -13,15 +13,17 @@ struct CrownScrubStrip: View {
     var ebbDeg: Double? = nil
     @Binding var scrubTime: Date
 
-    /// The watch's geometry: a short sky and plot, so the card fits below.
+    /// The watch's geometry: a short plot under the card. The sky shows
+    /// behind the card, so the strip keeps only room for a high's dot.
     /// ponytail: tuned on the 46mm simulator; retune on the wrist.
-    static let padTop: CGFloat = 26
+    static let padTop: CGFloat = 8
     static let plotDepth: CGFloat = 52
     /// The strip ends under its row of hours: the phone's day and sun rows
     /// below that have no room on a wrist, so they are clipped off.
     static func height(_ geo: TimelineGeo) -> CGFloat { geo.timeY + 10 }
-    /// Where the sky's horizon sits: the bottom of the plot.
-    static var skyHeight: CGFloat { padTop + 10 + plotDepth }
+    /// The row of hours under the plot's floor, which the sky stops above:
+    /// `timeY` is 18 below the floor, and the strip ends 10 below that.
+    static let belowHorizon: CGFloat = 28
     /// How far a turn of the Crown carries the strip: the feel knob.
     /// ponytail: one number; tune on a real Crown.
     static let crownSensitivity: DigitalCrownRotationalSensitivity = .medium
