@@ -17,10 +17,6 @@ version=${tag#nightly-}
 version=${version%-$build}
 commit=$(git rev-parse "$tag^{commit}")
 git merge-base --is-ancestor "$commit" origin/main || fail "$tag is not reachable from origin/main"
-beta="beta-$version-$build"
-if git rev-parse -q --verify "refs/tags/$beta" >/dev/null; then
-  [[ $(git rev-parse "$beta^{commit}") == $commit ]] || fail "$beta points to a different commit"
-fi
 node scripts/asc.mjs verify "$version" "$build" .github/testflight-beta-groups.txt
 
 notes=$TMP/notes.md
@@ -28,7 +24,10 @@ saved="docs/release-notes/$version-$build.md"
 if [[ -f $saved ]]; then
   cp "$saved" "$notes"
 else
-  previous=$(git describe --tags --abbrev=0 --match 'v*' --match 'beta-*' "$commit^")
+  previous_build=$(node scripts/asc.mjs previous-beta "$build")
+  previous=$(git tag --list "nightly-*-$previous_build")
+  [[ -n $previous ]] || previous=$(git describe --tags --abbrev=0 --match 'v*' "$commit^")
+  git merge-base --is-ancestor "$previous" "$commit" || fail "previous Beta is not an ancestor of $tag"
   printf '%s (%s)\n\n' "$version" "$build" > "$notes"
   for sha in "${(@f)$(git rev-list --reverse --first-parent "$previous..$commit")}"; do
     title=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" --jq '.[0].title // empty')
@@ -40,11 +39,3 @@ cat "$notes"
 [[ -z ${GITHUB_STEP_SUMMARY:-} ]] || cat "$notes" >> "$GITHUB_STEP_SUMMARY"
 node scripts/asc.mjs notes "$build" "$notes"
 node scripts/asc.mjs promote "$version" "$build" .github/testflight-beta-groups.txt
-
-# Each promoted build is the baseline for the next collection of notes.
-if gh release view "$beta" >/dev/null 2>&1; then
-  [[ $(git rev-parse "$beta^{commit}") == $commit ]] || fail "$beta points to a different commit"
-  gh release edit "$beta" --notes-file "$notes"
-else
-  gh release create "$beta" --title "$version ($build) Beta" --notes-file "$notes" --target "$commit"
-fi

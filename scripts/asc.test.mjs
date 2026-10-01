@@ -27,6 +27,10 @@ globalThis.fetch = async (url, options = {}) => {
       { id: 'nightly', attributes: { name: 'Nightly', isInternalGroup: true } },
       { id: 'beta', attributes: { name: externalName, isInternalGroup: false } },
     ] };
+  } else if (pathname === '/v1/betaGroups/beta/builds?limit=200') {
+    body = { data: [{ attributes: { version: '48' } }, { attributes: { version: '42' } }], links: { next: 'https://api.appstoreconnect.apple.com/v1/betaGroups/beta/builds?cursor=next' } };
+  } else if (pathname === '/v1/betaGroups/beta/builds?cursor=next') {
+    body = { data: [{ attributes: { version: '47' } }, { attributes: { version: '49' } }] };
   } else if (pathname.startsWith('/v1/builds?')) {
     body = {
       data: [{ id: 'build-48', attributes: { version: '48', processingState: 'VALID' }, relationships: {
@@ -54,6 +58,11 @@ globalThis.fetch = async (url, options = {}) => {
 const output = [];
 const originalLog = console.log;
 console.log = (...args) => output.push(args.join(' '));
+
+process.argv = ['node', 'asc.mjs', 'previous-beta', '48'];
+await import(`./asc.mjs?previous=${Date.now()}`);
+assert.equal(output.pop(), '47', 'baseline must exclude this build and newer builds, and follow pagination');
+assert.ok(!calls.some(([, pathname]) => pathname.includes('/betaGroups/nightly/builds')), 'baseline included the Nightly group');
 
 process.argv = ['node', 'asc.mjs', 'verify', '1.15.0', '48', groupsFile];
 await import(`./asc.mjs?verify=${Date.now()}`);

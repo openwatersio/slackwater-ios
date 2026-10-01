@@ -38,6 +38,7 @@ cat > "$FAKEBIN/node" <<'EOF'
 #!/bin/zsh
 set -euo pipefail
 if [[ "$1" == scripts/asc.mjs ]]; then
+  [[ $2 != previous-beta ]] || exit 0
   print "asc:${2}" >> "$PROMOTE_STATE/events"
   [[ $2 != notes ]] || cp "$4" "$PROMOTE_STATE/notes"
   [[ -f "$PROMOTE_STATE/asc-fail" ]] && { print -u2 'App Store Connect mismatch'; exit 1; }
@@ -136,14 +137,13 @@ grep -qx '· Fix favorite station ordering' "$STATE/notes"
 grep -qx '· Direct commit without a PR' "$STATE/notes"
 [[ $(events '^asc:notes$') == 1 ]]
 [[ $(events '^asc:promote$') == 1 ]]
-grep -q "^release:create:beta-1.15.0-48:$NIGHTLY_COMMIT$" "$STATE/events"
+[[ $(events '^release:') == 0 ]]
 [[ $(git -C "$REPO" rev-parse HEAD) == $NIGHTLY_COMMIT ]]
 [[ $(events '^pr:') == 0 ]]
 
-# Reusing a version/build repairs the existing Beta rather than opening a PR.
+# A rerun updates Apple without writing GitHub releases or branches.
 promote 48
-[[ $(events '^release:create:') == 1 ]]
-[[ $(events '^release:edit:beta-1.15.0-48$') == 1 ]]
+[[ $(events '^release:') == 0 ]]
 
 mkdir -p "$REPO/docs/release-notes"
 print 'Collected notes for build 48' > "$REPO/docs/release-notes/1.15.0-48.md"

@@ -116,6 +116,21 @@ if (cmd === 'create-cert') {
     const groups = (b.relationships?.betaGroups?.data ?? []).map((g) => inc(g.id)?.attributes?.name ?? g.id);
     console.log(`${v} (${b.attributes.version})  ${b.attributes.processingState}  ${b.attributes.uploadedDate}  [${groups.join(', ')}]`);
   }
+} else if (cmd === 'previous-beta') {
+  if (!/^\d+$/.test(args[0] ?? '')) throw new Error('previous-beta requires a build number');
+  let previous = 0;
+  for (const group of await externalGroups()) {
+    let next = `/v1/betaGroups/${group.id}/builds?limit=200`;
+    while (next) {
+      const response = await api('GET', next);
+      for (const build of response.data) {
+        const number = Number(build.attributes.version);
+        if (Number.isSafeInteger(number) && number < Number(args[0])) previous = Math.max(previous, number);
+      }
+      next = response.links?.next ? new URL(response.links.next).pathname + new URL(response.links.next).search : undefined;
+    }
+  }
+  if (previous) console.log(previous);
 } else if (cmd === 'verify') {
   const { build, groups } = await verifiedPromotion(args[0], args[1], args[2]);
   console.log(`${args[0]} (${args[1]}) ${build.id} [${groups.map((group) => group.attributes.name).join(', ')}]`);
@@ -218,5 +233,5 @@ if (cmd === 'create-cert') {
     console.log(`profile "${name}" -> ${uuid}`);
   }
 } else {
-  console.log('usage: asc.mjs builds | verify <version> <buildNumber> <groupFile> | promote <version> <buildNumber> <groupFile> | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName] | install-profiles <name>...');
+  console.log('usage: asc.mjs builds | previous-beta <buildNumber> | verify <version> <buildNumber> <groupFile> | promote <version> <buildNumber> <groupFile> | notes <buildNumber> <file> | create-cert <csr> <out.cer> | create-profile <bundleIdentifier> <certId> <out.mobileprovision> [profileName] | install-profiles <name>...');
 }

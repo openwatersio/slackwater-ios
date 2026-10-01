@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: testflight
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Require an owner
         env:
