@@ -1,7 +1,7 @@
 # Alerts
 
 *A calendar per station, subscribed in Settings, and notifications set by long-pressing the
-moment you care about on the strip. The calendar is free; anything that interrupts is Premium.
+moment you care about on the strip. Both are Premium: reading the app is free, being told is not.
 Source comments cite this document by section number.*
 
 ## 1. Goal
@@ -24,20 +24,20 @@ no account, no background execution.
 
 ## 2. The line
 
-**Reading is free. Being interrupted is Premium. One place is free; a cruising ground is Premium.**
+**Reading is free. Being told is Premium.**
 
-- **Free:** a calendar for one station, its events syncing to every device the user's calendar
-  account reaches.
+- **Free:** every prediction the app shows, as it always has been.
 - **Premium:** notifications, and a calendar for as many stations as the user wants — each its own
-  calendar, so they turn them on and off per trip in whatever calendar app they already use.
+  calendar syncing to every device the user's calendar account reaches, so they turn them on and
+  off per trip in whatever calendar app they already use.
 
 Nothing Slackwater writes to a calendar ever carries an alarm, for anyone. A station calendar is a
 reference layer holding around four events a day; alarms on all of them is the behaviour people
 uninstall over, and iOS Default Alert Times already lets anyone add their own per calendar.
 
 The long-press popup (§7.2) is widgets-premium §5 item 3 and the third and last upsell surface.
-Settings → Calendar upsells only at the point a second station is turned on, so a free user who
-wants one calendar never meets the tier sheet.
+Settings → Calendar upsells at the point a station is turned on; the list itself, and turning a
+station off, never meet the tier sheet.
 
 ## 3. Notification alerts
 
@@ -131,7 +131,7 @@ threshold changes every `.slackWindowOpens` occurrence (§6).
 
 | Mechanism | What feeds it | Horizon | Tier |
 |---|---|---|---|
-| EventKit, one calendar per station | station subscriptions | 90 days | one station free, more Premium |
+| EventKit, one calendar per station | station subscriptions | 90 days | Premium |
 | One-shot local notification | rules | 14 days, soonest 64 | Premium |
 | AlarmKit `Alarm.Schedule.fixed(fire)` | rules | plan 2 | Premium |
 | The alarm's Live Activity countdown | rules | plan 2 | Premium |
@@ -194,15 +194,13 @@ calendar's events from now forward, removes those the plan no longer contains, a
 missing ones, so an event already under way is left alone and two triggers that produce the same
 event produce one entry.
 
-**Turning it off** deletes that station's calendar, and with it the events. A free user turning on
-a second station is offered the swap. Both paths go through one confirmation naming the station and
-the number of events that will disappear; nothing synced vanishes off the user's Mac without them
-having read that sentence.
+**Turning it off** deletes that station's calendar, and with it the events, through one
+confirmation naming the station and the number of events that will disappear; nothing synced
+vanishes off the user's Mac without them having read that sentence.
 
-**A lapsed Premium keeps its calendars** — they stay subscribed and keep publishing — but free
-holds one, so with more than one on, turning another station on opens the tier sheet and changes
-nothing. The swap is offered at exactly one; otherwise dropping one of five and adding a sixth
-would hold five for free.
+**A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be
+turned off — but turning a station on opens the tier sheet and changes nothing. Without Premium
+the toggles read off and do the same.
 
 ### 5.2 Notifications
 
@@ -259,7 +257,7 @@ thread, plans, and hands the plan to thin writers.
 **Plan rules**
 
 - Calendar: every subscribed station's events still ahead and within 90 days, whatever the tier.
-  A free user's list is capped at one subscription when it is written, not when it is planned.
+  The tier gates turning a station on (§7.4), not what an existing subscription publishes.
 - Notifications, when Premium: rules with `fire` ahead and within 14 days, soonest 64.
 - Not Premium: no notifications, so the writer clears them. Rules and calendars stay; entitlement
   returning restores delivery on the next run.
@@ -345,8 +343,8 @@ toggle each — the same row idiom the Alerts and Offline downloads rows use. Th
 says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
 - Online gates are listed but unavailable, with the reason (§8).
-- A free user with one station on sees the others offer the swap (§5.1); the tier sheet is reachable
-  from that confirmation for anyone who would rather keep both.
+- Without Premium, turning a station on opens the tier sheet and nothing changes; turning one off
+  works at any tier (§5.1).
 - Denied calendar access leaves the toggles off and says so, with a link to Settings.
 
 ### 7.5 Alerts screen
@@ -409,7 +407,7 @@ No engine or Almanac version change.
 - The plan — lead applied; passed events and fires dropped; the 90-day, 14-day and 64 limits; a
   free plan keeps every subscribed calendar and no notifications.
 - Station calendars — the trigger list per station kind; a tide station's day holds its highs and
-  lows and nothing else; the free cap of one subscription; the swap's event count.
+  lows and nothing else; the tier gate on turning a station on; the turn-off's event count.
 - Copy — place-first notification titles against place-less calendar titles; bodies per trigger;
   lead only on notifications.
 - Calendar identity — an event a second out still matches; a retitled one does not; an event under
@@ -422,7 +420,8 @@ with the run's start time. An eclipse is searched from an absolute window rather
 grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
 **UI:** a long press on a tide strip and on a current strip opens the popup with the right header;
-a free user's Alert me opens the tier sheet; Settings → Calendar turns a station on.
+a free user's Alert me and calendar toggle each open the tier sheet; with Premium, Settings →
+Calendar turns a station on and asks before turning it off.
 
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the
 app killed; two stations' calendars land separately and open the app at the event; a comfort-speed
@@ -458,7 +457,7 @@ press and its popup, the Alerts screen, Settings → Calendar.
 ## 13. Launch blockers
 
 Inherited from widgets-premium §8: the seller entity and revenue split, and the Premium SKUs not
-yet on sale. The free single calendar depends on neither and can ship first.
+yet on sale. Every delivery in this document is Premium, so none of it ships before the SKUs do.
 
 ## 14. Out of scope
 

@@ -30,6 +30,12 @@ final class PremiumStore: ObservableObject {
 
     private init() {
         isPremium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
+        #if DEBUG
+        // UI-test hook, like TestSeeds' -seed* arguments: -seedPremium holds the tier on for
+        // the run. Without the early return, refreshEntitlement would set it back to what the
+        // simulator's empty StoreKit account owns.
+        if CommandLine.arguments.contains("-seedPremium") { isPremium = true; return }
+        #endif
         updatesTask = Task { [weak self] in
             for await _ in Transaction.updates { await self?.refreshEntitlement() }
         }

@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Settings → Calendar: subscribe a station, one at a time without Premium (docs/alerts.md §7.4).
+// Slackwater — GPL v3. Settings → Calendar: subscribe a station, with Premium (docs/alerts.md §7.4).
 import XCTest
 
 final class CalendarSettingsTests: ScreenshotTestCase {
@@ -35,15 +35,13 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["calendar-empty"].appears(within: 5))
     }
 
-    func testAFreeUserTurningOneOnLeavesTheOtherOff() {
+    func testAFreeUsersToggleOpensTheTierSheet() {
         let app = launch("-seedGate", "-resetCalendars", "-seedFavorites", "\(tide),\(current)")
         openCalendarSettings(app)
         let tideSwitch = app.switches["calendar-station-\(tide)"]
         tideSwitch.tap()
-        allowCalendarIfAsked(app)
 
-        XCTAssert(waitFor(tideSwitch, "value == '1'", timeout: settle), "turning tide on did not settle")
-        XCTAssertEqual(app.switches["calendar-station-\(current)"].value as? String, "0")
+        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
     }
 
     /// The calendar prompt is a system alert and only appears on the first run of a fresh sim.
@@ -57,11 +55,11 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     }
 
     /// Turning a station off is destructive — its calendar and events go too — so it reads
-    /// through the same confirmation the free tier's swap does (global constraint: nothing
-    /// synced vanishes without the user reading the cost first). Dismissing leaves the toggle
-    /// exactly where it was; confirming turns it off.
+    /// through a confirmation first (global constraint: nothing synced vanishes without the
+    /// user reading the cost first). Dismissing leaves the toggle exactly where it was;
+    /// confirming turns it off.
     func testTurningAStationOffAsksFirst() {
-        let app = launch("-seedGate", "-resetCalendars", "-seedFavorites", tide)
+        let app = launch("-seedGate", "-seedPremium", "-resetCalendars", "-seedFavorites", tide)
         openCalendarSettings(app)
         let toggle = app.switches["calendar-station-\(tide)"]
         toggle.tap()

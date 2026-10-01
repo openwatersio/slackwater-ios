@@ -1,4 +1,4 @@
-// Slackwater — GPL v3. Which stations publish a calendar: one for free, as many as you like with Premium (docs/alerts.md §7.4).
+// Slackwater — GPL v3. Which stations publish a calendar, a Premium feature (docs/alerts.md §7.4).
 import SwiftUI
 
 struct CalendarStationsView: View {
@@ -13,15 +13,12 @@ struct CalendarStationsView: View {
     @State private var revoked = false
     @State private var revokedName = ""
 
-    /// A calendar (and its events) about to go away before this toggle finishes — an outright
-    /// turn-off, or the free tier's swap. `on` is nil for a plain turn-off and set to the
-    /// station the swap is turning on next; one confirmation covers both (global constraint:
-    /// nothing synced vanishes without the user reading the cost first).
+    /// A calendar (and its events) about to go away when the user confirms the turn-off
+    /// (global constraint: nothing synced vanishes without the user reading the cost first).
     private struct PendingRemoval: Identifiable {
         let off: String
         let offName: String
         let events: Int
-        let on: String?
         var id: String { off }
     }
 
@@ -47,7 +44,7 @@ struct CalendarStationsView: View {
                     row(stationID)
                 }
                 if !premium.isPremium, !favorites.ids.isEmpty {
-                    Text("One station's calendar is free. Slackwater Premium publishes as many as you like, each its own calendar you can switch on and off.")
+                    Text("Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off.")
                         .font(.caption)
                         .foregroundStyle(SN.foam.opacity(0.62))
                 }
@@ -76,8 +73,7 @@ struct CalendarStationsView: View {
             Text("Slackwater will stop publishing to this calendar, but calendar access is off, so it can't remove the calendar itself. Delete it by hand in Calendar if you don't want it anymore.")
         }
         .confirmationDialog(pendingTitle, isPresented: pendingPrompt, presenting: pending) { removal in
-            Button(removal.on == nil ? "Turn Off" : "Replace", role: .destructive) { Task { await apply(removal) } }
-            if removal.on != nil { Button("Get Premium") { showPremium = true } }
+            Button("Turn Off", role: .destructive) { Task { await apply(removal) } }
             Button("Cancel", role: .cancel) {}
         } message: { removal in
             Text(removalMessage(removal))
@@ -86,14 +82,13 @@ struct CalendarStationsView: View {
 
     private var pendingTitle: String {
         guard let pending else { return "" }
-        return pending.on == nil ? "Turn off \(pending.offName)?" : "Replace \(pending.offName)?"
+        return "Turn off \(pending.offName)?"
     }
 
     private func removalMessage(_ removal: PendingRemoval) -> String {
         let events = removal.events == 0 ? "" :
             " and its \(removal.events) upcoming event\(removal.events == 1 ? "" : "s")"
         return "\(removal.offName)'s calendar\(events) will be removed."
-            + (removal.on == nil ? "" : " One station's calendar is free.")
     }
 
     private var pendingPrompt: Binding<Bool> {
@@ -145,20 +140,14 @@ struct CalendarStationsView: View {
                 return
             }
             pending = PendingRemoval(off: stationID, offName: name(stationID),
-                                     events: AlertCalendar.futureEventCount(for: stationID, now: appNow()),
-                                     on: nil)
+                                     events: AlertCalendar.futureEventCount(for: stationID, now: appNow()))
         case .add:
             guard await grantedAccess() else { return }
             await subscribeAndVerify(stationID)
         case .upsell:
-            // More calendars on than free grants — a lapsed Premium. What they have keeps
-            // publishing; adding to it is what Premium buys.
+            // Station calendars are Premium. A lapsed Premium's calendars keep publishing and
+            // can still be turned off; turning one on is what the tier buys.
             showPremium = true
-        case .replace(let off):
-            guard await grantedAccess() else { return }
-            pending = PendingRemoval(off: off, offName: name(off),
-                                     events: AlertCalendar.futureEventCount(for: off, now: appNow()),
-                                     on: stationID)
         }
     }
 
@@ -166,7 +155,6 @@ struct CalendarStationsView: View {
         AlertCalendar.removeCalendar(for: removal.off)
         calendars.unsubscribe(removal.off)
         pending = nil
-        if let on = removal.on { await subscribeAndVerify(on) }
     }
 
     /// Subscribes — without notifying (`notify: false`): this call drives its own reschedule and
@@ -189,7 +177,7 @@ struct CalendarStationsView: View {
         failed = true
     }
 
-    /// Checked before every add/replace — `AlertCalendar.calendarFor` itself has no permission
+    /// Checked before every add — `AlertCalendar.calendarFor` itself has no permission
     /// guard, so this is what tells "no calendar permission" apart from "every source refused
     /// a new calendar" (the `failed` alert above).
     private func grantedAccess() async -> Bool {

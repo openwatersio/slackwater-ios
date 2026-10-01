@@ -1,5 +1,5 @@
 // Slackwater — GPL v3. Station calendar subscriptions: what each kind publishes, what it's
-// called, and the free tier's one-at-a-time rule.
+// called, and which toggles the tier gates.
 import XCTest
 @testable import Slackwater
 
@@ -46,21 +46,15 @@ final class StationCalendarTests: XCTestCase {
         XCTAssertEqual(stationCalendarTitle(name: "Dodd Narrows", kind: .derived), "Dodd Narrows Currents")
     }
 
-    // MARK: the free tier's one calendar
+    // MARK: calendars are Premium
 
-    func testAFreeUsersFirstStationJustGoesOn() {
-        XCTAssertEqual(calendarSubscriptionChange([], stationID: "a", premium: false), .add)
+    func testAFreeUsersFirstStationOpensTheTierSheet() {
+        XCTAssertEqual(calendarSubscriptionChange([], stationID: "a", premium: false), .upsell)
     }
 
-    func testAFreeUsersSecondStationReplacesTheFirst() {
-        let on = [StationCalendar(stationID: "a", calendarID: "cal-a")]
-        XCTAssertEqual(calendarSubscriptionChange(on, stationID: "b", premium: false),
-                       .replace(stationID: "a"))
-    }
-
-    func testAFreeUserWhoKeptSeveralCalendarsCannotAddAnother() {
-        // A lapsed Premium keeps what it published (spec §5.1). Swapping one of them for a new
-        // station would make the free tier hold as many calendars as Premium ever did.
+    func testALapsedPremiumKeepsWhatItPublishedAndCannotAdd() {
+        // What a lapsed Premium published stays on and can still be taken down (spec §5.1);
+        // adding to it is what the tier buys.
         let on = (1...3).map { StationCalendar(stationID: "s\($0)", calendarID: "cal-\($0)") }
 
         XCTAssertEqual(calendarSubscriptionChange(on, stationID: "new", premium: false), .upsell)

@@ -8544,22 +8544,6 @@
         }
       }
     },
-    "Get Premium" : {
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obtener Premium"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Obtenir Premium"
-          }
-        }
-      }
-    },
     "No alerts yet. Press and hold any station's timeline to set one." : {
       "localizations" : {
         "es-ES" : {
@@ -8588,22 +8572,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activée"
-          }
-        }
-      }
-    },
-    "One station's calendar is free. Slackwater Premium publishes as many as you like, each its own calendar you can switch on and off." : {
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El calendario de una estación es gratis. Slackwater Premium publica tantos como quieras, cada uno en su propio calendario que puedes activar o desactivar."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le calendrier d’une station est gratuit. Slackwater Premium en publie autant que vous voulez, chacun dans son propre calendrier que vous pouvez activer ou désactiver."
           }
         }
       }
@@ -8652,22 +8620,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Me rappeler"
-          }
-        }
-      }
-    },
-    "Replace" : {
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reemplazar"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remplacer"
           }
         }
       }
@@ -8812,6 +8764,29 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quand"
+          }
+        }
+      }
+    },
+    "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off." : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los calendarios de estación forman parte de Slackwater Premium: cada estación tiene su propio calendario que puedes activar o desactivar."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les calendriers de station font partie de Slackwater Premium : chaque station a son propre calendrier que vous pouvez activer ou désactiver."
           }
         }
       }
