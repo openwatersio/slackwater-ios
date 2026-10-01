@@ -169,7 +169,7 @@ enum BackgroundDownloads {
                     task.updateTitle("Downloading tide stations",
                                      subtitle: service.queue.deferred() > 0
                                         ? "Waiting to retry…"
-                                        : "\(Int(done.rounded())) of \(Int(planned.rounded())) requests")
+                                        : "\(service.queue.ready) of \(service.queue.total) stations ready")
                     try? await Task.sleep(for: .seconds(2))
                 }
                 task.setTaskCompleted(success: !Task.isCancelled)

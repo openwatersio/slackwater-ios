@@ -172,7 +172,8 @@ struct ChsWaitingView: View {
                          action: status == .failed
                             ? String(localized: "Retry", comment: "Retry a failed station download.")
                             : String(localized: "See all downloads", comment: "Open the offline-download manager."),
-                         identifier: "chs-waiting-warning", status: status) {
+                         identifier: "chs-waiting-warning", status: status,
+                         downloadProgress: status == .downloading ? job?.downloadProgress ?? 0 : nil) {
                 if status == .failed { service.promote(jobID) }
                 else { showDownloads = true }
             }
@@ -232,8 +233,8 @@ struct ChsWaitingView: View {
         if status == .retrying {
             return String(localized: "Slackwater retries automatically when a connection is available.", comment: "Station download retry expectation.")
         }
-        if let job, job.status == .downloading, job.total > 0 {
-            return String(localized: "\(job.done) of \(job.total) requests downloaded. This station stays available offline when finished.", comment: "Station download progress. Values are completed and total request counts.")
+        if job?.status == .downloading {
+            return String(localized: "This station stays available offline when finished.", comment: "Station download expectation.")
         }
         let queued = service.queue.position(jobID).map { at -> String in
             at <= 1
@@ -282,6 +283,7 @@ struct ChsAmberCard: View {
     /// screen.
     var iconLabel = String(localized: "Warning", comment: "VoiceOver label for a warning icon.")
     var status: CardStatus? = nil
+    var downloadProgress: Double? = nil
     let onAction: () -> Void
 
     /// Tracks the icon's own `.title3` so the tile keeps containing the
@@ -311,9 +313,8 @@ struct ChsAmberCard: View {
                 }
             }
 
-            if status == .downloading {
-                ProgressView()
-                    .tint(status?.tint ?? SN.leaf)
+            if let downloadProgress {
+                StationDownloadProgress(value: downloadProgress)
             }
 
             if let expectation {

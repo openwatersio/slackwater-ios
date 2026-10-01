@@ -4,9 +4,7 @@ import SlackwaterKit
 func cardDownloadLabel(_ job: ChsJob, position: Int?, at now: Date = appNow()) -> String {
     switch job.status {
     case .downloading:
-        return job.total > 0
-            ? String(localized: "\(min(job.done, job.total)) of \(job.total) downloaded", comment: "Compact download progress. Values are completed and total requests.")
-            : String(localized: "Downloading", comment: "Compact download status.")
+        return String(localized: "Downloading", comment: "Compact download status.")
     case .pending:
         if let due = job.retryAfter {
             guard due > now else { return String(localized: "Retrying", comment: "Compact download status.") }
@@ -158,7 +156,8 @@ struct ChsCardView: View {
     private func pending() -> ChsPendingCard {
         let status = listCardStatus(id: info.id)
         return ChsPendingCard(name: info.name, region: info.region, id: info.id, km: km,
-                              status: status, detail: cardStatusDetail(id: info.id, status: status))
+                              status: status, detail: cardStatusDetail(id: info.id, status: status),
+                              progress: status == .downloading ? service.queue.job(info.id)?.downloadProgress ?? 0 : nil)
     }
 }
 
@@ -172,11 +171,13 @@ struct ChsPendingCard: View {
     var km: Double? = nil
     let status: CardStatus
     var detail: String? = nil
+    var progress: Double? = nil
 
     var body: some View {
         StationCard(name: name, region: region, km: km,
                     status: status,
                     statusDetail: detail,
+                    downloadProgress: progress,
                     opacity: 0.82,  // visibly quieter than a station with numbers
                     trailing: { EmptyView() })
             // Named per station. "Some card on screen says 'Canadian tidal
@@ -224,7 +225,8 @@ struct ChsGateCardView: View {
     private func pending() -> ChsPendingCard {
         let status = listCardStatus(id: gate.reference)
         return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                              status: status, detail: cardStatusDetail(id: gate.reference, status: status))
+                              status: status, detail: cardStatusDetail(id: gate.reference, status: status),
+                              progress: status == .downloading ? service.queue.job(gate.reference)?.downloadProgress ?? 0 : nil)
     }
 
     private func fittedCard(_ record: DerivedGateRecord) -> some View {
@@ -295,7 +297,8 @@ struct ChsCurrentGateCardView: View {
     private func pending() -> ChsPendingCard {
         let status = listCardStatus(id: gate.id)
         return ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
-                              status: status, detail: cardStatusDetail(id: gate.id, status: status))
+                              status: status, detail: cardStatusDetail(id: gate.id, status: status),
+                              progress: status == .downloading ? service.queue.job(gate.id)?.downloadProgress ?? 0 : nil)
     }
 
     /// The 7 online (fit-reject) gates: a covering fetched window
@@ -319,7 +322,8 @@ struct ChsCurrentGateCardView: View {
                 ? (previous == nil ? CardStatus.notDownloaded : .expired) : status
             ChsPendingCard(name: gate.name, region: gate.region, id: gate.id, km: km,
                            status: listStatus,
-                           detail: onlineCardDownloadLabel(state: fetchState, position: position))
+                           detail: onlineCardDownloadLabel(state: fetchState, position: position),
+                           progress: listStatus == .downloading ? service.onlineProgress[gate.id] ?? 0 : nil)
         }
     }
 }
@@ -418,7 +422,9 @@ struct CurrentCardView: View {
 
     var body: some View {
         StationCard(name: name, region: region, km: km,
-                    status: status, graph: graph) {
+                    status: status,
+                    downloadProgress: provisional.flatMap { ChsFitService.shared.queue.job($0.id)?.downloadProgress },
+                    graph: graph) {
             if let state, let record {
                 ConditionsItem(reading: .current(
                     signed: state.signed,

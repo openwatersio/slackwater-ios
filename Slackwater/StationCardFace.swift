@@ -31,6 +31,7 @@ struct StationCard<Trailing: View>: View {
     /// conflating them regresses both.
     var status: CardStatus? = nil
     var statusDetail: String? = nil
+    var downloadProgress: Double? = nil
     var opacity: Double = 1
     /// The context curve (`StationCardGraph.window` wide) behind the content.
     var graph: StationCardGraph? = nil
@@ -111,6 +112,10 @@ struct StationCard<Trailing: View>: View {
             // the card measures ~4.1:1, under AA for caption text where the
             // full-strength 4.71:1 clears it (docs/testflight.md).
             .opacity(opacity)
+            if let downloadProgress {
+                StationDownloadProgress(value: downloadProgress)
+                    .padding(.top, 10)
+            }
             // Offline and failure status sits OUTSIDE the ViewThatFits, and that
             // placement is load-bearing: `ViewThatFits` compares each
             // candidate's IDEAL width, and a `Text`'s ideal width is its
@@ -151,6 +156,18 @@ struct StationCard<Trailing: View>: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: chrome ? 24 : 0, style: .continuous))
         .shadow(color: chrome ? SN.shadow.opacity(0.24) : .clear, radius: chrome ? 12 : 0, y: chrome ? 10 : 0)
+    }
+}
+
+struct StationDownloadProgress: View {
+    let value: Double
+
+    var body: some View {
+        ProgressView(value: value, total: 10)
+            .progressViewStyle(.linear)
+            .tint(SN.leaf)
+            .accessibilityLabel(Text("Downloading"))
+            .accessibilityValue(Text(""))
     }
 }
 

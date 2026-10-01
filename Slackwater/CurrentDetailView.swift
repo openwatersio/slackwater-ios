@@ -106,7 +106,8 @@ struct CurrentDetailView: View {
                                     ChsAmberCard(title: String(localized: "Fast answer", comment: "Provisional current-model card title."), headline: gate.provisionalHeadline,
                                                  expectation: gate.provisionalExpectation(online: net.online),
                                                  action: String(localized: "See all downloads", comment: "Open the offline-download manager."),
-                                                 identifier: "chs-provisional-warning") { showDownloads = true }
+                                                 identifier: "chs-provisional-warning",
+                                                 downloadProgress: service.queue.job(gate.id)?.downloadProgress) { showDownloads = true }
                                         .padding(.bottom, 14)
                                 }
                             },
@@ -201,8 +202,8 @@ struct CurrentDetailView: View {
 
     private var footer: some View {
         DetailFooter(stationID: record.itemId, scrubTime: scrubTime, tz: tz) {
-            if let gate = provisionalGate {
-                Text("\(Int(ChsCurrentGateInfo.provisionalDays)) of \(Int(gate.fitDays)) days downloaded. The on-device fit is still refining. Flood sets \(Int(record.floodDirection.rounded()))°T.")
+            if provisionalGate != nil {
+                Text("The on-device fit is still refining. Flood sets \(Int(record.floodDirection.rounded()))°T.")
                     .font(.caption2).foregroundStyle(SN.amber.opacity(0.7))
                     .multilineTextAlignment(.center)
             } else if record.isChs {

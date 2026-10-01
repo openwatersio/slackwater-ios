@@ -835,48 +835,25 @@
         }
       }
     },
-    "%lld of %lld days downloaded. The on-device fit is still refining. Flood sets %lld°T." : {
-      "comment" : "Offline-download interface text. Placeholders are runtime values shown in context.",
+    "The on-device fit is still refining. Flood sets %lld°T." : {
+      "comment" : "Provisional current-model footer. The integer is the flood direction in degrees true.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld of %2$lld days downloaded. The on-device fit is still refining. Flood sets %3$lld°T."
+            "value" : "The on-device fit is still refining. Flood sets %lld°T."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld jours sur %2$lld téléchargés. L’ajustement sur cet appareil s’affine encore. Le flot porte au %3$lld°T."
+            "value" : "L’ajustement sur cet appareil s’affine encore. Le flot porte au %lld°T."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld de %2$lld días descargados. El ajuste en el dispositivo aún se está refinando. La corriente de flujo se establece a %3$lld°T."
-          }
-        }
-      }
-    },
-    "%lld of %lld downloaded" : {
-      "comment" : "Compact download progress. Values are completed and total requests.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld of %2$lld downloaded"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld sur %2$lld téléchargés"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld de %2$lld descargadas"
+            "value" : "El ajuste en el dispositivo aún se está refinando. La corriente de flujo se establece a %lld°T."
           }
         }
       }
@@ -927,25 +904,25 @@
         }
       }
     },
-    "%lld of %lld requests downloaded. This station stays available offline when finished." : {
-      "comment" : "Station download progress. Values are completed and total request counts.",
+    "This station stays available offline when finished." : {
+      "comment" : "Station download expectation.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld of %2$lld requests downloaded. This station stays available offline when finished."
+            "value" : "This station stays available offline when finished."
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld sur %2$lld demandes téléchargées. Cette station restera disponible hors ligne une fois terminée."
+            "value" : "Cette station restera disponible hors ligne une fois terminée."
           }
         },
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld de %2$lld solicitudes descargadas. Esta estación quedará disponible sin conexión al terminar."
+            "value" : "Esta estación quedará disponible sin conexión al terminar."
           }
         }
       }
@@ -2371,29 +2348,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Descargando — las predicciones canadienses se descargan una vez y después funcionan sin conexión."
-          }
-        }
-      }
-    },
-    "Downloading · %lld of %lld" : {
-      "comment" : "Download progress. Values are completed and total requests.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Downloading · %1$lld of %2$lld"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement — %1$lld sur %2$lld"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargando · %1$lld de %2$lld"
           }
         }
       }

@@ -48,9 +48,7 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
     case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
     case .failed: return String(localized: "Predictions unavailable", comment: "Prediction download status.")
     case .downloading:
-        return job.total > 0
-            ? String(localized: "Downloading · \(job.done) of \(job.total)", comment: "Download progress. Values are completed and total requests.")
-            : String(localized: "Downloading…", comment: "Download status.")
+        return String(localized: "Downloading…", comment: "Download status.")
     case .pending:
         guard online else { return String(localized: "Waiting for signal", comment: "Download status while offline.") }
         if let due = job.retryAfter, due > now {
@@ -655,7 +653,8 @@ struct OfflineManagerList: View {
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
                 if service.onlineState(gate.id) == .fetching {
-                    ProgressView().tint(SN.leaf)
+                    StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
+                        .frame(width: 100)
                 }
             }
         }
@@ -732,9 +731,15 @@ struct OfflineManagerList: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(statusText(job))
-                .font(.footnote)
-                .foregroundStyle(statusTint(job))
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(statusText(job))
+                    .font(.footnote)
+                    .foregroundStyle(statusTint(job))
+                if job.status == .downloading {
+                    StationDownloadProgress(value: job.downloadProgress)
+                        .frame(width: 100)
+                }
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

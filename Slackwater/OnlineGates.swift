@@ -96,10 +96,14 @@ extension ChsFitService {
         // set covering start…end (up to 7 days of slop at the grid boundary,
         // same tradeoff the fit path already makes).
         let plan = Self.chunkPlan(days: end.timeIntervalSince(start) / 86_400, end: end)
+        let total = plan.count * 2 + 1
+        await MainActor.run { shared.setOnlineProgress(gate.id, done: 1, total: total) }
         var speeds: [ChsSample] = [], dirs: [ChsSample] = []
-        for chunk in plan {
+        for (index, chunk) in plan.enumerated() {
             speeds += try await fetcher.series("wcsp1", stationID: station.id, chunk: chunk)
+            await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 2, total: total) }
             dirs += try await fetcher.series("wcdp1", stationID: station.id, chunk: chunk)
+            await MainActor.run { shared.setOnlineProgress(gate.id, done: index * 2 + 3, total: total) }
         }
         let projected = Self.project(speeds: speeds.sorted { $0.t < $1.t }, dirs: dirs, floodDirection: flood)
         // IWLS can 200 with an empty series (a quiet chunk boundary, no error

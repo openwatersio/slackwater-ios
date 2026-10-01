@@ -91,6 +91,7 @@ final class ChsFitService: ObservableObject {
     }
 
     @Published private(set) var onlineStates: [String: OnlineFetchState] = [:]
+    @Published private(set) var onlineProgress: [String: Double] = [:]
     private var onlineAttempts: [String: Int] = [:]
     private var onlineRetryTimers: [String: Task<Void, Never>] = [:]
     private var onlineDesired: [String: ChsCurrentGateInfo] = [:]
@@ -569,18 +570,25 @@ final class ChsFitService: ObservableObject {
 
     func beginOnlineFetch(_ gate: ChsCurrentGateInfo) {
         onlineDesired[gate.id] = gate
+        onlineProgress[gate.id] = 0
         onlineStates[gate.id] = .fetching
     }
 
     func finishOnlineFetch(_ id: String) {
+        onlineProgress[id] = 10
         onlineStates[id] = .idle
         onlineAttempts[id] = 0
+    }
+
+    func setOnlineProgress(_ id: String, done: Int, total: Int) {
+        onlineProgress[id] = total > 0 ? min(10, max(0, Double(done) / Double(total) * 10)) : 0
     }
 
 #if DEBUG
     func resetOnlineStateForTesting() {
         for timer in onlineRetryTimers.values { timer.cancel() }
         onlineStates = [:]
+        onlineProgress = [:]
         onlineAttempts = [:]
         onlineRetryTimers = [:]
         onlineDesired = [:]

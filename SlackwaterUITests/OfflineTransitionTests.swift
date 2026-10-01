@@ -17,6 +17,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-pending-chs-victoria"].firstMatch.exists)
         releaseFixture(token, "chs-victoria-first-chunk")
         XCTAssert(pending.disappears(within: 30), "fixture tide fit never landed")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
@@ -82,8 +83,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             format: "label CONTAINS 'Stay connected'"
         )).firstMatch.exists)
         XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS '60 of 210 days downloaded'"
+            format: "label CONTAINS 'The on-device fit is still refining'"
         )).firstMatch.exists)
+        XCTAssert(app.progressIndicators["chs-provisional-warning"].firstMatch.exists)
         releaseFixture(token, "after-provisional")
         XCTAssert(warning.disappears(within: 30))
         assertCurrentDetailRendered(app)
@@ -182,6 +184,10 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "halifax")
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
         XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-waiting-warning"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'requests downloaded'"
+        )).firstMatch.exists)
         releaseFixture(token, "chs-halifax-first-chunk")
         XCTAssert(app.staticTexts["Today"].appears(within: 30))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
