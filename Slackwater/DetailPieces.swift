@@ -852,6 +852,11 @@ struct Commentary: View {
 /// no number at all and passes nil, leaving the moon on its own.
 struct SummaryTiles: View {
     var primary: (label: String, value: String, caption: String)? = nil
+    /// The primary tile's sheet, where it has more to say than it can show —
+    /// and the SF Symbol that marks it. Built by the caller: this view knows
+    /// about moons, not about what makes one station's range worth explaining.
+    var primaryDetail: (() -> AnyView)? = nil
+    var primarySymbol: String? = nil
     /// The illumination the SKY already computed, rather than a second lookup
     /// per frame for the same instant (#299).
     let moon: MoonIllumination?
@@ -891,8 +896,10 @@ struct SummaryTiles: View {
         HStack(alignment: .top, spacing: 12) {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            accessibility: primary.label) {
-                    EmptyView()
+                            accessibility: primary.label, detail: primaryDetail) {
+                    if let primarySymbol {
+                        Image(systemName: primarySymbol).foregroundStyle(SN.foam.opacity(0.55))
+                    }
                 } value: {
                     Text(primary.value).font(ReadoutType.hero.monospacedDigit())
                 }
@@ -943,9 +950,10 @@ struct ReadoutTile<Glyph: View, Value: View>: View {
     /// Spoken for the eyebrow row, glyph included; the tile then reads as one
     /// element, this, the value and the caption in order.
     let accessibility: String
-    /// A tile with somewhere to go: a chevron, a tap, and a sheet. Only the
-    /// Moon tile has one so far — `Range` and `Next max` stay inert until they
-    /// have something to say that the tile itself doesn't already.
+    /// A tile with somewhere to go: a chevron, a tap, and a sheet. The Moon
+    /// always has one; `Range` has one only at a station whose water is
+    /// seasonal rather than tidal, where the small number needs explaining.
+    /// `Next max` stays inert — it has nothing to say that it doesn't show.
     var detail: (() -> AnyView)? = nil
     @ViewBuilder var glyph: () -> Glyph
     @ViewBuilder var value: () -> Value
