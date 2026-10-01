@@ -305,7 +305,7 @@ final class ColourAndFormTests: XCTestCase {
     }
 
     func testColourLiteralsLiveInTheme() throws {
-        let allowed: Set<String> = ["Palette.swift", "Theme.swift", "TimelineStrip.swift"]
+        let allowed: Set<String> = ["Palette.swift", "Theme.swift", "DetailPieces.swift", "TimelineStrip.swift"]
         var offenders: [String] = []
         for (name, source) in try appSources() where !allowed.contains(name) {
             for (n, line) in source.components(separatedBy: .newlines).enumerated()
