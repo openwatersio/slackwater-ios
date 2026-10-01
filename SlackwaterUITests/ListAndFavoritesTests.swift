@@ -167,7 +167,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Leave the simulator as found: swipe-unfavorite the row so later
         // tests that assume a clean favorites store aren't ambushed.
-        row.swipeLeft()
+        listContainer(app).cells.containing(.staticText, identifier: row.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
         _ = app.staticTexts["Favorites"].disappears(within: 10)
@@ -253,7 +253,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(row.exists, "the favorited online gate is missing from the Favorites group")
 
         // Leave the simulator as found.
-        row.swipeLeft()
+        listContainer(app).cells.containing(.staticText, identifier: row.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
         _ = app.staticTexts["Favorites"].disappears(within: 10)
@@ -300,7 +300,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         // on the FAB pinned over the bottom of the list (see `scrollTo`).
         let parkRow = app.staticTexts["Deception Pass State Park"].firstMatch
         scrollTo(parkRow, in: app)
-        parkRow.swipeLeft()
+        listContainer(app).cells.containing(.staticText, identifier: parkRow.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Remove"].appears(within: 5),
                   "trailing swipe did not reveal the Recents remove action")
         app.buttons["Remove"].firstMatch.tap()
@@ -315,7 +315,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         listContainer(app).swipeDown()
         let fridayRow = app.staticTexts["Friday Harbor"].firstMatch
         XCTAssert(fridayRow.appears(within: 5))
-        fridayRow.swipeLeft()
+        listContainer(app).cells.containing(.staticText, identifier: fridayRow.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5),
                   "trailing swipe did not reveal the favorites remove action")
         app.buttons["Unfavorite"].firstMatch.tap()
@@ -593,7 +593,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         let title = app.staticTexts["North Galiano"].firstMatch
         XCTAssert(title.appears(within: 10))
         scrollTo(title, in: app)
-        title.swipeLeft()
+        listContainer(app).cells.containing(.staticText, identifier: title.label).firstMatch.swipeLeft()
         let remove = app.buttons["Remove"].firstMatch
         XCTAssert(remove.appears(within: 5), "no swipe action on the removed-station row")
         // bounded retap (see pickSearchResult); once the tap lands the button is gone
