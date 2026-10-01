@@ -226,7 +226,7 @@ The full strip height is the direct-manipulation surface. There is no separate g
 
 The scrubber commonly sits inside a vertically scrolling page. Use native gesture arbitration or directional locking so a clearly vertical gesture scrolls the page and a clearly horizontal gesture scrubs time. Do not add a full-screen drag recognizer that steals vertical navigation or an edge-back gesture.
 
-There is no haptic tick for ordinary samples or magnetic targets in the reference behavior.
+There is no haptic tick for ordinary samples or magnetic targets in the reference behavior. The watch is the exception: the Digital Crown's own per-detent ticks are off, and one light haptic plays when a settle lands on a magnetic target, because a wrist has no finger on glass to feel the landing.
 
 ### 6.4 Rest and pill visibility
 
@@ -645,6 +645,10 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during every offset update. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the opening so the selected time and sky follow every frame.
 
+### watchOS
+
+The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
+
 ### Android
 
 A Compose implementation can use horizontal scroll state plus `Canvas`, or a custom scrollable modifier backed by native fling behavior. Derive selected time from the settled and in-flight offset; do not animate only the canvas transform while leaving semantic state behind. Use dp for logical geometry and px only at the drawing boundary.
@@ -755,7 +759,7 @@ Design history and completed implementation plans belong in Git history and pull
 
 ## 20. Maintaining this specification
 
-Any user-visible scrubber change should update this file in the same change as the reference implementation. At minimum, review all four consumers: tide, harmonic current, online current, and derived gate.
+Any user-visible scrubber change should update this file in the same change as the reference implementation. At minimum, review all five consumers: tide, harmonic current, online current, derived gate, and the watch place page.
 
 When an implementation differs intentionally:
 

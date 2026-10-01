@@ -53,6 +53,39 @@ final class WatchUITests: XCTestCase {
         waitForExpectations(timeout: 5)
     }
 
+    private func openFirstPlace() {
+        let row = app.buttons["place-row"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        tap(row, until: app.buttons["back-to-list"].firstMatch)
+    }
+
+    func testCrownScrubShowsTheX() {
+        openFirstPlace()
+        XCUIDevice.shared.rotateDigitalCrown(delta: 2.0)
+        XCTAssertTrue(app.buttons["return-to-now"].firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    func testXReturnsToNowAndThenTheList() {
+        openFirstPlace()
+        XCUIDevice.shared.rotateDigitalCrown(delta: 8.0)   // far enough to leave the loaded day
+        // The toolbar repeats an item's identifier on its nested elements.
+        let x = app.buttons["return-to-now"].firstMatch
+        XCTAssertTrue(x.waitForExistence(timeout: 5))
+        x.tap()
+        let list = app.buttons["back-to-list"].firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 5), app.debugDescription)
+        list.tap()
+        XCTAssertTrue(app.buttons["add-place-row"].exists || app.buttons["place-row"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    func testCardOpensTheSheet() {
+        openFirstPlace()
+        let card = app.buttons["reading-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        card.tap()
+        XCTAssertTrue(app.buttons["sheet-favorite"].waitForExistence(timeout: 5), app.debugDescription)
+    }
+
     private func search(_ query: String) {
         let field = app.textFields["place-search-field"]
         let addPlace = app.buttons["add-place-row"]

@@ -18,9 +18,9 @@ A stale `@slackwater/database` pin is a slug hazard. A bump can swap stations in
 
 `anchor` is the station-local midnight of the schedule week. `today` drives Today/Tomorrow labels; `now` drives the reference dot and return-to-now. Tide, harmonic-current, and derived-gate details use `TimelineWindowStore`'s seven-calendar-day chunks for continuous scrolling. Their loaded span is independent of the schedule anchor. The online-current detail remains bounded by `Timeline.window(anchor:)`: 228 elapsed hours with an unconditional 48-hour back-pad. That function also defines when the continuous details re-anchor their schedule after a settled scrub. Do not re-derive either window.
 
-## A scrubber change has four consumers
+## A scrubber change has five consumers
 
-Review every scrubber presentation change in `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView`, and `OnlineGateDetailView`. `ChsDetailView` is a routing wrapper, not a fifth presentation.
+Review every scrubber presentation change in `TideDetailView`, `CurrentDetailView`, `DerivedGateDetailView`, `OnlineGateDetailView`, and the watch's `PlaceDetail` (`SlackwaterWatch/`), which draws the same canvas under the Digital Crown. `ChsDetailView` is a routing wrapper, not a sixth presentation.
 
 ## Calendar days are not 86,400 seconds
 
