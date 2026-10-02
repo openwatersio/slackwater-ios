@@ -9,6 +9,8 @@ struct SlackwaterEntry: TimelineEntry {
     let card: WidgetCard?
     let premium: Bool
     let stationID: String?
+    /// The watch's inline, circular and corner families draw this (#524).
+    var complication: ComplicationReading? = nil
 }
 
 /// RFC 3986 "unreserved" only. `.urlPathAllowed` looked like the obvious

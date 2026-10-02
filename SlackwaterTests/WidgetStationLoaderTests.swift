@@ -481,4 +481,13 @@ final class WidgetStationLoaderTests: XCTestCase {
         d.set([removed, live], forKey: AppGroup.recentsKey)
         XCTAssertEqual(WidgetStationLoader.fallbackStationID(defaults: d), live)
     }
+
+    func testConfiguredNamesTheSentinelItFollows() {
+        XCTAssertEqual(WidgetStationLoader.configured(AppGroup.nearestTideStationID).prefix, "Nearest Tide")
+        XCTAssertEqual(WidgetStationLoader.configured(AppGroup.nearestCurrentStationID).prefix, "Nearest Current")
+        XCTAssertEqual(WidgetStationLoader.configured(nil).prefix, "Current Location")
+        let friday = TideStationRecord.fridayHarborID
+        XCTAssertEqual(WidgetStationLoader.configured(friday).id, friday)
+        XCTAssertNil(WidgetStationLoader.configured(friday).prefix)
+    }
 }
