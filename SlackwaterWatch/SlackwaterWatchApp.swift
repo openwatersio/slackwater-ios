@@ -7,6 +7,9 @@ struct SlackwaterWatchApp: App {
         // Reconcile with iCloud before the list's first frame, as the phone does.
         _ = UnitsCloud.shared
         _ = FavoritesStore.shared
+        // The complications read the entitlement from the App Group; this
+        // keeps it current, from StoreKit, which shares the phone's purchases.
+        _ = PremiumStore.shared
     }
 
     var body: some Scene {

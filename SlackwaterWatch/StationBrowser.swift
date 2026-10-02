@@ -2,6 +2,7 @@
 // wearer, favorites, places near, recents, then Add Place. The phone's
 // groups, with a card's corner mark where a wrist has no room for headings.
 import SwiftUI
+import WidgetKit
 
 enum BrowseRoute: Hashable {
     case station(StationItem, PlaceMark?)
@@ -45,6 +46,13 @@ struct StationBrowser: View {
                 }
             }
         }
+        // A complication's tap (#524): its place, on top of the list. A
+        // locked complication's link has no station and just opens the list.
+        .onOpenURL { url in
+            guard url.scheme == "slackwater", url.host() == "station",
+                  let item = StationItem.widgetItem(id: stationID(from: url)) else { return }
+            path = [.station(item, nil)]
+        }
         .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids)) {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
             // The phone's anchor without a fix: the last place opened, else its first-run default.
@@ -52,8 +60,13 @@ struct StationBrowser: View {
             let favoriteIds = favorites.ids, recentIds = recents.ids
             // Ranking the whole catalog is too slow for the watch's main thread.
             let next = await Task.detached(priority: .userInitiated) {
-                BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
-                             recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
+                // The watch's complications follow this fix (#524); the
+                // extension never asks for location itself (#566).
+                if let fix, cacheNearestWidgetStations(lat: fix.lat, lon: fix.lon) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+                return BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
+                                    recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
             }.value
             // A newer input's ranking may have landed first.
             guard !Task.isCancelled else { return }

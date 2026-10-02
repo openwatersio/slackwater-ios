@@ -20,14 +20,7 @@ struct StationProvider: AppIntentTimelineProvider {
                               for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
         let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
         let accessory = Self.accessoryFamilies.contains(family)
-        let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
-        let id = WidgetStationLoader.resolvedStationID(selectedID)
-        let prefix: String? = switch selectedID {
-        case AppGroup.currentLocationStationID: "Current Location"
-        case AppGroup.nearestTideStationID: "Nearest Tide"
-        case AppGroup.nearestCurrentStationID: "Nearest Current"
-        default: nil
-        }
+        let (id, prefix) = WidgetStationLoader.configured(intent.station?.id)
         let source: (Date) -> WidgetRecord? = accessory && !premium
             ? { _ in nil } : WidgetStationLoader.recordSource(id: id)
         return { date in

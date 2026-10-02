@@ -65,7 +65,7 @@ enum AppGroup {
     // The series-narrowed siblings of Current Location: synthetic picker
     // entries that follow the fix but resolve to the nearest station OF THAT
     // SERIES. Cached alongside the any-series id on every fix
-    // (LocationService.cacheNearestWidgetStation), resolved in
+    // (cacheNearestWidgetStations), resolved in
     // WidgetStationLoader.resolvedStationID.
     static let nearestTideStationKey = "slackwater.nearestTideStation"
     static let nearestTideStationID = "slackwater:nearest-tide"

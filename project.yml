@@ -95,6 +95,7 @@ targetTemplates:
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
+      - Slackwater/ComplicationReading.swift
       - Slackwater/DayCurveContentView.swift
       - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
@@ -273,6 +274,8 @@ targets:
       # The list's stores and their iCloud sync. Not in PortableSources: the
       # widget never reads favourites through them.
       - Slackwater/StationLists.swift
+      - Slackwater/NearestWidgetStation.swift
+      - Slackwater/PremiumStore.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.
@@ -290,6 +293,8 @@ targets:
     dependencies:
       - package: Almanac
         product: Almanac
+      - target: SlackwaterWatchWidgets
+        embed: true
     info:
       path: SlackwaterWatch/Info.plist
       properties:
@@ -301,6 +306,8 @@ targets:
         # Standalone-capable: catalogs are bundled, favorites arrive over
         # iCloud KVS, and nothing needs the phone (#482).
         WKRunsIndependentlyOfCompanionApp: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [slackwater]
         NSLocationWhenInUseUsageDescription: >-
           Your location helps find nearby tide and current predictions.
           It stays on this device.
@@ -323,6 +330,34 @@ targets:
         # There is no distribution profile to sign it with yet, so it builds
         # unsigned; XcodeGen's watchOS preset already sets SKIP_INSTALL, which
         # keeps it out of the archive's products.
+        Release:
+          CODE_SIGNING_ALLOWED: NO
+  # The watch's complications (#524): the phone's picker, loader and card,
+  # drawn for the watch's four accessory families.
+  SlackwaterWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    templates: [PortableSources]
+    sources: [SlackwaterWatchWidgets]
+    info:
+      path: SlackwaterWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Slackwater
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.watchkitapp.widgets
+        CODE_SIGN_ENTITLEMENTS: SlackwaterWatchWidgets/SlackwaterWatchWidgets.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Z59BQLF5VQ
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+      configs:
+        # Unsigned like the watch app until #525 registers its profile.
         Release:
           CODE_SIGNING_ALLOWED: NO
   SlackwaterTests:

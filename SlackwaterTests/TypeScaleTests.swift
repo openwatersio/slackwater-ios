@@ -168,6 +168,10 @@ extension TypeScaleTests {
             // The popup's repeating row: built here, rendered by AlertPopup's one Text, which
             // carries the mono trait (AlertPopup.swift).
             "AlertOffer.swift:alertEveryLabel",
+            // The watch complications' value and gauge ends: built here, drawn by
+            // ComplicationViews' Texts, which carry the mono trait (SlackwaterWatchWidgets/).
+            "ComplicationReading.swift:build",
+            "ComplicationReading.swift:currentGauge",
         ]
         // Numeric speech is not rendered as Text, so typography cannot apply.
         let knownNonVisual: Set<String> = [
