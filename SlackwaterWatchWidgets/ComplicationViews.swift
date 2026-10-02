@@ -25,6 +25,7 @@ struct InlineView: View {
             // One text run: an inline complication keeps only one image, and
             // an image inside the text survives where a second view would not.
             Text("\(Text(verbatim: "\(r.valueText) \(r.word) "))\(Image(systemName: r.symbol))")
+                .monospacedDigit()
         } else { Text("Open Slackwater", comment: "Watch complication with nothing to show.") }
     }
 }
@@ -113,9 +114,9 @@ struct CornerView: View {
                         } currentValueLabel: {
                             EmptyView()
                         } minimumValueLabel: {
-                            Text(verbatim: g.startText ?? "")
+                            Text(verbatim: g.startText ?? "").monospacedDigit()
                         } maximumValueLabel: {
-                            Text(verbatim: g.endText ?? "")
+                            Text(verbatim: g.endText ?? "").monospacedDigit()
                         }
                         .tint(Self.tint(g))
                     }
