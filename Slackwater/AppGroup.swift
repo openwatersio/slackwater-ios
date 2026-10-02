@@ -16,6 +16,12 @@ enum AppGroup {
     /// `SlackwaterApp.init()` runs `migrateIfNeeded` explicitly, first thing,
     /// before anything touches FavoritesStore/RecentsStore/ChsFitService.
     static let defaults: UserDefaults = {
+        validateEntitlement(
+            containerURL: FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id
+            ),
+            isTesting: NSClassFromString("XCTestCase") != nil
+        )
         guard let d = UserDefaults(suiteName: id) else {
             #if DEBUG
             assertionFailure("App Group suite unavailable — widget will not see shared state")
@@ -28,6 +34,21 @@ enum AppGroup {
         }
         return d
     }()
+
+    @discardableResult
+    static func validateEntitlement(containerURL: URL?, isTesting: Bool) -> Bool {
+        guard containerURL != nil else {
+            Logger(subsystem: "io.openwaters.slackwater", category: "AppGroup")
+                .fault("App Group entitlement unavailable — shared state will not reach extensions")
+            #if DEBUG
+            if !isTesting {
+                assertionFailure("App Group entitlement unavailable — shared state will not reach extensions")
+            }
+            #endif
+            return false
+        }
+        return true
+    }
 
     /// Shared container; falls back to App Support so unit tests (no
     /// provisioned group) still get a real directory.
