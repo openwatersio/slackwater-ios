@@ -17,6 +17,8 @@ struct ComplicationReading: Equatable {
     struct Gauge: Equatable {
         let fraction: Double
         let startText: String?
+        /// A tide's high. A current's window: when it closes while now is
+        /// inside it, otherwise when it opens.
         let endText: String?
         let windowStart: Double?
         let towardEnd: Bool
@@ -30,8 +32,9 @@ struct ComplicationReading: Equatable {
     let slackRuns: [ClosedRange<Double>]
     let gauge: Gauge?
 
-    /// The line's reach: the circular draws ±3 h of it.
-    static let span: ClosedRange<Double> = -3...10
+    /// The line's reach: the circular draws ±3 h of it, and nothing reads
+    /// further (the rectangular draws the card).
+    static let span: ClosedRange<Double> = -3...3
     private static let step: TimeInterval = 600
     /// How far ahead a current's next slack window is looked for. Past this
     /// the corner draws its speed alone.
@@ -71,25 +74,26 @@ struct ComplicationReading: Equatable {
                 samples: samples, slackRuns: [], gauge: gauge)
 
         case .current(let s, let tz, _):
-            let threshold = slackThresholdKn
-            let points = s.speeds(from: from, to: now.addingTimeInterval(windowSearch), step: step)
+            let end = now.addingTimeInterval(windowSearch)
+            let points = s.speeds(from: from, to: end, step: step)
             let samples = points.map { Sample(hours: hours($0.time), value: $0.speed) }
                 .filter { span.contains($0.hours) }
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
-            let runs = Self.runs(points, under: threshold, hours: hours)
+            // The card's windows, so the complication's slack is the app's slack.
+            let slacks = s.events(from: from, to: end).filter { $0.kind == .slack }.map(\.time)
+            let windows = cardWindows(points: points, slacks: slacks)
+                .map { hours($0.start)...hours($0.end) }
             let phase = currentPhase(signed: signed)
-            let symbol = switch phase {
-            case .flood: "arrow.up.right"
-            case .ebb: "arrow.down.right"
-            case .slack: "arrow.left.arrow.right"
-            }
+            let slack = windows.contains { $0.contains(0) } || phase == .slack
+            let symbol = slack ? "arrow.left.arrow.right"
+                : phase == .flood ? "arrow.up.right" : "arrow.down.right"
             return ComplicationReading(
                 kind: .current, valueText: formatSpeed(abs(signed), unit: speedUnit),
-                word: phase.word,
+                word: (slack ? CurrentPhase.slack : phase).word,
                 symbol: symbol,
                 samples: samples,
-                slackRuns: runs.filter { $0.overlaps(span) },
-                gauge: Self.currentGauge(runs, now: now, tz: tz))
+                slackRuns: windows.filter { $0.overlaps(span) },
+                gauge: Self.currentGauge(windows, now: now, tz: tz))
 
         case .derived:
             // Derived gates are Canadian; the watch shows them nothing until #523.
@@ -97,31 +101,18 @@ struct ComplicationReading: Equatable {
         }
     }
 
-    /// Stretches of `points` under `threshold`, in hours from now.
-    private static func runs(_ points: [CurrentPoint], under threshold: Double,
-                             hours: (Date) -> Double) -> [ClosedRange<Double>] {
-        var out: [ClosedRange<Double>] = []
-        var start: Double?
-        var last = 0.0
-        for p in points {
-            let h = hours(p.time)
-            if abs(p.speed) < threshold { if start == nil { start = h }; last = h }
-            else if let s = start { out.append(s...last); start = nil }
-        }
-        if let s = start { out.append(s...last) }
-        return out
-    }
-
     /// One swing of arc ending where the next slack window ends: now's dot
     /// approaches the window from the left, and sits inside it during slack.
-    private static func currentGauge(_ runs: [ClosedRange<Double>], now: Date, tz: TimeZone) -> Gauge? {
-        guard let window = runs.first(where: { $0.upperBound >= 0 }) else { return nil }
+    private static func currentGauge(_ windows: [ClosedRange<Double>], now: Date, tz: TimeZone) -> Gauge? {
+        guard let window = windows.first(where: { $0.upperBound >= 0 }) else { return nil }
         let swing = StationCardGraph.swing / 3600
         let span = max(swing, window.upperBound - window.lowerBound)
         let arcStart = window.upperBound - span
         return Gauge(fraction: min(1, max(0, (0 - arcStart) / span)),
                      startText: nil,
-                     endText: cardTime(now.addingTimeInterval(window.lowerBound * 3600), tz),
+                     // Inside the window the sailor needs how long is left.
+                     endText: cardTime(now.addingTimeInterval(
+                        (window.lowerBound <= 0 ? window.upperBound : window.lowerBound) * 3600), tz),
                      windowStart: max(0, (window.lowerBound - arcStart) / span),
                      towardEnd: true)
     }

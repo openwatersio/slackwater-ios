@@ -31,7 +31,7 @@ final class ComplicationReadingTests: XCTestCase {
         // within one step of the span's.
         let step = 1.0 / 6
         XCTAssert((-3 ... -3 + step).contains(try XCTUnwrap(r.samples.first).hours))
-        XCTAssert((10 - step ... 10).contains(try XCTUnwrap(r.samples.last).hours))
+        XCTAssert((3 - step ... 3).contains(try XCTUnwrap(r.samples.last).hours))
         for (a, b) in zip(r.samples, r.samples.dropFirst()) {
             XCTAssertEqual(b.hours - a.hours, step, accuracy: 1e-6)
         }
@@ -59,22 +59,52 @@ final class ComplicationReadingTests: XCTestCase {
         }
     }
 
-    func testCurrentSlackRunsCoverEverySampleUnderTheThreshold() throws {
+    /// The card's windows for `current` around `at`, over the reading's
+    /// range (-3 h to +26 h), built straight from the station.
+    private func cardRuns(at t: Date) throws -> [WindowRun] {
+        guard case .current(let s, _, _) = current else { throw XCTSkip("fixture is not a current") }
+        let from = t.addingTimeInterval(-3 * 3600), to = t.addingTimeInterval(26 * 3600)
+        return cardWindows(points: s.speeds(from: from, to: to, step: 600),
+                           slacks: s.events(from: from, to: to).filter { $0.kind == .slack }.map(\.time))
+    }
+
+    func testCurrentSlackRunsAreTheCardWindows() throws {
         let r = try XCTUnwrap(ComplicationReading.build(current, now: now))
         XCTAssertEqual(r.kind, .current)
-        for s in r.samples where abs(s.value) < slackThresholdKn {
-            XCTAssert(r.slackRuns.contains { $0.contains(s.hours) }, "sample at \(s.hours) h")
-        }
+        let hours = { (t: Date) in t.timeIntervalSince(self.now) / 3600 }
+        let expected = try cardRuns(at: now).map { hours($0.start)...hours($0.end) }
+            .filter { $0.overlaps(ComplicationReading.span) }
+        XCTAssertFalse(expected.isEmpty, "the fixture has a window within ±3 h")
+        XCTAssertEqual(r.slackRuns, expected)
     }
 
     func testInsideAWindowTheDotSitsInTheWindow() throws {
-        // Walk forward until the current is under the slack threshold.
-        guard case .current(let s, _, _) = current else { return XCTFail() }
-        let slackAt = try XCTUnwrap(s.speeds(from: now, to: now.addingTimeInterval(86_400), step: 300)
-            .first { abs($0.speed) < slackThresholdKn * 0.5 }?.time)
-        let g = try XCTUnwrap(ComplicationReading.build(current, now: slackAt)?.gauge)
+        guard case .current(_, let tz, _) = current else { return XCTFail() }
+        let ahead = try XCTUnwrap(try cardRuns(at: now).first { $0.start > now })
+        let t = ahead.start.addingTimeInterval(ahead.end.timeIntervalSince(ahead.start) / 2)
+        let r = try XCTUnwrap(ComplicationReading.build(current, now: t))
+        let g = try XCTUnwrap(r.gauge)
         XCTAssertGreaterThanOrEqual(g.fraction, try XCTUnwrap(g.windowStart))
         XCTAssertLessThanOrEqual(g.fraction, 1)
+        XCTAssertEqual(r.word, CurrentPhase.slack.word)
+        // The label is when the window closes, never a time already past.
+        let window = try XCTUnwrap(try cardRuns(at: t).first { $0.contains(t) })
+        XCTAssertGreaterThan(window.end, t)
+        XCTAssertEqual(g.endText, cardTime(window.end, tz))
+    }
+
+    func testWordIsSlackInsideAWindowAboveTheFixedThreshold() throws {
+        // A moment the card calls slack (inside its window) whose speed is
+        // still above the phase word's fixed 0.15 kn.
+        guard case .current(let s, _, _) = current else { return XCTFail() }
+        let runs = try cardRuns(at: now)
+        let p = try XCTUnwrap(s.speeds(from: now, to: now.addingTimeInterval(48 * 3600), step: 600).first { p in
+            (slackKn..<slackThresholdKn).contains(abs(p.speed)) && runs.contains { $0.contains(p.time) }
+        })
+        XCTAssertNotEqual(currentPhase(signed: p.speed), .slack)
+        let r = try XCTUnwrap(ComplicationReading.build(current, now: p.time))
+        XCTAssertEqual(r.word, CurrentPhase.slack.word)
+        XCTAssertEqual(r.symbol, "arrow.left.arrow.right")
     }
 
     func testCurrentGaugeEndsAtTheWindow() throws {
