@@ -31,6 +31,7 @@ struct SlackwaterApp: App {
         DispatchQueue.main.async { ChartPackManager.shared.start(styleURL: BASEMAP_STYLE_URL) }
         #if DEBUG
         applySeedHooksIfRequested()
+        if uiTestQuiet { UIView.setAnimationsEnabled(false) }
         #endif
         // Must come after the seed hooks above: `-resetTour`/`-seedTour`
         // write `seenTourKey`, and `arm()` reads it.
