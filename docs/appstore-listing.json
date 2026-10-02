@@ -60,11 +60,11 @@
     "supportsAudioDescriptions": false,
     "supportsCaptions": false,
     "supportsDarkInterface": true,
-    "supportsDifferentiateWithoutColorAlone": false,
+    "supportsDifferentiateWithoutColorAlone": true,
     "supportsLargerText": false,
-    "supportsReducedMotion": false,
+    "supportsReducedMotion": true,
     "supportsSufficientContrast": false,
-    "supportsVoiceControl": false,
-    "supportsVoiceover": false
+    "supportsVoiceControl": true,
+    "supportsVoiceover": true
   }
 }

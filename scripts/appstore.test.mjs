@@ -120,3 +120,26 @@ test('chunks slice the file exactly as the upload operations ask', () => {
   assert.equal(parts[1].url, 'https://a/2');
   assert.throws(() => chunks(bytes, [{ method: 'PUT', url: 'x', offset: 0, length: 6 }]), /cover 6 of 10 bytes/);
 });
+
+test('the accessibility flags claim exactly the labels the metadata doc answers yes', () => {
+  const keys = {
+    'Dark Interface': ['supportsDarkInterface'],
+    'Captions, Audio Descriptions': ['supportsCaptions', 'supportsAudioDescriptions'],
+    'Larger Text': ['supportsLargerText'],
+    VoiceOver: ['supportsVoiceover'],
+    'Reduced Motion': ['supportsReducedMotion'],
+    'Sufficient Contrast': ['supportsSufficientContrast'],
+    'Differentiate Without Color': ['supportsDifferentiateWithoutColorAlone'],
+    'Voice Control': ['supportsVoiceControl'],
+  };
+  const doc = fs.readFileSync(new URL('../docs/appstore-metadata.md', import.meta.url), 'utf8');
+  const rows = doc.split('## Accessibility Nutrition Labels')[1].split('\n## ')[0].split('\n')
+    .map((line) => line.split('|').map((cell) => cell.trim()))
+    .filter((cells) => keys[cells[1]]);
+  assert.deepEqual(rows.map((cells) => cells[1]).sort(), Object.keys(keys).sort(), 'every label has a row');
+  const { accessibility } = loadListing();
+  for (const [, label, answer] of rows) {
+    for (const key of keys[label]) assert.equal(accessibility[key], answer === 'Yes', `${label}: the table says ${answer}`);
+  }
+  assert.deepEqual(Object.keys(accessibility).sort(), Object.values(keys).flat().sort());
+});
