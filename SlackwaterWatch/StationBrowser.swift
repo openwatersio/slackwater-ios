@@ -46,7 +46,14 @@ struct StationBrowser: View {
                 }
             }
         }
-        .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids)) {
+        // A complication's tap (#524): its place, on top of the list. A
+        // locked complication's link has no station and just opens the list.
+        .onOpenURL { url in
+            guard url.scheme == "slackwater", url.host() == "station",
+                  let item = StationItem.widgetItem(id: stationID(from: url)) else { return }
+            path = [.station(item, nil)]
+        }
+        .task(id: Inputs(fix: location.fix,favorites: favorites.ids, recents: recents.ids)) {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
             // The phone's anchor without a fix: the last place opened, else its first-run default.
             let fallback = recents.lastOpened.map { (lat: $0.latitude, lon: $0.longitude) } ?? firstRunFix

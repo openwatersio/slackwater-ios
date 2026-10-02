@@ -306,6 +306,8 @@ targets:
         # Standalone-capable: catalogs are bundled, favorites arrive over
         # iCloud KVS, and nothing needs the phone (#482).
         WKRunsIndependentlyOfCompanionApp: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [slackwater]
         NSLocationWhenInUseUsageDescription: >-
           Your location helps find nearby tide and current predictions.
           It stays on this device.
