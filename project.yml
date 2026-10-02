@@ -274,6 +274,7 @@ targets:
       # widget never reads favourites through them.
       - Slackwater/StationLists.swift
       - Slackwater/NearestWidgetStation.swift
+      - Slackwater/PremiumStore.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.
