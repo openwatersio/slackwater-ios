@@ -123,6 +123,8 @@ final class FavoritesStore: ObservableObject {
         // unconfigured widget shows, so its timeline must not wait for the
         // next half-hourly tick (H1).
         WidgetCenter.shared.reloadAllTimelines()
+        // The watch face lists each favourite as a complication preset.
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
     /// True removal, for a station that has left the bundle (issue #91).
@@ -133,6 +135,7 @@ final class FavoritesStore: ObservableObject {
         ids.removeAll { $0 == id }
         unstar(id)
         persist()
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
     /// Swap a removed station for the replacement the user picked, in place —
@@ -191,6 +194,7 @@ final class FavoritesStore: ObservableObject {
         ids = next
         persist()
         WidgetCenter.shared.reloadAllTimelines()
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 }
 
