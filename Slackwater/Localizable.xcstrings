@@ -1784,6 +1784,23 @@
         }
       }
     },
+    "Between low and high, or on the way to slack." : {
+      "comment" : "Watch complication description.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre basse et haute, ou en route vers l’étale."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre bajamar y pleamar, o camino de la estoa."
+          }
+        }
+      }
+    },
     "Between us and the sun, so its lit side faces away." : {
       "comment" : "Plain-language explanation of a new moon.",
       "localizations" : {
@@ -7242,6 +7259,23 @@
         }
       }
     },
+    "The line around now, with the water's height or speed." : {
+      "comment" : "Watch complication description.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La courbe autour de maintenant, avec la hauteur ou la vitesse de l’eau."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La curva en torno a ahora, con la altura o la velocidad del agua."
+          }
+        }
+      }
+    },
     "The map works offline here: the world, the water around you, and your saved stations." : {
       "comment" : "Offline-map availability summary.",
       "localizations" : {
@@ -7381,6 +7415,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La próxima ventana de estoa en %1$@ va de %2$@ a %3$@ y comienza %4$@."
+          }
+        }
+      }
+    },
+    "The place's curve, its turns and their times." : {
+      "comment" : "Watch complication description.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La courbe du lieu, ses renversements et leurs heures."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La curva del lugar, sus cambios y sus horas."
+          }
+        }
+      }
+    },
+    "The water now and which way it's going." : {
+      "comment" : "Watch complication description.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’eau maintenant, et dans quel sens elle va."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El agua ahora, y hacia dónde va."
           }
         }
       }
@@ -7693,6 +7761,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Estación de mareas"
+          }
+        }
+      }
+    },
+    "Tide or Current" : {
+      "comment" : "Watch complication name.",
+      "localizations" : {
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marée ou courant"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marea o corriente"
           }
         }
       }
