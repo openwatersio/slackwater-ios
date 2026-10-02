@@ -32,11 +32,13 @@ settings:
     SWIFT_VERSION: "5.0"
     SWIFT_EMIT_LOC_STRINGS: YES
   configs:
-    # Premium (the lock-screen widgets, its sheet, and slackwater://premium) is
-    # Debug-only until it ships (#463). Add PREMIUM_ENABLED to Release to ship
-    # it. DEBUG is restated because this key replaces XcodeGen's preset.
+    # Premium (the lock-screen widgets, its sheet, and slackwater://premium)
+    # ships in both configurations (#155); removing PREMIUM_ENABLED hides it.
+    # DEBUG is restated because this key replaces XcodeGen's preset.
     Debug:
       SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG PREMIUM_ENABLED"
+    Release:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "PREMIUM_ENABLED"
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
