@@ -1,6 +1,7 @@
 // Slackwater — GPL v3. The watch's complication timeline (#524). Entries are
 // precomputed every 15 minutes for 12 hours: predictions are deterministic,
 // and the dot moves visibly between them.
+import SwiftUI
 import WidgetKit
 
 struct ComplicationProvider: AppIntentTimelineProvider {
@@ -27,9 +28,15 @@ struct ComplicationProvider: AppIntentTimelineProvider {
         }
     }
 
-    // Empty, so the face editor offers the intent's own station picker
-    // instead of a fixed list of presets.
-    func recommendations() -> [AppIntentRecommendation<StationConfigIntent>] { [] }
+    /// The watch has no editor for the intent, so the face's gallery lists
+    /// exactly these: the nearest-station choices, then each favourite.
+    func recommendations() -> [AppIntentRecommendation<StationConfigIntent>] {
+        StationQuery().sectionedChoices(includeRecents: false).flatMap(\.items).map { choice in
+            let intent = StationConfigIntent()
+            intent.station = choice
+            return AppIntentRecommendation(intent: intent, description: Text(verbatim: choice.name))
+        }
+    }
     func placeholder(in context: Context) -> SlackwaterEntry {
         entryBuilder(StationConfigIntent(), for: context.family)(.now)
     }

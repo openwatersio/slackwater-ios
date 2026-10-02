@@ -50,8 +50,9 @@ struct StationQuery: EntityQuery {
     /// The picker's grouping, as plain data the tests can read: the
     /// location-following entries, then Favorites, then Recents — a starred
     /// station stays under Favorites, never repeated under Recents. Empty
-    /// sections don't render.
-    func sectionedChoices() -> [(title: String, items: [StationChoice])] {
+    /// sections don't render. The watch's complication presets leave Recents
+    /// out.
+    func sectionedChoices(includeRecents: Bool = true) -> [(title: String, items: [StationChoice])] {
         var seen = Set<String>()
         func resolve(_ key: String) -> [StationChoice] {
             (defaults.stringArray(forKey: key) ?? []).compactMap { id in
@@ -62,7 +63,8 @@ struct StationQuery: EntityQuery {
         }
         return [(title: String(localized: "Nearest Station", comment: "Widget station-picker section."), items: sentinels),
                 (title: String(localized: "Favorites", comment: "Widget station-picker section."), items: resolve(AppGroup.favoritesKey)),
-                (title: String(localized: "Recents", comment: "Widget station-picker section."), items: resolve(AppGroup.recentsKey))]
+                (title: String(localized: "Recents", comment: "Widget station-picker section."),
+                 items: includeRecents ? resolve(AppGroup.recentsKey) : [])]
             .filter { !$0.items.isEmpty }
     }
     func entities(for identifiers: [String]) async throws -> [StationChoice] {
