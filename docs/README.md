@@ -18,6 +18,7 @@ Documentation here describes the current product, maintained operating procedure
 | Document | Purpose |
 |---|---|
 | [TestFlight](testflight.md) | Release setup and signing |
+| [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
