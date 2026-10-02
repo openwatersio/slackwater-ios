@@ -297,9 +297,12 @@ class ScreenshotTestCase: XCTestCase {
     func scrubStrip(_ app: XCUIApplication) {
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "timeline strip missing")
+        // A scrub starts moving promptly so the alert long-press recognizer cannot claim it.
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo:
-                strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+            .press(forDuration: 0.05, thenDragTo:
+                strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
+                withVelocity: .default, thenHoldForDuration: 0)
+        XCTAssertFalse(app.buttons["alert-popup-close"].exists, "scrubbing opened the alert popover")
     }
 
     /// Tap the Now pill and confirm the strip came home: the pill leaves once
