@@ -20,8 +20,9 @@ struct LockedComplication: View {
 struct InlineView: View {
     let entry: SlackwaterEntry
     var body: some View {
-        if !entry.premium { Text("Premium", comment: "Locked watch complication.") }
-        else if let r = entry.complication {
+        if !entry.premium {
+            Text("\(Image(systemName: "water.waves")) \(Text("Premium", comment: "Locked watch complication."))")
+        } else if let r = entry.complication {
             // One text run: an inline complication keeps only one image, and
             // an image inside the text survives where a second view would not.
             Text("\(Text(verbatim: "\(r.valueText) \(r.word) "))\(Image(systemName: r.symbol))")
@@ -109,6 +110,8 @@ struct ComplicationLine: View {
 
 struct CornerView: View {
     let entry: SlackwaterEntry
+    /// Tinted faces draw the window at full opacity, as `ComplicationLine` does.
+    @Environment(\.widgetRenderingMode) private var mode
     var body: some View {
         if !entry.premium { Image(systemName: "water.waves").widgetLabel { Text("Premium", comment: "Locked watch complication.") } }
         else if let r = entry.complication {
@@ -126,15 +129,18 @@ struct CornerView: View {
                         } maximumValueLabel: {
                             Text(verbatim: g.endText ?? "").monospacedDigit()
                         }
-                        .tint(Self.tint(g))
+                        .tint(Self.tint(g, slack: mode == .fullColor ? slackColor : .primary))
                     }
                 }
-        } else { Image(systemName: "water.waves") }
+        } else {
+            Image(systemName: "water.waves")
+                .widgetLabel { Text("Open Slackwater", comment: "Watch complication with nothing to show.") }
+        }
     }
 
     /// A system gauge cannot draw its own strokes, so its gradient does the
     /// work: the travelled side dim; for a current, the slack window bright.
-    static func tint(_ g: ComplicationReading.Gauge) -> Gradient {
+    static func tint(_ g: ComplicationReading.Gauge, slack: Color) -> Gradient {
         let past = Color.primary.opacity(pastOpacity), ahead = Color.primary, f = g.fraction
         guard let window = g.windowStart else {
             let (low, high) = g.towardEnd ? (past, ahead) : (ahead, past)
@@ -147,8 +153,8 @@ struct CornerView: View {
                                 .init(color: past, location: f),
                                 .init(color: ahead.opacity(0.7), location: f),
                                 .init(color: ahead.opacity(0.7), location: w),
-                                .init(color: slackColor, location: w),
-                                .init(color: slackColor, location: 1)])
+                                .init(color: slack, location: w),
+                                .init(color: slack, location: 1)])
     }
 }
 

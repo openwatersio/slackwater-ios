@@ -53,7 +53,7 @@ struct StationBrowser: View {
                   let item = StationItem.widgetItem(id: stationID(from: url)) else { return }
             path = [.station(item, nil)]
         }
-        .task(id: Inputs(fix: location.fix,favorites: favorites.ids, recents: recents.ids)) {
+        .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids)) {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
             // The phone's anchor without a fix: the last place opened, else its first-run default.
             let fallback = recents.lastOpened.map { (lat: $0.latitude, lon: $0.longitude) } ?? firstRunFix
@@ -66,7 +66,7 @@ struct StationBrowser: View {
                     WidgetCenter.shared.reloadAllTimelines()
                 }
                 return BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
-                             recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
+                                    recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
             }.value
             // A newer input's ranking may have landed first.
             guard !Task.isCancelled else { return }

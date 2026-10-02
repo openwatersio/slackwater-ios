@@ -152,6 +152,7 @@ final class FavoritesStore: ObservableObject {
         unstar(old)
         if inserted { star(new, at: stamp > 0 ? stamp : nil) }
         persist()
+        WidgetCenter.shared.invalidateConfigurationRecommendations()
     }
 
     // MARK: - iCloud (see FavoritesCloud)
