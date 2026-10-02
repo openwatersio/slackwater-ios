@@ -78,11 +78,19 @@ struct ComplicationLine: View {
                 return p
             }
             let style = StrokeStyle(lineWidth: line, lineCap: .round, lineJoin: .round)
+            if reading.kind == .current {
+                var zero = Path()
+                zero.move(to: CGPoint(x: 0, y: y(0)))
+                zero.addLine(to: CGPoint(x: size.width, y: y(0)))
+                context.stroke(zero, with: .color(.primary.opacity(pastOpacity)),
+                               style: StrokeStyle(lineWidth: line / 2, dash: [line, line]))
+            }
+            let ink: Color = mode == .fullColor ? slackColor : .primary
             for run in reading.slackRuns {
                 let part = pts.filter { run.contains($0.hours) }
-                if part.count > 1 {
-                    let ink: Color = mode == .fullColor ? slackColor : .primary
-                    context.stroke(path(part), with: .color(ink.opacity(part[0].hours < 0 ? pastOpacity : 1)),
+                for (half, opacity) in [(part.filter { $0.hours <= 0 }, pastOpacity),
+                                        (part.filter { $0.hours >= 0 }, 1.0)] where half.count > 1 {
+                    context.stroke(path(half), with: .color(ink.opacity(opacity)),
                                    style: StrokeStyle(lineWidth: line * 2.3, lineCap: .round))
                 }
             }
@@ -127,15 +135,19 @@ struct CornerView: View {
     /// A system gauge cannot draw its own strokes, so its gradient does the
     /// work: the travelled side dim; for a current, the slack window bright.
     static func tint(_ g: ComplicationReading.Gauge) -> Gradient {
-        let past = Color.primary.opacity(pastOpacity), ahead = Color.primary
+        let past = Color.primary.opacity(pastOpacity), ahead = Color.primary, f = g.fraction
         guard let window = g.windowStart else {
-            return Gradient(colors: g.towardEnd ? [past, ahead] : [ahead, past])
+            let (low, high) = g.towardEnd ? (past, ahead) : (ahead, past)
+            return Gradient(stops: [.init(color: low, location: 0), .init(color: low, location: f),
+                                    .init(color: high, location: f), .init(color: high, location: 1)])
         }
+        // Inside the window now is past its start; the stops must not run backwards.
+        let w = max(window, f)
         return Gradient(stops: [.init(color: past, location: 0),
-                                .init(color: past, location: g.fraction),
-                                .init(color: ahead.opacity(0.7), location: g.fraction),
-                                .init(color: ahead.opacity(0.7), location: window),
-                                .init(color: slackColor, location: window),
+                                .init(color: past, location: f),
+                                .init(color: ahead.opacity(0.7), location: f),
+                                .init(color: ahead.opacity(0.7), location: w),
+                                .init(color: slackColor, location: w),
                                 .init(color: slackColor, location: 1)])
     }
 }
