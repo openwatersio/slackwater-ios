@@ -17,6 +17,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "victoria")
         let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
         XCTAssert(pending.appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-pending-chs-victoria"].firstMatch.exists)
         releaseFixture(token, "chs-victoria-first-chunk")
         XCTAssert(pending.disappears(within: 30), "fixture tide fit never landed")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
@@ -38,7 +39,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
     }
 
     func testValidatedGateGoesStraightToFinal() {
-        let (app, _) = fixture("terminal", "chs-active-pass", fix: ("48.4235", "-123.3705"))
+        // Fixed AT the gate (its own coordinates, DownloadTier.swift): the
+        // `.inView` tier only auto-downloads the stations the list renders,
+        // and putting the fix here makes Active Pass the nearest station —
+        // the hero card — so it lands in that cohort with no tap required.
+        let (app, _) = fixture("terminal", "chs-active-pass", fix: ("48.8604", "-123.3128"))
         openSearch(app, "active pass")
         let fitted = app.scrollViews.firstMatch.staticTexts.matching(NSPredicate(
             format: "label == 'Flooding' OR label == 'Ebbing' OR label == 'SLACK' OR label == 'Slack'"
@@ -78,8 +83,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             format: "label CONTAINS 'Stay connected'"
         )).firstMatch.exists)
         XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS '60 of 210 days downloaded'"
+            format: "label CONTAINS 'The on-device fit is still refining'"
         )).firstMatch.exists)
+        XCTAssert(app.progressIndicators["chs-provisional-warning"].firstMatch.exists)
         releaseFixture(token, "after-provisional")
         XCTAssert(warning.disappears(within: 30))
         assertCurrentDetailRendered(app)
@@ -131,13 +137,32 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let gear = app.buttons["Settings"].firstMatch
         XCTAssert(indicator.frame.maxY <= gear.frame.minY + 1)
         openDownloads(app)
+        // Race Passage (18 km) and Porlier Pass (68 km) sit outside the
+        // `.inView` cohort, so they only join the queue once the widest tier
+        // is accepted (DownloadTier.swift) — this test is about queue order
+        // and promotion, not tier gating, so pull the whole fixture set in.
+        let everything = app.descendants(matching: .any)["download-tier-everything-toggle"].firstMatch
+        XCTAssert(everything.appears(within: 5))
+        everything.tap()
+        // The widest tier has been accepted when the card stops offering it.
+        // Asserted here rather than left to the row waits below, so a tap that
+        // does not land fails as itself instead of as four missing stations —
+        // which is how the Toggle this replaced hid a real bug (#462).
+        XCTAssert(app.descendants(matching: .any)["download-tier-everything-on"]
+            .firstMatch.appears(within: 5), "the widest tier never took")
         let rows = app.descendants(matching: .any)
         let victoria = rows["download-row-chs-victoria"].firstMatch
         let race = rows["download-row-chs-race-passage"].firstMatch
         let porlier = rows["download-row-chs-porlier-pass"].firstMatch
         XCTAssert(victoria.appears(within: 5))
+        XCTAssert(race.appears(within: 5))
+        XCTAssert(porlier.appears(within: 5))
         let ordered = settled { [victoria.frame, race.frame, porlier.frame] }
         XCTAssert(ordered[0].minY < ordered[1].minY && ordered[1].minY < ordered[2].minY)
+        // `.everything` still stops at ChsFitService.autoFitRadiusKm (150 km):
+        // Weynton Passage at 347 km stays out of the queue until it is opened
+        // by hand below, which pins that ceiling.
+        XCTAssertFalse(rows["download-row-chs-weynton-passage"].firstMatch.exists)
         XCTAssertFalse(rows["download-row-chs-sooke"].firstMatch.exists)
         app.buttons["Done"].tap()
         openSearch(app, "weynton")
@@ -159,6 +184,10 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openSearch(app, "halifax")
         pickSearchResult(app, app.descendants(matching: .any)["chs-pending-chs-halifax"].firstMatch)
         XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-waiting-warning"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'requests downloaded'"
+        )).firstMatch.exists)
         releaseFixture(token, "chs-halifax-first-chunk")
         XCTAssert(app.staticTexts["Today"].appears(within: 30))
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)

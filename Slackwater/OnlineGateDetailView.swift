@@ -27,6 +27,7 @@ struct OnlineGateDetailView: View {
     /// Plan B) the range bar move it; everything else reads it.
     @State private var anchor = Date.distantPast
     @State private var fetchState: ChsFitService.OnlineFetchState = .idle
+    @State private var downloadProgress: Double = 0
     /// The nearest tide-series station inside `nearbyStationRadiusKm` — the
     /// discovery fallback when this gate carries no `tideReference`. Computed
     /// once on appear; the body re-evaluates on every scrub tick.
@@ -176,6 +177,8 @@ struct OnlineGateDetailView: View {
             }
             .onReceive(ChsFitService.shared.$onlineStates
                 .map { $0[gate.id] ?? .idle }.removeDuplicates()) { fetchState = $0 }
+            .onReceive(ChsFitService.shared.$onlineProgress
+                .map { $0[gate.id] ?? 0 }.removeDuplicates()) { downloadProgress = $0 }
             .onChange(of: slackWindowSpeed) { _, _ in rebuild() }
             .onChange(of: net.online) { _, online in
                 if online, timeline == nil { fetchNow(from: anchor) }
@@ -274,7 +277,8 @@ struct OnlineGateDetailView: View {
     private var honestyCard: some View {
         ChsAmberCard(title: downloadTitle, headline: gate.onlineNote ?? "",
                      expectation: expectation, action: downloadAction,
-                     identifier: "online-honesty-card", status: downloadStatus) {
+                     identifier: "online-honesty-card", status: downloadStatus,
+                     downloadProgress: downloadStatus == .downloading ? downloadProgress : nil) {
             fetchNow(from: anchor)
         }
     }

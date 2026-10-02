@@ -571,7 +571,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             let parked = scrubClock(app)
             let dx = dragHours * pointsPerHour / strip.frame.width
             strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.3,
+                .press(forDuration: 0.05,
                        thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.5 - dx, dy: 0.5)),
                        withVelocity: .default,
                        thenHoldForDuration: 0.5)
@@ -631,7 +631,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5))
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+            .press(forDuration: 0.05, thenDragTo: strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
         let now = app.buttons["detail-return-now"].firstMatch
         XCTAssert(now.appears(within: 5), "no return-to-now after scrubbing back")
         save(app, "history-before-now.png")

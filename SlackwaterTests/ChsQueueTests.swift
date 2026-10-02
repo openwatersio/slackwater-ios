@@ -6,6 +6,23 @@ import XCTest
 @testable import Slackwater
 
 final class ChsQueueTests: XCTestCase {
+    @MainActor
+    func testStationProgressUsesAZeroToTenScale() {
+        var station = job("a", 48.4, -123.3)
+        XCTAssertEqual(station.downloadProgress, 0)
+        station.total = 20
+        for (done, expected) in [(-1, 0.0), (8, 4.0), (20, 10.0), (21, 10.0)] {
+            station.done = done
+            XCTAssertEqual(station.downloadProgress, expected)
+            ChsFitService.shared.setOnlineProgress(station.id, done: done, total: station.total)
+            XCTAssertEqual(ChsFitService.shared.onlineProgress[station.id], expected)
+        }
+        station.total = 0
+        station.status = .ready
+        XCTAssertEqual(station.downloadProgress, 10)
+        ChsFitService.shared.resetOnlineStateForTesting()
+    }
+
     func testOnlyNamedCausesArePermanent() {
         XCTAssert(ChsError.isPermanent(ChsError.permanent("no IWLS station serves wlp")))
         XCTAssertFalse(ChsError.isPermanent(ChsError.transient("HTTP 503")))
@@ -53,7 +70,7 @@ final class ChsQueueTests: XCTestCase {
 
         q.set("a", .downloading)
         q.setProgress("a", done: 12, total: 31)
-        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Downloading · 12 of 31")
+        XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Downloading…")
 
         q.deferRetry("a", error: "dropped", at: t0)
         XCTAssertEqual(rowStatus(q.job("a")!, online: true, at: t0), "Retrying in 1 min")

@@ -284,10 +284,11 @@ class ScreenshotTestCase: XCTestCase {
     @discardableResult
     func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
         for _ in 0..<tries {
-            if waitFor(el, "isHittable == true", timeout: 2) { return true }
+            if el.exists, !el.frame.isEmpty, el.frame.intersects(app.frame),
+               waitFor(el, "isHittable == true", timeout: 2) { return true }
             app.swipeUp()
         }
-        return el.isHittable
+        return el.exists && !el.frame.isEmpty && el.frame.intersects(app.frame) && el.isHittable
     }
 
     /// Pan the timeline strip under its fixed centerline (drag left = later).
@@ -296,9 +297,12 @@ class ScreenshotTestCase: XCTestCase {
     func scrubStrip(_ app: XCUIApplication) {
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "timeline strip missing")
+        // A scrub starts moving promptly so the alert long-press recognizer cannot claim it.
         strip.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
-            .press(forDuration: 0.3, thenDragTo:
-                strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+            .press(forDuration: 0.05, thenDragTo:
+                strip.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
+                withVelocity: .default, thenHoldForDuration: 0)
+        XCTAssertFalse(app.buttons["alert-popup-close"].exists, "scrubbing opened the alert popover")
     }
 
     /// Tap the Now pill and confirm the strip came home: the pill leaves once

@@ -48,9 +48,7 @@ func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
     case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
     case .failed: return String(localized: "Predictions unavailable", comment: "Prediction download status.")
     case .downloading:
-        return job.total > 0
-            ? String(localized: "Downloading · \(job.done) of \(job.total)", comment: "Download progress. Values are completed and total requests.")
-            : String(localized: "Downloading…", comment: "Download status.")
+        return String(localized: "Downloading…", comment: "Download status.")
     case .pending:
         guard online else { return String(localized: "Waiting for signal", comment: "Download status while offline.") }
         if let due = job.retryAfter, due > now {
@@ -294,6 +292,7 @@ struct OfflineManagerList: View {
             // Rendering all of Canada here was the old shape and would have
             // been an unbounded list of rows nobody scrolls.
             LazyVStack(alignment: .leading, spacing: 14) {
+                tierSection
                 summary
                 chartsCard
                 ForEach(downloads) { download in
@@ -308,6 +307,87 @@ struct OfflineManagerList: View {
         }
         .background(CanvasBackground())
         .accessibilityIdentifier("downloads-manager")
+    }
+
+    // MARK: Tiers
+
+    /// The tiers, and the only place a duration is allowed to appear: someone
+    /// who opened the manager came looking for the number, whereas the same
+    /// number on the list's strip is an invitation to sit and wait.
+    @ViewBuilder private var tierSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("In view").font(.headline)
+                Text("The stations on your list download on their own.")
+            }
+            .accessibilityIdentifier("download-tier-in-view")
+
+            if service.tier == .inView {
+                Button("Download \(service.remainingBeyondCohort) more within 25 km") {
+                    service.accept(.nearby)
+                }
+                .buttonStyle(.borderedProminent)
+                // Same reason as the list strip's Yes: untinted, this fills
+                // with the system accent and is the only blue on the screen.
+                // The explicit label colour matters for the same reason too —
+                // a prominent button's label inherits the surrounding
+                // foreground, so a leaf fill under a leaf label vanishes.
+                .tint(SN.leaf)
+                .foregroundStyle(SN.canvas)
+                .disabled(service.remainingBeyondCohort == 0)
+                .accessibilityIdentifier("download-tier-nearby-accept")
+            } else {
+                Text("Nearby (25 km) — downloading").foregroundStyle(SN.leaf)
+            }
+
+            // A Button, NOT a Toggle. Every queue tick re-evaluates this
+            // body, and that cancels a UISwitch's in-flight gesture: while
+            // anything was downloading — which is precisely when someone
+            // opens this sheet — a tap on the switch was silently eaten,
+            // and the tier never widened. A Button fires on touch-up and
+            // survives the same churn. Measured both ways on an erased
+            // device before this was changed (#462).
+            //
+            // Losing the off position costs nothing it was honestly
+            // offering: turning it off never stopped the work already in
+            // flight, only the widening, which is why the copy below had to
+            // explain that away.
+            if service.tier == .everything {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Keep downloading Canadian stations within 150 km")
+                        .foregroundStyle(SN.leaf)
+                    Text("Adding more whenever Slackwater is open. \(service.queue.ready) so far.")
+                        .font(.footnote)
+                }
+                .accessibilityIdentifier("download-tier-everything-on")
+            } else {
+                Button {
+                    service.accept(.everything)
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // 150 km, not "Canadian stations" unqualified — this
+                        // stops at ChsFitService.autoFitRadiusKm same as the
+                        // unconstrained auto-fit; lifting that radius is a
+                        // separate change (DownloadTier.everything).
+                        Text("Keep downloading Canadian stations within 150 km")
+                        // No estimate and no percentage: 1,073 stations is
+                        // hours of requests and has no finish line to show.
+                        Text("Adds more whenever Slackwater is open, as far as 150 km out.")
+                            .font(.footnote)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(SN.leaf)
+                .accessibilityIdentifier("download-tier-everything-toggle")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(SN.cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(SN.cardStroke, lineWidth: 0.5))
     }
 
     // MARK: Summary
@@ -438,7 +518,7 @@ struct OfflineManagerList: View {
             return [String(localized: "Waiting for signal. Downloads resume when you're connected; anything already available keeps working offline.", comment: "Offline-download summary while offline."), onDemandLine]
                 .filter { !$0.isEmpty }.joined(separator: " ")
         }
-        let base = String(localized: "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, \(durationPhrase(remainingSeconds)) for the rest.", comment: "Offline-download progress summary. The value is an approximate duration.")
+        let base = String(localized: "The stations you have opened are ready and stay ready offline. Everything else fills in as you use the app, and nothing downloads twice.", comment: "Offline-download progress summary.")
         return [base, onDemandLine].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
@@ -446,11 +526,6 @@ struct OfflineManagerList: View {
         let rest = service.notQueued
         guard rest > 0 else { return "" }
         return String(localized: "\(rest) more Canadian stations are searchable everywhere — open one and it downloads.", comment: "Offline-download catalog note. The integer is a station count; vary by plural.")
-    }
-
-    private var remainingSeconds: Double {
-        queue.jobs.filter { $0.status == .pending || $0.status == .downloading }
-            .reduce(0) { $0 + $1.estimatedSeconds(perRequest: service.observedSecondsPerRequest) }
     }
 
     private var allGates: [ChsJob] { service.gatesToDownload }
@@ -578,7 +653,8 @@ struct OfflineManagerList: View {
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
                 if service.onlineState(gate.id) == .fetching {
-                    ProgressView().tint(SN.leaf)
+                    StationDownloadProgress(value: service.onlineProgress[gate.id] ?? 0)
+                        .frame(width: 100)
                 }
             }
         }
@@ -655,9 +731,15 @@ struct OfflineManagerList: View {
                 }
             }
             Spacer(minLength: 8)
-            Text(statusText(job))
-                .font(.footnote)
-                .foregroundStyle(statusTint(job))
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(statusText(job))
+                    .font(.footnote)
+                    .foregroundStyle(statusTint(job))
+                if job.status == .downloading {
+                    StationDownloadProgress(value: job.downloadProgress)
+                        .frame(width: 100)
+                }
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

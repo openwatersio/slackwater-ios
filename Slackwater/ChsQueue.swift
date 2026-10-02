@@ -45,6 +45,10 @@ struct ChsJob: Identifiable, Hashable {
     var done = 0
     var total = 0
 
+    var downloadProgress: Double {
+        status == .ready ? 10 : total > 0 ? min(10, max(0, Double(done) / Double(total) * 10)) : 0
+    }
+
     /// Number of IWLS requests needed for the fit window.
     var requestCount: Double {
         let chunks = (fitDays / 7).rounded(.up) + 1
