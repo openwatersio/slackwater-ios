@@ -46,7 +46,10 @@ struct ComplicationReading: Equatable {
 
         switch station {
         case .tide(let s, _, _):
-            let samples = s.heights(from: from, to: to, step: step).map { Sample(hours: hours($0.time), value: $0.height) }
+            // The engine aligns samples to its step grid, so clip to the span.
+            let samples = s.heights(from: from, to: to, step: step)
+                .map { Sample(hours: hours($0.time), value: $0.height) }
+                .filter { span.contains($0.hours) }
             let height = s.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
             let extremes = s.extremes(from: now.addingTimeInterval(-15 * 3600), to: now.addingTimeInterval(15 * 3600))
             let last = extremes.last { $0.time <= now }
@@ -70,7 +73,8 @@ struct ComplicationReading: Equatable {
         case .current(let s, let tz, _):
             let threshold = slackThresholdKn
             let points = s.speeds(from: from, to: now.addingTimeInterval(windowSearch), step: step)
-            let samples = points.filter { $0.time <= to }.map { Sample(hours: hours($0.time), value: $0.speed) }
+            let samples = points.map { Sample(hours: hours($0.time), value: $0.speed) }
+                .filter { span.contains($0.hours) }
             let signed = s.speeds(from: now, to: now.addingTimeInterval(1), step: 1).first?.speed ?? 0
             let runs = Self.runs(points, under: threshold, hours: hours)
             let phase = currentPhase(signed: signed)

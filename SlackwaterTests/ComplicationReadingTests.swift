@@ -27,9 +27,14 @@ final class ComplicationReadingTests: XCTestCase {
 
     func testSamplesCoverTheSpanEveryTenMinutes() throws {
         let r = try XCTUnwrap(ComplicationReading.build(tide, now: now))
-        XCTAssertEqual(r.samples.first?.hours ?? 0, -3, accuracy: 1e-9)
-        XCTAssertEqual(r.samples.last?.hours ?? 0, 10, accuracy: 1e-9)
-        XCTAssertEqual(r.samples.count, 13 * 6 + 1)
+        // The engine aligns samples to a ten-minute grid, so the ends land
+        // within one step of the span's.
+        let step = 1.0 / 6
+        XCTAssert((-3 ... -3 + step).contains(try XCTUnwrap(r.samples.first).hours))
+        XCTAssert((10 - step ... 10).contains(try XCTUnwrap(r.samples.last).hours))
+        for (a, b) in zip(r.samples, r.samples.dropFirst()) {
+            XCTAssertEqual(b.hours - a.hours, step, accuracy: 1e-6)
+        }
     }
 
     func testTideGaugeSitsBetweenItsTurns() throws {
