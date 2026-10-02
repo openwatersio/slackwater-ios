@@ -802,7 +802,7 @@ struct SeriesFilterChips: View {
 
 /// The stations picked in the matching-station chooser. The list shows a pick
 /// in place of the nearest namesake (`RankedStations`), and the widget's
-/// nearest-station ids resolve to it (`LocationService.cacheNearestWidgetStation`).
+/// nearest-station ids resolve to it (`cacheNearestWidgetStations`).
 /// The App Group copy is this device's truth; iCloud carries picks between devices.
 ///
 /// A pick is a station id, not a place: a place is a series and a name, and a
@@ -827,13 +827,9 @@ final class ChosenStationsStore: ObservableObject {
         MainActor.assumeIsolated { self.adopt(cloud) }
     }
 
-    /// The picks on disk. Builds before the catalog could rename a station
-    /// kept them as place key → id; the values are the ids, so that shape is
-    /// read as-is and written back as the array on the next change.
+    /// The picks on disk; an older place-keyed shape is written back as the array on the next change.
     static func load(_ defaults: UserDefaults) -> Set<String> {
-        if let ids = defaults.stringArray(forKey: AppGroup.chosenStationsKey) { return Set(ids) }
-        let legacy = defaults.dictionary(forKey: AppGroup.chosenStationsKey) as? [String: String] ?? [:]
-        return Set(legacy.values)
+        chosenStationIDs(defaults)
     }
 
     /// The pick that answers for a group of namesakes, nearest first: the
@@ -909,7 +905,7 @@ final class ChosenStationsStore: ObservableObject {
         // Without a fix the widget ids catch up on the next one.
         let loc = LocationService.shared
         if loc.authorized, let c = loc.location?.coordinate,
-           LocationService.cacheNearestWidgetStation(lat: c.latitude, lon: c.longitude) {
+           cacheNearestWidgetStations(lat: c.latitude, lon: c.longitude) {
             WidgetCenter.shared.reloadAllTimelines()
         }
     }

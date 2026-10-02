@@ -2,6 +2,7 @@
 // wearer, favorites, places near, recents, then Add Place. The phone's
 // groups, with a card's corner mark where a wrist has no room for headings.
 import SwiftUI
+import WidgetKit
 
 enum BrowseRoute: Hashable {
     case station(StationItem, PlaceMark?)
@@ -52,7 +53,12 @@ struct StationBrowser: View {
             let favoriteIds = favorites.ids, recentIds = recents.ids
             // Ranking the whole catalog is too slow for the watch's main thread.
             let next = await Task.detached(priority: .userInitiated) {
-                BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
+                // The watch's complications follow this fix (#524); the
+                // extension never asks for location itself (#566).
+                if let fix, cacheNearestWidgetStations(lat: fix.lat, lon: fix.lon) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+                return BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
                              recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
             }.value
             // A newer input's ranking may have landed first.

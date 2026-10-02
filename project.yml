@@ -273,6 +273,7 @@ targets:
       # The list's stores and their iCloud sync. Not in PortableSources: the
       # widget never reads favourites through them.
       - Slackwater/StationLists.swift
+      - Slackwater/NearestWidgetStation.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.
