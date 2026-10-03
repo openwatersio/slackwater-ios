@@ -362,8 +362,12 @@ jobs:
       # always(): by this step "Test result" has already failed the job, and
       # a condition without a status function is gated on success — the first
       # run under this workflow lost its evidence that way (#552's list shard).
-      - name: Upload screenshots and results on failure
-        if: always() && steps.tests.outcome == 'failure'
+      # 'cancelled' is the outcome a step gets when the job hits
+      # timeout-minutes, and that is the failure with nothing to read anywhere
+      # else: test.sh pipes xcodebuild through tail, so a shard that hangs
+      # writes a log naming no test at all, and "Failure messages" never runs.
+      - name: Upload screenshots and results
+        if: always() && (steps.tests.outcome == 'failure' || steps.tests.outcome == 'cancelled')
         uses: actions/upload-artifact@v7
         with:
           name: test-evidence-${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && '-ipad' || '' }}
