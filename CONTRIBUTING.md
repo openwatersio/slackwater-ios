@@ -33,7 +33,7 @@ For quick iteration on the gate itself, the `Slackwater First Run` scheme relaun
 
 Run the `SlackwaterWatch` scheme on a watch simulator; the phone schemes cannot deploy to a watch. Its UI tests run the same way, `xcodebuild test -scheme SlackwaterWatch -destination 'platform=watchOS Simulator,name=<watch>'`, under the test lock described in CLAUDE.md. `-locDenied` skips the location prompt, as on the phone.
 
-Building the watch scheme in Xcode rewrites `Slackwater/Localizable.xcstrings` from the watch's strings alone. Shared strings lose the translator comments that only the phone's code supplies (for example "High" and "Downloading"), and the whole file reorders. Do not commit that diff: `git checkout Slackwater/Localizable.xcstrings`, then add any new watch string to the catalog by hand.
+The watch targets do not extract strings (`SWIFT_EMIT_LOC_STRINGS: NO` in `project.yml`), because extracting from the watch alone would drop the translator comments that only the phone's code supplies for shared keys. Building the watch scheme therefore leaves `Slackwater/Localizable.xcstrings` untouched, and a new watch string goes into the catalog by hand.
 
 ## Screenshotting a deep-linked screen
 
@@ -49,7 +49,9 @@ Use familiar terms such as tides, currents, and places in prominent headings, bu
 
 Every user-facing string ships in English, Canadian French (`fr-CA`), and Spanish (`es-ES`). Include translations in the same pull request as any new or changed copy, including accessibility labels and system notifications. Use SwiftUI's localized string APIs or `String(localized:)`; plain Swift strings passed to system APIs are not localized automatically.
 
-Update `Slackwater/Localizable.xcstrings` with translator context and complete translations for both supported locales. Preserve format placeholders, add plural variants where the wording requires them, and remove unused keys when deleting copy. Review the catalog diff for missing translations and unrelated Xcode rewrites, then build and check the changed screens in both languages before opening the pull request. English fallback is not a completed translation.
+Update `Slackwater/Localizable.xcstrings` with translator context and complete translations for both supported locales. Preserve format placeholders, add plural variants where the wording requires them, and remove unused keys when deleting copy. Review the catalog diff for missing translations, then build and check the changed screens in both languages before opening the pull request. English fallback is not a completed translation.
+
+A phone scheme extracts strings into the catalog on every build, which is how a new key first appears. Write a hand-added entry's locales in alphabetical order, `es-ES` before `fr-CA`, the order Xcode itself writes. An entry stored the other way round is re-sorted by the next build, and a handful of them turns an ordinary review into a thousand-line diff carrying no content change.
 
 ## Running the tests
 
