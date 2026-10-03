@@ -45,6 +45,8 @@ Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `tes
 
 Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
 
+Use the SF Symbol `sparkles` beside Premium labels, headings, and purchase options. Keep the icon separate from localized text; compact widgets can use “Premium” alone as the label.
+
 ## Localization
 
 Every user-facing string ships in English, Canadian French (`fr-CA`), and Spanish (`es-ES`). Include translations in the same pull request as any new or changed copy, including accessibility labels and system notifications. Use SwiftUI's localized string APIs or `String(localized:)`; plain Swift strings passed to system APIs are not localized automatically.

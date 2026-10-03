@@ -48,7 +48,11 @@ struct WidgetSettingsContent: View {
             }
             #if PREMIUM_ENABLED
                 VStack(alignment: .leading, spacing: 16) {
-                    MonoLabel(text: String(localized: "Slackwater Premium", comment: "Settings section heading."))
+                    Label {
+                        MonoLabel(text: String(localized: "Slackwater Premium", comment: "Settings section heading."))
+                    } icon: {
+                        Image(systemName: "sparkles").foregroundStyle(SN.leaf)
+                    }
                     if platform == .mobile {
                         group(
                             String(localized: "Lock screen — Premium", comment: "Settings widget section title."),
@@ -122,7 +126,15 @@ struct WidgetSettingsContent: View {
         @ViewBuilder previews: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            MonoLabel(text: title)
+            if purchases {
+                Label {
+                    MonoLabel(text: title)
+                } icon: {
+                    Image(systemName: "sparkles").foregroundStyle(SN.leaf)
+                }
+            } else {
+                MonoLabel(text: title)
+            }
             previews()
             ForEach(rows, id: \.0) { row in
                 HStack(alignment: .top, spacing: 10) {

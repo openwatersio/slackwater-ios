@@ -72,9 +72,15 @@ struct AlertsView: View {
                                         .font(.caption.monospacedDigit())
                                         .foregroundStyle(SN.foam.opacity(0.62))
                                 }
-                                Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
-                                    .font(.caption)
-                                    .foregroundStyle(SN.foam.opacity(0.62))
+                                Group {
+                                    if rule.enabled, !scheduler.status.unresolved.contains(rule.id), !premium.isPremium {
+                                        Label("Notifications are Premium", systemImage: "sparkles")
+                                    } else {
+                                        Text(alertStatusText(rule, scheduler.status, premium: premium.isPremium))
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(SN.foam.opacity(0.62))
                             }
                         }
                     }

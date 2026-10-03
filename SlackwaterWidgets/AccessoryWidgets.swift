@@ -1,16 +1,14 @@
 // Slackwater — GPL v3. Premium lock-screen widgets (spec §4). Without the
-// entitlement they render the quiet locked state — wave glyph + "Premium",
-// no data, no urgency. Tapping a locked one opens the in-app Widgets page;
+// entitlement they render the quiet locked state — sparkle glyph + "Premium",
+// no data, no urgency. Tapping a locked one opens Settings at Premium;
 // an unlocked one opens its station (`accessoryDeepLink`).
 import SwiftUI
 import WidgetKit
 
 private struct Locked: View {
     var body: some View {
-        HStack(spacing: 3) {
-            Image(systemName: "water.waves")
-            Text("Premium").font(.caption2)
-        }
+        Label("Premium", systemImage: "sparkles")
+            .font(.caption2)
     }
 }
 
