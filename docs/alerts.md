@@ -37,7 +37,7 @@ uninstall over, and iOS Default Alert Times already lets anyone add their own pe
 
 The long-press popup (§7.2) is widgets-premium §5 item 3 and the third and last upsell surface.
 Settings → Calendar upsells at the point a station is turned on; the list itself, and turning a
-station off, never meet the tier sheet.
+station off, never open the Premium purchase controls.
 
 ## 3. Notification alerts
 
@@ -203,7 +203,7 @@ confirmation naming the station and the number of events that will disappear; no
 vanishes off the user's Mac without them having read that sentence.
 
 **A lapsed Premium keeps its calendars** — they stay subscribed, keep publishing, and can still be
-turned off — but turning a station on opens the tier sheet and changes nothing. Without Premium
+turned off — but turning a station on opens Settings at Premium and changes nothing. Without Premium
 the toggles read off and do the same.
 
 ### 5.2 Notifications
@@ -326,7 +326,7 @@ riding-dot overlay keeps `allowsHitTesting(false)` untouched.
   "Every low tide", "Every slack window", "Every time it falls past 3.3 ft".
 - A row whose rule already exists reads as on; tapping it removes the rule.
 - A 30-minute lead, and no lead picker: that is the rule sheet's job (§7.3).
-- For a free user both rows open the tier sheet and no rule is created.
+- For a free user both rows open Settings at Premium and no rule is created.
 
 Notification permission is requested the first time a rule is created, never at launch.
 
@@ -343,11 +343,11 @@ Opened from the Alerts screen to edit one rule:
 ### 7.4 Settings → Calendar
 
 A section directly after Alerts, `NavigationLink` to a list of the user's saved stations with a
-toggle each — the same row idiom the Alerts and Offline downloads rows use. The section's own line
+toggle each — the same row idiom the Alerts row uses. The section's own line
 says what is on: "Friday Harbor", "3 stations", or a hint when none is.
 
 - Online gates are listed but unavailable, with the reason (§8).
-- Without Premium, turning a station on opens the tier sheet and nothing changes; turning one off
+- Without Premium, turning a station on opens Settings at Premium and nothing changes; turning one off
   works at any tier (§5.1).
 - Denied calendar access leaves the toggles off and says so, with a link to Settings.
 
@@ -424,7 +424,7 @@ with the run's start time. An eclipse is searched from an absolute window rather
 grid, and a derived gate's slack is skipped on a machine whose reference port isn't fitted.
 
 **UI:** a long press on a tide strip and on a current strip opens the popup with the right header;
-a free user's Alert me and calendar toggle each open the tier sheet; with Premium, Settings →
+a free user's Alert me and calendar toggle each open Settings at Premium; with Premium, Settings →
 Calendar turns a station on and asks before turning it off.
 
 **On device**, because none of it is trustworthy in the simulator: a notification fires with the

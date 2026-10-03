@@ -818,29 +818,6 @@
         }
       }
     },
-    "%lld of %lld nearby Canadian stations on this device" : {
-      "comment" : "Station discovery interface text. Placeholders are runtime values shown in context.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld of %2$lld nearby Canadian stations on this device"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld de %2$lld estaciones canadienses cercanas en este dispositivo"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld sur %2$lld stations canadiennes à proximité sur cet appareil"
-          }
-        }
-      }
-    },
     "%lld of %lld ready" : {
       "comment" : "Offline-download progress. Values are ready and total station counts.",
       "localizations" : {
@@ -1155,25 +1132,25 @@
         }
       }
     },
-    "About Slackwater Premium" : {
-      "comment" : "Premium interface text.",
+    "about the same as the daily tide" : {
+      "comment" : "The annual swing is about the size of the daily tide."
+    },
+    "About" : {
+      "comment" : "Settings row and destination title for prediction notes, attribution, privacy, license, and version.",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Acerca de Slackwater Premium"
+            "value" : "Acerca de"
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "À propos de Slackwater Premium"
+            "value" : "À propos"
           }
         }
       }
-    },
-    "about the same as the daily tide" : {
-      "comment" : "The annual swing is about the size of the daily tide."
     },
     "About these predictions" : {
       "comment" : "Settings section heading.",
@@ -2076,23 +2053,6 @@
         }
       }
     },
-    "Coming to the same tier: the live slack tile, alerts, go-windows for your boat" : {
-      "comment" : "Tide and current interface text.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Próximamente en el mismo nivel: el indicador de estoa en directo, alertas y ventanas de navegación para tu embarcación"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bientôt dans la même offre : la tuile d’étale en direct, les alertes et les fenêtres de sortie pour votre bateau"
-          }
-        }
-      }
-    },
     "Concerns or Feedback" : {
       "comment" : "Problem-report interface text.",
       "localizations" : {
@@ -2224,6 +2184,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant · NOAA"
+          }
+        }
+      }
+    },
+    "Control-click your desktop → Edit Widgets → Slackwater." : {
+      "comment" : "Instructions for adding a Mac desktop widget.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en el escritorio con la tecla Control → Editar widgets → Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur le bureau en maintenant Contrôle enfoncé → Modifier les widgets → Slackwater."
           }
         }
       }
@@ -2432,6 +2409,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Distance de la Terre"
+          }
+        }
+      }
+    },
+    "Desktop — free" : {
+      "comment" : "Free desktop widgets on Mac.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escritorio — gratis"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bureau — gratuit"
           }
         }
       }
@@ -2985,23 +2979,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chaque fois qu’elle monte au-dessus de %1$@ %2$@"
-          }
-        }
-      }
-    },
-    "Everything you use today stays free, forever. Premium adds the lock screen — and it's how Slackwater's development gets funded. Buy it because you want it, or because you want to say thanks." : {
-      "comment" : "Widget interface text.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Todo lo que usas hoy seguirá siendo gratis para siempre. Premium añade la pantalla de bloqueo y ayuda a financiar el desarrollo de Slackwater. Cómpralo porque lo quieres o para darnos las gracias."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tout ce que vous utilisez aujourd’hui restera gratuit. Premium ajoute l’écran de verrouillage et finance le développement de Slackwater. Achetez-le parce qu’il vous plaît ou pour nous remercier."
           }
         }
       }
@@ -4186,23 +4163,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écran verrouillé — Premium"
-          }
-        }
-      }
-    },
-    "Lock screen widgets — next slack, next turn, the workable window" : {
-      "comment" : "Widget interface text.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets de pantalla de bloqueo: próxima estoa, próximo cambio y ventana navegable"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets de l’écran verrouillé — prochaine étale, prochain renversement, fenêtre d’étale praticable"
           }
         }
       }
@@ -5964,40 +5924,6 @@
         }
       }
     },
-    "Premium — thank you for supporting the app" : {
-      "comment" : "Premium settings row for an existing supporter.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premium — gracias por apoyar la app"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premium — merci de soutenir l’app"
-          }
-        }
-      }
-    },
-    "Premium isn't on sale yet — these widgets are still being finished. Everything you use today stays free either way." : {
-      "comment" : "Widget interface text.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Premium aún no está a la venta; estos widgets todavía están en desarrollo. Todo lo que usas hoy seguirá siendo gratis en cualquier caso."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le Premium n’est pas encore en vente — ces widgets sont encore en cours de finalisation. Tout ce que vous utilisez aujourd’hui restera gratuit, quoi qu’il arrive."
-          }
-        }
-      }
-    },
     "Preparing the map for offline use…" : {
       "comment" : "Offline-map download status.",
       "localizations" : {
@@ -6078,6 +6004,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Politique de confidentialité"
+          }
+        }
+      }
+    },
+    "Purchases are temporarily unavailable." : {
+      "comment" : "StoreKit could not load any Premium products. The user can retry or restore.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las compras no están disponibles temporalmente."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les achats sont temporairement indisponibles."
           }
         }
       }
@@ -7748,23 +7691,6 @@
         }
       }
     },
-    "Support the app — lock screen widgets and more" : {
-      "comment" : "Premium settings row for a non-subscriber.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apoya la app — widgets de pantalla de bloqueo y más"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Soutenir l’app — widgets de l’écran verrouillé et plus encore"
-          }
-        }
-      }
-    },
     "The difference between this swing's high and low, %@." : {
       "comment" : "Explains what the tide-range number measures. The placeholder is 'low to high' or 'high to low'."
     },
@@ -8415,6 +8341,23 @@
         }
       }
     },
+    "Support Slackwater's development." : {
+      "comment" : "Premium support copy on platforms without lock-screen widgets.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoya el desarrollo de Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soutenez le développement de Slackwater."
+          }
+        }
+      }
+    },
     "Tide height" : {
       "comment" : "Settings section heading.",
       "localizations" : {
@@ -8823,6 +8766,23 @@
         }
       }
     },
+    "Try again" : {
+      "comment" : "Retry loading Premium purchase options from StoreKit.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intentar de nuevo"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        }
+      }
+    },
     "Version" : {
       "comment" : "Settings section heading.",
       "localizations" : {
@@ -9124,23 +9084,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Widgets"
-          }
-        }
-      }
-    },
-    "Widgets — add them to your home and lock screen" : {
-      "comment" : "Settings link to the widget gallery.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets — añádelos a tus pantallas de inicio y de bloqueo"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets — ajoutez-les à votre écran d’accueil et à l’écran de verrouillage"
           }
         }
       }

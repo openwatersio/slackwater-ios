@@ -368,15 +368,6 @@ class ScreenshotTestCase: XCTestCase {
         openSettings(app)
         let segment = app.buttons[label]
         XCTAssert(segment.appears(within: 5))
-        // The sheet's two fixed statements, asserted on the way past. Every
-        // caller of this helper already has them on screen, so they are checked
-        // here rather than in a test of its own with its own launch and its own
-        // Settings round trip.
-        XCTAssert(app.staticTexts["Not for navigation."].exists,
-                  "the settings sheet lost its disclaimer")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenFreeMap'")).firstMatch.exists,
-                  "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
         XCTAssert(stationList(app).appears(within: 5))
