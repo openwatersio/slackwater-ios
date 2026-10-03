@@ -152,6 +152,29 @@ final class DownloadTierTests: XCTestCase {
                        .asking(count: 14))
     }
 
+    func testStripStaysVisibleForANonCohortDownloadAtTheInViewTier() {
+        let (cohort, settled) = settledQueue()
+        var queue = settled
+        queue.add(job("detail", 48.44, -123.38))
+        queue.set("detail", .downloading)
+        queue.setProgress("detail", done: 5, total: 10)
+
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,
+                                          declined: false, remaining: 14),
+                       .working(done: 1, total: 2, progress: 7.5))
+    }
+
+    func testRestoredWiderTierShowsAnActiveQueueWithoutACohort() {
+        let cohort = DownloadCohort()
+        var queue = ChsQueue([job("restored", 48.44, -123.38)])
+        queue.set("restored", .downloading)
+        queue.setProgress("restored", done: 5, total: 10)
+
+        XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .nearby,
+                                          declined: false, remaining: 14),
+                       .working(done: 0, total: 1, progress: 5))
+    }
+
     func testStripIsAbsentWhenDeclined() {
         let (cohort, queue) = settledQueue()
         XCTAssertEqual(downloadStripState(cohort: cohort, queue: queue, tier: .inView,

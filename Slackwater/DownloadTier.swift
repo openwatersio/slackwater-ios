@@ -120,12 +120,12 @@ enum DownloadStripState: Equatable {
 /// rather than a view model so it can be tested without a view or a service.
 func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadTier,
                         declined: Bool, remaining: Int) -> DownloadStripState {
-    guard !cohort.ids.isEmpty else { return .absent }
-    if tier == .inView ? !cohort.settled(in: queue) : queue.active {
+    if queue.active {
         let requests = queue.requestProgress
         let progress = requests.total > 0 ? requests.completed / requests.total * 10 : 0
         return .working(done: queue.ready, total: queue.total, progress: progress)
     }
+    guard !cohort.ids.isEmpty else { return .absent }
     guard tier.next != nil, !declined, remaining > 0 else { return .absent }
     return .asking(count: remaining)
 }
