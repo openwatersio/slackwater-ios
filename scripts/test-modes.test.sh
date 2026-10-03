@@ -66,6 +66,7 @@ assert_has "id=SIM-Slackwater_iPhone_17_·_repo"
 assert_has "-skip-testing:SlackwaterUITests/LiveFetchTests"
 assert_has "-skip-testing:SlackwaterTests/NationalScaleTests/testHybridDirectionHasFullCoverageAndMatchesBaseline"
 assert_has "-collect-test-diagnostics never"
+assert_has "-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600"
 assert_has "-derivedDataPath build/DerivedData"
 assert_lacks "live=1"
 [[ $(sed -n '/^node /=' "$log") -lt $(sed -n '/^xcodegen /=' "$log") ]] || {
@@ -108,6 +109,7 @@ assert_lacks "simctl create"
 # A prebuilt run tests the given products and never rebuilds or regenerates.
 SLACKWATER_XCTESTRUN='products/Plan.xctestrun' run_mode
 assert_has "xcodebuild test-without-building -xctestrun products/Plan.xctestrun"
+assert_has "-test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600"
 assert_lacks "xcodegen"
 assert_lacks "iwls-fixtures.mjs prepare"
 assert_lacks "-derivedDataPath"
