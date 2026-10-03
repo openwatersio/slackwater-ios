@@ -94,7 +94,7 @@ struct SettingsView: View {
                         section("Calendar") {
                             NavigationLink {
                                 CalendarStationsView()
-                                    .navigationTitle("Calendar")
+                                    .navigationTitle("Favourites calendars")
                                     .navigationBarTitleDisplayMode(.inline)
                                     .toolbarBackground(SN.canvas, for: .navigationBar)
                             } label: {

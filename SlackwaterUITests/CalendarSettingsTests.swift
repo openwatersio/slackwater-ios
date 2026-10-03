@@ -7,7 +7,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         let row = app.buttons["settings-calendar-row"].firstMatch
         for _ in 0..<4 where !row.isHittable { app.swipeUp() }
         row.tap()
-        XCTAssert(app.navigationBars["Calendar"].appears(within: 5))
+        XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
     }
 
     /// One tide station and one current station: the two calendar kinds, both in the bundle.

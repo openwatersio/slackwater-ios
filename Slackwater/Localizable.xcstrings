@@ -1203,6 +1203,23 @@
         }
       }
     },
+    "Add a place to your favourites to create a calendar for its tides or slack-water events." : {
+      "comment" : "Empty favourites calendar screen: explains where places come from.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade un lugar a tus favoritos para crear un calendario con sus mareas o eventos de estoa."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un lieu à vos favoris pour créer un calendrier de ses marées ou de ses événements d’étale."
+          }
+        }
+      }
+    },
     "Add favorite" : {
       "comment" : "VoiceOver action for a station.",
       "localizations" : {
@@ -1220,6 +1237,23 @@
         }
       }
     },
+    "Add high and low tides" : {
+      "comment" : "Subtitle for an inactive tide calendar switch.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir pleamares y bajamares"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter les marées hautes et basses"
+          }
+        }
+      }
+    },
     "Add Place" : {
       "comment" : "Watch list row that opens place search.",
       "localizations" : {
@@ -1233,6 +1267,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter un lieu"
+          }
+        }
+      }
+    },
+    "Add slack-water events" : {
+      "comment" : "Subtitle for an inactive current calendar switch; events mark slack water or the start of a usable slack window.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir eventos de estoa"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter les événements d’étale"
           }
         }
       }
@@ -3281,6 +3332,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Favoris"
+          }
+        }
+      }
+    },
+    "Favourites calendars" : {
+      "comment" : "Title of the screen for calendars created from favourite places.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendarios de favoritos"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calendriers des favoris"
           }
         }
       }
@@ -6330,6 +6398,23 @@
         }
       }
     },
+    "Requires Slackwater Premium" : {
+      "comment" : "Shown above calendar switches so people know Premium is required before adding a calendar.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere Slackwater Premium"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite Slackwater Premium"
+          }
+        }
+      }
+    },
     "Restore purchase" : {
       "comment" : "Premium interface text.",
       "localizations" : {
@@ -6610,22 +6695,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Enregistrer"
-          }
-        }
-      }
-    },
-    "Save a station and it can publish its tides or slack windows to your calendar." : {
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Guarda una estación y podrá publicar sus mareas o ventanas de estoa en tu calendario."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enregistrez une station et elle pourra publier ses marées ou ses fenêtres d’étale dans votre calendrier."
           }
         }
       }
@@ -7375,28 +7444,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Station"
-          }
-        }
-      }
-    },
-    "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los calendarios de estación forman parte de Slackwater Premium: cada estación tiene su propio calendario que puedes activar o desactivar."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les calendriers de station font partie de Slackwater Premium : chaque station a son propre calendrier que vous pouvez activer ou désactiver."
           }
         }
       }
@@ -8694,6 +8741,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Activez la localisation pour afficher les prévisions à proximité en premier."
+          }
+        }
+      }
+    },
+    "Turning on a favourite creates a separate calendar in your Calendar app. It contains high and low tides or slack-water events, plus eclipses." : {
+      "comment" : "Explanation below calendar switches. Each place gets its own calendar; event types depend on whether it predicts tides or currents.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Al activar un favorito, se crea un calendario independiente en tu app Calendario. Contiene pleamares y bajamares o eventos de estoa, además de eclipses."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer un favori crée un calendrier distinct dans votre app Calendrier. Il contient les marées hautes et basses ou les événements d’étale, ainsi que les éclipses."
           }
         }
       }
