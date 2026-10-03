@@ -9,6 +9,9 @@
     }
   ],
   "defaultOptions" : {
+    "testTimeoutsEnabled" : true,
+    "defaultTestExecutionTimeAllowance" : 600,
+    "maximumTestExecutionTimeAllowance" : 600,
     "targetForVariableExpansion" : {
       "containerPath" : "container:Slackwater.xcodeproj",
       "identifier" : "CD48C26F8F8167BA5FD3B248",

@@ -239,9 +239,11 @@ for i in {1..$#sims}; do
     action=(test -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
   fi
+  # XCTest must bound a blocked launch, including in downloaded test products (#580).
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
     -parallel-testing-worker-count "$workers" \
     -collect-test-diagnostics "$diagnostics" \
+    -test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 \
     "${selection[@]}" \
     -resultBundlePath "$bundle" \
     | tail -40
