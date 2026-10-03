@@ -21,7 +21,7 @@ Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly wor
 
 Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY`). `op run` works well for keeping them in 1Password.
 
-1. **App IDs, capabilities, and the App Group.** Open `Slackwater.xcodeproj` signed into the team and build the Debug scheme to a device. Automatic signing registers both bundle IDs, enables the capabilities in the entitlements files, and creates the App Group. Confirm on developer.apple.com → Identifiers that both IDs list the capabilities in the table above.
+1. **App IDs, capabilities, and the App Group.** Open `Slackwater.xcodeproj` signed into the team and build the `Slackwater` and `SlackwaterWatch` Debug schemes to their respective devices. Automatic signing registers all four bundle IDs and enables the capabilities in their entitlements files. Confirm on developer.apple.com → Identifiers that all four IDs list the capabilities in the table above and belong to `group.io.openwaters.slackwater`. Verify the watch app's iCloud key-value storage entitlement names the phone's store, `$(TeamIdentifierPrefix)io.openwaters.slackwater`, before creating profiles.
 2. **App record.** App Store Connect → Apps → New App, bundle ID `io.openwaters.slackwater`. Records can't be created through the public API.
 3. **In-app purchases.** Create the subscription group, the yearly subscription, and the lifetime purchase with the product IDs above. Reference names match `Slackwater.storekit`: group "Slackwater Premium", "Premium Yearly", "Premium Lifetime". Check `inAppPurchasesV2` and `subscriptionGroups` on the app before release notes mention a purchase.
 4. **Distribution certificate.**
