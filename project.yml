@@ -32,7 +32,7 @@ settings:
     SWIFT_VERSION: "5.0"
     SWIFT_EMIT_LOC_STRINGS: YES
   configs:
-    # Premium (the lock-screen widgets, its sheet, and slackwater://premium)
+    # Premium (the lock-screen widgets, purchase controls, and slackwater://premium)
     # ships in both configurations (#155); removing PREMIUM_ENABLED hides it.
     # DEBUG is restated because this key replaces XcodeGen's preset.
     Debug:
@@ -188,8 +188,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        # The app's first URL scheme: `slackwater://premium` opens the Widgets
-        # gallery, `slackwater://station/<id>` opens that station's detail.
+        # The app's first URL scheme: `slackwater://premium` opens Settings at Premium
+        # and `slackwater://station/<id>` opens that station's detail.
         # Widgets already emit both (Task 5/6); StationListView.onOpenURL
         # (SlackwaterApp.swift) is the receiving end.
         CFBundleURLTypes:

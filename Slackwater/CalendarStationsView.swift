@@ -56,7 +56,7 @@ struct CalendarStationsView: View {
             .padding(.bottom, 30)
         }
         .background(CanvasBackground())
-        .sheet(isPresented: $showPremium) { PremiumView() }
+        .sheet(isPresented: $showPremium) { SettingsView(opensPremium: true) }
         .alert("Calendar access is off", isPresented: $denied) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
