@@ -23,6 +23,20 @@ final class ChsQueueTests: XCTestCase {
         ChsFitService.shared.resetOnlineStateForTesting()
     }
 
+    func testQueueProgressWeightsStationsByPlannedRequests() {
+        var tide = job("tide", 48.4, -123.3)
+        tide.status = .ready
+        var current = ChsJob(id: "current", name: "Current", region: "BC", isCurrent: true,
+                             latitude: 48.5, longitude: -123.4, fitDays: 60,
+                             status: .downloading)
+        current.done = 10
+        current.total = 21
+
+        let progress = ChsQueue([tide, current]).requestProgress
+        XCTAssertEqual(progress.completed, 20)
+        XCTAssertEqual(progress.total, 31)
+    }
+
     func testOnlyNamedCausesArePermanent() {
         XCTAssert(ChsError.isPermanent(ChsError.permanent("no IWLS station serves wlp")))
         XCTAssertFalse(ChsError.isPermanent(ChsError.transient("HTTP 503")))

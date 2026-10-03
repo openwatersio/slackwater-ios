@@ -73,6 +73,13 @@ struct ChsQueue {
     var total: Int { jobs.count }
     var ready: Int { jobs.filter { $0.status == .ready }.count }
     var failed: Int { jobs.filter { $0.status == .failed }.count }
+    var requestProgress: (completed: Double, total: Double) {
+        let total = jobs.reduce(0.0) { $0 + $1.requestCount }
+        let completed = jobs.reduce(0.0) { sum, job in
+            sum + (job.status == .ready ? job.requestCount : Double(job.done))
+        }
+        return (completed, total)
+    }
     /// A run is still in flight: something is queued or downloading.
     var active: Bool { jobs.contains { $0.status == .pending || $0.status == .downloading } }
     var complete: Bool { total > 0 && ready == total }

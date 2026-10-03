@@ -26,6 +26,21 @@ final class StationCardLoadingTests: XCTestCase {
     }
 
     @MainActor
+    func testDownloadProgressFillsTheSkeletonWaveFromTheLeadingEdge() throws {
+        let empty = try lowerHalf(try card(.downloading, progress: 0))
+        let half = try lowerHalf(try card(.downloading, progress: 5))
+        let attachment = XCTAttachment(image: half)
+        attachment.name = "station-download-wave-half"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        XCTAssertGreaterThan(differingFraction(try horizontalHalf(empty, leading: true),
+                                               try horizontalHalf(half, leading: true)), 0.001)
+        XCTAssertLessThan(differingFraction(try horizontalHalf(empty, leading: false),
+                                            try horizontalHalf(half, leading: false)), 0.0002)
+    }
+
+    @MainActor
     func testAutomaticQueueStatesShowTheirProgress() {
         XCTAssertGreaterThan(statusSize(.downloading, detail: "Downloading").width, 80)
         XCTAssertGreaterThan(statusSize(.queued, detail: "4th in line").width, 60)
@@ -61,10 +76,12 @@ final class StationCardLoadingTests: XCTestCase {
     }
 
     @MainActor
-    private func card(_ status: CardStatus, minHeight: CGFloat? = nil) throws -> UIImage {
+    private func card(_ status: CardStatus, minHeight: CGFloat? = nil,
+                      progress: Double? = nil) throws -> UIImage {
         let renderer = ImageRenderer(content:
             StationCard(name: "Victoria Harbour", region: "British Columbia",
-                        status: status, minHeight: minHeight) { EmptyView() }
+                        status: status, downloadProgress: progress,
+                        minHeight: minHeight) { EmptyView() }
                 .frame(width: 364)
                 .background(SN.canvas))
         return try XCTUnwrap(renderer.uiImage)
@@ -93,6 +110,13 @@ final class StationCardLoadingTests: XCTestCase {
         let source = try XCTUnwrap(image.cgImage)
         let rect = CGRect(x: 0, y: source.height / 2,
                           width: source.width, height: source.height / 2)
+        return UIImage(cgImage: try XCTUnwrap(source.cropping(to: rect)))
+    }
+
+    private func horizontalHalf(_ image: UIImage, leading: Bool) throws -> UIImage {
+        let source = try XCTUnwrap(image.cgImage)
+        let rect = CGRect(x: leading ? 0 : source.width / 2, y: 0,
+                          width: source.width / 2, height: source.height)
         return UIImage(cgImage: try XCTUnwrap(source.cropping(to: rect)))
     }
 }
