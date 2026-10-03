@@ -167,7 +167,10 @@ jobs:
       - run: brew install xcodegen
 
       - name: Test runner modes
-        run: zsh scripts/test-modes.test.sh
+        run: |
+          zsh scripts/test-modes.test.sh
+          sh scripts/test-retryable.test.sh
+          sh scripts/test-failed-selectors.test.sh
 
       # MapLibre is a binary download, not a compile — the cache saves the
       # fetch, not a build. The generated xcodeproj and its Package.resolved
@@ -313,13 +316,7 @@ jobs:
       # iPad-only assertions that read as more flake because nothing surfaced
       # their text.
       #
-      # The same messages classify the failure. An assertion string is a test
-      # or app defect and stays red. "Timed out while evaluating UI query",
-      # "Failed to get screenshot" and "Failed to terminate" are XCUITest's
-      # own services timing out on the runner, with nothing in the test to fix
-      # (CLAUDE.md, "Reading a CI failure"); a shard whose every message is
-      # one of those reruns just its failed tests, once. A shard with even one
-      # assertion among them does not — a retry would hide it.
+      # Assertion failures stay red; service and execution timeouts get one rerun.
       - name: Failure messages
         id: failures
         if: steps.tests.outcome == 'failure'
@@ -327,22 +324,20 @@ jobs:
           { echo '```'; scripts/test-failures.sh build/*.xcresult; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           failed=$(for b in build/*.xcresult; do
             xcrun xcresulttool get test-results tests --path "$b" 2>/dev/null \
-              | jq -r '.. | objects | select(.nodeType == "Test Case" and .result == "Failed") | .nodeIdentifier'
-          done | sed 's/()$//; s|^|SlackwaterUITests/|' | paste -sd, -)
+              | jq -r -f scripts/test-failed-selectors.jq
+          done | paste -sd, -)
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
           # Exit 0 only when there is at least one message and every one of
-          # them is a service timeout.
-          if scripts/test-failures.sh build/*.xcresult | awk '
-                /^    / { n++; if ($0 !~ /Timed out while|Failed to get screenshot|Failed to terminate/) bad = 1 }
-                END { exit (n == 0 || bad) }'; then
-            echo "service_only=true" >> "$GITHUB_OUTPUT"
+          # them is a service or execution timeout.
+          if scripts/test-failures.sh build/*.xcresult | sh scripts/test-retryable.sh; then
+            echo "retryable_only=true" >> "$GITHUB_OUTPUT"
           fi
 
       # The first attempt's bundle is renamed, not replaced: it is the evidence
       # of what timed out, and test.sh removes a bundle at the path it writes.
-      - name: Rerun the tests XCUITest's services timed out on
+      - name: Rerun tests that timed out
         id: rerun
-        if: steps.tests.outcome == 'failure' && steps.failures.outputs.service_only == 'true'
+        if: steps.tests.outcome == 'failure' && steps.failures.outputs.retryable_only == 'true'
         run: |
           for b in build/*.xcresult; do mv "$b" "${b%.xcresult}-attempt1.xcresult"; done
           SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \

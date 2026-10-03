@@ -44,7 +44,7 @@ class ScreenshotTestCase: XCTestCase {
         // -seedTour: arm() now fires on every launch, so without this every
         // detail-opening test would grow an unexpected coach mark.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
-                             "-currentFillOff", "-chartPacksOff", "-starTwinkleOff", "-seedTour",
+                             "-currentFillOff", "-chartPacksOff", "-seedTour",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
