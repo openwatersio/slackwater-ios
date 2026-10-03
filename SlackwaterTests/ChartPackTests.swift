@@ -9,7 +9,7 @@ final class ChartPackTests: XCTestCase {
     // MARK: - Attribution
 
     /// The tile provider is named in three places: the constant the app
-    /// fetches from, the Settings sheet the user reads, and the repository's
+    /// fetches from, the About screen the user reads, and the repository's
     /// notice file. Retargeting `BASEMAP_STYLE_URL` left the notice crediting
     /// the retired provider and omitting OpenStreetMap, whose ODbL
     /// attribution is the one that carries a licence obligation. Nothing tied
@@ -22,7 +22,7 @@ final class ChartPackTests: XCTestCase {
         // "tiles.openfreemap.org" -> "openfreemap"
         let provider = try XCTUnwrap(host.split(separator: ".").dropLast().last)
         for (file, what) in [("THIRD-PARTY-NOTICES.md", "the repository notice"),
-                             ("Slackwater/SettingsView.swift", "the Settings sheet")] {
+                             ("Slackwater/AboutView.swift", "the About screen")] {
             let source = try repoSource(file).lowercased()
             XCTAssertTrue(source.contains(provider.lowercased()),
                           "\(what) does not credit \(provider) — the provider \(host) serves")
@@ -30,7 +30,7 @@ final class ChartPackTests: XCTestCase {
                           "\(what) must credit OpenStreetMap: the basemap is ODbL data")
         }
         // The retired provider must not linger anywhere the user can read it.
-        for file in ["THIRD-PARTY-NOTICES.md", "Slackwater/SettingsView.swift"] {
+        for file in ["THIRD-PARTY-NOTICES.md", "Slackwater/AboutView.swift"] {
             XCTAssertFalse(try repoSource(file).lowercased().contains("versatiles"),
                            "\(file) still credits VersaTiles, which the app no longer fetches")
         }
