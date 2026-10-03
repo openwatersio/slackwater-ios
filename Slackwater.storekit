@@ -13,8 +13,8 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "io.openwaters.slackwater.premium.lifetime",
-      "referenceName" : "Premium Lifetime",
+      "productID" : "io.openwaters.slackwater.premium.lifetime.v2",
+      "referenceName" : "Premium Lifetime Purchase",
       "type" : "NonConsumable"
     }
   ],

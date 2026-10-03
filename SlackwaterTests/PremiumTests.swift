@@ -8,7 +8,7 @@ final class PremiumTests: XCTestCase {
         XCTAssertFalse(PremiumStore.isPremium(owned: []))
         XCTAssertFalse(PremiumStore.isPremium(owned: ["some.other.product"]))
         XCTAssertTrue(PremiumStore.isPremium(owned: [PremiumStore.yearlyID]))
-        XCTAssertTrue(PremiumStore.isPremium(owned: [PremiumStore.lifetimeID]))
+        XCTAssertTrue(PremiumStore.isPremium(owned: ["io.openwaters.slackwater.premium.lifetime.v2"]))
         XCTAssertTrue(PremiumStore.isPremium(owned: [PremiumStore.yearlyID,
                                                      PremiumStore.lifetimeID]))
     }
