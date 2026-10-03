@@ -259,6 +259,12 @@ struct SkyBackdrop: View {
     /// The strip's plot depth, which the sky runs on under: shorter on the watch.
     var plotDepth: CGFloat = TimelineGeo.plotDepth
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if DEBUG
+    // Pause decorative animation so UI tests can wait for finite transitions (#580).
+    private let twinkleOff = CommandLine.arguments.contains("-starTwinkleOff")
+    #else
+    private let twinkleOff = false
+    #endif
 
     var body: some View {
         GeometryReader { proxy in
@@ -278,7 +284,7 @@ struct SkyBackdrop: View {
                 if sky.sun != nil {
                     let opacity = starOpacity(sunAltitude: sky.litAltitude)
                     TimelineView(.animation(minimumInterval: 0.125,
-                                            paused: opacity == 0 || reduceMotion)) { timeline in
+                                            paused: opacity == 0 || reduceMotion || twinkleOff)) { timeline in
                         let seconds = timeline.date.timeIntervalSinceReferenceDate
                         // The stars share the sun's frame (`skyPoint` with
                         // its span), so the field slides with the bodies as
@@ -292,7 +298,7 @@ struct SkyBackdrop: View {
                                                      latitude: sky.latitude, span: sky.sunSpan, size: size)
                                 let radius = max(0.5, 1.6 - 0.3 * CGFloat(placed.star.mag))
                                 let twinkle = starTwinkle(index: i, seconds: seconds,
-                                                          reduceMotion: reduceMotion)
+                                                          reduceMotion: reduceMotion || twinkleOff)
                                 context.fill(Path(ellipseIn: CGRect(x: point.x - radius,
                                                                    y: point.y - radius,
                                                                    width: radius * 2,
