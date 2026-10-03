@@ -263,6 +263,7 @@ targets:
     templates: [PortableSources]
     sources:
       - SlackwaterWatch
+      - Slackwater/Assets.xcassets
       # The full catalog ships on the watch (#482). The index is the one file
       # the widget leaves out: the watch browses, so it builds `StationItem.all`.
       - path: Slackwater/Resources/station-index.json
@@ -310,6 +311,7 @@ targets:
       base:
         # Permanent once registered (#207): the companion's id plus .watchkitapp.
         PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
