@@ -92,6 +92,10 @@ struct PlaceDetail: View {
                                       floodDeg: flow?.flood, ebbDeg: flow?.ebb)
         return VStack(spacing: 6) {
             card(reading)
+                // The system clock owns the top-right corner and cannot be
+                // moved, so the glass starts below it rather than under it.
+                // ponytail: tuned on the 46mm simulator.
+                .padding(.top, 22)
                 .padding(.horizontal, 4)
             CrownScrubStrip(data: tl, scale: store?.scale, now: live, imperial: imperial,
                             speedUnit: speedUnit, floodDeg: flow?.flood, ebbDeg: flow?.ebb,
@@ -112,8 +116,7 @@ struct PlaceDetail: View {
                     if let t = tl.snapTimes.last(where: { $0 < scrubTime.addingTimeInterval(-1) }) { scrubTime = t }
                 }
         }
-        // Top-aligned, the card starts beside the clock; the hours row is
-        // the first thing a short screen loses.
+        // Top-aligned: the hours row is the first thing a short screen loses.
         .frame(maxHeight: .infinity, alignment: .top)
         // The sky runs behind the card from the top of the screen and sets
         // at the plot's floor, so the bodies rise and set behind the glass.
@@ -128,13 +131,11 @@ struct PlaceDetail: View {
     private func card(_ r: ScrubReading) -> some View {
         Button { showSheet = true } label: {
             VStack(alignment: .leading, spacing: 2) {
-                // The card's first row is the title, beside the clock: the
-                // place, or the scrubbed time while away from now.
-                // ponytail: the clock's width tuned on the 46mm simulator.
+                // The card's first row is the title: the place, or the
+                // scrubbed time while away from now.
                 title.font(.headline).lineLimit(1)
                     // The scrubbed time shrinks rather than lose its minutes.
                     .minimumScaleFactor(0.7)
-                    .padding(.trailing, 48)
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     if let value = r.value {
                         Text(verbatim: value).font(.system(.title, design: .rounded).weight(.semibold).monospacedDigit())
