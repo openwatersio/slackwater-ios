@@ -9,19 +9,21 @@ Slackwater ships from the Open Waters Apple team (`Z59BQLF5VQ`). The Nightly wor
 | ASC API key | `testflight` environment secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` (the `.p8` contents) | Signs `asc.mjs` requests and authenticates the upload. App Store Connect → Users and Access → Integrations → Team Keys, role App Manager |
 | Bundle ID (app) | `io.openwaters.slackwater` | Capabilities: In-App Purchase, App Groups, iCloud (key-value storage), Associated Domains. The `apple-app-site-association` file slackwater.xyz serves for `applinks:` must list `Z59BQLF5VQ.io.openwaters.slackwater` |
 | Bundle ID (appex) | `io.openwaters.slackwater.widgets` | Capabilities: App Groups. An appex needs its own bundle ID **and its own profile** — the app's covers neither |
-| App Group | `group.io.openwaters.slackwater` | Shared by app + appex (`Slackwater.entitlements`, `SlackwaterWidgets.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Not in the ASC API** — `/v1/appGroups` is a 404. Create it in Xcode or the developer.apple.com UI |
-| In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |
+| Bundle ID (watch app) | `io.openwaters.slackwater.watchkitapp` | Capabilities: App Groups, iCloud (key-value storage). The watch reads the phone's KVS store, so its `ubiquity-kvstore-identifier` names `io.openwaters.slackwater`, not itself |
+| Bundle ID (watch complications) | `io.openwaters.slackwater.watchkitapp.widgets` | Capabilities: App Groups |
+| App Group | `group.io.openwaters.slackwater` | Shared by every target above (each target's `.entitlements`); how the widget reads the fitted model and the Premium entitlement. **Not in the ASC API** — `/v1/appGroups` is a 404. Create it in Xcode or the developer.apple.com UI |
+| In-app purchases | `io.openwaters.slackwater.premium.yearly` (auto-renewable, in a subscription group) and `io.openwaters.slackwater.premium.lifetime.v2` (non-consumable) | `PremiumStore.swift`. Created in the App Store Connect UI. The ID without `.v2` belongs to a one-year subscription and is not requested by the app. `Slackwater.storekit` only reaches Debug runs, so an archive with no products in ASC shows the pitch with nothing to buy |
 | Distribution identity | `testflight` environment secrets `SIGNING_P12` (base64 `.p12`) and `SIGNING_P12_PASSWORD` | "Apple Distribution" certificate, minted through `asc.mjs create-cert`. `testflight.sh` imports it into a throwaway keychain per run |
-| Provisioning profiles | "Slackwater App Store" and "Slackwater Widgets App Store" | `testflight.sh` downloads both by name (`asc.mjs install-profiles`), so a re-mint needs no secret change. Both must post-date every capability on their bundle ID |
+| Provisioning profiles | "Slackwater App Store", "Slackwater Widgets App Store", "Slackwater Watch App Store", and "Slackwater Watch Widgets App Store" | `testflight.sh` downloads all four by name (`asc.mjs install-profiles`), so a re-mint needs no secret change. Each must post-date every capability on its bundle ID |
 | Signing config | `project.yml`: Release = manual signing, "Apple Distribution" + the profile; Debug stays automatic | |
 
 ## One-time setup
 
 Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY`). `op run` works well for keeping them in 1Password.
 
-1. **App IDs, capabilities, and the App Group.** Open `Slackwater.xcodeproj` signed into the team and build the Debug scheme to a device. Automatic signing registers both bundle IDs, enables the capabilities in the entitlements files, and creates the App Group. Confirm on developer.apple.com → Identifiers that both IDs list the capabilities in the table above.
+1. **App IDs, capabilities, and the App Group.** Open `Slackwater.xcodeproj` signed into the team and build the `Slackwater` and `SlackwaterWatch` Debug schemes to their respective devices. Automatic signing registers all four bundle IDs and enables the capabilities in their entitlements files. Confirm on developer.apple.com → Identifiers that all four IDs list the capabilities in the table above and belong to `group.io.openwaters.slackwater`. Verify the watch app's iCloud key-value storage entitlement names the phone's store, `$(TeamIdentifierPrefix)io.openwaters.slackwater`, before creating profiles.
 2. **App record.** App Store Connect → Apps → New App, bundle ID `io.openwaters.slackwater`. Records can't be created through the public API.
-3. **In-app purchases.** Create the subscription group, the yearly subscription, and the lifetime purchase with the product IDs above. Reference names match `Slackwater.storekit`: group "Slackwater Premium", "Premium Yearly", "Premium Lifetime". Check `inAppPurchasesV2` and `subscriptionGroups` on the app before release notes mention a purchase.
+3. **In-app purchases.** Create the subscription group, the yearly subscription, and the lifetime purchase with the product IDs above. Reference names match `Slackwater.storekit`: group "Slackwater Premium", "Premium Yearly", "Premium Lifetime Purchase". Check `inAppPurchasesV2` and `subscriptionGroups` on the app before release notes mention a purchase.
 4. **Distribution certificate.**
 
    ```sh
@@ -37,6 +39,8 @@ Run from a checkout with the ASC key exported (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `A
    ```sh
    node scripts/asc.mjs create-profile io.openwaters.slackwater <certId> app.mobileprovision
    node scripts/asc.mjs create-profile io.openwaters.slackwater.widgets <certId> widgets.mobileprovision "Slackwater Widgets App Store"
+   node scripts/asc.mjs create-profile io.openwaters.slackwater.watchkitapp <certId> watch.mobileprovision "Slackwater Watch App Store"
+   node scripts/asc.mjs create-profile io.openwaters.slackwater.watchkitapp.widgets <certId> watch-widgets.mobileprovision "Slackwater Watch Widgets App Store"
    ```
 
 6. **Secrets**, in a `testflight` environment that only `main` can deploy to, so a workflow edited on another branch can't read them:
@@ -106,12 +110,11 @@ The order that works, when a target gains an entitlement:
 5. **Add the appex to `exportOptions`' `provisioningProfiles` dict** in
    `testflight.sh`. A missing entry fails the export *after* a successful archive.
 
-The watch app follows the same order before it can ship. Until its two bundle IDs
-and profiles exist, only Debug builds embed it: the app's Release block sets
-`EXCLUDED_SOURCE_FILE_NAMES: SlackwaterWatch.app`, which skips the Embed Watch
-Content copy, and the watch target builds unsigned in Release. The archive still
-compiles the watch app for the device but leaves it out. Remove both settings in
-the change that registers the watch bundle IDs.
+The watch app and its complications went through the same order (#525): each is
+a bundle ID with App Groups assigned in the developer.apple.com UI, its own
+profile, a Release block, and an `exportOptions` entry. Watch bundle IDs register
+as iOS bundle IDs, so their profiles are `IOS_APP_STORE` like the phone's, and the
+watch app ships inside the phone's archive rather than as a separate upload.
 
 Verify before archiving, rather than after:
 

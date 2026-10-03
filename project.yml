@@ -135,7 +135,6 @@ targets:
         product: MapLibre
       - target: SlackwaterWidgets
         embed: true
-      # Embedded in Debug only; see EXCLUDED_SOURCE_FILE_NAMES under Release.
       - target: SlackwaterWatch
     info:
       path: Slackwater/Info.plist
@@ -222,12 +221,6 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Apple Distribution"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater App Store"
-          # Keeps the watch app out of the archive until it has its own bundle
-          # IDs and App Store profiles (#482, Phase 3). Xcode applies this
-          # setting to the Embed Watch Content copy as well as to sources, and
-          # skipping the copy also skips its embedded-binary validation. Delete
-          # it, and SlackwaterWatch's Release block, in the provisioning PR.
-          EXCLUDED_SOURCE_FILE_NAMES: SlackwaterWatch.app
   SlackwaterWidgets:
     type: app-extension
     platform: iOS
@@ -327,13 +320,12 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: NO
         CODE_SIGN_ENTITLEMENTS: SlackwaterWatch/SlackwaterWatch.entitlements
       configs:
-        # A Release archive still builds this target, because the app depends
-        # on it, but does not embed it (the app's EXCLUDED_SOURCE_FILE_NAMES).
-        # There is no distribution profile to sign it with yet, so it builds
-        # unsigned; XcodeGen's watchOS preset already sets SKIP_INSTALL, which
-        # keeps it out of the archive's products.
+        # Its own profile, like the phone's appex: the app's covers neither
+        # the watch app nor its complications (#525, docs/testflight.md).
         Release:
-          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "Slackwater Watch App Store"
   # The watch's complications (#524): the phone's picker, loader and card,
   # drawn for the watch's four accessory families.
   SlackwaterWatchWidgets:
@@ -359,9 +351,10 @@ targets:
         SKIP_INSTALL: YES
         SWIFT_EMIT_LOC_STRINGS: NO
       configs:
-        # Unsigned like the watch app until #525 registers its profile.
         Release:
-          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "Slackwater Watch Widgets App Store"
   SlackwaterTests:
     type: bundle.unit-test
     platform: iOS
