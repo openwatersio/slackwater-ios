@@ -9,7 +9,8 @@ description: Use when cutting a Slackwater iOS release, bumping MARKETING_VERSIO
 been — read The rule that bites before touching either one.
 
 One-time infrastructure (ASC key, keychain, signing identity, profile) lives in
-`docs/testflight.md`. This skill is the per-release procedure only.
+`docs/testflight.md`. This skill is the per-release procedure only. Submitting a
+beta build to the App Store is `docs/appstore.md`.
 
 ## The rule that bites
 
