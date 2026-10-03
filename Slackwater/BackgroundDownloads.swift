@@ -141,21 +141,10 @@ enum BackgroundDownloads {
                 // uses, and `ChsFitService.shared` is @MainActor-isolated.
                 let service = ChsFitService.shared
                 service.resumeForBackground()
-                // Per REQUEST, not per station: a 210-day current gate is ~150
-                // requests behind one station-level tick, which freezes the bar
-                // for ~2.5 minutes on an API that kills tasks showing no
-                // progress first. `ChsJob.total`/`done` already track chunks
-                // within a job (set by `fit`/`fitCurrent`); `requestCount` is
-                // the same figure for a job that hasn't started one yet, so it
-                // stands in as that job's planned share before `total` is set.
                 while !Task.isCancelled, service.queue.active {
-                    let jobs = service.queue.jobs
-                    let planned = jobs.reduce(0.0) { $0 + $1.requestCount }
-                    let done = jobs.reduce(0.0) { sum, job in
-                        sum + (job.status == .ready ? job.requestCount : Double(job.done))
-                    }
-                    task.progress.totalUnitCount = Int64(planned.rounded())
-                    task.progress.completedUnitCount = Int64(done.rounded())
+                    let progress = service.queue.requestProgress
+                    task.progress.totalUnitCount = Int64(progress.total.rounded())
+                    task.progress.completedUnitCount = Int64(progress.completed.rounded())
                     // A deferred job is sitting out `ChsQueue.backoff`, which
                     // reads as a stall with no explanation — up to 15 minutes,
                     // on an API that kills tasks showing no progress first.

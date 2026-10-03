@@ -352,20 +352,14 @@ final class ChsFitService: ObservableObject {
                                    tier: tier, cohort: cohort.ids) { queue.add(job) }
         queue.prioritize(lat: lat, lon: lon)
         markFailOnly()
-        // What accepting would actually GAIN, not what geography holds.
-        // `autoFitSet` is pure distance and never consults the queue, so from
-        // the second launch onward every already-fitted station still counted
-        // — the strip offered "Download 14 more nearby?" for fourteen stations
-        // sitting on disk, and Yes was a dead tap (`add` is a no-op for a
-        // known id, so `pump()` found nothing to do). `.ready` is the only
-        // status that means "you already have this": a `.pending`, `.failed`
-        // or backing-off job is still work the tier would carry out.
-        // `constrained:` matches `adopt`'s own call above — in Low Data Mode
-        // the offer must not be larger than accepting it would queue.
+        guard let next = tier.next else {
+            remainingBeyondCohort = 0
+            return
+        }
         remainingBeyondCohort = Self.autoFitSet(lat: lat, lon: lon,
                                                 constrained: Connectivity.shared.constrained,
-                                                tier: .nearby, cohort: cohort.ids)
-            .count { !cohort.ids.contains($0.id) && queue.status($0.id) != .ready }
+                                                tier: next, cohort: cohort.ids)
+            .count { queue.status($0.id) == nil }
     }
 
     /// The list hands over what it is rendering. Captured once per place; a

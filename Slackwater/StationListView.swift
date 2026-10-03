@@ -760,7 +760,9 @@ struct StationListView: View {
                                       tier: chs.tier, declined: chs.declinedNearby,
                                       remaining: chs.remainingBeyondCohort),
             onOpen: { showDownloads = true },
-            onAccept: { ChsFitService.shared.accept(.nearby) },
+            onAccept: {
+                if let next = chs.tier.next { ChsFitService.shared.accept(next) }
+            },
             onDecline: { ChsFitService.shared.declineNearby() })
             // On CHANGE, not on every body evaluation. Dispatching the
             // capture from inside the builder ran it on every render, and a
