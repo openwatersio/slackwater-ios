@@ -34,8 +34,19 @@ struct CalendarStationsView: View {
             // Revisit (a capped list, or a lazy container once the Toggle-tap bug above is
             // understood) if a real favorites list ever gets long enough for this to measure.
             VStack(alignment: .leading, spacing: 10) {
+                Label {
+                    Text(premium.isPremium
+                         ? String(localized: "Slackwater Premium")
+                         : String(localized: "Requires Slackwater Premium"))
+                } icon: {
+                    Image(systemName: "sparkles")
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(SN.leaf)
+                .padding(.bottom, 6)
+
                 if favorites.ids.isEmpty {
-                    Text("Save a station and it can publish its tides or slack windows to your calendar.")
+                    Text("Add a place to your favourites to create a calendar for its tides or slack-water events.")
                         .font(.footnote)
                         .foregroundStyle(SN.foam.opacity(0.62))
                         .accessibilityIdentifier("calendar-empty")
@@ -46,11 +57,10 @@ struct CalendarStationsView: View {
                             .filter { !favorites.ids.contains($0) }, id: \.self) { stationID in
                     row(stationID)
                 }
-                if !premium.isPremium, !favorites.ids.isEmpty {
-                    Text("Station calendars are part of Slackwater Premium: each station gets its own calendar you can switch on and off.")
-                        .font(.caption)
-                        .foregroundStyle(SN.foam.opacity(0.62))
-                }
+                Text("Turning on a favourite creates a separate calendar in your Calendar app. It contains high and low tides or slack-water events, plus eclipses.")
+                    .font(.footnote)
+                    .foregroundStyle(SN.foam.opacity(0.62))
+                    .padding(.top, 6)
             }
             .padding(16)
             .padding(.bottom, 30)
@@ -106,7 +116,14 @@ struct CalendarStationsView: View {
         // the same render pass would be a second catalog scan for a value already in hand.
         let record = WidgetStationLoader.loadRecord(id: stationID)
         let subtitle: String = if let record {
-            on ? stationCalendarTitle(name: name(stationID), kind: record.calendarKind) : "Publish this station's events"
+            if on {
+                stationCalendarTitle(name: name(stationID), kind: record.calendarKind)
+            } else {
+                switch record.calendarKind {
+                case .tide: String(localized: "Add high and low tides")
+                case .current, .derived: String(localized: "Add slack-water events")
+                }
+            }
         } else {
             "Needs a download before it can publish"
         }

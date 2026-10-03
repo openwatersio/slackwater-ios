@@ -11,7 +11,7 @@ struct PremiumPurchaseControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if store.isPremium {
-                Label("You have Premium — thank you.", systemImage: "checkmark.seal")
+                Label("You have Premium — thank you.", systemImage: "sparkles")
                     .font(.callout.weight(.semibold))
             } else {
                 if loading {
@@ -41,6 +41,7 @@ struct PremiumPurchaseControls: View {
                         }
                     } label: {
                         HStack {
+                            Image(systemName: "sparkles")
                             VStack(alignment: .leading) {
                                 Text(product.displayName).fontWeight(.semibold)
                                 if product.id == PremiumStore.lifetimeID {
