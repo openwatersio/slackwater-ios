@@ -3,7 +3,12 @@ import XCTest
 
 final class CalendarSettingsTests: ScreenshotTestCase {
     private func openCalendarSettings(_ app: XCUIApplication) {
-        openSettings(app)
+        let settings = app.navigationBars["Settings"]
+        for _ in 0..<3 {
+            openSettings(app)
+            if settings.appears(within: 5) { break }
+        }
+        XCTAssert(settings.exists, "Settings did not open after tapping its row")
         let row = app.buttons["settings-calendar-row"].firstMatch
         for _ in 0..<4 where !row.isHittable { app.swipeUp() }
         row.tap()
