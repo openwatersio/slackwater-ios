@@ -188,6 +188,26 @@ Each "not yet" row names the issue that closes it; [`scrubber.md`](scrubber.md) 
   ```
 
   Five frames, numbered in upload order: currents on slack, a mixed tide mid-rise, the scrubber parked at night, the nearby list with its three groups, and the map. None may show Premium or imply navigation use.
+- [ ] Mac screenshots uploaded if distributing on Mac. Apple accepts 1280×800, 1440×900, 2560×1600, or 2880×1800 ([specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)). Run the installed Mac app, then use the guided capture session:
+
+  ```sh
+  ./scripts/mac-screenshots.sh --set
+  ./scripts/mac-screenshots.sh --verify
+  ```
+
+  The script prompts you to choose each screen, resizes the normal Mac window before every capture, and saves five numbered PNGs in `/tmp/slackwater-appstore/mac`. It captures the actual running app, including its Mac sidebar and title bar. It uses live app state: the clock, location, favorites, selected dates, and map camera are not seeded. On Mac, choose a local place and scroll its detail to Nearby for frame four, keeping Favorites visible in the sidebar. Choose a nighttime schedule row or scrub the graph for frame three. Double-click the map to zoom, then click empty water to clear its preview card for frame five. Wait for reading updates and map tiles before confirming each prompt. Inspect the resulting images before uploading in filename order; `app-version.txt` records the captured version and build.
+
+  `--size` only sizes the window; `--capture 02-tide` captures the current screen without prompting. `SHOT_DIR` overrides the output directory. The default sizes the window to 1280×800 points and exports 2560×1600 pixels on Retina. `MAC_PIXELS=1280x800` supports a non-Retina display; `MAC_PIXELS=1440x900` or `2880x1800` uses a 1440×900 point window. The main display must have room for the entire window. The script refuses full screen, ambiguous windows, wrong aspect ratios, and upscaling. Exports are opaque sRGB PNGs, with rounded window corners flattened onto a dark background and no window shadow.
+
+  macOS requires Accessibility and Screen Recording access for the terminal or app hosting the script. Enable these under System Settings → Privacy & Security if denied. Run exactly one Slackwater app; `MAC_BUNDLE_ID` can select a particular running build when both the old `org.openwaters.slackwater` and current `io.openwaters.slackwater` identities are installed. Xcode command-line tools supply the Swift compiler; no additional packages or simulator are needed. Generated screenshots and helper binaries stay outside tracked source.
+
+  Focused export checks cover alpha removal, native-size and downsampled output, invalid dimensions, and rejection of distorted or upscaled images:
+
+  ```sh
+  xcrun swiftc -D SCREENSHOT_TEST scripts/mac-screenshot.swift scripts/mac-screenshot-tests.swift \
+    -o /tmp/slackwater-mac-screenshot-checks
+  /tmp/slackwater-mac-screenshot-checks
+  ```
 - [ ] Station counts re-derived and rounded down.
 - [ ] Support URL `https://slackwater.xyz/support/`. Marketing URL `https://slackwater.xyz`.
 - [ ] Premium listed as an in-app purchase if it is on sale by submission; the description's "the offline core is free and stays free" is written to stay true either way.
