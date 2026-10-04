@@ -3,15 +3,35 @@ import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
     func testWidgetsAndAboutAreInSettings() {
-        checkSettings(language: "en", aboutTitle: "About", restoreTitle: "Restore purchase")
+        checkSettings(language: "en", settingsTitle: "Settings", aboutTitle: "About", restoreTitle: "Restore purchase")
     }
 
     func testSettingsInFrench() {
-        checkSettings(language: "fr-CA", aboutTitle: "À propos", restoreTitle: "Restaurer l’achat")
+        checkSettings(language: "fr-CA", settingsTitle: "Réglages", aboutTitle: "À propos", restoreTitle: "Restaurer l’achat")
     }
 
     func testSettingsInSpanish() {
-        checkSettings(language: "es-ES", aboutTitle: "Acerca de", restoreTitle: "Restaurar compra")
+        checkSettings(language: "es-ES", settingsTitle: "Ajustes", aboutTitle: "Acerca de", restoreTitle: "Restaurar compra")
+    }
+
+    func testSettingsInJapanese() {
+        checkSettings(language: "ja", settingsTitle: "設定", aboutTitle: "このアプリについて", restoreTitle: "購入を復元")
+    }
+
+    func testSettingsInGerman() {
+        checkSettings(language: "de", settingsTitle: "Einstellungen", aboutTitle: "Über", restoreTitle: "Kauf wiederherstellen")
+    }
+
+    func testSettingsInPortuguese() {
+        checkSettings(language: "pt-BR", settingsTitle: "Ajustes", aboutTitle: "Sobre", restoreTitle: "Restaurar compra")
+    }
+
+    func testSettingsInDutch() {
+        checkSettings(language: "nl", settingsTitle: "Instellingen", aboutTitle: "Info", restoreTitle: "Aankoop herstellen")
+    }
+
+    func testSettingsInNorwegian() {
+        checkSettings(language: "nb", settingsTitle: "Innstillinger", aboutTitle: "Om", restoreTitle: "Gjenopprett kjøp")
     }
 
     func testMacSettingsShowsDesktopWidgets() {
@@ -57,14 +77,13 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "settings-tv-policy.png")
     }
 
-    private func checkSettings(language: String, aboutTitle: String, restoreTitle: String) {
+    private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String) {
         let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
         // Use the gear's identifier-independent location in translated runs.
         if language == "en" {
             openSettings(app)
         } else {
-            let label = language == "fr-CA" ? "Réglages" : "Ajustes"
-            let settings = app.buttons[label].firstMatch
+            let settings = app.buttons[settingsTitle].firstMatch
             scrollTo(settings, in: app)
             settings.tap()
         }

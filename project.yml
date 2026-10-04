@@ -2,7 +2,7 @@ name: Slackwater
 options:
   bundleIdPrefix: io.openwaters
   developmentLanguage: en
-  knownRegions: [Base, en, es-ES, fr-CA]
+  knownRegions: [Base, de, en, es-ES, fr-CA, ja, nb, nl, pt-BR]
   # iOS 26: Liquid Glass chrome with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
@@ -264,6 +264,7 @@ targets:
     templates: [PortableSources]
     sources:
       - SlackwaterWatch
+      - Slackwater/InfoPlist.xcstrings
       - Slackwater/Assets.xcassets
       # The full catalog ships on the watch (#482). The index is the one file
       # the widget leaves out: the watch browses, so it builds `StationItem.all`.

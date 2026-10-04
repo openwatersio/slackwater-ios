@@ -82,7 +82,7 @@ struct SettingsView: View {
                                     Text(
                                         alerts.rules.isEmpty
                                             ? "Press and hold any station's timeline to set an alert"
-                                            : "\(alerts.rules.count) alert\(alerts.rules.count == 1 ? "" : "s")")
+                                            : "\(alerts.rules.count) alerts")
                                     Spacer()
                                     Image(systemName: "chevron.right")
                                         .font(.footnote.weight(.semibold))

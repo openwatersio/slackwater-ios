@@ -1,0 +1,248 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "When is the next high tide in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wann ist das nächste Hochwasser in ${applicationName}",
+              "Um wie viel Uhr ist das nächste Hochwasser in ${applicationName}",
+              "Wann ist Hochwasser in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "When is the next high tide in ${applicationName}",
+              "What time is the next high tide in ${applicationName}",
+              "When is high tide in ${applicationName}"
+            ]
+          }
+        },
+        "es-ES" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuándo es la próxima pleamar en ${applicationName}",
+              "A qué hora es la próxima pleamar en ${applicationName}",
+              "Cuándo es la pleamar en ${applicationName}"
+            ]
+          }
+        },
+        "fr-CA" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quand est la prochaine marée haute dans ${applicationName}",
+              "À quelle heure est la prochaine marée haute dans ${applicationName}",
+              "Quand est la marée haute dans ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で次の満潮はいつ",
+              "${applicationName}で次の満潮は何時",
+              "${applicationName}で満潮はいつ"
+            ]
+          }
+        },
+        "nb" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Når er neste høyvann i ${applicationName}",
+              "Hva er klokken ved neste høyvann i ${applicationName}",
+              "Når er det høyvann i ${applicationName}"
+            ]
+          }
+        },
+        "nl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wanneer is het volgende hoogwater in ${applicationName}",
+              "Hoe laat is het volgende hoogwater in ${applicationName}",
+              "Wanneer is het hoogwater in ${applicationName}"
+            ]
+          }
+        },
+        "pt-BR" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é a próxima preamar no ${applicationName}",
+              "A que horas é a próxima preamar no ${applicationName}",
+              "Quando é a preamar no ${applicationName}"
+            ]
+          }
+        }
+      },
+      "comment" : "Siri invocation phrases. Preserve ${applicationName} in every phrase."
+    },
+    "When is the next low tide in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wann ist das nächste Niedrigwasser in ${applicationName}",
+              "Um wie viel Uhr ist das nächste Niedrigwasser in ${applicationName}",
+              "Wann ist Niedrigwasser in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "When is the next low tide in ${applicationName}",
+              "What time is the next low tide in ${applicationName}",
+              "When is low tide in ${applicationName}"
+            ]
+          }
+        },
+        "es-ES" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuándo es la próxima bajamar en ${applicationName}",
+              "A qué hora es la próxima bajamar en ${applicationName}",
+              "Cuándo es la bajamar en ${applicationName}"
+            ]
+          }
+        },
+        "fr-CA" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quand est la prochaine marée basse dans ${applicationName}",
+              "À quelle heure est la prochaine marée basse dans ${applicationName}",
+              "Quand est la marée basse dans ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で次の干潮はいつ",
+              "${applicationName}で次の干潮は何時",
+              "${applicationName}で干潮はいつ"
+            ]
+          }
+        },
+        "nb" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Når er neste lavvann i ${applicationName}",
+              "Hva er klokken ved neste lavvann i ${applicationName}",
+              "Når er det lavvann i ${applicationName}"
+            ]
+          }
+        },
+        "nl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wanneer is het volgende laagwater in ${applicationName}",
+              "Hoe laat is het volgende laagwater in ${applicationName}",
+              "Wanneer is het laagwater in ${applicationName}"
+            ]
+          }
+        },
+        "pt-BR" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é a próxima baixa-mar no ${applicationName}",
+              "A que horas é a próxima baixa-mar no ${applicationName}",
+              "Quando é a baixa-mar no ${applicationName}"
+            ]
+          }
+        }
+      },
+      "comment" : "Siri invocation phrases. Preserve ${applicationName} in every phrase."
+    },
+    "When is the next slack window in ${applicationName}" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wann ist das nächste Stauwasserfenster in ${applicationName}"
+            ]
+          }
+        },
+        "en" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "When is the next slack window in ${applicationName}"
+            ]
+          }
+        },
+        "es-ES" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Cuándo es la próxima ventana de estoa en ${applicationName}"
+            ]
+          }
+        },
+        "fr-CA" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quand est la prochaine fenêtre d’étale dans ${applicationName}"
+            ]
+          }
+        },
+        "ja" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}で次の潮止まり時間帯はいつ"
+            ]
+          }
+        },
+        "nb" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Når er neste strømstillevindu i ${applicationName}"
+            ]
+          }
+        },
+        "nl" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Wanneer is het volgende kenteringsvenster in ${applicationName}"
+            ]
+          }
+        },
+        "pt-BR" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é a próxima janela de estofo no ${applicationName}"
+            ]
+          }
+        }
+      },
+      "comment" : "Siri invocation phrases. Preserve ${applicationName} in every phrase."
+    }
+  },
+  "version" : "1.0"
+}
