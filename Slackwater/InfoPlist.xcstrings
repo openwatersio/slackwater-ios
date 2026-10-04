@@ -1,6 +1,17 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "CFBundleDisplayName" : {
+      "shouldTranslate" : false,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater"
+          }
+        }
+      }
+    },
     "CFBundleName" : {
       "comment" : "Bundle name",
       "extractionState" : "extracted_with_value",
@@ -18,6 +29,12 @@
       "comment" : "Privacy - Calendars Full Access Usage Description",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater erstellt für jede Station, die du aktivierst, einen eigenen Kalender mit dem Namen dieser Station und hält ihre Gezeiten- oder Strömungsereignisse aktuell. Wenn du die Station deaktivierst, löscht Slackwater diesen Kalender und seine Ereignisse. Es liest nur Kalender mit einem Stationsnamen, um seine eigenen zu finden, und verändert niemals deine anderen Kalender."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
@@ -35,16 +52,52 @@
             "state" : "translated",
             "value" : "Slackwater crée un calendrier pour chaque station que vous activez, nommé d’après cette station, et y maintient à jour ses marées ou ses courants. Désactivez la station et Slackwater supprime ce calendrier et ses événements. Il ne lit que les calendriers portant le nom d’une station, pour retrouver les siens, et ne modifie jamais vos autres calendriers."
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwaterは、オンにした観測所ごとに、その観測所名のカレンダーを作成し、潮汐や潮流の予定を最新に保ちます。観測所をオフにすると、そのカレンダーと予定を削除します。自分が作成したカレンダーを見つけるために、観測所名のカレンダーだけを読み取り、ほかのカレンダーは変更しません。"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater gir hver stasjon du slår på, en egen kalender med stasjonens navn, og holder tidevanns- eller strømhendelsene oppdatert. Når du slår av stasjonen, sletter Slackwater kalenderen og hendelsene. Appen leser bare kalendere med stasjonsnavn for å finne sine egne, og endrer aldri de andre kalenderne dine."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater geeft elk station dat je aanzet een eigen kalender met de naam van dat station en houdt de getij- of stroomgebeurtenissen daarin bij. Als je het station uitzet, verwijdert Slackwater die kalender en de gebeurtenissen. Het leest alleen kalenders met een stationsnaam om zijn eigen kalenders te vinden en wijzigt nooit je andere kalenders."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slackwater cria um calendário para cada estação que você ativa, com o nome da estação, e mantém seus eventos de maré ou corrente atualizados. Ao desativar a estação, Slackwater exclui esse calendário e seus eventos. Ele lê apenas calendários com nomes de estações, para encontrar os seus, e nunca altera seus outros calendários."
+          }
         }
       }
     },
     "NSLocationWhenInUseUsageDescription" : {
       "comment" : "System location permission prompt. Explain why Slackwater requests location and that the location remains on this device.",
       "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Standort hilft, Gezeiten- und Strömungsvorhersagen in der Nähe zu finden. Er bleibt auf diesem Gerät."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Your location helps find nearby tide and current predictions. It stays on this device."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu ubicación ayuda a encontrar predicciones cercanas de mareas y corrientes. Permanece en este dispositivo."
           }
         },
         "fr-CA" : {
@@ -53,10 +106,28 @@
             "value" : "Votre position permet de trouver des prévisions de marée et de courant à proximité. Elle reste sur cet appareil."
           }
         },
-        "es-ES" : {
+        "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tu ubicación ayuda a encontrar predicciones cercanas de mareas y corrientes. Permanece en este dispositivo."
+            "value" : "位置情報を使って、近くの潮汐と潮流の予測を探します。位置情報はこのデバイス内にとどまります。"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posisjonen din hjelper med å finne tidevanns- og strømprognoser i nærheten. Den blir på denne enheten."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je locatie helpt om getij- en stroomvoorspellingen in de buurt te vinden. Deze blijft op dit apparaat."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sua localização ajuda a encontrar previsões de marés e correntes próximas. Ela fica neste dispositivo."
           }
         }
       }
