@@ -28,7 +28,7 @@ The following are deliberately outside this specification because they are separ
 - station header, favourite control, navigation, provenance, and related-station links; and
 - loading, download, and error cards shown instead of the scrubber.
 
-This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are separate contracts.
+This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
 
 ## 2. Product idea
 
@@ -739,6 +739,7 @@ These scenarios define the minimum behavior shared by all platforms.
 These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
+- The online-current detail has no alert popup, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 

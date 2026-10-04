@@ -84,6 +84,8 @@ So, structurally:
 
 `ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. `ChsFitter.basis` preserves the validated 23 constituents and excludes SA/SSA from the 60-day fit. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
 
+The 60-day tide window is not a download-time knob. A 35-day fit missed held-out CHS predictions by up to 121 cm, the safe floor is about 48 days, and the in-sample `rms` cannot see the failure. [CHS tide validation](validation/chs-tides.md) has the bar and the sweep.
+
 ### This pattern does NOT generalise — the rule, and why
 
 Fetch-don't-bundle looks like a general answer to any restrictively licensed
