@@ -91,7 +91,7 @@ struct SettingsView: View {
                             }
                         }
 
-                        section("Calendar") {
+                        section(String(localized: "Calendar", comment: "Settings section heading.")) {
                             NavigationLink {
                                 CalendarStationsView()
                                     .navigationTitle("Favourites calendars")
