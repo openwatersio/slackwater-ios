@@ -27,9 +27,6 @@ struct StationCardGraph: View {
     /// Vertical headroom above and below the sampled range, as a fraction
     /// of it.
     private static let domainPadFraction = 0.25
-    /// Strip at the bottom reserved for the time axis; the curve plots above
-    /// it so a trough never runs into the labels.
-    private static let axisHeight: CGFloat = 6
     /// An extreme closer than this to a card edge keeps its dot and axis
     /// time but drops its value label; every axis time — extreme or slack
     /// crossing — uses the tighter margin.
@@ -96,6 +93,10 @@ struct StationCardGraph: View {
     /// the line's rate colour. Empty on a current curve, and the preview
     /// sines — the line is then plain blue.
     var rates: [Double] = []
+    var showsReadings = true
+    var showsTimes = true
+    // Compact widgets need a separate lane for times below the curve and its dots.
+    var timeLabelSpace: CGFloat = 6
 
     var body: some View {
         Canvas { context, size in
@@ -113,7 +114,7 @@ struct StationCardGraph: View {
             lo -= pad; hi += pad
 
             func x(_ t: Date) -> CGFloat { t.timeIntervalSince(start) * xScale }
-            let plotHeight = size.height - Self.axisHeight
+            let plotHeight = max(0, size.height - timeLabelSpace)
             func y(_ v: Double) -> CGFloat { plotHeight * (1 - (v - lo) / (hi - lo)) }
             let nowX = x(now)
 
@@ -199,7 +200,7 @@ struct StationCardGraph: View {
                 }
                 // The extreme's time joins the bottom axis under the axis's
                 // own edge rule — the same one the slack crossing times use.
-                if !isCurrent, dotAt.x >= Self.axisEdgeMargin,
+                if showsTimes, !isCurrent, dotAt.x >= Self.axisEdgeMargin,
                    dotAt.x <= size.width - Self.axisEdgeMargin {
                     context.draw(Text(e.timeText)
                                     .font(.system(size: Self.timeFontSize).monospacedDigit())
@@ -210,7 +211,7 @@ struct StationCardGraph: View {
                 // An extreme hugging the card edge keeps its dot and axis
                 // time but drops its value label — a shifted label detaches
                 // from its dot and reads as belonging to the wrong spot.
-                guard dotAt.x >= Self.labelEdgeMargin,
+                guard showsReadings, dotAt.x >= Self.labelEdgeMargin,
                       dotAt.x <= size.width - Self.labelEdgeMargin else { continue }
                 // The reading hangs off the turn toward the plot middle with
                 // its pointer nearest the dot (current-charts §15.1). The set
@@ -233,7 +234,7 @@ struct StationCardGraph: View {
 
             // The axis names each run's opening, and a bare slack only where
             // no run covers it — the same moments the detail strip prints.
-            if includesZero {
+            if includesZero && showsTimes {
                 for when in currentAxisMoments(runs: windows, slacks: slacks) {
                     let cx = x(when)
                     let fade = when < now ? CurveStyle.pastLabelFade : 1.0

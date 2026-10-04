@@ -708,3 +708,21 @@ colour is the phase, and the curve's labels are the schedule. Turns near
 either edge keep their dot and time and drop the value, as on the card. A
 derived gate, which has no curve, keeps a *Slack · time* line.
 
+### 15.6 Lock-screen widgets
+
+The circular and rectangular lock-screen widgets draw `StationCardGraph`,
+with its now dot, dimmed past, and slack-window strokes. The circular
+widget shows three hours on either side of now above the next-event time,
+without curve labels. The rectangle shows the place and current height or speed
+above the small widget's curve span, keeping axis times but omitting
+hanging readings. Derived gates use their schematic phase curve, without
+speed values or measured slack windows. The inline family keeps its text
+layout because it cannot contain a chart.
+The rectangle reserves a 22-point time-label lane below the curve so low
+tide dots and strokes cannot intersect the times.
+
+All three declare a removable transparent widget container, including
+their locked and empty states.
+The locked state uses the watch's tide icon; tapping it opens the Premium
+support explanation in Settings. Loading placeholders use the same icon,
+without calculating predictions or linking subscribers to Premium.
