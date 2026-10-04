@@ -62,7 +62,6 @@ struct AccessoryCircularContent: View {
             if let next = snapshot.next {
                 Text(next.time, style: .time)
                     .font(.caption.weight(.semibold).monospacedDigit())
-                    .minimumScaleFactor(0.7)
                     .lineLimit(1)
                     .environment(\.timeZone, snapshot.tz)
             }
@@ -74,6 +73,7 @@ struct AccessoryCircularContent: View {
         .accessibilityValue(Text(verbatim: snapshot.next.map {
             "\($0.label) \(cardTime($0.time, snapshot.tz))"
         } ?? snapshot.value))
+        .monospacedDigit()
     }
 
     private var compactGraph: StationCardGraph {
