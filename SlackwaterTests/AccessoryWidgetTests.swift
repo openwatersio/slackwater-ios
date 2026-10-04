@@ -25,6 +25,23 @@ final class AccessoryWidgetTests: XCTestCase {
     }
 
     @MainActor
+    func testSubscriberWithoutDataIsToldToOpenTheApp() throws {
+        func ink(premium: Bool, _ family: WidgetFamily) throws -> Int {
+            let entry = SlackwaterEntry(date: .distantPast, snapshot: nil, card: nil,
+                                        premium: premium, stationID: nil)
+            let renderer = ImageRenderer(content: AccessoryWidgetView(entry: entry, family: family)
+                .frame(width: 160, height: 76)
+                .environment(\.colorScheme, .dark))
+            return try self.ink(in: try XCTUnwrap(renderer.uiImage), rows: 20..<56)
+        }
+        // The prompt is words, wider than the locked state's lone icon.
+        for family in [WidgetFamily.accessoryInline, .accessoryRectangular] {
+            XCTAssertGreaterThan(try ink(premium: true, family), 2 * (try ink(premium: false, family)),
+                                 "\(family) must say to open the app, not draw the locked icon")
+        }
+    }
+
+    @MainActor
     func testAccessoryCurvesRenderAtLockScreenSizes() throws {
         let now = Date(timeIntervalSince1970: 1_755_800_000)
         let tide = try XCTUnwrap(WidgetStationLoader.loadRecord(id: TideStationRecord.fridayHarborID))
