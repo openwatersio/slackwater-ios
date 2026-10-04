@@ -24,14 +24,25 @@ struct AccessoryWidgetView: View {
                         AccessoryRectangularContent(snapshot: snapshot, graph: graph)
                     }
                 } else {
-                    Image(systemName: "water.waves").unredacted()
+                    openApp
                 }
             } else {
-                Image(systemName: "water.waves").unredacted()
+                openApp
             }
         }
         .containerBackground(for: .widget) { Color.clear }
         .widgetURL(accessoryDeepLink(entry))
+    }
+
+    // A subscriber with no data yet (an undownloaded station) needs a prompt
+    // that reads differently from the locked and loading icon.
+    @ViewBuilder private var openApp: some View {
+        if family == .accessoryCircular {
+            Image(systemName: "water.waves").unredacted()
+                .accessibilityLabel(Text("Open Slackwater"))
+        } else {
+            Text("Open Slackwater")
+        }
     }
 }
 
