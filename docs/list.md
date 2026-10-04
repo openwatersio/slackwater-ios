@@ -115,7 +115,7 @@ Near Me lists the collapsed, filtered ranking with heroes and favorites removed:
 - **Add:** the detail header's star, or a leading swipe "Favorite" (star, sun tint `#F0C860`) on a Near Me or Recents card.
 - **Remove:** a trailing swipe "Unfavorite" on a favorite card, or the detail header's star. A full swipe must not trigger it. An unstarred station moves to the front of Recents rather than disappearing.
 - **Limit:** none.
-- **Storage:** an ordered list on the device, shared with widgets, and one iCloud key-value entry per station whose value is the star time. After the first merge, the iCloud key set is the list. When the iCloud account changes, the device re-seeds iCloud from its own list instead of adopting the new account's.
+- **Storage:** an ordered list on the device, shared with widgets, and one iCloud key-value entry per station whose value is the star time. After the first merge, the iCloud key set is the list, which is how an unstar on one device reaches the others: an iCloud store emptied elsewhere empties this device too. When the iCloud account changes, the device re-seeds iCloud from its own list instead of adopting the new account's.
 - **Widgets** reload on every change.
 
 Cards show no distance in Favorites.
@@ -385,8 +385,6 @@ These are implementation gaps, not behavior to copy to another platform:
 - Search shows nothing, rather than an empty-state message, when no station matches.
 - Changing the slack threshold does not rebuild cards already on screen.
 - The first-run tour reads the device location without checking authorization, unlike the ranking anchor.
-- An iCloud store emptied on another device empties this device's favorites. Only an account change is guarded.
-
 Fixing one of these should update this section and add or amend a conformance scenario.
 
 ## 16. Reference implementation map
