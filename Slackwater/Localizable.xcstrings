@@ -656,10 +656,8 @@
             "value" : "%1$@%2$@"
           }
         }
-      }
-    },
-    "%@%% lit" : {
-
+      },
+      "shouldTranslate" : false
     },
     "%lld alert%@" : {
       "localizations" : {
@@ -994,8 +992,39 @@
         }
       }
     },
+    "About" : {
+      "comment" : "Settings row and destination title for prediction notes, attribution, privacy, license, and version.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acerca de"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À propos"
+          }
+        }
+      }
+    },
     "about %@× the daily tide" : {
-      "comment" : "How much larger the annual swing is than the daily tide."
+      "comment" : "How much larger the annual swing is than the daily tide.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aproximadamente %@ veces la marea diaria"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "environ %@ fois la marée quotidienne"
+          }
+        }
+      }
     },
     "about %lld hours" : {
       "comment" : "Approximate duration. The integer is a number of hours; vary by plural.",
@@ -1133,21 +1162,18 @@
       }
     },
     "about the same as the daily tide" : {
-      "comment" : "The annual swing is about the size of the daily tide."
-    },
-    "About" : {
-      "comment" : "Settings row and destination title for prediction notes, attribution, privacy, license, and version.",
+      "comment" : "The annual swing is about the size of the daily tide.",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Acerca de"
+            "value" : "aproximadamente igual que la marea diaria"
           }
         },
         "fr-CA" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "À propos"
+            "value" : "environ la même amplitude que la marée quotidienne"
           }
         }
       }
@@ -1653,7 +1679,6 @@
     },
     "Between low and high, or on the way to slack." : {
       "comment" : "Watch complication description.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -2172,6 +2197,23 @@
         }
       }
     },
+    "Control-click your desktop → Edit Widgets → Slackwater." : {
+      "comment" : "Instructions for adding a Mac desktop widget.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en el escritorio con la tecla Control → Editar widgets → Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur le bureau en maintenant Contrôle enfoncé → Modifier les widgets → Slackwater."
+          }
+        }
+      }
+    },
     "Couldn't publish %@" : {
       "localizations" : {
         "es-ES" : {
@@ -2235,23 +2277,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Courant · NOAA"
-          }
-        }
-      }
-    },
-    "Control-click your desktop → Edit Widgets → Slackwater." : {
-      "comment" : "Instructions for adding a Mac desktop widget.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haz clic en el escritorio con la tecla Control → Editar widgets → Slackwater."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cliquez sur le bureau en maintenant Contrôle enfoncé → Modifier les widgets → Slackwater."
           }
         }
       }
@@ -2447,23 +2472,6 @@
         }
       }
     },
-    "Distance from Earth" : {
-      "comment" : "Moon distance chart label.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distancia a la Tierra"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance de la Terre"
-          }
-        }
-      }
-    },
     "Desktop — free" : {
       "comment" : "Free desktop widgets on Mac.",
       "localizations" : {
@@ -2477,6 +2485,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bureau — gratuit"
+          }
+        }
+      }
+    },
+    "Distance from Earth" : {
+      "comment" : "Moon distance chart label.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distancia a la Tierra"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance de la Terre"
           }
         }
       }
@@ -2708,24 +2733,6 @@
         }
       }
     },
-    "Downloading Canadian tidal and current predictions… Nearest to you first, and whatever you open jumps the queue. At the current speed, %@ for the rest." : {
-      "comment" : "Offline-download progress summary. The value is an approximate duration.",
-      "extractionState" : "stale",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargando predicciones canadienses de mareas y corrientes… Primero las más cercanas; las que abras avanzan en la cola. A la velocidad actual, faltan %@."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement des prévisions de marée et de courant canadiennes… Les plus proches de vous d’abord, et tout ce que vous ouvrez saute la file d’attente. À la vitesse actuelle, %@ pour le reste."
-          }
-        }
-      }
-    },
     "Downloading Canadian tidal predictions…" : {
       "comment" : "Station download progress.",
       "localizations" : {
@@ -2756,23 +2763,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Téléchargement des zones de carte — le monde, l’eau autour de vous et vos stations enregistrées."
-          }
-        }
-      }
-    },
-    "Downloading nearby stations" : {
-      "comment" : "Station-list download progress heading.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargando estaciones cercanas"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement des stations à proximité"
           }
         }
       }
@@ -3791,7 +3781,7 @@
       }
     },
     "Home screen — free" : {
-      "comment" : "Widget gallery section title.",
+      "comment" : "Settings widget section title.",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -3808,7 +3798,21 @@
       }
     },
     "How to read a station" : {
-      "comment" : "Settings section heading."
+      "comment" : "Settings section heading.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo interpretar un lugar"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comment lire les prévisions d’un lieu"
+          }
+        }
+      }
     },
     "I can help with an unavailable station" : {
       "comment" : "Problem-report subject.",
@@ -4219,7 +4223,7 @@
       }
     },
     "Lock screen — Premium" : {
-      "comment" : "Widget gallery section title.",
+      "comment" : "Settings widget section title.",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -4621,7 +4625,21 @@
       }
     },
     "mostly seasonal" : {
-      "comment" : "Tide-range caption where the yearly cycle dwarfs the daily tide."
+      "comment" : "Tide-range caption where the yearly cycle dwarfs the daily tide.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "principalmente estacional"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "surtout saisonnier"
+          }
+        }
+      }
     },
     "My Location" : {
       "comment" : "Current-location section heading.\nMap action using the person's location.",
@@ -4777,7 +4795,20 @@
       }
     },
     "Next ›" : {
-
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siguiente ›"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivant ›"
+          }
+        }
+      }
     },
     "Next event" : {
       "comment" : "VoiceOver chart action.",
@@ -5294,6 +5325,22 @@
         }
       }
     },
+    "Notifications are Premium" : {
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las notificaciones requieren Premium"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notifications nécessitent Premium"
+          }
+        }
+      }
+    },
     "Now" : {
       "comment" : "Slackwater interface text.",
       "localizations" : {
@@ -5541,7 +5588,6 @@
     },
     "Open" : {
       "comment" : "Watch search result already a favorite: open it.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -5752,7 +5798,21 @@
       }
     },
     "partly seasonal" : {
-      "comment" : "Tide-range caption where the yearly cycle rivals the daily tide."
+      "comment" : "Tide-range caption where the yearly cycle rivals the daily tide.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "parcialmente estacional"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en partie saisonnier"
+          }
+        }
+      }
     },
     "Past full: more than half lit, and shrinking." : {
       "comment" : "Plain-language explanation of a waning gibbous moon.",
@@ -6076,23 +6136,6 @@
         }
       }
     },
-    "Purchases are temporarily unavailable." : {
-      "comment" : "StoreKit could not load any Premium products. The user can retry or restore.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las compras no están disponibles temporalmente."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les achats sont temporairement indisponibles."
-          }
-        }
-      }
-    },
     "Purchase couldn't be verified — try again." : {
       "comment" : "Premium purchase verification error.",
       "localizations" : {
@@ -6123,6 +6166,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’achat n’a pas abouti — réessayez."
+          }
+        }
+      }
+    },
+    "Purchases are temporarily unavailable." : {
+      "comment" : "StoreKit could not load any Premium products. The user can retry or restore.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las compras no están disponibles temporalmente."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les achats sont temporairement indisponibles."
           }
         }
       }
@@ -6921,7 +6981,21 @@
       }
     },
     "Show the tour again" : {
-      "comment" : "Settings row that replays the first-run tour."
+      "comment" : "Settings row that replays the first-run tour.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a mostrar la visita guiada"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoir la visite guidée"
+          }
+        }
+      }
     },
     "Show tides" : {
       "comment" : "Accessibility label for the station filter that shows tide stations.",
@@ -7009,7 +7083,20 @@
       }
     },
     "Skip" : {
-
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer"
+          }
+        }
+      }
     },
     "Slack" : {
       "comment" : "Current event: water is near zero speed.\nCurrent phase: water is near zero speed.\nWidget slack-current event label.",
@@ -7738,8 +7825,39 @@
         }
       }
     },
+    "Support Slackwater's development." : {
+      "comment" : "Premium support copy on platforms without lock-screen widgets.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apoya el desarrollo de Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Soutenez le développement de Slackwater."
+          }
+        }
+      }
+    },
     "The difference between this swing's high and low, %@." : {
-      "comment" : "Explains what the tide-range number measures. The placeholder is 'low to high' or 'high to low'."
+      "comment" : "Explains what the tide-range number measures. The placeholder is 'low to high' or 'high to low'.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La diferencia entre la pleamar y la bajamar de esta oscilación, %@."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La différence entre la pleine mer et la basse mer de cette oscillation, %@."
+          }
+        }
+      }
     },
     "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full %lld-day model — nothing to tap." : {
       "comment" : "Offline prediction-refinement explanation. The integer is the full model length in days.",
@@ -7759,11 +7877,24 @@
       }
     },
     "The highs and lows below are still computed the same way and are still correct. They are just a small movement inside a much larger seasonal one, so a whole day can sit above or below what the same day looks like six months from now." : {
-      "comment" : "Reassures that predictions are correct at a seasonal station."
+      "comment" : "Reassures that predictions are correct at a seasonal station.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las pleamares y bajamares de abajo se siguen calculando de la misma forma y siguen siendo correctas. Son solo una pequeña oscilación dentro de un cambio estacional mucho mayor, por lo que los niveles de todo un día pueden quedar por encima o por debajo de los de ese mismo día seis meses después."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les pleines et basses mers ci-dessous sont toujours calculées de la même façon et demeurent correctes. Elles ne représentent qu’une petite oscillation dans une variation saisonnière beaucoup plus grande. Les niveaux d’une journée entière peuvent donc être au-dessus ou au-dessous de ceux de la même journée six mois plus tard."
+          }
+        }
+      }
     },
     "The line around now, with the water's height or speed." : {
       "comment" : "Watch complication description.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -7981,7 +8112,6 @@
     },
     "The place's curve, its turns and their times." : {
       "comment" : "Watch complication description.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -8066,14 +8196,41 @@
       }
     },
     "The water at %@ has a real tide, and a yearly cycle of about the same size. The times below are unaffected — high and low arrive when they arrive — but the heights drift across the year as the seasonal level rises and falls underneath them." : {
-      "comment" : "Explains a station whose annual cycle is comparable to its tide. The placeholder is a place name."
+      "comment" : "Explains a station whose annual cycle is comparable to its tide. The placeholder is a place name.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En %@ hay una marea real y un ciclo anual de amplitud similar. Las horas indicadas abajo no cambian: la pleamar y la bajamar llegan a su hora. Pero las alturas varían a lo largo del año a medida que el nivel estacional sube y baja."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %@, il y a une véritable marée et un cycle annuel d’amplitude semblable. Les heures ci-dessous ne changent pas : la pleine mer et la basse mer arrivent à l’heure prévue. Les hauteurs varient toutefois au fil de l’année, selon la hausse et la baisse du niveau saisonnier."
+          }
+        }
+      }
     },
     "The water at %@ rises and falls far more across a year than it does across a day. Rivers, lakes and lagoons behave this way: the level follows the seasons — runoff, rainfall, wind — and the daily tide is a ripple on top of it." : {
-      "comment" : "Explains a station whose annual cycle dominates its tide. The placeholder is a place name."
+      "comment" : "Explains a station whose annual cycle dominates its tide. The placeholder is a place name.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En %@, el agua sube y baja mucho más a lo largo de un año que en un día. Así se comportan los ríos, lagos y lagunas: el nivel sigue las estaciones —escorrentía, lluvia y viento—, y la marea diaria es una pequeña oscilación sobre ese nivel."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À %@, le niveau de l’eau varie beaucoup plus au cours d’une année qu’au cours d’une journée. Les rivières, les lacs et les lagunes se comportent ainsi : le niveau suit les saisons — ruissellement, pluie, vent — et la marée quotidienne n’est qu’une petite oscillation qui s’y ajoute."
+          }
+        }
+      }
     },
     "The water now and which way it's going." : {
       "comment" : "Watch complication description.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -8388,23 +8545,6 @@
         }
       }
     },
-    "Support Slackwater's development." : {
-      "comment" : "Premium support copy on platforms without lock-screen widgets.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apoya el desarrollo de Slackwater."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Soutenez le développement de Slackwater."
-          }
-        }
-      }
-    },
     "Tide height" : {
       "comment" : "Settings section heading.",
       "localizations" : {
@@ -8458,7 +8598,6 @@
     },
     "Tide or Current" : {
       "comment" : "Watch complication name.",
-      "extractionState" : "stale",
       "localizations" : {
         "es-ES" : {
           "stringUnit" : {
@@ -8695,6 +8834,23 @@
         }
       }
     },
+    "Try again" : {
+      "comment" : "Retry loading Premium purchase options from StoreKit.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intentar de nuevo"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        }
+      }
+    },
     "Turn Off" : {
       "localizations" : {
         "es-ES" : {
@@ -8826,23 +8982,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stations américaines : constituants harmoniques de NOAA CO-OPS (domaine public)."
-          }
-        }
-      }
-    },
-    "Try again" : {
-      "comment" : "Retry loading Premium purchase options from StoreKit.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intentar de nuevo"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réessayer"
           }
         }
       }
@@ -9135,48 +9274,22 @@
         }
       }
     },
-    "Widgets" : {
-      "comment" : "Widget interface text.",
-      "localizations" : {
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Widgets"
-          }
-        }
-      }
-    },
-    "window %@–%@" : {
-      "comment" : "Rectangular widget slack window. Values are localized start and end times.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "window %1$@–%2$@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ventana %@–%@"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "fenêtre d’étale %1$@–%2$@"
-          }
-        }
-      }
-    },
     "Yearly change" : {
-      "comment" : "Label for how much the water level moves across a year."
+      "comment" : "Label for how much the water level moves across a year.",
+      "localizations" : {
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variación anual"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Variation annuelle"
+          }
+        }
+      }
     },
     "Yesterday" : {
       "comment" : "Relative label for the previous day.",

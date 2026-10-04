@@ -171,6 +171,7 @@ jobs:
           zsh scripts/test-modes.test.sh
           sh scripts/test-retryable.test.sh
           sh scripts/test-failed-selectors.test.sh
+          python3 scripts/localization.test.py
 
       # MapLibre is a binary download, not a compile — the cache saves the
       # fetch, not a build. The generated xcodeproj and its Package.resolved
@@ -183,13 +184,19 @@ jobs:
 
       # The IWLS fixture is compiled into the unit-test bundle, so it is staged
       # here, before the build, and the shards never need it.
+      - name: Prepare project
+        run: |
+          node scripts/iwls-fixtures.mjs prepare
+          xcodegen generate
+
+      - name: Localization completeness
+        run: python3 scripts/localization.py
+
       - name: Build
         run: |
           # `bash -e` without pipefail: the pipe into tail would report tail's
           # status, and a failed build would upload a partial archive.
           set -o pipefail
-          node scripts/iwls-fixtures.mjs prepare
-          xcodegen generate
           xcodebuild build-for-testing -project Slackwater.xcodeproj -scheme Slackwater \
             -testPlan Slackwater -destination 'generic/platform=iOS Simulator' ARCHS=arm64 \
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \

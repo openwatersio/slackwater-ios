@@ -55,6 +55,8 @@ Update `Slackwater/Localizable.xcstrings` with translator context and complete t
 
 A phone scheme extracts strings into the catalog on every build, which is how a new key first appears. Write a hand-added entry's locales in alphabetical order, `es-ES` before `fr-CA`, the order Xcode itself writes. An entry stored the other way round is re-sorted by the next build, and a handful of them turns an ordinary review into a thousand-line diff carrying no content change.
 
+The macOS build lane runs `python3 scripts/localization.py` after generating the project. It exports current source keys with an empty temporary catalog and extraction enabled for the phone, widgets, and watch, then restores the catalog byte for byte. Missing or stale keys and missing or unfinished translations (including plural variants) fail the check. Only `shouldTranslate: false` exempts an entry. Translation locales come from `knownRegions` in `project.yml`, excluding `Base` and the source language. Export diagnostics are saved to `build/localization-export.log`. The small fixture check runs with `python3 scripts/localization.test.py`.
+
 ## Running the tests
 
 One test plan, driven by `scripts/test.sh`. Fixture preparation requires Node 24;

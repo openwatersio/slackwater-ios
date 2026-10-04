@@ -1,0 +1,185 @@
+[
+  {
+    "name": "complete including plural variants",
+    "source": [
+      "Hello"
+    ],
+    "catalog": {
+      "Hello": {
+        "localizations": {
+          "es-ES": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Traduction"
+            }
+          },
+          "fr-CA": {
+            "variations": {
+              "plural": {
+                "one": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                },
+                "other": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "errors": []
+  },
+  {
+    "name": "new source key",
+    "source": [
+      "Hello",
+      "New"
+    ],
+    "catalog": {
+      "Hello": {
+        "localizations": {
+          "es-ES": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Traduction"
+            }
+          },
+          "fr-CA": {
+            "variations": {
+              "plural": {
+                "one": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                },
+                "other": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "errors": [
+      "source: missing catalog key: New"
+    ]
+  },
+  {
+    "name": "changed key with stale translations",
+    "source": [
+      "Changed"
+    ],
+    "catalog": {
+      "Old": {
+        "localizations": {
+          "es-ES": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Traduction"
+            }
+          },
+          "fr-CA": {
+            "variations": {
+              "plural": {
+                "one": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                },
+                "other": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Changed": {
+        "localizations": {
+          "es-ES": {
+            "variations": {
+              "plural": {
+                "one": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Uno"
+                  }
+                },
+                "other": {}
+              }
+            }
+          },
+          "fr-CA": {
+            "variations": {
+              "plural": {
+                "one": {
+                  "stringUnit": {
+                    "state": "translated",
+                    "value": "Traduction"
+                  }
+                },
+                "other": {
+                  "stringUnit": {
+                    "state": "new",
+                    "value": "Traduction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "errors": [
+      "source: stale catalog key: Old",
+      "es-ES: unfinished translation: Changed",
+      "fr-CA: unfinished translation: Changed"
+    ]
+  },
+  {
+    "name": "non-translatable key is the only exemption",
+    "source": [
+      "Brand"
+    ],
+    "catalog": {
+      "Brand": {
+        "shouldTranslate": false
+      },
+      "Missing": {},
+      "Empty": {
+        "localizations": {
+          "es-ES": {},
+          "fr-CA": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Traduction"
+            }
+          }
+        }
+      }
+    },
+    "errors": [
+      "source: stale catalog key: Empty",
+      "source: stale catalog key: Missing",
+      "es-ES: missing translation: Empty",
+      "es-ES: missing translation: Missing",
+      "fr-CA: missing translation: Missing"
+    ]
+  }
+]
