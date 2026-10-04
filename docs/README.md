@@ -6,6 +6,8 @@ Documentation here describes the current product, maintained operating procedure
 
 | Document | Purpose |
 |---|---|
+| [Station list](list.md) | Home list sections, location states, favorites and recents, the station card, search, and opening a station |
+| [Station detail](detail.md) | Detail page composition, header, tiles, schedule, week picker, provenance, and the waiting, honesty, and unavailable pages |
 | [Scrubber](scrubber.md) | Detail timeline behavior, rendering, input, accessibility, and platform conformance |
 | [Current charts](current-charts.md) | Current, slack-window, magnitude, and direction semantics; the scrubber spec owns detail presentation |
 | [Alerts](alerts.md) | Station calendars and notification rules: triggers, occurrence resolution, delivery horizons, the free/Premium line, and permissions |
@@ -21,6 +23,7 @@ Documentation here describes the current product, maintained operating procedure
 | [Performance](performance.md) | Measured latency, attribution, and profiling boundaries for user-facing journeys |
 | [Release notes](release-notes/) | Versioned release copy consumed by `scripts/testflight.sh`, its format, and the App Store extraction; retained release history |
 | [CHS current validation](validation/chs-currents.md) | Fit acceptance bars, recorded measurements, and reproduction |
+| [CHS tide validation](validation/chs-tides.md) | Tide fit-window bar, the window sweep, and why 60 days stays |
 | [World tide validation](validation/world-tide-stations.md) | Datum/amplitude validation evidence and its timing limitation |
 | [Generated resources](../Slackwater/Resources/README.md) | Bundle inputs, generation order, and provenance |
 | [Fill pipeline](../tools/fill-pipeline/README.md) | SSCOFS speed-fill certification, fitting, and packing |

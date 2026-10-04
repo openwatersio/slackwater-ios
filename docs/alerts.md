@@ -316,8 +316,8 @@ press only lands on a strip that is already still, none of the row's rest-state 
 ### 7.2 The popup
 
 A `.popover` with `.presentationCompactAdaptation(.popover)`, so it is an arrow-anchored card on
-iPhone as well as iPad, attached to the strip at `.point(.center)` — the centerline the press just
-parked its moment on. Dismissal, positioning and the arrow come with the popover, and the strip's
+iPhone as well as iPad, attached to the strip's bounds (`.rect(.bounds)`, arrow on the top edge),
+which contain the centerline the press just parked its moment on. Dismissal, positioning and the arrow come with the popover, and the strip's
 riding-dot overlay keeps `allowsHitTesting(false)` untouched.
 
 - A header: the station, then the moment and what it is — "Sat 14:32 · Max ebb".

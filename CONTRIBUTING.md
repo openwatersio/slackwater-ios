@@ -144,7 +144,7 @@ Keep documentation that has an ongoing reader: product contracts, architecture c
 
 Put implementation plans, task checklists, session reports, and spike scratch in ignored `.superpowers/` or `/tmp`. Use issues and PRs for proposed work and review history. Before removing a completed experiment, move any lasting constraints or measurements into the appropriate living document. Code imported by a maintained pipeline belongs under `tools/`, with its reproduction instructions and checks. Generated data provenance and release records remain durable evidence.
 
-A scrubber behavior change updates [docs/scrubber.md](docs/scrubber.md) in the same PR and reviews all four detail consumers.
+A scrubber behavior change updates [docs/scrubber.md](docs/scrubber.md) in the same PR and reviews all four detail consumers. A list or detail behavior change updates [docs/list.md](docs/list.md) or [docs/detail.md](docs/detail.md) the same way. These three are the reference contracts other platforms build from.
 
 ## AI agents
 

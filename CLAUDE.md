@@ -6,7 +6,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first for policy and basics: branching, 
 
 Follow CONTRIBUTING.md's documentation policy. Use ignored `.superpowers/` for plans, task briefs, and spike output, including when a workflow suggests `docs/superpowers/`. Keep proposed work in its issue or PR; a merged proposal is not evidence that the behavior ships. Promote lasting decisions into the relevant living document and reusable experiment code into `tools/` with checks. Do not commit completed implementation diaries or obsolete prototypes.
 
-Verify claims against this repo's tests and code. Sibling repos can have different conventions. The detail scrubber's maintained contract is [docs/scrubber.md](docs/scrubber.md).
+Verify claims against this repo's tests and code. Sibling repos can have different conventions. The maintained cross-platform contracts are [docs/scrubber.md](docs/scrubber.md), [docs/list.md](docs/list.md), and [docs/detail.md](docs/detail.md).
 
 ## Generated data is a chain
 
