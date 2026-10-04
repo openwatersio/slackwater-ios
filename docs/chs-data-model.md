@@ -90,6 +90,8 @@ The watch downloads and fits its own models through the same `IwlsFetcher`, `Chs
 
 Watch details offer Open on iPhone through Handoff, carrying the place's station ID to the phone's existing deep-link route. The user accepts it in the iPhone app switcher; the watch cannot force the phone app into the foreground. Handoff needs the usual Apple account, proximity, and enabled-Handoff conditions, and its delivery requires paired-device verification.
 
+Watch downloads attempt HTTP requests directly through `URLSession`, which waits for connectivity and bounds each resource wait to five minutes. Transient failures use the queue's retry backoff. `NWPathMonitor` cannot gate these requests: [Apple TN3135](https://developer.apple.com/documentation/technotes/tn3135-low-level-networking-on-watchos) specifies that ordinary watch apps receive an unsatisfied low-level path even when HTTP networking is available. The simulator does not enforce that restriction, so regression tests inject an unsatisfied path while serving recorded CHS responses. A visible app on the idle, always-on screen can have an inactive scene; downloads pause until the user wakes the watch and activates the app. Device verification confirms downloads on a paired watch; standalone Wi-Fi and cellular access require separate checks.
+
 ### This pattern does NOT generalise — the rule, and why
 
 Fetch-don't-bundle looks like a general answer to any restrictively licensed

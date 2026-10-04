@@ -3,8 +3,8 @@ import Combine
 import Foundation
 import Network
 
-/// Is there a network path right now. Its own tiny observable so the indicator
-/// can say offline/online without any of it leaking into the fit service.
+/// Whether downloads may attempt HTTP requests. The phone observes its path;
+/// watchOS leaves connection handling to URLSession (Apple TN3135).
 @MainActor
 final class Connectivity: ObservableObject {
     static let shared = Connectivity()
@@ -22,6 +22,10 @@ final class Connectivity: ObservableObject {
         let forcedOnline = false
         #endif
 #if DEBUG
+        if CommandLine.arguments.contains("-connectivityUnsatisfied") {
+            update(status: .unsatisfied, constrained: true)
+            return
+        }
         if IwlsFetcher.usesFixture || forcedOnline {
             online = true
             constrained = false
@@ -32,14 +36,29 @@ final class Connectivity: ObservableObject {
             constrained = false
             return
         }
+        #if os(watchOS)
+        update(status: .unsatisfied, constrained: true)
+        #else
         monitor.pathUpdateHandler = { [weak self] path in
-            let up = path.status == .satisfied
+            let status = path.status
             let constrained = path.isConstrained
             Task { @MainActor in
-                self?.online = up
-                self?.constrained = constrained
+                self?.update(status: status, constrained: constrained)
             }
         }
         monitor.start(queue: .global(qos: .utility))
+        #endif
+    }
+
+    private func update(status: NWPath.Status, constrained: Bool) {
+        #if os(watchOS)
+        // NWPathMonitor stays unsatisfied on a normal watch app even when
+        // URLSession can use Wi-Fi, cellular, or the paired phone's network.
+        online = true
+        self.constrained = true
+        #else
+        online = status == .satisfied
+        self.constrained = constrained
+        #endif
     }
 }
