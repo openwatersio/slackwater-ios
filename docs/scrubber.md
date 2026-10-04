@@ -283,6 +283,8 @@ An animated request must:
 4. animate the requested target beneath the centreline; and
 5. park `selectedTime` on the exact requested instant at completion.
 
+Scroll feedback during that animation must not cancel the request. A rendered selection can trail the current offset; the destination remains the requested instant until the animation finishes or an explicit interaction interrupts it.
+
 A finger that is still down retains control. Do not fight an active drag with an external state update.
 
 Reduce Motion, a target less than 0.5 logical units away, travel greater than seven elapsed days, or a non-visual restore must land directly without animation. Nearby Now and commentary requests ride the strip to their destination; distant picker, shared-link, and Now requests load the destination and land without compressing weeks into a short animation.

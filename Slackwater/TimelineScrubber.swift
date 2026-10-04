@@ -172,6 +172,8 @@ struct TimelineScrubber: UIViewRepresentable {
                 sv.contentOffset = CGPoint(x: desired, y: 0)
             } else {
                 co.magneting = true
+                // Scroll feedback must not cancel the external jump before its destination lands.
+                co.nudging = true
                 co.magnetTarget = scrubTime
                 sv.setContentOffset(CGPoint(x: desired, y: 0), animated: true)
             }
