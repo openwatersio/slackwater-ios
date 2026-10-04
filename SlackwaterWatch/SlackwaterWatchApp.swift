@@ -6,6 +6,7 @@ import WidgetKit
 struct SlackwaterWatchApp: App {
     init() {
         WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
+        _ = ChsModelTransfer.shared
         // Reconcile with iCloud before the list's first frame, as the phone does.
         _ = UnitsCloud.shared
         _ = FavoritesStore.shared

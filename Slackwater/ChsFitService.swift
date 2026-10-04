@@ -755,6 +755,27 @@ final class ChsFitService: ObservableObject {
     private nonisolated func run() async {
         let fetcher = IwlsFetcher()
         let fitter = ChsFitter()
+        #if os(watchOS)
+        var checked: Set<String> = []
+        while !Task.isCancelled {
+            let next = await MainActor.run {
+                self.queue.jobs.first { $0.status == .pending && !checked.contains($0.id) }
+            }
+            guard let job = next else { break }
+            checked.insert(job.id)
+            _ = try? await copyPhoneModel(job)
+        }
+        let hasPending = await MainActor.run { self.queue.nextPending() != nil }
+        if Task.isCancelled || !hasPending {
+            await MainActor.run {
+                self.running = false
+                self.fitTask = nil
+                self.scheduleRetryPump()
+                if Task.isCancelled { self.pump() }
+            }
+            return
+        }
+        #endif
         guard let list = try? await fetcher.stationList() else {
             await MainActor.run {
                 if !Task.isCancelled {
@@ -820,6 +841,29 @@ final class ChsFitService: ObservableObject {
             if Task.isCancelled { self.pump() }
         }
     }
+
+    #if os(watchOS)
+    private nonisolated func copyPhoneModel(_ job: ChsJob) async throws -> Bool {
+        let request = ChsModelRequest(stationID: job.id, isCurrent: job.isCurrent)
+        guard let model = try await ChsModelTransfer.shared.model(for: request) else { return false }
+        try Task.checkCancellation()
+        if job.isCurrent { try ChsModelStore.saveCurrent(model) }
+        else { try ChsModelStore.save(model) }
+        await MainActor.run {
+            if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
+                self.currentRecords[job.id] = gate.record(with: model)
+                self.provisional.remove(job.id)
+            } else if let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
+                self.tideRecords[job.id] = info.record(with: model)
+            }
+            self.queue.set(job.id, .ready)
+            self.modelRevision += 1
+        }
+        ChsChunkStore.purge(model.iwlsID)
+        print("CHS model copied from phone: \(job.id)")
+        return true
+    }
+    #endif
 
     nonisolated static func reason(_ error: Error) -> String {
         switch error {
