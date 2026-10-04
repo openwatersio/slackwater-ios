@@ -97,5 +97,11 @@ struct RootView: View {
             pendingDeepLink = url
             seenGate = true
         }
+        .onContinueUserActivity(stationActivityType) { activity in
+            guard !seenGate, let id = activity.userInfo?["stationID"] as? String,
+                  let url = deepLink(forStationID: id) else { return }
+            pendingDeepLink = url
+            seenGate = true
+        }
     }
 }

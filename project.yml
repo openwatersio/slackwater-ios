@@ -145,6 +145,7 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         ITSAppUsesNonExemptEncryption: false
+        NSUserActivityTypes: [io.openwaters.slackwater.station]
         # SwiftUI's `.preferredColorScheme(.dark)` (RootView, SlackwaterApp.swift)
         # only reaches the app's own view hierarchy. This plist key sets the
         # app's trait collection at the OS level, so in-process system UI the
@@ -272,6 +273,13 @@ targets:
       # The list's stores and their iCloud sync. Not in PortableSources: the
       # widget never reads favourites through them.
       - Slackwater/StationLists.swift
+      - Slackwater/Connectivity.swift
+      - Slackwater/ChsFitService.swift
+      - Slackwater/ChsFitter.swift
+      - Slackwater/ChsQueue.swift
+      - Slackwater/DownloadTier.swift
+      - Slackwater/IwlsClient.swift
+      - Slackwater/OnlineGates.swift
       - Slackwater/NearestWidgetStation.swift
       - Slackwater/PremiumStore.swift
       - Slackwater/FavoritesCloud.swift
@@ -296,6 +304,7 @@ targets:
     info:
       path: SlackwaterWatch/Info.plist
       properties:
+        NSUserActivityTypes: [io.openwaters.slackwater.station]
         CFBundleDisplayName: Slackwater
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)

@@ -14,11 +14,19 @@ struct StationRow: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = ""
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = ""
     @State private var card: WidgetCard?
+    @ObservedObject private var downloads = ChsFitService.shared
 
     var body: some View {
         Group {
             if let card {
                 NextEventContentView(card: card, mark: mark)
+                    .overlay(alignment: .bottomLeading) {
+                        if case .chsCurrent(let gate) = item, downloads.isProvisional(gate.id) {
+                            CardStatusStrip(status: .refining(tolerance: gate.provisionalTolerance))
+                                .padding(12)
+                                .background(SN.canvas.opacity(0.9))
+                        }
+                    }
             } else {
                 // While the record loads, and for good when this device
                 // cannot predict the place.
@@ -34,7 +42,7 @@ struct StationRow: View {
         .frame(height: 150)
         .background(SN.canvas)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .task(id: "\(item.id)|\(now.timeIntervalSince1970)|\(units)|\(speedUnit)") {
+        .task(id: "\(item.id)|\(now.timeIntervalSince1970)|\(units)|\(speedUnit)|\(downloads.modelRevision)") {
             let id = item.id, now = now
             let next = await Task.detached(priority: .utility) {
                 WidgetStationLoader.loadRecord(id: id, at: now).map { WidgetCard.build($0, now: now) }

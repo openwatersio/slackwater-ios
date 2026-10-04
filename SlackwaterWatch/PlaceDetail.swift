@@ -22,6 +22,7 @@ struct PlaceDetail: View {
     let onList: () -> Void
 
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var downloads = ChsFitService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
@@ -33,6 +34,8 @@ struct PlaceDetail: View {
     @State private var scrubTime = Date()
     @State private var anchor = Date()
     @State private var showSheet = false
+    @State private var offerOnPhone = false
+    @State private var showPhoneInstructions = false
 
     private var imperial: Bool { units != "metric" }
     private var scrubbedAway: Bool { abs(scrubTime.timeIntervalSince(live)) > Timeline.scrubbedSeconds }
@@ -42,8 +45,11 @@ struct PlaceDetail: View {
             if let tl = store?.timeline, let source {
                 page(tl, source)
             } else if unavailable {
-                Text("Predictions unavailable", comment: "Prediction download status.")
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 12) {
+                    Text("Predictions unavailable", comment: "Prediction download status.")
+                        .foregroundStyle(.secondary)
+                    phoneButton
+                }
             } else {
                 ProgressView()
             }
@@ -51,7 +57,19 @@ struct PlaceDetail: View {
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbar }
         .onAppear { RecentsStore.shared.record(item.id) }
-        .task(id: item.id) { await load() }
+        .task(id: "\(item.id)|\(downloads.modelRevision)") { await load() }
+        .userActivity(stationActivityType, isActive: offerOnPhone) { activity in
+            activity.title = item.name
+            activity.userInfo = ["stationID": item.id]
+            activity.isEligibleForHandoff = true
+        }
+        .alert(Text("Open on iPhone", comment: "Watch Handoff action and instructions title."),
+               isPresented: $showPhoneInstructions) {
+            Button("Done", role: .cancel) {}
+        } message: {
+            Text("To continue, open the app switcher on your iPhone and tap Slackwater.",
+                 comment: "Watch instructions for accepting a station Handoff on iPhone.")
+        }
         .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: 200) }
         // A scrub at rest outside the loaded window re-anchors, as on the phone.
         .task(id: scrubTime) {
@@ -75,12 +93,16 @@ struct PlaceDetail: View {
         let record = await Task.detached(priority: .userInitiated) {
             WidgetStationLoader.loadRecord(id: id, at: now)
         }.value
+        guard !Task.isCancelled else { return }
         guard let record, let s = TimelineSource(record) else { unavailable = true; return }
-        live = now
-        scrubTime = now
-        anchor = dayLocal(now, s.tz)
+        unavailable = false
+        if source == nil {
+            live = now
+            scrubTime = now
+            anchor = dayLocal(now, s.tz)
+        }
         let st = TimelineWindowStore(source: s)
-        st.start(anchor: anchor, now: now)
+        st.start(anchor: anchor, now: live, focus: scrubTime)
         source = s
         store = st
     }
@@ -209,6 +231,9 @@ struct PlaceDetail: View {
 
     private var sheet: some View {
         List {
+            if case .chsCurrent(let gate) = item, downloads.isProvisional(gate.id) {
+                CardStatusStrip(status: .refining(tolerance: gate.provisionalTolerance))
+            }
             if let tl = store?.timeline {
                 ForEach(ScrubReading.todaysEvents(after: scrubTime, in: tl, imperial: imperial,
                                                   speedUnit: speedUnit), id: \.self) { Text(verbatim: $0).monospacedDigit() }
@@ -222,6 +247,18 @@ struct PlaceDetail: View {
                       systemImage: favorites.contains(item.id) ? "star.slash" : "star.fill")
             }
             .accessibilityIdentifier("sheet-favorite")
+            phoneButton
         }
+    }
+
+    private var phoneButton: some View {
+        Button {
+            offerOnPhone = true
+            showPhoneInstructions = true
+        } label: {
+            Label(String(localized: "Open on iPhone", comment: "Watch Handoff action and instructions title."),
+                  systemImage: "iphone")
+        }
+        .accessibilityIdentifier("open-on-phone")
     }
 }

@@ -5,6 +5,38 @@ import XCTest
 
 final class ChsVisibilityTests: XCTestCase {
 
+    func testCancelledSavePreservesPreviousModel() async throws {
+        let id = "cancelled-save-\(UUID().uuidString)"
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.url(id)) }
+        try ChsModelStore.save(1, id: id, suffix: "")
+        await Task<Void, Never> {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                try ChsModelStore.save(2, id: id, suffix: "")
+                XCTFail("A cancelled download must not replace a usable model")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+        }.value
+        let saved: Int? = ChsModelStore.load(id, suffix: "")
+        XCTAssertEqual(saved, 1)
+    }
+
+    func testCancelledSaveDoesNotCreateModel() async {
+        let id = "cancelled-save-\(UUID().uuidString)"
+        defer { try? FileManager.default.removeItem(at: ChsModelStore.url(id)) }
+        await Task<Void, Never> {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                try ChsModelStore.save(1, id: id, suffix: "")
+                XCTFail("A cancelled download must not become visible")
+            } catch {
+                XCTAssertTrue(error is CancellationError)
+            }
+        }.value
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ChsModelStore.url(id).path))
+    }
+
     private func first(_ match: (StationItem) -> Bool) throws -> StationItem {
         try XCTUnwrap(StationItem.all.first(where: match))
     }

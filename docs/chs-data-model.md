@@ -86,6 +86,10 @@ So, structurally:
 
 The 60-day tide window is not a download-time knob. A 35-day fit missed held-out CHS predictions by up to 121 cm, the safe floor is about 48 days, and the in-sample `rms` cannot see the failure. [CHS tide validation](validation/chs-tides.md) has the bar and the sweep.
 
+The watch downloads and fits its own models through the same `IwlsFetcher`, `ChsFitter`, and `ChsFitService`. It queues up to six nearby tide ports and three fitted current gates within 150 km, plus synced favorites. A derived gate's favorite queues its reference port. Downloads run while the watch scene is active; interruption preserves cached chunks and any usable model, and returning to the app resumes the queue. Model replacement is atomic and checks cancellation before writing. The watch browser and search hide places until their model is stored. The list shows download progress separately, and provisional current models carry the shared Refining status. Online gates are not prefetched on the watch because its detail requires a harmonic model.
+
+Watch details offer Open on iPhone through Handoff, carrying the place's station ID to the phone's existing deep-link route. The user accepts it in the iPhone app switcher; the watch cannot force the phone app into the foreground. Handoff needs the usual Apple account, proximity, and enabled-Handoff conditions, and its delivery requires paired-device verification.
+
 ### This pattern does NOT generalise — the rule, and why
 
 Fetch-don't-bundle looks like a general answer to any restrictively licensed

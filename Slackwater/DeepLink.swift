@@ -2,6 +2,8 @@
 import Foundation
 import WidgetKit
 
+let stationActivityType = "io.openwaters.slackwater.station"
+
 // Shared with the app target so unit tests cover the widget entry-to-URL boundary.
 struct SlackwaterEntry: TimelineEntry {
     let date: Date
