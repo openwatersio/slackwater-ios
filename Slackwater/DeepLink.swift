@@ -9,6 +9,8 @@ struct SlackwaterEntry: TimelineEntry {
     let card: WidgetCard?
     let premium: Bool
     let stationID: String?
+    var accessoryGraph: StationCardGraph? = nil
+    var isPlaceholder = false
     /// The watch's inline, circular and corner families draw this (#524).
     var complication: ComplicationReading? = nil
 }
@@ -50,7 +52,8 @@ func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.s
 /// while locked. The provider resolves `stationID` either way, so the locked
 /// case can't lean on `deepLink(_:)`'s nil fallback.
 func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {
-    entry.premium ? deepLink(entry) : deepLink(forStationID: nil)
+    guard !entry.isPlaceholder else { return nil }
+    return entry.premium ? deepLink(entry) : deepLink(forStationID: nil)
 }
 
 /// The station id back out of a `slackwater://station/<id>` URL — the inverse

@@ -24,8 +24,11 @@ struct NextEventWidget: Widget {
 struct NextEventView: View {
     let entry: SlackwaterEntry
     var body: some View {
-        Group {
-            if let card = entry.card {
+        ZStack(alignment: .topLeading) {
+            if entry.isPlaceholder {
+                Image(systemName: "water.waves").font(.title).unredacted()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let card = entry.card {
                 NextEventContentView(card: card, mark: card.locationMark ? .location : nil)
             } else {
                 // Content margins are off, so the empty state pads itself.
@@ -34,7 +37,7 @@ struct NextEventView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(deepLink(entry))
+        .widgetURL(entry.isPlaceholder ? nil : deepLink(entry))
     }
 }
 
@@ -57,8 +60,11 @@ struct DayCurveWidget: Widget {
 struct DayCurveView: View {
     let entry: SlackwaterEntry
     var body: some View {
-        Group {
-            if let card = entry.card {
+        ZStack(alignment: .topLeading) {
+            if entry.isPlaceholder {
+                Image(systemName: "water.waves").font(.title).unredacted()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let card = entry.card {
                 DayCurveContentView(card: card)
             } else {
                 Text("Open Slackwater to download this station")
@@ -66,6 +72,6 @@ struct DayCurveView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .widgetURL(deepLink(entry))
+        .widgetURL(entry.isPlaceholder ? nil : deepLink(entry))
     }
 }
