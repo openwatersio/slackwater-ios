@@ -214,6 +214,11 @@ struct StationListView: View {
             SettingsView(onReplayTour: replayTour, opensPremium: true)
         }
         .onOpenURL(perform: handleDeepLink)
+        .onContinueUserActivity(stationActivityType) { activity in
+            guard let id = activity.userInfo?["stationID"] as? String,
+                  let url = deepLink(forStationID: id) else { return }
+            handleDeepLink(url)
+        }
         // A tapped alert carries the same station link a share does.
         .onReceive(AlertTap.shared.$url) { url in
             guard let url else { return }

@@ -1,9 +1,11 @@
 // Slackwater — GPL v3. The watch app's entry point: one list of places (#521).
 import SwiftUI
+import WidgetKit
 
 @main
 struct SlackwaterWatchApp: App {
     init() {
+        WidgetReload.trigger = { WidgetCenter.shared.reloadAllTimelines() }
         // Reconcile with iCloud before the list's first frame, as the phone does.
         _ = UnitsCloud.shared
         _ = FavoritesStore.shared

@@ -15132,6 +15132,54 @@
         }
       }
     },
+    "Open on iPhone" : {
+      "comment" : "Watch Handoff action and instructions title.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf dem iPhone öffnen"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir en el iPhone"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir sur l’iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneで開く"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne på iPhone"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Openen op iPhone"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir no iPhone"
+          }
+        }
+      }
+    },
     "Open Settings" : {
       "localizations" : {
         "de" : {
@@ -23521,6 +23569,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Marés e correntes abrem aqui."
+          }
+        }
+      }
+    },
+    "To continue, open the app switcher on your iPhone and tap Slackwater." : {
+      "comment" : "Watch instructions for accepting a station Handoff on iPhone.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne zum Fortfahren den App-Umschalter auf deinem iPhone und tippe auf Slackwater."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para continuar, abre el selector de apps en tu iPhone y toca Slackwater."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pour continuer, ouvrez le sélecteur d’apps sur votre iPhone et touchez Slackwater."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続けるには、iPhoneでAppスイッチャーを開き、Slackwaterをタップしてください。"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For å fortsette åpner du appveksleren på iPhone og trykker på Slackwater."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open de appkiezer op je iPhone en tik op Slackwater om verder te gaan."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para continuar, abra o seletor de apps no iPhone e toque em Slackwater."
           }
         }
       }

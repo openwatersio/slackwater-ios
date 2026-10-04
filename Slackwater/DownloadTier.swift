@@ -129,3 +129,14 @@ func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadT
     guard tier.next != nil, !declined, remaining > 0 else { return .absent }
     return .asking(count: remaining)
 }
+
+// Estimates reflect request pacing, so their copy deliberately avoids a countdown.
+func durationPhrase(_ seconds: Double) -> String {
+    if seconds < 90 { return String(localized: "under a minute", comment: "Approximate download duration under ninety seconds.") }
+    let minutes = Int((seconds / 60).rounded())
+    if minutes < 60 { return String(localized: "about \(minutes) minutes", comment: "Approximate duration. The integer is a number of minutes; vary by plural.") }
+    let hours = Int((Double(minutes) / 60).rounded())
+    return hours <= 1
+        ? String(localized: "about an hour", comment: "Approximate duration of one hour.")
+        : String(localized: "about \(hours) hours", comment: "Approximate duration. The integer is a number of hours; vary by plural.")
+}
