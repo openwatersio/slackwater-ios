@@ -3,6 +3,8 @@ require "json"
 
 root = File.expand_path("..", __dir__)
 workflow = YAML.safe_load(File.read("#{root}/.github/workflows/ci.yml"), aliases: true)
+run_name = workflow.fetch("run-name")
+raise "CI run name must preserve the PR marker and complete expression" unless run_name.include?("format('CI · PR \#{0}', github.event.number)") && run_name.end_with?("}}")
 app = workflow.fetch("jobs").fetch("app")
 shards = app.fetch("strategy").fetch("matrix").fetch("shard")
 raise "keep the five release validation shards" unless shards.map { |s| s.fetch("name") } == %w[offline list transition detail rest]
