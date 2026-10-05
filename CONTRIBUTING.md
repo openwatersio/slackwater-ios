@@ -138,7 +138,7 @@ Non-visual changes do not need screenshots.
 | Build for testing | GitHub-hosted | Builds the app and its test bundles once and uploads them |
 | App tests       | GitHub-hosted | Runs `scripts/test.sh` against that upload in five shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
 
-The five shard names remain offline, list, transition, detail, and rest. Settings methods are spread across the first four using measured iPhone/iPad durations; rest skips only the selected tests and catches new classes and methods. `ruby scripts/test-shards.test.rb` checks that source test methods run exactly once. Each hosted runner uses one simulator worker.
+The five shard names remain offline, list, transition, detail, and rest. Settings methods are spread across the first four using measured iPhone/iPad durations; rest skips only the selected tests and catches new classes and methods. `ruby scripts/test-shards.test.rb` checks that source test methods run exactly once. Alert popup tests run in offline; accessibility audits and tour tests run in detail. Each hosted runner uses one simulator worker.
 
 New app PR commits cancel obsolete build and shard jobs. Main build and shard jobs use a separate concurrency group for each workflow run, so newer pushes cannot replace pending siblings of a full validation attempt. This preserves complete results for each SHA and can queue more main work within the five macOS slots. Docs-only changes never enter those concurrency groups. Full main validation remains exhaustive on both devices. PR validation remains exhaustive on iPhone; no extra iPad job is booked into the five macOS slots. iPad-specific failures therefore still require main validation or a targeted local check before merge.
 
