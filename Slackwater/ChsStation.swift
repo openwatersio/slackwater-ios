@@ -163,7 +163,10 @@ enum ChsModelStore {
     }
 
     static func load(_ stationID: String) -> ChsModel? { load(stationID, suffix: "") }
-    static func save(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "") }
+    static func save(_ model: ChsModel) throws {
+        try save(model, id: model.stationID, suffix: "")
+        try? FileManager.default.removeItem(at: url(model.stationID, suffix: "-tide-preview"))
+    }
 }
 
 extension ChsModelStore {

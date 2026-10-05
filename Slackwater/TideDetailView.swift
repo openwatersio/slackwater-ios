@@ -17,8 +17,6 @@ struct TideDetailView: View {
     @State private var previewTimeline: TimelineData?
     @State private var displayedPreview: ChsTidePreview?
     @State private var previewGate = ScrollGate()
-    @ObservedObject private var downloads = ChsFitService.shared
-    @ObservedObject private var net = Connectivity.shared
     @State private var chsFittedAt: Date?
     /// The nearest current-series station inside `nearbyStationRadiusKm`, or
     /// nil. Computed once on appear — a catalog scan has no place in a body
@@ -124,15 +122,7 @@ struct TideDetailView: View {
                                 heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
                             above: {
                                 if let coverage = activePreview?.coverage {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Predictions available through \(coverage.upperBound.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
-                                        Text(previewDownloadStatus)
-                                            .foregroundStyle(SN.foam.opacity(0.7))
-                                    }
-                                    .font(.caption)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 20).padding(.vertical, 8)
-                                    .accessibilityIdentifier("chs-tide-preview")
+                                    TidePreviewNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
                                 }
                             },
                             card: { tl in
@@ -386,10 +376,6 @@ struct TideDetailView: View {
         return record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
     }
 
-    private var previewDownloadStatus: String {
-        tidePreviewDownloadStatus(downloads.queue.job(record.id), online: net.online)
-    }
-
     private func returnToNow() {
         live = appNow()
         // The anchor too: return-to-now from a September window has to bring
@@ -402,6 +388,26 @@ struct TideDetailView: View {
         if let coverage = activePreview?.coverage {
             scrubTime = min(max(live, coverage.lowerBound), coverage.upperBound)
         } else { scrubTime = live }
+    }
+}
+
+private struct TidePreviewNotice: View {
+    let stationID: String
+    let end: Date
+    let tz: TimeZone
+    @ObservedObject private var downloads = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Predictions available through \(end.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
+            Text(tidePreviewDownloadStatus(downloads.queue.job(stationID), online: net.online))
+                .foregroundStyle(SN.foam.opacity(0.7))
+        }
+        .font(.caption)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20).padding(.vertical, 8)
+        .accessibilityIdentifier("chs-tide-preview")
     }
 }
 

@@ -78,6 +78,7 @@ struct StationCardView: View {
     private let statusDetail: String?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
+    @State private var appliedPreviewAt: Date?
 
     init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false,
          preview: ChsTidePreview? = nil, status: CardStatus? = nil, statusDetail: String? = nil) {
@@ -123,6 +124,7 @@ struct StationCardView: View {
         }
         _state = State(initialValue: seeded.0)
         _graph = State(initialValue: seeded.1)
+        _appliedPreviewAt = State(initialValue: preview?.fetchedAt)
     }
 
     var body: some View {
@@ -132,10 +134,13 @@ struct StationCardView: View {
             }
         }
         .task(id: preview?.fetchedAt) {
+            guard state == nil || graph == nil || appliedPreviewAt != preview?.fetchedAt else { return }
             guard let record = await resolve() else { return }
+            guard !Task.isCancelled else { return }
             let station: any TidePredicting = preview.map { $0 as any TidePredicting } ?? record.engineStation
             state = record.cardState(at: appNow(), station: station)
             graph = record.cardGraph(at: appNow(), imperial: imperial, station: station)
+            appliedPreviewAt = preview?.fetchedAt
         }
     }
 }

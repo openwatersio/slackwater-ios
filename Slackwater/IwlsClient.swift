@@ -337,13 +337,14 @@ final class IwlsFetcher {
 
     /// wlp for one chunk on the 15-min grid the fit wants. The filter holds
     /// that grid for chunks cached on disk at IWLS's native 1-min rate.
-    func wlp(stationID: String, chunk: ChsChunk) async throws -> [ChsSample] {
-        try await cached("wlp", stationID: stationID, chunk: chunk) {
+    func wlp(stationID: String, chunk: ChsChunk, cache: Bool = true) async throws -> [ChsSample] {
+        try await cached("wlp", stationID: stationID, chunk: chunk, cache: cache) {
             $0.filter { $0.t.truncatingRemainder(dividingBy: 900_000) == 0 }
         }
     }
 
     private func cached(_ code: String, stationID: String, chunk: ChsChunk,
+                        cache: Bool = true,
                         _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
         try Task.checkCancellation()
 #if DEBUG
@@ -366,7 +367,7 @@ final class IwlsFetcher {
             }
         }
 #endif
-        if let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
+        if cache, let hit = ChsChunkStore.load(stationID, code, chunk) { return transform(hit) }
         let raw: [ChsSample]
 #if DEBUG
         if Self.usesFixture {
@@ -380,7 +381,7 @@ final class IwlsFetcher {
         let samples = transform(raw)
         // Only whole grid chunks are cached: the newest one runs to "now" and
         // would be a different chunk tomorrow.
-        if chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
+        if cache, chunk.end.timeIntervalSince(chunk.start) >= 7 * 86_400 {
             ChsChunkStore.save(samples, stationID, code, chunk)
         }
         return samples

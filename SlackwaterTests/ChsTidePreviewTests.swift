@@ -54,6 +54,56 @@ final class ChsTidePreviewTests: XCTestCase {
         XCTAssertNil(loaded.height(at: start.addingTimeInterval(1801)))
     }
 
+    func testSavingFullModelRemovesItsPreviewFile() throws {
+        let id = "preview-test-\(UUID().uuidString)"
+        let p = ChsTidePreview(stationID: id, fetchedAt: start, samples: preview([1, 2, 1]).samples)
+        let previewURL = ChsModelStore.url(id, suffix: "-tide-preview")
+        defer {
+            try? FileManager.default.removeItem(at: previewURL)
+            try? FileManager.default.removeItem(at: ChsModelStore.url(id))
+        }
+        try ChsModelStore.saveTidePreview(p)
+        XCTAssertNotNil(ChsModelStore.loadTidePreview(id))
+        let model = ChsModel(stationID: id, iwlsID: "test", iwlsName: "Test",
+                             fittedAt: start, fitStartMs: 0, fitEndMs: 1,
+                             offset: 1, rms: 0.01,
+                             constituents: [Con(name: "M2", amplitude: 1, phase: 0)])
+        try ChsModelStore.save(model)
+        XCTAssertNotNil(ChsModelStore.load(id))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: previewURL.path))
+        XCTAssertNil(ChsModelStore.loadTidePreview(id))
+    }
+
+    func testPreviewRequestBypassesAnIncompleteFitChunk() async throws {
+        let id = "preview-test-\(UUID().uuidString)"
+        let chunk = ChsChunk(start: start, end: start.addingTimeInterval(7 * 86400))
+        let samples = [ChsSample(t: start.timeIntervalSince1970 * 1000, v: 1)]
+        ChsChunkStore.save(samples, id, "wlp", chunk)
+        defer { ChsChunkStore.purge(id) }
+        let fetcher = IwlsFetcher(killSwitch: true)
+        let cached = try await fetcher.wlp(stationID: id, chunk: chunk)
+        XCTAssertEqual(cached, samples)
+        do {
+            _ = try await fetcher.wlp(stationID: id, chunk: chunk, cache: false)
+            XCTFail("A preview must request fresh samples instead of accepting the incomplete fit chunk")
+        } catch ChsError.networkDisabled {}
+    }
+
+    func testDownloadRowOnlyPromisesPredictionsInsidePreviewCoverage() {
+        let p = preview([1, 2, 1])
+        var job = ChsJob(id: p.stationID, name: "Test", region: "", isCurrent: false,
+                         latitude: 0, longitude: 0, fitDays: 60)
+        XCTAssertEqual(rowStatus(job, online: false, preview: p, at: start),
+                       "More data will download when you reconnect")
+        XCTAssertEqual(rowStatus(job, online: false, preview: p, at: start.addingTimeInterval(1801)),
+                       "Waiting for signal")
+        job.status = .failed
+        XCTAssertEqual(rowStatus(job, online: true, preview: p, at: start),
+                       "Additional download failed. Your downloaded predictions remain available.")
+        XCTAssertEqual(rowStatus(job, online: true, preview: p, at: start.addingTimeInterval(1801)),
+                       "Predictions unavailable")
+    }
+
     func testPlacesWithoutReadingsGetAPreviewBeforeOtherModelsFinish() {
         let near = ChsJob(id: "near", name: "Near", region: "", isCurrent: false, latitude: 0, longitude: 0, fitDays: 60)
         let far = ChsJob(id: "far", name: "Far", region: "", isCurrent: false, latitude: 1, longitude: 0, fitDays: 60)

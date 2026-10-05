@@ -829,7 +829,8 @@ final class ChsFitService: ObservableObject {
                             let station = try Self.resolve(info, in: list)
                             let start = todayLocal(info.tz).addingTimeInterval(-Timeline.backHours * 3600)
                             let end = start.addingTimeInterval(7 * 24 * 3600)
-                            let samples = try await fetcher.wlp(stationID: station.id, chunk: ChsChunk(start: start, end: end))
+                            // Preview samples are persisted only after coverage validation.
+                            let samples = try await fetcher.wlp(stationID: station.id, chunk: ChsChunk(start: start, end: end), cache: false)
                             let preview = ChsTidePreview(stationID: info.id, fetchedAt: appNow(), samples: samples.map {
                                 .init(time: Date(timeIntervalSince1970: $0.t / 1000), height: $0.v)
                             })
