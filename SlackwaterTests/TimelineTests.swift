@@ -10,6 +10,28 @@ import SlackwaterKit
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
+    func testPixelRoundedCenterStaysWithinHalfAPointOfTheReadout() {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        let target = formatter("yyyy-MM-dd HH:mm", friday.tz).date(from: "2026-09-09 09:54")!
+        for width in [CGFloat(400), 500, 514, 800, 834, 1194] {
+            var scrub = target
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: { scrub = $0 }))
+            let co = TimelineScrubber.Coordinator(strip)
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: width, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            co.layoutDidRun(sv)
+            let centre = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
+            XCTAssertEqual(centre.timeIntervalSince(target), 0, accuracy: 0.5 * 3600 / Double(Timeline.pph),
+                           "width \(width): the curve drifted more than half a point")
+            XCTAssertEqual(sv.accessibilityValue, spokenWhen(centre, data.tz))
+            XCTAssertEqual(scrub, target, "pixel rounding must not rewrite the selected time")
+        }
+    }
+
     func testSlackWindowSettingHasIncrementalTouchControls() throws {
         let source = try repoSource("Slackwater/SettingsView.swift")
         XCTAssertTrue(source.contains("Stepper(value: slackWindowSpeedBinding, in: 0.1...10, step: 0.1)"),
