@@ -13,7 +13,7 @@ struct AlertPopup: View {
 
     @ObservedObject private var store = AlertRuleStore.shared
     @ObservedObject private var premium = PremiumStore.shared
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @Environment(\.dismiss) private var dismiss
     @State private var showPremium = false
     /// True while a tap's permission prompt and store write are in flight: a second tap in

@@ -63,7 +63,7 @@ final class WidgetSnapshotTests: XCTestCase {
     /// H2(4): the widget used to hardcode `" %.1f m"` regardless of the
     /// app's own Settings choice, so a metric-only label shipped to every
     /// imperial user. Setting imperial explicitly (rather than relying on
-    /// the unset default, which is already imperial) is the test that
+    /// the regional default) is the test that
     /// actually distinguishes the fix from the old hardcoded string — that
     /// one always ended in "m", imperial or not.
     func testTideLabelRespectsImperialUnits() {

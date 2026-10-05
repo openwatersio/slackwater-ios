@@ -4,6 +4,16 @@
     "When is the next high tide in ${applicationName}" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "da" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Hvornår er næste højvande i ${applicationName}",
+              "Hvad tid er næste højvande i ${applicationName}",
+              "Hvornår er der højvande i ${applicationName}"
+            ]
+          }
+        },
         "de" : {
           "stringSet" : {
             "state" : "translated",
@@ -34,6 +44,16 @@
             ]
           }
         },
+        "fi" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Milloin on seuraava ylävesi sovelluksessa ${applicationName}",
+              "Mihin aikaan on seuraava ylävesi sovelluksessa ${applicationName}",
+              "Milloin on ylävesi sovelluksessa ${applicationName}"
+            ]
+          }
+        },
         "fr-CA" : {
           "stringSet" : {
             "state" : "translated",
@@ -44,6 +64,16 @@
             ]
           }
         },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando è la prossima alta marea in ${applicationName}",
+              "A che ora è la prossima alta marea in ${applicationName}",
+              "Quando è l’alta marea in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
@@ -51,6 +81,16 @@
               "${applicationName}で次の満潮はいつ",
               "${applicationName}で次の満潮は何時",
               "${applicationName}で満潮はいつ"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 다음 만조는 언제야",
+              "${applicationName}에서 다음 만조는 몇 시야",
+              "${applicationName}에서 만조는 언제야"
             ]
           }
         },
@@ -83,6 +123,26 @@
               "Quando é a preamar no ${applicationName}"
             ]
           }
+        },
+        "pt-PT" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é a próxima preia-mar no ${applicationName}",
+              "A que horas é a próxima preia-mar no ${applicationName}",
+              "Quando é a preia-mar no ${applicationName}"
+            ]
+          }
+        },
+        "sv" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "När är nästa högvatten i ${applicationName}",
+              "Vilken tid är nästa högvatten i ${applicationName}",
+              "När är det högvatten i ${applicationName}"
+            ]
+          }
         }
       },
       "comment" : "Siri invocation phrases. Preserve ${applicationName} in every phrase."
@@ -90,6 +150,16 @@
     "When is the next low tide in ${applicationName}" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "da" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Hvornår er næste lavvande i ${applicationName}",
+              "Hvad tid er næste lavvande i ${applicationName}",
+              "Hvornår er der lavvande i ${applicationName}"
+            ]
+          }
+        },
         "de" : {
           "stringSet" : {
             "state" : "translated",
@@ -120,6 +190,16 @@
             ]
           }
         },
+        "fi" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Milloin on seuraava alavesi sovelluksessa ${applicationName}",
+              "Mihin aikaan on seuraava alavesi sovelluksessa ${applicationName}",
+              "Milloin on alavesi sovelluksessa ${applicationName}"
+            ]
+          }
+        },
         "fr-CA" : {
           "stringSet" : {
             "state" : "translated",
@@ -130,6 +210,16 @@
             ]
           }
         },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando è la prossima bassa marea in ${applicationName}",
+              "A che ora è la prossima bassa marea in ${applicationName}",
+              "Quando è la bassa marea in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
@@ -137,6 +227,16 @@
               "${applicationName}で次の干潮はいつ",
               "${applicationName}で次の干潮は何時",
               "${applicationName}で干潮はいつ"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 다음 간조는 언제야",
+              "${applicationName}에서 다음 간조는 몇 시야",
+              "${applicationName}에서 간조는 언제야"
             ]
           }
         },
@@ -169,6 +269,26 @@
               "Quando é a baixa-mar no ${applicationName}"
             ]
           }
+        },
+        "pt-PT" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é a próxima baixa-mar no ${applicationName}",
+              "A que horas é a próxima baixa-mar no ${applicationName}",
+              "Quando é a baixa-mar no ${applicationName}"
+            ]
+          }
+        },
+        "sv" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "När är nästa lågvatten i ${applicationName}",
+              "Vilken tid är nästa lågvatten i ${applicationName}",
+              "När är det lågvatten i ${applicationName}"
+            ]
+          }
         }
       },
       "comment" : "Siri invocation phrases. Preserve ${applicationName} in every phrase."
@@ -176,6 +296,14 @@
     "When is the next slack window in ${applicationName}" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "da" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Hvornår er næste strømstille periode i ${applicationName}"
+            ]
+          }
+        },
         "de" : {
           "stringSet" : {
             "state" : "translated",
@@ -200,6 +328,14 @@
             ]
           }
         },
+        "fi" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Milloin on seuraava heikon virtauksen jakso sovelluksessa ${applicationName}"
+            ]
+          }
+        },
         "fr-CA" : {
           "stringSet" : {
             "state" : "translated",
@@ -208,11 +344,27 @@
             ]
           }
         },
+        "it" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando è la prossima finestra di stanca in ${applicationName}"
+            ]
+          }
+        },
         "ja" : {
           "stringSet" : {
             "state" : "translated",
             "values" : [
               "${applicationName}で次の潮止まり時間帯はいつ"
+            ]
+          }
+        },
+        "ko" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "${applicationName}에서 다음 정조 시간대는 언제야"
             ]
           }
         },
@@ -237,6 +389,22 @@
             "state" : "translated",
             "values" : [
               "Quando é a próxima janela de estofo no ${applicationName}"
+            ]
+          }
+        },
+        "pt-PT" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "Quando é o próximo período de estofo no ${applicationName}"
+            ]
+          }
+        },
+        "sv" : {
+          "stringSet" : {
+            "state" : "translated",
+            "values" : [
+              "När är nästa strömstilla period i ${applicationName}"
             ]
           }
         }

@@ -7,7 +7,7 @@ import SlackwaterKit
 struct TideDetailView: View {
     let record: TideStationRecord
     var preview: ChsTidePreview? = nil
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
 
     @State private var live = appNow()
     /// The single scrub time — whatever sits under the centerline.

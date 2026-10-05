@@ -51,7 +51,7 @@ def check(source, catalog, locales, source_language="en"):
             else:
                 original = catalog[key].get("localizations", {}).get(source_language, {})
                 originals = list(string_units(original))
-                if "plural" in original.get("variations", {}) and locale.split("-")[0] in {"de", "es", "fr", "nb", "nl", "pt"}:
+                if "plural" in original.get("variations", {}) and locale.split("-")[0] in {"da", "de", "es", "fi", "fr", "it", "nb", "nl", "pt", "sv"}:
                     plural = catalog[key]["localizations"][locale].get("variations", {}).get("plural", {})
                     missing = {"one", "other"} - plural.keys()
                     if missing:

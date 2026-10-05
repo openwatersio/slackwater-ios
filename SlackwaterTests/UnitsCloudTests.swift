@@ -54,6 +54,7 @@ final class UnitsCloudTests: XCTestCase {
     }
 
     func testFreshInstallDoesNotUploadDefaults() {
+        XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "en_FR")), "metric")
         let sync = sync()
         withExtendedLifetime(sync) {
             XCTAssertTrue(cloud.writes.isEmpty)

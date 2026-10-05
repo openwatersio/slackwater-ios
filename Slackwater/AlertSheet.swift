@@ -5,7 +5,7 @@ struct AlertSheet: View {
     @State var rule: AlertRule
     let stationName: String
     @ObservedObject private var store = AlertRuleStore.shared
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @Environment(\.dismiss) private var dismiss
     @State private var saving = false
 

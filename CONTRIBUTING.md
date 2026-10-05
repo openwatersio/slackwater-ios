@@ -51,7 +51,7 @@ Use the SF Symbol `sparkles` beside Premium labels, headings, and purchase optio
 
 ## Localization
 
-Every user-facing string ships in English, German (`de`), Spanish (`es-ES`), Canadian French (`fr-CA`), Japanese (`ja`), Norwegian Bokmål (`nb`), Dutch (`nl`), and Brazilian Portuguese (`pt-BR`). Include translations in the same pull request as any new or changed copy, including accessibility labels and system notifications. Use SwiftUI's localized string APIs or `String(localized:)`; plain Swift strings passed to system APIs are not localized automatically.
+Every user-facing string ships in English, Danish (`da`), German (`de`), Spanish (`es-ES`), Finnish (`fi`), Canadian French (`fr-CA`), Italian (`it`), Japanese (`ja`), Korean (`ko`), Norwegian Bokmål (`nb`), Dutch (`nl`), Brazilian Portuguese (`pt-BR`), European Portuguese (`pt-PT`), and Swedish (`sv`). Include translations in the same pull request as any new or changed copy, including accessibility labels and system notifications. Use SwiftUI's localized string APIs or `String(localized:)`; plain Swift strings passed to system APIs are not localized automatically.
 
 Update `Slackwater/Localizable.xcstrings` with translator context and complete translations for every supported locale. Permission prompts live in `InfoPlist.xcstrings`, shared with the watch; Siri invocation phrases live in `AppShortcuts.xcstrings`. Preserve format placeholders and Siri's `${applicationName}` token, add plural variants where the wording requires them, and remove unused keys when deleting copy. Review the catalog diff for missing translations, then build and check the changed screens in the affected languages before opening the pull request. English fallback is not a completed translation.
 

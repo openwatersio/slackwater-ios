@@ -6,7 +6,7 @@ struct SettingsView: View {
     /// for why this cannot just arm-and-dismiss.
     var onReplayTour: (() -> Void)? = nil
     var opensPremium = false
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
@@ -18,11 +18,13 @@ struct SettingsView: View {
     /// What the Calendar row says it is doing, from what is actually subscribed.
     private var calendarSummary: String {
         let on = calendars.subscriptions.map(\.stationID)
-        return switch on.count {
-        case 0: "Publish a station's tides or slack windows to your calendar"
-        case 1: StationItem.byId[on[0]]?.name ?? "1 station"
-        default: "\(on.count) stations"
+        if on.isEmpty {
+            return String(localized: "Publish a station's tides or slack windows to your calendar", comment: "Settings calendar row when no place is subscribed.")
         }
+        if on.count == 1, let name = StationItem.byId[on[0]]?.name {
+            return name
+        }
+        return String(localized: "\(on.count) stations", comment: "Settings calendar subscription count; used when multiple places are subscribed or a single place name is unavailable.")
     }
 
     var body: some View {
@@ -72,7 +74,7 @@ struct SettingsView: View {
                             Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
                         }
 
-                        section("Alerts") {
+                        section(String(localized: "Alerts", comment: "Settings section heading.")) {
                             NavigationLink {
                                 AlertsView()
                                     .navigationTitle("Alerts")

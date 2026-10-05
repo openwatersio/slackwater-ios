@@ -47,7 +47,7 @@ struct WidgetSnapshot: Equatable {
         // Read once, here — not per format call — so `build` stays a pure
         // function of (station, now) (H2): the setting is an input, same as
         // the other two.
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let imperial = heightUnits() != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
 
         var cal = Calendar(identifier: .gregorian)
@@ -190,7 +190,7 @@ struct WidgetCard {
     let countdownEnd: Date?
 
     static func build(_ record: WidgetRecord, now: Date, stationNamePrefix: String? = nil) -> WidgetCard {
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let imperial = heightUnits() != "metric"
         let speedUnit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let locationMark = stationNamePrefix != nil
         switch record {

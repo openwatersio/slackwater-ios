@@ -5,6 +5,30 @@ import XCTest
 @testable import Slackwater
 
 final class UnitsAndGroupsTests: XCTestCase {
+    func testHeightDefaultsFollowRegionRatherThanLanguage() {
+        let suite = "HeightUnits.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        for (identifier, expected) in [("en_US", "imperial"), ("fr_US", "imperial"),
+                                       ("en_FR", "metric"), ("fi_FI", "metric"),
+                                       ("en_GB", "metric"), ("en_CA", "metric"),
+                                       ("en", "metric")] {
+            XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: identifier)), expected, identifier)
+        }
+        XCTAssertNil(defaults.object(forKey: unitsKey), "A regional fallback must not become a saved or cloud preference")
+    }
+
+    func testSavedHeightPreferenceWinsOverRegionAndLanguageChanges() {
+        let suite = "HeightUnits.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("imperial", forKey: unitsKey)
+        XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "en_FR")), "imperial")
+        XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "fi_FI")), "imperial")
+        defaults.set("metric", forKey: unitsKey)
+        XCTAssertEqual(heightUnits(defaults: defaults, locale: Locale(identifier: "en_US")), "metric")
+    }
+
     // MARK: - formatSpeed mirrors web units.ts (kn | kmh | ms, one decimal)
 
     func testFormatSpeedUnits() {

@@ -27,6 +27,9 @@ func applySeedHooksIfRequested() {
     if CommandLine.arguments.contains("-resetSeriesFilter") {
         UserDefaults.standard.removeObject(forKey: seriesFilterKey)
     }
+    if CommandLine.arguments.contains("-resetUnits") {
+        AppGroup.defaults.removeObject(forKey: unitsKey)
+    }
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)
     }

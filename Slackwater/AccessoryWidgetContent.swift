@@ -50,7 +50,7 @@ extension WidgetRecord {
     func accessoryGraph(at now: Date) -> StationCardGraph {
         switch self {
         case .tide(let record, let station):
-            record.cardGraph(at: now, imperial: AppGroup.defaults.string(forKey: unitsKey) != "metric",
+            record.cardGraph(at: now, imperial: heightUnits() != "metric",
                              station: station)
         case .current(let record, let station):
             record.cardGraph(at: now, unit: AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn",
