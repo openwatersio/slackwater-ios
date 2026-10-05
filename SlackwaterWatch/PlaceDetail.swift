@@ -25,7 +25,7 @@ struct PlaceDetail: View {
     @ObservedObject private var downloads = ChsFitService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @State private var store: TimelineWindowStore?
     @State private var source: TimelineSource?

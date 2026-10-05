@@ -47,7 +47,7 @@ struct AlertsView: View {
     @ObservedObject private var store = AlertRuleStore.shared
     @ObservedObject private var scheduler = AlertScheduler.shared
     @ObservedObject private var premium = PremiumStore.shared
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @State private var editing: AlertRule?
 
     private func name(_ stationID: String) -> String { StationItem.byId[stationID]?.name ?? stationID }

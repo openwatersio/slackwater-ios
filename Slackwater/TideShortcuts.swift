@@ -31,7 +31,7 @@ struct TideShortcutResult {
     let timeZone: TimeZone
 
     var spoken: String {
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let imperial = heightUnits() != "metric"
         let time = extreme.time.formatted(Date.FormatStyle(
             date: .complete, time: .shortened, timeZone: timeZone))
         let height = formatHeight(extreme.height, imperial: imperial)

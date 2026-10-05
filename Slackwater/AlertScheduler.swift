@@ -128,7 +128,7 @@ struct AlertStatusSnapshot: Equatable {
         let rules = AlertRuleStore.shared.rules
         let threshold = slackThresholdKn
         let premium = PremiumStore.shared.isPremium
-        let imperial = AppGroup.defaults.string(forKey: unitsKey) != "metric"
+        let imperial = heightUnits() != "metric"
 
         let subscriptions = StationCalendarStore.shared.subscriptions.map(\.stationID)
 

@@ -74,7 +74,7 @@ struct StationListView: View {
     /// tap that sets the second without clearing the first.
     @State private var mapPreview: MapPreview?
     @Environment(\.openURL) private var openURL
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     /// Read for the map's identity, not for this view's own text: the pins'
     /// readings are baked into the GeoJSON, so a speed-unit change has to
     /// rebuild the source. Observing it here is what republishes the body.

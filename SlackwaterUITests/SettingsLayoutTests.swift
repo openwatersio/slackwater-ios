@@ -2,6 +2,25 @@
 import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
+    func testHeightDefaultsUseRegionAndPreserveAnExplicitChoice() {
+        for (region, selected) in [("US", "Feet"), ("FR", "Meters")] {
+            let app = launch("-seedGate", "-locDenied", "-resetUnits",
+                             "-AppleLanguages", "(en)", "-AppleLocale", "en_\(region)")
+            openSettings(app)
+            XCTAssertTrue(app.segmentedControls.buttons[selected].isSelected)
+            XCTAssertTrue(app.segmentedControls.buttons["Knots"].isSelected)
+            save(app, "settings-region-\(region).png")
+            if region == "FR" { app.segmentedControls.buttons["Feet"].tap() }
+            app.terminate()
+        }
+        let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_FI")
+        openSettings(app)
+        XCTAssertTrue(app.segmentedControls.buttons["Feet"].isSelected)
+        app.terminate()
+        let clean = launch("-seedGate", "-locDenied", "-resetUnits")
+        clean.terminate()
+    }
+
     func testSlackWindowPreviewChangesWithComfortCurrent() {
         let app = launch("-seedGate", "-locDenied")
         openSettings(app)

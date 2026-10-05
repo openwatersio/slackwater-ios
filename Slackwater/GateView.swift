@@ -6,7 +6,7 @@ import SwiftUI
 
 struct GateView: View {
     @AppStorage(seenGateKey) private var seenGate = false
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @ObservedObject private var loc = LocationService.shared
     @State private var asked = false
     private let exampleStation = StationIndex.bundled.tides.first { $0.id == "noaa/9449880" }

@@ -219,7 +219,7 @@ func readoutUnitSignature() -> String {
 }
 
 private func readoutUnits() -> (imperial: Bool, speedUnit: String) {
-    ((AppGroup.defaults.string(forKey: unitsKey) ?? "imperial") == "imperial",
+    (heightUnits() == "imperial",
      AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn")
 }
 

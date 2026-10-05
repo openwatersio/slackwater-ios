@@ -6,7 +6,7 @@ struct SettingsView: View {
     /// for why this cannot just arm-and-dismiss.
     var onReplayTour: (() -> Void)? = nil
     var opensPremium = false
-    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
+    @AppStorage(unitsKey, store: AppGroup.defaults) private var units = heightUnits()
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
