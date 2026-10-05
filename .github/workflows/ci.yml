@@ -1,4 +1,5 @@
 name: CI
+run-name: ${{ github.event_name == 'pull_request' && format('CI · PR #{0}', github.event.number) || format('CI · {0}', github.sha) }}
 
 # Required checks is the protected-branch gate and accepts the app lane's docs-only skip.
 
@@ -114,6 +115,7 @@ jobs:
         run: |
           ruby scripts/test-shards.test.rb
           python3 scripts/nightly-validation.test.py
+          python3 scripts/cancel-closed-ci.test.py
           ruby scripts/nightly-workflow.test.rb
           sudo apt-get update && sudo apt-get install -y zsh
           zsh scripts/nightly.test.sh
