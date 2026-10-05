@@ -272,10 +272,17 @@ class ScreenshotTestCase: XCTestCase {
                     .first { $0.exists } ?? container
             }
             if reachable() { break }
-            if attempt < 10 { container.swipeUp() }
+            if attempt < 10 {
+                // A swipe can carry a short row past the sheet's top edge.
+                if el.exists, el.frame.minY < container.frame.minY {
+                    container.swipeDown(velocity: .slow)
+                } else {
+                    container.swipeUp(velocity: .slow)
+                }
+            }
         }
         settleLayout(el)
-        XCTAssert(reachable(), "could not scroll element within reach")
+        XCTAssert(reachable(), "could not scroll element within reach: target \(el.exists ? "\(el.identifier) \(el.frame)" : "missing"), container \(container.identifier) \(container.frame)")
     }
 
     /// Bring `el` within reach inside a SHEET using a bounded wait after each
