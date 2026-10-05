@@ -3,7 +3,6 @@ import SwiftUI
 
 struct WatchDownloadStatus: View {
     @ObservedObject private var service = ChsFitService.shared
-    @ObservedObject private var network = Connectivity.shared
 
     var body: some View {
         if let job = service.queue.jobs.first(where: { $0.status == .downloading })
@@ -33,8 +32,7 @@ struct WatchDownloadStatus: View {
         case .failed: .failed
         case .downloading: .downloading
         case .pending:
-            if !network.online { .offline }
-            else if (job.retryAfter ?? .distantPast) > appNow() { .retrying }
+            if (job.retryAfter ?? .distantPast) > appNow() { .retrying }
             else { .queued }
         }
     }

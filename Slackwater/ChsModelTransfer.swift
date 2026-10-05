@@ -2,7 +2,7 @@
 import Foundation
 import WatchConnectivity
 
-struct ChsModelRequest: Codable {
+struct ChsModelRequest: Codable, Hashable {
     let stationID: String
     let isCurrent: Bool
 
@@ -26,10 +26,30 @@ struct ChsModelRequest: Codable {
             ? ChsCurrentGateInfo.all.contains { $0.id == stationID && !$0.isOnline }
             : ChsStationInfo.all.contains { $0.id == stationID }
         guard known else { return Data() }
-        let name = stationID + (isCurrent ? "-current" : "") + ".json"
+        let name = ChsModelStore.url(stationID, suffix: isCurrent ? "-current" : "").lastPathComponent
         guard let data = try? Data(contentsOf: directory.appendingPathComponent(name)),
               data.count <= 60 * 1024, decode(data) != nil else { return Data() }
         return data
+    }
+}
+
+struct ChsModelBatch: Codable {
+    let requests: [ChsModelRequest]
+    static let limit = 12
+
+    func reply(from directory: URL = ChsModelStore.dir) -> Data {
+        var models: [String: Data] = [:]
+        for request in requests.prefix(Self.limit) {
+            let data = request.reply(from: directory)
+            guard !data.isEmpty else { continue }
+            var candidate = models
+            candidate[request.stationID] = data
+            // Watch Connectivity's message budget includes base64 encoding.
+            if let encoded = try? JSONEncoder().encode(candidate), encoded.count <= 60 * 1024 {
+                models = candidate
+            }
+        }
+        return (try? JSONEncoder().encode(models)) ?? Data()
     }
 }
 
@@ -38,9 +58,14 @@ final class ChsModelTransfer: NSObject, WCSessionDelegate, @unchecked Sendable {
     private let session: WCSession?
     private let send: ((Data, @escaping (Data?) -> Void) -> Void)?
     private let timeout: TimeInterval
+    private let ready: (() -> Bool)?
+    private let cacheLock = NSLock()
+    private var missing: Set<ChsModelRequest> = []
+    private var unavailableUntil = Date.distantPast
 
     private override init() {
         send = nil
+        ready = nil
         timeout = 5
         let testing = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
             || networkKillSwitch || IwlsFetcher.usesFixture
@@ -50,24 +75,63 @@ final class ChsModelTransfer: NSObject, WCSessionDelegate, @unchecked Sendable {
         session?.activate()
     }
 
-    init(send: @escaping (Data, @escaping (Data?) -> Void) -> Void, timeout: TimeInterval) {
+    init(send: @escaping (Data, @escaping (Data?) -> Void) -> Void, timeout: TimeInterval,
+         ready: @escaping () -> Bool = { true }) {
         self.send = send
+        self.ready = ready
         self.timeout = timeout
         session = nil
         super.init()
     }
 
-    func model(for request: ChsModelRequest) async throws -> ChsModel? {
-        try Task.checkCancellation()
-        if send == nil {
-            guard let session else { return nil }
-            // Cold launches can reach the queue before session activation finishes.
-            for _ in 0..<20 where session.activationState != .activated {
-                try await Task.sleep(for: .milliseconds(100))
-            }
-            guard session.activationState == .activated, session.isReachable else { return nil }
+    func resetAvailability() {
+        cacheLock.withLock {
+            missing.removeAll()
+            unavailableUntil = .distantPast
         }
-        let data = try JSONEncoder().encode(request)
+    }
+
+    func model(for request: ChsModelRequest) async throws -> ChsModel? {
+        try await models(for: [request])[request.stationID]
+    }
+
+    func models(for requests: [ChsModelRequest]) async throws -> [String: ChsModel] {
+        try Task.checkCancellation()
+        let pending = cacheLock.withLock {
+            Date.now < unavailableUntil ? [] : requests.filter { !missing.contains($0) }
+        }
+        guard !pending.isEmpty, send != nil || session != nil else { return [:] }
+        // Reachability can arrive after activation on a cold launch.
+        for _ in 0..<20 {
+            if ready?() ?? (session?.activationState == .activated && session?.isReachable == true) { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        guard ready?() ?? (session?.activationState == .activated && session?.isReachable == true) else {
+            cacheLock.withLock { unavailableUntil = .now.addingTimeInterval(30) }
+            return [:]
+        }
+        var models: [String: ChsModel] = [:]
+        for start in stride(from: 0, to: pending.count, by: ChsModelBatch.limit) {
+            try Task.checkCancellation()
+            let batch = Array(pending[start..<min(start + ChsModelBatch.limit, pending.count)])
+            let response = await exchange(try JSONEncoder().encode(ChsModelBatch(requests: batch)))
+            try Task.checkCancellation()
+            guard let response, let replies = try? JSONDecoder().decode([String: Data].self, from: response) else {
+                cacheLock.withLock { unavailableUntil = .now.addingTimeInterval(30) }
+                break
+            }
+            for request in batch {
+                if let data = replies[request.stationID], let model = request.decode(data) {
+                    models[request.stationID] = model
+                } else {
+                    _ = cacheLock.withLock { missing.insert(request) }
+                }
+            }
+        }
+        return models
+    }
+
+    private func exchange(_ data: Data) async -> Data? {
         let reply = PendingModelReply()
         let response: Data? = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
@@ -83,8 +147,7 @@ final class ChsModelTransfer: NSObject, WCSessionDelegate, @unchecked Sendable {
         } onCancel: {
             reply.finish(nil)
         }
-        try Task.checkCancellation()
-        return response.flatMap(request.decode)
+        return response
     }
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState,
@@ -93,11 +156,15 @@ final class ChsModelTransfer: NSObject, WCSessionDelegate, @unchecked Sendable {
     func session(_ session: WCSession, didReceiveMessageData messageData: Data,
                  replyHandler: @escaping (Data) -> Void) {
         #if os(iOS)
-        let request = try? JSONDecoder().decode(ChsModelRequest.self, from: messageData)
+        let request = try? JSONDecoder().decode(ChsModelBatch.self, from: messageData)
         replyHandler(request?.reply() ?? Data())
         #else
         replyHandler(Data())
         #endif
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        if session.isReachable { resetAvailability() }
     }
 
     #if os(iOS)

@@ -11,54 +11,38 @@ final class Connectivity: ObservableObject {
 
     @Published private(set) var online = false
     @Published private(set) var constrained = true
+    #if !os(watchOS)
     private let monitor = NWPathMonitor()
+    #endif
 
     private init() {
-        // The kill switch is the UI tests' airplane mode: stay offline, and
-        // don't start a monitor that would immediately contradict it.
-        #if DEBUG
-        let forcedOnline = CommandLine.arguments.contains("-connectivityOnline")
+        #if os(watchOS)
+        // Low-level paths stay unsatisfied on ordinary watch apps (TN3135).
+        // URLSession decides whether a request can connect; keep the budget small.
+        online = !networkKillSwitch
+        constrained = true
         #else
-        let forcedOnline = false
-        #endif
-#if DEBUG
-        if CommandLine.arguments.contains("-connectivityUnsatisfied") {
-            update(status: .unsatisfied, constrained: true)
-            return
-        }
-        if IwlsFetcher.usesFixture || forcedOnline {
+        #if DEBUG
+        if CommandLine.arguments.contains("-connectivityUnsatisfied") { return }
+        if IwlsFetcher.usesFixture || CommandLine.arguments.contains("-connectivityOnline") {
             online = true
             constrained = false
             return
         }
-#endif
+        #endif
         guard !networkKillSwitch else {
             constrained = false
             return
         }
-        #if os(watchOS)
-        update(status: .unsatisfied, constrained: true)
-        #else
         monitor.pathUpdateHandler = { [weak self] path in
             let status = path.status
             let constrained = path.isConstrained
             Task { @MainActor in
-                self?.update(status: status, constrained: constrained)
+                self?.online = status == .satisfied
+                self?.constrained = constrained
             }
         }
         monitor.start(queue: .global(qos: .utility))
-        #endif
-    }
-
-    private func update(status: NWPath.Status, constrained: Bool) {
-        #if os(watchOS)
-        // NWPathMonitor stays unsatisfied on a normal watch app even when
-        // URLSession can use Wi-Fi, cellular, or the paired phone's network.
-        online = true
-        self.constrained = true
-        #else
-        online = status == .satisfied
-        self.constrained = constrained
         #endif
     }
 }
