@@ -1,10 +1,8 @@
-// Slackwater — GPL v3. One state model for a list card that has no reading to
-// show (#93). The explanation — what CHS is, why a gate has no offline model,
+// Slackwater — GPL v3. One download state model for list cards (#93). The explanation — what CHS is, why a gate has no offline model,
 // what "queued" means — stays on the detail views, which have room for it.
 import SwiftUI
 
-/// What a station card is waiting on. States with no reading at all, plus
-/// `.refining` — the one state that HAS a reading and isn't final yet.
+/// What a station card is downloading, whether or not a reading is available.
 ///
 /// One enum rather than a sentence built at each site: the online-gate path
 /// used to compose its own literal and so could not tell "never fetched" from
@@ -29,10 +27,6 @@ enum CardStatus: Equatable {
     case notDownloaded
     /// Another attempt would get the same answer.
     case failed
-    /// Showing the 60-day fast answer while the full model downloads. Carries
-    /// this gate's own measured slack tolerance ("±35 min") — the number the
-    /// ⚠️ badge it replaced could only gesture at.
-    case refining(tolerance: String?)
 
     var showsPlaceholder: Bool {
         switch self {
@@ -58,7 +52,6 @@ enum CardStatus: Equatable {
         case .offline: "wifi.slash"
         case .expired, .notDownloaded: "wifi.slash"
         case .failed: "exclamationmark.triangle.fill"
-        case .refining: "brain"
         }
     }
 
@@ -73,10 +66,6 @@ enum CardStatus: Equatable {
         case .expired: String(localized: "Expired", comment: "Compact offline-download status.")
         case .notDownloaded: String(localized: "Not downloaded", comment: "Compact offline-download status.")
         case .failed: String(localized: "Failed", comment: "Compact download status.")
-        case .refining(let tolerance):
-            tolerance.map {
-                String(localized: "Refining · \($0)", comment: "Compact prediction status. The value is a measured time tolerance.")
-            } ?? String(localized: "Refining", comment: "Compact prediction status.")
         }
     }
 
@@ -92,11 +81,6 @@ enum CardStatus: Equatable {
         case .expired: return String(localized: "Expired — get back online to download current predictions.", comment: "VoiceOver download status.")
         case .notDownloaded: return String(localized: "Not downloaded — get back online to download predictions.", comment: "VoiceOver download status.")
         case .failed: return String(localized: "Station unavailable.", comment: "VoiceOver station status.")
-        case .refining(let tolerance):
-            if let tolerance {
-                return String(localized: "Refining — showing the fast answer, slack accurate to \(tolerance). The full model is still downloading.", comment: "VoiceOver prediction status. The value is a measured time tolerance.")
-            }
-            return String(localized: "Refining — showing the fast answer. The full model is still downloading.", comment: "VoiceOver prediction status.")
         }
     }
 
@@ -104,12 +88,11 @@ enum CardStatus: Equatable {
     /// actually happening, quiet foam otherwise. Amber (`#EF6F4A`) on the
     /// composited card background measures 4.71:1–5.59:1 (docs/testflight.md),
     /// which clears AA for text as well as 1.4.11's 3:1 for the icon — that
-    /// measurement is why the fast answer can be plain text here at all, where
-    /// the badge it replaced needed its own opaque disc.
+    /// measurement lets the status use plain text without an opaque disc.
     var tint: Color {
         switch self {
         case .downloading: SN.leaf
-        case .failed, .refining: SN.amber
+        case .failed: SN.amber
         case .queued, .retrying, .notQueued, .offline, .expired, .notDownloaded: SN.foam.opacity(0.85)
         }
     }
@@ -151,7 +134,7 @@ struct CardStatusStrip: View {
         // PROPAGATES a container's identifier down over every descendant's —
         // verified in an a11y dump, where this element came back carrying the
         // card's id and not its own. A per-state locator would work on a
-        // refining card and silently not on a pending one, which is worse than
+        // usable card and silently not on a pending one, which is worse than
         // none. Tests locate the strip by its full accessibility label.
     }
 }

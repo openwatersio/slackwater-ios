@@ -13,7 +13,7 @@ final class LiveFetchTests: ScreenshotTestCase {
         XCTAssert(stationList(app).appears(within: 10))
         openSearch(app, "victoria")
         pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
-        let preview = app.descendants(matching: .any)["chs-tide-preview"].firstMatch
+        let preview = app.descendants(matching: .any)["chs-download-notice"].firstMatch
         XCTAssert(preview.appears(within: 60), "Victoria never showed downloaded predictions — IWLS unreachable?")
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
         XCTAssert(preview.disappears(within: 300), "Victoria's full offline model never completed")

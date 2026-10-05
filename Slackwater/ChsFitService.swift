@@ -1139,3 +1139,21 @@ extension ChsModelStore {
         try? FileManager.default.removeItem(at: IwlsFetcher.stationListCache)
     }
 }
+
+/// Where a fittable CHS station stands, in precedence order: what is happening
+/// right now beats what is merely true. Replaces the five sentences
+/// `chsPendingMessage` used to build.
+@MainActor func cardStatus(id: String) -> CardStatus {
+    guard let job = ChsFitService.shared.queue.job(id) else {
+        return Connectivity.shared.online ? .notQueued : .notDownloaded
+    }
+    switch job.status {
+    case .downloading: return .downloading
+    case .failed: return .failed
+    case .ready: return .queued
+    case .pending:
+        guard Connectivity.shared.online else { return .offline }
+        if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
+        return .queued
+    }
+}

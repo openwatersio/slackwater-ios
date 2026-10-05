@@ -10,8 +10,9 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
         save(app, "tide-waiting.png")
         releaseFixture(token, "chs-victoria-first-chunk")
-        let preview = app.descendants(matching: .any)["chs-tide-preview"].firstMatch
+        let preview = app.descendants(matching: .any)["chs-download-notice"].firstMatch
         XCTAssert(preview.appears(within: 10))
+        XCTAssert(app.progressIndicators["chs-download-notice"].firstMatch.exists)
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
         let strip = app.descendants(matching: .any)["timeline-strip"].firstMatch
         let moon = app.descendants(matching: .any)["tile-moon"].firstMatch
@@ -117,14 +118,15 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         )).firstMatch.exists)
     }
 
-    func testProvisionalGateRefinesInOpenDetail() {
+    func testCurrentDownloadStaysUsableAndFinishesInOpenDetail() {
         let (app, token) = fixture("provisional-final", "chs-dodd-narrows",
                                    fix: ("49.1344", "-123.8171"))
         openSearch(app, "dodd")
-        let badge = app.staticTexts.matching(
-            NSPredicate(format: "label BEGINSWITH 'Refining'")).firstMatch
-        XCTAssert(badge.appears(within: 30))
-        XCTAssert(badge.label.contains("±35 min"))
+        let reading = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS '~'")).firstMatch
+        XCTAssert(reading.appears(within: 30))
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Downloading'")).firstMatch.exists)
+        save(app, "current-download.png")
         let tildeReading = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS '~'")).firstMatch
         let tildeCurve = app.descendants(matching: .any).matching(
@@ -135,13 +137,16 @@ final class OfflineTransitionTests: ScreenshotTestCase {
             format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'"
         )).firstMatch
         XCTAssert(warning.appears(within: 5))
-        XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'Stay connected'"
-        )).firstMatch.exists)
-        XCTAssert(app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'The on-device fit is still refining'"
-        )).firstMatch.exists)
-        XCTAssert(app.progressIndicators["chs-provisional-warning"].firstMatch.exists)
+        XCTAssert(app.staticTexts["Additional data is required to improve accuracy"].exists)
+        let strip = app.descendants(matching: .any)["timeline-strip"].firstMatch
+        let moon = app.descendants(matching: .any)["tile-moon"].firstMatch
+        let notice = app.descendants(matching: .any)["chs-download-notice"].firstMatch
+        let progress = app.progressIndicators["chs-download-notice"].firstMatch
+        XCTAssert(progress.exists)
+        XCTAssertGreaterThanOrEqual(notice.frame.minY, strip.frame.maxY)
+        XCTAssertLessThanOrEqual(notice.frame.maxY, moon.frame.minY)
+        XCTAssertEqual(notice.frame.midX, strip.frame.midX, accuracy: 1)
+        save(app, "current-detail.png")
         releaseFixture(token, "after-provisional")
         XCTAssert(warning.disappears(within: 30))
         assertCurrentDetailRendered(app)
@@ -267,7 +272,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         openDownloads(app)
         let row = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
         XCTAssert(row.appears(within: 10))
-        XCTAssert(row.label.contains("Refining"))
-        XCTAssert(row.label.contains("Fast answer ±35 min"))
+        XCTAssert(row.label.contains("Waiting for signal"))
+        XCTAssertFalse(row.label.contains("Fast answer"))
     }
 }

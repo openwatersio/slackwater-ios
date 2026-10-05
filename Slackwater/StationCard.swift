@@ -76,12 +76,13 @@ struct StationCardView: View {
     private let preview: ChsTidePreview?
     private let status: CardStatus?
     private let statusDetail: String?
+    private let downloadProgress: Double?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
     @State private var appliedPreviewAt: Date?
 
     init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false,
-         preview: ChsTidePreview? = nil, status: CardStatus? = nil, statusDetail: String? = nil) {
+         preview: ChsTidePreview? = nil, status: CardStatus? = nil, statusDetail: String? = nil, downloadProgress: Double? = nil) {
         name = record.name
         region = record.region
         self.imperial = imperial
@@ -90,6 +91,7 @@ struct StationCardView: View {
         self.preview = preview
         self.status = status
         self.statusDetail = statusDetail
+        self.downloadProgress = downloadProgress
         if eager { seed(record) }
     }
 
@@ -102,6 +104,7 @@ struct StationCardView: View {
         preview = nil
         status = nil
         statusDetail = nil
+        downloadProgress = nil
         if eager, let record = info.tideRecord { seed(record) }
     }
 
@@ -128,7 +131,7 @@ struct StationCardView: View {
     }
 
     var body: some View {
-        StationCard(name: name, region: region, km: km, status: status, usableWhileDownloading: preview != nil, statusDetail: statusDetail, graph: graph) {
+        StationCard(name: name, region: region, km: km, status: status, usableWhileDownloading: preview != nil, statusDetail: statusDetail, downloadProgress: downloadProgress, graph: graph) {
             if let state {
                 ConditionsItem(reading: .tide(state, imperial: imperial))
             }
@@ -164,7 +167,8 @@ struct ChsCardView: View {
         case .preview(let preview):
             StationCardView(record: info.previewIdentity, imperial: imperial, km: km, eager: eager,
                             preview: preview, status: cardStatus(id: info.id),
-                            statusDetail: tidePreviewDownloadStatus(service.queue.job(info.id), online: net.online))
+                            statusDetail: cardStatusDetail(id: info.id, status: cardStatus(id: info.id)),
+                            downloadProgress: service.queue.job(info.id)?.downloadProgress)
         case .fitting:
             pending()
         case .pending:
@@ -388,10 +392,8 @@ struct CurrentCardView: View {
     let region: String
     var km: Double? = nil
     /// Set while this gate is showing its 60-day fast answer. On the LIST card
-    /// that is the amber "Refining" strip and a `~` on the readings — nothing
-    /// else. One marking per state (#93), and the strip carries the gate's own
-    /// measured tolerance. The full explanation lives
-    /// on the detail view's amber card.
+    /// that is the ongoing download status and a `~` on the readings — nothing
+    /// else. The measured timing tolerance lives in the detail notice.
     var provisional: ChsCurrentGateInfo? = nil
     /// The caller's own record, when it has one. A CHS fit is replaced under
     /// an open list when a refinement lands, so it has to stay observable; a
@@ -446,17 +448,14 @@ struct CurrentCardView: View {
         _graphKey = State(initialValue: "\(unit)-\(slackThresholdKn)")
     }
 
-    /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
-    /// a gate that never offered a fast answer has no measured number to show.
     private var status: CardStatus? {
-        provisional.map {
-            .refining(tolerance: $0.provisionalSlackMinutes == nil ? nil : $0.provisionalTolerance)
-        }
+        provisional.map { cardStatus(id: $0.id) }
     }
 
     var body: some View {
         StationCard(name: name, region: region, km: km,
-                    status: status,
+                    status: status, usableWhileDownloading: provisional != nil,
+                    statusDetail: provisional.flatMap { cardStatusDetail(id: $0.id, status: cardStatus(id: $0.id)) },
                     downloadProgress: provisional.flatMap { ChsFitService.shared.queue.job($0.id)?.downloadProgress },
                     graph: graph) {
             if let state, let record {
@@ -611,24 +610,6 @@ private func previewGraph(scale: Double, offset: Double, includesZero: Bool, pha
             }
             .padding()
         }
-    }
-}
-
-/// Where a fittable CHS station stands, in precedence order: what is happening
-/// right now beats what is merely true. Replaces the five sentences
-/// `chsPendingMessage` used to build.
-@MainActor func cardStatus(id: String) -> CardStatus {
-    guard let job = ChsFitService.shared.queue.job(id) else {
-        return Connectivity.shared.online ? .notQueued : .notDownloaded
-    }
-    switch job.status {
-    case .downloading: return .downloading
-    case .failed: return .failed
-    case .ready: return .queued
-    case .pending:
-        guard Connectivity.shared.online else { return .offline }
-        if (job.retryAfter ?? .distantPast) > appNow() { return .retrying }
-        return .queued
     }
 }
 
