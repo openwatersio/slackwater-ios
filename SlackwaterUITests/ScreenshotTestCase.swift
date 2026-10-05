@@ -49,7 +49,7 @@ class ScreenshotTestCase: XCTestCase {
         // walks (`launchShots`) build their own arguments and keep the app as
         // users see it.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
-                             "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
+                             "-currentFillOff", "-chartPacksOff", "-seedTour",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
