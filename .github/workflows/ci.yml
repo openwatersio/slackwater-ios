@@ -7,10 +7,6 @@ on:
   push:
     branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
   # public-repo macOS pools can queue at peak — a docs-only change should not
@@ -114,6 +110,17 @@ jobs:
       - run: npm ci
         working-directory: tools
 
+      - name: CI and release tooling
+        run: |
+          ruby scripts/test-shards.test.rb
+          python3 scripts/nightly-validation.test.py
+          ruby scripts/nightly-workflow.test.rb
+          sudo apt-get update && sudo apt-get install -y zsh
+          zsh scripts/nightly.test.sh
+          zsh scripts/promote-nightly.test.sh
+          ruby scripts/promote-workflow.test.rb
+          node --test scripts/asc.test.mjs
+
       - name: Fixture tooling
         run: node --test scripts/iwls-fixtures.test.mjs
 
@@ -154,7 +161,12 @@ jobs:
   # and on a free org's five macOS slots that doubled the wall clock.
   build:
     name: Build for testing
+    # Successful full build jobs: median 3.55 min, p90 6.55 min (100-run audit).
+    timeout-minutes: 20
     needs: changes
+    concurrency:
+      group: ci-build-${{ github.event_name == 'push' && github.run_id || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
     steps:
@@ -193,6 +205,7 @@ jobs:
         run: python3 scripts/localization.py
 
       - name: Build
+        timeout-minutes: 15
         run: |
           # `bash -e` without pipefail: the pipe into tail would report tail's
           # status, and a failed build would upload a partial archive.
@@ -213,11 +226,14 @@ jobs:
         with:
           name: build-products
           path: build/products.tgz
-          retention-days: 1
+          retention-days: 7
 
   app:
     name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
     needs: build
+    concurrency:
+      group: ci-app-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: macos-latest
     # The slowest shard (rest · iPad) takes ~30 min, and the rerun step below
     # can add a few tests' worth. A runner that hangs inside xcodebuild sits
@@ -227,16 +243,10 @@ jobs:
     # Five shards per device: a PR's five iPhone jobs fill the org's five macOS
     # slots in one wave, and a push to main's ten fill them in two.
     #
-    # Balanced on hosted-runner numbers (iPhone, seconds), never a local run's:
-    #
-    #   offline     OfflineCoverage                          ~480
-    #   list        ListAndFavorites + DeepLink              ~500
-    #   transition  OfflineTransition + 4 Detail tests       ~525
-    #   detail      the rest of DetailAndScrub               ~490
-    #   rest        Map, the unit tests, anything new        ~460
-    #
-    # Rebalance from a result bundle (test-evidence-*), and when a test moves,
-    # move it in both its `only` and the catch-all's `skip`.
+    # October 2026 rest bundles: Settings cost 416s on iPhone / 903s on
+    # iPad before seven more locale tests. Spread its methods across four
+    # shards; keep Map and units in rest. New methods still fall into rest.
+    # Re-measure from test-summary artifacts after this redistribution.
     strategy:
       # A failing shard must not cancel its siblings. The whole point is to see
       # every failure in one run rather than the first one and then wait again.
@@ -249,19 +259,19 @@ jobs:
         device: ${{ fromJSON(github.event_name == 'push' && '["iPhone 17", "iPad Pro 11-inch (M5)"]' || '["iPhone 17"]') }}
         shard:
           - name: offline
-            only: SlackwaterUITests/OfflineCoverageTests
+            only: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/SettingsLayoutTests/testHeightDefaultsUseRegionAndPreserveAnExplicitChoice,SlackwaterUITests/SettingsLayoutTests/testSettingsInSpanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInDutch,SlackwaterUITests/SettingsLayoutTests/testSettingsInItalian,SlackwaterUITests/SettingsLayoutTests/testMacSettingsShowsDesktopWidgets
           - name: list
-            only: SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests
+            only: SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/SettingsLayoutTests/testSlackWindowPreviewChangesWithComfortCurrent,SlackwaterUITests/SettingsLayoutTests/testSettingsInJapanese,SlackwaterUITests/SettingsLayoutTests/testSettingsInNorwegian,SlackwaterUITests/SettingsLayoutTests/testSettingsInKorean,SlackwaterUITests/SettingsLayoutTests/testMacWidgetInstructionsInFrenchAndSpanish
           - name: transition
-            only: SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon
+            only: SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon,SlackwaterUITests/SettingsLayoutTests/testWidgetsAndAboutAreInSettings,SlackwaterUITests/SettingsLayoutTests/testSettingsInGerman,SlackwaterUITests/SettingsLayoutTests/testSettingsInDanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInEuropeanPortuguese,SlackwaterUITests/SettingsLayoutTests/testTVSettingsOmitsWidgetInstructions
           - name: detail
-            only: SlackwaterUITests/DetailAndScrubTests
+            only: SlackwaterUITests/DetailAndScrubTests,SlackwaterUITests/SettingsLayoutTests/testSettingsInFrench,SlackwaterUITests/SettingsLayoutTests/testSettingsInPortuguese,SlackwaterUITests/SettingsLayoutTests/testSettingsInFinnish,SlackwaterUITests/SettingsLayoutTests/testSettingsInSwedish,SlackwaterUITests/SettingsLayoutTests/testPremiumSupporterSeesTheirEntitlementInline
             skip: SlackwaterUITests/DetailAndScrubTests/testM1Walkthrough,SlackwaterUITests/DetailAndScrubTests/testM42ContinuousScrubAcrossMidnight,SlackwaterUITests/DetailAndScrubTests/testReportAProblemOffersItsThreeSubjects,SlackwaterUITests/DetailAndScrubTests/testM41DetailHeaderSunMoon
           # The catch-all names no tests — it SKIPS the others. A class added
           # tomorrow therefore runs here, instead of running nowhere and
           # looking green. Never convert this one to `only`.
           - name: rest
-            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests
+            skip: SlackwaterUITests/OfflineCoverageTests,SlackwaterUITests/ListAndFavoritesTests,SlackwaterUITests/DeepLinkUITests,SlackwaterUITests/OfflineTransitionTests,SlackwaterUITests/DetailAndScrubTests,SlackwaterUITests/SettingsLayoutTests/testHeightDefaultsUseRegionAndPreserveAnExplicitChoice,SlackwaterUITests/SettingsLayoutTests/testSettingsInSpanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInDutch,SlackwaterUITests/SettingsLayoutTests/testSettingsInItalian,SlackwaterUITests/SettingsLayoutTests/testMacSettingsShowsDesktopWidgets,SlackwaterUITests/SettingsLayoutTests/testSlackWindowPreviewChangesWithComfortCurrent,SlackwaterUITests/SettingsLayoutTests/testSettingsInJapanese,SlackwaterUITests/SettingsLayoutTests/testSettingsInNorwegian,SlackwaterUITests/SettingsLayoutTests/testSettingsInKorean,SlackwaterUITests/SettingsLayoutTests/testMacWidgetInstructionsInFrenchAndSpanish,SlackwaterUITests/SettingsLayoutTests/testWidgetsAndAboutAreInSettings,SlackwaterUITests/SettingsLayoutTests/testSettingsInGerman,SlackwaterUITests/SettingsLayoutTests/testSettingsInDanish,SlackwaterUITests/SettingsLayoutTests/testSettingsInEuropeanPortuguese,SlackwaterUITests/SettingsLayoutTests/testTVSettingsOmitsWidgetInstructions,SlackwaterUITests/SettingsLayoutTests/testSettingsInFrench,SlackwaterUITests/SettingsLayoutTests/testSettingsInPortuguese,SlackwaterUITests/SettingsLayoutTests/testSettingsInFinnish,SlackwaterUITests/SettingsLayoutTests/testSettingsInSwedish,SlackwaterUITests/SettingsLayoutTests/testPremiumSupporterSeesTheirEntitlementInline
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -346,7 +356,14 @@ jobs:
         id: rerun
         if: steps.tests.outcome == 'failure' && steps.failures.outputs.retryable_only == 'true'
         run: |
-          for b in build/*.xcresult; do mv "$b" "${b%.xcresult}-attempt1.xcresult"; done
+          for b in build/*.xcresult build/*.log build/*.summary.json; do
+            [ -e "$b" ] || continue
+            case "$b" in
+              *.xcresult) mv "$b" "${b%.xcresult}-attempt1.xcresult" ;;
+              *.log) mv "$b" "${b%.log}-attempt1.log" ;;
+              *.summary.json) mv "$b" "${b%.summary.json}-attempt1.summary.json" ;;
+            esac
+          done
           SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \
             ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }} \
             || { scripts/test-failures.sh build/*.xcresult | grep -v attempt1; exit 1; }
@@ -359,6 +376,14 @@ jobs:
       - name: Test result
         if: always()
         run: test "${{ steps.tests.outcome }}" = success || test "${{ steps.rerun.outcome }}" = success
+
+      - name: Upload test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-summary-${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && '-ipad' || '' }}
+          path: build/*.summary.json
+          if-no-files-found: ignore
 
       # There is no runner to ssh into, so the evidence has to travel.
       # always(): by this step "Test result" has already failed the job, and
@@ -376,6 +401,7 @@ jobs:
           path: |
             /tmp/slackwater-shots
             build/*.xcresult
+            build/results-*.log
           if-no-files-found: ignore
 
   required:

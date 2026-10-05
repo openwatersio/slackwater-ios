@@ -239,23 +239,38 @@ for i in {1..$#sims}; do
     action=(test -project Slackwater.xcodeproj -scheme Slackwater -testPlan Slackwater
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
   fi
+  mkdir -p build
+  rawlog="${bundle%.xcresult}.log"
   # XCTest must bound a blocked launch, including in downloaded test products (#580).
+  set +e
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
     -parallel-testing-worker-count "$workers" \
     -collect-test-diagnostics "$diagnostics" \
     -test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 \
     "${selection[@]}" \
     -resultBundlePath "$bundle" \
-    | tail -40
+    2>&1 | tee "$rawlog" | tail -40
+  command_status=$pipestatus[1]
+  set -e
   # A shard that runs NOTHING exits 0 and reports green — which is the failure
   # mode sharding introduces, and the one nobody would notice. A typo in
   # SLACKWATER_ONLY, a class renamed out from under the matrix, and the lane
   # goes green faster than ever while testing nothing. So count what ran.
   ran=$(xcrun xcresulttool get test-results summary --path "$bundle" 2>/dev/null \
-    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("passedTests",0)+d.get("failedTests",0))' 2>/dev/null || echo 0)
-  if [[ "$ran" == "0" ]]; then
-    echo "error: no tests ran on $sim — check SLACKWATER_ONLY/SLACKWATER_SKIP" >&2
-    exit 1
+    | python3 -c 'import json,sys
+try:
+    d=json.load(sys.stdin)
+    ran=d["passedTests"]+d["failedTests"]
+    summary={k:d[k] for k in ("title","result","startTime","finishTime","passedTests","failedTests","skippedTests","totalTestCount") if k in d}
+    summary["status"]="available"
+except (ValueError,KeyError,TypeError):
+    ran="unavailable"
+    summary={"status":"unavailable"}
+with open(sys.argv[1],"w") as f: json.dump(summary,f); f.write("\n")
+if ran=="unavailable": sys.exit(1)
+print(ran)' "${bundle%.xcresult}.summary.json" 2>/dev/null || echo unavailable)
+  if [[ "$ran" == unavailable ]]; then
+    echo "warning: test results unavailable on $sim — see $rawlog" >&2
   fi
   # XCUITest waits for the app to report its animations complete before every
   # synthesized event and every query, and spends 60 s on the wait when that
@@ -274,6 +289,12 @@ for i in {1..$#sims}; do
     echo "warning: $idle XCUITest idle timeouts on $sim, 60 s each (#556)"
   fi
   echo "=== $MODE · $sim: $((SECONDS - start))s · $ran tests ==="
+  (( command_status == 0 )) || exit "$command_status"
+  if [[ "$ran" == "0" ]]; then
+    echo "error: no tests ran on $sim — check SLACKWATER_ONLY/SLACKWATER_SKIP" >&2
+    exit 1
+  fi
+  [[ "$ran" != unavailable ]] || exit 1
 done
 
 # Not fatal: the run may well be clean, and the person editing is entitled to.

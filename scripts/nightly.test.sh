@@ -16,6 +16,7 @@ git -C "$REPO" config user.name 'Nightly Test'
 git -C "$REPO" config user.email nightly@example.test
 mkdir -p "$REPO/scripts"
 cp "$ROOT/scripts/nightly.sh" "$REPO/scripts/nightly.sh"
+cp "$ROOT/scripts/nightly-validation.py" "$REPO/scripts/nightly-validation.py"
 
 cat > "$REPO/project.yml" <<'EOF'
 settings:
@@ -62,6 +63,18 @@ EOF
 cat > "$FAKEBIN/gh" <<'EOF'
 #!/bin/zsh
 set -euo pipefail
+if [[ "$1" == api ]]; then
+  python3 - "$NIGHTLY_REPO" "$*" <<'PYGH'
+import json, os, subprocess, sys
+sha = subprocess.check_output(["git", "-C", sys.argv[1], "rev-parse", "HEAD"], text=True).strip()
+if "workflows/ci.yml" in sys.argv[2]:
+    print(json.dumps([{"workflow_runs": [{"id": 123, "run_attempt": 1, "head_sha": sha, "head_branch": "main", "event": "push", "status": "completed", "conclusion": os.environ.get("NIGHTLY_CI_CONCLUSION", "success")}]}]))
+else:
+    names = ["Build for testing"] + [f"App tests · {s}{d}" for s in ("offline", "list", "transition", "detail", "rest") for d in ("", " · iPad")]
+    print(json.dumps([{"jobs": [{"id": i, "run_attempt": 1, "name": n, "status": "completed", "conclusion": "success"} for i, n in enumerate(names)]}]))
+PYGH
+  exit
+fi
 [[ "$1 $2" == 'release create' ]] || { print -u2 "unexpected gh call: $*"; exit 1; }
 tag=$3
 shift 3
@@ -75,6 +88,7 @@ chmod +x "$FAKEBIN/node" "$FAKEBIN/gh"
 export PATH="$FAKEBIN:$PATH"
 export NIGHTLY_STATE=$STATE
 export NIGHTLY_REPO=$REPO
+export GITHUB_REPOSITORY=example/slackwater
 fail() { print -u2 "check failed: $1"; exit 1; }
 nightly() { (cd "$REPO" && zsh scripts/nightly.sh) }
 new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
@@ -83,6 +97,8 @@ new_commit() { print "$1" >> "$REPO/app.txt"; git -C "$REPO" commit -qam "$1"; }
 # tags the commit it built.
 : > "$STATE/asc-build"
 head=$(git -C "$REPO" rev-parse HEAD)
+! NIGHTLY_CI_CONCLUSION=failure nightly || fail "accepted failed CI"
+[[ ! -e "$STATE/events" ]] || fail "published before full validation"
 nightly
 diff -u <(printf 'upload:39\nrelease:nightly-1.13.0-39\n') "$STATE/events"
 [[ $(git -C "$REPO" rev-parse HEAD) == $head ]]

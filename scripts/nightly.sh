@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Cut a Nightly-only release from trusted main. The workflow owns the trigger
-# gate; the suite runs in CI on every push to main (ci.yml), not here.
+# gate; require the full CI suite for this exact checkout before archiving.
 #
 # Nothing is committed. The build number comes from App Store Connect and is
 # passed to the archive, so project.yml's CURRENT_PROJECT_VERSION only floors it.
@@ -14,6 +14,8 @@ if [[ -n $MARKER && $(git rev-parse "$MARKER^{commit}") == $SHA ]]; then
   echo "No changes since $MARKER."
   exit 0
 fi
+
+python3 scripts/nightly-validation.py "$SHA"
 
 VERSION=$(awk '$1 == "MARKETING_VERSION:" { print $2; exit }' project.yml)
 CURRENT_BUILD=$(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2; exit }' project.yml)
