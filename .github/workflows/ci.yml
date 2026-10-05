@@ -165,7 +165,7 @@ jobs:
     timeout-minutes: 20
     needs: changes
     concurrency:
-      group: ci-build-${{ github.ref }}
+      group: ci-build-${{ github.event_name == 'push' && github.run_id || github.ref }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     if: needs.changes.outputs.app == 'true'
     runs-on: macos-latest
@@ -232,7 +232,7 @@ jobs:
     name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
     needs: build
     concurrency:
-      group: ci-app-${{ github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
+      group: ci-app-${{ github.event_name == 'push' && github.run_id || github.ref }}-${{ matrix.shard.name }}-${{ matrix.device }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: macos-latest
     # The slowest shard (rest · iPad) takes ~30 min, and the rerun step below

@@ -37,4 +37,17 @@ raise "docs-only workflows must not cancel app validation" if workflow.key?("con
 %w[build app].each do |job|
   raise "cancel only obsolete PR validation" unless workflow.fetch("jobs").fetch(job).dig("concurrency", "cancel-in-progress") == "${{ github.event_name == 'pull_request' }}"
 end
+# Main attempts must not share pending slots; PR attempts must share them.
+run_or_ref = "${{ github.event_name == 'push' && github.run_id || github.ref }}"
+%w[build app].each do |job|
+  template = workflow.fetch("jobs").fetch(job).dig("concurrency", "group")
+  expected = "ci-#{job}-#{run_or_ref}"
+  expected += "-${{ matrix.shard.name }}-${{ matrix.device }}" if job == "app"
+  raise "main #{job} groups must be unique per run" unless template == expected
+  group = ->(event, run, ref) { template.sub(run_or_ref, event == "push" ? run.to_s : ref) }
+  raise "main attempts share a pending slot" if group.call("push", 1, "refs/heads/main") == group.call("push", 2, "refs/heads/main")
+  raise "obsolete PR attempts cannot cancel" unless group.call("pull_request", 1, "refs/pull/1/merge") == group.call("pull_request", 2, "refs/pull/1/merge")
+  raise "unrelated PRs share a slot" if group.call("pull_request", 1, "refs/pull/1/merge") == group.call("pull_request", 2, "refs/pull/2/merge")
+end
+puts "main groups preserve pending siblings; PR groups cancel obsolete attempts"
 puts "#{tests.size} test methods run exactly once across five shards; new classes and Settings methods reach rest"
