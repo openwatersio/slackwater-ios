@@ -474,6 +474,10 @@ final class TimelineTests: XCTestCase {
     /// `UIScrollView` and a live `UIAccessibility`, and this target can inject
     /// neither. The UI suite covers what a scrub actually does; this only
     /// guards the accessibility branch from being simplified away.
+    ///
+    /// The branch asks `landsInstantly`, which is the Reduce Motion question
+    /// with `-uiTestQuiet` folded in, so `assertLandsInstantly` below keeps
+    /// the name honest rather than letting the indirection hide its removal.
     func testExternalScrubHonoursReduceMotion() throws {
         let source = try repoSource("Slackwater/TimelineScrubber.swift")
         let lines = source.components(separatedBy: .newlines)
@@ -481,7 +485,8 @@ final class TimelineTests: XCTestCase {
               let offset = lines[(start + 1)...].firstIndex(where: { $0.contains("return") })
         else { return XCTFail("the jump branch was not found — this tripwire needs retargeting") }
         let jump = lines[start...offset].joined(separator: "\n")
-        XCTAssertTrue(jump.contains("UIAccessibility.isReduceMotionEnabled"),
+        assertLandsInstantlyAsksAboutReduceMotion(source)
+        XCTAssertTrue(jump.contains("landsInstantly"),
                       "the jump must ask about Reduce Motion before animating")
         XCTAssertTrue(jump.contains("co.magneting = false"),
                       "the direct landing clears the magnet rather than riding it")
@@ -500,10 +505,24 @@ final class TimelineTests: XCTestCase {
               let end = lines[(start + 1)...].firstIndex(where: { $0.contains("animated: true") })
         else { return XCTFail("the magnet was not found — this tripwire needs retargeting") }
         let magnet = lines[start...end].joined(separator: "\n")
-        XCTAssertTrue(magnet.contains("UIAccessibility.isReduceMotionEnabled"),
+        assertLandsInstantlyAsksAboutReduceMotion(source)
+        XCTAssertTrue(magnet.contains("landsInstantly"),
                       "the drag-end magnet must ask about Reduce Motion before animating")
         XCTAssertTrue(magnet.contains("park(sv, at: target)"),
                       "the direct landing parks on the target itself")
+    }
+
+    /// Both tripwires above read `landsInstantly` rather than the flag itself,
+    /// so they are only as good as what that name means. A scrubber that asks
+    /// it but has quietly stopped asking about Reduce Motion is the exact
+    /// regression they exist to catch.
+    private func assertLandsInstantlyAsksAboutReduceMotion(_ source: String) {
+        let lines = source.components(separatedBy: .newlines)
+        guard let decl = lines.firstIndex(where: { $0.contains("private var landsInstantly: Bool") })
+        else { return XCTFail("landsInstantly was not found — these tripwires need retargeting") }
+        XCTAssertTrue(lines[decl...min(decl + 3, lines.count - 1)]
+            .joined(separator: "\n").contains("UIAccessibility.isReduceMotionEnabled"),
+                      "landsInstantly must still be the Reduce Motion question")
     }
 
     /// The chrome pills fade in once the scrub rests; under Reduce Motion the
