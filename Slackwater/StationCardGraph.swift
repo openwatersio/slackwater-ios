@@ -95,6 +95,7 @@ struct StationCardGraph: View {
     var rates: [Double] = []
     var showsReadings = true
     var showsTimes = true
+    var showsNow = true
     // Compact widgets need a separate lane for times below the curve and its dots.
     var timeLabelSpace: CGFloat = 6
 
@@ -255,7 +256,7 @@ struct StationCardGraph: View {
             }
 
             // The "now" dot rides the curve one swing in from the left edge.
-            CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now))))
+            if showsNow { CurveDrawing.nowDot(context, at: CGPoint(x: nowX, y: y(valueAt(now)))) }
         }
         .accessibilityLabel("\(Int(((back + forward) / 3600).rounded()))-hour curve")
         .accessibilityValue(extremes.filter { $0.time >= start && $0.time <= end }
@@ -325,12 +326,13 @@ extension TideStationRecord {
 extension CurrentStationRecord {
     /// `tilde` hedges the extreme values (`~3.0 kn`) for a provisional
     /// (60-day) gate, like the reading's own tilde.
-    func cardGraph(at now: Date, unit: String, tilde: Bool = false) -> StationCardGraph {
-        cardGraph(at: now, unit: unit, tilde: tilde, station: engineStation)
+    func cardGraph(at now: Date, unit: String, tilde: Bool = false,
+                   threshold: Double = slackThresholdKn) -> StationCardGraph {
+        cardGraph(at: now, unit: unit, tilde: tilde, station: engineStation, threshold: threshold)
     }
 
     func cardGraph(at now: Date, unit: String, tilde: Bool = false,
-                   station s: any CurrentPredicting) -> StationCardGraph {
+                   station s: any CurrentPredicting, threshold: Double = slackThresholdKn) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let raw = s.speeds(from: start, to: end, step: StationCardGraph.sampleStep)
@@ -351,13 +353,13 @@ extension CurrentStationRecord {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes),
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }
 
 extension ChsOnlineWindow {
-    func cardGraph(at now: Date, unit: String) -> StationCardGraph {
+    func cardGraph(at now: Date, unit: String, threshold: Double = slackThresholdKn) -> StationCardGraph {
         let start = now.addingTimeInterval(-StationCardGraph.backWindow)
         let end = now.addingTimeInterval(StationCardGraph.forwardWindow)
         let tz = TimeZone(identifier: timezone) ?? .current
@@ -379,7 +381,7 @@ extension ChsOnlineWindow {
             now: now,
             includesZero: true,
             tz: tz,
-            windows: cardWindows(points: raw, slacks: slackTimes),
+            windows: cardWindows(points: raw, slacks: slackTimes, threshold: threshold),
             slacks: slackTimes)
     }
 }

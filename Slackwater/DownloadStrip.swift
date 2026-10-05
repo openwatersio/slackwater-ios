@@ -26,7 +26,7 @@ struct DownloadStrip: View {
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Downloading tide stations")
+                        Text("Downloading")
                         Spacer()
                         Text("\(done) of \(total)").monospacedDigit()
                     }

@@ -10,6 +10,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     static let shared = LocationService()
 
     @Published var status: CLAuthorizationStatus
+    @Published var accuracyAuthorization: CLAccuracyAuthorization
     @Published var location: CLLocation?
     /// True from the moment the ask starts until a fix or a denial lands.
     @Published var locating = false
@@ -40,7 +41,10 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     override private init() {
         status = manager.authorizationStatus
+        accuracyAuthorization = CommandLine.arguments.contains("-locApproximate")
+            ? .reducedAccuracy : manager.accuracyAuthorization
         super.init()
+        locating = Self.testAuthorizedNoFix
         // Test locations must not be overwritten by the simulator's cached fix
         // or authorization callback, including the deliberate no-fix states.
         if Self.testFix == nil && !Self.testDenied && !Self.testAuthorizedNoFix
@@ -91,6 +95,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         guard !Self.testAuthorizedNoFix else { return }
         status = manager.authorizationStatus
+        accuracyAuthorization = manager.accuracyAuthorization
         if authorized {
             manager.requestLocation()
         } else if status != .notDetermined {

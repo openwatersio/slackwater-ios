@@ -60,7 +60,7 @@ enum BackgroundDownloads {
 
         let request = BGContinuedProcessingTaskRequest(
             identifier: id,
-            title: String(localized: "Downloading tide stations", comment: "Background station-download activity title."),
+            title: String(localized: "Downloading", comment: "Compact download status."),
             subtitle: String(localized: "\(queue.ready) of \(queue.total)", comment: "Completed and total station downloads."))
         request.strategy = .queue
         do {
@@ -155,7 +155,7 @@ enum BackgroundDownloads {
                     // written for is the one case it does NOT catch: IWLS's 429
                     // wait happens inside `IwlsClient.get`, with the job still
                     // `.downloading`. "Waiting to retry" is true of all of them.
-                    task.updateTitle(String(localized: "Downloading tide stations", comment: "Background station-download activity title."),
+                    task.updateTitle(String(localized: "Downloading", comment: "Compact download status."),
                                      subtitle: service.queue.deferred() > 0
                                         ? String(localized: "Waiting to retry…", comment: "Background download activity while waiting to retry.")
                                         : String(localized: "Stations ready: \(service.queue.ready) of \(service.queue.total)", comment: "Background download activity. Values are ready and total station counts."))

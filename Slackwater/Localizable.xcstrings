@@ -3983,6 +3983,59 @@
         }
       }
     },
+    "Approximate location" : {
+      "comment" : "My Location status when iOS supplies an approximate rather than precise location; replaces precise-looking coordinates.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ungefährer Standort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approximate location"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicación aproximada"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position approximative"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "おおよその位置"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omtrentlig posisjon"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschatte locatie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Localização aproximada"
+          }
+        }
+      }
+    },
     "At a new or full moon, the Sun and Moon reinforce each other, widening the tidal range. Near apogee the Moon is farther away, so its tidal effect is weaker: lower highs and higher lows than during a perigean spring tide." : {
       "comment" : "Explanation of an apogean spring tide.",
       "localizations" : {
@@ -7388,53 +7441,6 @@
         }
       }
     },
-    "Downloading tide stations" : {
-      "comment" : "Background station-download activity title.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gezeitenstationen werden geladen"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargando estaciones de mareas"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement des stations de marée"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "潮汐観測所をダウンロード中"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laster ned tidevannsstasjoner"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Getijstations downloaden"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixando estações de marés"
-          }
-        }
-      }
-    },
     "Downloading, %lld of %lld ready" : {
       "comment" : "VoiceOver download summary. Values are ready and total station counts.",
       "localizations" : {
@@ -8091,6 +8097,112 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sempre que subir acima de %@ %@"
+          }
+        }
+      }
+    },
+    "Example" : {
+      "comment" : "Label on the illustrative current curve in slack-window settings; this is not a real place prediction.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beispiel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejemplo"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemple"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eksempel"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorbeeld"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemplo"
+          }
+        }
+      }
+    },
+    "Example slack window" : {
+      "comment" : "Accessibility label for the illustrative current curve in settings. Its value is the example window duration, which changes with the comfort-current setting.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beispiel für ein Stauwasserfenster"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example slack window"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ejemplo de ventana de estoa"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemple de fenêtre d’étale"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "潮止まり時間帯の例"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eksempel på strømstillevindu"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorbeeld van een kenteringsvenster"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exemplo de janela de estofo"
           }
         }
       }
@@ -13810,6 +13922,59 @@
         }
       }
     },
+    "No matches" : {
+      "comment" : "Empty station-search result; the search and series filters remain available.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Treffer"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No matches"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No hay coincidencias"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun résultat"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致する場所なし"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingen treff"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geen resultaten"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum resultado"
+          }
+        }
+      }
+    },
     "No places found" : {
       "comment" : "Watch place search with no matches.",
       "localizations" : {
@@ -19133,6 +19298,59 @@
         }
       }
     },
+    "Showing places near %@" : {
+      "comment" : "My Location fallback when there is no device location. The argument is the last-opened place name or the unchanged proper name Chesapeake Bay; displayed distances are from that place.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orte in der Nähe von %@"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing places near %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrando lugares cerca de %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieux près de %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@付近の場所を表示中"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viser steder nær %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plaatsen in de buurt van %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrando locais perto de %@"
+          }
+        }
+      }
+    },
     "Showing the closest station. Choose another station for a different part of the water." : {
       "comment" : "Station chooser explanation.",
       "localizations" : {
@@ -23479,53 +23697,6 @@
         }
       }
     },
-    "Tides and currents near you" : {
-      "comment" : "Location-permission card title.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gezeiten und Strömungen in deiner Nähe"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mareas y corrientes cerca de ti"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marées et courants à proximité"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "近くの潮汐と潮流"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tidevann og strømmer nær deg"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Getij en stromingen in je buurt"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Marés e correntes perto de você"
-          }
-        }
-      }
-    },
     "Tides and currents open here." : {
       "comment" : "Tide and current interface text.",
       "localizations" : {
@@ -24133,53 +24304,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ative a localização em Ajustes para encontrar marés e correntes próximas."
-          }
-        }
-      }
-    },
-    "Turn on location to put nearby predictions first." : {
-      "comment" : "Location-permission explanation.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aktiviere den Standort, um Vorhersagen in der Nähe zuerst anzuzeigen."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activa la ubicación para mostrar primero las predicciones cercanas."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Activez la localisation pour afficher les prévisions à proximité en premier."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "位置情報をオンにすると、近くの予測を先に表示します。"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Slå på posisjon for å vise prognoser i nærheten først."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zet locatie aan om voorspellingen in de buurt eerst te tonen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ative a localização para mostrar as previsões próximas primeiro."
           }
         }
       }

@@ -337,13 +337,16 @@ struct OnlineGateCardView: View {
     let window: ChsOnlineWindow
     var km: Double? = nil
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
 
     private var state: CurrentCardState { window.cardState(at: appNow()) }
 
     var body: some View {
         let state = state
         let now = appNow()
-        let graph = window.cardGraph(at: now, unit: speedUnit)
+        let graph = window.cardGraph(at: now, unit: speedUnit,
+                                     threshold: normalizedSlackThresholdKn(slackWindowSpeed))
         StationCard(name: gate.name, region: gate.region, km: km, graph: graph) {
             ConditionsItem(reading: .current(
                 signed: state.signed,
@@ -374,9 +377,16 @@ struct CurrentCardView: View {
     private let fitted: CurrentStationRecord?
     private let resolve: @Sendable () async -> CurrentStationRecord?
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = "kn"
+    @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
+    private var slackWindowSpeed = defaultSlackThresholdKn
     @State private var record: CurrentStationRecord?
     @State private var state: CurrentCardState?
     @State private var graph: StationCardGraph?
+    @State private var graphKey: String?
+
+    private var graphInputKey: String {
+        "\(speedUnit)-\(normalizedSlackThresholdKn(slackWindowSpeed))"
+    }
 
     init(record: CurrentStationRecord, km: Double? = nil, provisional: ChsCurrentGateInfo? = nil,
          eager: Bool = false) {
@@ -404,12 +414,13 @@ struct CurrentCardView: View {
         let unit = AppGroup.defaults.string(forKey: speedUnitKey) ?? "kn"
         let now = appNow()
         let tilde = provisional != nil
-        let seeded = currentSeeds.value(for: "\(record.id)-\(unit)-\(tilde)", now: now) {
+        let seeded = currentSeeds.value(for: "\(record.id)-\(unit)-\(tilde)-\(slackThresholdKn)", now: now) {
             (record.cardState(at: now), record.cardGraph(at: now, unit: unit, tilde: tilde))
         }
         _record = State(initialValue: record)
         _state = State(initialValue: seeded.0)
         _graph = State(initialValue: seeded.1)
+        _graphKey = State(initialValue: "\(unit)-\(slackThresholdKn)")
     }
 
     /// nil tolerance rather than the "±0 min" `provisionalTolerance` prints:
@@ -434,18 +445,26 @@ struct CurrentCardView: View {
                     inWindow: graph?.windows.contains { $0.contains(appNow()) } ?? false))
             }
         }
-        .task {
+        .task(id: graphInputKey) {
+            let key = graphInputKey
             if record == nil { record = await resolve() }
+            guard !Task.isCancelled else { return }
             guard let record else { return }
             if state == nil { state = record.cardState(at: appNow()) }
-            if graph == nil { graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil) }
+            if graphKey != key {
+                graph = record.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil,
+                                         threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+                graphKey = key
+            }
         }
         // The refinement replaces the record under an open list: recompute.
         .onChange(of: fitted) { _, refined in
             guard let refined else { return }
             record = refined
             state = refined.cardState(at: appNow())
-            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil)
+            graph = refined.cardGraph(at: appNow(), unit: speedUnit, tilde: provisional != nil,
+                                      threshold: normalizedSlackThresholdKn(slackWindowSpeed))
+            graphKey = graphInputKey
         }
     }
 }
