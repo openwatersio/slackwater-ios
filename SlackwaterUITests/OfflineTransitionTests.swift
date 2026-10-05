@@ -182,7 +182,8 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(dodd.label.contains("Available offline"))
         XCTAssert(tofino.label.contains("Downloading"))
         releaseFixture(token, "tofino-first-chunk")
-        waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30)
+        XCTAssert(waitFor(tofino, "label CONTAINS 'Available offline'", timeout: 30),
+                  "Tofino did not become available offline")
     }
 
     func testDownloadsManagerOrdersAndPromotesRealQueue() {

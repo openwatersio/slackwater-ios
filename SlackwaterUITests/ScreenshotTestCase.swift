@@ -37,7 +37,7 @@ class ScreenshotTestCase: XCTestCase {
         super.tearDown()
     }
 
-    func testArguments(_ args: [String], live: Bool = false) -> [String] {
+    func testArguments(_ args: [String], live: Bool = false, resetSettings: Bool = true) -> [String] {
         // -resetSeriesFilter / -resetChosenStations: the Tides/Currents pick and
         // chooser picks persist, and one test's pick would otherwise change
         // the next test's lists.
@@ -51,6 +51,8 @@ class ScreenshotTestCase: XCTestCase {
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
                              "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
+        // Opt out only when a relaunch is asserting persisted preferences.
+        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
         }
@@ -268,13 +270,16 @@ class ScreenshotTestCase: XCTestCase {
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
         var tries = 0
         while tries < 10 {
-            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
+            if el.exists, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80, el.isHittable {
                 break
             }
             listContainer(app).swipeUp()
             tries += 1
         }
-        XCTAssert(el.exists, "could not scroll to element")
+        settleLayout(el)
+        XCTAssert(el.exists && el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80
+                  && el.isHittable,
+                  "could not scroll element within reach")
     }
 
     /// Bring `el` within reach inside a SHEET, where `scrollTo` cannot help:
@@ -339,12 +344,12 @@ class ScreenshotTestCase: XCTestCase {
         launch(args)
     }
 
-    func launch(_ args: [String]) -> XCUIApplication {
+    func launch(_ args: [String], resetSettings: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = testArguments(args)
+        app.launchArguments = testArguments(args, resetSettings: resetSettings)
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
         return app
@@ -723,6 +728,7 @@ class ShotWalk: ScreenshotTestCase {
 
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
         var args = ["-seedGate", "-resetRecents", "-noCloudSync",
+                    "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", shotEpoch] + fix + extra
         if let time {

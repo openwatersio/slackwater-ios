@@ -29,6 +29,7 @@ final class TourUITests: ScreenshotTestCase {
         // One-way: the flag survives a relaunch.
         app.terminate()
         app.launchArguments = testArguments(["-seedGate", "-locAuthorizedNoFix"])
+            .filter { $0 != "-seedTour" }
         app.launch()
         XCTAssertFalse(app.otherElements["tour-mark"].firstMatch.appears(within: 5),
                        "a seen tour must not run again")

@@ -200,6 +200,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
 
         // Leave the simulator as found: swipe-unfavorite the row so later
         // tests that assume a clean favorites store aren't ambushed.
+        settleLayout(row)
         listContainer(app).cells.containing(.staticText, identifier: row.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
@@ -286,6 +287,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(row.exists, "the favorited online gate is missing from the Favorites group")
 
         // Leave the simulator as found.
+        settleLayout(row)
         listContainer(app).cells.containing(.staticText, identifier: row.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5))
         app.buttons["Unfavorite"].firstMatch.tap()
@@ -348,6 +350,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         listContainer(app).swipeDown()
         let fridayRow = app.staticTexts["Friday Harbor"].firstMatch
         XCTAssert(fridayRow.appears(within: 5))
+        settleLayout(fridayRow)
         listContainer(app).cells.containing(.staticText, identifier: fridayRow.label).firstMatch.swipeLeft()
         XCTAssert(app.buttons["Unfavorite"].appears(within: 5),
                   "trailing swipe did not reveal the favorites remove action")
@@ -388,15 +391,6 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS 'km/h'")).firstMatch.appears(within: 5),
                   "current detail readout did not follow the km/h setting")
-        // Leave the store on knots for the other tests. No launch argument
-        // resets the unit — it is plain persisted app state — so the way back
-        // is the same Settings round trip that set it.
-        goBack(app)
-        openSettings(app)
-        let kn = app.buttons["Knots"]
-        XCTAssert(kn.appears(within: 5))
-        kn.tap()
-        app.buttons["Done"].tap()
     }
 
     // MARK: - Station identity presentation
