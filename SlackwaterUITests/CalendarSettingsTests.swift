@@ -10,7 +10,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         }
         XCTAssert(settings.exists, "Settings did not open after tapping its row")
         let row = app.buttons["settings-calendar-row"].firstMatch
-        for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+        scrollTo(row, in: app)
         row.tap()
         XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
     }
