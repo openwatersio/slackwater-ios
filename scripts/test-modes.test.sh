@@ -20,9 +20,20 @@ print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNE
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
   exit 1
 }
-# xcodebuild's own stdout, which the runner files away and reads back.
-[[ ${0:t} == xcodebuild ]] && repeat ${IDLE_TIMEOUTS:-0} \
-  print -- "    t = 1.00s App animations complete notification not received, will attempt to continue."
+# The idle-timeout text lives in the result bundle's store, so a run that
+# spent its time there leaves it where the runner looks.
+if [[ ${0:t} == xcodebuild && ${IDLE_TIMEOUTS:-0} -gt 0 ]]; then
+  prev=""
+  for a in "$@"; do
+    [[ $prev == -resultBundlePath ]] && bundle=$a
+    prev=$a
+  done
+  if [[ -n ${bundle:-} ]]; then
+    mkdir -p "$bundle"
+    repeat $IDLE_TIMEOUTS \
+      print -n -- "animations complete notification not received" >> "$bundle/database.sqlite3"
+  fi
+fi
 [[ ${0:t} == xcodebuild && ${FAIL_XCODEBUILD:-0} == 1 ]] && exit 65
 exit 0
 STUB
