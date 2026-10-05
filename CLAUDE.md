@@ -32,6 +32,10 @@ Gate yearly and absolute claims (LAT/HAT, "highest of the year") on the station 
 
 A subordinate's reduced LAT/HAT is the floor of a prediction, not a datum. It belongs in `latDatum`/`hatDatum`, never in `datums`, where tide-database's datum-ordering gate rejects it.
 
+## A new non-optional field on `TideStationRecord` breaks the whole test target
+
+`TideStationRecord` is `Codable`, and Swift's synthesized decoder demands every non-optional key, so adding one to a type that decodes `stations.json` makes the decode throw inside a `try!` in `TideStationDatabaseTests`. All three of its tests fail with no assertion text, and a clean build does not help. Worse, the crash masks most of the target: `--unit` then runs 181 tests instead of 576, so the suite looks like it passed. Declare new fields optional, as `reference` and `offsets` are.
+
 ## Astronomy belongs in Almanac
 
 When the app needs something [Almanac](https://github.com/openwatersio/almanac) lacks, file the issue there instead of porting the math into the app. almanac#6 and almanac#12 were each filled the same day.
