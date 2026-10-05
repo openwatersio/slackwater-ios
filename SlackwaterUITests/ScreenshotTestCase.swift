@@ -274,7 +274,7 @@ class ScreenshotTestCase: XCTestCase {
             if reachable() { break }
             if attempt < 10 {
                 // A swipe can carry a short row past the sheet's top edge.
-                if el.exists, el.frame.minY < container.frame.minY {
+                if el.exists, !el.frame.isEmpty, el.frame.minY < container.frame.minY {
                     container.swipeDown(velocity: .slow)
                 } else {
                     container.swipeUp(velocity: .slow)
