@@ -488,31 +488,41 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         let device = XCUIDevice.shared
         device.orientation = .portrait
         defer { device.orientation = .portrait }
-        let app = launch("-seedGate")
+        let app = launch("-seedGate", "-scrubInstant", "2026-09-09T09:54:00-07:00")
         openFridayHarbor(app)
         let strip = app.otherElements["timeline-strip"].firstMatch
         XCTAssert(strip.appears(within: 5), "timeline strip missing")
-        // Away from now, so nothing but the rotation moves the strip.
-        scrubStrip(app)
-        settleScrub(app)
-        XCTAssertTrue(stripCentre(app).contains(scrubClock(app)),
-                      "before rotating, the curve and readout already disagree")
+        XCTAssertEqual(scrubClock(app), localizedClock("09:54"), "the fixture moment did not land")
+        let before = try assertStripCentre(app)
 
         for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
-            let before = scrubClock(app)
             device.orientation = orientation
             settleLayout(strip)
-            let readout = scrubClock(app), centre = stripCentre(app)
+            let readout = try assertStripCentre(app)
             XCTAssertEqual(readout, before, "rotation changed the readout")
-            XCTAssertTrue(centre.contains(readout),
-                          "after rotating to \(orientation.rawValue) the curve under the "
-                          + "centerline reads \(centre) while the readout says \(readout)")
         }
     }
 
-    /// The localized reading and dated time under the strip's centerline.
-    private func stripCentre(_ app: XCUIApplication) -> String {
-        app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""
+    private func assertStripCentre(_ app: XCUIApplication,
+                                   file: StaticString = #filePath, line: UInt = #line) throws -> String {
+        let values = settled {
+            [leadReading(app).value as? String ?? "",
+             app.otherElements["timeline-strip"].scrollViews.firstMatch.value as? String ?? ""]
+        }
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")
+        formatter.defaultDate = Self.fixtureDate
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "MMMd", options: 0, locale: formatter.locale)!
+            + " '·' " + DateFormatter.dateFormat(fromTemplate: "jm", options: 0, locale: formatter.locale)!
+        let readout = try XCTUnwrap(formatter.date(from: values[0]), "unreadable readout: \(values[0])", file: file, line: line)
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdjmz")
+        let spokenTime = values[1].components(separatedBy: ", ").last ?? ""
+        let centre = try XCTUnwrap(formatter.date(from: spokenTime), "unreadable strip: \(values[1])", file: file, line: line)
+        // Half-point offset rounding plus minute-only clocks can differ by up to 160s.
+        XCTAssertEqual(centre.timeIntervalSince(readout), 0, accuracy: 160,
+                       "curve reads \(values[1]) while the readout says \(values[0])", file: file, line: line)
+        return values[0]
     }
 
     /// Over a fast tide the pill explains the yellow line: the rate, in the
