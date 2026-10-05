@@ -240,13 +240,32 @@ for i in {1..$#sims}; do
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages)
   fi
   # XCTest must bound a blocked launch, including in downloaded test products (#580).
+  #
+  # Through a file rather than straight into `tail`, because the forty lines
+  # tail keeps are the test names and the whole log is the only place the
+  # idle-timeout count below can be read. Nothing streamed before this either:
+  # the pipe into tail already held every line until the run ended.
+  log="build/xcodebuild-$MODE-${sim// /_}.log"
+  mkdir -p build
   xcodebuild "${action[@]}" -destination "$dests[$i]" \
     -parallel-testing-worker-count "$workers" \
     -collect-test-diagnostics "$diagnostics" \
     -test-timeouts-enabled YES -default-test-execution-time-allowance 600 -maximum-test-execution-time-allowance 600 \
     "${selection[@]}" \
     -resultBundlePath "$bundle" \
-    | tail -40
+    > "$log" 2>&1 || xcstatus=$?
+  tail -40 "$log"
+  # XCUITest waits for the app to report its animations complete before every
+  # synthesized event and every query, and spends 60 s on the wait when that
+  # report never comes. A run that does it repeatedly is measuring the timeout
+  # and not the app (#556), and the only trace is this line, which tail drops
+  # and the result bundle only travels on a failure. Count it out loud: a
+  # suite that is slow for this reason looks exactly like a slow runner.
+  idle=$(grep -c "animations complete notification not received" "$log" || true)
+  if (( idle )); then
+    echo "warning: $idle XCUITest idle timeouts on $sim, 60 s each (#556)"
+  fi
+  if (( ${xcstatus:-0} )); then exit $xcstatus; fi
   # A shard that runs NOTHING exits 0 and reports green — which is the failure
   # mode sharding introduces, and the one nobody would notice. A typo in
   # SLACKWATER_ONLY, a class renamed out from under the matrix, and the lane

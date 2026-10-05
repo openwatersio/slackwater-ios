@@ -20,6 +20,10 @@ print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNE
   print -u2 -- "IWLS recording missing; run: node scripts/iwls-fixtures.mjs refresh"
   exit 1
 }
+# xcodebuild's own stdout, which the runner files away and reads back.
+[[ ${0:t} == xcodebuild ]] && repeat ${IDLE_TIMEOUTS:-0} \
+  print -- "    t = 1.00s App animations complete notification not received, will attempt to continue."
+[[ ${0:t} == xcodebuild && ${FAIL_XCODEBUILD:-0} == 1 ]] && exit 65
 exit 0
 STUB
   chmod +x "$scratch/bin/$tool"
@@ -192,5 +196,25 @@ assert_has "open -a DeviceHub"
 PATH="$scratch/bin:$PATH" CALL_LOG="$log" NO_DEVICE_HUB=1 \
   zsh "$scratch/repo/scripts/first-run.sh" >/dev/null 2>&1
 assert_has "open -a Simulator"
+
+# A run that spent its time on XCUITest's 60 s idle timeout says so. The line
+# is xcodebuild's, `tail -40` drops it, and the result bundle carrying it only
+# travels on a failure — so without this the lane is silently slow (#556).
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 IDLE_TIMEOUTS=3 \
+  zsh "$scratch/repo/scripts/test.sh" --unit)
+[[ $out == *"warning: 3 XCUITest idle timeouts"* ]] \
+  || { print -u2 -- "idle timeouts went unreported"; print -r -- "$out"; exit 1; }
+
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 \
+  zsh "$scratch/repo/scripts/test.sh" --unit)
+[[ $out != *"idle timeouts"* ]] \
+  || { print -u2 -- "a clean run warned anyway"; print -r -- "$out"; exit 1; }
+
+# Filing xcodebuild's output away must not swallow its exit status.
+if PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 \
+    zsh "$scratch/repo/scripts/test.sh" --unit >/dev/null 2>&1; then
+  print -u2 -- "runner reported a failed xcodebuild as success"
+  exit 1
+fi
 
 print "runner mode checks passed"
