@@ -66,12 +66,12 @@ The slot shows exactly one of four states. It cross-fades (0.25 s ease on iOS) w
 |---|---|---|
 | Authorized, with a fix | My Location tile and one or two hero cards | "Near Me", 4 cards |
 | Authorized, no fix yet | My Location tile with a spinner and "Finding your location…", at least 96 units tall | 5 cards |
-| Denied or restricted | Attention-amber card: title "Location unavailable", text "Turn on location in Settings to find nearby tides and currents.", action "Go to Settings" opening the app's system settings | 5 cards |
-| Not determined | Go-green card: title "Tides and currents near you", text "Turn on location to put nearby predictions first.", action "Find tides near me" raising the system prompt | 5 cards |
+| Denied or restricted | My Location heading and attention-amber card: title "Location unavailable", action "Go to Settings" opening the app's system settings | 5 cards |
+| Not determined | My Location heading and go-green card: title "Location unavailable", action "Find tides near me" raising the system prompt | 5 cards |
 
-Without a fix the Near Me heading reads "Near Me", except on a launch where nothing has ever been opened, when it names the fallback anchor's region, "Chesapeake Bay".
+Without a fix the My Location slot says "Showing places near [last-opened place]", or "Showing places near Chesapeake Bay" on a first launch. This names the origin of the displayed distances. The Near Me heading reads "Near Me", except on a launch where nothing has ever been opened, when it names the fallback anchor's region, "Chesapeake Bay". Keep that proper name unchanged in every language.
 
-The My Location tile has the eyebrow "My Location", a location arrow, and the fix as degrees to three decimals with hemisphere letters ("48.423°N, 123.371°W"), monospaced. The coordinate wraps rather than truncating.
+The My Location tile has the eyebrow "My Location", a location arrow, and the fix as degrees to three decimals with hemisphere letters ("48.423°N, 123.371°W"), monospaced. The coordinate wraps rather than truncating. When iOS supplies reduced accuracy, "Approximate location" replaces the precise-looking coordinate. If an authorized location request fails, the slot says "Location unavailable" and names the fallback origin instead of continuing to spin.
 
 A fix counts only while location is authorized. A cached fix is usable when it is no more than 600 seconds old and has a valid accuracy. The reference requests 100 m accuracy and refreshes the fix whenever the list appears and whenever the app returns to the foreground.
 
@@ -172,6 +172,8 @@ Tide state is Rising when the next extreme is a high. With no next extreme it is
 
 Current state is "Slack" in go green when the instant lies inside a measured slack window or the speed is below 0.15 kn; otherwise "Flooding" or "Ebbing" in neutral foam. The set arrow is flood blue (`#4A9FD8`) or ebb amber (`#E8A33D`). Below 0.05 kn the bearing is replaced by a neutral dot, because the direction means nothing there. Slack windows use the person's slack threshold, 0.5 kn by default.
 
+Changing the slack threshold refreshes already-mounted measured-current cards, including map previews and online current gates. Derived gates have no measured speed window. Settings includes an illustrative current curve labeled "Example": its green window and duration expand or contract with the comfort-current value. The example is not a place prediction.
+
 A Canadian current gate still refining its fit prefixes every number with "~" and adds the attention-amber strip "Refining · ±N min", or "Refining" when no tolerance has been measured, with a progress wave.
 
 An online Canadian gate shows an ordinary current card while its downloaded window covers today; otherwise it shows the pending shell with "Not downloaded" (never fetched) or "Expired" (fetched before).
@@ -229,6 +231,8 @@ An empty query returns the nearest 60, so opening search shows nearby stations a
 
 When exactly 60 results return, "Nearest 60 — keep typing to narrow" appears above them.
 
+When a completed search has no results, "No matches" appears above the empty grid. The input and series filters remain available. The message is hidden while a different query is still being ranked.
+
 ### 7.2 Results
 
 Results use the station card (§6) without a distance and without swipe actions, in an adaptive grid with a 360-unit minimum column and 12-unit spacing: one column on a phone, two on a portrait iPad, three in landscape. Tapping a result closes search and opens the station.
@@ -237,7 +241,7 @@ Results use the station card (§6) without a distance and without swipe actions,
 
 Canadian predictions download to the device in tiers: the stations in view, then those within 25 km, then those within 150 km. The download strip reports that work at the top of the list.
 
-- **Working:** "Downloading tide stations" with "N of M" and a progress bar. Tapping opens the Downloads sheet.
+- **Working:** "Downloading" with "N of M" and a progress bar. Tapping opens the Downloads sheet.
 - **Offering the next tier:** "Download N more?" with a decline button ("Not now") and an accept button ("Download N more"). Declining lasts for the session.
 - **Neither:** the strip takes no space.
 
@@ -346,10 +350,10 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 
 ### Location
 
-5. **Denied:** The slot shows the amber card, "Go to Settings" opens the app's settings, and Near Me shows 5 cards ranked from the last-opened station.
+5. **Denied:** My Location shows the amber card and names the last-opened place used for distances; "Go to Settings" opens the app's settings, and Near Me shows 5 cards ranked from that place.
 6. **Not determined:** The slot shows the green card; "Find tides near me" raises the system prompt.
 7. **Authorized, no fix:** The slot shows "Finding your location…" and Near Me shows 5 cards.
-8. **First launch, no fix:** Near Me is headed "Chesapeake Bay" and ranks from Annapolis.
+8. **First launch, no fix:** My Location says "Showing places near Chesapeake Bay"; Near Me keeps that proper-name heading in every language and ranks from Annapolis.
 9. **Second hero:** A fix within 20 km of both a tide and a current station shows both as heroes; tapping one opens only that one.
 
 ### Favorites and recents
@@ -372,6 +376,10 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 19. **Removed deep link:** A link to a withdrawn station closes search and shows the Station unavailable section.
 20. **Unknown deep link:** A link to an id the app has never known leaves the list as it was.
 
+21. **No search match:** A completed search with no match shows "No matches" and keeps the series filter visible.
+22. **Approximate fix:** My Location says "Approximate location" instead of precise coordinates when iOS supplies reduced accuracy.
+23. **Slack threshold:** Changing comfort current changes the example window in Settings and refreshes measured-current cards already mounted in the list or map preview.
+
 ## 15. Known iOS deviations from the intended contract
 
 These are implementation gaps, not behavior to copy to another platform:
@@ -379,11 +387,6 @@ These are implementation gaps, not behavior to copy to another platform:
 - A list card's reading is not combined into one spoken phrase; VoiceOver reads the number, unit, word, and unlabelled arrow separately. Widgets already speak the combined phrase.
 - List cards are not announced as buttons; the map preview card is.
 - Section labels are not marked as headings, so heading navigation skips them.
-- The "Chesapeake Bay" heading is not localized.
-- The download strip says "Downloading tide stations" while it is also downloading current gates.
-- Without a fix, Near Me shows distances from the fallback anchor without saying where they are measured from. The namesake chooser hides such distances.
-- Search shows nothing, rather than an empty-state message, when no station matches.
-- Changing the slack threshold does not rebuild cards already on screen.
 - The first-run tour reads the device location without checking authorization, unlike the ranking anchor.
 Fixing one of these should update this section and add or amend a conformance scenario.
 

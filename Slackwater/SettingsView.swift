@@ -68,6 +68,7 @@ struct SettingsView: View {
                                     Text(verbatim: "kn")
                                 }
                             }
+                            SlackWindowPreview(threshold: slackWindowSpeedBinding.wrappedValue)
                             Text("Sets the fastest current Slackwater treats as a usable slack window (0.1–10 kn).")
                         }
 

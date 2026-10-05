@@ -35,6 +35,7 @@ struct StationListView: View {
     @State private var showPremiumSettings = false
     @State private var searching = false
     @State private var results: [StationItem] = []
+    @State private var completedSearch: SearchInput?
     /// Tides/Currents narrowing, nil = everything. One persisted value for
     /// Near Me, search and every detail's Nearby, so a pick carries between
     /// them; `SeriesFilterChips` writes it.
@@ -784,15 +785,19 @@ struct StationListView: View {
         // card. Keep the slot mounted while Core Location finds a fix.
         Group {
             if let fix, !heroItems.isEmpty {
-                MyLocationTile(items: heroItems, fix: fix, imperial: imperial) { item in
+                MyLocationTile(items: heroItems, fix: fix, imperial: imperial,
+                               approximate: loc.accuracyAuthorization == .reducedAccuracy) { item in
                     itemCard(item, km: item.km(fromLat: fix.lat, lon: fix.lon))
                 }
                     .transition(.opacity)
             } else if loc.authorized {
-                MyLocationLoadingTile()
+                MyLocationLoadingTile(locating: loc.locating, fallback: fallbackLocationText)
                     .transition(.opacity)
             } else if loc.denied {
-                unavailableCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionLabel(String(localized: "My Location", comment: "Current-location section heading."))
+                    unavailableCard
+                }
             } else {
                 // .notDetermined past the gate. Two ways in, and NEITHER is a
                 // first run: the gate's "or search" bypass sets seenGate
@@ -802,7 +807,10 @@ struct StationListView: View {
                 // only caller of `request()` — never comes back, and this slot
                 // used to render nothing at all: the whole My Location group
                 // silently vanished with no prompt and no explanation.
-                askCard.padding(.top, 14)  // ChsAmberCard brings its own horizontal inset
+                VStack(alignment: .leading, spacing: 4) {
+                    sectionLabel(String(localized: "My Location", comment: "Current-location section heading."))
+                    askCard
+                }
             }
         }
         .animation(.easeInOut(duration: 0.25),
@@ -969,12 +977,17 @@ struct StationListView: View {
             .prefix(5))
     }
 
+    private var fallbackLocationText: String {
+        let place = recents.lastOpened?.name ?? "Chesapeake Bay"
+        return String(localized: "Showing places near \(place)", comment: "My Location fallback when there is no device location. The argument is the last-opened place name or the unchanged proper name Chesapeake Bay; displayed distances are from that place.")
+    }
+
     /// Location never answered — same card shape as `unavailableCard`, but the
     /// action is the ask itself, not a trip to Settings: `.notDetermined` is
     /// the one state iOS still lets the app prompt from.
     private var askCard: some View {
-        ChsAmberCard(title: String(localized: "Tides and currents near you", comment: "Location-permission card title."),
-                     headline: String(localized: "Turn on location to put nearby predictions first.", comment: "Location-permission explanation."),
+        ChsAmberCard(title: String(localized: "Location unavailable", comment: "Location-denied card title."),
+                     headline: fallbackLocationText,
                      action: String(localized: "Find tides near me", comment: "Request location permission action."),
                      identifier: "location-ask-card",
                      icon: "location.fill",
@@ -988,7 +1001,7 @@ struct StationListView: View {
     /// contrast story), deep linking to the app's iOS Settings.
     private var unavailableCard: some View {
         ChsAmberCard(title: String(localized: "Location unavailable", comment: "Location-denied card title."),
-                     headline: String(localized: "Turn on location in Settings to find nearby tides and currents.", comment: "Location-denied explanation."),
+                     headline: fallbackLocationText,
                      action: String(localized: "Go to Settings", comment: "Open iOS Settings to enable location."),
                      identifier: "location-denied-card",
                      icon: "location.slash",
@@ -1105,6 +1118,7 @@ struct StationListView: View {
     private func openSearch() {
         query = ""       // a new search never inherits the last query
         results = []
+        completedSearch = nil
         searching = true
     }
 
@@ -1138,6 +1152,7 @@ struct StationListView: View {
         // overwrite the answer (CI showed "d" results under "deception").
         guard !Task.isCancelled else { return }
         results = ranked
+        completedSearch = input
     }
 
     private var searchOverlay: some View {
@@ -1149,6 +1164,13 @@ struct StationListView: View {
             CanvasBackground()
             ScrollView {
                     VStack(spacing: 12) {
+                        if results.isEmpty, completedSearch == searchInput {
+                            Text("No matches", comment: "Empty station-search result; the search and series filters remain available.")
+                                .foregroundStyle(SN.foam.opacity(0.62))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 6)
+                                .accessibilityIdentifier("search-no-matches")
+                        }
                         // Nationally a two-letter query matches a thousand
                         // stations. Showing the nearest 60 is the useful
                         // answer; saying so is the honest one — and it says so
@@ -1304,6 +1326,7 @@ struct MyLocationTile<Card: View>: View {
     let items: [StationItem]
     let fix: (lat: Double, lon: Double)
     let imperial: Bool
+    var approximate = false
     @ViewBuilder let card: (StationItem) -> Card
 
     var body: some View {
@@ -1314,7 +1337,9 @@ struct MyLocationTile<Card: View>: View {
                     .rotationEffect(.degrees(45))
                 MonoLabel(text: String(localized: "My Location", comment: "Current-location section heading."), color: SN.foam.opacity(0.9))
                 Spacer(minLength: 8)
-                Text(formatCoord(lat: fix.lat, lon: fix.lon))
+                Text(approximate
+                     ? String(localized: "Approximate location", comment: "My Location status when iOS supplies an approximate rather than precise location; replaces precise-looking coordinates.")
+                     : formatCoord(lat: fix.lat, lon: fix.lon))
                     .font(.caption2.monospaced())
                     .foregroundStyle(SN.foam.opacity(0.55))
                     // Deliberately neither shrunk to fit nor line-limited: the
@@ -1340,6 +1365,9 @@ struct MyLocationTile<Card: View>: View {
 }
 
 struct MyLocationLoadingTile: View {
+    let locating: Bool
+    let fallback: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -1355,10 +1383,15 @@ struct MyLocationLoadingTile: View {
             .padding(.bottom, 4)
 
             HStack(spacing: 12) {
-                ProgressView().tint(SN.leaf)
-                Text("Finding your location…")
-                    .font(.callout)
-                    .foregroundStyle(SN.foam.opacity(0.7))
+                if locating { ProgressView().tint(SN.leaf) }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(locating
+                         ? String(localized: "Finding your location…")
+                         : String(localized: "Location unavailable", comment: "Location-denied card title."))
+                        .font(.callout)
+                    Text(fallback).font(.footnote)
+                }
+                .foregroundStyle(SN.foam.opacity(0.7))
                 Spacer()
             }
             .frame(minHeight: 96)

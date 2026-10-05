@@ -2,6 +2,21 @@
 import XCTest
 
 final class SettingsLayoutTests: ScreenshotTestCase {
+    func testSlackWindowPreviewChangesWithComfortCurrent() {
+        let app = launch("-seedGate", "-locDenied")
+        openSettings(app)
+        save(app, "slack-window-settings-before.png")
+        let preview = app.descendants(matching: .any)["slack-window-preview"].firstMatch
+        XCTAssert(preview.appears(within: 5))
+        let before = preview.value as? String
+        let stepper = app.steppers.firstMatch
+        stepper.buttons["Increment"].tap()
+        let changed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value != %@", before ?? ""), object: preview)
+        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
+        save(app, "slack-window-settings-expanded.png")
+    }
+
     func testWidgetsAndAboutAreInSettings() {
         checkSettings(language: "en", settingsTitle: "Settings", aboutTitle: "About", restoreTitle: "Restore purchase")
     }

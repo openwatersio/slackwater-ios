@@ -7,6 +7,39 @@ import UIKit
 import XCTest
 
 final class ListAndFavoritesTests: ScreenshotTestCase {
+    func testEmptySearchShowsAnAnswerAndKeepsFiltersAvailable() {
+        let app = launch("-seedGate", "-locDenied")
+        openSearch(app, "zzzzzzzz")
+        XCTAssert(app.staticTexts["No matches"].appears(within: 5))
+        XCTAssert(app.buttons["Show tides"].exists)
+        XCTAssert(app.buttons["Show currents"].exists)
+        save(app, "list-no-matches.png")
+    }
+
+    func testMissingLocationNamesTheFallbackAnchor() {
+        let app = launch("-seedGate", "-resetRecents", "-locDenied")
+        XCTAssert(app.staticTexts["Showing places near Chesapeake Bay"].appears(within: 5))
+        save(app, "list-location-fallback.png")
+    }
+
+    func testMissingLocationNamesTheLastOpenedPlace() {
+        let app = launch("-seedGate", "-resetRecents", "-locDenied")
+        openFridayHarbor(app)
+        goBack(app)
+        let origin = app.staticTexts["Showing places near Friday Harbor"].firstMatch
+        scrollTo(origin, in: app)
+        XCTAssert(origin.exists)
+        save(app, "list-location-last-place.png")
+    }
+
+    func testApproximateLocationDoesNotPresentPreciseCoordinates() {
+        let app = launch("-seedGate", "-resetRecents", "-locApproximate",
+                         "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        XCTAssert(app.staticTexts["Approximate location"].appears(within: 5))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '°N'")).firstMatch.exists)
+        save(app, "list-location-approximate.png")
+    }
+
     // The list's groups — My Location hero (nm pill, 3-dp coords, no
     // match-grade sentence), Recents after a visit, Near Me, and the utility
     // footer (no catalog section, no units pill).
@@ -98,7 +131,7 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
         XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
         XCTAssert(app.images["Location unavailable"].exists)
         XCTAssert(app.staticTexts["Go to Settings"].exists)
-        XCTAssertFalse(app.staticTexts["My Location"].exists)
+        XCTAssert(app.staticTexts["My Location"].exists)
         XCTAssert(app.staticTexts["Chesapeake Bay"].exists)
         XCTAssert(app.staticTexts["Annapolis (US Naval Academy)"].firstMatch.exists)
         XCTAssert(app.staticTexts["Greenbury Point"].firstMatch.exists)
@@ -115,10 +148,10 @@ final class ListAndFavoritesTests: ScreenshotTestCase {
     /// key from an earlier answer.
     func testM41UndeterminedSlotOffersTheAsk() throws {
         let app = launch("-seedGate", "-resetRecents", "-locUndetermined")
-        XCTAssert(app.staticTexts["Tides and currents near you"].appears(within: 5))
+        XCTAssert(app.staticTexts["Location unavailable"].appears(within: 5))
         XCTAssert(app.images["Location"].exists)
         XCTAssert(app.staticTexts["Find tides near me"].exists)
-        XCTAssertFalse(app.staticTexts["Location unavailable"].exists)
+        XCTAssert(app.staticTexts["Showing places near Chesapeake Bay"].exists)
         XCTAssert(app.staticTexts["Chesapeake Bay"].exists)
         save(app, "m41-location-ask.png")
     }
