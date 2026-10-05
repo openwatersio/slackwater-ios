@@ -18,7 +18,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
     }
 
     func testWidgetsAndAboutAreInSettings() {
-        checkSettings(language: "en", settingsTitle: "Settings", aboutTitle: "About", restoreTitle: "Restore purchase")
+        checkSettings(language: "en", settingsTitle: "Settings", aboutTitle: "About", restoreTitle: "Restore purchase", previewTitle: "Example slack window", calendarSummary: "Publish a station's tides or slack windows to your calendar")
     }
 
     func testSettingsInFrench() {
@@ -47,6 +47,30 @@ final class SettingsLayoutTests: ScreenshotTestCase {
 
     func testSettingsInNorwegian() {
         checkSettings(language: "nb", settingsTitle: "Innstillinger", aboutTitle: "Om", restoreTitle: "Gjenopprett kjøp")
+    }
+
+    func testSettingsInDanish() {
+        checkSettings(language: "da", settingsTitle: "Indstillinger", aboutTitle: "Om", restoreTitle: "Gendan køb", previewTitle: "Eksempel på strømstille periode", calendarSummary: "Føj en stations tidevand eller strømstille perioder til din kalender")
+    }
+
+    func testSettingsInFinnish() {
+        checkSettings(language: "fi", settingsTitle: "Asetukset", aboutTitle: "Tietoja", restoreTitle: "Palauta osto", previewTitle: "Esimerkki heikon virtauksen jaksosta", calendarSummary: "Lisää aseman vuorovedet tai heikon virtauksen jaksot kalenteriisi")
+    }
+
+    func testSettingsInItalian() {
+        checkSettings(language: "it", settingsTitle: "Impostazioni", aboutTitle: "Informazioni", restoreTitle: "Ripristina acquisto", previewTitle: "Esempio di finestra di stanca", calendarSummary: "Aggiungi al calendario le maree o le finestre di stanca di una stazione")
+    }
+
+    func testSettingsInKorean() {
+        checkSettings(language: "ko", settingsTitle: "설정", aboutTitle: "정보", restoreTitle: "구매 복원", previewTitle: "정조 시간대 예시", calendarSummary: "관측소의 조석이나 정조 시간대를 캘린더에 추가")
+    }
+
+    func testSettingsInEuropeanPortuguese() {
+        checkSettings(language: "pt-PT", settingsTitle: "Definições", aboutTitle: "Sobre", restoreTitle: "Restaurar compra", previewTitle: "Exemplo de período de estofo", calendarSummary: "Adicione as marés ou períodos de estofo de uma estação ao calendário")
+    }
+
+    func testSettingsInSwedish() {
+        checkSettings(language: "sv", settingsTitle: "Inställningar", aboutTitle: "Om", restoreTitle: "Återställ köp", previewTitle: "Exempel på strömstilla period", calendarSummary: "Lägg till en stations tidvatten eller strömstilla perioder i kalendern")
     }
 
     func testMacSettingsShowsDesktopWidgets() {
@@ -92,7 +116,7 @@ final class SettingsLayoutTests: ScreenshotTestCase {
         save(app, "settings-tv-policy.png")
     }
 
-    private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String) {
+    private func checkSettings(language: String, settingsTitle: String, aboutTitle: String, restoreTitle: String, previewTitle: String? = nil, calendarSummary: String? = nil) {
         let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(\(language))", "-AppleLocale", language)
         // Use the gear's identifier-independent location in translated runs.
         if language == "en" {
@@ -101,6 +125,21 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             let settings = app.buttons[settingsTitle].firstMatch
             scrollTo(settings, in: app)
             settings.tap()
+        }
+        if let previewTitle {
+            let preview = app.descendants(matching: .any)["slack-window-preview"].firstMatch
+            XCTAssert(preview.appears(within: 5))
+            XCTAssertEqual(preview.label, previewTitle)
+            XCTAssertFalse((preview.value as? String ?? "").isEmpty)
+            save(app, "settings-slack-window-\(language).png")
+        }
+        if let calendarSummary {
+            let calendar = app.buttons["settings-calendar-row"].firstMatch
+            scrollTo(calendar, in: app)
+            XCTAssertTrue(calendar.label.contains(calendarSummary))
+            if language != "en" {
+                XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label ==[c] %@", "Alerts")).firstMatch.exists)
+            }
         }
         XCTAssertFalse(app.staticTexts["Not for navigation."].exists)
         XCTAssertFalse(app.staticTexts["Offline downloads"].exists)
