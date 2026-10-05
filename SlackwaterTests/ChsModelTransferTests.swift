@@ -59,17 +59,15 @@ final class ChsModelTransferTests: XCTestCase {
     }
 
     func testCancelledTransferDoesNotImportLateReply() async {
-        let started = expectation(description: "Waiting for the phone")
         let lock = NSLock()
         var lateReply: ((Data?) -> Void)?
         let bytes = try! JSONEncoder().encode(["chs-victoria": JSONEncoder().encode(model())])
         let transfer = ChsModelTransfer(send: { _, reply in
             lock.withLock { lateReply = reply }
-            started.fulfill()
+            // Cancel while the waiter is installed, before its timeout can win a scheduler race.
+            withUnsafeCurrentTask { $0?.cancel() }
         }, timeout: 1)
         let task = Task { try await transfer.model(for: ChsModelRequest(stationID: "chs-victoria", isCurrent: false)) }
-        await fulfillment(of: [started], timeout: 1)
-        task.cancel()
         do {
             _ = try await task.value
             XCTFail("An inactive watch must stop waiting for the phone")
