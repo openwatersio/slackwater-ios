@@ -32,7 +32,7 @@ struct StationListView: View {
     @State private var query = ""
     @State private var showSettings = false
     @State private var showDownloads = false
-    @State private var showWidgetsGallery = false
+    @State private var showPremiumSettings = false
     @State private var searching = false
     @State private var results: [StationItem] = []
     /// Tides/Currents narrowing, nil = everything. One persisted value for
@@ -198,11 +198,6 @@ struct StationListView: View {
         // overlay is up (VoiceOver correctness, and hit-tests resolve to the
         // overlay's cards, not identically-named cards underneath).
         .accessibilityHidden(searching)
-        // Re-forwarded here too: Settings pushes `OfflineManagerList` in its
-        // OWN `NavigationStack` (SettingsView.swift), and that push inherits
-        // fine — but SettingsView itself is this `.sheet`'s ROOT content, so
-        // without this it's SettingsView's environment that's broken, not
-        // OfflineManagerList's. Same boundary as the comment below.
         .sheet(isPresented: $showSettings) {
             SettingsView(onReplayTour: replayTour).environment(\.openChsRoute, openChsRoute)
         }
@@ -215,12 +210,15 @@ struct StationListView: View {
         // nothing). Every `.sheet` that can present `OfflineManagerView` needs
         // this same re-forward — see `ChsWaitingView` and `CurrentDetailView`.
         .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
-        // No environment re-forward needed here (unlike showSettings/showDownloads
-        // above): the gallery's only nested presentation is PremiumView, which
-        // reads no custom environment key. If it ever grows a station link, mind
-        // the reforwarding gotcha those two sheets document.
-        .sheet(isPresented: $showWidgetsGallery) { WidgetsGalleryView() }
+        .sheet(isPresented: $showPremiumSettings) {
+            SettingsView(onReplayTour: replayTour, opensPremium: true)
+        }
         .onOpenURL(perform: handleDeepLink)
+        .onContinueUserActivity(stationActivityType) { activity in
+            guard let id = activity.userInfo?["stationID"] as? String,
+                  let url = deepLink(forStationID: id) else { return }
+            handleDeepLink(url)
+        }
         // A tapped alert carries the same station link a share does.
         .onReceive(AlertTap.shared.$url) { url in
             guard let url else { return }
@@ -644,7 +642,7 @@ struct StationListView: View {
         guard url.scheme == "slackwater" else { return }
         switch url.host {
         #if PREMIUM_ENABLED
-        case "premium": showWidgetsGallery = true
+        case "premium": showPremiumSettings = true
         #endif
         // `stationID(from:)`, never `pathComponents` — see DeepLink.swift.
         case "station":
@@ -656,7 +654,7 @@ struct StationListView: View {
                 showMap = false
                 showSettings = false
                 showDownloads = false
-                showWidgetsGallery = false
+                showPremiumSettings = false
                 searching = false
                 chooser = nil
                 linkedRemovedStationID = id
@@ -760,7 +758,9 @@ struct StationListView: View {
                                       tier: chs.tier, declined: chs.declinedNearby,
                                       remaining: chs.remainingBeyondCohort),
             onOpen: { showDownloads = true },
-            onAccept: { ChsFitService.shared.accept(.nearby) },
+            onAccept: {
+                if let next = chs.tier.next { ChsFitService.shared.accept(next) }
+            },
             onDecline: { ChsFitService.shared.declineNearby() })
             // On CHANGE, not on every body evaluation. Dispatching the
             // capture from inside the builder ran it on every render, and a

@@ -22,15 +22,15 @@ struct DownloadStrip: View {
             // capture that creates the cohort never fired and nothing ever
             // downloaded. A zero-height row is a view; EmptyView is a hole.
             Color.clear.frame(height: 0)
-        case let .working(done, total):
+        case let .working(done, total, progress):
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Downloading nearby stations")
+                        Text("Downloading tide stations")
                         Spacer()
                         Text("\(done) of \(total)").monospacedDigit()
                     }
-                    ProgressView(value: uiTestQuiet ? 0 : Double(done), total: Double(max(total, 1)))
+                    ProgressView(value: uiTestQuiet ? 0 : progress, total: 10)
                 }
             }
             .buttonStyle(.plain)

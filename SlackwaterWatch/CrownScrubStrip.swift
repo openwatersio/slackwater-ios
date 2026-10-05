@@ -26,7 +26,7 @@ struct CrownScrubStrip: View {
     static let belowHorizon: CGFloat = 28
     /// How far a turn of the Crown carries the strip: the feel knob.
     /// ponytail: one number; tune on a real Crown.
-    static let crownSensitivity: DigitalCrownRotationalSensitivity = .medium
+    static let crownSensitivity: DigitalCrownRotationalSensitivity = .high
 
     init(data: TimelineData, scale: TimelineScale?, now: Date, imperial: Bool, speedUnit: String,
          floodDeg: Double? = nil, ebbDeg: Double? = nil, scrubTime: Binding<Date>) {

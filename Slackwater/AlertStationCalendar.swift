@@ -50,7 +50,7 @@ func stationCalendarTitle(name: String, kind: StationCalendarKind) -> String {
 /// What turning a station's toggle does, given what is already on.
 enum CalendarSubscriptionChange: Equatable {
     case add
-    /// Nothing changes and the tier sheet opens: station calendars are Premium (spec §2).
+    /// Nothing changes and Settings at Premium opens: station calendars are Premium (spec §2).
     case upsell
     case remove
 }

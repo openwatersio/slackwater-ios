@@ -3,11 +3,16 @@ import XCTest
 
 final class CalendarSettingsTests: ScreenshotTestCase {
     private func openCalendarSettings(_ app: XCUIApplication) {
-        openSettings(app)
+        let settings = app.navigationBars["Settings"]
+        for _ in 0..<3 {
+            openSettings(app)
+            if settings.appears(within: 5) { break }
+        }
+        XCTAssert(settings.exists, "Settings did not open after tapping its row")
         let row = app.buttons["settings-calendar-row"].firstMatch
         for _ in 0..<4 where !row.isHittable { app.swipeUp() }
         row.tap()
-        XCTAssert(app.navigationBars["Calendar"].appears(within: 5))
+        XCTAssert(app.navigationBars["Favourites calendars"].appears(within: 5))
     }
 
     /// One tide station and one current station: the two calendar kinds, both in the bundle.
@@ -41,17 +46,24 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         let tideSwitch = app.switches["calendar-station-\(tide)"]
         tideSwitch.tap()
 
-        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        XCTAssert(app.buttons["Restore purchase"].isHittable)
     }
 
     /// The calendar prompt is a system alert and only appears on the first run of a fresh sim.
-    private func allowCalendarIfAsked(_ app: XCUIApplication) {
+    private func allowCalendarIfAsked() {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         guard springboard.alerts.firstMatch.appears(within: 6) else { return }
-        for label in ["Allow Full Access", "Allow", "OK", "Continue"] {
-            let button = springboard.alerts.buttons[label].firstMatch
-            if button.exists { button.tap(); return }
+        let alert = springboard.alerts.firstMatch
+        // A permission tap can be dropped on a loaded simulator; dismissal is the landed signal (#578).
+        for _ in 0..<3 {
+            guard alert.exists else { return }
+            let button = alert.buttons["Allow Full Access"].firstMatch
+            XCTAssert(button.exists, "the calendar permission alert has no Allow Full Access button")
+            button.tap()
+            if alert.disappears(within: 5) { return }
         }
+        XCTFail("the calendar permission alert did not dismiss after allowing full access")
     }
 
     /// Turning a station off is destructive — its calendar and events go too — so it reads
@@ -63,7 +75,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         openCalendarSettings(app)
         let toggle = app.switches["calendar-station-\(tide)"]
         toggle.tap()
-        allowCalendarIfAsked(app)
+        allowCalendarIfAsked()
         XCTAssert(waitFor(toggle, "value == '1'", timeout: settle), "turning on did not settle")
 
         toggle.tap()

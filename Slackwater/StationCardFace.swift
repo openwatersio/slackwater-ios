@@ -112,8 +112,9 @@ struct StationCard<Trailing: View>: View {
             // the card measures ~4.1:1, under AA for caption text where the
             // full-strength 4.71:1 clears it (docs/testflight.md).
             .opacity(opacity)
-            if let downloadProgress {
-                StationDownloadProgress(value: downloadProgress)
+            if let downloadProgress, !placeholder {
+                StationDownloadWave(value: downloadProgress)
+                    .frame(height: 20)
                     .padding(.top, 10)
             }
             // Offline and failure status sits OUTSIDE the ViewThatFits, and that
@@ -149,7 +150,7 @@ struct StationCard<Trailing: View>: View {
                 if let graph {
                     graph.padding(.top, 54).padding(.horizontal, -3)
                 } else if placeholder {
-                    StationCardPlaceholder()
+                    StationCardPlaceholder(progress: downloadProgress)
                         .padding(.top, 54).padding(.horizontal, -3)
                 }
             }
@@ -186,8 +187,42 @@ struct StationDownloadProgress: View {
     }
 }
 
+private struct StationDownloadWave: View {
+    let value: Double?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let wave = stationDownloadWave(width: proxy.size.width, height: proxy.size.height)
+            wave.stroke(SN.foam.opacity(0.2), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            if let value {
+                wave.trimmedPath(from: 0, to: min(1, max(0, value / 10)))
+                    .stroke(SN.leaf, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            }
+        }
+        .accessibilityRepresentation {
+            if let value {
+                ProgressView(value: value, total: 10)
+                    .accessibilityLabel(Text("Downloading"))
+                    .accessibilityValue(Text(""))
+            }
+        }
+    }
+}
+
+private func stationDownloadWave(width: CGFloat, height: CGFloat) -> Path {
+    Path { path in
+        path.move(to: CGPoint(x: -4, y: height * 0.46))
+        for x in stride(from: CGFloat.zero, through: width + 4, by: 4) {
+            let y = height * (0.46 - 0.26 * sin(x / max(width, 1) * 4 * .pi))
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+    }
+}
+
 /// A data-free echo of the card curve and its time axis.
 private struct StationCardPlaceholder: View {
+    var progress: Double? = nil
+
     var body: some View {
         marks.foregroundStyle(SN.foam.opacity(0.2))
     }
@@ -196,14 +231,7 @@ private struct StationCardPlaceholder: View {
         GeometryReader { proxy in
             let w = proxy.size.width
             let h = proxy.size.height
-            Path { path in
-                path.move(to: CGPoint(x: -4, y: h * 0.46))
-                for x in stride(from: CGFloat.zero, through: w + 4, by: 4) {
-                    let y = h * (0.46 - 0.26 * sin(x / max(w, 1) * 4 * .pi))
-                    path.addLine(to: CGPoint(x: x, y: y))
-                }
-            }
-            .stroke(style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            StationDownloadWave(value: progress)
 
             ForEach([0.22, 0.5, 0.78], id: \.self) { x in
                 Capsule()

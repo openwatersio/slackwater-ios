@@ -521,6 +521,54 @@ final class TimelineTests: XCTestCase {
         }
     }
 
+    @MainActor func testCommentaryJumpSurvivesScrollFeedback() async throws {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = friday.tz
+        let data = TimelineData.build(tide: friday, current: nil, now: now,
+                                      anchor: calendar.startOfDay(for: now))
+        let geo = TimelineGeo(data: data)
+        var scrub = now.addingTimeInterval(-6 * 3600)
+        func strip(_ token: Int) -> TimelineScrubber {
+            let renderedTime = scrub
+            return TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                    scrubTime: Binding(get: { renderedTime }, set: { scrub = $0 }),
+                                    jumpToken: token)
+        }
+        let host = UIHostingController(rootView: strip(0))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(100))
+        func scrollView(in view: UIView) -> UIScrollView? {
+            if let scroll = view as? TimelineScrubber.ScrubScrollView { return scroll }
+            return view.subviews.compactMap { scrollView(in: $0) }.first
+        }
+        let sv = try XCTUnwrap(scrollView(in: host.view))
+        let co = try XCTUnwrap(sv.delegate as? TimelineScrubber.Coordinator)
+        let target = scrub.addingTimeInterval(2 * 3600)
+        scrub = target
+        host.rootView = strip(1)
+        host.view.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(50))
+        let landing = co.magnetTarget
+        XCTAssertTrue(co.magneting, "the commentary must still be travelling when feedback arrives")
+        // A rendered scroll update can trail the offset while the jump animates.
+        scrub = data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).addingTimeInterval(-600)
+        host.rootView = strip(1)
+        host.view.layoutIfNeeded()
+        for _ in 0..<100 where co.magneting {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(landing, target, "scroll feedback must not replace the tapped destination")
+        XCTAssertEqual(scrub.timeIntervalSince(target), 0, accuracy: 1,
+                       "the commentary jump must finish on its destination despite scroll feedback")
+        XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
+                       0, accuracy: 300, "the curve must finish under the same selected time")
+    }
+
     /// #280: rotation keeps `contentOffset.x` while the viewport width
     /// changes, so the time under the centerline (`offset + width / 2`)
     /// drifts by half the width change and the curve disagrees with the

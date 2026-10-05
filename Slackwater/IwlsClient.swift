@@ -346,6 +346,7 @@ final class IwlsFetcher {
 
     private func cached(_ code: String, stationID: String, chunk: ChsChunk,
                         _ transform: ([ChsSample]) -> [ChsSample]) async throws -> [ChsSample] {
+        try Task.checkCancellation()
 #if DEBUG
         if Self.usesFixture {
             let key = "\(stationID):\(code)"

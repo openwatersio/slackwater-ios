@@ -43,7 +43,8 @@ final class AlertPopupTests: ScreenshotTestCase {
         XCTAssert(app.buttons["alert-popup-once"].appears(within: 5))
         app.buttons["alert-popup-once"].tap()
 
-        XCTAssert(app.navigationBars["Slackwater Premium"].appears(within: 5))
+        XCTAssert(app.navigationBars["Settings"].appears(within: 5))
+        XCTAssert(app.buttons["Restore purchase"].isHittable)
     }
 
     func testTheStripIsStillScrubbableAfterThePopupCloses() {

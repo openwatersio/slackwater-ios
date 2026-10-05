@@ -2,6 +2,8 @@
 import Foundation
 import WidgetKit
 
+let stationActivityType = "io.openwaters.slackwater.station"
+
 // Shared with the app target so unit tests cover the widget entry-to-URL boundary.
 struct SlackwaterEntry: TimelineEntry {
     let date: Date
@@ -9,6 +11,10 @@ struct SlackwaterEntry: TimelineEntry {
     let card: WidgetCard?
     let premium: Bool
     let stationID: String?
+    var accessoryGraph: StationCardGraph? = nil
+    var isPlaceholder = false
+    /// The watch's inline, circular and corner families draw this (#524).
+    var complication: ComplicationReading? = nil
 }
 
 /// RFC 3986 "unreserved" only. `.urlPathAllowed` looked like the obvious
@@ -27,8 +33,8 @@ let idPathCharacters = CharacterSet(charactersIn:
 /// percent-encoded; the receiving `.onOpenURL` reads the id back decoded via
 /// `url.pathComponents`.
 ///
-/// With no id to resolve (M2) a PREMIUM_ENABLED build opens the Widgets
-/// gallery/explainer. Without Premium that route does not exist, so the widget
+/// With no id to resolve (M2) a PREMIUM_ENABLED build opens Settings at Premium.
+/// Without Premium that route does not exist, so the widget
 /// gets no URL and a tap opens the app wherever it was.
 func deepLink(forStationID id: String?) -> URL? {
     guard let id, let encoded = id.addingPercentEncoding(withAllowedCharacters: idPathCharacters)
@@ -36,7 +42,7 @@ func deepLink(forStationID id: String?) -> URL? {
         #if PREMIUM_ENABLED
         return URL(string: "slackwater://premium")
         #else
-        return nil  // no gallery route without Premium; the tap just opens the app
+        return nil  // no Premium route without Premium; the tap just opens the app
         #endif
     }
     return URL(string: "slackwater://station/\(encoded)")
@@ -44,11 +50,12 @@ func deepLink(forStationID id: String?) -> URL? {
 
 func deepLink(_ entry: SlackwaterEntry) -> URL? { deepLink(forStationID: entry.stationID) }
 
-/// A lock-screen widget's link: its station once unlocked, the Widgets page
+/// A lock-screen widget's link: its station once unlocked, Settings’ Premium section
 /// while locked. The provider resolves `stationID` either way, so the locked
 /// case can't lean on `deepLink(_:)`'s nil fallback.
 func accessoryDeepLink(_ entry: SlackwaterEntry) -> URL? {
-    entry.premium ? deepLink(entry) : deepLink(forStationID: nil)
+    guard !entry.isPlaceholder else { return nil }
+    return entry.premium ? deepLink(entry) : deepLink(forStationID: nil)
 }
 
 /// The station id back out of a `slackwater://station/<id>` URL — the inverse

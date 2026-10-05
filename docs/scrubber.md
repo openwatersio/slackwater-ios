@@ -28,7 +28,7 @@ The following are deliberately outside this specification because they are separ
 - station header, favourite control, navigation, provenance, and related-station links; and
 - loading, download, and error cards shown instead of the scrubber.
 
-This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are separate contracts.
+This specification covers their selection handoff to the scrubber: date taps open the picker, explicit selections land on their requested instant, and the schedule follows a settled selection (§4.2). Their remaining layout and behavior are defined in [`detail.md`](detail.md).
 
 ## 2. Product idea
 
@@ -282,6 +282,8 @@ An animated request must:
 3. cancel an in-progress magnetic animation and forget its old destination;
 4. animate the requested target beneath the centreline; and
 5. park `selectedTime` on the exact requested instant at completion.
+
+Scroll feedback during that animation must not cancel the request. A rendered selection can trail the current offset; the destination remains the requested instant until the animation finishes or an explicit interaction interrupts it.
 
 A finger that is still down retains control. Do not fight an active drag with an external state update.
 
@@ -651,7 +653,7 @@ The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`.
 
 ### watchOS
 
-The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
+The watch place page (`SlackwaterWatch/PlaceDetail.swift`) draws the same `TimelineCanvas` under an offset driven by `digitalCrownRotation`, with no momentum code of its own: the Crown brings it. Crown sensitivity is high. The Crown's position is measured from a fixed origin at the strip's points per hour, so chunk swaps that move `data.start` do not move the selected time. When the Crown goes idle, `TimelineData.magnetTarget(nearX:)` (the phone's magnet rule) picks the landing and the page re-anchors through `Timeline.reanchor(settledAt:anchor:tz:)` after the same 600 ms rest. The Crown only scrubs: the page does not scroll vertically. The strip is clipped under its row of hours; the day and sun rows do not fit. A rescale lands directly, as under Reduce Motion, because watchOS has no display link to glide on.
 
 ### Android
 
@@ -737,6 +739,7 @@ These scenarios define the minimum behavior shared by all platforms.
 These are implementation gaps, not behavior to copy to another platform:
 
 - The day-row date hit test uses local noon, although the label is drawn at the daylight midpoint. Hit regions should follow the visible labels.
+- The online-current detail has no alert popup, but its strip still installs the press recognizer and the "Set an alert" action, which then do nothing (§6.5.1).
 
 Fixing one of these should update this section and add or amend a conformance scenario. Do not weaken the cross-platform contract to preserve an iOS gap.
 

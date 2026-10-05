@@ -2,7 +2,7 @@ name: Slackwater
 options:
   bundleIdPrefix: io.openwaters
   developmentLanguage: en
-  knownRegions: [Base, en, es-ES, fr-CA]
+  knownRegions: [Base, de, en, es-ES, fr-CA, ja, nb, nl, pt-BR]
   # iOS 26: Liquid Glass chrome with no #available fences. Raised
   # from the scaffolded 17 pre-App-Store (build 18, TestFlight only) while the
   # floor was still free to set. Retired nav-station iPads are a chartplotter
@@ -32,11 +32,13 @@ settings:
     SWIFT_VERSION: "5.0"
     SWIFT_EMIT_LOC_STRINGS: YES
   configs:
-    # Premium (the lock-screen widgets, its sheet, and slackwater://premium) is
-    # Debug-only until it ships (#463). Add PREMIUM_ENABLED to Release to ship
-    # it. DEBUG is restated because this key replaces XcodeGen's preset.
+    # Premium (the lock-screen widgets, purchase controls, and slackwater://premium)
+    # ships in both configurations (#155); removing PREMIUM_ENABLED hides it.
+    # DEBUG is restated because this key replaces XcodeGen's preset.
     Debug:
       SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG PREMIUM_ENABLED"
+    Release:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "PREMIUM_ENABLED"
 packages:
   Almanac:
     url: https://github.com/openwatersio/almanac
@@ -95,6 +97,8 @@ targetTemplates:
       - Slackwater/WidgetStationLoader.swift
       - Slackwater/StationIntent.swift
       - Slackwater/WidgetSnapshot.swift
+      - Slackwater/ComplicationReading.swift
+      - Slackwater/AccessoryWidgetContent.swift
       - Slackwater/DayCurveContentView.swift
       - Slackwater/NextEventContentView.swift
       - Slackwater/TideStation.swift
@@ -132,7 +136,6 @@ targets:
         product: MapLibre
       - target: SlackwaterWidgets
         embed: true
-      # Embedded in Debug only; see EXCLUDED_SOURCE_FILE_NAMES under Release.
       - target: SlackwaterWatch
     info:
       path: Slackwater/Info.plist
@@ -142,6 +145,7 @@ targets:
         UILaunchScreen:
           UIColorName: LaunchBackground
         ITSAppUsesNonExemptEncryption: false
+        NSUserActivityTypes: [io.openwaters.slackwater.station]
         # SwiftUI's `.preferredColorScheme(.dark)` (RootView, SlackwaterApp.swift)
         # only reaches the app's own view hierarchy. This plist key sets the
         # app's trait collection at the OS level, so in-process system UI the
@@ -186,8 +190,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        # The app's first URL scheme: `slackwater://premium` opens the Widgets
-        # gallery, `slackwater://station/<id>` opens that station's detail.
+        # The app's first URL scheme: `slackwater://premium` opens Settings at Premium
+        # and `slackwater://station/<id>` opens that station's detail.
         # Widgets already emit both (Task 5/6); StationListView.onOpenURL
         # (SlackwaterApp.swift) is the receiving end.
         CFBundleURLTypes:
@@ -219,12 +223,6 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "Apple Distribution"
           PROVISIONING_PROFILE_SPECIFIER: "Slackwater App Store"
-          # Keeps the watch app out of the archive until it has its own bundle
-          # IDs and App Store profiles (#482, Phase 3). Xcode applies this
-          # setting to the Embed Watch Content copy as well as to sources, and
-          # skipping the copy also skips its embedded-binary validation. Delete
-          # it, and SlackwaterWatch's Release block, in the provisioning PR.
-          EXCLUDED_SOURCE_FILE_NAMES: SlackwaterWatch.app
   SlackwaterWidgets:
     type: app-extension
     platform: iOS
@@ -267,12 +265,23 @@ targets:
     templates: [PortableSources]
     sources:
       - SlackwaterWatch
+      - Slackwater/InfoPlist.xcstrings
+      - Slackwater/Assets.xcassets
       # The full catalog ships on the watch (#482). The index is the one file
       # the widget leaves out: the watch browses, so it builds `StationItem.all`.
       - path: Slackwater/Resources/station-index.json
       # The list's stores and their iCloud sync. Not in PortableSources: the
       # widget never reads favourites through them.
       - Slackwater/StationLists.swift
+      - Slackwater/Connectivity.swift
+      - Slackwater/ChsFitService.swift
+      - Slackwater/ChsFitter.swift
+      - Slackwater/ChsQueue.swift
+      - Slackwater/DownloadTier.swift
+      - Slackwater/IwlsClient.swift
+      - Slackwater/OnlineGates.swift
+      - Slackwater/NearestWidgetStation.swift
+      - Slackwater/PremiumStore.swift
       - Slackwater/FavoritesCloud.swift
       - Slackwater/UnitsCloud.swift
       # The phone's timeline data and drawing, and the detail pieces over it.
@@ -290,9 +299,12 @@ targets:
     dependencies:
       - package: Almanac
         product: Almanac
+      - target: SlackwaterWatchWidgets
+        embed: true
     info:
       path: SlackwaterWatch/Info.plist
       properties:
+        NSUserActivityTypes: [io.openwaters.slackwater.station]
         CFBundleDisplayName: Slackwater
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -301,6 +313,8 @@ targets:
         # Standalone-capable: catalogs are bundled, favorites arrive over
         # iCloud KVS, and nothing needs the phone (#482).
         WKRunsIndependentlyOfCompanionApp: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [slackwater]
         NSLocationWhenInUseUsageDescription: >-
           Your location helps find nearby tide and current predictions.
           It stays on this device.
@@ -308,6 +322,7 @@ targets:
       base:
         # Permanent once registered (#207): the companion's id plus .watchkitapp.
         PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: Z59BQLF5VQ
         GENERATE_INFOPLIST_FILE: NO
@@ -318,13 +333,41 @@ targets:
         SWIFT_EMIT_LOC_STRINGS: NO
         CODE_SIGN_ENTITLEMENTS: SlackwaterWatch/SlackwaterWatch.entitlements
       configs:
-        # A Release archive still builds this target, because the app depends
-        # on it, but does not embed it (the app's EXCLUDED_SOURCE_FILE_NAMES).
-        # There is no distribution profile to sign it with yet, so it builds
-        # unsigned; XcodeGen's watchOS preset already sets SKIP_INSTALL, which
-        # keeps it out of the archive's products.
+        # Its own profile, like the phone's appex: the app's covers neither
+        # the watch app nor its complications (#525, docs/testflight.md).
         Release:
-          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "Slackwater Watch App Store"
+  # The watch's complications (#524): the phone's picker, loader and card,
+  # drawn for the watch's four accessory families.
+  SlackwaterWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    templates: [PortableSources]
+    sources: [SlackwaterWatchWidgets]
+    info:
+      path: SlackwaterWatchWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Slackwater
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.openwaters.slackwater.watchkitapp.widgets
+        CODE_SIGN_ENTITLEMENTS: SlackwaterWatchWidgets/SlackwaterWatchWidgets.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: Z59BQLF5VQ
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        SWIFT_EMIT_LOC_STRINGS: NO
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "Slackwater Watch Widgets App Store"
   SlackwaterTests:
     type: bundle.unit-test
     platform: iOS

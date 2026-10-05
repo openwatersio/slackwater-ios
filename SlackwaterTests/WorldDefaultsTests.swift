@@ -48,11 +48,11 @@ final class WorldDefaultsTests: XCTestCase {
             $0.name == "Portsmouth" && $0.latitude > 50 && $0.longitude < 0
         })
 
-        XCTAssertTrue(LocationService.cacheNearestWidgetStation(
+        XCTAssertTrue(cacheNearestWidgetStations(
             lat: portsmouth.latitude, lon: portsmouth.longitude, defaults: d))
         XCTAssertEqual(d.string(forKey: AppGroup.currentLocationStationKey),
                        portsmouth.id)
-        XCTAssertFalse(LocationService.cacheNearestWidgetStation(
+        XCTAssertFalse(cacheNearestWidgetStations(
             lat: portsmouth.latitude, lon: portsmouth.longitude, defaults: d))
 
         // The same fix caches the series-narrowed siblings, each of its own
@@ -71,7 +71,7 @@ final class WorldDefaultsTests: XCTestCase {
         let far = try XCTUnwrap(sierra.first { $0.region == "3.8 nm east" })
         d.set([far.id], forKey: AppGroup.chosenStationsKey)
 
-        XCTAssertTrue(LocationService.cacheNearestWidgetStation(
+        XCTAssertTrue(cacheNearestWidgetStations(
             lat: here.latitude, lon: here.longitude, defaults: d))
         XCTAssertEqual(d.string(forKey: AppGroup.nearestCurrentStationKey), far.id)
         XCTAssertEqual(d.string(forKey: AppGroup.currentLocationStationKey), far.id)

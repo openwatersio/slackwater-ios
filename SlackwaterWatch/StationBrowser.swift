@@ -2,6 +2,7 @@
 // wearer, favorites, places near, recents, then Add Place. The phone's
 // groups, with a card's corner mark where a wrist has no room for headings.
 import SwiftUI
+import WidgetKit
 
 enum BrowseRoute: Hashable {
     case station(StationItem, PlaceMark?)
@@ -12,6 +13,7 @@ struct StationBrowser: View {
     @StateObject private var location = WatchLocation()
     @ObservedObject private var favorites = FavoritesStore.shared
     @ObservedObject private var recents = RecentsStore.shared
+    @ObservedObject private var downloads = ChsFitService.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var groups: BrowseGroups?
     /// When the wearer last raised the app: rows read at this instant. No
@@ -23,12 +25,14 @@ struct StationBrowser: View {
         let fix: WatchLocation.Fix?
         let favorites: [String]
         let recents: [String]
+        let modelRevision: Int
     }
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
                 if location.fix == nil { locationCard }
+                WatchDownloadStatus()
                 if let groups { rows(groups) }
                 NavigationLink(value: BrowseRoute.addPlace) {
                     Label(String(localized: "Add Place", comment: "Watch list row that opens place search."),
@@ -45,22 +49,46 @@ struct StationBrowser: View {
                 }
             }
         }
-        .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids)) {
+        // A complication's tap (#524): its place, on top of the list. A
+        // locked complication's link has no station and just opens the list.
+        .onOpenURL { url in
+            guard url.scheme == "slackwater", url.host() == "station",
+                  let item = StationItem.widgetItem(id: stationID(from: url)) else { return }
+            path = [.station(item, nil)]
+        }
+        .task(id: Inputs(fix: location.fix, favorites: favorites.ids, recents: recents.ids,
+                         modelRevision: downloads.modelRevision)) {
             let fix = location.fix.map { (lat: $0.lat, lon: $0.lon) }
             // The phone's anchor without a fix: the last place opened, else its first-run default.
             let fallback = recents.lastOpened.map { (lat: $0.latitude, lon: $0.longitude) } ?? firstRunFix
             let favoriteIds = favorites.ids, recentIds = recents.ids
             // Ranking the whole catalog is too slow for the watch's main thread.
             let next = await Task.detached(priority: .userInitiated) {
-                BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
-                             recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
+                // The watch's complications follow this fix (#524); the
+                // extension never asks for location itself (#566).
+                if let fix, cacheNearestWidgetStations(lat: fix.lat, lon: fix.lon) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+                return BrowseGroups(fix: fix, fallback: fallback, favoriteIds: favoriteIds,
+                                    recentIds: recentIds, fitted: ChsModelStore.fittedIDs())
             }.value
             // A newer input's ranking may have landed first.
             guard !Task.isCancelled else { return }
             groups = next
+            if let origin = fix ?? recents.lastOpened.map({ (lat: $0.latitude, lon: $0.longitude) }) {
+                let jobs = ChsFitService.autoFitSet(lat: origin.lat, lon: origin.lon, constrained: true)
+                downloads.prioritizeFavorites(favoriteIds + jobs.map(\.id), after: nil)
+                downloads.captureCohort(ids: jobs.map(\.id), heroID: jobs.first?.id)
+            } else {
+                downloads.prioritizeFavorites(favoriteIds, after: nil)
+            }
         }
-        .onAppear { location.refresh() }
+        .onAppear {
+            location.refresh()
+            downloads.setDownloadsActive(scenePhase == .active)
+        }
         .onChange(of: scenePhase) { _, phase in
+            downloads.setDownloadsActive(phase == .active)
             guard phase == .active else { return }
             shownAt = .now
             location.refresh()

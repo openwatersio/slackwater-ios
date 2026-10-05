@@ -11,7 +11,7 @@
 // Tide mode fits 60 d by default. `--days 28,35,42,60` sweeps several windows
 // instead: one fetch covers the longest, every shorter window is its trailing
 // slice, and each is scored against the same held-out data. The bar the tide
-// numbers are read against is spikes/chs-tide-window/README.md — held-out error
+// numbers are read against is docs/validation/chs-tides.md — held-out error
 // is the only instrument that sees a short-window failure, because the in-sample
 // rms does not move while it happens.
 //
@@ -459,7 +459,7 @@ struct Fit: Decodable {
     let constituents: [Con], unseparable: [String]
 }
 
-/// The bar, set before scoring — spikes/chs-tide-window/README.md.
+/// The bar, set before scoring — docs/validation/chs-tides.md.
 ///
 /// Height is not slack: nobody transits a port *at* high water the way a gate
 /// is transited at slack, so timing uses the engine's established maxima bar

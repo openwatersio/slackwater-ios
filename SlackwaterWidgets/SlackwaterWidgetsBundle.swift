@@ -12,22 +12,17 @@ struct StationProvider: AppIntentTimelineProvider {
     private static let accessoryFamilies: Set<WidgetFamily> =
         [.accessoryInline, .accessoryCircular, .accessoryRectangular]
 
-    /// Build only what this family draws. A snapshot and a card each cost a
-    /// full day of harmonic evaluation, and every widget reads exactly one of
-    /// them — so building both was half of a 48-entry timeline thrown away.
-    /// A locked accessory draws neither and needs no station record at all.
+    /// Build only what this family draws. A locked accessory needs no station
+    /// record, and inline needs no graph. Circular and rectangular build both
+    /// a snapshot and a full card-span graph, roughly twice the harmonic
+    /// evaluation per entry of either alone.
+    // ponytail: both full builds per entry; narrow the graph to the family's
+    // span or derive the snapshot from it if the timeline is measured too slow.
     private func entryBuilder(_ intent: StationConfigIntent,
                               for family: WidgetFamily) -> (Date) -> SlackwaterEntry {
         let premium = AppGroup.defaults.bool(forKey: AppGroup.premiumKey)
         let accessory = Self.accessoryFamilies.contains(family)
-        let selectedID = intent.station?.id ?? WidgetStationLoader.defaultStationID()
-        let id = WidgetStationLoader.resolvedStationID(selectedID)
-        let prefix: String? = switch selectedID {
-        case AppGroup.currentLocationStationID: "Current Location"
-        case AppGroup.nearestTideStationID: "Nearest Tide"
-        case AppGroup.nearestCurrentStationID: "Nearest Current"
-        default: nil
-        }
+        let (id, prefix) = WidgetStationLoader.configured(intent.station?.id)
         let source: (Date) -> WidgetRecord? = accessory && !premium
             ? { _ in nil } : WidgetStationLoader.recordSource(id: id)
         return { date in
@@ -36,12 +31,16 @@ struct StationProvider: AppIntentTimelineProvider {
                 ? record.map { WidgetSnapshot.build(WidgetStationLoader.station(from: $0), now: date, stationNamePrefix: prefix) }
                 : nil
             let card = accessory ? nil : record.map { WidgetCard.build($0, now: date, stationNamePrefix: prefix) }
+            let graph = accessory && family != .accessoryInline
+                ? record.map { $0.accessoryGraph(at: date) } : nil
             return SlackwaterEntry(date: date, snapshot: snapshot, card: card,
-                                   premium: premium, stationID: id)
+                                   premium: premium, stationID: id, accessoryGraph: graph)
         }
     }
     func placeholder(in context: Context) -> SlackwaterEntry {
-        entryBuilder(StationConfigIntent(), for: context.family)(.now)
+        SlackwaterEntry(date: .now, snapshot: nil, card: nil,
+                        premium: AppGroup.defaults.bool(forKey: AppGroup.premiumKey),
+                        stationID: nil, isPlaceholder: true)
     }
     func snapshot(for intent: StationConfigIntent, in context: Context) async -> SlackwaterEntry {
         entryBuilder(intent, for: context.family)(.now)

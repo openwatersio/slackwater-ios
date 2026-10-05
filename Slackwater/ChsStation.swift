@@ -149,8 +149,11 @@ enum ChsModelStore {
     }
 
     static func save<T: Encodable>(_ value: T, id: String, suffix: String) throws {
+        try Task.checkCancellation()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try JSONEncoder().encode(value).write(to: url(id, suffix: suffix), options: .atomic)
+        let data = try JSONEncoder().encode(value)
+        try Task.checkCancellation()
+        try data.write(to: url(id, suffix: suffix), options: .atomic)
         // The one place every model write funnels through — tide (suffix
         // ""), current (suffix "-current") and online-window (suffix
         // "-online") saves all land here, so one call covers all three

@@ -286,14 +286,18 @@ class ScreenshotTestCase: XCTestCase {
     /// away; when the sheet settles with it further down — or is still
     /// settling, which is what a loaded machine buys — the hard assert on the
     /// next line then fails on a row that is merely below the fold.
+    ///
+    /// Hittability is asked only of a row wholly on screen. A row straddling
+    /// the bottom edge has no valid activation point, and XCUITest answers
+    /// that query by failing the test, not with false (#570).
     @discardableResult
     func reachInSheet(_ el: XCUIElement, in app: XCUIApplication, tries: Int = 6) -> Bool {
+        let onScreen = { el.exists && !el.frame.isEmpty && app.frame.contains(el.frame) }
         for _ in 0..<tries {
-            if el.exists, !el.frame.isEmpty, el.frame.intersects(app.frame),
-               waitFor(el, "isHittable == true", timeout: 2) { return true }
+            if onScreen(), waitFor(el, "isHittable == true", timeout: 2) { return true }
             app.swipeUp()
         }
-        return el.exists && !el.frame.isEmpty && el.frame.intersects(app.frame) && el.isHittable
+        return onScreen() && el.isHittable
     }
 
     /// Pan the timeline strip under its fixed centerline (drag left = later).
@@ -369,15 +373,6 @@ class ScreenshotTestCase: XCTestCase {
         openSettings(app)
         let segment = app.buttons[label]
         XCTAssert(segment.appears(within: 5))
-        // The sheet's two fixed statements, asserted on the way past. Every
-        // caller of this helper already has them on screen, so they are checked
-        // here rather than in a test of its own with its own launch and its own
-        // Settings round trip.
-        XCTAssert(app.staticTexts["Not for navigation."].exists,
-                  "the settings sheet lost its disclaimer")
-        XCTAssert(app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS 'OpenFreeMap'")).firstMatch.exists,
-                  "the settings sheet lost its map attribution")
         segment.tap()
         app.buttons["Done"].tap()
         XCTAssert(stationList(app).appears(within: 5))

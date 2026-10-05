@@ -25,6 +25,14 @@ enum DownloadTier: String {
     /// the whole mechanism; a tier that reads as 45 minutes gets declined.
     static let nearbyRadiusKm = 25.0
 
+    var next: Self? {
+        switch self {
+        case .inView: .nearby
+        case .nearby: .everything
+        case .everything: nil
+        }
+    }
+
     /// Does this tier take that station into the download set?
     ///
     /// The cohort is admitted at every tier, never only at `.inView`: a station
@@ -102,7 +110,7 @@ struct DownloadCohort {
 /// What the strip at the top of the station list is saying, if anything.
 enum DownloadStripState: Equatable {
     case absent
-    case working(done: Int, total: Int)
+    case working(done: Int, total: Int, progress: Double)
     /// `count` is the offer. A count and never a duration: locking the device
     /// stops the work, so any promise of a finish would be false in a pocket.
     case asking(count: Int)
@@ -112,17 +120,23 @@ enum DownloadStripState: Equatable {
 /// rather than a view model so it can be tested without a view or a service.
 func downloadStripState(cohort: DownloadCohort, queue: ChsQueue, tier: DownloadTier,
                         declined: Bool, remaining: Int) -> DownloadStripState {
-    guard !cohort.ids.isEmpty else { return .absent }
-    guard cohort.settled(in: queue) else {
-        // An id the queue has never heard of counts as done, same as
-        // `settled` above (`isDone`): no job means nothing is downloading,
-        // so it can't be holding the cohort back. Without this, an unknown
-        // id is settled-but-not-done and `done` never reaches `total`.
-        let done = cohort.ids.count { cohort.isDone($0, in: queue) }
-        return .working(done: done, total: cohort.ids.count)
+    if queue.active {
+        let requests = queue.requestProgress
+        let progress = requests.total > 0 ? requests.completed / requests.total * 10 : 0
+        return .working(done: queue.ready, total: queue.total, progress: progress)
     }
-    // The question belongs to the automatic tier. Once a wider one is running
-    // the manager owns the conversation.
-    guard tier == .inView, !declined, remaining > 0 else { return .absent }
+    guard !cohort.ids.isEmpty else { return .absent }
+    guard tier.next != nil, !declined, remaining > 0 else { return .absent }
     return .asking(count: remaining)
+}
+
+// Estimates reflect request pacing, so their copy deliberately avoids a countdown.
+func durationPhrase(_ seconds: Double) -> String {
+    if seconds < 90 { return String(localized: "under a minute", comment: "Approximate download duration under ninety seconds.") }
+    let minutes = Int((seconds / 60).rounded())
+    if minutes < 60 { return String(localized: "about \(minutes) minutes", comment: "Approximate duration. The integer is a number of minutes; vary by plural.") }
+    let hours = Int((Double(minutes) / 60).rounded())
+    return hours <= 1
+        ? String(localized: "about an hour", comment: "Approximate duration of one hour.")
+        : String(localized: "about \(hours) hours", comment: "Approximate duration. The integer is a number of hours; vary by plural.")
 }

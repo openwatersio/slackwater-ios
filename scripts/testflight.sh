@@ -34,7 +34,8 @@ security import $TMP/signing.p12 -k $KC -P "$SIGNING_P12_PASSWORD" -T /usr/bin/c
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" $KC > /dev/null
 security list-keychains -d user -s $KC "${OLD_KCS[@]}"
 
-node scripts/asc.mjs install-profiles "Slackwater App Store" "Slackwater Widgets App Store"
+node scripts/asc.mjs install-profiles "Slackwater App Store" "Slackwater Widgets App Store" \
+  "Slackwater Watch App Store" "Slackwater Watch Widgets App Store"
 
 xcodegen generate
 # -clonedSourcePackagesDirPath: repo-local SPM cache so CLI builds never share
@@ -65,13 +66,15 @@ cat > build/exportUpload.plist <<'EOF'
   <key>signingStyle</key><string>manual</string>
   <key>teamID</key><string>Z59BQLF5VQ</string>
   <key>signingCertificate</key><string>Apple Distribution</string>
-  <!-- Every signed bundle in the archive needs an entry, the appex included:
-       an app's profile does not cover its extensions, and a missing entry
-       fails the export AFTER a successful archive. -->
+  <!-- Every signed bundle in the archive needs an entry, the appexes and the
+       watch app included: an app's profile does not cover what it embeds, and
+       a missing entry fails the export AFTER a successful archive. -->
   <key>provisioningProfiles</key>
   <dict>
     <key>io.openwaters.slackwater</key><string>Slackwater App Store</string>
     <key>io.openwaters.slackwater.widgets</key><string>Slackwater Widgets App Store</string>
+    <key>io.openwaters.slackwater.watchkitapp</key><string>Slackwater Watch App Store</string>
+    <key>io.openwaters.slackwater.watchkitapp.widgets</key><string>Slackwater Watch Widgets App Store</string>
   </dict>
 </dict>
 </plist>

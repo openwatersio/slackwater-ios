@@ -150,6 +150,19 @@ enum WidgetStationLoader {
         AppGroup.currentLocationStationID
     }
 
+    /// The station a widget's chosen station resolves to now, and the prefix
+    /// its name carries when the choice follows the nearest one.
+    static func configured(_ selectedID: String?) -> (id: String, prefix: String?) {
+        let selected = selectedID ?? defaultStationID()
+        let prefix: String? = switch selected {
+        case AppGroup.currentLocationStationID: "Current Location"
+        case AppGroup.nearestTideStationID: "Nearest Tide"
+        case AppGroup.nearestCurrentStationID: "Nearest Current"
+        default: nil
+        }
+        return (resolvedStationID(selected), prefix)
+    }
+
     /// No fix: first available favorite, else recent, else Friday Harbor.
     static func fallbackStationID(
         defaults: UserDefaults = AppGroup.defaults,

@@ -4,6 +4,14 @@ import XCTest
 @testable import Slackwater
 
 final class AppGroupTests: XCTestCase {
+    func testEntitlementValidationUsesSharedContainerAvailability() {
+        XCTAssertFalse(AppGroup.validateEntitlement(containerURL: nil, isTesting: true))
+        XCTAssertTrue(AppGroup.validateEntitlement(
+            containerURL: URL(fileURLWithPath: "/tmp/app-group"),
+            isTesting: true
+        ))
+    }
+
     func testMigrationCopiesOnce() {
         let from = UserDefaults(suiteName: "test.from")!
         let into = UserDefaults(suiteName: "test.into")!
