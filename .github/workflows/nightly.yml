@@ -16,7 +16,7 @@ permissions:
 jobs:
   authorize:
     name: Owner gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require an owner on main
         env:

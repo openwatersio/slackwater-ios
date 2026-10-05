@@ -23,7 +23,7 @@ jobs:
   # a top-level .md. A new directory nobody thought about runs the suite.
   changes:
     name: What changed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # This repo's default_workflow_permissions is `read`, which is GitHub's
     # RESTRICTIVE default — contents and packages only, no pull-requests scope.
     # Without this grant `gh api .../pulls/N/files` 403s, the step's fail-safe
@@ -99,7 +99,7 @@ jobs:
 
   data:
     name: Data generators
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -143,7 +143,7 @@ jobs:
 
   feedback:
     name: TestFlight intake
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -410,7 +410,7 @@ jobs:
     name: Required checks
     if: always()
     needs: [changes, data, feedback, build, app]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Verify required jobs
         env:

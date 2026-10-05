@@ -16,7 +16,7 @@ jobs:
   promote:
     name: Promote existing Nightly build
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: testflight
     permissions:
       contents: read
