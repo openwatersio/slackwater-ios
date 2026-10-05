@@ -166,9 +166,10 @@ Readings describe the moment the card was built (§6.5).
 | Tide | Height: feet to one decimal or metres to two, then " ft" or " m" | "Rising" with a teal (`#2DD4BF`) up-right arrow, or "Falling" with an amber (`#FBBF24`) down-right arrow |
 | Measured current | Absolute speed to one decimal, then "kn", "km/h", or "m/s" | A state word, a 16-point compass direction, and an arrow rotated to the set |
 | Derived gate | None | The phase word with a forward, back, or slack glyph |
-| Unfitted Canadian station | None | The download status (§6.3) |
+| Canadian tide preview | Downloaded height, with the ordinary tide state | Additional download status below the identity |
+| Canadian station without readings | None | The download status (§6.3) |
 
-Tide state is Rising when the next extreme is a high. With no next extreme it is Rising.
+Tide state is Rising when the next extreme is a high. With no next extreme it is Rising, except that a finite Canadian preview uses the local downloaded slope.
 
 Current state is "Slack" in go green when the instant lies inside a measured slack window or the speed is below 0.15 kn; otherwise "Flooding" or "Ebbing" in neutral foam. The set arrow is flood blue (`#4A9FD8`) or ebb amber (`#E8A33D`). Below 0.05 kn the bearing is replaced by a neutral dot, because the direction means nothing there. Slack windows use the person's slack threshold, 0.5 kn by default.
 
@@ -191,7 +192,9 @@ An online Canadian gate shows an ordinary current card while its downloaded wind
 | Not downloaded | "Not downloaded" | Strip below the identity |
 | Failed | "Failed", in attention amber | Strip below the identity |
 
-While a station is downloading, queued, retrying, not queued, or not downloaded, the curve area shows a data-free skeleton (a wave and three capsules) at full card height, so the list does not jump when data arrives. An unfitted Canadian card shows its identity at 82% opacity with no reading. A derived gate takes its status from its reference port.
+A Canadian tide port first downloads a finite prediction preview. While its coverage includes now, its card shows a reading and the available portion of the mini curve alongside the remaining download status. A failed or interrupted full-model download must retain that usable preview. Other tide ports without readings get their previews before the queue completes existing previews, except that opening a place promotes its download. Derived gates still require the reference port’s fitted model.
+
+While a station has no usable predictions and is downloading, queued, retrying, not queued, or not downloaded, the curve area shows a data-free skeleton (a wave and three capsules) at full card height, so the list does not jump when data arrives. An unfitted Canadian card shows its identity at 82% opacity with no reading. A derived gate takes its status from its reference port.
 
 Each status has a spoken sentence explaining what will happen, for example "Queued — Canadian predictions download once, then work offline." and "Not downloaded — get back online to download predictions."
 
@@ -257,7 +260,7 @@ A tap anywhere on a card opens that station's detail, replacing whatever was sho
 |---|---|
 | NOAA tide | Tide detail |
 | NOAA current | Current detail |
-| Canadian tide port | Tide detail once fitted; the waiting page before that |
+| Canadian tide port | Tide detail with a downloaded preview or fitted model; the waiting page before either |
 | Canadian derived gate | Derived-gate detail once its reference port is fitted; the waiting page before that |
 | Canadian current gate | The online detail for online gates; the current detail once fitted; the waiting page before that |
 

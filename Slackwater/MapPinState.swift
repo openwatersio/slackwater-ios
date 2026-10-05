@@ -91,12 +91,16 @@ let PIN_GAUGE_BUCKETS = 8
 /// search behind them are skipped outright — not narrowed, not cached, just
 /// not computed. Only the direction (the pin's colour) is always needed.
 func tidePinState(_ record: TideStationRecord, at now: Date,
-                  imperial: Bool, detailed: Bool) -> PinState {
-    guard let rising = tidePinRisingHybrid(record, at: now) else {
+                  imperial: Bool, detailed: Bool, station override: (any TidePredicting)? = nil) -> PinState {
+    let previewRising = override.flatMap { predictor in
+        predictor.extremes(from: now, to: now.addingTimeInterval(30 * 3600)).first.map { $0.kind == .high }
+            ?? predictor.rates(from: now, to: now.addingTimeInterval(1), step: 1).first.map { $0.rate >= 0 }
+    }
+    guard let rising = previewRising ?? tidePinRisingHybrid(record, at: now) else {
         return PinState(state: "unknown")
     }
     let state = rising ? "rising" : "falling"
-    let station = record.engineStation
+    let station = override ?? record.engineStation
     guard detailed, let height = station
         .heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height
     else { return PinState(state: state) }
@@ -256,7 +260,8 @@ private func pinState(_ item: StationItem, at now: Date, chsStates: [String: Pin
 /// Canadian port the camera is nowhere near has no pin to colour.
 func chsPinStates(at now: Date, items: [StationItem], detailed: Bool,
                   tideRecords: [String: TideStationRecord],
-                  currentRecords: [String: CurrentStationRecord]) -> [String: PinState] {
+                  currentRecords: [String: CurrentStationRecord],
+                  tidePreviews: [String: ChsTidePreview] = [:]) -> [String: PinState] {
     let units = readoutUnits()
     var states: [String: PinState] = [:]
     for item in items {
@@ -264,9 +269,12 @@ func chsPinStates(at now: Date, items: [StationItem], detailed: Bool,
         case .tide, .current:
             continue
         case .chs(let info):
-            guard let record = tideRecords[info.id] else { continue }
-            states[item.id] = tidePinState(record, at: now, imperial: units.imperial,
-                                           detailed: detailed)
+            if let record = tideRecords[info.id] {
+                states[item.id] = tidePinState(record, at: now, imperial: units.imperial, detailed: detailed)
+            } else if let preview = tidePreviews[info.id], preview.coverage?.contains(now) == true {
+                states[item.id] = tidePinState(info.previewIdentity, at: now, imperial: units.imperial,
+                                               detailed: detailed, station: preview)
+            }
         case .chsCurrent(let gate):
             guard let record = currentRecords[gate.id] else { continue }
             states[item.id] = currentPinState(record, at: now, speedUnit: units.speedUnit,

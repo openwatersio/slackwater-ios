@@ -112,9 +112,11 @@ Anything meaning “calendar day,” “midnight,” or “noon” must use a ca
 
 ### 4.2 Loaded window and schedule
 
-Tide, harmonic-current, and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
+Fitted tide, harmonic-current, and derived-gate details extend continuously in both directions. They compute seven-calendar-day chunks in the station's time zone and keep a sliding set around the selection. Scrolling across a chunk boundary must preserve the selected instant, momentum, samples, event marks, and day/night shading. A merged window must contain only contiguous data; missing chunks must never become a flat or fabricated curve.
 
 The iOS reference prepares two chunks on each side of the selected chunk and ordinarily publishes at most three on each side. Appending on the right may happen during motion. Prepending or evicting on the left changes the coordinate origin, so it waits until dragging, momentum, opening, and settling are quiet. Repeated backward flings can temporarily reach the loaded edge; the strip clamps until a quiet moment permits extension. Memory and mounted drawing surfaces remain bounded during ordinary settled use.
+
+A Canadian tide preview is bounded by its contiguous downloaded samples. It must never extend, extrapolate, or offer a date outside those samples. The available-through notice stays visible while the remaining model downloads, centered below the scrubber and above the summary cards. Download and status notices must never write over the scrubber. When the full tide model lands, the continuous store starts around the selected instant without navigating away or replaying the opening motion.
 
 Official online-current details remain bounded by downloaded coverage. Their displayed window is defined by `Timeline.window(anchor:)`:
 

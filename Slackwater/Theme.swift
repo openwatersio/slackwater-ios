@@ -148,7 +148,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
             .background(CanvasBackground())
             .onPreferenceChange(DetailTopHeightKey.self) { topHeight = $0 }
             .environment(\.timeZone, tz)
-            .environment(\.openWeekPicker, { showPicker = true })
+            .environment(\.openWeekPicker, { if canPickDate { showPicker = true } })
             .environment(\.openAlertPopup, { if alertOffer != nil { showAlertPopup = true } })
             .toolbar(.hidden, for: .navigationBar)
             // A shared link's moment (#187): on appear, and again if another
@@ -320,6 +320,7 @@ struct ScrubDetailScaffold<Above: View, Card: View, Links: View, Bottom: View>: 
     private func scheduleCard(_ tl: TimelineData) -> some View {
         VStack(spacing: 0) {
             WeekRangeBar(anchor: tl.anchor, today: tl.today, tz: tz, onTap: { showPicker = true })
+                .disabled(!canPickDate)
             Divider().overlay(Color.white.opacity(0.08))
             // Both dates, never one: `anchor` keys the day groups (it is what
             // `days` offsets are relative to), `today` only says Today/Tomorrow.

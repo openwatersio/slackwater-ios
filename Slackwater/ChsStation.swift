@@ -163,7 +163,10 @@ enum ChsModelStore {
     }
 
     static func load(_ stationID: String) -> ChsModel? { load(stationID, suffix: "") }
-    static func save(_ model: ChsModel) throws { try save(model, id: model.stationID, suffix: "") }
+    static func save(_ model: ChsModel) throws {
+        try save(model, id: model.stationID, suffix: "")
+        try? FileManager.default.removeItem(at: url(model.stationID, suffix: "-tide-preview"))
+    }
 }
 
 extension ChsModelStore {
@@ -191,6 +194,11 @@ extension StationItem {
 }
 
 extension ChsStationInfo {
+    var previewIdentity: TideStationRecord {
+        TideStationRecord(id: id, name: name, region: region, aliases: aliases,
+                          latitude: latitude, longitude: longitude, timezone: timezone,
+                          chartDatum: "LLWLT", datumOffset: 0, constituents: [])
+    }
     /// A fitted CHS station renders through the exact same record/engine/view
     /// path as a bundled NOAA station — provenance shows only in the footer.
     func record(with model: ChsModel) -> TideStationRecord {
@@ -200,6 +208,17 @@ extension ChsStationInfo {
             chartDatum: "LLWLT",  // CHS chart datum: Lower Low Water, Large Tide
             datumOffset: model.offset,
             constituents: model.constituents)
+    }
+}
+
+extension ChsModelStore {
+    static func loadTidePreview(_ id: String) -> ChsTidePreview? {
+        let preview: ChsTidePreview? = load(id, suffix: "-tide-preview")
+        return preview?.stationID == id ? preview : nil
+    }
+
+    static func saveTidePreview(_ preview: ChsTidePreview) throws {
+        try save(preview, id: preview.stationID, suffix: "-tide-preview")
     }
 }
 

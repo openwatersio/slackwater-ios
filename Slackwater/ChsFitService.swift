@@ -21,6 +21,7 @@ enum ChsState {
     case fitting
     case failed       // another attempt would get the same answer
     case fitted(TideStationRecord)
+    case preview(ChsTidePreview)
 }
 
 /// Same four states for a validated current gate — the fitted payload is a
@@ -47,6 +48,7 @@ final class ChsFitService: ObservableObject {
     /// Readable (the map's pin-tone resolve reads it beside `currentRecords`);
     /// written only by the fit run.
     private(set) var tideRecords: [String: TideStationRecord] = [:]
+    @Published private(set) var tidePreviews: [String: ChsTidePreview] = [:]
     /// Published: a gate's record is REPLACED in place when the provisional fit
     /// refines to the final one, and any open detail has to follow it.
     @Published private(set) var currentRecords: [String: CurrentStationRecord] = [:]
@@ -277,6 +279,9 @@ final class ChsFitService: ObservableObject {
                 // queued so the next connected run refines it, and its cached
                 // chunks mean that costs only the chunks it never fetched.
                 if gate.isProvisional(model) { provisional.insert(job.id) } else { job.status = .ready }
+            } else if !job.isCurrent, files.contains("\(job.id)-tide-preview.json"),
+                      let preview = ChsModelStore.loadTidePreview(job.id) {
+                tidePreviews[job.id] = preview
             } else if !stored {
                 continue  // not downloaded, and the auto-fit set decides below
             }
@@ -314,8 +319,10 @@ final class ChsFitService: ObservableObject {
         files.sorted().filter { file in
             guard file.hasSuffix(".json") else { return false }
             let stem = String(file.dropLast(5))
-            // `-current` and `-online` are the only suffixes ChsModelStore
-            // writes, and both belong to gates; anything else is a port id.
+            if stem.hasSuffix("-tide-preview") {
+                return !ports.contains(String(stem.dropLast("-tide-preview".count)))
+            }
+            // Current fits and fetched windows belong to gates.
             if let suffix = ["-current", "-online"].first(where: { stem.hasSuffix($0) }) {
                 return !gates.contains(String(stem.dropLast(suffix.count)))
             }
@@ -443,6 +450,7 @@ final class ChsFitService: ObservableObject {
 
     func state(_ id: String) -> ChsState {
         if let record = tideRecords[id] { return .fitted(record) }
+        if let preview = tidePreviews[id], preview.coverage?.contains(appNow()) == true { return .preview(preview) }
         switch queue.status(id) ?? .pending {
         case .downloading: return .fitting
         case .failed: return .failed
@@ -743,7 +751,13 @@ final class ChsFitService: ObservableObject {
     /// Claim the head of the queue. Sync find-then-mark on the main actor, so
     /// the loop can never hand the same job out twice (web offlineSync.worker).
     private func claimNext() -> ChsJob? {
-        guard downloadsActive, let job = queue.nextPending() else { return nil }
+        #if os(iOS)
+        let previewed = Set(tidePreviews.filter { $0.value.coverage?.contains(appNow()) == true }.keys)
+        let pending = queue.nextPending(previewedIDs: previewed)
+        #else
+        let pending = queue.nextPending()
+        #endif
+        guard downloadsActive, let job = pending else { return nil }
         queue.set(job.id, .downloading)
         return job
     }
@@ -808,6 +822,40 @@ final class ChsFitService: ObservableObject {
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.permanent("no bundled port \(job.id)") }
+                    #if os(iOS)
+                    let hasPreview = await MainActor.run { self.tidePreviews[job.id]?.coverage?.contains(appNow()) == true }
+                    if !hasPreview {
+                        do {
+                            let station = try Self.resolve(info, in: list)
+                            let start = todayLocal(info.tz).addingTimeInterval(-Timeline.backHours * 3600)
+                            let end = start.addingTimeInterval(7 * 24 * 3600)
+                            // Preview samples are persisted only after coverage validation.
+                            let samples = try await fetcher.wlp(stationID: station.id, chunk: ChsChunk(start: start, end: end), cache: false)
+                            let preview = ChsTidePreview(stationID: info.id, fetchedAt: appNow(), samples: samples.map {
+                                .init(time: Date(timeIntervalSince1970: $0.t / 1000), height: $0.v)
+                            })
+                            guard let coverage = preview.coverage, coverage.contains(appNow()),
+                                  coverage.upperBound >= todayLocal(info.tz).addingTimeInterval(48 * 3600) else {
+                                throw ChsError.transient("Incomplete tide preview")
+                            }
+                            try ChsModelStore.saveTidePreview(preview)
+                            await MainActor.run {
+                                self.tidePreviews[info.id] = preview
+                                self.queue.set(info.id, .pending)
+                                self.modelRevision += 1
+                            }
+#if DEBUG
+                            if IwlsFetcher.fixtureScenario == "tide-preview-final" {
+                                try await IwlsFetcher.waitForFixtureRelease("after-tide-preview")
+                            }
+#endif
+                            continue
+                        } catch {
+                            try Task.checkCancellation()
+                            print("CHS preview \(info.id): \(error)")
+                        }
+                    }
+                    #endif
                     let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
                     try await land(model, for: job)
                 }
@@ -846,6 +894,7 @@ final class ChsFitService: ObservableObject {
                 self.provisional.remove(job.id)
             } else if let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
                 self.tideRecords[job.id] = info.record(with: model)
+                self.tidePreviews.removeValue(forKey: job.id)
             }
             self.queue.set(job.id, .ready)
             self.modelRevision += 1

@@ -41,9 +41,20 @@ func downloadIsReady(_ state: ManagedDownloadState) -> Bool {
     state == .available || state == .permanent
 }
 
+func tidePreviewDownloadStatus(_ job: ChsJob?, online: Bool, at now: Date = appNow()) -> String {
+    guard online else { return String(localized: "More data will download when you reconnect") }
+    if job?.status == .failed { return String(localized: "Additional download failed. Your downloaded predictions remain available.") }
+    if job?.status == .downloading { return String(localized: "Downloading more data") }
+    if (job?.retryAfter ?? .distantPast) > now { return String(localized: "Waiting to retry the additional download") }
+    return String(localized: "More data is queued for download")
+}
+
 func rowStatus(_ job: ChsJob, online: Bool, position: Int? = nil,
-               provisional: Bool = false, at now: Date = appNow()) -> String {
+               provisional: Bool = false, preview: ChsTidePreview? = nil, at now: Date = appNow()) -> String {
     if provisional { return String(localized: "Refining…", comment: "Compact prediction status.") }
+    if preview?.coverage?.contains(now) == true, job.status != .ready {
+        return tidePreviewDownloadStatus(job, online: online, at: now)
+    }
     switch job.status {
     case .ready: return String(localized: "Available offline", comment: "Offline-download status.")
     case .failed: return String(localized: "Predictions unavailable", comment: "Prediction download status.")
@@ -510,7 +521,7 @@ struct OfflineManagerList: View {
 
     private func statusText(_ job: ChsJob) -> String {
         rowStatus(job, online: net.online, position: queue.position(job.id),
-                  provisional: service.isProvisional(job.id))
+                  provisional: service.isProvisional(job.id), preview: service.tidePreviews[job.id])
     }
 
     private func statusTint(_ job: ChsJob) -> Color {

@@ -49,8 +49,9 @@ struct ChsDetailView: View {
         Group {
             switch route {
             case .port(let info):
-                if case .fitted(let record) = service.state(info.id) {
-                    TideDetailView(record: record)
+                let preview = service.tidePreviews[info.id].flatMap { $0.coverage?.contains(appNow()) == true ? $0 : nil }
+                if let record = service.tideRecords[info.id] ?? preview.map({ _ in info.previewIdentity }) {
+                    TideDetailView(record: record, preview: service.tideRecords[info.id] == nil ? preview : nil)
                 } else {
                     waiting(name: info.name, region: info.region, favoriteId: info.id, needs: nil)
                 }

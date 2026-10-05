@@ -7,6 +7,26 @@ import XCTest
 @testable import Slackwater
 
 final class ChsPinToneTests: XCTestCase {
+    func testLastPreviewSegmentKeepsItsReadingAndDirectionWithoutFeedingDerivedGates() throws {
+        let gate = try XCTUnwrap(ChsGateInfo.all.first)
+        let info = try XCTUnwrap(ChsStationInfo.all.first { $0.id == gate.reference })
+        let preview = ChsTidePreview(stationID: info.id, fetchedAt: now, samples: [
+            .init(time: now.addingTimeInterval(-900), height: 2),
+            .init(time: now, height: 1),
+            .init(time: now.addingTimeInterval(900), height: 0),
+        ])
+        let card = info.previewIdentity.cardState(at: now, station: preview)
+        XCTAssertEqual(card.height, 1)
+        XCTAssertFalse(card.rising)
+        XCTAssertNil(card.next)
+        let states = chsPinStates(at: now, items: StationItem.all, detailed: true,
+                                 tideRecords: [:], currentRecords: [:], tidePreviews: [info.id: preview])
+        XCTAssertEqual(states[info.id]?.state, "falling")
+        XCTAssertNotNil(states[info.id]?.reading)
+        XCTAssertNil(states[gate.id])
+        XCTAssertTrue(chsPinStates(at: now.addingTimeInterval(901), items: StationItem.all, detailed: true,
+                                  tideRecords: [:], currentRecords: [:], tidePreviews: [info.id: preview]).isEmpty)
+    }
 
     /// A fitted-model-shaped record around a synthetic M2-only tide, keyed to
     /// whatever CHS identity the test hands it.

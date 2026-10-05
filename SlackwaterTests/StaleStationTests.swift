@@ -96,6 +96,8 @@ final class StaleStationTests: XCTestCase {
     func testOrphanFilesAreTheOnesNoBundledStationClaims() {
         let files: Set<String> = [
             "chs-victoria.json",            // a live port
+            "chs-victoria-tide-preview.json",
+            "chs-gone-tide-preview.json",
             "chs-active-pass-current.json", // a live gate's fit
             "chs-active-pass-online.json",  // a live gate's fetched window
             "chs-north-galiano.json",       // withdrawn — orphan
@@ -106,7 +108,7 @@ final class StaleStationTests: XCTestCase {
         let orphans = ChsFitService.orphanFiles(
             in: files, ports: ["chs-victoria"], gates: ["chs-active-pass"])
         XCTAssertEqual(orphans,
-                       ["chs-gone-current.json", "chs-gone-online.json", "chs-north-galiano.json"])
+                       ["chs-gone-current.json", "chs-gone-online.json", "chs-gone-tide-preview.json", "chs-north-galiano.json"])
     }
 
     /// A gate id is not a port id: a `-current` file must be judged against the
@@ -124,6 +126,7 @@ final class StaleStationTests: XCTestCase {
         let ports = Set(ChsStationInfo.all.map(\.id))
         let gates = Set(ChsCurrentGateInfo.all.map(\.id))
         let files = Set(ports.map { "\($0).json" }
+                        + ports.map { "\($0)-tide-preview.json" }
                         + gates.map { "\($0)-current.json" }
                         + gates.map { "\($0)-online.json" })
         XCTAssertEqual(ChsFitService.orphanFiles(in: files, ports: ports, gates: gates), [])

@@ -4,12 +4,22 @@ import XCTest
 final class LiveFetchTests: ScreenshotTestCase {
     func testLiveTideFit() throws {
         try skipUnlessLive()
-        let app = launchLive("-seedGate", "-chsResetModels", "-chsFitOnly", "chs-victoria",
-                             "-fixLat", "48.4235", "-fixLon", "-123.3705")
+        let app = XCUIApplication()
+        app.launchArguments = testArguments([
+            "-seedGate", "-chsResetModels", "-chsFitOnly", "chs-victoria",
+            "-fixLat", "48.4235", "-fixLon", "-123.3705"
+        ], live: true) + ["-nowEpoch", String(Date().timeIntervalSince1970)]
+        app.launch()
+        XCTAssert(stationList(app).appears(within: 10))
         openSearch(app, "victoria")
-        let pending = app.descendants(matching: .any)["chs-pending-chs-victoria"].firstMatch
-        XCTAssert(pending.appears(within: 15))
-        XCTAssert(pending.disappears(within: 300), "Victoria never fitted — IWLS unreachable?")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        let preview = app.descendants(matching: .any)["chs-tide-preview"].firstMatch
+        XCTAssert(preview.appears(within: 60), "Victoria never showed downloaded predictions — IWLS unreachable?")
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+        XCTAssert(preview.disappears(within: 300), "Victoria's full offline model never completed")
+        XCTAssert(app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS 'computed on this device'"
+        )).firstMatch.exists)
     }
 
     func testLiveCurrentFit() throws {
@@ -39,8 +49,8 @@ final class LiveFetchTests: ScreenshotTestCase {
                   "the live fetch did not render the strip")
         XCTAssert(provenance.label.contains("CHS-published"),
                   "the fetched footer must say CHS-published — never claim an on-device computation")
-        XCTAssert(provenance.label.range(of: "covers to [A-Z][a-z]{2} \\d{1,2}",
+        XCTAssert(provenance.label.range(of: "available through [A-Z][a-z]{2} \\d{1,2}",
                                           options: .regularExpression) != nil,
-                  "provenance must carry a real covers-to date, not a placeholder")
+                  "provenance must carry a real available-through date, not a placeholder")
     }
 }
