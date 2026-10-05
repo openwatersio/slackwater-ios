@@ -104,6 +104,8 @@ An implementation must keep these concepts separate:
 
 The reference implementation samples `now` when the detail opens, when Now is activated, and when the app returns to the foreground. On foreground return, compare the selection with the old `now` using the 200-second home threshold. If it was home, refresh `now` and return the selection and schedule to the current instant using the ordinary Now movement. If it was scrubbed away, refresh only `now`; preserve the selected instant and planning position. Foreground return must not replay the opening motion.
 
+`now` never advances on a timer while the view stays open. A minute tick, or a `TimelineView`-driven `live`, was considered and declined: Slackwater is not a charting app, and nobody holds a detail open long enough for the marker to go visibly stale. Resampling on foreground return covers the real case. Implement one only if a reader asks for it.
+
 All visible civil-time language uses the station's time zone, never the device's time zone. Horizontal geometry uses elapsed time. A daylight-saving transition therefore produces a 23- or 25-hour civil day while the curve remains continuous.
 
 Anything meaning “calendar day,” “midnight,” or “noon” must use a calendar in the station's time zone. It must not be implemented as a multiple of 86,400 seconds.

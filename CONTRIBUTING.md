@@ -45,6 +45,8 @@ Use a throwaway UI test instead. Subclass `ScreenshotTestCase`, launch with `tes
 
 Use familiar terms such as tides, currents, and places in prominent headings, buttons, and permission copy. Reserve “station” for a specific data source or an example whose meaning is clear from context; new users should not need to know how predictions are measured.
 
+Never write “scrub” in a string the reader sees — titles, coach marks, labels, accessibility labels. It is a developer word for the gesture, not a word people know. Say “swipe to see more”, “move through time”, or name the result instead. Code identifiers and these docs keep it. Before pushing copy near the timeline, grep `Slackwater/` for `scrub` inside string literals.
+
 Use the SF Symbol `sparkles` beside Premium labels, headings, and purchase options. Keep the icon separate from localized text; compact widgets can use “Premium” alone as the label.
 
 ## Localization

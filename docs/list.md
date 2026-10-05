@@ -271,6 +271,8 @@ An alert notification opens through the same path.
 
 A link to a station that is no longer published resets navigation, closes search, and shows the Station unavailable section at the top of the list. A link to an id the app has never known does nothing. A link that arrives before the first-run gate is answered marks the gate seen and opens once the list first appears.
 
+Neither the unavailable section nor the removed-station card says *why* the station is gone, and that is deliberate. The app cannot tell a decommissioned gauge from a renumbered one from a publisher's outage, and a guess printed as a reason is worse than no reason. Do not add an explanation back.
+
 ### 9.3 Stations that leave the catalog
 
 A favorite or deep-linked station that is no longer published stays in place as a removed-station card:
