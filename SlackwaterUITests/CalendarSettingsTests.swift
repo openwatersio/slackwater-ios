@@ -19,10 +19,7 @@ final class CalendarSettingsTests: ScreenshotTestCase {
     private let tide = "noaa/9444900"
     private let current = "current:noaa/PUG1701"
 
-    /// The toggle reads on only once the station's calendar is written and verified, which
-    /// is a full reschedule. Seconds here; on a hosted runner the same thing has taken over
-    /// a minute, because every XCUITest step there waits out the app-idle timeout while a
-    /// download is in flight (#556). `scaled` caps this at the local value plus a minute.
+    /// Authorization and subscription updates can take longer on hosted runners (#556).
     private let settle: TimeInterval = 60
 
     func testTheCalendarSectionListsSavedStations() {
@@ -78,7 +75,8 @@ final class CalendarSettingsTests: ScreenshotTestCase {
         allowCalendarIfAsked()
         XCTAssert(waitFor(toggle, "value == '1'", timeout: settle), "turning on did not settle")
 
-        toggle.tap()
+        // A brief tap can miss the iPad switch's press recognizer after permission (#619).
+        toggle.press(forDuration: 0.2)
         XCTAssert(app.buttons["Turn Off"].appears(within: 15))
         // On this simulator's confirmationDialog presentation the explicit Cancel role is
         // omitted — Apple's own documented popover behavior: tapping outside the dialog
