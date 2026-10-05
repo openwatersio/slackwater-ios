@@ -5,7 +5,8 @@
 //
 // Licensing posture (chs-online-design §2): the app ships identity we authored.
 // CHS predictions are fetched by each user under DFO's own terms, fitted
-// on-device, stored locally, and never re-served. No CHS data is bundled.
+// on-device, stored on the user's devices, and never publicly re-served.
+// Fitted models can be copied privately to the user's paired watch. No CHS data is bundled.
 import Foundation
 
 /// Bundled identity for one CHS tide reference port (chs-stations.json).
@@ -83,7 +84,7 @@ struct UnavailableStation: Decodable, Identifiable, Hashable, StationIdentity {
 
 /// A harmonic model fitted on this device from IWLS predictions (`wlp` for a
 /// tide port, `wcsp1`/`wcdp1` for a current gate) — the only CHS-derived
-/// artifact, and it never leaves the device. One shape for both series; the
+/// artifact, reusable on the user's paired watch. One shape for both series; the
 /// optionals are nil for a tide port, and stay optional so every model file
 /// either pre-merge shape ever wrote to a device still decodes.
 struct ChsModel: Codable {

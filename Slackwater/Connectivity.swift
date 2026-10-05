@@ -3,43 +3,46 @@ import Combine
 import Foundation
 import Network
 
-/// Is there a network path right now. Its own tiny observable so the indicator
-/// can say offline/online without any of it leaking into the fit service.
+/// Whether downloads may attempt HTTP requests. The phone observes its path;
+/// watchOS leaves connection handling to URLSession (Apple TN3135).
 @MainActor
 final class Connectivity: ObservableObject {
     static let shared = Connectivity()
 
     @Published private(set) var online = false
     @Published private(set) var constrained = true
+    #if !os(watchOS)
     private let monitor = NWPathMonitor()
+    #endif
 
     private init() {
-        // The kill switch is the UI tests' airplane mode: stay offline, and
-        // don't start a monitor that would immediately contradict it.
-        #if DEBUG
-        let forcedOnline = CommandLine.arguments.contains("-connectivityOnline")
+        #if os(watchOS)
+        // Low-level paths stay unsatisfied on ordinary watch apps (TN3135).
+        // URLSession decides whether a request can connect; keep the budget small.
+        online = !networkKillSwitch
+        constrained = true
         #else
-        let forcedOnline = false
-        #endif
-#if DEBUG
-        if IwlsFetcher.usesFixture || forcedOnline {
+        #if DEBUG
+        if CommandLine.arguments.contains("-connectivityUnsatisfied") { return }
+        if IwlsFetcher.usesFixture || CommandLine.arguments.contains("-connectivityOnline") {
             online = true
             constrained = false
             return
         }
-#endif
+        #endif
         guard !networkKillSwitch else {
             constrained = false
             return
         }
         monitor.pathUpdateHandler = { [weak self] path in
-            let up = path.status == .satisfied
+            let status = path.status
             let constrained = path.isConstrained
             Task { @MainActor in
-                self?.online = up
+                self?.online = status == .satisfied
                 self?.constrained = constrained
             }
         }
         monitor.start(queue: .global(qos: .utility))
+        #endif
     }
 }

@@ -113,6 +113,29 @@ final class WatchUITests: XCTestCase {
         tap(victoria.firstMatch, until: app.buttons["reading-card"])
     }
 
+    func testCanadianDownloadIgnoresUnsatisfiedLowLevelPath() {
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-networkKillSwitch" }
+        app.launchArguments += ["-chsFitOnly", "chs-victoria", "-seedFavorites", "chs-victoria",
+                                "-chsFixture", UUID().uuidString, "-connectivityUnsatisfied"]
+        app.launch()
+        let victoria = app.buttons.matching(NSPredicate(
+            format: "identifier == 'place-row' AND label CONTAINS 'Victoria' AND label CONTAINS 'Favorites'"))
+        XCTAssertTrue(victoria.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+    }
+
+    func testActivatingWatchRetriesDeferredDownloadImmediately() {
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-networkKillSwitch" }
+        app.launchArguments += ["-chsResetModels", "-chsFitOnly", "chs-victoria",
+                                "-chsDeferOnly", "chs-victoria", "-chsFixture", UUID().uuidString,
+                                "-seedFavorites", "chs-victoria"]
+        app.launch()
+        let victoria = app.buttons.matching(NSPredicate(
+            format: "identifier == 'place-row' AND label CONTAINS 'Victoria' AND label CONTAINS 'Favorites'"))
+        XCTAssertTrue(victoria.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+    }
+
     func testInterruptedDownloadStaysHiddenAndReportsInlineStatus() {
         app.terminate()
         app.launchArguments.removeAll { $0 == "-networkKillSwitch" }

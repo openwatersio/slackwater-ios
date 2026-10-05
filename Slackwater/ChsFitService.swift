@@ -672,6 +672,10 @@ final class ChsFitService: ObservableObject {
     func setDownloadsActive(_ active: Bool) {
         downloadsActive = active
         if active {
+            #if os(watchOS)
+            queue.clearBackoffs()
+            ChsModelTransfer.shared.resetAvailability()
+            #endif
             pump()
         } else {
             fitTask?.cancel()
@@ -755,6 +759,24 @@ final class ChsFitService: ObservableObject {
     private nonisolated func run() async {
         let fetcher = IwlsFetcher()
         let fitter = ChsFitter()
+        #if os(watchOS)
+        var checked: Set<String> = []
+        let pending = await MainActor.run {
+            self.queue.jobs.filter { $0.status == .pending && ($0.retryAfter ?? .distantPast) <= appNow() }
+        }
+        checked.formUnion(pending.map(\.id))
+        try? await copyPhoneModels(pending)
+        let hasPending = await MainActor.run { self.queue.nextPending() != nil }
+        if Task.isCancelled || !hasPending {
+            await MainActor.run {
+                self.running = false
+                self.fitTask = nil
+                self.scheduleRetryPump()
+                if Task.isCancelled { self.pump() }
+            }
+            return
+        }
+        #endif
         guard let list = try? await fetcher.stationList() else {
             await MainActor.run {
                 if !Task.isCancelled {
@@ -772,29 +794,22 @@ final class ChsFitService: ObservableObject {
         while let job = await MainActor.run(body: { self.claimNext() }) {
             do {
                 try Task.checkCancellation()
+                #if os(watchOS)
+                if checked.insert(job.id).inserted {
+                    try await copyPhoneModels([job])
+                    if await MainActor.run(body: { self.queue.job(job.id)?.status == .ready }) { continue }
+                }
+                #endif
                 if job.isCurrent {
                     guard let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.permanent("no bundled gate \(job.id)") }
                     let model = try await fitCurrent(gate, list: list, fetcher: fetcher, fitter: fitter)
-                    try ChsModelStore.saveCurrent(model)
-                    await MainActor.run {
-                        self.currentRecords[gate.id] = gate.record(with: model)
-                        self.provisional.remove(gate.id)
-                        self.queue.set(job.id, .ready)
-                        self.modelRevision += 1
-                    }
-                    ChsChunkStore.purge(model.iwlsID)
+                    try await land(model, for: job)
                 } else {
                     guard let info = ChsStationInfo.all.first(where: { $0.id == job.id })
                     else { throw ChsError.permanent("no bundled port \(job.id)") }
                     let model = try await fit(info, list: list, fetcher: fetcher, fitter: fitter)
-                    try ChsModelStore.save(model)
-                    await MainActor.run {
-                        self.tideRecords[info.id] = info.record(with: model)
-                        self.queue.set(job.id, .ready)
-                        self.modelRevision += 1
-                    }
-                    ChsChunkStore.purge(model.iwlsID)
+                    try await land(model, for: job)
                 }
             } catch {
                 if Task.isCancelled {
@@ -820,6 +835,35 @@ final class ChsFitService: ObservableObject {
             if Task.isCancelled { self.pump() }
         }
     }
+
+    private nonisolated func land(_ model: ChsModel, for job: ChsJob) async throws {
+        try Task.checkCancellation()
+        if job.isCurrent { try ChsModelStore.saveCurrent(model) }
+        else { try ChsModelStore.save(model) }
+        await MainActor.run {
+            if job.isCurrent, let gate = ChsCurrentGateInfo.all.first(where: { $0.id == job.id }) {
+                self.currentRecords[job.id] = gate.record(with: model)
+                self.provisional.remove(job.id)
+            } else if let info = ChsStationInfo.all.first(where: { $0.id == job.id }) {
+                self.tideRecords[job.id] = info.record(with: model)
+            }
+            self.queue.set(job.id, .ready)
+            self.modelRevision += 1
+        }
+        ChsChunkStore.purge(model.iwlsID)
+    }
+
+    #if os(watchOS)
+    private nonisolated func copyPhoneModels(_ jobs: [ChsJob]) async throws {
+        let requests = jobs.map { ChsModelRequest(stationID: $0.id, isCurrent: $0.isCurrent) }
+        let models = try await ChsModelTransfer.shared.models(for: requests)
+        for job in jobs {
+            guard let model = models[job.id] else { continue }
+            try await land(model, for: job)
+            print("CHS model copied from phone: \(job.id)")
+        }
+    }
+    #endif
 
     nonisolated static func reason(_ error: Error) -> String {
         switch error {

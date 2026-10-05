@@ -13,6 +13,7 @@ struct SlackwaterApp: App {
         // shared suite on a fresh install, and migrating on that read would
         // burn the app's own standard-defaults history the appex never had.
         AppGroup.migrateIfNeeded(into: AppGroup.defaults, from: .standard)
+        _ = ChsModelTransfer.shared
         // The widget-reload hook (ChsStation.swift's `WidgetReload`): a no-op
         // until the app assigns it, so the widget extension — which also
         // compiles ChsModelStore.save — never triggers its own reload.

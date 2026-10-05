@@ -168,9 +168,8 @@ final class IwlsFetcher {
         // parks the claimed job on "Downloading" and the run behind it for the
         // life of the process. Five minutes still clears the 851 KB station
         // list at ~3 KB/s, well under anything a ship link does.
-        // ponytail: a blunt ceiling. The honest fix is not starting a run
-        // while `Connectivity` says there is no path, and re-pumping when one
-        // returns — queue work, not client work.
+        // The phone's path monitor gates the queue. watchOS cannot use that
+        // check (TN3135), so URLSession waits here and the queue retries failures.
         config.timeoutIntervalForResource = 300
         return URLSession(configuration: config)
     }()
