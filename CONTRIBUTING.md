@@ -128,15 +128,21 @@ Non-visual changes do not need screenshots.
 
 ## CI
 
-Five jobs, in `.github/workflows/ci.yml`, which documents its own mechanics in comments. CI is advisory today — it reports, it cannot block a merge.
+`Required checks` in `.github/workflows/ci.yml` is the protected-branch merge gate. It requires the change filter, data generators, TestFlight intake, and app build/tests to succeed; a docs-only app skip is accepted. The branch rule does not require an up-to-date PR branch.
 
 | Job             | Where         | What it does                                                  |
 | --------------- | ------------- | ------------------------------------------------------------- |
 | What changed    | GitHub-hosted | Decides whether the app lane needs to run                     |
-| Data generators | GitHub-hosted | Regenerates the bundles and checks the committed copies match |
+| Data generators | GitHub-hosted | Regenerates the bundles, checks committed copies, and runs CI/release tooling checks |
 | TestFlight intake | GitHub-hosted | Tests and type-checks the TestFlight feedback service (`services/testflight-feedback`) |
 | Build for testing | GitHub-hosted | Builds the app and its test bundles once and uploads them |
 | App tests       | GitHub-hosted | Runs `scripts/test.sh` against that upload in five shards: iPhone only for PRs; `--full` on iPhone and iPad for pushes to `main` |
+
+The five shard names remain offline, list, transition, detail, and rest. Settings methods are spread across the first four using measured iPhone/iPad durations; rest skips only the selected tests and catches new classes and methods. `ruby scripts/test-shards.test.rb` checks that source test methods run exactly once. Each hosted runner uses one simulator worker.
+
+New app PR commits cancel obsolete build and shard jobs. Main build and shard jobs finish instead of being cancelled by the next push; pending jobs coalesce to the latest commit. Docs-only changes never enter those concurrency groups. Full main validation remains exhaustive on both devices. PR validation remains exhaustive on iPhone; no extra iPad job is booked into the five macOS slots. iPad-specific failures therefore still require main validation or a targeted local check before merge.
+
+Nightly checks out the triggering immutable commit and requires a completed successful main CI run at that exact SHA, with the build and all ten iPhone/iPad app jobs successful. A docs-only green run cannot authorize a release. Test summary artifacts are retained for every attempt, failure artifacts include raw logs and result bundles, and the shared build upload remains available for seven days.
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
 
