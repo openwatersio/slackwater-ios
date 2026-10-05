@@ -17,8 +17,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // somewhere else entirely.
         let app = launch("-seedGate", "-fixLat", "48.4235", "-fixLon", "-123.3705")
 
-        // Units live in Settings only (no list pill): reset to feet first —
-        // the setting persists across runs.
+        // Units live in Settings only (no list pill): start this walk in feet.
         setUnits(app, "Feet")
 
         openFridayHarbor(app)
@@ -82,9 +81,6 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(waitFor(leadReading(app), "label MATCHES '.*\\\\d m.*'"),
                   "the lead did not re-render in metres: \(leadReading(app).label)")
         save(app, "m1-detail-metric.png")
-        // Leave the store imperial for the other tests.
-        goBack(app)
-        setUnits(app, "Feet")
     }
 
     /// #95: the tide detail says where the water is and how big this swing is
@@ -449,8 +445,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
 
         // Return to now restores the live reading and hides the control.
         app.buttons["Return to now"].firstMatch.tap()
-        XCTAssertFalse(app.buttons["Return to now"].firstMatch.appears(within: 2),
-                       "return-to-now did not restore the live readout")
+        XCTAssert(app.buttons["Return to now"].firstMatch.disappears(within: 2),
+                  "return-to-now did not restore the live readout")
     }
 
     // The riding dot: initial centering must happen at the first layout, not

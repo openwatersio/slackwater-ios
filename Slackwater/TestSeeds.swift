@@ -29,6 +29,10 @@ func applySeedHooksIfRequested() {
     }
     if CommandLine.arguments.contains("-resetUnits") {
         AppGroup.defaults.removeObject(forKey: unitsKey)
+        AppGroup.defaults.removeObject(forKey: speedUnitKey)
+    }
+    if CommandLine.arguments.contains("-resetComfortCurrent") {
+        AppGroup.defaults.removeObject(forKey: AppGroup.slackWindowSpeedKey)
     }
     if CommandLine.arguments.contains("-resetChosenStations") {
         AppGroup.defaults.removeObject(forKey: AppGroup.chosenStationsKey)

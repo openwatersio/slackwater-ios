@@ -60,14 +60,12 @@ final class ChsModelTransferTests: XCTestCase {
 
     func testCancelledTransferDoesNotImportLateReply() async {
         let started = expectation(description: "Waiting for the phone")
-        let lateReply = expectation(description: "Phone reply after cancellation")
+        let lock = NSLock()
+        var lateReply: ((Data?) -> Void)?
         let bytes = try! JSONEncoder().encode(["chs-victoria": JSONEncoder().encode(model())])
         let transfer = ChsModelTransfer(send: { _, reply in
+            lock.withLock { lateReply = reply }
             started.fulfill()
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
-                reply(bytes)
-                lateReply.fulfill()
-            }
         }, timeout: 1)
         let task = Task { try await transfer.model(for: ChsModelRequest(stationID: "chs-victoria", isCurrent: false)) }
         await fulfillment(of: [started], timeout: 1)
@@ -76,7 +74,8 @@ final class ChsModelTransferTests: XCTestCase {
             _ = try await task.value
             XCTFail("An inactive watch must stop waiting for the phone")
         } catch { XCTAssertTrue(error is CancellationError) }
-        await fulfillment(of: [lateReply], timeout: 1)
+        // Release the callback only once cancellation has finished the waiter.
+        lock.withLock { lateReply }?(bytes)
     }
 
     func testOnlyFirstReplyIsAccepted() async throws {

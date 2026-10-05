@@ -37,7 +37,7 @@ class ScreenshotTestCase: XCTestCase {
         super.tearDown()
     }
 
-    func testArguments(_ args: [String], live: Bool = false) -> [String] {
+    func testArguments(_ args: [String], live: Bool = false, resetSettings: Bool = true) -> [String] {
         // -resetSeriesFilter / -resetChosenStations: the Tides/Currents pick and
         // chooser picks persist, and one test's pick would otherwise change
         // the next test's lists.
@@ -51,6 +51,8 @@ class ScreenshotTestCase: XCTestCase {
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
                              "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
+        // Opt out only when a relaunch is asserting persisted preferences.
+        if resetSettings { result += ["-resetUnits", "-resetComfortCurrent"] }
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
         }
@@ -252,34 +254,39 @@ class ScreenshotTestCase: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized, hittable, and clear of the
-    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
-    /// ~80pt exclusion the schedule-row taps apply inline, "home indicator
-    /// band" case). Bare `isHittable` alone is not enough for
-    /// elements near the list's bottom — XCUITest counts an element hittable
-    /// the moment any part of it is on-screen and unobscured by an ancestor's
-    /// clipping, which can be true while it still sits directly under the
-    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
-    /// silently lands on the FAB instead and nothing happens (confirmed by
-    /// diagnostic frame dumps: at the bare-isHittable stopping point the
-    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
-    /// one more swipe carried it clear by ~68pt and it stayed there — the
-    /// list was genuinely bottomed out, not still scrolling).
+    /// Reach the target in its own scroll container: on iPad the sidebar
+    /// remains mounted behind Settings and beside the detail. Only the
+    /// station list needs the 80pt bottom clearance for its floating buttons.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
-        var tries = 0
-        while tries < 10 {
-            if el.exists, el.isHittable, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80 {
-                break
-            }
-            listContainer(app).swipeUp()
-            tries += 1
+        var container = listContainer(app)
+        let reachable = {
+            var bounds = container.frame.intersection(app.windows.firstMatch.frame)
+            if container.identifier == "station-list" { bounds.size.height -= 80 }
+            return el.exists && !el.frame.isEmpty && bounds.contains(el.frame) && el.isHittable
         }
-        XCTAssert(el.exists, "could not scroll to element")
+        for attempt in 0...10 {
+            if el.exists {
+                let identifier = el.identifier.isEmpty ? el.label : el.identifier
+                container = [app.tables, app.collectionViews, app.scrollViews]
+                    .lazy.map { $0.containing(el.elementType, identifier: identifier).firstMatch }
+                    .first { $0.exists } ?? container
+            }
+            if reachable() { break }
+            if attempt < 10 {
+                // A swipe can carry a short row past the sheet's top edge.
+                if el.exists, !el.frame.isEmpty, el.frame.minY < container.frame.minY {
+                    container.swipeDown(velocity: .slow)
+                } else {
+                    container.swipeUp(velocity: .slow)
+                }
+            }
+        }
+        settleLayout(el)
+        XCTAssert(reachable(), "could not scroll element within reach: target \(el.exists ? "\(el.identifier) \(el.frame)" : "missing"), container \(container.identifier) \(container.frame)")
     }
 
-    /// Bring `el` within reach inside a SHEET, where `scrollTo` cannot help:
-    /// its `listContainer` resolves to the station list still mounted behind
-    /// the presentation, so its swipes land on the wrong scroll view.
+    /// Bring `el` within reach inside a SHEET using a bounded wait after each
+    /// swipe, when the row may not yet be realized in its scroll container.
     ///
     /// Waits between swipes rather than swiping blind. A single speculative
     /// swipe is right only when the row happens to start exactly one screen
@@ -339,12 +346,12 @@ class ScreenshotTestCase: XCTestCase {
         launch(args)
     }
 
-    func launch(_ args: [String]) -> XCUIApplication {
+    func launch(_ args: [String], resetSettings: Bool = true) -> XCUIApplication {
         let app = XCUIApplication()
         // -noCloudSync on every launch: favourites live in iCloud KVS (#134),
         // the simulator's copy outlives the run, and a test that stars a gate
         // would otherwise leak it into the next test's "clean" device.
-        app.launchArguments = testArguments(args)
+        app.launchArguments = testArguments(args, resetSettings: resetSettings)
         app.launch()
         XCTAssert(stationList(app).appears(within: 10))
         return app
@@ -723,6 +730,7 @@ class ShotWalk: ScreenshotTestCase {
 
     func launchShots(_ extra: [String] = [], scrubTo time: String? = nil) -> XCUIApplication {
         var args = ["-seedGate", "-resetRecents", "-noCloudSync",
+                    "-resetUnits", "-resetComfortCurrent",
                     "-seedFavorites", seededFavorites,
                     "-nowEpoch", shotEpoch] + fix + extra
         if let time {

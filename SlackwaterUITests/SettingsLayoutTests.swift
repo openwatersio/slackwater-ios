@@ -13,12 +13,37 @@ final class SettingsLayoutTests: ScreenshotTestCase {
             if region == "FR" { app.segmentedControls.buttons["Feet"].tap() }
             app.terminate()
         }
-        let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_FI")
+        let app = launch(["-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_FI"],
+                         resetSettings: false)
         openSettings(app)
         XCTAssertTrue(app.segmentedControls.buttons["Feet"].isSelected)
         app.terminate()
         let clean = launch("-seedGate", "-locDenied", "-resetUnits")
         clean.terminate()
+    }
+
+    func testLaunchResetsPersistedPreferences() {
+        let app = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        openSettings(app)
+        let preview = app.descendants(matching: .any)["slack-window-preview"].firstMatch
+        XCTAssert(preview.appears(within: 5))
+        let baseline = preview.value as? String
+        XCTAssertNotNil(baseline)
+        app.segmentedControls.buttons["Meters"].tap()
+        app.segmentedControls.buttons["km/h"].tap()
+        app.steppers.firstMatch.buttons["Increment"].tap()
+        let changed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value != %@", baseline!), object: preview)
+        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed)
+        app.terminate()
+
+        let relaunched = launch("-seedGate", "-locDenied", "-AppleLanguages", "(en)", "-AppleLocale", "en_US")
+        openSettings(relaunched)
+        XCTAssertTrue(relaunched.segmentedControls.buttons["Feet"].isSelected)
+        XCTAssertTrue(relaunched.segmentedControls.buttons["Knots"].isSelected)
+        let resetPreview = relaunched.descendants(matching: .any)["slack-window-preview"].firstMatch
+        XCTAssert(resetPreview.appears(within: 5))
+        XCTAssertEqual(resetPreview.value as? String, baseline)
     }
 
     func testSlackWindowPreviewChangesWithComfortCurrent() {
