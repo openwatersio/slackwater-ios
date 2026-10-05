@@ -14,6 +14,7 @@ struct StationRow: View {
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = ""
     @AppStorage(speedUnitKey, store: AppGroup.defaults) private var speedUnit = ""
     @State private var card: WidgetCard?
+    @ObservedObject private var net = Connectivity.shared
     @ObservedObject private var downloads = ChsFitService.shared
 
     var body: some View {
@@ -22,7 +23,8 @@ struct StationRow: View {
                 NextEventContentView(card: card, mark: mark)
                     .overlay(alignment: .bottomLeading) {
                         if case .chsCurrent(let gate) = item, downloads.isProvisional(gate.id) {
-                            CardStatusStrip(status: .refining(tolerance: gate.provisionalTolerance))
+                            CardStatusStrip(status: cardStatus(id: gate.id))
+                                .accessibilityLabel(cardStatus(id: gate.id).label)
                                 .padding(12)
                                 .background(SN.canvas.opacity(0.9))
                         }

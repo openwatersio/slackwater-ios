@@ -197,13 +197,3 @@ extension ChsOnlineStore {
         blocks.first { $0.covers(anchor: anchor) }
     }
 }
-
-extension ChsCurrentGateInfo {
-    /// Offline, "stay connected" is advice you can't act on — say what's true
-    /// instead, without implying a wait in progress.
-    func provisionalExpectation(online: Bool) -> String {
-        online
-            ? String(localized: "Stay connected for \(durationPhrase(refineSeconds)) more and Slackwater refines it to the full \(Int(fitDays))-day model, in place — nothing to tap.", comment: "Online prediction-refinement explanation. Values are an approximate duration and model length in days.")
-            : String(localized: "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full \(Int(fitDays))-day model — nothing to tap.", comment: "Offline prediction-refinement explanation. The integer is the full model length in days.")
-    }
-}

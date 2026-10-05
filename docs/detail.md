@@ -20,7 +20,7 @@ This document covers:
 6. the week-range bar and date picker;
 7. the footer: provenance, station details, and problem reports;
 8. the Nearby section;
-9. the pages and cards shown instead of a scrubber: waiting, provisional, online honesty, and unavailable; and
+9. waiting and unavailable pages, additional-download notices, and online honesty cards; and
 10. sharing a moment.
 
 ## 2. Product idea
@@ -40,7 +40,7 @@ Three rules hold across every kind:
 | NOAA or TICON tide | Tide detail | — |
 | NOAA current | Current detail | — |
 | Canadian tide port | Tide detail, including a finite downloaded preview | Waiting page (§12.1) |
-| Canadian fitted current gate | Current detail, with the provisional card while refining (§12.2) | Waiting page |
+| Canadian fitted current gate | Current detail, with an additional-download notice (§12.2) | Waiting page |
 | Canadian online current gate | Online detail | Online honesty card (§12.3) |
 | Canadian derived gate | Derived-gate detail | Waiting page naming its reference port |
 | Station with no predictions | Unavailable page (§13) | — |
@@ -58,8 +58,8 @@ Sections, top to bottom:
 | # | Section | Tide | Current | Derived gate | Online gate |
 |---|---|---|---|---|---|
 | 1 | Header | ✓ | ✓ | ✓ | ✓ |
-| 2 | Provisional card | | while refining | | |
-| 3 | Scrubber card | ✓ | ✓ | ✓ | when a window is downloaded |
+| 2 | Scrubber card | ✓ | ✓ | ✓ | when a window is downloaded |
+| 3 | Download notice | while a preview is showing | while an early model is showing | | |
 | 4 | Summary tiles | Range, Moon | Next max, Moon | Shape only, Moon | Next max, Moon |
 | 5 | Station links (§7) | Nearby current | Tide at port, or nearby tide | Tide at port | Tide at port, or nearby tide |
 | 6 | Schedule card | ✓ | ✓ | ✓ | when a window is downloaded |
@@ -257,7 +257,6 @@ The footer starts with "Predictions — not for navigation" in small uppercase, 
 | NOAA current | "NOAA harmonic current prediction. Flood sets N°T. Speeds use <unit>." |
 | NOAA subordinate current | "NOAA subordinate station: <reference>'s slacks and maxima, corrected by published offsets. Flood sets N°T." The reference name is omitted when it is the station's own name. |
 | Canadian current | "Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets N°T." |
-| Canadian current, refining | "The on-device fit is still refining. Flood sets N°T.", in attention amber |
 | Derived gate | "Slackwater estimates <gate> slack times from high and low water at <port>, using a cruising rule of thumb. CHS does not publish current predictions for this pass." |
 | Online gate | "CHS-published predictions downloaded <date>; available through <date>. Not computed on this device." then its validity and a Refresh button |
 
@@ -300,20 +299,19 @@ Retries are automatic, backing off from 60 seconds and doubling to a 15-minute c
 
 ### 12.1.1 Downloaded tide preview
 
-An iPhone tide port becomes useful after its first seven-elapsed-day IWLS request, covering the preceding 48 hours and about five days ahead. Heights interpolate the downloaded 15-minute predictions; highs and lows come from those samples. The detail identifies these as official CHS predictions, shows “Predictions available through <date>”, and describes additional downloading separately from the available reading. The availability and download notice is centered between the scrubber and the summary cards. Offline, retry, and failure states keep the downloaded prediction visible inside its coverage.
+An iPhone tide port becomes useful after its first seven-elapsed-day IWLS request, covering the preceding 48 hours and about five days ahead. Heights interpolate the downloaded 15-minute predictions; highs and lows come from those samples. The detail identifies these as official CHS predictions, shows “Predictions available through <date>”, and describes additional downloading separately from the available reading. The notice is centered between the scrubber and the summary cards. It says “Additional data is required to improve accuracy” above the station’s retained download progress meter, followed by the available-through date. Queued work is represented by the meter rather than a separate “more data is queued” sentence. Offline, retry, and failure messages appear when applicable, and the downloaded prediction stays visible inside its coverage.
 
 The preview scrubber stops at the actual downloaded bounds. Date picking and tide alerts are unavailable until the full model lands. The schedule contains only downloaded turns. A completed 60-day fit replaces the preview in the same open detail, preserves the selected instant, and enables the ordinary continuous timeline. The footer and station details then identify the on-device fitted prediction. Derived gates, paired-current tides, and watch model transfer continue to require that full model.
 
-### 12.2 Provisional current card
+### 12.2 Additional current downloading
 
-A Canadian gate with a fast 60-day answer shows an attention-amber card above its scrubber while the full model downloads:
+A Canadian gate with a usable 60-day model keeps its scrubber visible while the remaining data downloads toward its validated full model. The centered notice sits below the scrubber and above the summary cards, matching the tide preview notice:
 
-- title "Fast answer";
-- "Fitted from the last 60 days — slack at <gate> can be off by up to ~N min.";
-- online: "Stay connected for <duration> more and Slackwater refines it to the full N-day model, in place — nothing to tap."; offline: "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full N-day model — nothing to tap."; and
-- the action "See all downloads".
+- “Additional data is required to improve accuracy” above the station’s retained download progress meter;
+- the station’s measured timing uncertainty: “Fitted from the last 60 days — slack at <gate> can be off by up to ~N min.”; and
+- offline, retry, or failure copy when applicable.
 
-While provisional, every number on the page carries "~" (scrubber §9.2).
+There is no separate “Refining” or “Fast answer” UI state. The station remains in the ordinary download queue until its full model meets the quality bar. Readings remain usable during queued, interrupted, or failed additional downloads. The notice disappears when the full model lands. Until then, numeric readings retain “~” (scrubber §9.2).
 
 ### 12.3 Online honesty card
 

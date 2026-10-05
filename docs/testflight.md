@@ -260,11 +260,9 @@ silently fall back to `/tmp`.
 
 ## Card contrast — amber against the flat card background (2026-08-02)
 
-**#93 deleted `ProvisionalBadge`** (the fast answer is now `CardStatus.refining`'s strip —
-icon, word and the gate's own tolerance, where the badge was a triangle to decode). The
-numbers below are why that strip can be plain amber text: at 4.71:1 worst case it clears AA
-for text, not just 1.4.11's 3:1 for the icon beside it, so the marking no longer needs its own
-opaque disc. `CardStatus.tint` cites this section.
+**#93 deleted `ProvisionalBadge`**. Amber status text against the flat card background
+measures 4.71:1 at worst, clearing AA for text as well as 1.4.11's 3:1 for icons.
+The marking needs no opaque disc. `CardStatus.tint` cites this section.
 
 
 Superseded by M53 (layout A): the per-station `stationGradient`/`gradientTrios` this section

@@ -140,7 +140,7 @@ struct TideDetailView: View {
                             links: { tl, jump in
                                 VStack(spacing: 12) {
                                     if let coverage = activePreview?.coverage {
-                                        TidePreviewNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
+                                        ChsDownloadNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
                                     }
                                     SummaryTiles(primary: range,
                                                  primaryDetail: rangeDetail,
@@ -390,24 +390,43 @@ struct TideDetailView: View {
     }
 }
 
-private struct TidePreviewNotice: View {
+/// Progress stays local to this notice so each downloaded chunk does not rebuild the timeline.
+struct ChsDownloadNotice: View {
     let stationID: String
-    let end: Date
+    var end: Date? = nil
     let tz: TimeZone
+    var gate: ChsCurrentGateInfo? = nil
     @ObservedObject private var downloads = ChsFitService.shared
     @ObservedObject private var net = Connectivity.shared
 
     var body: some View {
-        VStack(alignment: .center, spacing: 4) {
-            Text("Predictions available through \(end.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
-            Text(tidePreviewDownloadStatus(downloads.queue.job(stationID), online: net.online))
-                .foregroundStyle(SN.foam.opacity(0.7))
+        let status = cardStatus(id: stationID)
+        VStack(alignment: .center, spacing: 8) {
+            Text("Additional data is required to improve accuracy")
+            StationDownloadProgress(value: downloads.queue.job(stationID)?.downloadProgress ?? 0)
+                .accessibilityValue(Text(status.label))
+            if status == .offline || status == .notDownloaded {
+                Text("More data will download when you reconnect")
+            } else if status == .failed {
+                Text("Additional download failed. Your downloaded predictions remain available.")
+            } else if status == .retrying {
+                CardStatusStrip(status: status)
+            }
+            if let end {
+                Text("Predictions available through \(end.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
+                    .foregroundStyle(SN.foam.opacity(0.7))
+            }
+            if let gate {
+                Text(gate.provisionalHeadline)
+                    .foregroundStyle(SN.amber)
+            }
         }
         .font(.caption)
         .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20).padding(.vertical, 8)
-        .accessibilityIdentifier("chs-tide-preview")
+        .accessibilityIdentifier("chs-download-notice")
     }
 }
 

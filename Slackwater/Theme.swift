@@ -592,12 +592,6 @@ struct StationDetailNote: View {
     }
 }
 
-// `ProvisionalBadge` — the ⚠️ disc that used to sit beside the region on a
-// provisional card — is gone (#93). One marking per state: the fast answer is
-// now `CardStatus.refining`'s strip, which says the word and the tolerance
-// instead of leaving the reader to decode a triangle. Its contrast measurement
-// (docs/testflight.md) still governs, and CardStatus.tint cites it.
-
 // MARK: - Detail-to-detail navigation
 
 /// Detail views push the paired port's own detail through this, not a

@@ -22,6 +22,7 @@ struct PlaceDetail: View {
     let onList: () -> Void
 
     @ObservedObject private var favorites = FavoritesStore.shared
+    @ObservedObject private var net = Connectivity.shared
     @ObservedObject private var downloads = ChsFitService.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -232,7 +233,11 @@ struct PlaceDetail: View {
     private var sheet: some View {
         List {
             if case .chsCurrent(let gate) = item, downloads.isProvisional(gate.id) {
-                CardStatusStrip(status: .refining(tolerance: gate.provisionalTolerance))
+                Text("Additional data is required to improve accuracy")
+                StationDownloadProgress(value: downloads.queue.job(gate.id)?.downloadProgress ?? 0)
+                CardStatusStrip(status: cardStatus(id: gate.id))
+                    .accessibilityLabel(cardStatus(id: gate.id).label)
+                Text(gate.provisionalHeadline)
             }
             if let tl = store?.timeline {
                 ForEach(ScrubReading.todaysEvents(after: scrubTime, in: tl, imperial: imperial,

@@ -4427,89 +4427,6 @@
         }
       }
     },
-    "±%lld min" : {
-      "comment" : "Measured slack-current timing tolerance in minutes; 'min' remains invariant.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "±%lld min"
-          }
-        }
-      }
-    },
     "A glance: arrow and time." : {
       "comment" : "Circular widget description.",
       "localizations" : {
@@ -6324,6 +6241,89 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lägger till fler när Slackwater är öppet. %lld hittills."
+          }
+        }
+      }
+    },
+    "Additional data is required to improve accuracy" : {
+      "comment" : "Shown below the timeline while usable predictions are available and the station still needs additional data to meet its accuracy target. Download progress appears below this text.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yderligere data er nødvendige for at forbedre nøjagtigheden"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Daten sind erforderlich, um die Genauigkeit zu verbessern"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se necesitan más datos para mejorar la precisión"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarkkuuden parantamiseksi tarvitaan lisää tietoja"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des données supplémentaires sont nécessaires pour améliorer la précision"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sono necessari altri dati per migliorare la precisione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精度を向上させるには追加のデータが必要です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정확도를 높이려면 추가 데이터가 필요합니다"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flere data er nødvendig for å forbedre nøyaktigheten"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Er zijn meer gegevens nodig om de nauwkeurigheid te verbeteren"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "São necessários mais dados para melhorar a precisão"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "São necessários mais dados para melhorar a precisão"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ytterligare data behövs för att förbättra noggrannheten"
           }
         }
       }
@@ -13403,89 +13403,6 @@
         }
       }
     },
-    "Downloading more data" : {
-      "comment" : "Additional prediction data is downloading while existing readings stay usable.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Henter flere data"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weitere Daten werden geladen"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Descargando más datos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ladataan lisää tietoja"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Téléchargement de données supplémentaires"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download di altri dati"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加データをダウンロード中"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "추가 데이터 다운로드 중"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laster ned flere data"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meer gegevens downloaden"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Baixando mais dados"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A transferir mais dados"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hämtar mer data"
-          }
-        }
-      }
-    },
     "Downloading, %lld of %lld ready" : {
       "comment" : "VoiceOver download summary. Values are ready and total station counts.",
       "localizations" : {
@@ -15904,172 +15821,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "längst bort %@"
-          }
-        }
-      }
-    },
-    "Fast answer" : {
-      "comment" : "Provisional current-model card title.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hurtig prognose"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schnelle Vorhersage"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Respuesta rápida"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nopea ennuste"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réponse rapide"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Risposta rapida"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速報予測"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "빠른 예측"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raskt resultat"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snelle voorspelling"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resultado rápido"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resultado rápido"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snabbprognos"
-          }
-        }
-      }
-    },
-    "Fast answer %@" : {
-      "comment" : "Provisional prediction badge. The value is a localized timing tolerance.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hurtig prognose %@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schnelle Vorhersage %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Respuesta rápida %@"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nopea ennuste %@"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réponse rapide %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Risposta rapida %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速報予測 %@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "빠른 예측 %@"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raskt resultat %@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snelle voorspelling %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resultado rápido %@"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resultado rápido %@"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snabbprognos %@"
           }
         }
       }
@@ -22401,89 +22152,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Måne"
-          }
-        }
-      }
-    },
-    "More data is queued for download" : {
-      "comment" : "The place has cached official predictions; additional data is queued and is not downloading yet.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flere data er i kø til download"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weitere Daten stehen zum Download bereit"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Más datos están en la cola de descarga"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää tietoja on latausjonossa"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "D’autres données sont en attente de téléchargement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Altri dati sono in coda per il download"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加データのダウンロード待ち"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "추가 데이터가 다운로드 대기 중입니다"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flere data står i nedlastingskøen"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Meer gegevens staan in de downloadwachtrij"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mais dados estão na fila de download"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Há mais dados na fila para transferência"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mer data väntar på att hämtas"
           }
         }
       }
@@ -31036,421 +30704,6 @@
         }
       }
     },
-    "Refining" : {
-      "comment" : "Compact prediction status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forfiner"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird verfeinert"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarkennetaan"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfezionamento"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度を向上中"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정밀화 중"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finjusterer"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verfijnen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aperfeiçoar"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Förfinar"
-          }
-        }
-      }
-    },
-    "Refining — showing the fast answer, slack accurate to %@. The full model is still downloading." : {
-      "comment" : "VoiceOver prediction status. The value is a measured time tolerance.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forfiner — viser den hurtige prognose, strømstille med nøjagtighed %@. Den fulde model hentes stadig."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird verfeinert — die schnelle Vorhersage wird angezeigt, Stauwasser auf %@ genau. Das vollständige Modell wird noch geladen."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando — se muestra la respuesta rápida, con una precisión de estoa de %@. El modelo completo aún se está descargando."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarkennetaan — näytetään nopea ennuste, virran tyyntymishetken tarkkuus %@. Koko mallia ladataan vielä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement — la réponse rapide est affichée; l’étale est précise à %@. Le modèle complet est encore en téléchargement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfezionamento — risposta rapida mostrata, stanca precisa entro %@. Il modello completo è ancora in download."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度を向上中 — 速報予測を表示しています。潮止まりの精度は%@です。完全なモデルはまだダウンロード中です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정밀화 중 — 빠른 예측 표시 중, 정조 정확도 %@. 전체 모델은 아직 다운로드 중입니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finjusterer — viser det raske resultatet, med strømstille nøyaktig innen %@. Hele modellen lastes fortsatt ned."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verfijnen — de snelle voorspelling wordt getoond, met de kentering nauwkeurig tot %@. Het volledige model wordt nog gedownload."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando — exibindo o resultado rápido, com precisão do estofo de %@. O modelo completo ainda está sendo baixado."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aperfeiçoar — a mostrar o resultado rápido, com precisão do estofo de %@. O modelo completo ainda está a ser descarregado."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Förfinar — visar snabbprognosen, strömstilla med noggrannhet %@. Den fullständiga modellen hämtas fortfarande."
-          }
-        }
-      }
-    },
-    "Refining — showing the fast answer. The full model is still downloading." : {
-      "comment" : "VoiceOver prediction status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forfiner — viser den hurtige prognose. Den fulde model hentes stadig."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird verfeinert — die schnelle Vorhersage wird angezeigt. Das vollständige Modell wird noch geladen."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando — se muestra la respuesta rápida. El modelo completo aún se está descargando."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarkennetaan — näytetään nopea ennuste. Koko mallia ladataan vielä."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement — la réponse rapide est affichée. Le modèle complet est encore en téléchargement."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfezionamento — risposta rapida mostrata. Il modello completo è ancora in download."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度を向上中 — 速報予測を表示しています。完全なモデルはまだダウンロード中です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정밀화 중 — 빠른 예측 표시 중. 전체 모델은 아직 다운로드 중입니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finjusterer — viser det raske resultatet. Hele modellen lastes fortsatt ned."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verfijnen — de snelle voorspelling wordt getoond. Het volledige model wordt nog gedownload."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando — exibindo o resultado rápido. O modelo completo ainda está sendo baixado."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aperfeiçoar — a mostrar o resultado rápido. O modelo completo ainda está a ser descarregado."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Förfinar — visar snabbprognosen. Den fullständiga modellen hämtas fortfarande."
-          }
-        }
-      }
-    },
-    "Refining · %@" : {
-      "comment" : "Compact prediction status. The value is a measured time tolerance.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forfiner · %@"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird verfeinert · %@"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando · %@"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarkennetaan · %@"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement · %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfezionamento · %@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度を向上中 · %@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정밀화 중 · %@"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finjusterer · %@"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verfijnen · %@"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando · %@"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aperfeiçoar · %@"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Förfinar · %@"
-          }
-        }
-      }
-    },
-    "Refining…" : {
-      "comment" : "Compact prediction status.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forfiner…"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wird verfeinert…"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando…"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarkennetaan…"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement…"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Perfezionamento…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度を向上中…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정밀화 중…"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finjusterer…"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verfijnen…"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Refinando…"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aperfeiçoar…"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Förfinar…"
-          }
-        }
-      }
-    },
     "Refresh" : {
       "comment" : "Slackwater interface text.",
       "localizations" : {
@@ -38119,95 +37372,6 @@
         }
       }
     },
-    "Stay connected for %@ more and Slackwater refines it to the full %lld-day model, in place — nothing to tap." : {
-      "comment" : "Online prediction-refinement explanation. Values are an approximate duration and model length in days.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bevar forbindelsen i %@ mere, så forfiner Slackwater den til den fulde model over %lld dage, på stedet — intet at trykke på."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bleibe noch %1$@ verbunden, dann verfeinert Slackwater die Vorhersage zum vollständigen %2$lld-Tage-Modell — ganz automatisch."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Stay connected for %1$@ more and Slackwater refines it to the full %2$lld-day model, in place — nothing to tap."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mantén la conexión %@ más y Slackwater la refinará al modelo completo de %lld días, sin que tengas que tocar nada."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pysy verkossa vielä %@, niin Slackwater tarkentaa ennusteen täyteen %lld päivän malliin automaattisesti — mitään ei tarvitse napauttaa."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restez connecté encore %1$@ et Slackwater affinera cette réponse grâce au modèle complet de %2$lld jours, sans aucune action de votre part."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Resta connesso per altri %1$@ e Slackwater passa automaticamente al modello completo di %2$lld giorni, senza toccare nulla."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あと%1$@接続を続けると、Slackwaterが%2$lld日分の完全なモデルに自動で更新します。操作は不要です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 더 연결되어 있으면 Slackwater가 전체 %lld일 모델로 자동 정밀화합니다. 탭할 필요가 없습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hold tilkoblingen i %1$@ til, så finjusterer Slackwater resultatet til hele %2$lld-dagersmodellen, på stedet — du trenger ikke trykke på noe."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Blijf nog %1$@ verbonden en Slackwater verfijnt dit tot het volledige model van %2$lld dagen, op dezelfde plek — je hoeft niets aan te tikken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mantenha a conexão por mais %1$@ e Slackwater refina o resultado para o modelo completo de %2$lld dias, automaticamente — sem precisar tocar."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mantenha a ligação por mais %1$@ e o Slackwater passa automaticamente ao modelo completo de %2$lld dias — sem precisar de tocar."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Var ansluten i %@ till så förfinar Slackwater prognosen till den fullständiga modellen över %lld dagar, på plats — inget att trycka på."
-          }
-        }
-      }
-    },
     "Sunrise" : {
       "comment" : "Next-event label.\nVoiceOver next-event label.",
       "localizations" : {
@@ -38702,89 +37866,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Skillnaden mellan hög- och lågvatten i den här cykeln, %@."
-          }
-        }
-      }
-    },
-    "The fast answer is already on this device; next time you're connected, Slackwater refines it to the full %lld-day model — nothing to tap." : {
-      "comment" : "Offline prediction-refinement explanation. The integer is the full model length in days.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Den hurtige prognose er allerede på denne enhed; næste gang du har forbindelse, forfiner Slackwater den til den fulde model over %lld dage — intet at trykke på."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die schnelle Vorhersage ist bereits auf diesem Gerät. Bei der nächsten Verbindung verfeinert Slackwater sie zum vollständigen %lld-Tage-Modell — ganz automatisch."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La respuesta rápida ya está en este dispositivo; la próxima vez que te conectes, Slackwater la refinará al modelo completo de %lld días, sin que tengas que tocar nada."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nopea ennuste on jo tällä laitteella; kun olet seuraavan kerran verkossa, Slackwater tarkentaa sen täyteen %lld päivän malliin — mitään ei tarvitse napauttaa."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La réponse rapide est déjà sur cet appareil; à la prochaine connexion, Slackwater l’affinera grâce au modèle complet de %lld jours, sans aucune action de votre part."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La risposta rapida è già su questo dispositivo; alla prossima connessione Slackwater passa al modello completo di %lld giorni, senza toccare nulla."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速報予測はすでにこのデバイスにあります。次回接続すると、Slackwaterが%lld日分の完全なモデルに自動で更新します。操作は不要です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "빠른 예측이 이미 이 기기에 있습니다. 다음에 연결되면 Slackwater가 전체 %lld일 모델로 정밀화합니다. 탭할 필요가 없습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det raske resultatet er allerede på denne enheten; neste gang du er tilkoblet, finjusterer Slackwater det til hele %lld-dagersmodellen — du trenger ikke trykke på noe."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "De snelle voorspelling staat al op dit apparaat; de volgende keer dat je verbinding hebt, verfijnt Slackwater deze tot het volledige model van %lld dagen — je hoeft niets aan te tikken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O resultado rápido já está neste dispositivo; na próxima conexão, Slackwater o refina para o modelo completo de %lld dias — sem precisar tocar."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O resultado rápido já está neste dispositivo; na próxima ligação, o Slackwater passa ao modelo completo de %lld dias — sem precisar de tocar."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Snabbprognosen finns redan på den här enheten; nästa gång du är ansluten förfinar Slackwater den till den fullständiga modellen över %lld dagar — inget att trycka på."
           }
         }
       }
@@ -39722,95 +38803,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nästa strömstilla period vid %@ är från %@ till %@ och börjar %@."
-          }
-        }
-      }
-    },
-    "The on-device fit is still refining. Flood sets %lld°T." : {
-      "comment" : "Provisional current-model footer. The integer is the flood direction in degrees true.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilpasningen på enheden forfines stadig. Flodstrømmen sætter %lld°T."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Modellanpassung auf dem Gerät wird noch verfeinert. Flutstrom setzt nach %lld°T."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The on-device fit is still refining. Flood sets %lld°T."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El ajuste en el dispositivo aún se está refinando. La corriente de flujo se establece a %lld°T."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laitteella sovitettua mallia tarkennetaan vielä. Nousuvirtauksen suunta on %lld°T."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’ajustement sur cet appareil s’affine encore. Le flot porte au %lld°T."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’adattamento su questo dispositivo è ancora in perfezionamento. Il flusso dirige verso %lld°T."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このデバイス上のモデルの精度を向上中です。上げ潮流の流向は%lld°Tです。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "기기 내 모델을 정밀화하는 중입니다. 창조류 방향은 %lld°T입니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilpasningen på enheten finjusteres fortsatt. Inngående strøm setter mot %lld°T."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Het model op dit apparaat wordt nog verfijnd. De vloedstroom zet naar %lld°T."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O ajuste neste dispositivo ainda está sendo refinado. A enchente segue para %lld°T."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O ajuste neste dispositivo ainda está a ser aperfeiçoado. A enchente segue para %lld°T."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anpassningen på enheten förfinas fortfarande. Flodströmmen sätter %lld°T."
           }
         }
       }
@@ -44718,89 +43710,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Väntar på nytt försök"
-          }
-        }
-      }
-    },
-    "Waiting to retry the additional download" : {
-      "comment" : "Cached official predictions are usable while the lasting-model download waits for its retry.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på at prøve den ekstra download igen"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Warten auf einen erneuten Versuch des zusätzlichen Downloads"
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esperando para reintentar la descarga adicional"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Odotetaan lisälatauksen uutta yritystä"
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En attente d’une nouvelle tentative de téléchargement supplémentaire"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "In attesa di riprovare il download aggiuntivo"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "追加ダウンロードの再試行を待機中"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "추가 다운로드 재시도 대기 중"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venter på å prøve den ekstra nedlastingen igjen"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wachten om de extra download opnieuw te proberen"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aguardando para tentar novamente o download adicional"
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A aguardar nova tentativa da transferência adicional"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Väntar på att försöka hämta ytterligare data igen"
           }
         }
       }

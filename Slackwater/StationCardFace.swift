@@ -31,6 +31,7 @@ struct StationCard<Trailing: View>: View {
     /// conflating them regresses both.
     var status: CardStatus? = nil
     var usableWhileDownloading = false
+    @ScaledMetric(relativeTo: .caption) private var downloadStatusInset = 54
     var statusDetail: String? = nil
     var downloadProgress: Double? = nil
     var opacity: Double = 1
@@ -99,6 +100,7 @@ struct StationCard<Trailing: View>: View {
     }
 
     var body: some View {
+        let statusInset = usableWhileDownloading && status != nil ? downloadStatusInset : 0
         let placeholder = status?.showsPlaceholder == true && !usableWhileDownloading
         VStack(alignment: .leading, spacing: 0) {
             // Which candidate wins is verified by screenshot, not by
@@ -139,7 +141,7 @@ struct StationCard<Trailing: View>: View {
         .padding(.vertical, 16)
         // A curve or its loading placeholder is taller: an identity band up
         // top, then room for the curve and its extreme labels.
-        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil && !placeholder ? 96 : 168),
+        .frame(maxWidth: .infinity, minHeight: minHeight ?? (graph == nil && !placeholder ? 96 : 168 + statusInset),
                maxHeight: chrome ? nil : .infinity, alignment: .topLeading)
         .background {
             ZStack {
@@ -151,7 +153,7 @@ struct StationCard<Trailing: View>: View {
                 // curve exits through the edge on its own slope no matter
                 // where any builder's last sample lands.
                 if let graph {
-                    graph.padding(.top, 54).padding(.horizontal, -3)
+                    graph.padding(.top, 54 + statusInset).padding(.horizontal, -3)
                 } else if placeholder {
                     StationCardPlaceholder(progress: downloadProgress)
                         .padding(.top, 54).padding(.horizontal, -3)

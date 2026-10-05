@@ -89,21 +89,6 @@ final class ChsTidePreviewTests: XCTestCase {
         } catch ChsError.networkDisabled {}
     }
 
-    func testDownloadRowOnlyPromisesPredictionsInsidePreviewCoverage() {
-        let p = preview([1, 2, 1])
-        var job = ChsJob(id: p.stationID, name: "Test", region: "", isCurrent: false,
-                         latitude: 0, longitude: 0, fitDays: 60)
-        XCTAssertEqual(rowStatus(job, online: false, preview: p, at: start),
-                       "More data will download when you reconnect")
-        XCTAssertEqual(rowStatus(job, online: false, preview: p, at: start.addingTimeInterval(1801)),
-                       "Waiting for signal")
-        job.status = .failed
-        XCTAssertEqual(rowStatus(job, online: true, preview: p, at: start),
-                       "Additional download failed. Your downloaded predictions remain available.")
-        XCTAssertEqual(rowStatus(job, online: true, preview: p, at: start.addingTimeInterval(1801)),
-                       "Predictions unavailable")
-    }
-
     func testPlacesWithoutReadingsGetAPreviewBeforeOtherModelsFinish() {
         let near = ChsJob(id: "near", name: "Near", region: "", isCurrent: false, latitude: 0, longitude: 0, fitDays: 60)
         let far = ChsJob(id: "far", name: "Far", region: "", isCurrent: false, latitude: 1, longitude: 0, fitDays: 60)

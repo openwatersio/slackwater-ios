@@ -40,7 +40,6 @@ struct CurrentDetailView: View {
     @AppStorage(AppGroup.slackWindowSpeedKey, store: AppGroup.defaults)
     private var slackWindowSpeed = defaultSlackThresholdKn
     @ObservedObject private var service = ChsFitService.shared
-    @ObservedObject private var net = Connectivity.shared
 
     @State private var live = appNow()
     @State private var scrubTime = Timeline.introStart(for: appNow())
@@ -50,7 +49,6 @@ struct CurrentDetailView: View {
     /// picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
     @State private var viewportPts: CGFloat = 0
-    @State private var showDownloads = false
     /// This gate's stored model, for the station details' fit rows — how many
     /// days it was fitted from and when that download happened. Re-read
     /// whenever the record changes, since a refinement replaces both.
@@ -59,11 +57,6 @@ struct CurrentDetailView: View {
     /// discovery fallback when no curated `tideReference` pairs this station.
     /// Computed once on appear; the body re-evaluates on every scrub tick.
     @State private var nearbyTide: (item: StationItem, km: Double)?
-    // Re-forwarded onto the sheet below — `.sheet` content doesn't inherit a
-    // custom `@Environment` key set above the presenting view on its own
-    // (SlackwaterApp.swift's `.sheet(showDownloads)` comment has the story).
-    @Environment(\.openChsRoute) private var openChsRoute
-
     private var timeline: TimelineData? { store?.timeline }
 
     /// The gate identity behind a provisional fast answer — nil for a final
@@ -101,21 +94,8 @@ struct CurrentDetailView: View {
                                     $0.kind != .slack && abs($0.time.timeIntervalSince(scrubTime)) < 1
                                 }.map { $0.kind == .maxFlood },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? [])),
-                            above: {
-                                if let gate = provisionalGate {
-                                    ChsAmberCard(title: String(localized: "Fast answer", comment: "Provisional current-model card title."), headline: gate.provisionalHeadline,
-                                                 expectation: gate.provisionalExpectation(online: net.online),
-                                                 action: String(localized: "See all downloads", comment: "Open the offline-download manager."),
-                                                 identifier: "chs-provisional-warning",
-                                                 downloadProgress: service.queue.job(gate.id)?.downloadProgress) { showDownloads = true }
-                                        .padding(.bottom, 14)
-                                }
-                            },
+                            above: { EmptyView() },
                             card: { tl in
-                                // No badge over the strip: the amber card
-                                // above, the amber numbers and the tilde
-                                // already say the reading is provisional, and
-                                // a fourth marking landed in the pill row.
                                 CurrentScrubCard(lead: lead(tl, ink: sky.ink), data: tl,
                                                  speedUnit: speedUnit, now: live,
                                                  floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
@@ -128,6 +108,9 @@ struct CurrentDetailView: View {
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
+                                    if let gate = provisionalGate {
+                                        ChsDownloadNotice(stationID: gate.id, tz: tz, gate: gate)
+                                    }
                                     SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination,
                                                  at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
@@ -150,7 +133,6 @@ struct CurrentDetailView: View {
                                     stationDetails
                                 }
                             })
-            .sheet(isPresented: $showDownloads) { OfflineManagerView().environment(\.openChsRoute, openChsRoute) }
             .onAppear {
                 if store == nil {
                     // A shared link that landed first has placed the anchor and
@@ -202,11 +184,7 @@ struct CurrentDetailView: View {
 
     private var footer: some View {
         DetailFooter(stationID: record.itemId, scrubTime: scrubTime, tz: tz) {
-            if provisionalGate != nil {
-                Text("The on-device fit is still refining. Flood sets \(Int(record.floodDirection.rounded()))°T.")
-                    .font(.caption2).foregroundStyle(SN.amber.opacity(0.7))
-                    .multilineTextAlignment(.center)
-            } else if record.isChs {
+            if record.isChs {
                 // Same register as the CHS tide footer (TideDetailView).
                 Text("Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions. Flood sets \(Int(record.floodDirection.rounded()))°T.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))

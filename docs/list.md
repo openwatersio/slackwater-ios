@@ -177,7 +177,7 @@ Current state is "Slack" in go green when the instant lies inside a measured sla
 
 Changing the slack threshold refreshes already-mounted measured-current cards, including map previews and online current gates. Derived gates have no measured speed window. Settings includes an illustrative current curve labeled "Example": its green window and duration expand or contract with the comfort-current value. The example is not a place prediction.
 
-A Canadian current gate still refining its fit prefixes every number with "~" and adds the attention-amber strip "Refining · ±N min", or "Refining" when no tolerance has been measured, with a progress wave.
+A Canadian current gate with a usable early model prefixes numbers with “~” and keeps the ordinary downloading, queued, retrying, offline, or failed status alongside its reading and progress wave. Timing uncertainty is explained in detail, separate from download status. There is no separate refining state or fast-answer badge. A usable tide preview follows the same download states. Both remain unfinished in the overall queue until their full models land.
 
 An online Canadian gate shows an ordinary current card while its downloaded window covers today; otherwise it shows the pending shell with "Not downloaded" (never fetched) or "Expired" (fetched before).
 
@@ -379,7 +379,7 @@ Touch targets meet the platform minimum: 44 by 44 units on iOS and the web, 48 b
 ### Cards and links
 
 17. **Pending Canadian card:** A queued Canadian station shows its place in line in place of the reading, a skeleton curve, and its full card height before data arrives.
-18. **Refining gate:** A provisional Canadian gate shows "~" before the speed and the "Refining" strip.
+18. **Current download:** A Canadian gate with an early model keeps its reading and “~” before the speed alongside the ordinary download status and progress.
 19. **Removed deep link:** A link to a withdrawn station closes search and shows the Station unavailable section.
 20. **Unknown deep link:** A link to an id the app has never known leaves the list as it was.
 
