@@ -758,15 +758,8 @@ final class DetailAndScrubTests: ScreenshotTestCase {
             XCTAssert(app.descendants(matching: .any)[id].firstMatch.exists,
                       "\(id) is not in the sheet")
         }
-        // The eclipse list runs off the bottom of a phone screen, so the half
-        // of this sheet that carries the three kinds has no shot otherwise.
-        app.swipeUp()
+        scrollTo(next, in: app)
         save(app, "moon-sheet-eclipses.png")
-        // Both swipes decelerate, and the tap below lands on a row that is
-        // still moving otherwise — the scroll ends with no accessibility
-        // signal, the same gap `settleLayout` exists for (#331).
-        app.swipeDown()
-        settleLayout(next)
 
         next.tap()
 
