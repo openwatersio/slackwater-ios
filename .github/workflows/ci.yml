@@ -213,7 +213,7 @@ jobs:
         with:
           name: build-products
           path: build/products.tgz
-          retention-days: 1
+          retention-days: 7
 
   app:
     name: App tests · ${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && ' · iPad' || '' }}
@@ -346,7 +346,14 @@ jobs:
         id: rerun
         if: steps.tests.outcome == 'failure' && steps.failures.outputs.retryable_only == 'true'
         run: |
-          for b in build/*.xcresult; do mv "$b" "${b%.xcresult}-attempt1.xcresult"; done
+          for b in build/*.xcresult build/*.log build/*.summary.json; do
+            [ -e "$b" ] || continue
+            case "$b" in
+              *.xcresult) mv "$b" "${b%.xcresult}-attempt1.xcresult" ;;
+              *.log) mv "$b" "${b%.log}-attempt1.log" ;;
+              *.summary.json) mv "$b" "${b%.summary.json}-attempt1.summary.json" ;;
+            esac
+          done
           SLACKWATER_XCTESTRUN=$(echo build/DerivedData/Build/Products/*.xctestrun) \
             ./scripts/test.sh ${{ github.event_name == 'push' && '--full' || '' }} \
             || { scripts/test-failures.sh build/*.xcresult | grep -v attempt1; exit 1; }
@@ -359,6 +366,14 @@ jobs:
       - name: Test result
         if: always()
         run: test "${{ steps.tests.outcome }}" = success || test "${{ steps.rerun.outcome }}" = success
+
+      - name: Upload test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-summary-${{ matrix.shard.name }}${{ matrix.device != 'iPhone 17' && '-ipad' || '' }}
+          path: build/*.summary.json
+          if-no-files-found: ignore
 
       # There is no runner to ssh into, so the evidence has to travel.
       # always(): by this step "Test result" has already failed the job, and
@@ -376,6 +391,7 @@ jobs:
           path: |
             /tmp/slackwater-shots
             build/*.xcresult
+            build/results-*.log
           if-no-files-found: ignore
 
   required:

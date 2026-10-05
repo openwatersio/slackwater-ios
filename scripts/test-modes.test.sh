@@ -11,9 +11,10 @@ cp "$root/scripts/first-run.sh" "$scratch/repo/scripts/first-run.sh"
 touch "$scratch/repo/scripts/iwls-fixtures.mjs"
 log="$scratch/calls"
 
-for tool in node open xcodegen xcodebuild; do
+for tool in node open xcodegen xcodebuild sysctl; do
   cat > "$scratch/bin/$tool" <<'STUB'
 #!/bin/zsh
+[[ ${0:t} == sysctl ]] && { print 34359738368; exit 0; }
 print -r -- "${0:t} $* | live=${TEST_RUNNER_SLACKWATER_LIVE:-} full=${TEST_RUNNER_SLACKWATER_FULL:-} perf=${TEST_RUNNER_SLACKWATER_PERF_SCALE:-}" >> "$CALL_LOG"
 [[ ${0:t} == open && $* == '-a DeviceHub' && ${NO_DEVICE_HUB:-0} == 1 ]] && exit 1
 [[ ${0:t} == node && ${FAIL_PREPARE:-0} == 1 ]] && {
@@ -34,7 +35,11 @@ if [[ ${0:t} == xcodebuild && ${IDLE_TIMEOUTS:-0} -gt 0 ]]; then
       print -n -- "animations complete notification not received" >> "$bundle/database.sqlite3"
   fi
 fi
-[[ ${0:t} == xcodebuild && ${FAIL_XCODEBUILD:-0} == 1 ]] && exit 65
+if [[ ${0:t} == xcodebuild ]]; then
+  repeat 45 print "raw test output"
+  print -u2 "raw stderr evidence"
+  [[ ${FAIL_XCODEBUILD:-0} == 1 ]] && exit 65
+fi
 exit 0
 STUB
   chmod +x "$scratch/bin/$tool"
@@ -48,7 +53,7 @@ cat > "$scratch/bin/xcrun" <<'STUB'
 print -r -- "xcrun $*" >> "$CALL_LOG"
 case "$1 $2" in
   "simctl create") print "SIM-${3// /_}" ;;
-  "xcresulttool get") print "{\"passedTests\": ${RAN_TESTS:-1}, \"failedTests\": 0}" ;;
+  "xcresulttool get") [[ ${UNAVAILABLE_RESULTS:-0} == 1 ]] && exit 1; [[ ${UNAVAILABLE_RESULTS:-0} == 2 ]] && { print "partial JSON"; exit 0; }; print "{\"passedTests\": ${RAN_TESTS:-1}, \"failedTests\": 0}" ;;
 esac
 exit 0
 STUB
@@ -221,11 +226,42 @@ out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 \
 [[ $out != *"idle timeouts"* ]] \
   || { print -u2 -- "a clean run warned anyway"; print -r -- "$out"; exit 1; }
 
-# Filing xcodebuild's output away must not swallow its exit status.
-if PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 \
-    zsh "$scratch/repo/scripts/test.sh" --unit >/dev/null 2>&1; then
-  print -u2 -- "runner reported a failed xcodebuild as success"
-  exit 1
-fi
+# Failures still leave elapsed output, a raw log including stderr, and a summary.
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 UNAVAILABLE_RESULTS=1 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 65 && $out == *"test results unavailable"* && $out == *"s · unavailable tests"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "failure status or diagnostics lost: $result $out"; exit 1; }
+rawlog="$scratch/repo/build/results-unit-iPhone_17.log"
+[[ $(grep -c '^raw test output$' "$rawlog") == 45 ]] || { print -u2 "raw output was truncated"; exit 1; }
+grep -q '^raw stderr evidence$' "$rawlog"
+grep -q '"status": "unavailable"' "${rawlog%.log}.summary.json"
+
+# A successful command with unreadable results is unavailable, never zero.
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 UNAVAILABLE_RESULTS=1 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 1 && $out == *"test results unavailable"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "unavailable results misreported: $result $out"; exit 1; }
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 UNAVAILABLE_RESULTS=2 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 1 && $out == *"test results unavailable"* && $out != *"no tests ran"* ]] \
+  || { print -u2 -- "partial results misreported: $result $out"; exit 1; }
+set +e
+out=$(PATH="$scratch/bin:$PATH" CALL_LOG="$log" SLACKWATER_TEST_LOCK=1 FAIL_XCODEBUILD=1 IDLE_TIMEOUTS=3 \
+    zsh "$scratch/repo/scripts/test.sh" --unit 2>&1)
+result=$?
+set -e
+[[ $result == 65 && $out == *"3 XCUITest idle timeouts"* && $out == *"s · 1 tests"* ]] \
+  || { print -u2 -- "failed run skipped diagnostics: $result $out"; exit 1; }
+run_mode --unit
+grep -q '"passedTests": 1' "${rawlog%.log}.summary.json"
 
 print "runner mode checks passed"
