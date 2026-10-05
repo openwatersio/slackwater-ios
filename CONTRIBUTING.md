@@ -142,6 +142,8 @@ The five shard names remain offline, list, transition, detail, and rest. Setting
 
 New app PR commits cancel obsolete build and shard jobs. Main build and shard jobs use a separate concurrency group for each workflow run, so newer pushes cannot replace pending siblings of a full validation attempt. This preserves complete results for each SHA and can queue more main work within the five macOS slots. Docs-only changes never enter those concurrency groups. Full main validation remains exhaustive on both devices. PR validation remains exhaustive on iPhone; no extra iPad job is booked into the five macOS slots. iPad-specific failures therefore still require main validation or a targeted local check before merge.
 
+Closing or merging a PR cancels its unfinished CI runs for the closing head commit. Cleanup matches the CI workflow, PR number, head repository, branch, and commit; it leaves main runs and attempts started after closure untouched. Reopened PRs are checked again before cancellation. CI runs without a PR number in their run name are left alone.
+
 Nightly checks out the triggering immutable commit and requires a completed successful main CI run at that exact SHA, with the build and all ten iPhone/iPad app jobs successful. A docs-only green run cannot authorize a release. Test summary artifacts are retained for every attempt, failure artifacts include raw logs and result bundles, and the shared build upload remains available for seven days.
 
 Every lane runs on ephemeral GitHub-hosted runners — no shared machine, no lock contention with local test runs. Public-repo macOS pools can queue a few minutes at peak; annoying, not blocking.
