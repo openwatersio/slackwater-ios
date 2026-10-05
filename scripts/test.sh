@@ -257,6 +257,22 @@ for i in {1..$#sims}; do
     echo "error: no tests ran on $sim — check SLACKWATER_ONLY/SLACKWATER_SKIP" >&2
     exit 1
   fi
+  # XCUITest waits for the app to report its animations complete before every
+  # synthesized event and every query, and spends 60 s on the wait when that
+  # report never comes. A shard doing it repeatedly is measuring the timeout
+  # and not the app (#556) — and it reads as nothing but a slow runner, since
+  # the run still passes. Say it out loud.
+  #
+  # Out of the bundle's store, not the output above: xcodebuild prints the
+  # activity text only when it runs the tests serially, and this script always
+  # runs clones. `grep -o`, because the store is one long line.
+  # `|| true` inside the pipe: grep exits 1 on no match, which under
+  # `set -o pipefail` would fail the assignment and abort the run.
+  idle=$({ grep -ao "animations complete notification not received" \
+    "$bundle/database.sqlite3" 2>/dev/null || true; } | wc -l | tr -d ' ')
+  if (( idle )); then
+    echo "warning: $idle XCUITest idle timeouts on $sim, 60 s each (#556)"
+  fi
   echo "=== $MODE · $sim: $((SECONDS - start))s · $ran tests ==="
 done
 
