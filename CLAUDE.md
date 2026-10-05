@@ -108,6 +108,14 @@ Debug-on-simulator and Release-archive differ in signing, entitlements, StoreKit
 - App Groups are not in the App Store Connect API (`/v1/appGroups` is a 404). Creating one is developer.apple.com UI work; budget a human for it.
 - **The widget's station picker never applies in the simulator.** linkd cannot read a simulator process's team id, so the App Intents runtime logs "StationChoice is not a registered AppEntity identifier" and resolves the configured station to nil — every widget shows the default station. Re-signing the simulator build with a real identity does not help. Verify the picker on a device.
 
+## Remove a worktree when its branch merges
+
+They accumulate — twenty at once has happened — and a stale one is worse than the disk it costs: another session can run tests in it against merged code and read the result as current. Clean up as part of finishing the work, not as a separate task.
+
+Removal is more than `git worktree remove`: also `git branch -d`, the remote branch if the merge did not delete it, `git remote prune origin`, and the per-worktree simulator `scripts/test.sh` creates. Find that last one with `xcrun simctl list devices available | grep "· <worktree>"`, then shut it down and delete it. Most of the space reclaimed is the worktree's own `build/SourcePackages` and `build/DerivedData`.
+
+Check for uncommitted work first. A worktree whose branch is merged can still hold live changes — an untracked spike file, or edits never committed — and `git worktree remove` without `--force` refuses for exactly that reason. Never force it to get past the refusal.
+
 ## Working with subagents here
 
 A subagent's backgrounded job dies when its turn ends — a `./scripts/test.sh` started that way leaves a 0-byte log and a corrupt result bundle. Implementers write code and compile-check; the coordinator runs the suite and relays results. Ask subagents for what they _observed_, not what they believe.
