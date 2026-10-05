@@ -104,8 +104,11 @@ final class IwlsFetcher {
         return CommandLine.arguments[i + 1]
     }()
 
-    static func waitForFixtureRelease(_ checkpoint: String) async throws {
-        guard let token = fixtureToken else { return }
+    static func waitForFixtureRelease(_ checkpoint: String, token: String? = fixtureToken,
+                                      pause: () async throws -> Void = {
+                                          try await Task.sleep(for: .milliseconds(50))
+                                      }) async throws {
+        guard let token else { return }
         let name = "org.openwaters.slackwater.ui.\(token).\(checkpoint)"
         var registration: Int32 = 0
         let status = name.withCString { notify_register_check($0, &registration) }
@@ -113,12 +116,13 @@ final class IwlsFetcher {
             throw ChsError.permanent("could not register UI fixture checkpoint: \(checkpoint)")
         }
         defer { notify_cancel(registration) }
-        for _ in 0..<1_200 {
+        // The test owns the deadline; slow UI navigation must not expire a held fixture.
+        while true {
+            try Task.checkCancellation()
             var state: UInt64 = 0
             if notify_get_state(registration, &state) == NOTIFY_STATUS_OK, state == 1 { return }
-            try await Task.sleep(for: .milliseconds(50))
+            try await pause()
         }
-        throw ChsError.permanent("UI fixture checkpoint timed out: \(checkpoint)")
     }
 
     private static func fixtureStations() -> [IwlsStation] {
