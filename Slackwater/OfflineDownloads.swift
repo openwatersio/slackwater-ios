@@ -113,7 +113,7 @@ struct OfflineStatusButton: View {
                 ZStack {
                     if case .downloading(let ready, let total) = state {
                         Circle()
-                            .trim(from: 0, to: total > 0 && !uiTestQuiet ? CGFloat(ready) / CGFloat(total) : 0)
+                            .trim(from: 0, to: total > 0 ? CGFloat(ready) / CGFloat(total) : 0)
                             .stroke(SN.leaf, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                             .rotationEffect(.degrees(-90))
                             .frame(width: 28, height: 28)
@@ -359,7 +359,7 @@ struct OfflineManagerList: View {
             // sentence below carries the whole state on its own.
             if !downloads.isEmpty {
                 MonoLabel(text: String(localized: "\(readyCount) of \(downloads.count) ready", comment: "Offline-download progress. Values are ready and total station counts."))
-                ProgressView(value: uiTestQuiet ? 0 : Double(readyCount), total: Double(downloads.count))
+                ProgressView(value: Double(readyCount), total: Double(downloads.count))
                     .tint(failedCount > 0 ? SN.amber : SN.leaf)
             }
             Text(summaryLine)
@@ -405,7 +405,7 @@ struct OfflineManagerList: View {
                 ? String(localized: "Charts", comment: "Offline-map card title.")
                 : String(localized: "Charts · \(state.ready) of \(state.total) ready", comment: "Offline-map card title. Values are ready and total area counts."))
             if state.total > 0 {
-                ProgressView(value: uiTestQuiet ? 0 : Double(state.ready), total: Double(max(state.total, 1)))
+                ProgressView(value: Double(state.ready), total: Double(max(state.total, 1)))
                     .tint(state.failed > 0 ? SN.amber : SN.leaf)
             }
             Text(chartsLine(state))

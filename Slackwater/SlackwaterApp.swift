@@ -42,9 +42,34 @@ struct SlackwaterApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
+                // The SwiftUI half of `-uiTestQuiet`: `setAnimationsEnabled`
+                // above governs UIKit's own transitions, not SwiftUI's.
+                .transaction { if uiTestQuiet { $0.disablesAnimations = true } }
         }
     }
 }
+
+/// `-uiTestQuiet`: the app under XCUITest runs with no animations at all.
+///
+/// XCUITest waits for the app to report its animations complete before every
+/// synthesized event and every query, and gives up after 60 s. On hosted
+/// runners that notification stopped arriving once a CHS download was in
+/// flight, and the whole suite then measured the timeout instead of the app
+/// (#556): six consecutive 60 s waits in one test, each ending in "App
+/// animations complete notification not received", while finds and hierarchy
+/// snapshots in between stayed at a tenth of a second and the screen recording
+/// held a single unchanging frame. An app with no animations has none to
+/// finish, which covers every animation the app grows later as well.
+///
+/// Debug builds only, and never on the screenshot walks, which shoot the app
+/// as users see it.
+let uiTestQuiet: Bool = {
+#if DEBUG
+    return CommandLine.arguments.contains("-uiTestQuiet")
+#else
+    return false
+#endif
+}()
 
 /// Gate until a choice is made; list ever after.
 struct RootView: View {

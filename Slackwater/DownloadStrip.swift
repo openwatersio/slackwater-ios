@@ -30,7 +30,7 @@ struct DownloadStrip: View {
                         Spacer()
                         Text("\(done) of \(total)").monospacedDigit()
                     }
-                    ProgressView(value: uiTestQuiet ? 0 : progress, total: 10)
+                    ProgressView(value: progress, total: 10)
                 }
             }
             .buttonStyle(.plain)

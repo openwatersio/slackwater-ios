@@ -43,11 +43,11 @@ class ScreenshotTestCase: XCTestCase {
         // the next test's lists.
         // -seedTour: arm() now fires on every launch, so without this every
         // detail-opening test would grow an unexpected coach mark.
-        // -uiTestQuiet: no implicit animations and static download bars, so a
-        // download in flight cannot keep the app from going idle and stall
-        // every XCUITest step for the 60 s idle timeout on hosted runners (#556).
-        // The screenshot walks (`launchShots`) build their own arguments and
-        // keep the app as users see it.
+        // -uiTestQuiet: no animations, so the app has none to finish and
+        // XCUITest's wait for them cannot spend its 60 s timeout before every
+        // event and every query (#556, SlackwaterApp.swift). The screenshot
+        // walks (`launchShots`) build their own arguments and keep the app as
+        // users see it.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
                              "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]

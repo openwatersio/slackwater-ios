@@ -160,26 +160,11 @@ struct StationCard<Trailing: View>: View {
     }
 }
 
-/// `-uiTestQuiet`: the UI tests' discriminating switch for #556. On hosted
-/// runners every XCUITest step waited out the 60 s app-idle timeout once a
-/// CHS download was in flight; with this set the app runs with UIKit's
-/// implicit animations off and draws every download bar static, so a run
-/// that still stalls is the fit's CPU, not rendering. Debug builds only.
-let uiTestQuiet: Bool = {
-#if DEBUG
-    return CommandLine.arguments.contains("-uiTestQuiet")
-#else
-    return false
-#endif
-}()
-
 struct StationDownloadProgress: View {
     let value: Double
 
     var body: some View {
-        // Held at zero under `-uiTestQuiet`: a bar that re-renders on every
-        // fetched chunk is one of #556's two suspects. No test reads its value.
-        ProgressView(value: uiTestQuiet ? 0 : value, total: 10)
+        ProgressView(value: value, total: 10)
             .progressViewStyle(.linear)
             .tint(SN.leaf)
             .accessibilityLabel(Text("Downloading"))
