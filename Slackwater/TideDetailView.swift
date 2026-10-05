@@ -120,11 +120,7 @@ struct TideDetailView: View {
                                 turnIsHigh: atTurn.map { $0.kind == .high },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
                                 heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
-                            above: {
-                                if let coverage = activePreview?.coverage {
-                                    TidePreviewNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
-                                }
-                            },
+                            above: { EmptyView() },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
@@ -143,6 +139,9 @@ struct TideDetailView: View {
                             },
                             links: { tl, jump in
                                 VStack(spacing: 12) {
+                                    if let coverage = activePreview?.coverage {
+                                        TidePreviewNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
+                                    }
                                     SummaryTiles(primary: range,
                                                  primaryDetail: rangeDetail,
                                                  // A year, which is what the tile is
@@ -399,13 +398,14 @@ private struct TidePreviewNotice: View {
     @ObservedObject private var net = Connectivity.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .center, spacing: 4) {
             Text("Predictions available through \(end.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
             Text(tidePreviewDownloadStatus(downloads.queue.job(stationID), online: net.online))
                 .foregroundStyle(SN.foam.opacity(0.7))
         }
         .font(.caption)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 20).padding(.vertical, 8)
         .accessibilityIdentifier("chs-tide-preview")
     }

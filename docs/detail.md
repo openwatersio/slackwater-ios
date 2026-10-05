@@ -300,7 +300,7 @@ Retries are automatic, backing off from 60 seconds and doubling to a 15-minute c
 
 ### 12.1.1 Downloaded tide preview
 
-An iPhone tide port becomes useful after its first seven-elapsed-day IWLS request, covering the preceding 48 hours and about five days ahead. Heights interpolate the downloaded 15-minute predictions; highs and lows come from those samples. The detail identifies these as official CHS predictions, shows “Predictions available through <date>”, and describes additional downloading separately from the available reading. Offline, retry, and failure states keep the downloaded prediction visible inside its coverage.
+An iPhone tide port becomes useful after its first seven-elapsed-day IWLS request, covering the preceding 48 hours and about five days ahead. Heights interpolate the downloaded 15-minute predictions; highs and lows come from those samples. The detail identifies these as official CHS predictions, shows “Predictions available through <date>”, and describes additional downloading separately from the available reading. The availability and download notice is centered between the scrubber and the summary cards. Offline, retry, and failure states keep the downloaded prediction visible inside its coverage.
 
 The preview scrubber stops at the actual downloaded bounds. Date picking and tide alerts are unavailable until the full model lands. The schedule contains only downloaded turns. A completed 60-day fit replaces the preview in the same open detail, preserves the selected instant, and enables the ordinary continuous timeline. The footer and station details then identify the on-device fitted prediction. Derived gates, paired-current tides, and watch model transfer continue to require that full model.
 

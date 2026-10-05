@@ -13,6 +13,11 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         let preview = app.descendants(matching: .any)["chs-tide-preview"].firstMatch
         XCTAssert(preview.appears(within: 10))
         XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        let strip = app.descendants(matching: .any)["timeline-strip"].firstMatch
+        let moon = app.descendants(matching: .any)["tile-moon"].firstMatch
+        XCTAssertGreaterThanOrEqual(preview.frame.minY, strip.frame.maxY)
+        XCTAssertLessThanOrEqual(preview.frame.maxY, moon.frame.minY)
+        XCTAssertEqual(preview.frame.midX, strip.frame.midX, accuracy: 1)
         XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
         save(app, "tide-preview.png")
 
