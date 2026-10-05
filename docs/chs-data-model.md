@@ -26,7 +26,7 @@ Both halves of that sentence constrain more work than people expect.
 
 | Series | What | Used for |
 |---|---|---|
-| `wlp` | water-level predictions, 1-minute native | tide ports — decimated to 15 min before fitting |
+| `wlp` | water-level predictions, 1-minute native | tide ports — 15-minute preview samples and full-model fitting |
 | `wcsp1` | current speed predictions | current gates |
 | `wcdp1` | current direction predictions | current gates — projected onto the flood axis |
 | `wcp1-events` | CHS's own published slack/max events | **validation only**, never shipped |
@@ -80,6 +80,8 @@ So, structurally:
   marks *"Predictions — not for navigation"* on every detail footer.
 
 `ChsFitter` runs Neaps's native Swift/Accelerate fit for both tide heights and signed current velocities, evaluating astronomy at every sample. `ChsFitter.basis` preserves the validated 23 constituents and excludes SA/SSA from the 60-day fit. Recorded Victoria and Dodd samples check coefficient parity against `@slackwater/engine` and prediction error on held-out data, including comparison with the frozen CHS fitter. The JavaScript artifacts live under `tools/chs-reference` for offline validation and field generation; they are not bundled with the app.
+
+On iPhone, tide ports first cache seven elapsed days of official water-level predictions, beginning 48 hours before station-local midnight. The finite preview supplies the initial reading, curve, and sampled turns while the full model downloads. It does not make yearly claims, supply derived gates, or travel to the watch as a harmonic model. Preview files survive interrupted downloads and remain useful offline inside their coverage; invalid or expired coverage never permits extrapolation.
 
 The 60-day tide window is not a download-time knob. A 35-day fit missed held-out CHS predictions by up to 121 cm, the safe floor is about 48 days, and the in-sample `rms` cannot see the failure. [CHS tide validation](validation/chs-tides.md) has the bar and the sweep.
 

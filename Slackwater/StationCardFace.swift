@@ -30,6 +30,7 @@ struct StationCard<Trailing: View>: View {
     /// on `detail`: the two differ in opacity, width, and font treatment, and
     /// conflating them regresses both.
     var status: CardStatus? = nil
+    var usableWhileDownloading = false
     var statusDetail: String? = nil
     var downloadProgress: Double? = nil
     var opacity: Double = 1
@@ -88,7 +89,7 @@ struct StationCard<Trailing: View>: View {
             Spacer(minLength: 8)
             // Same rhythm as the identity column's name/region stack.
             VStack(alignment: .trailing, spacing: 2) {
-                if let status, status.showsAutomaticStatus {
+                if let status, status.showsAutomaticStatus, !usableWhileDownloading {
                     CardStatusStrip(status: status, detail: statusDetail)
                 } else {
                     trailing()
@@ -98,7 +99,7 @@ struct StationCard<Trailing: View>: View {
     }
 
     var body: some View {
-        let placeholder = status?.showsPlaceholder == true
+        let placeholder = status?.showsPlaceholder == true && !usableWhileDownloading
         VStack(alignment: .leading, spacing: 0) {
             // Which candidate wins is verified by screenshot, not by
             // unit test — ViewThatFits exposes no way to ask.
@@ -127,8 +128,10 @@ struct StationCard<Trailing: View>: View {
             // both candidates, so it has no business being measured by the
             // picker — shorter copy does not change that, it only shrinks the
             // window in which the bug would be visible.
-            if let status, status.showsIndicator, !status.showsAutomaticStatus {
+            if let status, status.showsIndicator, !status.showsAutomaticStatus || usableWhileDownloading {
                 CardStatusStrip(status: status, detail: statusDetail)
+                    .accessibilityLabel(usableWhileDownloading ? (statusDetail ?? status.label)
+                                        : statusDetail.map { "\($0). \(status.accessibilityLabel)" } ?? status.accessibilityLabel)
                     .padding(.top, 10)
             }
         }

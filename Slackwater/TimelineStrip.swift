@@ -492,6 +492,25 @@ struct TimelineData {
                             slackWindows: windows, slackThreshold: threshold)
     }
 
+    static func build(preview: ChsTidePreview, tide: TideStationRecord, now: Date, anchor: Date) -> TimelineData? {
+        guard let coverage = preview.coverage else { return nil }
+        let start = coverage.lowerBound, end = coverage.upperBound
+        let chrome = dayChrome(tz: tide.tz, lat: tide.latitude, lon: tide.longitude, anchor: anchor, now: now)
+        let points = preview.heights(from: start, to: end, step: 600)
+        let rates = preview.rates(from: start, to: end, step: 600)
+        let extremes = preview.extremes(from: start, to: end)
+        let eclipses = windowEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
+        let solar = windowSolarEclipses(lat: tide.latitude, lon: tide.longitude, start: start, end: end)
+        let sun = chrome.days.flatMap { [$0.sunrise, $0.sunset].compactMap { $0 } }
+        let snaps = Array(Set(extremes.map(\.time) + tideFlowArrows(rates).map(\.time) + sun
+                              + eclipses.flatMap(\.contacts) + solar.flatMap(\.contacts)))
+            .filter { coverage.contains($0) }.sorted()
+        return TimelineData(tz: tide.tz, anchor: anchor, today: chrome.today, start: start, end: end,
+                            days: chrome.days, tidePoints: points, tideRates: rates, tideExtremes: extremes,
+                            currentPoints: [], currentEvents: [], snapTimes: snaps,
+                            eclipses: eclipses, solarEclipses: solar, slackWindows: [])
+    }
+
     static func build(tide: TideStationRecord?, current: CurrentStationRecord?,
                       now: Date, anchor: Date, gate: DerivedGateRecord? = nil,
                       threshold: Double = slackThresholdKn) -> TimelineData {

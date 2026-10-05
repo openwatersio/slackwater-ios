@@ -377,6 +377,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
         Task { @MainActor [weak self, weak style] in
             let service = ChsFitService.shared
             let tides = service.tideRecords
+            let previews = service.tidePreviews
             let currents = service.currentRecords
             let geojson = await Task.detached(priority: .utility) { () -> Data? in
                 let items = visibleStations(in: box, zoom: zoom, pinned: selectedID,
@@ -387,7 +388,7 @@ final class MapStyler: NSObject, MLNMapViewDelegate {
                 // web port learned the fetch-on-open version is a request
                 // storm against IWLS).
                 let states = chsPinStates(at: now, items: items, detailed: zoom >= READING_MIN_ZOOM,
-                                          tideRecords: tides, currentRecords: currents)
+                                          tideRecords: tides, currentRecords: currents, tidePreviews: previews)
                 let geojson = pinFeatures(for: items, zoom: zoom, chsStates: states, now: now,
                                           selectedID: selectedID)
                 return try? JSONSerialization.data(withJSONObject: geojson)

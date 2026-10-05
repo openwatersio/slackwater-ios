@@ -3468,6 +3468,53 @@
         }
       }
     },
+    "Additional download failed. Your downloaded predictions remain available." : {
+      "comment" : "The lasting-model download failed, but the cached official tide predictions remain usable within their date coverage.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der zusätzliche Download ist fehlgeschlagen. Deine heruntergeladenen Vorhersagen bleiben verfügbar."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La descarga adicional falló. Tus predicciones descargadas siguen disponibles."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le téléchargement supplémentaire a échoué. Vos prévisions téléchargées restent disponibles."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加のダウンロードに失敗しました。ダウンロード済みの予測は引き続き利用できます。"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den ekstra nedlastingen mislyktes. De nedlastede prognosene er fortsatt tilgjengelige."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De extra download is mislukt. Je gedownloade voorspellingen blijven beschikbaar."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O download adicional falhou. As previsões baixadas continuam disponíveis."
+          }
+        }
+      }
+    },
     "Additional stations use TICON-4 harmonic constants from SEANOE under CC BY 4.0 (seanoe.org/data/00980/109129)." : {
       "comment" : "Station discovery interface text.",
       "localizations" : {
@@ -7437,6 +7484,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Baixando áreas do mapa — o mundo, as águas próximas e suas estações salvas."
+          }
+        }
+      }
+    },
+    "Downloading more data" : {
+      "comment" : "Additional prediction data is downloading while existing readings stay usable.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Daten werden geladen"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Descargando más datos"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Téléchargement de données supplémentaires"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加データをダウンロード中"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laster ned flere data"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer gegevens downloaden"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Baixando mais dados"
           }
         }
       }
@@ -12514,6 +12608,100 @@
         }
       }
     },
+    "More data is queued for download" : {
+      "comment" : "The place has cached official predictions; additional data is queued and is not downloading yet.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Daten stehen zum Download bereit"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más datos están en la cola de descarga"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’autres données sont en attente de téléchargement"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加データのダウンロード待ち"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flere data står i nedlastingskøen"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer gegevens staan in de downloadwachtrij"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais dados estão na fila de download"
+          }
+        }
+      }
+    },
+    "More data will download when you reconnect" : {
+      "comment" : "The cached tide preview works offline; its lasting offline model still needs a connection.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Daten werden geladen, sobald du wieder verbunden bist"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se descargarán más datos cuando vuelvas a conectarte"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "D’autres données seront téléchargées lorsque vous vous reconnecterez"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再接続すると追加データをダウンロードします"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flere data lastes ned når du kobler til igjen"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meer gegevens worden gedownload zodra je weer verbinding hebt"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais dados serão baixados quando você se reconectar"
+          }
+        }
+      }
+    },
     "More than half lit, filling toward full." : {
       "comment" : "Plain-language explanation of a waxing gibbous moon.",
       "localizations" : {
@@ -14685,6 +14873,100 @@
         }
       }
     },
+    "Official CHS predictions" : {
+      "comment" : "Prediction source for a downloaded official tide preview. Keep CHS exact.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offizielle CHS-Vorhersagen"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones oficiales de CHS"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévisions officielles du CHS"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CHSの公式予測"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offisielle CHS-prognoser"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Officiële CHS-voorspellingen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsões oficiais do CHS"
+          }
+        }
+      }
+    },
+    "Official CHS tide predictions, downloaded to this device. Heights are above LLWLT chart datum." : {
+      "comment" : "Provenance of the cached tide preview. Keep CHS and LLWLT exact; these predictions are official, not fitted on the device.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offizielle CHS-Gezeitenvorhersagen, auf dieses Gerät heruntergeladen. Die Höhen beziehen sich auf das Kartennull LLWLT."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones oficiales de mareas de CHS, descargadas en este dispositivo. Las alturas se miden sobre el datum de la carta LLWLT."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévisions de marées officielles du CHS, téléchargées sur cet appareil. Les hauteurs sont mesurées au-dessus du zéro des cartes LLWLT."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスにダウンロードしたCHSの公式潮汐予測です。潮位は海図基準面LLWLTからの高さです。"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offisielle tidevannsprognoser fra CHS, lastet ned til denne enheten. Høydene er over sjøkartnull LLWLT."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Officiële getijdenvoorspellingen van CHS, gedownload naar dit apparaat. Hoogten worden gemeten boven kaartdatum LLWLT."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsões oficiais de marés do CHS, baixadas neste dispositivo. As alturas são medidas acima do datum da carta LLWLT."
+          }
+        }
+      }
+    },
     "Offline" : {
       "comment" : "Compact network status.",
       "localizations" : {
@@ -16470,6 +16752,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "As previsões não foram baixadas."
+          }
+        }
+      }
+    },
+    "Predictions available through %@" : {
+      "comment" : "Date through which downloaded official tide predictions remain usable. The value is a date in the place’s time zone.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorhersagen verfügbar bis %@"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicciones disponibles hasta %@"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prévisions disponibles jusqu’au %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@までの予測を利用できます"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prognoser tilgjengelige til %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voorspellingen beschikbaar tot %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previsões disponíveis até %@"
           }
         }
       }
@@ -24962,6 +25291,53 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aguardando nova tentativa"
+          }
+        }
+      }
+    },
+    "Waiting to retry the additional download" : {
+      "comment" : "Cached official predictions are usable while the lasting-model download waits for its retry.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warten auf einen erneuten Versuch des zusätzlichen Downloads"
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esperando para reintentar la descarga adicional"
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d’une nouvelle tentative de téléchargement supplémentaire"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加ダウンロードの再試行を待機中"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Venter på å prøve den ekstra nedlastingen igjen"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wachten om de extra download opnieuw te proberen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aguardando para tentar novamente o download adicional"
           }
         }
       }

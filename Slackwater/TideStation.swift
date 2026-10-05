@@ -137,6 +137,7 @@ protocol TidePredicting {
 }
 extension Station: TidePredicting {}
 extension SubordinateTideStation: TidePredicting {}
+extension ChsTidePreview: TidePredicting {}
 
 /// What a list card shows: height now, direction, next turn. Heights in metres.
 struct CardState {
@@ -163,7 +164,7 @@ extension TideStationRecord {
         let height = station.heights(from: now, to: now.addingTimeInterval(1), step: 1).first?.height ?? 0
         // Direction from the next turn, not neighbouring samples (web tides.ts:
         // near a turn the curve is flat and sampling picks up numerical noise).
-        let rising = next.map { $0.kind == .high } ?? true
+        let rising = next.map { $0.kind == .high } ?? (station as? ChsTidePreview).map { $0.rateOfChange(at: now) >= 0 } ?? true
         return CardState(height: height, rising: rising, next: next)
     }
 }

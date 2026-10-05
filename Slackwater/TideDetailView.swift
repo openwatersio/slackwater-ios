@@ -6,6 +6,7 @@ import SlackwaterKit
 
 struct TideDetailView: View {
     let record: TideStationRecord
+    var preview: ChsTidePreview? = nil
     @AppStorage(unitsKey, store: AppGroup.defaults) private var units = "imperial"
 
     @State private var live = appNow()
@@ -13,6 +14,11 @@ struct TideDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    @State private var previewTimeline: TimelineData?
+    @State private var displayedPreview: ChsTidePreview?
+    @State private var previewGate = ScrollGate()
+    @ObservedObject private var downloads = ChsFitService.shared
+    @ObservedObject private var net = Connectivity.shared
     @State private var chsFittedAt: Date?
     /// The nearest current-series station inside `nearbyStationRadiusKm`, or
     /// nil. Computed once on appear — a catalog scan has no place in a body
@@ -25,7 +31,8 @@ struct TideDetailView: View {
     /// scale governor fits the curve against.
     @State private var viewportPts: CGFloat = 0
 
-    private var timeline: TimelineData? { store?.timeline }
+    private var timeline: TimelineData? { store?.timeline ?? previewTimeline }
+    private var activePreview: ChsTidePreview? { store == nil ? preview ?? displayedPreview : nil }
 
     private var imperial: Bool { units == "imperial" }
     private var tz: TimeZone { record.tz }
@@ -34,7 +41,10 @@ struct TideDetailView: View {
     private var nextExtreme: TideExtreme? {
         timeline?.tideExtremes.first { $0.time > scrubTime }
     }
-    private var rising: Bool { nextExtreme.map { $0.kind == .high } ?? true }
+    private var rising: Bool {
+        if let preview = activePreview { return preview.rateOfChange(at: scrubTime) >= 0 }
+        return nextExtreme.map { $0.kind == .high } ?? true
+    }
     private var prevExtreme: TideExtreme? {
         timeline?.tideExtremes.last { $0.time <= scrubTime }
     }
@@ -99,14 +109,32 @@ struct TideDetailView: View {
                             timeline: timeline, entries: scheduleEntries,
                             scrubTime: $scrubTime,
                             anchor: $anchor,
-                            onPicked: { picked in store?.jump(to: scrubTime, anchor: picked) },
+                            canPickDate: activePreview == nil,
+                            onPicked: { picked in
+                                if let coverage = activePreview?.coverage {
+                                    anchor = todayLocal(tz)
+                                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                                } else { store?.jump(to: scrubTime, anchor: picked) }
+                            },
                             topBackdrop: AnyView(SkyBackdrop(sky: sky)),
-                            alertOffer: tideAlertOffer(
+                            alertOffer: activePreview == nil ? tideAlertOffer(
                                 scrubbedAway: scrubbedAway(scrubTime, from: live),
                                 turnIsHigh: atTurn.map { $0.kind == .high },
                                 onEclipseContact: isOnEclipseContact(scrubTime, timeline?.eclipses ?? []),
-                                heightM: scrubHeight, rising: rising, imperial: imperial),
-                            above: { EmptyView() },
+                                heightM: scrubHeight, rising: rising, imperial: imperial) : nil,
+                            above: {
+                                if let coverage = activePreview?.coverage {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Predictions available through \(coverage.upperBound.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: tz)))")
+                                        Text(previewDownloadStatus)
+                                            .foregroundStyle(SN.foam.opacity(0.7))
+                                    }
+                                    .font(.caption)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 20).padding(.vertical, 8)
+                                    .accessibilityIdentifier("chs-tide-preview")
+                                }
+                            },
                             card: { tl in
                                 let geo = TimelineGeo(data: tl, scale: store?.scale)
                                 TimelineScrubStrip(data: tl, geo: geo,
@@ -119,7 +147,7 @@ struct TideDetailView: View {
                                                    commentary: commentary,
                                                    commentaryTint: rateWarning(over: sky.chromeGround),
                                                    onCommentary: scrubToCommentary,
-                                                   scrollGate: store?.gate,
+                                                   scrollGate: store?.gate ?? previewGate,
                                                    onViewportWidth: { viewportPts = $0 })
                                     .overlay(alignment: .top) { lead(sky: sky) }
                             },
@@ -150,12 +178,9 @@ struct TideDetailView: View {
                                 }
                             })
             .onAppear {
-                if store == nil {
-                    // A shared link that landed first has placed the anchor and
-                    // the scrub (ScrubDetailScaffold.jump): open on its moment,
-                    // or the first build covers now and the strip clamps it away.
-                    let linked = anchor != .distantPast
-                    if !linked { anchor = todayLocal(tz) }
+                let linked = anchor != .distantPast
+                if anchor == .distantPast { anchor = todayLocal(tz) }
+                if preview == nil, store == nil {
                     let s = TimelineWindowStore(source: .tide(record))
                     s.start(anchor: anchor, now: live, focus: linked ? scrubTime : nil)
                     store = s
@@ -170,12 +195,42 @@ struct TideDetailView: View {
                     nearbyCurrent = n
                 }
             }
-            .onChange(of: scrubTime) { _, t in store?.focus(t, viewportPts: viewportPts) }
+            .task(id: preview?.fetchedAt) {
+                if anchor == .distantPast { anchor = todayLocal(tz) }
+                if let preview, let coverage = preview.coverage {
+                    displayedPreview = preview
+                    anchor = todayLocal(tz)
+                    scrubTime = min(max(scrubTime, coverage.lowerBound), coverage.upperBound)
+                    let record = record, now = live, day = anchor
+                    let built = await Task.detached(priority: .userInitiated) {
+                        TimelineData.build(preview: preview, tide: record, now: now, anchor: day)
+                    }.value
+                    guard !Task.isCancelled else { return }
+                    previewTimeline = built
+                } else if store == nil {
+                    while !previewGate.isQuiet {
+                        guard (try? await Task.sleep(for: .milliseconds(50))) != nil else { return }
+                    }
+                    guard !Task.isCancelled else { return }
+                    let s = TimelineWindowStore(source: .tide(record))
+                    s.start(anchor: anchor, now: live, focus: scrubTime)
+                    store = s
+                    previewTimeline = nil
+                    chsFittedAt = record.isChs ? ChsModelStore.load(record.id)?.fittedAt : nil
+                }
+            }
+            .onChange(of: scrubTime) { _, t in
+                if let coverage = activePreview?.coverage {
+                    let clamped = min(max(t, coverage.lowerBound), coverage.upperBound)
+                    if t != clamped { scrubTime = clamped }
+                } else { store?.focus(t, viewportPts: viewportPts) }
+            }
             // The schedule follows a scrub that has settled somewhere outside
             // its window — the strip is endless now, and a list still describing
             // three weeks ago would be a lie. A cancelled sleep is a scrub
             // still in motion, same rest rule as the chrome row's.
             .task(id: scrubTime) {
+                guard activePreview == nil else { return }
                 guard (try? await Task.sleep(for: .milliseconds(600))) != nil else { return }
                 // `Timeline.window`, not `scheduleRange`: the look-back is this anchor's own ink.
                 if let tl = timeline,
@@ -272,7 +327,11 @@ struct TideDetailView: View {
     // full clause-10 licence statement carries its weight in Settings.
     private var footer: some View {
         DetailFooter(stationID: record.id, scrubTime: scrubTime, tz: tz) {
-            if record.isChs {
+            if activePreview != nil {
+                Text("Official CHS tide predictions, downloaded to this device. Heights are above LLWLT chart datum.")
+                    .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            } else if record.isChs {
                 Text("\(record.chartDatum) chart datum. Downloaded from CHS (IWLS), then fitted and computed on this device. These are not CHS-published predictions.")
                     .font(.caption2).foregroundStyle(SN.foam.opacity(0.3))
                     .multilineTextAlignment(.center)
@@ -299,7 +358,9 @@ struct TideDetailView: View {
             StationDetailRow("Station", record.id)
             StationDetailRow("Position", formatCoord(lat: record.latitude, lon: record.longitude))
             StationDetailRow("Time zone", record.timezone)
-            if let ref = record.referenceRecord {
+            if activePreview != nil {
+                StationDetailRow("Prediction", String(localized: "Official CHS predictions"))
+            } else if let ref = record.referenceRecord {
                 StationDetailRow("Reference", "\(ref.name), \(Int(distanceKm(record.latitude, record.longitude, ref.latitude, ref.longitude).rounded())) km away")
                 StationDetailRow("Prediction", "NOAA reference highs and lows, adjusted by published offsets and computed on this device")
             } else {
@@ -321,7 +382,12 @@ struct TideDetailView: View {
     /// Engine-exact height — the same call the old model's committed readout
     /// made, so the now-readout is unchanged by the scrub rework.
     private func exactHeight(at t: Date) -> Double {
-        record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+        if let preview = activePreview { return preview.height(at: t) ?? 0 }
+        return record.engineStation.heights(from: t, to: t.addingTimeInterval(1), step: 1).first?.height ?? 0
+    }
+
+    private var previewDownloadStatus: String {
+        tidePreviewDownloadStatus(downloads.queue.job(record.id), online: net.online)
     }
 
     private func returnToNow() {
@@ -333,7 +399,9 @@ struct TideDetailView: View {
         // the store only guarantees now's chunks exist.
         anchor = todayLocal(tz)
         store?.jump(to: live, anchor: anchor)
-        scrubTime = live
+        if let coverage = activePreview?.coverage {
+            scrubTime = min(max(live, coverage.lowerBound), coverage.upperBound)
+        } else { scrubTime = live }
     }
 }
 

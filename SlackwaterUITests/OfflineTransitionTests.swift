@@ -3,6 +3,57 @@
 import XCTest
 
 final class OfflineTransitionTests: ScreenshotTestCase {
+    func testTidePreviewStaysUsableOfflineThenFinishesInOpenDetail() {
+        let (app, token) = fixture("tide-preview-final", "chs-victoria", fix: ("48.4235", "-123.3705"))
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(app.staticTexts["Downloading…"].appears(within: 10))
+        save(app, "tide-waiting.png")
+        releaseFixture(token, "chs-victoria-first-chunk")
+        let preview = app.descendants(matching: .any)["chs-tide-preview"].firstMatch
+        XCTAssert(preview.appears(within: 10))
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+        save(app, "tide-preview.png")
+
+        app.terminate()
+        app.launchArguments = testArguments(["-seedGate", "-nowOffsetDays", "1"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        XCTAssert(app.staticTexts["More data will download when you reconnect"].exists)
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+
+        app.terminate()
+        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", UUID().uuidString,
+                                            "-chsFixtureScenario", "tide-preview-fail"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        XCTAssert(app.staticTexts["Additional download failed. Your downloaded predictions remain available."].appears(within: 10))
+        XCTAssertFalse(scheduleValues(app, "\\b\\d+\\.\\d+ (?:ft|m)\\b").isEmpty)
+
+        app.terminate()
+        let resumeToken = UUID().uuidString
+        app.launchArguments = testArguments(["-seedGate", "-chsFitOnly", "chs-victoria", "-chsFixture", resumeToken,
+                                            "-chsFixtureScenario", "hold-first"])
+        app.launch()
+        openSearch(app, "victoria")
+        pickSearchResult(app, app.staticTexts["Victoria"].firstMatch)
+        XCTAssert(preview.appears(within: 5))
+        scrubStrip(app)
+        settleScrub(app)
+        let selectedTime = leadReading(app).value as? String
+        releaseFixture(resumeToken, "chs-victoria-first-chunk")
+        XCTAssert(preview.disappears(within: 30))
+        XCTAssertEqual(leadReading(app).value as? String, selectedTime)
+        XCTAssert(app.staticTexts["Today"].appears(within: 5))
+        XCTAssert(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'computed on this device'")).firstMatch.exists)
+        save(app, "tide-full-model.png")
+    }
+
     private func fixture(_ scenario: String = "terminal", _ ids: String,
                          fix: (String, String)? = nil) -> (XCUIApplication, String) {
         let token = UUID().uuidString

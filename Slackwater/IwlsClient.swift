@@ -348,10 +348,13 @@ final class IwlsFetcher {
         try Task.checkCancellation()
 #if DEBUG
         if Self.usesFixture {
+            if Self.fixtureScenario == "tide-preview-fail", code == "wlp" {
+                throw ChsError.permanent("fixture: additional tide download failed")
+            }
             let key = "\(stationID):\(code)"
             let count = fixtureRequests[key, default: 0]
             fixtureRequests[key] = count + 1
-            if Self.fixtureScenario == "hold-first", count == 0 {
+            if ["hold-first", "tide-preview-final"].contains(Self.fixtureScenario ?? ""), count == 0 {
                 try await Self.waitForFixtureRelease("\(stationID)-first-chunk")
             }
             if Self.fixtureScenario == "no-interrupt", count == 0 {

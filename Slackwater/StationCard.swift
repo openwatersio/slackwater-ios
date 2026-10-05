@@ -73,15 +73,22 @@ struct StationCardView: View {
     /// through `init(info:)` and its record is decoded on demand (#317); a
     /// CHS-fitted port already has one and hands it over directly.
     private let resolve: @Sendable () async -> TideStationRecord?
+    private let preview: ChsTidePreview?
+    private let status: CardStatus?
+    private let statusDetail: String?
     @State private var state: CardState?
     @State private var graph: StationCardGraph?
 
-    init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false) {
+    init(record: TideStationRecord, imperial: Bool, km: Double? = nil, eager: Bool = false,
+         preview: ChsTidePreview? = nil, status: CardStatus? = nil, statusDetail: String? = nil) {
         name = record.name
         region = record.region
         self.imperial = imperial
         self.km = km
         resolve = { record }
+        self.preview = preview
+        self.status = status
+        self.statusDetail = statusDetail
         if eager { seed(record) }
     }
 
@@ -91,6 +98,9 @@ struct StationCardView: View {
         self.imperial = imperial
         self.km = km
         resolve = { await info.resolveTideRecord() }
+        preview = nil
+        status = nil
+        statusDetail = nil
         if eager, let record = info.tideRecord { seed(record) }
     }
 
@@ -107,23 +117,25 @@ struct StationCardView: View {
     /// which publishes continuously while the map is up.
     private mutating func seed(_ record: TideStationRecord) {
         let now = appNow()
-        let seeded = tideSeeds.value(for: "\(record.id)-\(imperial)", now: now) {
-            (record.cardState(at: now), record.cardGraph(at: now, imperial: imperial))
+        let station: any TidePredicting = preview.map { $0 as any TidePredicting } ?? record.engineStation
+        let seeded = tideSeeds.value(for: "\(record.id)-\(imperial)-\(preview?.fetchedAt.timeIntervalSince1970 ?? 0)", now: now) {
+            (record.cardState(at: now, station: station), record.cardGraph(at: now, imperial: imperial, station: station))
         }
         _state = State(initialValue: seeded.0)
         _graph = State(initialValue: seeded.1)
     }
 
     var body: some View {
-        StationCard(name: name, region: region, km: km, graph: graph) {
+        StationCard(name: name, region: region, km: km, status: status, usableWhileDownloading: preview != nil, statusDetail: statusDetail, graph: graph) {
             if let state {
                 ConditionsItem(reading: .tide(state, imperial: imperial))
             }
         }
-        .task {
-            guard state == nil || graph == nil, let record = await resolve() else { return }
-            if state == nil { state = record.cardState(at: appNow()) }
-            if graph == nil { graph = record.cardGraph(at: appNow(), imperial: imperial) }
+        .task(id: preview?.fetchedAt) {
+            guard let record = await resolve() else { return }
+            let station: any TidePredicting = preview.map { $0 as any TidePredicting } ?? record.engineStation
+            state = record.cardState(at: appNow(), station: station)
+            graph = record.cardGraph(at: appNow(), imperial: imperial, station: station)
         }
     }
 }
@@ -144,6 +156,10 @@ struct ChsCardView: View {
         switch service.state(info.id) {
         case .fitted(let record):
             StationCardView(record: record, imperial: imperial, km: km, eager: eager)
+        case .preview(let preview):
+            StationCardView(record: info.previewIdentity, imperial: imperial, km: km, eager: eager,
+                            preview: preview, status: cardStatus(id: info.id),
+                            statusDetail: tidePreviewDownloadStatus(service.queue.job(info.id), online: net.online))
         case .fitting:
             pending()
         case .pending:
@@ -212,6 +228,8 @@ struct ChsGateCardView: View {
         switch service.state(gate.reference) {
         case .fitted(let port):
             fittedCard(DerivedGateRecord(gate: gate, port: port))
+        case .preview:
+            pending()
         case .fitting:
             pending()
         case .pending:

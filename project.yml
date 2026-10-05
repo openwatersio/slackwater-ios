@@ -48,7 +48,7 @@ packages:
     # so the repo has no post-rename semver tag yet. Becomes a `from:` version
     # at the deliberate 1.0.0 release. Native CHS fitting requires #341.
     url: https://github.com/openwatersio/slackwater
-    revision: 6021524a3f2c5f609cd41af645ebea4a0e135bf8
+    revision: bd9f1b2424c1c8abd580499329af3b14c7debe07
   SlackwaterDatabase:
     # Exact, and the same release as @slackwater/database in tools/package.json:
     # the reader and the stations.tcdb that gen-tides builds must match.
@@ -110,6 +110,7 @@ targetTemplates:
       # watch adds the index in its own target below.
       - Slackwater/StationIndex.swift
       - Slackwater/ChsStation.swift
+      - Slackwater/ChsTidePreview.swift
       - Slackwater/ChsGate.swift
       - Slackwater/ChsCurrentGate.swift
     dependencies:
