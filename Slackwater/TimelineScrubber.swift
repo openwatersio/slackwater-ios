@@ -7,6 +7,19 @@ import UIKit
 
 // MARK: - The scroll host: native pan + momentum, magnet on settle
 
+/// Land on the target instead of riding an animated `setContentOffset` there.
+///
+/// Reduce Motion asks for it. `-uiTestQuiet` needs it: with UIKit's animations
+/// off the scroll view arrives in the same frame and never calls
+/// `scrollViewDidEndScrollingAnimation`, which is the callback that parks
+/// `scrubTime` on the stop and clears `magneting`. Left on the animated path,
+/// the first magnet after a scrub wedges the coordinator for the life of the
+/// detail — `magnet` returns early ever after, and every later scrub leaves
+/// the readout exactly where it was.
+private var landsInstantly: Bool {
+    UIAccessibility.isReduceMotionEnabled || uiTestQuiet
+}
+
 struct TimelineScrubber: UIViewRepresentable {
     let data: TimelineData
     let geo: TimelineGeo
@@ -166,7 +179,7 @@ struct TimelineScrubber: UIViewRepresentable {
             co.stopIntro()
             sv.setContentOffset(sv.contentOffset, animated: false)
             let travel = abs(desired - sv.contentOffset.x)
-            if UIAccessibility.isReduceMotionEnabled || travel < 0.5
+            if landsInstantly || travel < 0.5
                 || travel > CGFloat(Timeline.snapJumpHours) * Timeline.pph {
                 co.magneting = false
                 sv.contentOffset = CGPoint(x: desired, y: 0)
@@ -397,7 +410,7 @@ struct TimelineScrubber: UIViewRepresentable {
             didInitialCenter = true
             laidOutWidth = sv.bounds.width
             guard isIntro else { return }
-            guard !UIAccessibility.isReduceMotionEnabled else {
+            guard !landsInstantly else {
                 sv.contentOffset = CGPoint(x: destinationX, y: 0)
                 Task { @MainActor [weak self] in self?.parent.scrubTime = destination }
                 return
@@ -501,7 +514,7 @@ struct TimelineScrubber: UIViewRepresentable {
             // Stop a fling first, then ride the magnet's animated path — the
             // same landing a tapped pill gets (updateUIView's jump branch).
             sv.setContentOffset(sv.contentOffset, animated: false)
-            if UIAccessibility.isReduceMotionEnabled || abs(desired - sv.contentOffset.x) < 0.5 {
+            if landsInstantly || abs(desired - sv.contentOffset.x) < 0.5 {
                 park(sv, at: landing)
             } else {
                 magneting = true
@@ -587,7 +600,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let desired = CGPoint(x: parent.data.x(target) - sv.bounds.width / 2, y: 0)
             // Reduce Motion: park on the stop directly, the same landing a
             // tap or a pill gets.
-            if UIAccessibility.isReduceMotionEnabled {
+            if landsInstantly {
                 park(sv, at: target)
                 return
             }

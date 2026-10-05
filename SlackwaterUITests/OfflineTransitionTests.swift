@@ -111,8 +111,10 @@ final class OfflineTransitionTests: ScreenshotTestCase {
                                    fix: ("49.1344", "-123.8171"))
         openDownloads(app)
         let dodd = app.descendants(matching: .any)["download-row-chs-dodd-narrows"].firstMatch
-        XCTAssert(dodd.appears(within: 10))
-        XCTAssert(dodd.label.contains("Downloading"))
+        // The status in the predicate, not read off the row once it appears:
+        // the row can exist a frame before its label says Downloading (#341).
+        XCTAssert(waitFor(dodd, "label CONTAINS 'Downloading'"),
+                  "Dodd Narrows never showed as downloading: \(dodd.label)")
         app.buttons["Done"].tap()
         openSearch(app, "tofino")
         pickSearchResult(app, app.staticTexts["Tofino"].firstMatch)

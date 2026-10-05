@@ -43,8 +43,13 @@ class ScreenshotTestCase: XCTestCase {
         // the next test's lists.
         // -seedTour: arm() now fires on every launch, so without this every
         // detail-opening test would grow an unexpected coach mark.
+        // -uiTestQuiet: no animations, so the app has none to finish and
+        // XCUITest's wait for them cannot spend its 60 s timeout before every
+        // event and every query (#556, SlackwaterApp.swift). The screenshot
+        // walks (`launchShots`) build their own arguments and keep the app as
+        // users see it.
         var result = args + ["-noCloudSync", "-resetSeriesFilter", "-resetChosenStations",
-                             "-currentFillOff", "-chartPacksOff", "-seedTour",
+                             "-currentFillOff", "-chartPacksOff", "-seedTour", "-uiTestQuiet",
                              "-nowEpoch", Self.fixtureNow]
         if !live && !args.contains("-chsFixture") && !args.contains("-networkKillSwitch") {
             result.append("-networkKillSwitch")
