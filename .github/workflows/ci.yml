@@ -1,5 +1,5 @@
 name: CI
-run-name: ${{ github.event_name == 'pull_request' && format('CI · PR #{0}', github.event.number) || format('CI · {0}', github.sha) }}
+run-name: "${{ github.event_name == 'pull_request' && format('CI · PR #{0}', github.event.number) || format('CI · {0}', github.sha) }}"
 
 # Required checks is the protected-branch gate and accepts the app lane's docs-only skip.
 
