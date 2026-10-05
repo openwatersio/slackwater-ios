@@ -254,37 +254,32 @@ class ScreenshotTestCase: XCTestCase {
         return app
     }
 
-    /// Scroll the list until `el` is realized, hittable, and clear of the
-    /// fixed FAB overlay pinned to the bottom of the sidebar/list (the same
-    /// ~80pt exclusion the schedule-row taps apply inline, "home indicator
-    /// band" case). Bare `isHittable` alone is not enough for
-    /// elements near the list's bottom — XCUITest counts an element hittable
-    /// the moment any part of it is on-screen and unobscured by an ancestor's
-    /// clipping, which can be true while it still sits directly under the
-    /// FAB circles' own hit-test region: a swipe or tap aimed at it then
-    /// silently lands on the FAB instead and nothing happens (confirmed by
-    /// diagnostic frame dumps: at the bare-isHittable stopping point the
-    /// Recents row's bottom edge sat within 1pt of the FAB zone's top edge;
-    /// one more swipe carried it clear by ~68pt and it stayed there — the
-    /// list was genuinely bottomed out, not still scrolling).
+    /// Reach the target in its own scroll container: on iPad the sidebar
+    /// remains mounted behind Settings and beside the detail. Only the
+    /// station list needs the 80pt bottom clearance for its floating buttons.
     func scrollTo(_ el: XCUIElement, in app: XCUIApplication) {
-        var tries = 0
-        while tries < 10 {
-            if el.exists, el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80, el.isHittable {
-                break
+        var container = listContainer(app)
+        let reachable = {
+            var bounds = container.frame.intersection(app.windows.firstMatch.frame)
+            if container.identifier == "station-list" { bounds.size.height -= 80 }
+            return el.exists && !el.frame.isEmpty && bounds.contains(el.frame) && el.isHittable
+        }
+        for attempt in 0...10 {
+            if el.exists {
+                let identifier = el.identifier.isEmpty ? el.label : el.identifier
+                container = [app.tables, app.collectionViews, app.scrollViews]
+                    .lazy.map { $0.containing(el.elementType, identifier: identifier).firstMatch }
+                    .first { $0.exists } ?? container
             }
-            listContainer(app).swipeUp()
-            tries += 1
+            if reachable() { break }
+            if attempt < 10 { container.swipeUp() }
         }
         settleLayout(el)
-        XCTAssert(el.exists && el.frame.maxY <= app.windows.firstMatch.frame.maxY - 80
-                  && el.isHittable,
-                  "could not scroll element within reach")
+        XCTAssert(reachable(), "could not scroll element within reach")
     }
 
-    /// Bring `el` within reach inside a SHEET, where `scrollTo` cannot help:
-    /// its `listContainer` resolves to the station list still mounted behind
-    /// the presentation, so its swipes land on the wrong scroll view.
+    /// Bring `el` within reach inside a SHEET using a bounded wait after each
+    /// swipe, when the row may not yet be realized in its scroll container.
     ///
     /// Waits between swipes rather than swiping blind. A single speculative
     /// swipe is right only when the row happens to start exactly one screen
