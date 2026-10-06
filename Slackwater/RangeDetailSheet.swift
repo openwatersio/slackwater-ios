@@ -8,28 +8,105 @@
 // `seasonal_dominant` (slackwater-database#220). A Gulf port's range tile is
 // complete on its own and stays inert.
 import SwiftUI
+import SlackwaterKit
 
 struct RangeDetailSheet: View {
     /// The swing itself, exactly as the tile prints it: "0.1 ft".
     let value: String
     /// "low to high" or "high to low" — which way this swing runs.
     let direction: String
-    /// How many times the yearly change exceeds the largest tidal term.
-    let seasonalRatio: Double
+    /// How many times the yearly change exceeds the largest tidal term, at a
+    /// station the database flags seasonal. Nil everywhere else, which is most
+    /// of the bundle and now still opens this sheet.
+    var seasonalRatio: Double? = nil
     /// The place, so the sheet can name the water rather than say "this station".
     let place: String
+    /// Where the turn ahead stands among the fortnight's own turns, and the
+    /// swing's heights to draw inside it. Nil before the scan lands.
+    var standing: TideStanding? = nil
+    /// Where this swing sits among the fortnight's swings — section 1's
+    /// subject, and a different judgement from `standing`'s.
+    var swing: SwingStanding? = nil
+    /// Twelve months of monthly extremes — section 3. Empty until the sheet's
+    /// own scan lands, and empty for good where the station has no bounds.
+    var months: [YearFigure.Month] = []
+    var latDatum: Double? = nil
+    var hatDatum: Double? = nil
+    var imperial = false
+    var unit = "m"
+    var tz: TimeZone = .current
+    var now: Date = .now
+    /// Moves the scrubber to a tapped fact, the way the Moon sheet's facts
+    /// already do. A superlative you cannot go and look at is trivia.
+    var onJump: ((Date) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
-    private var leads: Bool { seasonalRatio >= TideStationRecord.seasonalLeadRatio }
+    private var leads: Bool { (seasonalRatio ?? 0) >= TideStationRecord.seasonalLeadRatio }
+
+    private var facts: [StandingFact] {
+        standing.map {
+            standingFacts($0, latDatum: latDatum, hatDatum: hatDatum, imperial: imperial,
+                          unit: unit, tz: tz, now: now)
+        } ?? []
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     head
-                    group { yearly }
-                    explanation
+                    // Three questions, three figures. One figure answering all
+                    // three read as a conflation on screen: "how big is this
+                    // swing", "where does this turn sit between the station's
+                    // ends" and "when does this station see its extremes" are
+                    // different quantities on different axes.
+                    if let swing {
+                        section(String(localized: "Is this beyond normal?",
+                                       comment: "Range sheet section: how this swing compares with the fortnight's.")) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                SwingFigure(standing: swing, tz: tz, onJump: onJump)
+                                    .accessibilityIdentifier("range-section-swings")
+                                // The bars are days and the caption counts
+                                // swings, so the series has to say which it is
+                                // — at a mixed station the marked day's
+                                // biggest swing is often not the selected one.
+                                Text("Each bar is one day's biggest swing.",
+                                     comment: "Explains the unit of the swing figure's bars.")
+                                    .font(.caption)
+                                    .foregroundStyle(SN.foam.opacity(0.5))
+                            }
+                        }
+                        factRow(swingFact)
+                    }
+                    if let standing, latDatum != nil {
+                        section(String(localized: "Against this station's own ends",
+                                       comment: "Range sheet section: where this turn sits between the station's floor and ceiling.")) {
+                            StandingFigure(standing: standing, latDatum: latDatum,
+                                           hatDatum: hatDatum, imperial: imperial)
+                                .accessibilityIdentifier("range-section-ends")
+                        }
+                        factRows
+                    }
+                    if months.count > 1 {
+                        section(String(localized: "When this station runs biggest",
+                                       comment: "Range sheet section: the months this station sees its extremes.")) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                YearFigure(months: months, now: now, tz: tz, imperial: imperial)
+                                    .accessibilityIdentifier("range-section-year")
+                                if let widest = YearFigure.standout(months).first {
+                                    Text("Widest around \(monthName(widest.start, tz: tz)).",
+                                         comment: "Caption under the year figure. The value is a month name.")
+                                        .font(.caption)
+                                        .foregroundStyle(SN.foam.opacity(0.5))
+                                }
+                            }
+                        }
+                    }
+                    if seasonalRatio != nil {
+                        group { yearly }
+                        explanation
+                    }
                 }
                 .padding(20)
             }
@@ -41,6 +118,70 @@ struct RangeDetailSheet: View {
         // Three short paragraphs do not need the whole screen, and a sheet that
         // takes it reads as more alarming than the thing it explains.
         .presentationDetents([.medium, .large])
+    }
+
+    /// A titled section: one question, one figure. The heading is what keeps
+    /// the three apart — without it the reader has to infer which quantity
+    /// each axis carries, which is the conflation this structure fixes.
+    @ViewBuilder private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MonoLabel(text: title, color: SN.foam.opacity(0.55))
+            group { content().padding(14) }
+        }
+    }
+
+    /// Section 1's caption. Counts rather than a percentile: "all but three of
+    /// 58" is a fact a reader can picture, and "the 95th percentile" is not.
+    private var swingFact: StandingFact? {
+        guard let swing else { return nil }
+        let bigger = swing.all.filter { $0.height > swing.selectedHeight }.count
+        if bigger == 0 {
+            return StandingFact(text: String(localized: "The biggest swing of the fortnight.",
+                                             comment: "Range sheet caption."))
+        }
+        return StandingFact(
+            text: String(localized: "Bigger than all but \(bigger) of this fortnight's \(swing.all.count) swings.",
+                         comment: "Range sheet caption. Both values are counts of tide swings."),
+            jumpTo: swing.nextBigger?.time)
+    }
+
+    @ViewBuilder private func factRow(_ fact: StandingFact?) -> some View {
+        if let fact { rows([fact]) }
+    }
+
+    /// The figure's captions. A fact with somewhere to go is a button that
+    /// moves the scrubber and closes the sheet — the reader asked to see it,
+    /// not to read about it.
+    @ViewBuilder private var factRows: some View { rows(facts) }
+
+    @ViewBuilder private func rows(_ items: [StandingFact]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(items, id: \.text) { fact in
+                if let to = fact.jumpTo, let onJump {
+                    Button {
+                        onJump(to)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(fact.text)
+                            Image(systemName: "arrow.right.circle")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(SN.graphLine)
+                        .multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("range-jump")
+                } else {
+                    Text(fact.text).foregroundStyle(SN.foam.opacity(0.75))
+                }
+            }
+        }
+        // The facts carry formatted heights and day counts, so the digits are
+        // fixed-width here — `standingFacts` formats them and this is their one
+        // renderer (TypeScaleTests' known indirections records the pair).
+        .font(.callout.monospacedDigit())
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The number the tile showed, restated with what it is the difference
@@ -60,16 +201,17 @@ struct RangeDetailSheet: View {
     /// The comparison itself, as a row rather than a sentence: it is the one
     /// number a reader might carry away, and prose buries it.
     private var yearly: some View {
-        HStack(alignment: .firstTextBaseline) {
+        let ratio = seasonalRatio ?? 0
+        return HStack(alignment: .firstTextBaseline) {
             Text("Yearly change", comment: "Label for how much the water level moves across a year.")
                 .font(.callout)
                 .foregroundStyle(SN.foam.opacity(0.75))
             Spacer()
             // "about 1× the daily tide" is a number that says nothing, and at
             // the bottom of the band that is exactly what the ratio rounds to.
-            Text(seasonalTimes(seasonalRatio) == "1"
+            Text(seasonalTimes(ratio) == "1"
                  ? String(localized: "about the same as the daily tide", comment: "The annual swing is about the size of the daily tide.")
-                 : String(localized: "about \(seasonalTimes(seasonalRatio))× the daily tide", comment: "How much larger the annual swing is than the daily tide."))
+                 : String(localized: "about \(seasonalTimes(ratio))× the daily tide", comment: "How much larger the annual swing is than the daily tide."))
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.trailing)

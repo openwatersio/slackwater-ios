@@ -76,6 +76,17 @@ extension TideStationRecord {
             // same record decoded from stations.json are the same value. The
             // flag means one thing and absence means the other; two spellings
             // of "no" would make any comparison of the two sources a trap.
-            seasonalDominant: station.seasonalDominant ? true : nil)
+            seasonalDominant: station.seasonalDominant ? true : nil,
+            // The library resolves a subordinate through its reference — which
+            // matters here, because gen-tides writes a subordinate's `datums`
+            // into the tcdb empty — rebases to the prediction source's chart
+            // datum, and reduces by the same offsets the predictor applies to
+            // the extremes. The result is the floor of a prediction rather than
+            // a hydrographic datum, which is why it is not in `datums`
+            // (tide-database docs/datums.md). gen-tides computes the identical
+            // pair for stations.json; `testAstronomicalBoundsMatchTheGeneratedJSON`
+            // holds the two implementations to each other.
+            latDatum: station.astronomicalBounds?.lat,
+            hatDatum: station.astronomicalBounds?.hat)
     }
 }

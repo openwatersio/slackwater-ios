@@ -14,6 +14,10 @@ struct TideDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    /// The ±15-day scan the Range tile's mark and its sheet both read. One per
+    /// station, loaded off the main actor, deliberately not re-anchored by the
+    /// scrub — see `TideStandingStore`.
+    @State private var standings = TideStandingStore()
     @State private var previewTimeline: TimelineData?
     @State private var displayedPreview: ChsTidePreview?
     @State private var previewGate = ScrollGate()
@@ -143,10 +147,8 @@ struct TideDetailView: View {
                                         ChsDownloadNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
                                     }
                                     SummaryTiles(primary: range,
-                                                 primaryDetail: rangeDetail,
-                                                 // A year, which is what the tile is
-                                                 // flagging: this water follows one.
-                                                 primarySymbol: record.seasonalRatio == nil ? nil : "calendar",
+                                                 primaryDetail: rangeDetail(jump: jump),
+                                                 primarySymbol: rangeSymbol,
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
@@ -207,6 +209,13 @@ struct TideDetailView: View {
                     previewTimeline = nil
                     chsFittedAt = record.isChs ? ChsModelStore.load(record.id)?.fittedAt : nil
                 }
+                // After the timeline, never before it: the strip is what the
+                // reader is waiting for, and this scan only feeds a tile
+                // caption and the sheet behind it.
+                await standings.load(record: record, around: live)
+                // The year costs about a second and only the sheet shows it,
+                // so it comes after the fortnight and never blocks the strip.
+                await standings.loadYear(record: record, around: live)
             }
             .onChange(of: scrubTime) { _, t in
                 if let coverage = activePreview?.coverage {
@@ -242,11 +251,37 @@ struct TideDetailView: View {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
         return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
-                // At a seasonal station the caption gives up the direction for
-                // the reason the number is small. The direction is the lesser
-                // fact — the curve and the schedule both show it — and a tile
-                // caption is one line, so the two cannot both be here.
-                record.seasonalRatio.map(seasonalCaption) ?? rangeDirection)
+                // One line, three claimants: `rangeCaption` owns the order.
+                rangeCaption(record: record, swing: swingStanding, direction: rangeDirection))
+    }
+
+    /// Where THIS SWING sits among the fortnight's swings. The tile prints a
+    /// swing, so the tile's mark ranks a swing: a station can have a big range
+    /// on a day whose low is unremarkable, and ranking the level on a tile
+    /// whose value is a range read as a conflation on screen.
+    private var swingStanding: SwingStanding? {
+        guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+        return standings.swing(abs(next.height - prev.height), time: next.time)
+    }
+
+    /// Where the turn ahead sits between the station's own floor and ceiling.
+    /// A different question from the swing's, and it belongs to the sheet's
+    /// max/min section rather than to the tile.
+    private var standing: TideStanding? {
+        nextExtreme.flatMap(standings.standing(at:))
+    }
+
+    /// The glyph beside the tile's label. A calendar where the water follows a
+    /// year, otherwise a to-bar arrow for a marked turn — the same `⤒`/`⤓`
+    /// sense the tile's own value carries: a swing is a distance between two
+    /// turns, not a direction of travel.
+    ///
+    /// Seasonal outranks the mark here for the reason it outranks it in the
+    /// caption: it changes how the whole screen should be read.
+    private var rangeSymbol: String? {
+        if record.seasonalRatio != nil { return "calendar" }
+        guard let swingStanding, swingStanding.marks else { return nil }
+        return "arrow.up.and.down"
     }
 
     /// Which way this swing runs, when there is nothing more pressing to say.
@@ -256,13 +291,23 @@ struct TideDetailView: View {
             : String(localized: "high to low", comment: "Tide-range direction.")
     }
 
-    /// The Range tile's sheet, and the marker on the tile that says it is there.
-    /// Both appear only where the water is seasonal rather than tidal.
-    private var rangeDetail: (() -> AnyView)? {
-        guard let ratio = record.seasonalRatio, let range else { return nil }
-        let place = record.name
-        return { AnyView(RangeDetailSheet(value: range.value, direction: self.rangeDirection,
-                                          seasonalRatio: ratio, place: place)) }
+    /// The Range tile's sheet. It opens wherever there is something behind the
+    /// number: a fortnight to rank this swing against, or water that follows a
+    /// year. A station with neither keeps the inert tile it had.
+    private func rangeDetail(jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
+        guard let range, record.seasonalRatio != nil || swingStanding != nil else { return nil }
+        let place = record.name, ratio = record.seasonalRatio
+        let standing = standing, swing = swingStanding, record = record
+        let months = standings.months
+        let imperial = imperial, unit = unit, now = live
+        return {
+            AnyView(RangeDetailSheet(
+                value: range.value, direction: self.rangeDirection,
+                seasonalRatio: ratio, place: place,
+                standing: standing, swing: swing, months: months,
+                latDatum: record.latDatum, hatDatum: record.hatDatum,
+                imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
+        }
     }
 
     private var leadState: String {

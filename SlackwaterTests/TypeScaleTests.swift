@@ -111,6 +111,18 @@ extension TypeScaleTests {
             // trait (Theme.swift).
             "TideDetailView.swift:range",
             "CurrentLead.swift:nextMax",
+            // The Range sheet's facts: the gap to a station's astronomical
+            // floor or ceiling, formatted where the standing is known and
+            // consumed by `RangeDetailSheet.factRows`, whose one font carries
+            // the mono trait. `gapSentence` exists as its own one-line
+            // declaration precisely so this key names what the walk computes —
+            // `standingFacts`' signature spans three lines (blind spot 2).
+            "TideStanding.swift:gapSentence",
+            // The max/min figure's measured dimensions: built in `dimensions`
+            // and drawn by the same view's Canvas, whose text is resolved
+            // monospacedDigit. `dimensionLabel` is its own one-line
+            // declaration so this key names what the walk computes.
+            "StandingFigure.swift:dimensionLabel",
             // The fast tide's rate, consumed by `Commentary`'s Text, which
             // carries the mono trait (Theme.swift).
             "TideDetailView.swift:tideRateCommentary",

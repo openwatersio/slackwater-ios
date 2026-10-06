@@ -103,7 +103,21 @@ All tiles describe the scrubber's selected instant and update as it moves.
 - **Caption:** "low to high" or "high to low".
 - **Absent** when either neighbouring extreme is missing.
 
-At a seasonally dominated station (§6.4), the caption reads "mostly seasonal" when the seasonal ratio is 3 or more and "partly seasonal" otherwise, and the tile gains a calendar glyph and opens the Range sheet.
+The tile ranks the quantity it prints. Its mark is about this **swing**, never about the height of either turn beside it: a station can have a big range on a day whose low is unremarkable, so the two are different judgements and only the first belongs here. The level question has its own section of the sheet (§6.4).
+
+The swing is ranked against every swing in the fifteen calendar days either side of the selection, in the station's own time zone. That window needs no annual constituent — the semidiurnal and diurnal terms and the fortnightly and perigean beats between them all resolve inside a 60-day CHS fit — so the mark works at every station.
+
+A swing in the top tenth of that window marks. The threshold is the feature: a fortnight holds about 29 highs, so the top tenth is roughly one spring series, and a mark that fires more often than that says nothing.
+
+The caption has one line and three claimants, in this order:
+
+1. **Seasonal.** At a seasonally dominated station (§6.4) it reads "mostly seasonal" when the seasonal ratio is 3 or more and "partly seasonal" otherwise. This outranks the rest: a reader who does not know the number is barely a tide will misread a claim that it is large.
+2. **The standing.** "the fortnight's biggest" when no swing in the window goes further, otherwise "beyond normal here".
+3. **The direction**, which the curve and the schedule both already show.
+
+The glyph follows the same order: a calendar at a seasonal station, otherwise a vertical span glyph on a marked tile and none on an unmarked one. The mark is also spoken, never carried by glyph or colour alone.
+
+The tile opens the Range sheet wherever there is something behind the number — a fortnight to rank the swing against, or water that follows a year. A station with neither keeps an inert tile.
 
 ### 6.2 Next max (current and online gate)
 
@@ -117,7 +131,17 @@ Inert. Label "Shape only", value "No speed", caption "<port> tides". It states p
 
 ### 6.4 Range sheet
 
-Title "Range", with Done. It shows the value, then "The difference between this swing's high and low, <direction>." and a "Yearly change" row: "about the same as the daily tide" when the ratio rounds to 1, or "about N× the daily tide", rounded to tens from 10 and to tenths below.
+Title "Range", with Done. It opens with the value and "The difference between this swing's high and low, <direction>."
+
+Beneath that it answers three questions, each in its own titled section with its own figure. They are different quantities on different axes — a swing, a level, and a calendar — and one figure for all three reads as a conflation. A section is absent, never empty, when its question cannot be answered at this station.
+
+**"Is this beyond normal?"** One bar per whole station-local day across the fortnight, each carrying that day's biggest swing, on one scale so the biggest day fills the box. The selected day is marked and the next bigger day is flagged ahead of it. Days are the unit rather than swings because rises and falls alternate large and small four times a day, which swamps the fortnightly beat that answers the question; the series is labelled "Each bar is one day's biggest swing" because the caption beneath counts swings, and at a mixed station the marked day's biggest is often not the selected one. The window runs local midnight to local midnight, so anything after its last midnight is a fragment and is dropped. The caption reads "The biggest swing of the fortnight." or "Bigger than all but N of this fortnight's M swings.", the latter tapping through to the next bigger swing.
+
+**"Against this station's own ends"** is a section drawing rather than a chart. On one vertical scale: the station's HAT and LAT, the fortnight's highest high and lowest low, and the selected turn. Each line carries its own height; extension lines run back to a chain of differences, with an outer chain for the station's whole range. The caption's number is one of those drawn dimensions rather than a separate calculation beside them. Two levels closer on screen than the minimum separation draw as one line keeping the surviving level's name, because the shared scale is the premise and nudging either apart would break it. The whole section is absent where the station has no astronomical bounds.
+
+**"When this station runs biggest"** is twelve whole calendar months around the selection, drawn as the envelope the monthly highest high and lowest low trace, with the widest months marked and the reader's own month ruled. Whole months because a window cut mid-month leaves a shallower half-month at each end, which draws as a season that is really an artefact of the cut. Captioned "Widest around <month>." Absent on the same gate as the section above.
+
+At a seasonally dominated station the sheet then adds a "Yearly change" row: "about the same as the daily tide" when the ratio rounds to 1, or "about N× the daily tide", rounded to tens from 10 and to tenths below.
 
 The seasonal ratio is the larger of the Sa and Ssa amplitudes over the largest tidal constituent, taken from the reference station's model for a subordinate. It exists only for stations the database flags as seasonally dominated. [The yearly tidal claims rule](../CONTRIBUTING.md#yearly-tidal-claims) applies: never infer it from the data source.
 
@@ -411,17 +435,21 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 ### Tiles and links
 
 14. **Provisional current:** the Next max value has a "~" and attention amber ink until the model is final.
-15. **Range follows the scrub:** moving across an extreme flips the caption between "low to high" and "high to low".
-16. **Seasonal station:** a seasonally dominated station's Range tile opens the Range sheet; an ordinary station's does not.
-17. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
-18. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
+15. **Range follows the scrub:** moving across an extreme flips the caption between "low to high" and "high to low", at a station whose swing is not marked.
+16. **Seasonal station:** a seasonally dominated station's Range tile reads "mostly seasonal" or "partly seasonal" and carries a calendar glyph, whatever its swing ranks.
+17. **A marked swing:** a swing in the top tenth of its fortnight captions "beyond normal here", or "the fortnight's biggest" when nothing in the window goes further, and carries the span glyph. An ordinary swing carries neither.
+18. **The sheet opens anywhere:** an ordinary station's Range tile is a button and its sheet leads with the three sections.
+19. **A station with no bounds:** a CHS station's sheet shows the fortnight section alone; the other two are absent rather than empty or zeroed.
+20. **The next bigger swing:** tapping the first section's caption moves the scrubber to that swing and closes the sheet.
+21. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
+22. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
 
 ### Waiting and sharing
 
-19. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
-20. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
-21. **Share at now:** sharing an untouched page shares the bare station link.
-22. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
+23. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
+24. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
+25. **Share at now:** sharing an untouched page shares the bare station link.
+26. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
 
 ## 19. Known iOS deviations from the intended contract
 
@@ -441,6 +469,7 @@ Fixing one of these should update this section and add or amend a conformance sc
 | Shared page composition, schedule card, week bar and picker, footer, station details, station links | `Slackwater/Theme.swift` |
 | Header, share link | `Slackwater/DetailHeader.swift`, `Slackwater/DeepLink.swift` |
 | Tide page, Range tile | `Slackwater/TideDetailView.swift`, `Slackwater/RangeDetailSheet.swift`, `Slackwater/TideStation.swift` |
+| Range sheet's three sections | `Slackwater/TideStanding.swift`, `Slackwater/TideStandingStore.swift`, `Slackwater/SwingFigure.swift`, `Slackwater/StandingFigure.swift`, `Slackwater/YearFigure.swift` |
 | Current page, Next max | `Slackwater/CurrentDetailView.swift`, `Slackwater/CurrentLead.swift` |
 | Derived gate | `Slackwater/DerivedGateDetailView.swift` |
 | Online gate and its honesty card | `Slackwater/OnlineGateDetailView.swift`, `Slackwater/OnlineGates.swift` |
