@@ -321,15 +321,11 @@ class ScreenshotTestCase: XCTestCase {
         XCTAssertFalse(app.buttons["alert-popup-close"].exists, "scrubbing opened the alert popover")
     }
 
-    /// Tap the Now pill and confirm the strip came home: the pill leaves once
-    /// it has. Parked first (`settleScrub`) — a tap taken while the magnet is
-    /// still snapping after a scrub is dropped, which is how
-    /// `testM46MalibuDerivedGateSeededOffline` went red on unrelated branches
-    /// (#378). Bounded retap on the same landed signal, `pickSearchResult`'s
-    /// shape; a retap cannot scrub away again, the pill is gone once home.
+    /// Bring the whole strip into view so its Now pill clears system chrome (#634).
     func returnToNow(_ app: XCUIApplication) {
         let now = app.buttons["detail-return-now"].firstMatch
         XCTAssert(now.appears(within: 5), "scrubbing away revealed no return-to-now")
+        scrollTo(app.otherElements["timeline-strip"].firstMatch, in: app)
         settleScrub(app)
         var home = false
         for _ in 0..<3 {

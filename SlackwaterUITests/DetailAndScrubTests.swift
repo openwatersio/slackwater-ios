@@ -321,7 +321,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // fix that only handled the shrink would blank the strip on the way
         // home. The range label, not "Today" in the day column: "Today" shows
         // for any anchor up to six days behind today.
-        app.buttons["detail-return-now"].tap()
+        returnToNow(app)
         XCTAssert(waitFor(bar, "label == '\(before)'"),
                   "return-to-now left the bar on '\(bar.label)', not '\(before)'")
         let homeInk = inkFraction(app.otherElements["timeline-strip"].firstMatch)
@@ -385,6 +385,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(app.otherElements["timeline-strip"].appears(within: 5),
                   "pan-under-centerline strip missing from tide detail")
 
+        settleScrub(app)
+        let liveClock = scrubClock(app)
+
         // Pan the strip while its midpoint is visible: the centerline readout moves off "now".
         scrubStrip(app)
         XCTAssert(app.buttons["Return to now"].appears(within: 5),
@@ -441,12 +444,9 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         // moved the scrub away from the present.
         XCTAssert(app.buttons["Return to now"].firstMatch.appears(within: 5),
                   "readout did not follow the cross-midnight scrub")
-        app.swipeDown()
-
-        // Return to now restores the live reading and hides the control.
-        app.buttons["Return to now"].firstMatch.tap()
-        XCTAssert(app.buttons["Return to now"].firstMatch.disappears(within: 2),
-                  "return-to-now did not restore the live readout")
+        returnToNow(app)
+        XCTAssertEqual(scrubClock(app), liveClock,
+                       "return-to-now did not restore the live readout")
     }
 
     // The riding dot: initial centering must happen at the first layout, not
