@@ -70,6 +70,25 @@ final class TideStandingTests: XCTestCase {
                        "the fall-back day is 25 hours long")
     }
 
+    func testTheStoreScansOnceAndRanksManyExtremes() async {
+        let store = TideStandingStore()
+        await store.load(record: station, around: at)
+        XCTAssertGreaterThan(store.extremes.count, 50, "a fortnight either side is ~116 extremes")
+        let lowest = store.extremes.filter { $0.kind == .low }.min { $0.height < $1.height }!
+        XCTAssertEqual(store.standing(at: lowest)?.isWindowExtreme, true)
+    }
+
+    /// The tiles recompute as the scrubber moves; the scan must not. A second
+    /// load for the same station is a no-op, which is what keeps it off the
+    /// per-frame path.
+    func testASecondLoadOfTheSameStationDoesNotRescan() async {
+        let store = TideStandingStore()
+        await store.load(record: station, around: at)
+        let first = store.extremes.map(\.time)
+        await store.load(record: station, around: at.addingTimeInterval(7 * 86_400))
+        XCTAssertEqual(store.extremes.map(\.time), first)
+    }
+
     /// The window is the station's local days, not the device's.
     func testTheWindowStartsAtStationLocalMidnight() {
         let w = TideStanding.window(around: at, tz: station.tz)
