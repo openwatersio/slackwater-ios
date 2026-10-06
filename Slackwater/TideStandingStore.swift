@@ -41,8 +41,22 @@ import SlackwaterKit
     private(set) var months: [YearFigure.Month] = []
     private var loadedYear: String?
 
+    /// Not gated on the station's astronomical bounds, deliberately.
+    ///
+    /// It was, on the reading that a seasonal claim needs an annual
+    /// constituent. That rule holds for an ABSOLUTE claim — the gap to LAT or
+    /// HAT, "the lowest low of the year" — because those depend on where the
+    /// season puts mean level. It does not hold for this one. Sa and Ssa move
+    /// mean level, and inside a month that offset lifts the month's highest
+    /// high and its lowest low together, so it cancels out of the span. What
+    /// widens the range across a year is the solar and declinational
+    /// structure, which every constituent set carries.
+    ///
+    /// Measured over this bundle: Chignik, which has no bounds, varies 1.24×
+    /// across the year; Portland, which has them, varies 1.16×. The gate was
+    /// hiding the stronger signal and showing the weaker one.
     func loadYear(record: TideStationRecord, around date: Date) async {
-        guard loadedYear != record.id, record.latDatum != nil else { return }
+        guard loadedYear != record.id else { return }
         let w = TideStanding.yearWindow(around: date, tz: record.tz)
         let station = record.engineStation, tz = record.tz
         months = await Task.detached(priority: .userInitiated) {
