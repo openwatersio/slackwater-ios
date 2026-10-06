@@ -653,7 +653,7 @@ Use native scrolling physics where practical, with a custom-drawn continuous str
 
 ### iOS reference
 
-The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during every offset update. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the opening so the selected time and sky follow every frame.
+The reference uses a horizontal `UIScrollView` hosting a tiled SwiftUI `Canvas`. The scroll delegate publishes the centre time during scrolling. Applying an external time or a changed timeline window suppresses synchronous scroll feedback; SwiftUI already owns that selected time. Initial centering suppresses that feedback throughout layout, including the direct landing under Reduce Motion; the direct opening publishes now after layout returns. A fixed SwiftUI overlay draws the line and riding dot. A display-link drives the animated opening so the selected time and sky follow every frame.
 
 ### watchOS
 

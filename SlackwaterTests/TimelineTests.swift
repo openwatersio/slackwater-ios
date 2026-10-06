@@ -10,6 +10,78 @@ import SlackwaterKit
 final class TimelineTests: XCTestCase {
     let friday = TideStationRecord.all.first { $0.id == TideStationRecord.fridayHarborID }!
 
+    @MainActor func testInitialCenterDoesNotPublishFromLayout() async {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
+        let geo = TimelineGeo(data: data)
+        for animated in [true, false] {
+            let start = Timeline.introStart(for: now)
+            var scrub = start
+            var writes: [Date] = []
+            let published = animated ? nil : expectation(description: "opening published after layout")
+            let strip = TimelineScrubber(data: data, geo: geo, imperial: true, speedUnit: "kn", now: now,
+                                        scrubTime: Binding(get: { scrub }, set: {
+                                            scrub = $0
+                                            writes.append($0)
+                                            if writes.count == 1 { published?.fulfill() }
+                                        }))
+            let co = TimelineScrubber.Coordinator(strip)
+            defer { co.stopIntro() }
+            let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: geo.height))
+            sv.contentSize = CGSize(width: data.totalWidth, height: geo.height)
+            sv.delegate = co
+            co.centerIfNeeded(sv, animated: animated)
+            co.centerIfNeeded(sv, animated: animated)
+            XCTAssertTrue(writes.isEmpty, "initial layout must not write the SwiftUI binding, animated: \(animated)")
+            XCTAssertTrue(co.didInitialCenter)
+            XCTAssertEqual(co.nudging, animated)
+            let target = animated ? start : now
+            XCTAssertEqual(data.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(target),
+                           0, accuracy: 300)
+            if let published {
+                await fulfillment(of: [published], timeout: 2)
+                XCTAssertEqual(writes, [now], "instant opening publishes exactly once after layout")
+            }
+            co.stopIntro()
+            let count = writes.count
+            sv.contentOffset.x += 40
+            XCTAssertGreaterThan(writes.count, count, "ordinary scroll feedback must still publish")
+            XCTAssertEqual(scrub, data.time(atX: sv.contentOffset.x + sv.bounds.width / 2))
+        }
+    }
+
+    @MainActor func testViewUpdatesDoNotPublishScrollFeedback() {
+        let now = Date(timeIntervalSince1970: 1788868800)
+        let anchor = dayLocal(now, friday.tz)
+        let initial = TimelineData.build(tide: friday, current: nil, now: now, anchor: anchor)
+        let shifted = TimelineData.build(tide: friday, current: nil, now: now,
+                                          anchor: addingDays(-1, to: anchor, in: friday.tz))
+        var scrub = now
+        var writes: [Date] = []
+        let binding = Binding(get: { scrub }, set: { scrub = $0; writes.append($0) })
+        let strip = TimelineScrubber(data: initial, geo: TimelineGeo(data: initial), imperial: true,
+                                    speedUnit: "kn", now: now, scrubTime: binding)
+        let co = TimelineScrubber.Coordinator(strip)
+        let sv = TimelineScrubber.ScrubScrollView(frame: CGRect(x: 0, y: 0, width: 400, height: strip.geo.height))
+        sv.contentSize = CGSize(width: initial.totalWidth, height: strip.geo.height)
+        sv.delegate = co
+        co.centerIfNeeded(sv)
+        for (hours, jump) in [(0.0, 0), (1.0, 0), (-30.0, 1)] {
+            let requested = now.addingTimeInterval(hours * 3600)
+            scrub = requested
+            let updated = TimelineScrubber(data: shifted, geo: TimelineGeo(data: shifted), imperial: true,
+                                          speedUnit: "kn", now: now, scrubTime: binding, jumpToken: jump)
+            updated.updateUIView(sv, coordinator: co)
+            XCTAssertTrue(writes.isEmpty, "applying a window, external time, or jump must not publish inside updateUIView")
+            XCTAssertEqual(scrub, requested)
+            XCTAssertEqual(shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2).timeIntervalSince(requested),
+                           0, accuracy: 300)
+        }
+        sv.contentOffset.x += 40
+        XCTAssertEqual(writes.count, 1, "ordinary scrolling must publish after the view update returns")
+        XCTAssertEqual(scrub, shifted.time(atX: sv.contentOffset.x + sv.bounds.width / 2))
+    }
+
     func testPixelRoundedCenterStaysWithinHalfAPointOfTheReadout() {
         let now = Date(timeIntervalSince1970: 1788868800)
         let data = TimelineData.build(tide: friday, current: nil, now: now, anchor: dayLocal(now, friday.tz))
