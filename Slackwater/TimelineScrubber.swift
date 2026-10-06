@@ -708,7 +708,7 @@ struct TimelineScrubStrip: View {
             // reachable only through `jumpToken`, which is this view's own
             // @State — so the tour asks for it through the observable rather
             // than through a parameter, which would fan out to every detail
-            // view (CLAUDE.md).
+            // view.
             .onChange(of: TourCoach.shared.glideToken) { _, _ in
                 jumpToken += 1
             }

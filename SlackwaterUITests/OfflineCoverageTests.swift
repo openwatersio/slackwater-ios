@@ -442,9 +442,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
         // trim — 15 days of slack either side survives both), so target that
         // date directly instead of a grid index: leading-blank/spillover
         // cells shift what a fixed `boundBy` index means across month
-        // layouts (this repo's CLAUDE.md documents exactly that failure
-        // class). Calendar-based add, not `addingTimeInterval` — see
-        // "Calendar days are not 86,400 seconds".
+        // layouts. Add calendar days so DST does not shift the target date.
         let target = Calendar(identifier: .gregorian).date(byAdding: .day, value: 45,
                                                            to: Self.fixtureDate)!
         let targetLabelFormatter = DateFormatter()

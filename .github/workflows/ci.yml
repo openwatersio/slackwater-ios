@@ -11,8 +11,7 @@ on:
 jobs:
   # Gates the app lane below. The lane is ~15 minutes of macOS runner time, and
   # public-repo macOS pools can queue at peak — a docs-only change should not
-  # book one. Measured: PRs whose entire diff was CLAUDE.md, or two markdown
-  # files, each took a full run.
+  # book one. Markdown-only PRs previously took a full run.
   #
   # This is a JOB-level gate, not `on: paths-ignore`, for two reasons: the free
   # Ubuntu lane below should still run, and a workflow that never starts leaves

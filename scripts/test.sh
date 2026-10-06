@@ -46,7 +46,7 @@ fi
 # with "Cannot launch simulated executable: no file found at .../Slackwater.app"
 # — zero assertion failures, which reads as a real regression and isn't one.
 # Same shape if you kill a run and then clean its DerivedData. Builds take this
-# lock too (CLAUDE.md has the recipe).
+# lock too (CONTRIBUTING.md, "Local test runs", has the recipe).
 #
 # Other worktrees' runs are not waited for. Runs on separate devices with
 # separate DerivedData do not disturb each other: measured 2026-10-01, two runs
@@ -94,8 +94,8 @@ fi
 
 # SLACKWATER_SIMS overrides the fast/full device list outright — CI sets it to
 # ONE device so the fast lane stays iPhone-only (see .github/workflows/ci.yml).
-# It is not concurrency protection: separate devices don't stop concurrent runs
-# from killing each other (see the lock comment at the top), the lock does.
+# Separate devices still share this worktree's DerivedData, so its lock also
+# covers runs with different device selections (see the lock comment above).
 #
 # Fast is iPhone-only. Measured on build 27: the iPad leg costs 1169 s and is
 # the ONLY place three tests run (testM44IPadSplit,
@@ -109,8 +109,8 @@ fi
 # a location permission grant, a simulated fix, an App Group plist — and
 # `xcodebuild test` clones inherit all of it. That costs correctness in both
 # directions (tests that fail only here, tests that pass only here, both
-# documented in CLAUDE.md), and it costs TIME. Measured 2026-09-09, same two
-# tests, same commit:
+# documented in CONTRIBUTING.md, "UI test state"), and it costs TIME.
+# Measured 2026-09-09, same two tests, same commit:
 #
 #   testReturnToNowFromHistory        264 s used device   24 s erased   25 s CI
 #   testFastTideCommentaryNamesTheRate 141 s used device   22 s erased   28 s CI
