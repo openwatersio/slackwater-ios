@@ -79,9 +79,10 @@ final class ChsProvisionalTests: XCTestCase {
     func testTheWarningNamesTheStationAndItsOwnNumber() {
         let dodd = gate("chs-dodd-narrows")
         XCTAssertEqual(dodd.provisionalHeadline,
-                       "Fitted from the last 60 days — slack at Dodd Narrows can be off by up to ~35 min.")
+                       "Slack at Dodd Narrows can be off by 35 min.")
         // Gillard is a different pass with a different error: different copy.
-        XCTAssert(gate("chs-gillard-passage").provisionalHeadline.contains("~20 min"))
+        XCTAssertEqual(gate("chs-gillard-passage").provisionalHeadline,
+                       "Slack at Gillard Passage can be off by 20 min.")
     }
 
     // MARK: - Chunks

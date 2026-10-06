@@ -16572,95 +16572,6 @@
         }
       }
     },
-    "Fitted from the last %lld days — slack at %@ can be off by up to ~%lld min." : {
-      "comment" : "Provisional current-model warning. Values are fitting days, station name, and measured timing error; vary days by plural.",
-      "localizations" : {
-        "da" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilpasset fra de seneste %lld dage — strømstille ved %@ kan afvige med op til ~%lld min."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "An die letzten %1$lld Tage angepasst — Stauwasser bei %2$@ kann um bis zu ~%3$lld min abweichen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Fitted from the last %1$lld days — slack at %2$@ can be off by up to ~%3$lld min."
-          }
-        },
-        "es-ES" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustada con los últimos %1$lld días: la estoa en %2$@ puede desviarse hasta ~%3$lld min."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sovitettu viimeisen %lld päivän perusteella — aseman %@ virran tyyntymishetki voi poiketa jopa ~%lld min."
-          }
-        },
-        "fr-CA" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustement fondé sur les %1$lld derniers jours — l’étale à %2$@ peut varier d’environ %3$lld min."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adattato agli ultimi %1$lld giorni — la stanca a %2$@ può discostarsi fino a ~%3$lld min."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "過去%1$lld日分から作成したモデルです。%2$@の潮止まりは、最大約%3$lld minずれることがあります。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "최근 %lld일 자료로 맞춘 모델입니다. %@의 정조 시간은 최대 ~%lld min 차이 날 수 있습니다."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tilpasset fra de siste %1$lld dagene — strømstille ved %2$@ kan avvike med opptil ~%3$lld min."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aangepast aan de laatste %1$lld dagen — de kentering bij %2$@ kan tot ~%3$lld min afwijken."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustado com os últimos %1$lld dias — o estofo em %2$@ pode desviar até ~%3$lld min."
-          }
-        },
-        "pt-PT" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajustado com os últimos %1$lld dias — o estofo em %2$@ pode desviar até ~%3$lld min."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anpassat från de senaste %lld dagarna — strömstilla vid %@ kan avvika med upp till ~%lld min."
-          }
-        }
-      }
-    },
     "Flood" : {
       "comment" : "Flood-current event label.",
       "localizations" : {
@@ -34439,6 +34350,95 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strömstilla"
+          }
+        }
+      }
+    },
+    "Slack at %@ can be off by %lld min." : {
+      "comment" : "Provisional current-model warning. Values are place name and its measured slack-current timing uncertainty in minutes.",
+      "localizations" : {
+        "da" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstille ved %1$@ kan afvige med %2$lld min."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stauwasser bei %1$@ kann um %2$lld min abweichen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slack at %1$@ can be off by %2$lld min."
+          }
+        },
+        "es-ES" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La estoa en %1$@ puede desviarse %2$lld min."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Virran tyyntymishetki paikassa %1$@ voi poiketa %2$lld min."
+          }
+        },
+        "fr-CA" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’étale à %1$@ peut varier de %2$lld min."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La stanca a %1$@ può discostarsi di %2$lld min."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@の潮止まりは、%2$lld minずれることがあります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@의 정조 시간은 %2$lld min 차이 날 수 있습니다."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strømstille ved %1$@ kan avvike med %2$lld min."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De kentering bij %1$@ kan %2$lld min afwijken."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O estofo em %1$@ pode desviar %2$lld min."
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O estofo em %1$@ pode desviar %2$lld min."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strömstilla vid %1$@ kan avvika med %2$lld min."
           }
         }
       }

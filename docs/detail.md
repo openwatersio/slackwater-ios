@@ -308,7 +308,7 @@ The preview scrubber stops at the actual downloaded bounds. Date picking and tid
 A Canadian gate with a usable 60-day model keeps its scrubber visible while the remaining data downloads toward its validated full model. The centered notice sits below the scrubber and above the summary cards, matching the tide preview notice:
 
 - “Additional data is required to improve accuracy” above the station’s retained download progress meter;
-- the station’s measured timing uncertainty: “Fitted from the last 60 days — slack at <gate> can be off by up to ~N min.”; and
+- the station’s measured timing uncertainty: “Slack at <gate> can be off by N min.”; and
 - offline, retry, or failure copy when applicable.
 
 There is no separate “Refining” or “Fast answer” UI state. The station remains in the ordinary download queue until its full model meets the quality bar. Readings remain usable during queued, interrupted, or failed additional downloads. The notice disappears when the full model lands. Until then, numeric readings retain “~” (scrubber §9.2).

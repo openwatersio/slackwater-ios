@@ -134,7 +134,7 @@ final class OfflineTransitionTests: ScreenshotTestCase {
         XCTAssert(tildeReading.exists || tildeCurve.exists)
         pickSearchResult(app, app.staticTexts["Dodd Narrows"].firstMatch)
         let warning = app.staticTexts.matching(NSPredicate(
-            format: "label CONTAINS 'slack at Dodd Narrows can be off by up to ~35 min'"
+            format: "label == 'Slack at Dodd Narrows can be off by 35 min.'"
         )).firstMatch
         XCTAssert(warning.appears(within: 5))
         XCTAssert(app.staticTexts["Additional data is required to improve accuracy"].exists)

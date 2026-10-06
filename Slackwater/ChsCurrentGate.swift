@@ -258,7 +258,7 @@ struct ChsOnlineStore: Codable {
 /// generic hedge. Register: what it is, how wrong it can be, what to do.
 extension ChsCurrentGateInfo {
     var provisionalHeadline: String {
-        String(localized: "Fitted from the last \(Int(Self.provisionalDays)) days — slack at \(name) can be off by up to ~\(provisionalSlackMinutes ?? 0) min.", comment: "Provisional current-model warning. Values are fitting days, station name, and measured timing error; vary days by plural.")
+        String(localized: "Slack at \(name) can be off by \(provisionalSlackMinutes ?? 0) min.", comment: "Provisional current-model warning. Values are place name and its measured slack-current timing uncertainty in minutes.")
     }
 
     /// Is this stored model the fast answer rather than the full model?
