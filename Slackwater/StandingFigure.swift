@@ -44,6 +44,8 @@ struct StandingFigure: View {
     /// centimetres apart, and nudging either would break the shared scale the
     /// whole figure rests on.
     static let minimumSeparation: CGFloat = 9
+    /// How far the band's lines sit inside the frame's, in points.
+    static let bandInset: CGFloat = 26
 
     let standing: TideStanding
     /// The swing's own heights, sampled. The sheet supplies them; the figure
@@ -60,7 +62,10 @@ struct StandingFigure: View {
     /// the outermost thing and fills the box rather than leaving the figure
     /// huddled in the middle of an axis nothing bounds.
     static func levels(standing: TideStanding, latDatum: Double?, hatDatum: Double?,
-                       height: CGFloat, imperial: Bool = false) -> [Level] {
+                       height: CGFloat, width: CGFloat = 320, imperial: Bool = false) -> [Level] {
+        // The band sits inside the frame so the nesting is visible as nesting
+        // rather than as four lines of equal weight.
+        let band = Swift.max(width - bandInset * 2, curveInset * 3)
         let bandLow = standing.windowLowest.height
         let bandHigh = standing.windowHighest.height
         let lo = latDatum.map { Swift.min($0, bandLow) } ?? bandLow
@@ -70,21 +75,21 @@ struct StandingFigure: View {
 
         var out: [Level] = []
         if let hatDatum {
-            out.append(Level(role: .absoluteHigh, y: y(hatDatum), width: .infinity,
+            out.append(Level(role: .absoluteHigh, y: y(hatDatum), width: width,
                              label: String(localized: "the highest water this station ever sees",
                                            comment: "Figure label for Highest Astronomical Tide."),
                              isMerged: false))
         }
-        out.append(Level(role: .fortnightHigh, y: y(bandHigh), width: curveInset * 4,
+        out.append(Level(role: .fortnightHigh, y: y(bandHigh), width: band,
                          label: String(localized: "the highest high of the fortnight",
                                        comment: "Figure label for the top of the surrounding month."),
                          isMerged: false))
-        out.append(Level(role: .fortnightLow, y: y(bandLow), width: curveInset * 4,
+        out.append(Level(role: .fortnightLow, y: y(bandLow), width: band,
                          label: String(localized: "the lowest low of the fortnight",
                                        comment: "Figure label for the bottom of the surrounding month."),
                          isMerged: false))
         if let latDatum {
-            out.append(Level(role: .absoluteLow, y: y(latDatum), width: .infinity,
+            out.append(Level(role: .absoluteLow, y: y(latDatum), width: width,
                              label: String(localized: "the lowest water this station ever sees",
                                            comment: "Figure label for Lowest Astronomical Tide."),
                              isMerged: false))
@@ -142,6 +147,12 @@ struct StandingFigure: View {
         levels.map(\.label).joined(separator: ". ")
     }
 
+    /// The band wears the curve's own high/low inks — the pair the strip uses
+    /// at a turn — because the band's two lines ARE a high and a low.
+    private func tint(_ role: Role) -> Color {
+        role == .fortnightHigh ? SN.graphHigh : SN.graphLow
+    }
+
     private var drawn: [Level] {
         Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
                     height: boxHeight, imperial: imperial)
@@ -150,11 +161,26 @@ struct StandingFigure: View {
 
     var body: some View {
         Canvas { ctx, size in
-            // Frame first, curve on top: the reader should read the curve
-            // against the levels, not the levels across the curve.
-            for level in drawn {
-                let w = level.width == .infinity ? size.width : Swift.min(level.width, size.width)
-                CurveDrawing.referenceLine(ctx, at: level.y, width: w)
+            // Frame first, curve on top: the reader reads the curve against the
+            // levels, not the levels across the curve.
+            for level in Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
+                                     height: size.height, width: size.width, imperial: imperial) {
+                let w = Swift.min(level.width, size.width)
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: level.y))
+                line.addLine(to: CGPoint(x: w, y: level.y))
+                // The frame is quiet and the band is inked: the band is the
+                // comparison being made, the frame is the room it happens in.
+                let absolute = level.role == .absoluteHigh || level.role == .absoluteLow
+                ctx.stroke(line, with: .color(absolute ? SN.foam.opacity(0.3) : tint(level.role)),
+                           lineWidth: absolute ? 1 : 1.8)
+                var label = ctx.resolve(Text(level.label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(absolute ? SN.foam.opacity(0.55) : tint(level.role)))
+                label.shading = .color(absolute ? SN.foam.opacity(0.55) : tint(level.role))
+                let high = level.role == .absoluteHigh || level.role == .fortnightHigh
+                ctx.draw(label, at: CGPoint(x: w - 2, y: level.y + (high ? 9 : -9)),
+                         anchor: high ? .topTrailing : .bottomTrailing)
             }
             ctx.stroke(Self.curvePath(points, standing: standing, latDatum: latDatum,
                                       hatDatum: hatDatum, size: size),
