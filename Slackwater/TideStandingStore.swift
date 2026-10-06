@@ -30,4 +30,8 @@ import SlackwaterKit
     func standing(at extreme: TideExtreme) -> TideStanding? {
         TideStanding.at(extreme, among: extremes)
     }
+
+    func swing(_ height: Double, time: Date) -> SwingStanding? {
+        SwingStanding.at(height, time: time, among: extremes)
+    }
 }

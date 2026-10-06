@@ -249,28 +249,36 @@ struct TideDetailView: View {
         return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
                 // One line, three claimants: `rangeCaption` owns the order.
-                rangeCaption(record: record, standing: standing, direction: rangeDirection))
+                rangeCaption(record: record, swing: swingStanding, direction: rangeDirection))
     }
 
-    /// Where the turn this swing is heading for sits among the fortnight's
-    /// own turns. The turn AHEAD rather than the one behind: a reader deciding
-    /// whether to go now is asking about the water they will arrive in, which
-    /// is the same reason a current's tile reads its next maximum.
+    /// Where THIS SWING sits among the fortnight's swings. The tile prints a
+    /// swing, so the tile's mark ranks a swing: a station can have a big range
+    /// on a day whose low is unremarkable, and ranking the level on a tile
+    /// whose value is a range read as a conflation on screen.
+    private var swingStanding: SwingStanding? {
+        guard let prev = prevExtreme, let next = nextExtreme else { return nil }
+        return standings.swing(abs(next.height - prev.height), time: next.time)
+    }
+
+    /// Where the turn ahead sits between the station's own floor and ceiling.
+    /// A different question from the swing's, and it belongs to the sheet's
+    /// max/min section rather than to the tile.
     private var standing: TideStanding? {
         nextExtreme.flatMap(standings.standing(at:))
     }
 
     /// The glyph beside the tile's label. A calendar where the water follows a
     /// year, otherwise a to-bar arrow for a marked turn — the same `⤒`/`⤓`
-    /// sense the strip uses at a high and a low, pointing at the limit the
-    /// water is reaching rather than at the direction it is moving.
+    /// sense the tile's own value carries: a swing is a distance between two
+    /// turns, not a direction of travel.
     ///
     /// Seasonal outranks the mark here for the reason it outranks it in the
     /// caption: it changes how the whole screen should be read.
     private var rangeSymbol: String? {
         if record.seasonalRatio != nil { return "calendar" }
-        guard let standing, standing.marks else { return nil }
-        return standing.selected.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line"
+        guard let swingStanding, swingStanding.marks else { return nil }
+        return "arrow.up.and.down"
     }
 
     /// Which way this swing runs, when there is nothing more pressing to say.

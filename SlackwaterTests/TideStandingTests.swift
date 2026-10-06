@@ -92,7 +92,9 @@ final class TideStandingTests: XCTestCase {
     // MARK: - The Range tile's caption
 
     /// Real standings rather than fixtures: the caption rule is only
-    /// interesting against tides that actually rank where they claim to.
+    /// interesting against swings that actually rank where they claim to.
+    /// Level standings, for the max/min section's facts — a different
+    /// judgement from the swing's, and tested separately for that reason.
     private func standings() -> (marked: TideStanding, plain: TideStanding) {
         let all = windowExtremes(at)
         let lows = all.filter { $0.kind == .low }.sorted { $0.height < $1.height }
@@ -100,30 +102,84 @@ final class TideStandingTests: XCTestCase {
                 TideStanding.at(lows[lows.count / 2], among: all)!)
     }
 
+    private func swingStandings() -> (marked: SwingStanding, plain: SwingStanding) {
+        let all = windowExtremes(at)
+        let sorted = all.ranges().sorted { $0.height < $1.height }
+        let big = sorted.last!, mid = sorted[sorted.count / 2]
+        return (SwingStanding.at(big.height, time: big.time, among: all)!,
+                SwingStanding.at(mid.height, time: mid.time, among: all)!)
+    }
+
     /// Three claimants, one line. Seasonal wins: at a lake, "this number is
     /// not really a tide" outranks "this one is big".
     func testSeasonalCaptionOutranksTheStanding() {
         let seasonal = TideStationRecord.record(id: "ticon/algonac_mi-9014070-usa-noaa")!
         XCTAssertNotNil(seasonal.seasonalRatio, "fixture station lost its flag")
-        XCTAssertEqual(rangeCaption(record: seasonal, standing: standings().marked, direction: "low to high"),
+        XCTAssertEqual(rangeCaption(record: seasonal, swing: swingStandings().marked, direction: "low to high"),
                        seasonalCaption(seasonal.seasonalRatio!))
     }
 
-    func testAMarkedLowTakesTheCaptionFromTheDirection() {
-        XCTAssertEqual(rangeCaption(record: station, standing: standings().marked, direction: "low to high"),
-                       String(localized: "lowest in a fortnight"))
+    /// The tile prints a swing, so its mark is about the swing.
+    func testABigSwingTakesTheCaptionFromTheDirection() {
+        XCTAssertEqual(rangeCaption(record: station, swing: swingStandings().marked, direction: "low to high"),
+                       String(localized: "the fortnight's biggest"))
     }
 
-    func testAnUnmarkedTideKeepsItsDirection() {
-        XCTAssertEqual(rangeCaption(record: station, standing: standings().plain, direction: "low to high"),
+    func testAnOrdinarySwingKeepsItsDirection() {
+        XCTAssertEqual(rangeCaption(record: station, swing: swingStandings().plain, direction: "low to high"),
                        "low to high")
     }
 
     /// A station whose scan has not landed yet, or one too sparse to rank,
     /// says the ordinary thing rather than nothing.
     func testNoStandingKeepsTheDirection() {
-        XCTAssertEqual(rangeCaption(record: station, standing: nil, direction: "high to low"),
+        XCTAssertEqual(rangeCaption(record: station, swing: nil, direction: "high to low"),
                        "high to low")
+    }
+
+    // MARK: - The swing's standing (what the TILE ranks)
+
+    private func swings(_ around: Date) -> [TideRange] { windowExtremes(around).ranges() }
+
+    func testTheFortnightsBiggestSwingMarks() {
+        let all = windowExtremes(at)
+        let biggest = all.ranges().max { $0.height < $1.height }!
+        let standing = SwingStanding.at(biggest.height, time: biggest.time, among: all)!
+        XCTAssertTrue(standing.marks)
+        XCTAssertNil(standing.nextBigger, "nothing in the window swings further")
+    }
+
+    func testAMiddlingSwingDoesNotMark() {
+        let all = windowExtremes(at)
+        let sorted = all.ranges().sorted { $0.height < $1.height }
+        let middling = sorted[sorted.count / 2]
+        XCTAssertFalse(SwingStanding.at(middling.height, time: middling.time, among: all)!.marks)
+    }
+
+    /// The tile ranks the quantity it prints. A station can have a big swing on
+    /// a day whose low is unremarkable, so the two rankings genuinely differ —
+    /// which is why ranking the level on a tile that prints a range was wrong.
+    func testSwingRankAndLevelRankAreNotTheSameJudgement() {
+        let all = windowExtremes(at)
+        let disagreements = all.ranges().filter { r in
+            let swing = SwingStanding.at(r.height, time: r.time, among: all)?.marks ?? false
+            let level = TideStanding.at(r.low, among: all)?.marks ?? false
+            return swing != level
+        }
+        XCTAssertFalse(disagreements.isEmpty, "if these always agreed the distinction would be academic")
+    }
+
+    func testTheNextBiggerSwingIsAheadInTime() {
+        let all = windowExtremes(at)
+        let sorted = all.ranges().sorted { $0.height < $1.height }
+        let small = sorted[sorted.count / 3]
+        let next = SwingStanding.at(small.height, time: small.time, among: all)?.nextBigger
+        XCTAssertGreaterThan(try XCTUnwrap(next).time, small.time)
+        XCTAssertGreaterThan(try XCTUnwrap(next).height, small.height)
+    }
+
+    func testTooFewSwingsRanksNothing() {
+        XCTAssertNil(SwingStanding.at(2.0, time: at, among: []))
     }
 
     // MARK: - The sheet's facts

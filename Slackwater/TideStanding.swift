@@ -81,6 +81,33 @@ struct TideStanding {
     }
 }
 
+/// Where one swing sits among the swings around it.
+///
+/// Separate from `TideStanding` because they are different judgements about
+/// different quantities, and a station can have a big swing on a day whose low
+/// is unremarkable. The Range tile prints a swing, so the Range tile ranks a
+/// swing; the levels question belongs to its own section of the sheet.
+struct SwingStanding {
+    /// Every swing in the window, in time order — the figure draws all of them.
+    let all: [TideRange]
+    /// This swing's position among them, 0…1.
+    let rank: Double
+    /// The next swing, after this one, that goes further.
+    let nextBigger: TideRange?
+
+    var marks: Bool { rank >= TideStanding.markThreshold }
+    var isWindowBiggest: Bool { nextBigger == nil && rank >= 1 }
+
+    /// `nil` when the window holds too few swings to rank one against.
+    static func at(_ height: Double, time: Date, among extremes: [TideExtreme]) -> SwingStanding? {
+        let all = extremes.ranges()
+        guard all.count > 1, let rank = all.map(\.height).percentileRank(of: height) else { return nil }
+        return SwingStanding(
+            all: all, rank: rank,
+            nextBigger: all.filter { $0.time > time && $0.height > height }.min { $0.time < $1.time })
+    }
+}
+
 /// One line of the sheet. `jumpTo` non-nil makes it a button that moves the
 /// scrubber, the way a tapped Moon fact already does.
 struct StandingFact: Equatable {
@@ -156,12 +183,12 @@ private func gapSentence(_ gap: Double, low: Bool, imperial: Bool, unit: String)
 /// big", and a reader who does not know the first will misread the second.
 /// Then the standing, the rarer and more useful fact. Then the direction, which
 /// is the lesser fact — the curve and the schedule both already show it.
-func rangeCaption(record: TideStationRecord, standing: TideStanding?, direction: String) -> String {
+func rangeCaption(record: TideStationRecord, swing: SwingStanding?, direction: String) -> String {
     if let ratio = record.seasonalRatio { return seasonalCaption(ratio) }
-    guard let standing, standing.marks else { return direction }
-    return standing.selected.kind == .high
-        ? String(localized: "highest in a fortnight",
-                 comment: "Tide-range caption: this high leads the surrounding month.")
-        : String(localized: "lowest in a fortnight",
-                 comment: "Tide-range caption: this low leads the surrounding month.")
+    guard let swing, swing.marks else { return direction }
+    return swing.isWindowBiggest
+        ? String(localized: "the fortnight's biggest",
+                 comment: "Tide-range caption: no swing within fifteen days either side goes further.")
+        : String(localized: "beyond normal here",
+                 comment: "Tide-range caption: this swing is far larger than this station's usual.")
 }
