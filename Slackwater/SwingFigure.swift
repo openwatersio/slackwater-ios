@@ -23,26 +23,50 @@ struct SwingFigure: View {
     }
 
     let standing: SwingStanding
+    /// The station's own zone: the days this aggregates are the station's,
+    /// never the device's.
+    var tz: TimeZone = .current
     var onJump: ((Date) -> Void)? = nil
 
-    /// One scale for every bar — the fortnight's biggest swing fills the box,
-    /// and every other bar is its true fraction of that. Auto-fitting each bar
-    /// to itself is exactly the defect #97 found in the strip.
-    static func bars(_ standing: SwingStanding, size: CGSize) -> [Bar] {
-        let all = standing.all
-        guard let biggest = all.map(\.height).max(), biggest > 0,
-              let first = all.first?.time, let last = all.last?.time,
-              last > first else { return [] }
-        let seconds = last.timeIntervalSince(first)
-        // Half a bar's margin at each end so the first and last are not clipped
-        // by the edge of the canvas.
-        let inset = size.width / CGFloat(Swift.max(all.count, 1)) / 2
-        let usable = Swift.max(size.width - inset * 2, 1)
-        return all.map { r in
-            Bar(x: inset + usable * CGFloat(r.time.timeIntervalSince(first) / seconds),
-                height: size.height * CGFloat(r.height / biggest),
-                isSelected: r.time == standing.selectedTime,
-                isNextBigger: r.time == standing.nextBigger?.time)
+    /// One bar per whole station-local day, carrying that day's biggest swing.
+    ///
+    /// Per-day rather than per-swing because the fortnightly beat is what
+    /// answers "beyond normal", and every swing buries it: rises and falls
+    /// alternate large and small four times a day, against a beat that turns
+    /// over a fortnight. On real Friday Harbor predictions the daily maximum
+    /// runs 1.8 → 3.7 → 1.9 → 3.0 → 1.8 ft across the window and the beat is
+    /// plain; the 99-swing series is noise.
+    ///
+    /// Only whole days. The window runs local midnight to local midnight, so
+    /// anything after its last midnight is a fragment — 0.1 ft at Friday
+    /// Harbor — and would draw as a bar collapsed to nothing at the edge.
+    ///
+    /// One scale for every bar: the biggest day fills the box and the rest are
+    /// their true fraction of it. Auto-fitting each bar to itself is exactly
+    /// the defect #97 found in the strip.
+    static func bars(_ standing: SwingStanding, tz: TimeZone, size: CGSize) -> [Bar] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = tz
+        var biggestOfDay: [Date: TideRange] = [:]
+        for r in standing.all {
+            let day = cal.startOfDay(for: r.time)
+            guard day >= standing.window.start,
+                  let next = cal.date(byAdding: .day, value: 1, to: day), next <= standing.window.end
+            else { continue }
+            if r.height > (biggestOfDay[day]?.height ?? -.infinity) { biggestOfDay[day] = r }
+        }
+        let days = biggestOfDay.keys.sorted()
+        guard let biggest = biggestOfDay.values.map(\.height).max(), biggest > 0,
+              days.count > 1 else { return [] }
+        let selectedDay = cal.startOfDay(for: standing.selectedTime)
+        let nextDay = standing.nextBigger.map { cal.startOfDay(for: $0.time) }
+        // Half a bar's margin at each end so neither is clipped by the edge.
+        let step = size.width / CGFloat(days.count)
+        return days.enumerated().map { i, day in
+            Bar(x: step * (CGFloat(i) + 0.5),
+                height: size.height * CGFloat(biggestOfDay[day]!.height / biggest),
+                isSelected: day == selectedDay,
+                isNextBigger: day == nextDay && day != selectedDay)
         }
     }
 
@@ -51,7 +75,8 @@ struct SwingFigure: View {
     var body: some View {
         Canvas { ctx, size in
             let baseline = size.height
-            for bar in Self.bars(standing, size: CGSize(width: size.width, height: size.height - 12)) {
+            for bar in Self.bars(standing, tz: tz,
+                                 size: CGSize(width: size.width, height: size.height - 12)) {
                 var path = Path()
                 path.move(to: CGPoint(x: bar.x, y: baseline))
                 path.addLine(to: CGPoint(x: bar.x, y: baseline - bar.height))

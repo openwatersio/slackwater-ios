@@ -98,17 +98,22 @@ struct SwingStanding {
     let rank: Double
     /// The next swing, after this one, that goes further.
     let nextBigger: TideRange?
+    /// The window these swings came from. The figure needs it to tell a whole
+    /// local day from the fragment after the window's last midnight.
+    let window: (start: Date, end: Date)
 
     var marks: Bool { rank >= TideStanding.markThreshold }
     var isWindowBiggest: Bool { nextBigger == nil && rank >= 1 }
 
     /// `nil` when the window holds too few swings to rank one against.
-    static func at(_ height: Double, time: Date, among extremes: [TideExtreme]) -> SwingStanding? {
+    static func at(_ height: Double, time: Date, among extremes: [TideExtreme],
+                   window: (start: Date, end: Date)) -> SwingStanding? {
         let all = extremes.ranges()
         guard all.count > 1, let rank = all.map(\.height).percentileRank(of: height) else { return nil }
         return SwingStanding(
             all: all, selectedHeight: height, selectedTime: time, rank: rank,
-            nextBigger: all.filter { $0.time > time && $0.height > height }.min { $0.time < $1.time })
+            nextBigger: all.filter { $0.time > time && $0.height > height }.min { $0.time < $1.time },
+            window: window)
     }
 }
 

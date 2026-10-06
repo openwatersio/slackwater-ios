@@ -79,22 +79,22 @@ struct StandingFigure: View {
         var out: [Level] = []
         if let hatDatum {
             out.append(Level(role: .absoluteHigh, metres: hatDatum, y: y(hatDatum), width: width,
-                             label: String(localized: "the highest water this station ever sees",
-                                           comment: "Figure label for Highest Astronomical Tide."),
+                             label: String(localized: "HAT · highest it ever gets",
+                                           comment: "Figure label for Highest Astronomical Tide. Keep HAT exact."),
                              isMerged: false))
         }
         out.append(Level(role: .fortnightHigh, metres: bandHigh, y: y(bandHigh), width: band,
-                         label: String(localized: "the highest high of the fortnight",
+                         label: String(localized: "the fortnight's highest",
                                        comment: "Figure label for the top of the surrounding month."),
                          isMerged: false))
         out.append(Level(role: .fortnightLow, metres: bandLow, y: y(bandLow), width: band,
-                         label: String(localized: "the lowest low of the fortnight",
+                         label: String(localized: "the fortnight's lowest",
                                        comment: "Figure label for the bottom of the surrounding month."),
                          isMerged: false))
         if let latDatum {
             out.append(Level(role: .absoluteLow, metres: latDatum, y: y(latDatum), width: width,
-                             label: String(localized: "the lowest water this station ever sees",
-                                           comment: "Figure label for Lowest Astronomical Tide."),
+                             label: String(localized: "LAT · lowest it ever gets",
+                                           comment: "Figure label for Lowest Astronomical Tide. Keep LAT exact."),
                              isMerged: false))
         }
         out.append(Level(role: .selected, metres: standing.selected.height,
@@ -206,9 +206,12 @@ struct StandingFigure: View {
         // A section drawing, not a chart: every level carries its own height,
         // and the differences between them are measured rather than described.
         Canvas { ctx, size in
-            let axisX = size.width * 0.50
-            let chainX = size.width * 0.33
-            let overallX = size.width * 0.19
+            // Measured against the longest label this draws: a 26-character
+            // level name at 9.5pt needs about 40% of the card's width, so the
+            // axis sits left of centre rather than on it.
+            let axisX = size.width * 0.42
+            let chainX = size.width * 0.27
+            let overallX = size.width * 0.15
             let levels = Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
                                      height: size.height, width: size.width, imperial: imperial)
 
@@ -225,16 +228,16 @@ struct StandingFigure: View {
                 let ink = absolute ? SN.foam.opacity(0.42) : tint(level.role)
                 var line = Path()
                 line.move(to: CGPoint(x: axisX, y: level.y))
-                line.addLine(to: CGPoint(x: axisX + size.width * 0.21, y: level.y))
+                line.addLine(to: CGPoint(x: axisX + size.width * 0.15, y: level.y))
                 ctx.stroke(line, with: .color(ink), lineWidth: absolute ? 1.2 : 1.6)
                 // Extension line back to the chains, as thin as a drafting one.
                 var ext = Path()
                 ext.move(to: CGPoint(x: overallX - 8, y: level.y))
-                ext.addLine(to: CGPoint(x: axisX - 34, y: level.y))
+                ext.addLine(to: CGPoint(x: axisX - 30, y: level.y))
                 ctx.stroke(ext, with: .color(ink.opacity(0.3)), lineWidth: 0.7)
-                write(level.label, ink, at: CGPoint(x: axisX + size.width * 0.225, y: level.y), .leading)
+                write(level.label, ink, at: CGPoint(x: axisX + size.width * 0.165, y: level.y), .leading)
                 write(dimensionLabel(level.metres, imperial), ink,
-                      at: CGPoint(x: axisX - 40, y: level.y), .trailing, 10)
+                      at: CGPoint(x: axisX - 36, y: level.y), .trailing, 10)
             }
 
             // The turn itself, the one thing on here that is not a reference.

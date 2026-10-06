@@ -61,7 +61,17 @@ struct RangeDetailSheet: View {
                     if let swing {
                         section(String(localized: "Is this beyond normal?",
                                        comment: "Range sheet section: how this swing compares with the fortnight's.")) {
-                            SwingFigure(standing: swing, onJump: onJump)
+                            VStack(alignment: .leading, spacing: 6) {
+                                SwingFigure(standing: swing, tz: tz, onJump: onJump)
+                                // The bars are days and the caption counts
+                                // swings, so the series has to say which it is
+                                // — at a mixed station the marked day's
+                                // biggest swing is often not the selected one.
+                                Text("Each bar is one day's biggest swing.",
+                                     comment: "Explains the unit of the swing figure's bars.")
+                                    .font(.caption)
+                                    .foregroundStyle(SN.foam.opacity(0.5))
+                            }
                         }
                         factRow(swingFact)
                     }

@@ -12,6 +12,9 @@ import SlackwaterKit
 
 @Observable final class TideStandingStore {
     private(set) var extremes: [TideExtreme] = []
+    /// The window `extremes` came from, so a consumer can tell a whole local
+    /// day from the fragment after its last midnight.
+    private(set) var window: (start: Date, end: Date) = (.distantPast, .distantPast)
     /// The station already scanned. Keyed by id rather than by window: the
     /// window moves with the scrub and the ranking deliberately does not, so
     /// re-anchoring it per scrub would reintroduce the per-frame cost.
@@ -24,6 +27,7 @@ import SlackwaterKit
         extremes = await Task.detached(priority: .userInitiated) {
             station.extremes(from: w.start, to: w.end)
         }.value
+        window = w
         loaded = record.id
     }
 
@@ -32,6 +36,6 @@ import SlackwaterKit
     }
 
     func swing(_ height: Double, time: Date) -> SwingStanding? {
-        SwingStanding.at(height, time: time, among: extremes)
+        SwingStanding.at(height, time: time, among: extremes, window: window)
     }
 }
