@@ -33,10 +33,7 @@ final class PatchFieldTests: XCTestCase {
     func testCellsScaleAnchorSpeed() throws {
         let (bin, header) = fixture()
         let field = try XCTUnwrap(PatchField(bin: bin, headerJSON: header))
-        // Bundled NOAA current-station ids are provider-prefixed ("noaa/PUG1701",
-        // see currents.json) — the brief's bare "PUG1701" lookup never matches
-        // and throws here regardless of PatchField's own correctness; fixed per
-        // this repo's CLAUDE.md ("check it and say so rather than complying").
+        // Bundled NOAA current-station IDs include the provider prefix.
         let anchor = try XCTUnwrap(CurrentStationRecord.all.first { $0.id == "noaa/PUG1701" })
         let date = Date(timeIntervalSince1970: 1_787_000_000)
         let signed = try XCTUnwrap(anchor.engineStation

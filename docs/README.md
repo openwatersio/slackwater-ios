@@ -35,7 +35,7 @@ Documentation here describes the current product, maintained operating procedure
 
 `Slackwater/` contains the app, `SlackwaterWidgets/` the extension, `SlackwaterWatch/` the watch app, and `SlackwaterTests/` and `SlackwaterUITests/` their checks. `project.yml` defines the generated Xcode project. `scripts/` holds build, test, and release entry points; `tools/` holds data generators and maintained validation pipelines. Service-specific code and docs live together under `services/`.
 
-Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and [CLAUDE.md](../CLAUDE.md) for agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
+Use [CONTRIBUTING.md](../CONTRIBUTING.md) for workflow and agent constraints. Temporary plans and experimental output go in ignored `.superpowers/` or `/tmp`. Preserve a reusable experiment as a named tool with a runbook and checks; preserve its lasting decision in the relevant product or data document.
 
 Strategy, market research, and future product planning live in the private [planning repository](https://github.com/openwatersio/planning/tree/main/slackwater-ios). Reviewed proposals remain available in their PRs: [download tiers #453](https://github.com/openwatersio/slackwater-ios/pull/453) and [catalog delivery #297](https://github.com/openwatersio/slackwater-ios/pull/297). A merged design proposal alone does not mean its behavior ships.
 

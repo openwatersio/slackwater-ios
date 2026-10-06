@@ -119,7 +119,7 @@ Inert. Label "Shape only", value "No speed", caption "<port> tides". It states p
 
 Title "Range", with Done. It shows the value, then "The difference between this swing's high and low, <direction>." and a "Yearly change" row: "about the same as the daily tide" when the ratio rounds to 1, or "about N× the daily tide", rounded to tens from 10 and to tenths below.
 
-The seasonal ratio is the larger of the Sa and Ssa amplitudes over the largest tidal constituent, taken from the reference station's model for a subordinate. It exists only for stations the database flags as seasonally dominated. CLAUDE.md's rule on yearly claims applies: never infer it from the data source.
+The seasonal ratio is the larger of the Sa and Ssa amplitudes over the largest tidal constituent, taken from the reference station's model for a subordinate. It exists only for stations the database flags as seasonally dominated. [The yearly tidal claims rule](../CONTRIBUTING.md#yearly-tidal-claims) applies: never infer it from the data source.
 
 The explanation depends on the ratio:
 
