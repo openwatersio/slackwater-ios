@@ -44,6 +44,7 @@ final class OfflineCoverageTests: ScreenshotTestCase {
     // The seeded reference renders Malibu's shape-only path without live IWLS.
     func testM46MalibuDerivedGateSeededOffline() throws {
         let app = launch("-seedGate", "-networkKillSwitch",
+                         "-scrubTrace", "\(shotDir)/malibu-scrub-\(UUID().uuidString).log",
                          "-seedTideModel", "chs-point-atkinson")
 
         openSearch(app, "malibu")

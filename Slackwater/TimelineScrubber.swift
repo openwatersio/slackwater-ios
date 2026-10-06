@@ -72,6 +72,13 @@ struct TimelineScrubber: UIViewRepresentable {
             accessibilityTraits = .adjustable
         }
         required init?(coder: NSCoder) { fatalError("not from a nib") }
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            let hit = super.hitTest(point, with: event)
+            if event?.type == .touches {
+                ScrubTrace.record("hit point=\(point) target=\(String(describing: hit))", self)
+            }
+            return hit
+        }
         override func layoutSubviews() {
             super.layoutSubviews()
             onLayout?()
@@ -118,6 +125,7 @@ struct TimelineScrubber: UIViewRepresentable {
 
     func updateUIView(_ sv: UIScrollView, context: Context) {
         let co = context.coordinator
+        ScrubTrace.record("update requested=\(scrubTime.timeIntervalSince1970) jump=\(jumpToken)", sv)
         co.parent = self
         // Rendered from the CURRENT offset; when a branch below moves the
         // offset, the scroll callback it fires refreshes again from the
@@ -163,6 +171,7 @@ struct TimelineScrubber: UIViewRepresentable {
         // UIKit stops a deceleration, and it cancels a magnet in flight too.
         let desired = data.x(scrubTime) - sv.bounds.width / 2
         if co.seenJump != jumpToken {
+            ScrubTrace.record("jump desired=\(desired)", sv)
             // A tapped pill mid-fling: the guard below would drop the jump and
             // the next scroll callback would write the fling's time back over
             // the tap. Stop the fling and the magnet, then ride the magnet's
@@ -194,6 +203,7 @@ struct TimelineScrubber: UIViewRepresentable {
             return
         }
         if abs(desired - sv.contentOffset.x) > 1, !sv.isDragging, !co.nudging {
+            ScrubTrace.record("external desired=\(desired)", sv)
             if sv.isDecelerating || co.magneting {
                 sv.setContentOffset(sv.contentOffset, animated: false)
                 co.cancelMagnet()
@@ -318,6 +328,7 @@ struct TimelineScrubber: UIViewRepresentable {
             let width = sv.bounds.width
             defer { laidOutWidth = width }
             guard didInitialCenter, width > 0, abs(width - laidOutWidth) > 0.5, !nudging else { return }
+            ScrubTrace.record("reanchor", sv)
             if sv.isDecelerating || magneting {
                 sv.setContentOffset(sv.contentOffset, animated: false)
                 cancelMagnet()
@@ -397,6 +408,7 @@ struct TimelineScrubber: UIViewRepresentable {
         /// intro. Reduce Motion likewise lands directly on now.
         func centerIfNeeded(_ sv: UIScrollView) {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
+            ScrubTrace.record("center", sv)
             let start = parent.scrubTime
             let isIntro = abs(start.timeIntervalSince(Timeline.introStart(for: parent.now))) < 2
             let destination = isIntro ? parent.now : start
@@ -452,6 +464,7 @@ struct TimelineScrubber: UIViewRepresentable {
         }
 
         func scrollViewDidScroll(_ sv: UIScrollView) {
+            ScrubTrace.record("scroll", sv)
             publishCenter(sv)
             refreshCanvas(sv)
             guard sv.bounds.width > 0, didInitialCenter, !reanchoring else { return }
@@ -460,14 +473,17 @@ struct TimelineScrubber: UIViewRepresentable {
         /// A touch during the opening slide leaves the scrubber exactly where
         /// the user grabbed it.
         func scrollViewWillBeginDragging(_ sv: UIScrollView) {
+            ScrubTrace.record("pan-began", sv)
             stopIntro()
             parent.scrollGate?.isQuiet = false
         }
         func scrollViewDidEndDragging(_ sv: UIScrollView, willDecelerate: Bool) {
+            ScrubTrace.record("pan-ended", sv)
             if !willDecelerate { magnet(sv) }
             syncGate(sv)
         }
         func scrollViewDidEndDecelerating(_ sv: UIScrollView) {
+            ScrubTrace.record("deceleration-ended", sv)
             magnet(sv)
             syncGate(sv)
         }
@@ -831,5 +847,49 @@ struct TimelineScrubStrip: View {
         from = nil
         to = nil
         startedAt = nil
+    }
+}
+
+// Native state travels with CI's screenshot artifacts when the Malibu test opts in (#613).
+@MainActor private enum ScrubTrace {
+    #if DEBUG && targetEnvironment(simulator)
+    static let path: URL? = {
+        guard let i = CommandLine.arguments.firstIndex(of: "-scrubTrace"),
+              CommandLine.arguments.indices.contains(i + 1) else { return nil }
+        return URL(fileURLWithPath: CommandLine.arguments[i + 1])
+    }()
+    static var lines: [String] = []
+    static var pending = false
+    static let writer = DispatchQueue(label: "scrub-trace", qos: .utility)
+    #endif
+
+    static func record(_ event: @autoclosure () -> String, _ sv: UIScrollView) {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let path, lines.count < 2000 else { return }
+        let co = sv.delegate as? TimelineScrubber.Coordinator
+        var gestures: [String] = []
+        var view: UIView? = sv
+        while let current = view {
+            gestures += (current.gestureRecognizers ?? []).map {
+                "\(ObjectIdentifier(current)):\(type(of: $0))=\($0.state.rawValue)"
+            }
+            view = current.superview
+        }
+        lines.append("\(Date().timeIntervalSince1970) \(event()) view=\(ObjectIdentifier(sv)) frame=\(sv.convert(sv.bounds, to: nil)) offset=\(sv.contentOffset) size=\(sv.contentSize) enabled=\(sv.isScrollEnabled) dragging=\(sv.isDragging) decelerating=\(sv.isDecelerating) translation=\(sv.panGestureRecognizer.translation(in: sv)) time=\(co?.parent.scrubTime.timeIntervalSince1970 ?? 0) jump=\(co?.seenJump ?? -1) centered=\(co?.didInitialCenter ?? false) nudging=\(co?.nudging ?? false) magnet=\(co?.magneting ?? false) reanchoring=\(co?.reanchoring ?? false) gestures=\(gestures)")
+        guard !pending else { return }
+        pending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            record("snapshot", sv)
+            pending = false
+            let snapshot = lines
+            writer.async {
+                do {
+                    try snapshot.joined(separator: "\n").write(to: path, atomically: true, encoding: .utf8)
+                } catch {
+                    print("Could not save scrub trace: \(error)")
+                }
+            }
+        }
+        #endif
     }
 }
