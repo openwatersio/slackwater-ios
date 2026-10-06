@@ -54,12 +54,12 @@ final class StandingFigureTests: XCTestCase {
     func testASwingThatIsTheFortnightsBiggestTouchesBothBandLines() {
         let maximal = standing(low: 0.6, high: 4.9, bandLow: 0.6, bandHigh: 4.9)
         let levels = StandingFigure.levels(standing: maximal, latDatum: 0, hatDatum: 5.4, height: height)
+        // The selected turn sits exactly on a band line, so the two merge —
+        // and the merge keeps the selection, which is the line the reader came
+        // for. The surviving band line is the opposite end.
         let band = levels.filter { $0.role == .fortnightLow || $0.role == .fortnightHigh }
-        XCTAssertEqual(band.count, 2)
-        for line in band {
-            XCTAssertGreaterThan(line.width, StandingFigure.curveInset * 2,
-                                 "the band outruns the curve so a touch is not a clip")
-        }
+        XCTAssertEqual(band.count, 1)
+        XCTAssertTrue(levels.contains { $0.role == .selected && $0.isMerged })
     }
 
     /// When a fortnight nearly reaches the station's own ceiling, two lines
@@ -77,44 +77,6 @@ final class StandingFigureTests: XCTestCase {
     func testWellSeparatedLevelsDoNotMerge() {
         let levels = StandingFigure.levels(standing: standing(), latDatum: 0, hatDatum: 5.4, height: height)
         XCTAssertFalse(levels.contains { $0.isMerged })
-    }
-
-    /// The point of the whole figure: the curve is drawn on the SAME scale as
-    /// the frame, so its amplitude is its real amplitude. A swing using a third
-    /// of the fortnight's band occupies a third of the band's height.
-    func testTheCurveIsDrawnOnTheSharedScale() {
-        let t = Date(timeIntervalSince1970: 1_780_000_000)
-        let points = (0...12).map {
-            TidePoint(time: t.addingTimeInterval(Double($0) * 1_800),
-                      height: 2.8 + 1.8 * cos(Double($0) / 12 * 2 * .pi))
-        }
-        let s = standing()  // band 0.6…4.9
-        let path = StandingFigure.curvePath(points, standing: s, latDatum: 0, hatDatum: 5.4,
-                                            size: CGSize(width: 300, height: height))
-        let levels = StandingFigure.levels(standing: s, latDatum: 0, hatDatum: 5.4, height: height)
-        let bandHigh = levels.first { $0.role == .fortnightHigh }!.y
-        let bandLow = levels.first { $0.role == .fortnightLow }!.y
-        // The curve spans 1.0…4.6 inside a band of 0.6…4.9: strictly inside.
-        XCTAssertGreaterThan(path.boundingRect.minY, bandHigh)
-        XCTAssertLessThan(path.boundingRect.maxY, bandLow)
-        // 3.6 m of swing against a 5.4 m axis over `height` points.
-        XCTAssertEqual(path.boundingRect.height, height * 3.6 / 5.4, accuracy: 2)
-    }
-
-    /// Review Focus 2 again, this time on the curve: when the swing IS the
-    /// fortnight, its extremes land on the band's lines rather than past them.
-    func testTheMaximalCurveLandsOnTheBandLines() {
-        let t = Date(timeIntervalSince1970: 1_780_000_000)
-        let points = (0...12).map {
-            TidePoint(time: t.addingTimeInterval(Double($0) * 1_800),
-                      height: 2.75 + 2.15 * cos(Double($0) / 12 * 2 * .pi))
-        }
-        let maximal = standing(low: 0.6, high: 4.9, bandLow: 0.6, bandHigh: 4.9)
-        let path = StandingFigure.curvePath(points, standing: maximal, latDatum: 0, hatDatum: 5.4,
-                                            size: CGSize(width: 300, height: height))
-        let levels = StandingFigure.levels(standing: maximal, latDatum: 0, hatDatum: 5.4, height: height)
-        XCTAssertEqual(path.boundingRect.minY, levels.first { $0.role == .fortnightHigh }!.y, accuracy: 1)
-        XCTAssertEqual(path.boundingRect.maxY, levels.first { $0.role == .fortnightLow }!.y, accuracy: 1)
     }
 
     /// A drawing may never be the only carrier (WCAG 1.4.1), so every level the

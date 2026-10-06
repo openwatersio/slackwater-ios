@@ -90,6 +90,10 @@ struct TideStanding {
 struct SwingStanding {
     /// Every swing in the window, in time order — the figure draws all of them.
     let all: [TideRange]
+    /// The swing being judged, carried so the figure can mark it without being
+    /// handed the same two values a second time.
+    let selectedHeight: Double
+    let selectedTime: Date
     /// This swing's position among them, 0…1.
     let rank: Double
     /// The next swing, after this one, that goes further.
@@ -103,7 +107,7 @@ struct SwingStanding {
         let all = extremes.ranges()
         guard all.count > 1, let rank = all.map(\.height).percentileRank(of: height) else { return nil }
         return SwingStanding(
-            all: all, rank: rank,
+            all: all, selectedHeight: height, selectedTime: time, rank: rank,
             nextBigger: all.filter { $0.time > time && $0.height > height }.min { $0.time < $1.time })
     }
 }

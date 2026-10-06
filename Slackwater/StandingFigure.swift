@@ -20,10 +20,16 @@ struct StandingFigure: View {
     enum Role: Equatable {
         case absoluteHigh, absoluteLow
         case fortnightHigh, fortnightLow
+        /// The turn being judged — the only line here that is not a reference.
+        case selected
     }
 
     struct Level: Equatable {
         let role: Role
+        /// The height this line stands at, metres above chart datum. Drawn
+        /// beside the line: a section drawing says what each level IS, not
+        /// only what it is called.
+        let metres: Double
         /// Points from the top of the box.
         let y: CGFloat
         let width: CGFloat
@@ -48,9 +54,6 @@ struct StandingFigure: View {
     static let bandInset: CGFloat = 26
 
     let standing: TideStanding
-    /// The swing's own heights, sampled. The sheet supplies them; the figure
-    /// never predicts.
-    let points: [TidePoint]
     let latDatum: Double?
     let hatDatum: Double?
     var imperial: Bool = false
@@ -75,25 +78,31 @@ struct StandingFigure: View {
 
         var out: [Level] = []
         if let hatDatum {
-            out.append(Level(role: .absoluteHigh, y: y(hatDatum), width: width,
+            out.append(Level(role: .absoluteHigh, metres: hatDatum, y: y(hatDatum), width: width,
                              label: String(localized: "the highest water this station ever sees",
                                            comment: "Figure label for Highest Astronomical Tide."),
                              isMerged: false))
         }
-        out.append(Level(role: .fortnightHigh, y: y(bandHigh), width: band,
+        out.append(Level(role: .fortnightHigh, metres: bandHigh, y: y(bandHigh), width: band,
                          label: String(localized: "the highest high of the fortnight",
                                        comment: "Figure label for the top of the surrounding month."),
                          isMerged: false))
-        out.append(Level(role: .fortnightLow, y: y(bandLow), width: band,
+        out.append(Level(role: .fortnightLow, metres: bandLow, y: y(bandLow), width: band,
                          label: String(localized: "the lowest low of the fortnight",
                                        comment: "Figure label for the bottom of the surrounding month."),
                          isMerged: false))
         if let latDatum {
-            out.append(Level(role: .absoluteLow, y: y(latDatum), width: width,
+            out.append(Level(role: .absoluteLow, metres: latDatum, y: y(latDatum), width: width,
                              label: String(localized: "the lowest water this station ever sees",
                                            comment: "Figure label for Lowest Astronomical Tide."),
                              isMerged: false))
         }
+        out.append(Level(role: .selected, metres: standing.selected.height,
+                         y: y(standing.selected.height), width: band,
+                         label: standing.selected.kind == .low
+                             ? String(localized: "this low", comment: "Figure label for the selected low tide.")
+                             : String(localized: "this high", comment: "Figure label for the selected high tide."),
+                         isMerged: false))
         return merging(out.sorted { $0.y < $1.y })
     }
 
@@ -107,8 +116,12 @@ struct StandingFigure: View {
                 out.append(level)
                 continue
             }
+            // The selected turn never loses its identity to a merge: it is the
+            // one line the reader came here to find.
+            let keep = level.role == .selected ? level : last
             out[out.count - 1] = Level(
-                role: last.role, y: last.y, width: Swift.max(last.width, level.width),
+                role: keep.role, metres: keep.metres, y: keep.y,
+                width: Swift.max(last.width, level.width),
                 label: String(localized: "\(last.label), and \(level.label)",
                               comment: "Figure label where two levels are too close to draw apart."),
                 isMerged: true)
@@ -116,28 +129,57 @@ struct StandingFigure: View {
         return out
     }
 
-    /// The swing itself, on the levels' own axis — which is the whole premise:
-    /// drawn against the same scale as the frame, the curve's amplitude IS its
-    /// amplitude, and a swing using a third of the fortnight occupies a third
-    /// of the band. Inset horizontally so the band's lines outrun it.
-    static func curvePath(_ points: [TidePoint], standing: TideStanding,
-                          latDatum: Double?, hatDatum: Double?, size: CGSize) -> Path {
+    /// One measured difference, drawn the way a section drawing measures one:
+    /// extension lines out to a chain, ticks at each end, the value sitting on
+    /// it. `isOverall` is the outer chain — everything this station does.
+    struct Dimension: Equatable {
+        let fromY: CGFloat
+        let toY: CGFloat
+        let metres: Double
+        let label: String
+        let isOverall: Bool
+        /// The gap the caption leads with. Drawn as ONE segment so the number a
+        /// reader acts on is a measurement off the picture rather than a
+        /// separate calculation that can drift from it.
+        let isHeadline: Bool
+    }
+
+    /// The chain, bottom to top. Members are the station's floor and ceiling,
+    /// the selected turn, and the fortnight line on the FAR side of it — the
+    /// near-side one is left as a reference line, because putting a tick there
+    /// would split the headline gap in two and the caption's number would stop
+    /// being a thing you can measure off the drawing.
+    ///
+    /// Empty without bounds: there is nothing absolute to measure against, and
+    /// a chain drawn off the fortnight alone would imply one.
+    static func dimensions(standing: TideStanding, latDatum: Double?, hatDatum: Double?,
+                           height: CGFloat, width: CGFloat = 320, imperial: Bool) -> [Dimension] {
+        guard let latDatum, let hatDatum else { return [] }
+        let low = standing.selected.kind == .low
         let bandLow = standing.windowLowest.height
         let bandHigh = standing.windowHighest.height
-        let lo = latDatum.map { Swift.min($0, bandLow) } ?? bandLow
-        let hi = hatDatum.map { Swift.max($0, bandHigh) } ?? bandHigh
+        let lo = Swift.min(latDatum, bandLow), hi = Swift.max(hatDatum, bandHigh)
         let span = Swift.max(hi - lo, 0.01)
-        guard let first = points.first, let last = points.last,
-              last.time > first.time else { return Path() }
-        let seconds = last.time.timeIntervalSince(first.time)
-        let usable = Swift.max(size.width - curveInset * 2, 1)
-        var path = Path()
-        for (i, p) in points.enumerated() {
-            let x = curveInset + usable * CGFloat(p.time.timeIntervalSince(first.time) / seconds)
-            let y = size.height - CGFloat((p.height - lo) / span) * size.height
-            i == 0 ? path.move(to: CGPoint(x: x, y: y)) : path.addLine(to: CGPoint(x: x, y: y))
+        func y(_ h: Double) -> CGFloat { height - CGFloat((h - lo) / span) * height }
+
+        let far = low ? bandHigh : bandLow
+        let members = ([latDatum, standing.selected.height, far, hatDatum]).sorted()
+        // The headline runs from the selected turn to its own end: under a low
+        // the floor — how much water could still go away — and under a high the
+        // ceiling, which is the clearance question.
+        let headlineEnd = low ? latDatum : hatDatum
+        var out: [Dimension] = []
+        for (a, b) in zip(members, members.dropFirst()) where b - a > 0.0005 {
+            let isHeadline = (a == headlineEnd && b == standing.selected.height)
+                || (b == headlineEnd && a == standing.selected.height)
+            out.append(Dimension(fromY: y(a), toY: y(b), metres: b - a,
+                                 label: dimensionLabel(b - a, imperial),
+                                 isOverall: false, isHeadline: isHeadline))
         }
-        return path
+        out.append(Dimension(fromY: y(latDatum), toY: y(hatDatum), metres: hatDatum - latDatum,
+                             label: dimensionLabel(hatDatum - latDatum, imperial),
+                             isOverall: true, isHeadline: false))
+        return out
     }
 
     /// Spoken in full: a drawing may never be the only carrier of meaning
@@ -150,7 +192,8 @@ struct StandingFigure: View {
     /// The band wears the curve's own high/low inks — the pair the strip uses
     /// at a turn — because the band's two lines ARE a high and a low.
     private func tint(_ role: Role) -> Color {
-        role == .fortnightHigh ? SN.graphHigh : SN.graphLow
+        if role == .selected { return standing.selected.kind == .low ? SN.graphLow : SN.graphHigh }
+        return role == .fortnightHigh ? SN.graphHigh : SN.graphLow
     }
 
     private var drawn: [Level] {
@@ -160,34 +203,76 @@ struct StandingFigure: View {
     private let boxHeight: CGFloat = 190
 
     var body: some View {
+        // A section drawing, not a chart: every level carries its own height,
+        // and the differences between them are measured rather than described.
         Canvas { ctx, size in
-            // Frame first, curve on top: the reader reads the curve against the
-            // levels, not the levels across the curve.
-            for level in Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
-                                     height: size.height, width: size.width, imperial: imperial) {
-                let w = Swift.min(level.width, size.width)
-                var line = Path()
-                line.move(to: CGPoint(x: 0, y: level.y))
-                line.addLine(to: CGPoint(x: w, y: level.y))
-                // The frame is quiet and the band is inked: the band is the
-                // comparison being made, the frame is the room it happens in.
-                let absolute = level.role == .absoluteHigh || level.role == .absoluteLow
-                ctx.stroke(line, with: .color(absolute ? SN.foam.opacity(0.3) : tint(level.role)),
-                           lineWidth: absolute ? 1 : 1.8)
-                var label = ctx.resolve(Text(level.label)
-                    .font(.system(size: 10))
-                    .foregroundStyle(absolute ? SN.foam.opacity(0.55) : tint(level.role)))
-                label.shading = .color(absolute ? SN.foam.opacity(0.55) : tint(level.role))
-                let high = level.role == .absoluteHigh || level.role == .fortnightHigh
-                ctx.draw(label, at: CGPoint(x: w - 2, y: level.y + (high ? 9 : -9)),
-                         anchor: high ? .topTrailing : .bottomTrailing)
+            let axisX = size.width * 0.50
+            let chainX = size.width * 0.33
+            let overallX = size.width * 0.19
+            let levels = Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
+                                     height: size.height, width: size.width, imperial: imperial)
+
+            func write(_ s: String, _ c: Color, at p: CGPoint, _ anchor: UnitPoint, _ pt: CGFloat = 9.5) {
+                // A section drawing's numbers are a column of measurements:
+                // monospacedDigit() keeps them aligned as the scrub moves them.
+                var t = ctx.resolve(Text(s).font(.system(size: pt).monospacedDigit()))
+                t.shading = .color(c)
+                ctx.draw(t, at: p, anchor: anchor)
             }
-            ctx.stroke(Self.curvePath(points, standing: standing, latDatum: latDatum,
-                                      hatDatum: hatDatum, size: size),
-                       with: .color(SN.graphLine), lineWidth: 2.6)
+
+            for level in levels {
+                let absolute = level.role == .absoluteHigh || level.role == .absoluteLow
+                let ink = absolute ? SN.foam.opacity(0.42) : tint(level.role)
+                var line = Path()
+                line.move(to: CGPoint(x: axisX, y: level.y))
+                line.addLine(to: CGPoint(x: axisX + size.width * 0.21, y: level.y))
+                ctx.stroke(line, with: .color(ink), lineWidth: absolute ? 1.2 : 1.6)
+                // Extension line back to the chains, as thin as a drafting one.
+                var ext = Path()
+                ext.move(to: CGPoint(x: overallX - 8, y: level.y))
+                ext.addLine(to: CGPoint(x: axisX - 34, y: level.y))
+                ctx.stroke(ext, with: .color(ink.opacity(0.3)), lineWidth: 0.7)
+                write(level.label, ink, at: CGPoint(x: axisX + size.width * 0.225, y: level.y), .leading)
+                write(dimensionLabel(level.metres, imperial), ink,
+                      at: CGPoint(x: axisX - 40, y: level.y), .trailing, 10)
+            }
+
+            // The turn itself, the one thing on here that is not a reference.
+            if let selected = levels.first(where: { $0.role == .selected }) {
+                CurveDrawing.dot(ctx, at: CGPoint(x: axisX + 14, y: selected.y), color: tint(.selected))
+            }
+
+            for d in Self.dimensions(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
+                                     height: size.height, width: size.width, imperial: imperial) {
+                let x = d.isOverall ? overallX : chainX
+                let ink = d.isHeadline ? tint(.selected) : SN.foam.opacity(d.isOverall ? 0.5 : 0.4)
+                var line = Path()
+                line.move(to: CGPoint(x: x, y: d.fromY))
+                line.addLine(to: CGPoint(x: x, y: d.toY))
+                ctx.stroke(line, with: .color(ink), lineWidth: 0.9)
+                for y in [d.fromY, d.toY] {   // the architect's slash, not an arrowhead
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: x - 4, y: y + 4))
+                    tick.addLine(to: CGPoint(x: x + 4, y: y - 4))
+                    ctx.stroke(tick, with: .color(ink), lineWidth: 1.1)
+                }
+                // The value sits ON the dimension line, so punch the line out
+                // from behind it rather than letting the two overlap.
+                let mid = CGPoint(x: x, y: (d.fromY + d.toY) / 2)
+                ctx.fill(Path(CGRect(x: mid.x - 19, y: mid.y - 7, width: 38, height: 14)),
+                         with: .color(SN.canvas))
+                write(d.label, ink.opacity(1), at: mid, .center, 9.5)
+            }
         }
         .frame(height: boxHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.summary(levels: drawn, imperial: imperial))
     }
+}
+
+/// A measurement as the drawing prints it. Its own one-line declaration so
+/// TypeScaleTests' indirection key names the symbol its text walk computes —
+/// `dimensions`' signature spans two lines (see WidgetSnapshot.swift:normalize).
+private func dimensionLabel(_ metres: Double, _ imperial: Bool) -> String {
+    formatHeight(metres, imperial: imperial)
 }

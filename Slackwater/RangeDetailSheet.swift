@@ -24,7 +24,9 @@ struct RangeDetailSheet: View {
     /// Where the turn ahead stands among the fortnight's own turns, and the
     /// swing's heights to draw inside it. Nil before the scan lands.
     var standing: TideStanding? = nil
-    var points: [TidePoint] = []
+    /// Where this swing sits among the fortnight's swings — section 1's
+    /// subject, and a different judgement from `standing`'s.
+    var swing: SwingStanding? = nil
     var latDatum: Double? = nil
     var hatDatum: Double? = nil
     var imperial = false
@@ -51,15 +53,23 @@ struct RangeDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     head
-                    // The comparison is the content, so the drawing leads and
-                    // the sentences are its captions — except at a seasonal
-                    // station, the one kind where the prose has to land first.
-                    if let standing {
-                        group {
-                            StandingFigure(standing: standing, points: points,
-                                           latDatum: latDatum, hatDatum: hatDatum,
-                                           imperial: imperial)
-                                .padding(14)
+                    // Three questions, three figures. One figure answering all
+                    // three read as a conflation on screen: "how big is this
+                    // swing", "where does this turn sit between the station's
+                    // ends" and "when does this station see its extremes" are
+                    // different quantities on different axes.
+                    if let swing {
+                        section(String(localized: "Is this beyond normal?",
+                                       comment: "Range sheet section: how this swing compares with the fortnight's.")) {
+                            SwingFigure(standing: swing, onJump: onJump)
+                        }
+                        factRow(swingFact)
+                    }
+                    if let standing, latDatum != nil {
+                        section(String(localized: "Against this station's own ends",
+                                       comment: "Range sheet section: where this turn sits between the station's floor and ceiling.")) {
+                            StandingFigure(standing: standing, latDatum: latDatum,
+                                           hatDatum: hatDatum, imperial: imperial)
                         }
                         factRows
                     }
@@ -80,12 +90,43 @@ struct RangeDetailSheet: View {
         .presentationDetents([.medium, .large])
     }
 
+    /// A titled section: one question, one figure. The heading is what keeps
+    /// the three apart — without it the reader has to infer which quantity
+    /// each axis carries, which is the conflation this structure fixes.
+    @ViewBuilder private func section<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MonoLabel(text: title, color: SN.foam.opacity(0.55))
+            group { content().padding(14) }
+        }
+    }
+
+    /// Section 1's caption. Counts rather than a percentile: "all but three of
+    /// 58" is a fact a reader can picture, and "the 95th percentile" is not.
+    private var swingFact: StandingFact? {
+        guard let swing else { return nil }
+        let bigger = swing.all.filter { $0.height > swing.selectedHeight }.count
+        if bigger == 0 {
+            return StandingFact(text: String(localized: "The biggest swing of the fortnight.",
+                                             comment: "Range sheet caption."))
+        }
+        return StandingFact(
+            text: String(localized: "Bigger than all but \(bigger) of this fortnight's \(swing.all.count) swings.",
+                         comment: "Range sheet caption. Both values are counts of tide swings."),
+            jumpTo: swing.nextBigger?.time)
+    }
+
+    @ViewBuilder private func factRow(_ fact: StandingFact?) -> some View {
+        if let fact { rows([fact]) }
+    }
+
     /// The figure's captions. A fact with somewhere to go is a button that
     /// moves the scrubber and closes the sheet — the reader asked to see it,
     /// not to read about it.
-    @ViewBuilder private var factRows: some View {
+    @ViewBuilder private var factRows: some View { rows(facts) }
+
+    @ViewBuilder private func rows(_ items: [StandingFact]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(facts, id: \.text) { fact in
+            ForEach(items, id: \.text) { fact in
                 if let to = fact.jumpTo, let onJump {
                     Button {
                         onJump(to)

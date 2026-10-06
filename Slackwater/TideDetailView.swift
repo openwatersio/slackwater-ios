@@ -292,27 +292,18 @@ struct TideDetailView: View {
     /// number: a fortnight to rank this swing against, or water that follows a
     /// year. A station with neither keeps the inert tile it had.
     private func rangeDetail(jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
-        guard let range, record.seasonalRatio != nil || standing != nil else { return nil }
-        let place = record.name, ratio = record.seasonalRatio, standing = standing
-        let points = swingPoints, record = record
+        guard let range, record.seasonalRatio != nil || swingStanding != nil else { return nil }
+        let place = record.name, ratio = record.seasonalRatio
+        let standing = standing, swing = swingStanding, record = record
         let imperial = imperial, unit = unit, now = live
         return {
             AnyView(RangeDetailSheet(
                 value: range.value, direction: self.rangeDirection,
                 seasonalRatio: ratio, place: place,
-                standing: standing, points: points,
+                standing: standing, swing: swing,
                 latDatum: record.latDatum, hatDatum: record.hatDatum,
                 imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
         }
-    }
-
-    /// The heights of the swing the tile is describing — the extreme behind the
-    /// selection to the one ahead — which is what the figure draws inside the
-    /// fortnight's band. Already sampled by the timeline, so the sheet predicts
-    /// nothing of its own.
-    private var swingPoints: [TidePoint] {
-        guard let prev = prevExtreme, let next = nextExtreme else { return [] }
-        return timeline?.tidePoints.filter { $0.time >= prev.time && $0.time <= next.time } ?? []
     }
 
     private var leadState: String {

@@ -118,6 +118,11 @@ extension TypeScaleTests {
             // declaration precisely so this key names what the walk computes —
             // `standingFacts`' signature spans three lines (blind spot 2).
             "TideStanding.swift:gapSentence",
+            // The max/min figure's measured dimensions: built in `dimensions`
+            // and drawn by the same view's Canvas, whose text is resolved
+            // monospacedDigit. `dimensionLabel` is its own one-line
+            // declaration so this key names what the walk computes.
+            "StandingFigure.swift:dimensionLabel",
             // The fast tide's rate, consumed by `Commentary`'s Text, which
             // carries the mono trait (Theme.swift).
             "TideDetailView.swift:tideRateCommentary",
