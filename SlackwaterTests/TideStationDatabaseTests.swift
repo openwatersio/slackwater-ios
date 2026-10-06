@@ -43,6 +43,41 @@ final class TideStationDatabaseTests: XCTestCase {
         }
     }
 
+    /// The astronomical floor and ceiling reach the app the same way every
+    /// other field does — through the tcdb, not the JSON. gen-tides computes
+    /// the pair in JavaScript for stations.json (#315); the library computes it
+    /// again in Swift from the raw datums, rebasing to chart datum and reducing
+    /// a subordinate through its reference. This holds the two to each other,
+    /// so a divergence in either implementation fails here rather than shipping.
+    func testAstronomicalBoundsMatchTheGeneratedJSON() {
+        var compared = 0
+        for json in Self.json {
+            guard let tcdb = TideStationRecord.record(id: json.id) else { return XCTFail("\(json.id) missing") }
+            if let lat = json.latDatum, let hat = json.hatDatum {
+                XCTAssertEqual(tcdb.latDatum ?? .nan, lat, accuracy: 0.001, json.id)
+                XCTAssertEqual(tcdb.hatDatum ?? .nan, hat, accuracy: 0.001, json.id)
+                compared += 1
+            } else {
+                // Absence is a state, not a zero: the database withholds the
+                // pair where Sa and Ssa are both zero amplitude.
+                XCTAssertNil(tcdb.latDatum, json.id)
+            }
+        }
+        XCTAssertGreaterThan(compared, 4_700, "#315 ships bounds on 4,772 of 4,782")
+    }
+
+    /// A subordinate predicts through its reference and carries no datums of
+    /// its own in the tcdb, so bounds can only reach it if the reader resolves
+    /// the reference and reduces by the offsets. All 2,016 of them have bounds.
+    func testSubordinatesCarryReducedBounds() {
+        let subordinates = Self.json.filter { $0.reference != nil }
+        XCTAssertGreaterThan(subordinates.count, 2_000)
+        for json in subordinates.prefix(50) {
+            guard let tcdb = TideStationRecord.record(id: json.id) else { return XCTFail("\(json.id) missing") }
+            XCTAssertEqual(tcdb.latDatum ?? .nan, json.latDatum ?? .nan, accuracy: 0.001, json.id)
+        }
+    }
+
     /// Every 20th station, which reaches references and both kinds of
     /// subordinate offset, over one day of extremes.
     func testPredictionsMatchTheGeneratedJSON() {

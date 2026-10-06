@@ -28,6 +28,20 @@ struct TideStationRecord: Codable, Identifiable, Hashable, StationIdentity {
     /// stations.json only where it is true, and a non-optional `Bool` would make
     /// the synthesized decoder demand the key on all 4,409 records that omit it.
     var seasonalDominant: Bool? = nil
+    /// The floor and ceiling of this station's predictions, in metres above its
+    /// chart datum — the same frame as `TideExtreme.height`, so they compare
+    /// against a predicted extreme directly.
+    ///
+    /// Optional for the reason the fields above are, and because absence is a
+    /// real state rather than a gap: the database withholds LAT and HAT where
+    /// Sa and Ssa are both zero amplitude, since a seasonless constituent set
+    /// narrows the envelope instead of bounding it. That is every CHS on-device
+    /// fit and about a fifth of NOAA's harmonic references. `nil` means the
+    /// station cannot support an absolute claim; `0.0` means its floor IS chart
+    /// datum, which is true of 887 shipped stations — so nothing may read a
+    /// missing value as zero.
+    var latDatum: Double? = nil
+    var hatDatum: Double? = nil
 
     var isSubordinate: Bool { reference != nil }
 
