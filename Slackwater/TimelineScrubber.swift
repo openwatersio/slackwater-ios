@@ -124,7 +124,12 @@ struct TimelineScrubber: UIViewRepresentable {
     }
 
     func updateUIView(_ sv: UIScrollView, context: Context) {
-        let co = context.coordinator
+        updateUIView(sv, coordinator: context.coordinator)
+    }
+
+    func updateUIView(_ sv: UIScrollView, coordinator co: Coordinator) {
+        co.updatingView = true
+        defer { co.updatingView = false }
         ScrubTrace.record("update requested=\(scrubTime.timeIntervalSince1970) jump=\(jumpToken)", sv)
         co.parent = self
         // Rendered from the CURRENT offset; when a branch below moves the
@@ -242,6 +247,9 @@ struct TimelineScrubber: UIViewRepresentable {
         /// scroll callback it fires must not write `scrubTime` back from
         /// layout.
         var reanchoring = false
+        /// Applying SwiftUI's state can synchronously fire the scroll delegate,
+        /// including when loaded chunks move the timeline's left edge.
+        var updatingView = false
         /// Everything the drawn strip depends on — and notably NOT
         /// `scrubTime`. The canvas is the same picture at every offset: a pan
         /// moves it, it does not change it. Assigning `rootView` per scroll
@@ -406,8 +414,9 @@ struct TimelineScrubber: UIViewRepresentable {
         /// exact opening state slides to now. Any other state (for example a
         /// picked week after an online timeline reload) centres without an
         /// intro. Reduce Motion likewise lands directly on now.
-        func centerIfNeeded(_ sv: UIScrollView) {
+        func centerIfNeeded(_ sv: UIScrollView, animated: Bool = !landsInstantly) {
             guard !didInitialCenter, sv.bounds.width > 0 else { return }
+            defer { didInitialCenter = true }
             ScrubTrace.record("center", sv)
             let start = parent.scrubTime
             let isIntro = abs(start.timeIntervalSince(Timeline.introStart(for: parent.now))) < 2
@@ -416,13 +425,12 @@ struct TimelineScrubber: UIViewRepresentable {
             let destinationX = parent.data.x(destination) - sv.bounds.width / 2
 
             // Offset assignment can call the delegate synchronously. Keep
-            // `didInitialCenter` false until the opening position is in place,
-            // so layout never mutates SwiftUI state.
+            // `didInitialCenter` false through both opening offsets, including
+            // the instant landing, so layout never mutates SwiftUI state.
             sv.contentOffset = CGPoint(x: isIntro ? startX : destinationX, y: 0)
-            didInitialCenter = true
             laidOutWidth = sv.bounds.width
             guard isIntro else { return }
-            guard !landsInstantly else {
+            guard animated else {
                 sv.contentOffset = CGPoint(x: destinationX, y: 0)
                 Task { @MainActor [weak self] in self?.parent.scrubTime = destination }
                 return
@@ -467,7 +475,7 @@ struct TimelineScrubber: UIViewRepresentable {
             ScrubTrace.record("scroll", sv)
             publishCenter(sv)
             refreshCanvas(sv)
-            guard sv.bounds.width > 0, didInitialCenter, !reanchoring else { return }
+            guard sv.bounds.width > 0, didInitialCenter, !reanchoring, !updatingView else { return }
             parent.scrubTime = parent.data.time(atX: sv.contentOffset.x + sv.bounds.width / 2)
         }
         /// A touch during the opening slide leaves the scrubber exactly where
@@ -497,7 +505,10 @@ struct TimelineScrubber: UIViewRepresentable {
             magneting = false
             nudging = false
             // Park exactly on the stop, so readouts show the event's own time.
-            if let t = magnetTarget { magnetTarget = nil; parent.scrubTime = t }
+            if let t = magnetTarget {
+                magnetTarget = nil
+                if !updatingView { parent.scrubTime = t }
+            }
             syncGate(sv)
         }
 
