@@ -8,28 +8,65 @@
 // `seasonal_dominant` (slackwater-database#220). A Gulf port's range tile is
 // complete on its own and stays inert.
 import SwiftUI
+import SlackwaterKit
 
 struct RangeDetailSheet: View {
     /// The swing itself, exactly as the tile prints it: "0.1 ft".
     let value: String
     /// "low to high" or "high to low" — which way this swing runs.
     let direction: String
-    /// How many times the yearly change exceeds the largest tidal term.
-    let seasonalRatio: Double
+    /// How many times the yearly change exceeds the largest tidal term, at a
+    /// station the database flags seasonal. Nil everywhere else, which is most
+    /// of the bundle and now still opens this sheet.
+    var seasonalRatio: Double? = nil
     /// The place, so the sheet can name the water rather than say "this station".
     let place: String
+    /// Where the turn ahead stands among the fortnight's own turns, and the
+    /// swing's heights to draw inside it. Nil before the scan lands.
+    var standing: TideStanding? = nil
+    var points: [TidePoint] = []
+    var latDatum: Double? = nil
+    var hatDatum: Double? = nil
+    var imperial = false
+    var unit = "m"
+    var tz: TimeZone = .current
+    var now: Date = .now
+    /// Moves the scrubber to a tapped fact, the way the Moon sheet's facts
+    /// already do. A superlative you cannot go and look at is trivia.
+    var onJump: ((Date) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
-    private var leads: Bool { seasonalRatio >= TideStationRecord.seasonalLeadRatio }
+    private var leads: Bool { (seasonalRatio ?? 0) >= TideStationRecord.seasonalLeadRatio }
+
+    private var facts: [StandingFact] {
+        standing.map {
+            standingFacts($0, latDatum: latDatum, hatDatum: hatDatum, imperial: imperial,
+                          unit: unit, tz: tz, now: now)
+        } ?? []
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     head
-                    group { yearly }
-                    explanation
+                    // The comparison is the content, so the drawing leads and
+                    // the sentences are its captions — except at a seasonal
+                    // station, the one kind where the prose has to land first.
+                    if let standing {
+                        group {
+                            StandingFigure(standing: standing, points: points,
+                                           latDatum: latDatum, hatDatum: hatDatum,
+                                           imperial: imperial)
+                                .padding(14)
+                        }
+                        factRows
+                    }
+                    if seasonalRatio != nil {
+                        group { yearly }
+                        explanation
+                    }
                 }
                 .padding(20)
             }
@@ -41,6 +78,38 @@ struct RangeDetailSheet: View {
         // Three short paragraphs do not need the whole screen, and a sheet that
         // takes it reads as more alarming than the thing it explains.
         .presentationDetents([.medium, .large])
+    }
+
+    /// The figure's captions. A fact with somewhere to go is a button that
+    /// moves the scrubber and closes the sheet — the reader asked to see it,
+    /// not to read about it.
+    @ViewBuilder private var factRows: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(facts, id: \.text) { fact in
+                if let to = fact.jumpTo, let onJump {
+                    Button {
+                        onJump(to)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(fact.text)
+                            Image(systemName: "arrow.right.circle")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(SN.graphLine)
+                        .multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(fact.text).foregroundStyle(SN.foam.opacity(0.75))
+                }
+            }
+        }
+        // The facts carry formatted heights and day counts, so the digits are
+        // fixed-width here — `standingFacts` formats them and this is their one
+        // renderer (TypeScaleTests' known indirections records the pair).
+        .font(.callout.monospacedDigit())
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The number the tile showed, restated with what it is the difference
@@ -60,16 +129,17 @@ struct RangeDetailSheet: View {
     /// The comparison itself, as a row rather than a sentence: it is the one
     /// number a reader might carry away, and prose buries it.
     private var yearly: some View {
-        HStack(alignment: .firstTextBaseline) {
+        let ratio = seasonalRatio ?? 0
+        return HStack(alignment: .firstTextBaseline) {
             Text("Yearly change", comment: "Label for how much the water level moves across a year.")
                 .font(.callout)
                 .foregroundStyle(SN.foam.opacity(0.75))
             Spacer()
             // "about 1× the daily tide" is a number that says nothing, and at
             // the bottom of the band that is exactly what the ratio rounds to.
-            Text(seasonalTimes(seasonalRatio) == "1"
+            Text(seasonalTimes(ratio) == "1"
                  ? String(localized: "about the same as the daily tide", comment: "The annual swing is about the size of the daily tide.")
-                 : String(localized: "about \(seasonalTimes(seasonalRatio))× the daily tide", comment: "How much larger the annual swing is than the daily tide."))
+                 : String(localized: "about \(seasonalTimes(ratio))× the daily tide", comment: "How much larger the annual swing is than the daily tide."))
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.trailing)

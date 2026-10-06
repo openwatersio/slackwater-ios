@@ -81,6 +81,74 @@ struct TideStanding {
     }
 }
 
+/// One line of the sheet. `jumpTo` non-nil makes it a button that moves the
+/// scrubber, the way a tapped Moon fact already does.
+struct StandingFact: Equatable {
+    let text: String
+    var jumpTo: Date? = nil
+}
+
+/// What the sheet says beneath the figure.
+///
+/// The figure carries the comparison; these put numbers and names on it. Two
+/// tiers, and the second is absent rather than zeroed at a station whose
+/// constituents cannot bound a year — which is every CHS fit and about a fifth
+/// of NOAA's references. `latDatum` of exactly 0.0 is a floor, not a gap: 887
+/// shipped stations have one, because their chart datum IS LAT.
+func standingFacts(_ standing: TideStanding, latDatum: Double?, hatDatum: Double?,
+                   imperial: Bool, unit: String, tz: TimeZone, now: Date,
+                   calendar: Calendar = .current) -> [StandingFact] {
+    var cal = calendar
+    cal.timeZone = tz
+    let low = standing.selected.kind == .low
+    var out: [StandingFact] = []
+
+    if let next = standing.nextMoreExtreme {
+        // Calendar days in the station's zone, as `onlineDownloadValidity`
+        // counts them — "in 12 days" across a DST change is still 12 days.
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: standing.selected.time),
+                                      to: cal.startOfDay(for: next.time)).day ?? 0
+        out.append(StandingFact(
+            text: low
+                ? String(localized: "The next lower low is in \(days) days.",
+                         comment: "Sheet fact. The integer is a number of calendar days; vary by plural.")
+                : String(localized: "The next higher high is in \(days) days.",
+                         comment: "Sheet fact. The integer is a number of calendar days; vary by plural."),
+            jumpTo: next.time))
+    } else {
+        out.append(StandingFact(text: low
+            ? String(localized: "The lowest low of the fortnight.",
+                     comment: "Sheet fact: nothing within fifteen days either side goes lower.")
+            : String(localized: "The highest high of the fortnight.",
+                     comment: "Sheet fact: nothing within fifteen days either side goes higher.")))
+    }
+
+    // The end that matters: under a low it is the floor — how much water could
+    // still go away — and under a high it is the ceiling.
+    if low, let latDatum {
+        out.append(StandingFact(text: gapSentence(standing.selected.height - latDatum,
+                                                  low: true, imperial: imperial, unit: unit)))
+    } else if !low, let hatDatum {
+        out.append(StandingFact(text: gapSentence(hatDatum - standing.selected.height,
+                                                  low: false, imperial: imperial, unit: unit)))
+    }
+    return out
+}
+
+/// The distance to the station's own floor or ceiling, as a sentence.
+///
+/// Its own function, declared on one line, because TypeScaleTests' scanner
+/// attributes a `formatHeight(` call to the nearest declaration line that ENDS
+/// in a brace — and `standingFacts`' signature does not fit on one. The
+/// exception it registers has to name a symbol the scanner actually computes.
+private func gapSentence(_ gap: Double, low: Bool, imperial: Bool, unit: String) -> String {
+    low
+        ? String(localized: "\(formatHeight(gap, imperial: imperial)) \(unit) above the lowest water this station ever sees.",
+                 comment: "Sheet fact. Values are a formatted height and its unit.")
+        : String(localized: "\(formatHeight(gap, imperial: imperial)) \(unit) below the highest water this station ever sees.",
+                 comment: "Sheet fact. Values are a formatted height and its unit.")
+}
+
 /// The Range tile's one caption line, in precedence order.
 ///
 /// Three things want this line and only one fits. Seasonal first: at a lake or

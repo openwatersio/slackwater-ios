@@ -126,6 +126,42 @@ final class TideStandingTests: XCTestCase {
                        "high to low")
     }
 
+    // MARK: - The sheet's facts
+
+    private func facts(_ s: TideStanding, lat: Double?, hat: Double?) -> [StandingFact] {
+        standingFacts(s, latDatum: lat, hatDatum: hat, imperial: false, unit: "m",
+                      tz: station.tz, now: at)
+    }
+
+    /// The fact that makes the whole feature worth building: a superlative you
+    /// cannot go and look at is trivia.
+    func testTheNextBiggerOneIsTappable() {
+        let s = standings().plain
+        let fact = facts(s, lat: nil, hat: nil).first { $0.jumpTo != nil }
+        XCTAssertEqual(fact?.jumpTo, s.nextMoreExtreme?.time)
+    }
+
+    func testTheWindowExtremeSaysSoAndOffersNoJump() {
+        let marked = standings().marked
+        let spoken = facts(marked, lat: nil, hat: nil)
+        XCTAssertTrue(spoken.contains { $0.text.contains("lowest") && $0.jumpTo == nil })
+        XCTAssertFalse(spoken.contains { $0.jumpTo != nil }, "nothing in the window is lower")
+    }
+
+    /// Review Focus 1: the absolute facts are absent, not zero, where the
+    /// station's constituents cannot bound a year.
+    func testWithoutBoundsNoAbsoluteFactIsClaimed() {
+        let spoken = facts(standings().marked, lat: nil, hat: nil)
+        XCTAssertFalse(spoken.contains { $0.text.contains("ever") })
+    }
+
+    /// A station whose chart datum IS LAT ships latDatum exactly 0.0, and 887
+    /// of them do. Zero is a real floor, so the gap must still be stated.
+    func testAZeroFloorIsAFloorNotAMissingValue() {
+        let spoken = facts(standings().marked, lat: 0.0, hat: 5.4)
+        XCTAssertTrue(spoken.contains { $0.text.contains("ever") })
+    }
+
     /// The window is the station's local days, not the device's.
     func testTheWindowStartsAtStationLocalMidnight() {
         let w = TideStanding.window(around: at, tz: station.tz)

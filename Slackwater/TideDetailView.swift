@@ -147,7 +147,7 @@ struct TideDetailView: View {
                                         ChsDownloadNotice(stationID: record.id, end: coverage.upperBound, tz: tz)
                                     }
                                     SummaryTiles(primary: range,
-                                                 primaryDetail: rangeDetail,
+                                                 primaryDetail: rangeDetail(jump: jump),
                                                  primarySymbol: rangeSymbol,
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
@@ -280,13 +280,31 @@ struct TideDetailView: View {
             : String(localized: "high to low", comment: "Tide-range direction.")
     }
 
-    /// The Range tile's sheet, and the marker on the tile that says it is there.
-    /// Both appear only where the water is seasonal rather than tidal.
-    private var rangeDetail: (() -> AnyView)? {
-        guard let ratio = record.seasonalRatio, let range else { return nil }
-        let place = record.name
-        return { AnyView(RangeDetailSheet(value: range.value, direction: self.rangeDirection,
-                                          seasonalRatio: ratio, place: place)) }
+    /// The Range tile's sheet. It opens wherever there is something behind the
+    /// number: a fortnight to rank this swing against, or water that follows a
+    /// year. A station with neither keeps the inert tile it had.
+    private func rangeDetail(jump: @escaping (Date) -> Void) -> (() -> AnyView)? {
+        guard let range, record.seasonalRatio != nil || standing != nil else { return nil }
+        let place = record.name, ratio = record.seasonalRatio, standing = standing
+        let points = swingPoints, record = record
+        let imperial = imperial, unit = unit, now = live
+        return {
+            AnyView(RangeDetailSheet(
+                value: range.value, direction: self.rangeDirection,
+                seasonalRatio: ratio, place: place,
+                standing: standing, points: points,
+                latDatum: record.latDatum, hatDatum: record.hatDatum,
+                imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
+        }
+    }
+
+    /// The heights of the swing the tile is describing — the extreme behind the
+    /// selection to the one ahead — which is what the figure draws inside the
+    /// fortnight's band. Already sampled by the timeline, so the sheet predicts
+    /// nothing of its own.
+    private var swingPoints: [TidePoint] {
+        guard let prev = prevExtreme, let next = nextExtreme else { return [] }
+        return timeline?.tidePoints.filter { $0.time >= prev.time && $0.time <= next.time } ?? []
     }
 
     private var leadState: String {
