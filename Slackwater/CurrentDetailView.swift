@@ -111,7 +111,9 @@ struct CurrentDetailView: View {
                                     if let gate = provisionalGate {
                                         ChsDownloadNotice(stationID: gate.id, tz: tz, gate: gate)
                                     }
-                                    SummaryTiles(primary: lead(tl).nextMax, moon: sky.illumination,
+                                    SummaryTiles(primary: lead(tl).nextMax,
+                                                 primaryValueColor: provisionalGate != nil ? SN.amber : .white,
+                                                 moon: sky.illumination,
                                                  at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },

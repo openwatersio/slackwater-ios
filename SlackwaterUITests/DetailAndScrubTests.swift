@@ -376,6 +376,18 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         XCTAssert(todayRow.appears(within: 5), "today's rows should start expanded")
         XCTAssertGreaterThanOrEqual(tomorrowDay.frame.width, todayRow.frame.width - 1,
                                     "the day header should span the schedule with its chevron trailing")
+        let laterDay = app.buttons.matching(identifier: "schedule-day-d2").firstMatch
+        scrollTo(laterDay, in: app)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = formatter.timeZone
+        let later = calendar.date(byAdding: .day, value: 2, to: Self.fixtureDate)!
+        XCTAssert(laterDay.staticTexts[formatter.string(from: later)].exists,
+                  "a day beyond Tomorrow must show its date")
+        save(app, "schedule-dates.png")
     }
 
     // The fixed centerline stays put while the multi-day strip pans underneath.
@@ -823,7 +835,7 @@ final class DetailAndScrubTests: ScreenshotTestCase {
         report.tap()
         for subject in ["Station is in the wrong place",
                         "Station name or details are wrong",
-                        "Tide height looks wrong"] {
+                        "Predictions look wrong"] {
             XCTAssert(app.descendants(matching: .any)[subject].firstMatch.appears(within: 5),
                       "the report menu is missing: \(subject)")
         }

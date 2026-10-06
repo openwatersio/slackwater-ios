@@ -107,7 +107,7 @@ At a seasonally dominated station (§6.4), the caption reads "mostly seasonal" w
 
 ### 6.2 Next max (current and online gate)
 
-- **Value:** the speed of the next maximum after the selection, with "~" in front while the model is provisional.
+- **Value:** the speed of the next maximum after the selection, with "~" in front and attention amber ink while the model is provisional.
 - **Caption:** "Flood at <time>" or "Ebb at <time>".
 - **Inert.** Absent when no maximum follows.
 
@@ -191,7 +191,7 @@ Every kind also lists lunar and solar eclipses visible from the station, timed a
 
 Each day with at least one event gets a header. A day with no events gets none.
 
-- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday. Beneath it, the sunrise time in sunrise ink (`#F0D890`) and the sunset time in sunset ink (`#C8A86A`), each when the sun rises or sets that day.
+- **Left:** "Today", "Tomorrow", or "Yesterday" relative to the real today, otherwise the short weekday. A localized short date sits beneath the label. Beneath the date, the sunrise time in sunrise ink (`#F0D890`) and the sunset time in sunset ink (`#C8A86A`), each when the sun rises or sets that day.
 - **Right:** a chevron that turns over when the day is open.
 
 Only one day is open at a time. The anchor day starts open. Tapping an open day closes it; tapping another day opens it and closes the first.
@@ -204,7 +204,7 @@ Only one day is open at a time. The anchor day starts open. Tapping an open day 
 
 - **Time:** station-local clock, monospaced, at least 58 units wide.
 - **Value:** the height or speed, or "—" when there is none.
-- **Pill:** a 120-unit trailing column, wide enough for the eclipse label at accessibility sizes.
+- **Pill:** a trailing column at least 120 units wide. Long labels wrap at larger text sizes.
 
 | Pill | Glyph and word | Ink on fill |
 |---|---|---|
@@ -213,7 +213,8 @@ Only one day is open at a time. The anchor day starts open. Tapping an open day 
 | Flood | Set arrow, 16-point compass, FLOOD | Navy on flood `#4A9FD8` |
 | Ebb | Set arrow, 16-point compass, EBB | Navy on ebb `#E8A33D` |
 | Slack | Opposed arrows, SLACK | Navy on go `#88B868` |
-| Eclipse | 🌘 ECLIPSE | Foam on umbra `#6B2A18` |
+| Lunar eclipse | 🌘 ECLIPSE | Foam on umbra `#6B2A18` |
+| Solar eclipse | Sun, SOLAR ECLIPSE | Foam on umbra `#6B2A18` |
 
 Past rows are not dimmed. The highlight is the time cue.
 
@@ -264,7 +265,7 @@ The online gate's validity reads "Available offline for N more days", "Expires i
 
 ### 10.2 Report a problem
 
-A menu, "Concerns or Feedback", offers "Station is in the wrong place", "Station name or details are wrong", and "Tide height looks wrong". Each composes an email to slackwater@openwaters.io with a prompt, then "— details —", the station name and id, the selected moment with its time zone, the share link, and the app version. Without a mail app the message is copied and an alert says "Your report was copied. Send it to slackwater@openwaters.io."
+A menu, "Concerns or Feedback", offers "Station is in the wrong place", "Station name or details are wrong", and "Predictions look wrong". Each composes an email to slackwater@openwaters.io with a prompt, then "— details —", the station name and id, the selected moment with its time zone, the share link, and the app version. Without a mail app the message is copied and an alert titled "Mail unavailable" says "Your report was copied. Send it to slackwater@openwaters.io."
 
 ### 10.3 Station details
 
@@ -398,27 +399,29 @@ The Share button shares `https://slackwater.xyz/<tides|currents>/<slug>`. When t
 6. **One open day:** opening Wednesday closes Today; tapping Wednesday again closes it.
 7. **Row tap:** tapping a row moves the scrubber to that event, and the highlight lands on that row.
 8. **Re-anchor:** scrubbing past the end of the week and resting 600 ms moves the schedule to the selected day without moving the graph. The online gate's schedule stays put.
-9. **DST week:** the schedule still shows seven local days.
+9. **DST week:** the schedule still shows seven local days, each with its station-local date.
+10. **Eclipses:** lunar rows show 🌘 and "Eclipse"; solar rows show a sun and "Solar Eclipse".
 
 ### Picker and Now
 
-10. **Pick a week:** picking a date three weeks ahead moves the bar's range to start that day, centres local noon of that day, and shows the Now pill.
-11. **Return:** Now restores today's range and the current instant.
-12. **Date in the strip:** tapping a date in the scrubber's day row opens the picker; tapping a sunrise moves the scrubber.
+11. **Pick a week:** picking a date three weeks ahead moves the bar's range to start that day, centres local noon of that day, and shows the Now pill.
+12. **Return:** Now restores today's range and the current instant.
+13. **Date in the strip:** tapping a date in the scrubber's day row opens the picker; tapping a sunrise moves the scrubber.
 
 ### Tiles and links
 
-13. **Range follows the scrub:** moving across an extreme flips the caption between "low to high" and "high to low".
-14. **Seasonal station:** a seasonally dominated station's Range tile opens the Range sheet; an ordinary station's does not.
-15. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
-16. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
+14. **Provisional current:** the Next max value has a "~" and attention amber ink until the model is final.
+15. **Range follows the scrub:** moving across an extreme flips the caption between "low to high" and "high to low".
+16. **Seasonal station:** a seasonally dominated station's Range tile opens the Range sheet; an ordinary station's does not.
+17. **Moon jump:** choosing "Next full" in the Moon sheet closes it and moves the scrubber to that night.
+18. **Pushed link:** following "Tide at <port>" and pressing Back returns to the current page as it was.
 
 ### Waiting and sharing
 
-17. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
-18. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
-19. **Share at now:** sharing an untouched page shares the bare station link.
-20. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
+19. **Waiting page fills in:** a queued Canadian station shows its place in line and becomes the tide detail when its download finishes, without navigation.
+20. **Failed download:** shows "Retry"; retrying moves it to the front of the queue.
+21. **Share at now:** sharing an untouched page shares the bare station link.
+22. **Share a moment:** sharing after scrubbing a day ahead includes that instant in the station's offset, and opening the link lands on it.
 
 ## 19. Known iOS deviations from the intended contract
 
@@ -427,12 +430,7 @@ These are implementation gaps, not behavior to copy:
 - The share link compares the selection with the device clock rather than the page's reference now. On an untouched page left open for more than 200 seconds, Share includes an instant while the Now pill stays hidden.
 - Kartverket (Norwegian) tide stations show "TICON-4 harmonic prediction." in their footer; any tide station outside NOAA and CHS falls into that line.
 - The online gate's honesty path has no "Predictions — not for navigation" line and no report menu.
-- Solar eclipse rows use the lunar 🌘 glyph and the word "Eclipse".
-- A provisional Next max shows its "~" in white rather than attention amber.
-- The report menu offers "Tide height looks wrong" on current and derived-gate pages.
-- The no-mail alert is titled "No mail app" in the footer and "Mail unavailable" on the unavailable page.
 - Day disclosure animates under Reduce Motion, and so does the first-run tour's scroll.
-- A day header shows only the weekday, never the date, so days beyond "Tomorrow" are identified by the week bar alone.
 
 Fixing one of these should update this section and add or amend a conformance scenario.
 
