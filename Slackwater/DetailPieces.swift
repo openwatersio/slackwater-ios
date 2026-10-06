@@ -857,6 +857,7 @@ struct SummaryTiles: View {
     /// about moons, not about what makes one station's range worth explaining.
     var primaryDetail: (() -> AnyView)? = nil
     var primarySymbol: String? = nil
+    var primaryValueColor: Color = .white
     /// The illumination the SKY already computed, rather than a second lookup
     /// per frame for the same instant (#299).
     let moon: MoonIllumination?
@@ -896,7 +897,7 @@ struct SummaryTiles: View {
         HStack(alignment: .top, spacing: 12) {
             if let primary {
                 ReadoutTile(label: primary.label, caption: primary.caption,
-                            accessibility: primary.label, detail: primaryDetail) {
+                            valueColor: primaryValueColor, accessibility: primary.label, detail: primaryDetail) {
                     if let primarySymbol {
                         Image(systemName: primarySymbol).foregroundStyle(SN.foam.opacity(0.55))
                     }

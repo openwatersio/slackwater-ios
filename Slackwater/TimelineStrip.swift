@@ -1172,7 +1172,7 @@ func relativeDayLabel(_ dayStart: Date, _ tz: TimeZone, today: Date) -> String {
 // MARK: - Rolling multi-day schedule (prototype tableEl)
 
 enum SchedulePill {
-    case high, low, flood, ebb, slack, eclipse
+    case high, low, flood, ebb, slack, eclipse, solarEclipse
 }
 
 struct ScheduleEntry: Identifiable {
@@ -1202,7 +1202,7 @@ func eclipseEntries(_ tl: TimelineData) -> [ScheduleEntry] {
         .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
     let solar = tl.solarEclipses
         .filter { tl.scheduleRange.contains($0.start) }
-        .map { ScheduleEntry(time: $0.start, pill: .eclipse, value: chartTime($0.peak, tl.tz)) }
+        .map { ScheduleEntry(time: $0.start, pill: .solarEclipse, value: chartTime($0.peak, tl.tz)) }
     return lunar + solar
 }
 
@@ -1256,6 +1256,9 @@ struct MultiDaySchedule: View {
                             Text(relativeDayLabel(group.start, tz, today: today))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(SN.foam.opacity(0.9))
+                            Text(monthDay(group.start, tz))
+                                .font(.caption2)
+                                .foregroundStyle(SN.foam.opacity(0.55))
                             if let day = days.first(where: { $0.offset == group.offset }) {
                                 VStack(alignment: .leading, spacing: 1) {
                                     if let rise = day.sunrise {
@@ -1321,7 +1324,7 @@ struct MultiDaySchedule: View {
                                         .foregroundStyle(e.value == nil ? SN.foam.opacity(0.5) : .white)
                                     pillView(e)
                                         // Room for the eclipse label at accessibility sizes.
-                                        .frame(width: 120, alignment: .trailing)
+                                        .frame(minWidth: 120, alignment: .trailing)
                                 }
                                 .padding(.vertical, 9)
                                 .padding(.leading, 14)
@@ -1413,16 +1416,22 @@ struct MultiDaySchedule: View {
                 .foregroundStyle(SN.navyDeep)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background(SN.go, in: Capsule())
-        case .eclipse:
+        case .eclipse, .solarEclipse:
             // Copper, and light text on it rather than navy: this is the one
             // row in the list that is not about water. The KIND (partial,
             // total, penumbral) is deliberately absent — the column caps at
             // 100pt for "WSW FLOOD" and "🌘 PENUMBRAL ECLIPSE" does not fit.
             // The kind belongs to the Moon sheet, which has room for it.
             HStack(spacing: 3) {
-                Text(verbatim: "🌘")
-                    .accessibilityHidden(true)
-                Text("Eclipse")
+                if e.pill == .solarEclipse {
+                    Image(systemName: "sun.max.fill")
+                        .accessibilityHidden(true)
+                    Text("Solar Eclipse")
+                } else {
+                    Text(verbatim: "🌘")
+                        .accessibilityHidden(true)
+                    Text("Eclipse")
+                }
             }
                 .textCase(.uppercase)
                 .font(.caption2.monospaced().weight(.medium)).tracking(0.5)

@@ -32,6 +32,10 @@ final class ReportProblemTests: XCTestCase {
         XCTAssertTrue(body.contains(link.absoluteString), body)
     }
 
+    func testPredictionSubjectFitsTidesCurrentsAndGates() {
+        XCTAssertEqual(ReportKind.height.subject, "Predictions look wrong")
+    }
+
     func testSubjectIsTheKind() throws {
         for kind in ReportKind.allCases {
             let url = try XCTUnwrap(reportMailURL(kind: kind, stationID: station,
