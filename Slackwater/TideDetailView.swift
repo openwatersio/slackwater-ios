@@ -14,6 +14,10 @@ struct TideDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    /// The ±15-day scan the Range tile's mark and its sheet both read. One per
+    /// station, loaded off the main actor, deliberately not re-anchored by the
+    /// scrub — see `TideStandingStore`.
+    @State private var standings = TideStandingStore()
     @State private var previewTimeline: TimelineData?
     @State private var displayedPreview: ChsTidePreview?
     @State private var previewGate = ScrollGate()
@@ -144,9 +148,7 @@ struct TideDetailView: View {
                                     }
                                     SummaryTiles(primary: range,
                                                  primaryDetail: rangeDetail,
-                                                 // A year, which is what the tile is
-                                                 // flagging: this water follows one.
-                                                 primarySymbol: record.seasonalRatio == nil ? nil : "calendar",
+                                                 primarySymbol: rangeSymbol,
                                                  moon: sky.illumination, at: scrubTime,
                                                  eclipse: tl.eclipses.first { $0.underway(at: scrubTime) },
                                                  solarEclipse: tl.solarEclipses.first { $0.underway(at: scrubTime) },
@@ -207,6 +209,10 @@ struct TideDetailView: View {
                     previewTimeline = nil
                     chsFittedAt = record.isChs ? ChsModelStore.load(record.id)?.fittedAt : nil
                 }
+                // After the timeline, never before it: the strip is what the
+                // reader is waiting for, and this scan only feeds a tile
+                // caption and the sheet behind it.
+                await standings.load(record: record, around: live)
             }
             .onChange(of: scrubTime) { _, t in
                 if let coverage = activePreview?.coverage {
@@ -242,11 +248,29 @@ struct TideDetailView: View {
         guard let prev = prevExtreme, let next = nextExtreme else { return nil }
         return (String(localized: "Range", comment: "Tide-range summary label."),
                 "\(formatHeight(abs(next.height - prev.height), imperial: imperial)) \(unit)",
-                // At a seasonal station the caption gives up the direction for
-                // the reason the number is small. The direction is the lesser
-                // fact — the curve and the schedule both show it — and a tile
-                // caption is one line, so the two cannot both be here.
-                record.seasonalRatio.map(seasonalCaption) ?? rangeDirection)
+                // One line, three claimants: `rangeCaption` owns the order.
+                rangeCaption(record: record, standing: standing, direction: rangeDirection))
+    }
+
+    /// Where the turn this swing is heading for sits among the fortnight's
+    /// own turns. The turn AHEAD rather than the one behind: a reader deciding
+    /// whether to go now is asking about the water they will arrive in, which
+    /// is the same reason a current's tile reads its next maximum.
+    private var standing: TideStanding? {
+        nextExtreme.flatMap(standings.standing(at:))
+    }
+
+    /// The glyph beside the tile's label. A calendar where the water follows a
+    /// year, otherwise a to-bar arrow for a marked turn — the same `⤒`/`⤓`
+    /// sense the strip uses at a high and a low, pointing at the limit the
+    /// water is reaching rather than at the direction it is moving.
+    ///
+    /// Seasonal outranks the mark here for the reason it outranks it in the
+    /// caption: it changes how the whole screen should be read.
+    private var rangeSymbol: String? {
+        if record.seasonalRatio != nil { return "calendar" }
+        guard let standing, standing.marks else { return nil }
+        return standing.selected.kind == .high ? "arrow.up.to.line" : "arrow.down.to.line"
     }
 
     /// Which way this swing runs, when there is nothing more pressing to say.

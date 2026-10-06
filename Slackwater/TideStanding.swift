@@ -80,3 +80,20 @@ struct TideStanding {
                 .min { $0.time < $1.time })
     }
 }
+
+/// The Range tile's one caption line, in precedence order.
+///
+/// Three things want this line and only one fits. Seasonal first: at a lake or
+/// a river reach, "this number is not really a tide" outranks "this one is
+/// big", and a reader who does not know the first will misread the second.
+/// Then the standing, the rarer and more useful fact. Then the direction, which
+/// is the lesser fact — the curve and the schedule both already show it.
+func rangeCaption(record: TideStationRecord, standing: TideStanding?, direction: String) -> String {
+    if let ratio = record.seasonalRatio { return seasonalCaption(ratio) }
+    guard let standing, standing.marks else { return direction }
+    return standing.selected.kind == .high
+        ? String(localized: "highest in a fortnight",
+                 comment: "Tide-range caption: this high leads the surrounding month.")
+        : String(localized: "lowest in a fortnight",
+                 comment: "Tide-range caption: this low leads the surrounding month.")
+}

@@ -89,6 +89,43 @@ final class TideStandingTests: XCTestCase {
         XCTAssertEqual(store.extremes.map(\.time), first)
     }
 
+    // MARK: - The Range tile's caption
+
+    /// Real standings rather than fixtures: the caption rule is only
+    /// interesting against tides that actually rank where they claim to.
+    private func standings() -> (marked: TideStanding, plain: TideStanding) {
+        let all = windowExtremes(at)
+        let lows = all.filter { $0.kind == .low }.sorted { $0.height < $1.height }
+        return (TideStanding.at(lows[0], among: all)!,
+                TideStanding.at(lows[lows.count / 2], among: all)!)
+    }
+
+    /// Three claimants, one line. Seasonal wins: at a lake, "this number is
+    /// not really a tide" outranks "this one is big".
+    func testSeasonalCaptionOutranksTheStanding() {
+        let seasonal = TideStationRecord.record(id: "ticon/algonac_mi-9014070-usa-noaa")!
+        XCTAssertNotNil(seasonal.seasonalRatio, "fixture station lost its flag")
+        XCTAssertEqual(rangeCaption(record: seasonal, standing: standings().marked, direction: "low to high"),
+                       seasonalCaption(seasonal.seasonalRatio!))
+    }
+
+    func testAMarkedLowTakesTheCaptionFromTheDirection() {
+        XCTAssertEqual(rangeCaption(record: station, standing: standings().marked, direction: "low to high"),
+                       String(localized: "lowest in a fortnight"))
+    }
+
+    func testAnUnmarkedTideKeepsItsDirection() {
+        XCTAssertEqual(rangeCaption(record: station, standing: standings().plain, direction: "low to high"),
+                       "low to high")
+    }
+
+    /// A station whose scan has not landed yet, or one too sparse to rank,
+    /// says the ordinary thing rather than nothing.
+    func testNoStandingKeepsTheDirection() {
+        XCTAssertEqual(rangeCaption(record: station, standing: nil, direction: "high to low"),
+                       "high to low")
+    }
+
     /// The window is the station's local days, not the device's.
     func testTheWindowStartsAtStationLocalMidnight() {
         let w = TideStanding.window(around: at, tz: station.tz)
