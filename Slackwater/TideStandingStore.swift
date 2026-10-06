@@ -31,6 +31,26 @@ import SlackwaterKit
         loaded = record.id
     }
 
+    /// The year, scanned only when the sheet that shows it opens.
+    ///
+    /// Twelve months of `extremes()` is the most expensive thing this feature
+    /// does — #217's engine note measures ~0.2 s on a Mac, so budget about a
+    /// second on a phone. The tile never pays for it: nothing on the tile reads
+    /// a month, and a reader who does not open the sheet never asks the
+    /// question this answers.
+    private(set) var months: [YearFigure.Month] = []
+    private var loadedYear: String?
+
+    func loadYear(record: TideStationRecord, around date: Date) async {
+        guard loadedYear != record.id, record.latDatum != nil else { return }
+        let w = TideStanding.yearWindow(around: date, tz: record.tz)
+        let station = record.engineStation, tz = record.tz
+        months = await Task.detached(priority: .userInitiated) {
+            YearFigure.months(station.extremes(from: w.start, to: w.end), tz: tz, window: w)
+        }.value
+        loadedYear = record.id
+    }
+
     func standing(at extreme: TideExtreme) -> TideStanding? {
         TideStanding.at(extreme, among: extremes)
     }

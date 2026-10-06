@@ -64,8 +64,13 @@ struct StandingFigure: View {
     /// station has one, otherwise the fortnight's own band, which then becomes
     /// the outermost thing and fills the box rather than leaving the figure
     /// huddled in the middle of an axis nothing bounds.
+    /// Room above the top line and below the bottom one for their labels,
+    /// which sit beside the line and would otherwise be clipped by the card.
+    static let verticalInset: CGFloat = 10
+
     static func levels(standing: TideStanding, latDatum: Double?, hatDatum: Double?,
-                       height: CGFloat, width: CGFloat = 320, imperial: Bool = false) -> [Level] {
+                       height rawHeight: CGFloat, width: CGFloat = 320, imperial: Bool = false) -> [Level] {
+        let height = Swift.max(rawHeight - verticalInset * 2, 1)
         // The band sits inside the frame so the nesting is visible as nesting
         // rather than as four lines of equal weight.
         let band = Swift.max(width - bandInset * 2, curveInset * 3)
@@ -74,7 +79,7 @@ struct StandingFigure: View {
         let lo = latDatum.map { Swift.min($0, bandLow) } ?? bandLow
         let hi = hatDatum.map { Swift.max($0, bandHigh) } ?? bandHigh
         let span = Swift.max(hi - lo, 0.01)
-        func y(_ h: Double) -> CGFloat { height - CGFloat((h - lo) / span) * height }
+        func y(_ h: Double) -> CGFloat { verticalInset + height - CGFloat((h - lo) / span) * height }
 
         var out: [Level] = []
         if let hatDatum {
@@ -122,9 +127,10 @@ struct StandingFigure: View {
             out[out.count - 1] = Level(
                 role: keep.role, metres: keep.metres, y: keep.y,
                 width: Swift.max(last.width, level.width),
-                label: String(localized: "\(last.label), and \(level.label)",
-                              comment: "Figure label where two levels are too close to draw apart."),
-                isMerged: true)
+                // Only the surviving level's own name. Spelling both out makes
+                // a run-on that overflows the column, and when the survivor is
+                // the selected turn the caption beneath already says the rest.
+                label: keep.label, isMerged: true)
         }
         return out
     }
@@ -153,14 +159,15 @@ struct StandingFigure: View {
     /// Empty without bounds: there is nothing absolute to measure against, and
     /// a chain drawn off the fortnight alone would imply one.
     static func dimensions(standing: TideStanding, latDatum: Double?, hatDatum: Double?,
-                           height: CGFloat, width: CGFloat = 320, imperial: Bool) -> [Dimension] {
+                           height rawHeight: CGFloat, width: CGFloat = 320, imperial: Bool) -> [Dimension] {
         guard let latDatum, let hatDatum else { return [] }
+        let height = Swift.max(rawHeight - verticalInset * 2, 1)
         let low = standing.selected.kind == .low
         let bandLow = standing.windowLowest.height
         let bandHigh = standing.windowHighest.height
         let lo = Swift.min(latDatum, bandLow), hi = Swift.max(hatDatum, bandHigh)
         let span = Swift.max(hi - lo, 0.01)
-        func y(_ h: Double) -> CGFloat { height - CGFloat((h - lo) / span) * height }
+        func y(_ h: Double) -> CGFloat { verticalInset + height - CGFloat((h - lo) / span) * height }
 
         let far = low ? bandHigh : bandLow
         let members = ([latDatum, standing.selected.height, far, hatDatum]).sorted()
@@ -210,8 +217,10 @@ struct StandingFigure: View {
             // level name at 9.5pt needs about 40% of the card's width, so the
             // axis sits left of centre rather than on it.
             let axisX = size.width * 0.42
-            let chainX = size.width * 0.27
-            let overallX = size.width * 0.15
+            // Far enough left that a dimension's end ticks never cross the
+            // level values sitting just inboard of the axis.
+            let chainX = size.width * 0.20
+            let overallX = size.width * 0.07
             let levels = Self.levels(standing: standing, latDatum: latDatum, hatDatum: hatDatum,
                                      height: size.height, width: size.width, imperial: imperial)
 
@@ -232,12 +241,12 @@ struct StandingFigure: View {
                 ctx.stroke(line, with: .color(ink), lineWidth: absolute ? 1.2 : 1.6)
                 // Extension line back to the chains, as thin as a drafting one.
                 var ext = Path()
-                ext.move(to: CGPoint(x: overallX - 8, y: level.y))
-                ext.addLine(to: CGPoint(x: axisX - 30, y: level.y))
+                ext.move(to: CGPoint(x: overallX - 6, y: level.y))
+                ext.addLine(to: CGPoint(x: axisX - 34, y: level.y))
                 ctx.stroke(ext, with: .color(ink.opacity(0.3)), lineWidth: 0.7)
                 write(level.label, ink, at: CGPoint(x: axisX + size.width * 0.165, y: level.y), .leading)
                 write(dimensionLabel(level.metres, imperial), ink,
-                      at: CGPoint(x: axisX - 36, y: level.y), .trailing, 10)
+                      at: CGPoint(x: axisX - 6, y: level.y), .trailing, 10)
             }
 
             // The turn itself, the one thing on here that is not a reference.

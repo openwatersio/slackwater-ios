@@ -27,6 +27,9 @@ struct RangeDetailSheet: View {
     /// Where this swing sits among the fortnight's swings — section 1's
     /// subject, and a different judgement from `standing`'s.
     var swing: SwingStanding? = nil
+    /// Twelve months of monthly extremes — section 3. Empty until the sheet's
+    /// own scan lands, and empty for good where the station has no bounds.
+    var months: [YearFigure.Month] = []
     var latDatum: Double? = nil
     var hatDatum: Double? = nil
     var imperial = false
@@ -82,6 +85,20 @@ struct RangeDetailSheet: View {
                                            hatDatum: hatDatum, imperial: imperial)
                         }
                         factRows
+                    }
+                    if months.count > 1 {
+                        section(String(localized: "When this station runs biggest",
+                                       comment: "Range sheet section: the months this station sees its extremes.")) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                YearFigure(months: months, now: now, tz: tz, imperial: imperial)
+                                if let widest = YearFigure.standout(months).first {
+                                    Text("Widest around \(monthName(widest.start, tz: tz)).",
+                                         comment: "Caption under the year figure. The value is a month name.")
+                                        .font(.caption)
+                                        .foregroundStyle(SN.foam.opacity(0.5))
+                                }
+                            }
+                        }
                     }
                     if seasonalRatio != nil {
                         group { yearly }

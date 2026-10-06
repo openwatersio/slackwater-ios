@@ -213,6 +213,9 @@ struct TideDetailView: View {
                 // reader is waiting for, and this scan only feeds a tile
                 // caption and the sheet behind it.
                 await standings.load(record: record, around: live)
+                // The year costs about a second and only the sheet shows it,
+                // so it comes after the fortnight and never blocks the strip.
+                await standings.loadYear(record: record, around: live)
             }
             .onChange(of: scrubTime) { _, t in
                 if let coverage = activePreview?.coverage {
@@ -295,12 +298,13 @@ struct TideDetailView: View {
         guard let range, record.seasonalRatio != nil || swingStanding != nil else { return nil }
         let place = record.name, ratio = record.seasonalRatio
         let standing = standing, swing = swingStanding, record = record
+        let months = standings.months
         let imperial = imperial, unit = unit, now = live
         return {
             AnyView(RangeDetailSheet(
                 value: range.value, direction: self.rangeDirection,
                 seasonalRatio: ratio, place: place,
-                standing: standing, swing: swing,
+                standing: standing, swing: swing, months: months,
                 latDatum: record.latDatum, hatDatum: record.hatDatum,
                 imperial: imperial, unit: unit, tz: record.tz, now: now, onJump: jump))
         }

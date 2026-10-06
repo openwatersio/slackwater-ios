@@ -59,6 +59,21 @@ struct TideStanding {
                 cal.date(byAdding: .day, value: halfWindowDays, to: day) ?? date)
     }
 
+    /// Twelve whole calendar months around a date, in the station's own zone.
+    ///
+    /// Whole months rather than six months either side of the day: a window cut
+    /// mid-month leaves a half-month at each end whose extremes are shallower
+    /// than that month's really are, which draws as a seasonal signal that is
+    /// only an artefact of where the cut fell.
+    static func yearWindow(around date: Date, tz: TimeZone,
+                           calendar: Calendar = .current) -> (start: Date, end: Date) {
+        var cal = calendar
+        cal.timeZone = tz
+        let month = cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
+        let start = cal.date(byAdding: .month, value: -6, to: month) ?? date
+        return (start, cal.date(byAdding: .month, value: 12, to: start) ?? date)
+    }
+
     /// Nil when the window cannot support a ranking: fewer than two same-kind
     /// extremes, or no high or no low to bound the band with.
     static func at(_ selected: TideExtreme, among extremes: [TideExtreme]) -> TideStanding? {
