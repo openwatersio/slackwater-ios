@@ -66,6 +66,7 @@ struct RangeDetailSheet: View {
                                        comment: "Range sheet section: how this swing compares with the fortnight's.")) {
                             VStack(alignment: .leading, spacing: 6) {
                                 SwingFigure(standing: swing, tz: tz, onJump: onJump)
+                                    .accessibilityIdentifier("range-section-swings")
                                 // The bars are days and the caption counts
                                 // swings, so the series has to say which it is
                                 // — at a mixed station the marked day's
@@ -83,6 +84,7 @@ struct RangeDetailSheet: View {
                                        comment: "Range sheet section: where this turn sits between the station's floor and ceiling.")) {
                             StandingFigure(standing: standing, latDatum: latDatum,
                                            hatDatum: hatDatum, imperial: imperial)
+                                .accessibilityIdentifier("range-section-ends")
                         }
                         factRows
                     }
@@ -91,6 +93,7 @@ struct RangeDetailSheet: View {
                                        comment: "Range sheet section: the months this station sees its extremes.")) {
                             VStack(alignment: .leading, spacing: 6) {
                                 YearFigure(months: months, now: now, tz: tz, imperial: imperial)
+                                    .accessibilityIdentifier("range-section-year")
                                 if let widest = YearFigure.standout(months).first {
                                     Text("Widest around \(monthName(widest.start, tz: tz)).",
                                          comment: "Caption under the year figure. The value is a month name.")
@@ -168,6 +171,7 @@ struct RangeDetailSheet: View {
                         .multilineTextAlignment(.leading)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("range-jump")
                 } else {
                     Text(fact.text).foregroundStyle(SN.foam.opacity(0.75))
                 }
