@@ -19,6 +19,9 @@ struct CurrentLead: View {
     var ink: Color = .white
     /// A fast answer marks every number with a tilde and paints them amber.
     var provisional = false
+    /// Where the next maximum stands among its own direction's maxima over the
+    /// fortnight. Nil on an online gate, which has no fortnight to rank against.
+    var standing: PeakStanding? = nil
 
     private var phase: CurrentPhase { currentPhase(signed: signed) }
     private var isSlack: Bool { timeline.containingSlackWindow(at: scrubTime) != nil || phase == .slack }
@@ -76,9 +79,17 @@ struct CurrentLead: View {
             .min(by: { $0.time < $1.time }) else { return nil }
         return (String(localized: "Next max", comment: "Current summary label for the next maximum speed."),
                 "\(tilde)\(formatSpeed(abs(e.speed), unit: speedUnit))\u{00a0}\(speedUnitLabel(speedUnit))",
-                e.kind == .maxFlood
-                    ? String(localized: "Flood at \(chartTime(e.time, tz))", comment: "Current summary caption. The value is a localized time.")
-                    : String(localized: "Ebb at \(chartTime(e.time, tz))", comment: "Current summary caption. The value is a localized time."))
+                maxCaption(standing: standing, kind: e.kind, time: chartTime(e.time, tz)))
+    }
+
+    /// The maximum the tile is describing, and where it stands among its own
+    /// direction's. Nil until the scan lands, and on an online gate for good:
+    /// its detail holds about nine and a half days and a fortnight either side
+    /// needs thirty.
+    var nextMaxEvent: CurrentEvent? {
+        timeline.currentEvents
+            .filter { $0.kind != .slack && $0.time > scrubTime }
+            .min { $0.time < $1.time }
     }
 
     /// At a max the water is at its fastest; otherwise it is flooding or

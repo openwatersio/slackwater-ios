@@ -45,6 +45,9 @@ struct CurrentDetailView: View {
     @State private var scrubTime = Timeline.introStart(for: appNow())
     /// Chunk cache + merged window + governed y-scale (TimelineChunks.swift).
     @State private var store: TimelineWindowStore?
+    /// The fortnight of maxima the Next max tile's mark and its sheet read.
+    /// One scan per station, off the main actor — see `CurrentStandingStore`.
+    @State private var standings = CurrentStandingStore()
     /// The local midnight the schedule week hangs from. `returnToNow`, the
     /// picker, and the settle-follow below move it.
     @State private var anchor = Date.distantPast
@@ -70,9 +73,14 @@ struct CurrentDetailView: View {
     /// Engine-exact velocity under the centerline, the same call the
     /// committed readout has always made.
     private func lead(_ tl: TimelineData, ink: Color = .white) -> CurrentLead {
-        CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
-                    floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
-                    speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
+        var l = CurrentLead(timeline: tl, scrubTime: scrubTime, now: live, signed: exactSigned(at: scrubTime),
+                            floodDeg: record.floodDirection, ebbDeg: record.ebbDirection,
+                            speedUnit: speedUnit, tz: tz, ink: ink, provisional: provisionalGate != nil)
+        // The tile ranks the maximum it prints, against its own direction's.
+        l.standing = l.nextMaxEvent.flatMap {
+            standings.standing(speed: $0.speed, time: $0.time, kind: $0.kind)
+        }
+        return l
     }
 
     var body: some View {
@@ -173,6 +181,14 @@ struct CurrentDetailView: View {
                 if r.isChs { chsModel = ChsModelStore.loadCurrent(r.id) }
             }
             .onChange(of: slackWindowSpeed) { _, _ in resetStore(focus: scrubTime) }
+            // After the strip, never before it: the scan only feeds a tile
+            // caption and the sheet behind it, and the curve is what the
+            // reader is waiting for.
+            .task(id: record.id) {
+                await standings.load(record: record, around: live)
+                // The year costs about a second and only the sheet shows it.
+                await standings.loadYear(record: record, around: live)
+            }
     }
 
     // MARK: - Colour
